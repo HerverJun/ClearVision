@@ -1,0 +1,42 @@
+using Acme.Product.Core.Entities;
+
+namespace Acme.Product.Core.Interfaces;
+
+/// <summary>
+/// 检测结果仓储接口
+/// </summary>
+public interface IInspectionResultRepository : IRepository<InspectionResult>
+{
+    /// <summary>
+    /// 根据工程ID获取结果列表
+    /// </summary>
+    Task<IEnumerable<InspectionResult>> GetByProjectIdAsync(Guid projectId, int pageIndex = 0, int pageSize = 20);
+
+    /// <summary>
+    /// 根据时间范围获取结果
+    /// </summary>
+    Task<IEnumerable<InspectionResult>> GetByTimeRangeAsync(Guid projectId, DateTime startTime, DateTime endTime);
+
+    /// <summary>
+    /// 获取统计信息
+    /// </summary>
+    Task<InspectionStatistics> GetStatisticsAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null);
+
+    /// <summary>
+    /// 获取缺陷分布统计
+    /// </summary>
+    Task<Dictionary<Enums.DefectType, int>> GetDefectDistributionAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null);
+}
+
+/// <summary>
+/// 检测统计信息
+/// </summary>
+public class InspectionStatistics
+{
+    public int TotalCount { get; set; }
+    public int OKCount { get; set; }
+    public int NGCount { get; set; }
+    public int ErrorCount { get; set; }
+    public double OKRate { get; set; }
+    public double AverageProcessingTimeMs { get; set; }
+}

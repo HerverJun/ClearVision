@@ -1,0 +1,407 @@
+## 清除视觉 - Git 忽略文件
+## 参考: https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
+
+# 用户特定文件
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# 用户特定文件 (MonoDevelop/Xamarin Studio)
+*.userprefs
+
+# 构建结果
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio 2015/2017 缓存/选项目录
+.vs/
+
+# Visual Studio 2017 自动生成的文件
+Generated\ Files/
+
+# MSTest 测试结果
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# NUnit
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+
+# 构建结果
+[Dd]ebugPS/
+[Rr]eleasePS/
+dlldata.c
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# StyleCop
+StyleCopReport.xml
+
+# 文件
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.tlog
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# Visual C++ 缓存文件
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Visual Studio 分析器
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Visual Studio Trace Files
+*.e2e
+
+# TFS 2012 本地工作区
+$tf/
+
+# 工具安装目录
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# TeamCity 是构建工具
+_TeamCity*
+
+# DotCover 是代码覆盖工具
+*.dotCover
+
+# AxoCover 是代码覆盖工具
+.axoCover/*
+!.axoCover/settings.json
+
+# Coverlet 是代码覆盖工具
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Visual Studio 代码覆盖结果
+*.coverage
+*.coveragexml
+
+# NCrunch
+_NCrunch_*
+.*crunch*.local.xml
+nCrunchTemp_*
+
+# MightyMoose
+*.mm.*
+AutoTest.Net/
+
+# Web 工作台 (sass)
+.sass-cache/
+
+# Installshield 输出文件夹
+[Ee]xpress/
+
+# DocProject
+DocProject/buildhelp/
+DocProject/Help/*.HxT
+DocProject/Help/*.HxC
+DocProject/Help/*.hhc
+DocProject/Help/*.hhk
+DocProject/Help/*.hhp
+DocProject/Help/Html2
+DocProject/Help/html
+
+# Click-Once 目录
+publish/
+
+# 发布 Web 输出
+*.[Pp]ublish.xml
+*.azurePubxml
+# 注意: 取消注释下一行以忽略 Web 部署设置文件
+# *.pubxml
+*.publishproj
+
+# Microsoft Azure Web App 发布设置
+PublishScripts/
+
+# NuGet 包
+*.nupkg
+# NuGet 符号包
+*.snupkg
+# 包文件夹
+**/[Pp]ackages/*
+# 但保留构建文件夹
+!**/[Pp]ackages/build/
+# 取消注释如有必要
+#!**/[Pp]ackages/repositories.config
+# NuGet v3 的 project.json 产生更少的可忽略文件
+*.nuget.props
+*.nuget.targets
+
+# Microsoft Azure Build 输出
+csx/
+*.build.csdef
+
+# Microsoft Azure 模拟器
+ecf/
+rcf/
+
+# Windows 应用商店应用包目录和文件
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx
+*.appxbundle
+*.appxupload
+
+# Visual Studio 缓存文件
+# 以缓存文件结尾的文件
+*.[Cc]ache
+# 但保留目录
+!?*.[Cc]ache/
+
+# 其他
+ClientBin/
+~$*
+*~
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.pfx
+*.publishsettings
+orleans.codegen.cs
+
+# 备份和报告文件
+_UpgradeReport_Files/
+Backup*/
+UpgradeLog*.XML
+UpgradeLog*.htm
+ServiceFabricBackup/
+*.rptproj.bak
+
+# SQL Server 文件
+*.mdf
+*.ldf
+*.ndf
+
+# Business Intelligence 项目
+*.rdl.data
+*.bim.layout
+*.bim_*.settings
+*.rptproj.rsuser
+*- [Bb]ackup.rdl
+*- [Bb]ackup ([0-9]).rdl
+*- [Bb]ackup ([0-9][0-9]).rdl
+
+# Microsoft Fakes
+FakesAssemblies/
+
+# GhostDoc 插件设置文件
+*.GhostDoc.xml
+
+# Node.js 工具
+node_modules/
+
+# Visual Studio 6 构建日志
+*.plg
+
+# Visual Studio 6 工作区选项文件
+*.opt
+
+# Visual Studio 6 自动生成的工作区文件
+*.vbw
+
+# Visual Studio 6 自动生成的项目文件
+*.vbp
+
+# Visual Studio 6 工作区和项目文件
+*.dsw
+*.dsp
+
+# Visual Studio 6 技术文件
+*.ncb
+*.aps
+
+# Visual Studio LightSwitch 构建输出
+**/*.HTMLClient/GeneratedArtifacts
+**/*.DesktopClient/GeneratedArtifacts
+**/*.DesktopClient/ModelManifest.xml
+**/*.Server/GeneratedArtifacts
+**/*.Server/ModelManifest.xml
+_Pvt_Extensions
+
+# Paket 依赖管理器
+.paket/paket.exe
+paket-files/
+
+# FAKE - F# Make
+.fake/
+
+# CodeRush 个人设置
+.cr/personal
+
+# Python 工具
+__pycache__/
+*.pyc
+
+# Cake 工具
+[Cc]ake/
+
+# 本地 History for Visual Studio
+.localhistory/
+
+# Visual Studio History (VSHistory) files
+.vshistory/
+
+# BeatPulse 健康检查临时数据库
+healthchecksdb
+
+# 备份文件夹
+Backup/
+
+# Ionide (跨平台 F# VS Code 工具) 工作区文件夹
+.ionide/
+
+# Fody - 自动生成的 XML 序列化
+FodyWeavers.xsd
+
+# VS Code 文件
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# 本地 History for Visual Studio Code
+.history/
+
+# Windows Installer 文件
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Windows 快捷方式
+*.lnk
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# ===========================
+# 清除视觉 - 特定忽略项
+# ===========================
+
+# 图像缓存和临时文件
+**/ImageCache/
+**/TempImages/
+**/Cache/
+*.tmp.jpg
+*.tmp.png
+*.tmp.bmp
+*.cache.img
+
+# 深度学习模型文件 (大文件)
+**/*.onnx
+**/*.pb
+**/*.h5
+**/*.pth
+**/*.pt
+**/*.caffemodel
+**/*.weights
+**/models/*.bin
+**/models/*.param
+
+# 训练数据集 (大文件)
+**/datasets/
+**/TrainingData/
+**/Samples/Large/
+
+# 检测结果和日志
+**/InspectionLogs/
+**/Results/Images/
+**/Results/Data/
+**/Logs/
+*.log
+
+# 相机 SDK 和驱动
+**/CameraSDK/
+**/Drivers/
+
+# 配置文件 (可能包含敏感信息)
+# appsettings.Development.json
+# appsettings.Local.json
+# *.secrets.json
+
+# 发布输出
+**/publish/
+**/out/
+**/dist/
+
+# 前端构建输出
+**/wwwroot/dist/
+**/wwwroot/build/
+**/node_modules/
+
+# 测试输出
+**/TestResults/
+**/coverage/
+
+# 临时文件
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

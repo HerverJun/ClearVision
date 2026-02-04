@@ -1,0 +1,39 @@
+:root {
+    /* 主题颜色 */
+    --primary-color: #1890ff;
+    --primary-hover: #40a9ff;
+    --success-color: #52c41a;
+    --warning-color: #faad14;
+    --error-color: #f5222d;
+    
+    /* 背景颜色 */
+    --bg-primary: #141414;
+    --bg-secondary: #1f1f1f;
+    --bg-tertiary: #2a2a2a;
+    --bg-hover: #2c2c2c;
+    
+    /* 文字颜色 */
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #707070;
+    
+    /* 边框颜色 */
+    --border-color: #434343;
+    --border-light: #303030;
+    
+    /* 尺寸 */
+    --toolbar-height: 48px;
+    --sidebar-width: 280px;
+    --status-bar-height: 28px;
+    --panel-padding: 12px;
+    
+    /* 字体 */
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-size-small: 12px;
+    --font-size-normal: 14px;
+    --font-size-large: 16px;
+    
+    /* 过渡 */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+}

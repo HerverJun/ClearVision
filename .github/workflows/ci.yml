@@ -1,0 +1,55 @@
+name: ClearVision CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore Dependencies
+      run: dotnet restore Acme.Product/Acme.Product.sln
+
+    - name: Build (Debug)
+      run: dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore
+
+    - name: Test
+      run: dotnet test Acme.Product/Acme.Product.sln --configuration Debug --no-build --verbosity normal
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install UI Test Dependencies
+      working-directory: Acme.Product/tests/Acme.Product.UI.Tests
+      run: |
+        npm ci
+        npx playwright install --with-deps chromium
+
+    - name: Run UI Tests
+      working-directory: Acme.Product/tests/Acme.Product.UI.Tests
+      run: npx playwright test
+
+    - name: Publish (Release)
+      run: dotnet publish Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj -c Release -r win-x64 --self-contained true -o ./publish
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ClearVision-Build
+        path: ./publish

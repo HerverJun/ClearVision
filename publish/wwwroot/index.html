@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClearVision - 工业视觉检测软件</title>
+    <link rel="stylesheet" href="src/shared/styles/variables.css">
+    <link rel="stylesheet" href="src/shared/styles/main.css">
+    <link rel="stylesheet" href="src/shared/styles/ui-components.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部工具栏 -->
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <h1 class="logo">ClearVision</h1>
+                <nav class="main-nav">
+                    <button class="nav-btn" data-view="project">工程</button>
+                    <button class="nav-btn active" data-view="flow">流程</button>
+                    <button class="nav-btn" data-view="inspection">检测</button>
+                    <button class="nav-btn" data-view="results">结果</button>
+                </nav>
+            </div>
+            <div class="toolbar-right">
+                <button id="btn-save" class="btn btn-primary">保存</button>
+                <button id="btn-run" class="btn btn-success">运行</button>
+                <button id="btn-settings" class="btn btn-icon">⚙️</button>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 左侧面板 -->
+            <aside class="sidebar left">
+                <div class="panel">
+                    <h3 class="panel-title">算子库</h3>
+                    <div class="operator-library" id="operator-library">
+                        <!-- 算子列表将动态加载 -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 中间工作区 -->
+            <section class="workspace">
+                <!-- 流程编辑器 -->
+                <div class="flow-editor-container" id="flow-editor">
+                    <canvas id="flow-canvas"></canvas>
+                </div>
+
+                <!-- 图像查看器（默认隐藏） -->
+                <div class="image-viewer-container hidden" id="image-viewer"></div>
+            </section>
+
+            <!-- 右侧面板 -->
+            <aside class="sidebar right">
+                <div class="panel">
+                    <h3 class="panel-title">属性</h3>
+                    <div class="property-panel" id="property-panel">
+                        <p class="empty-text">选择一个算子查看属性</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3 class="panel-title">结果</h3>
+                    <div class="results-panel" id="results-panel">
+                        <div class="result-summary">
+                            <span class="result-ok">OK: 0</span>
+                            <span class="result-ng">NG: 0</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- 底部状态栏 -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span id="status-text">就绪</span>
+            </div>
+            <div class="status-right">
+                <span id="project-name">未命名工程</span>
+                <span id="version">v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 加载核心模块 -->
+    <script type="module" src="src/core/messaging/webMessageBridge.js"></script>
+    <script type="module" src="src/core/messaging/httpClient.js"></script>
+    <script type="module" src="src/core/state/store.js"></script>
+    <script type="module" src="src/core/canvas/flowCanvas.js"></script>
+    <script type="module" src="src/core/canvas/imageCanvas.js"></script>
+    
+    <!-- 加载功能模块 -->
+    <script type="module" src="src/features/operator-library/operatorLibrary.js"></script>
+    <script type="module" src="src/features/image-viewer/imageViewer.js"></script>
+    <script type="module" src="src/features/inspection/inspectionController.js"></script>
+    <script type="module" src="src/features/results/resultPanel.js"></script>
+    
+    <!-- 加载主应用 -->
+    <script type="module" src="src/app.js"></script>
+</body>
+</html>

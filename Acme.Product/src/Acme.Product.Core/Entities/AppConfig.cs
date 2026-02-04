@@ -1,0 +1,104 @@
+namespace Acme.Product.Core.Entities;
+
+/// <summary>
+/// 应用程序全局配置
+/// </summary>
+public class AppConfig
+{
+    /// <summary>
+    /// 常规设置
+    /// </summary>
+    public GeneralConfig General { get; set; } = new();
+    
+    /// <summary>
+    /// 硬件通讯设置
+    /// </summary>
+    public CommunicationConfig Communication { get; set; } = new();
+    
+    /// <summary>
+    /// 数据存储设置
+    /// </summary>
+    public StorageConfig Storage { get; set; } = new();
+    
+    /// <summary>
+    /// 运行时参数
+    /// </summary>
+    public RuntimeConfig Runtime { get; set; } = new();
+}
+
+public class GeneralConfig
+{
+    /// <summary>
+    /// 软件标题（显示于工厂/产线名称）
+    /// </summary>
+    public string SoftwareTitle { get; set; } = "ClearVision 检测站";
+    
+    /// <summary>
+    /// 界面主题：dark / light
+    /// </summary>
+    public string Theme { get; set; } = "dark";
+    
+    /// <summary>
+    /// 是否开机自启动
+    /// </summary>
+    public bool AutoStart { get; set; } = false;
+}
+
+public class CommunicationConfig
+{
+    /// <summary>
+    /// PLC IP 地址
+    /// </summary>
+    public string PlcIpAddress { get; set; } = "192.168.1.100";
+    
+    /// <summary>
+    /// PLC 端口号
+    /// </summary>
+    public int PlcPort { get; set; } = 502;
+    
+    /// <summary>
+    /// 通讯协议：ModbusTcp / TcpSocket
+    /// </summary>
+    public string Protocol { get; set; } = "ModbusTcp";
+    
+    /// <summary>
+    /// 心跳检测间隔（毫秒）
+    /// </summary>
+    public int HeartbeatIntervalMs { get; set; } = 1000;
+}
+
+public class StorageConfig
+{
+    /// <summary>
+    /// 图片保存根目录
+    /// </summary>
+    public string ImageSavePath { get; set; } = @"D:\VisionData\Images";
+    
+    /// <summary>
+    /// 保存策略：All / NgOnly / None
+    /// </summary>
+    public string SavePolicy { get; set; } = "NgOnly";
+    
+    /// <summary>
+    /// 图片保留天数（超过后自动清理）
+    /// </summary>
+    public int RetentionDays { get; set; } = 30;
+    
+    /// <summary>
+    /// 磁盘空间下限阈值（GB），低于此值时强制清理
+    /// </summary>
+    public int MinFreeSpaceGb { get; set; } = 5;
+}
+
+public class RuntimeConfig
+{
+    /// <summary>
+    /// 软件启动后是否自动开始检测
+    /// </summary>
+    public bool AutoRun { get; set; } = false;
+    
+    /// <summary>
+    /// 连续 NG 停机阈值（0 = 不启用）
+    /// </summary>
+    public int StopOnConsecutiveNg { get; set; } = 0;
+}

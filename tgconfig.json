@@ -1,0 +1,5 @@
+{
+  "assemblies": [
+    "Acme.Product/src/Acme.Product.Application/bin/Debug/net8.0/Acme.Product.Application.dll"
+  ]
+}
