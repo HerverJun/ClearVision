@@ -1,6 +1,7 @@
 using Acme.Product.Contracts.Messages;
 using Acme.Product.Core.Services;
 using Acme.Product.Desktop.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -13,21 +14,18 @@ namespace Acme.Product.Desktop.Handlers;
 /// </summary>
 public class WebMessageHandler
 {
-    private readonly IFlowExecutionService _flowExecutionService;
-    private readonly IInspectionService _inspectionService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOperatorFactory _operatorFactory;
     private readonly ILogger<WebMessageHandler> _logger;
     private WebView2? _webViewControl;
     private CoreWebView2? _webView;
 
     public WebMessageHandler(
-        IFlowExecutionService flowExecutionService,
-        IInspectionService inspectionService,
+        IServiceScopeFactory scopeFactory,
         IOperatorFactory operatorFactory,
         ILogger<WebMessageHandler> logger)
     {
-        _flowExecutionService = flowExecutionService;
-        _inspectionService = inspectionService;
+        _scopeFactory = scopeFactory;
         _operatorFactory = operatorFactory;
         _logger = logger;
     }
@@ -37,6 +35,9 @@ public class WebMessageHandler
     /// </summary>
     public void Initialize(WebView2 webViewControl)
     {
+        if (webViewControl?.CoreWebView2 == null)
+            throw new InvalidOperationException("WebView2 content is not initialized.");
+
         _webViewControl = webViewControl;
         _webView = webViewControl.CoreWebView2;
         _webView.WebMessageReceived += OnWebMessageReceived;
@@ -135,6 +136,10 @@ public class WebMessageHandler
 
         try
         {
+            // 创建 Scope
+            using var scope = _scopeFactory.CreateScope();
+            var flowService = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
+
             // 创建算子实例
             var op = _operatorFactory.CreateOperator(
                 Enum.Parse<Core.Enums.OperatorType>(command.OperatorId.ToString()),
@@ -142,7 +147,7 @@ public class WebMessageHandler
                 0, 0);
 
             // 执行算子
-            var result = await _flowExecutionService.ExecuteOperatorAsync(op, command.Inputs);
+            var result = await flowService.ExecuteOperatorAsync(op, command.Inputs);
 
             // 发送结果事件
             var eventData = new OperatorExecutedEvent
@@ -210,6 +215,10 @@ public class WebMessageHandler
 
         try
         {
+            // 创建 Scope
+            using var scope = _scopeFactory.CreateScope();
+            var inspectionService = scope.ServiceProvider.GetRequiredService<IInspectionService>();
+
             byte[]? imageData = null;
 
             if (!string.IsNullOrEmpty(command.ImageBase64))
@@ -219,8 +228,8 @@ public class WebMessageHandler
 
             // 执行检测
             var result = imageData != null
-                ? await _inspectionService.ExecuteSingleAsync(command.ProjectId, imageData)
-                : await _inspectionService.ExecuteSingleAsync(command.ProjectId, command.CameraId ?? "default");
+                ? await inspectionService.ExecuteSingleAsync(command.ProjectId, imageData)
+                : await inspectionService.ExecuteSingleAsync(command.ProjectId, command.CameraId ?? "default");
 
             // 发送检测完成事件
             var eventData = new InspectionCompletedEvent
@@ -262,7 +271,9 @@ public class WebMessageHandler
     /// </summary>
     private async Task HandleStopInspectionCommand()
     {
-        await _inspectionService.StopRealtimeInspectionAsync();
+        using var scope = _scopeFactory.CreateScope();
+        var inspectionService = scope.ServiceProvider.GetRequiredService<IInspectionService>();
+        await inspectionService.StopRealtimeInspectionAsync();
         _logger.LogInformation("[WebMessageHandler] 检测已停止");
     }
 
@@ -376,3 +387,4 @@ public class WebMessageHandler
         }
     }
 }
+

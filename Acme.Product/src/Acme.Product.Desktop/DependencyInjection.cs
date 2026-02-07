@@ -31,25 +31,25 @@ public static class DependencyInjection
         var loggerFactory = SerilogConfiguration.ConfigureSerilog();
         services.AddSingleton<ILoggerFactory>(loggerFactory);
 
-        // 数据库 - 使用 Singleton 生命周期以支持其他 Singleton 服务
+        // 数据库 - 使用 Scoped 生命周期（EF Core DbContext 不是线程安全的）
         services.AddDbContext<VisionDbContext>(options =>
         {
             options.UseSqlite("Data Source=vision.db");
-        }, ServiceLifetime.Singleton, ServiceLifetime.Singleton);
+        });
 
-        // 仓储 - 全部使用 Singleton 以支持单线程桌面应用
-        services.AddSingleton(typeof(IRepository<>), typeof(RepositoryBase<>));
-        services.AddSingleton<IProjectRepository, ProjectRepository>();
-        services.AddSingleton<IOperatorRepository, OperatorRepository>();
-        services.AddSingleton<IInspectionResultRepository, InspectionResultRepository>();
-        services.AddSingleton<IImageCacheRepository, ImageCacheRepository>();
+        // 仓储 - 使用 Scoped 生命周期（DbContext 是 Scoped，Repository 也必须是 Scoped 或 Transient）
+        services.AddScoped(typeof(IRepository<>), typeof(RepositoryBase<>));
+        services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IOperatorRepository, OperatorRepository>();
+        services.AddScoped<IInspectionResultRepository, InspectionResultRepository>();
+        services.AddSingleton<IImageCacheRepository, ImageCacheRepository>(); // 缓存可以是 Singleton
 
         // 应用服务
-        services.AddSingleton<ProjectService>();
-        services.AddSingleton<IInspectionService, InspectionService>();
+        services.AddScoped<ProjectService>();
+        services.AddScoped<IInspectionService, InspectionService>();
 
         // 领域服务
-        services.AddSingleton<IFlowExecutionService, FlowExecutionService>();
+        services.AddScoped<IFlowExecutionService, FlowExecutionService>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
 
         // 算子执行器
@@ -62,12 +62,13 @@ public static class DependencyInjection
         services.AddSingleton<IOperatorExecutor, TemplateMatchOperator>();
         services.AddSingleton<IOperatorExecutor, FindContoursOperator>();
         services.AddSingleton<IOperatorExecutor, MeasureDistanceOperator>();
+        services.AddSingleton<IOperatorExecutor, ResultOutputOperator>();
 
         // 应用服务 - Sprint 4新增
-        services.AddSingleton<IOperatorService, OperatorService>();
-        services.AddSingleton<IImageAcquisitionService, ImageAcquisitionService>();
-        services.AddSingleton<DemoProjectService>();
-        services.AddSingleton<IResultAnalysisService, ResultAnalysisService>();
+        services.AddScoped<IOperatorService, OperatorService>();
+        services.AddScoped<IImageAcquisitionService, ImageAcquisitionService>();
+        services.AddScoped<DemoProjectService>();
+        services.AddScoped<IResultAnalysisService, ResultAnalysisService>();
 
         // 相机
         services.AddSingleton<ICameraManager, CameraManager>();

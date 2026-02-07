@@ -199,6 +199,13 @@ class SettingsModal {
                             <option value="light" ${general.theme === 'light' ? 'selected' : ''}>亮色模式</option>
                         </select>
                     </div>
+                    <div class="settings-row">
+                        <div>
+                            <div class="settings-label">皮肤风格</div>
+                            <div class="settings-hint">切换整套 UI 皮肤 (需重新加载)</div>
+                        </div>
+                        <button id="btn-open-launcher" class="cv-btn cv-btn-secondary" style="width: auto; padding: 4px 12px;">切换皮肤</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -361,6 +368,16 @@ class SettingsModal {
                 }
             });
         });
+
+        // 绑定切换皮肤按钮
+        const launcherBtn = this.modalOverlay.querySelector('#btn-open-launcher');
+        if (launcherBtn) {
+            launcherBtn.addEventListener('click', () => {
+                if (confirm('切换皮肤需要重新加载页面，确定继续吗？')) {
+                    window.location.href = 'launcher.html';
+                }
+            });
+        }
     }
     
     /**

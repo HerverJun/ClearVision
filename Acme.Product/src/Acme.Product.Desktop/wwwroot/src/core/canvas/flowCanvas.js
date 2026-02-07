@@ -106,19 +106,40 @@ class FlowCanvas {
     }
 
     /**
+     * 生成UUID
+     */
+    generateUUID() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    /**
      * 添加节点
      */
     addNode(type, x, y, config = {}) {
         const node = {
-            id: `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: this.generateUUID(),
             type,
             x,
             y,
             width: 140,
             height: 60,
             title: config.title || type,
-            inputs: config.inputs || [],
-            outputs: config.outputs || [],
+            inputs: (config.inputs || []).map(p => ({
+                id: p.id || this.generateUUID(),
+                name: p.name,
+                type: p.type
+            })),
+            outputs: (config.outputs || []).map(p => ({
+                id: p.id || this.generateUUID(),
+                name: p.name,
+                type: p.type
+            })),
             color: config.color || '#1890ff',
             ...config
         };
@@ -149,7 +170,7 @@ class FlowCanvas {
      */
     addConnection(sourceId, sourcePort, targetId, targetPort) {
         const connection = {
-            id: `conn_${Date.now()}`,
+            id: this.generateUUID(),
             source: sourceId,
             sourcePort,
             target: targetId,
@@ -609,6 +630,189 @@ class FlowCanvas {
         }
 
         this._animationFrameId = requestAnimationFrame(() => this.render());
+    }
+
+    /**
+     * 序列化流程数据 - 适配后端 DTO (camelCase)
+     * 后端 Program.cs 配置 JsonNamingPolicy.CamelCase，所以必须使用小驼峰
+     */
+    serialize() {
+        // 构建 Operators 列表 (camelCase)
+        const operators = Array.from(this.nodes.values()).map(node => ({
+            id: node.id,
+            name: node.title,
+            type: node.type,
+            x: node.x,
+            y: node.y,
+            inputPorts: (node.inputs || []).map(p => ({
+                id: p.id || this.generateUUID(),
+                name: p.name,
+                dataType: p.type || 0, // PortDataType enum
+                direction: 0, // Input
+                isRequired: false
+            })),
+            outputPorts: (node.outputs || []).map(p => ({
+                id: p.id || this.generateUUID(),
+                name: p.name,
+                dataType: p.type || 0,
+                direction: 1, // Output
+                isRequired: false
+            })),
+            parameters: node.parameters || [],
+            isEnabled: true
+        }));
+
+        // 构建 Connections 列表 (camelCase)
+        console.log('[DEBUG serialize] === START SERIALIZE ===');
+        console.log('[DEBUG serialize] Raw connections count:', this.connections.length);
+        console.log('[DEBUG serialize] Raw connections:', JSON.stringify(this.connections, null, 2));
+        console.log('[DEBUG serialize] Nodes in canvas:', Array.from(this.nodes.keys()));
+        
+        const connections = this.connections
+            .filter(conn => {
+                // 过滤掉无效的连接（source 或 target 为空、undefined 或空GUID）
+                const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
+                const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
+                if (!isValidSource || !isValidTarget) {
+                    console.warn(`[DEBUG serialize] 过滤掉无效连接: source=${conn.source}, target=${conn.target}`);
+                }
+                return isValidSource && isValidTarget;
+            })
+            .map(conn => {
+                const sourceNode = this.nodes.get(conn.source);
+                const targetNode = this.nodes.get(conn.target);
+
+                console.log(`[DEBUG serialize] Processing connection: source=${conn.source}, target=${conn.target}`);
+                console.log(`[DEBUG serialize]   sourceNode exists: ${!!sourceNode}, targetNode exists: ${!!targetNode}`);
+
+                // 查找端口 ID
+                const sourcePortId = sourceNode?.outputs[conn.sourcePort]?.id;
+                const targetPortId = targetNode?.inputs[conn.targetPort]?.id;
+
+                console.log(`[DEBUG serialize]   sourcePortId: ${sourcePortId}, targetPortId: ${targetPortId}`);
+
+                const result = {
+                    id: conn.id,
+                    sourceOperatorId: conn.source,
+                    sourcePortId: sourcePortId || this.generateUUID(),
+                    targetOperatorId: conn.target,
+                    targetPortId: targetPortId || this.generateUUID()
+                };
+
+                console.log(`[DEBUG serialize]   Serialized connection:`, JSON.stringify(result));
+                return result;
+            });
+
+        // UpdateFlowRequest 期望的结构 (camelCase 会被后端自动映射)
+        const result = {
+            operators: operators,
+            connections: connections
+        };
+        
+        console.log('[DEBUG serialize] === FINAL SERIALIZED DATA ===');
+        console.log('[DEBUG serialize] Operators count:', operators.length);
+        console.log('[DEBUG serialize] Operator IDs:', operators.map(o => o.id));
+        console.log('[DEBUG serialize] Connections count:', connections.length);
+        console.log('[DEBUG serialize] Connections:', JSON.stringify(connections, null, 2));
+        console.log('[DEBUG serialize] === END SERIALIZE ===');
+        
+        return result;
+    }
+
+    /**
+     * 反序列化流程数据
+     */
+    deserialize(data) {
+        this.clear();
+
+        // Handle both lowercase (frontend) and uppercase (backend) keys for lists
+        const operators = data.operators || data.Operators || data.nodes || [];
+        const connections = data.connections || data.Connections || [];
+
+        if (operators) {
+            operators.forEach(op => {
+                // Adapt backend DTO (PascalCase) or frontend (camelCase) to frontend node
+                const id = op.id || op.Id;
+                const type = op.type || op.Type;
+                const title = op.name || op.Name || op.title || type;
+                
+                const node = {
+                    id: id,
+                    type: type, 
+                    x: op.x || op.X || 0,
+                    y: op.y || op.Y || 0,
+                    width: 140,
+                    height: 60,
+                    title: title,
+                    inputs: op.inputPorts || op.InputPorts || op.inputs || [],
+                    outputs: op.outputPorts || op.OutputPorts || op.outputs || [],
+                    parameters: op.parameters || op.Parameters || [],
+                    color: '#1890ff' // Default
+                };
+
+                // Restore color logic based on type
+                if (node.type === 'ImageAcquisition') node.color = '#52c41a';
+                if (node.type === 'ResultOutput') node.color = '#595959';
+                
+                this.nodes.set(node.id, node);
+            });
+        }
+
+        if (connections) {
+            this.connections = connections.map(conn => {
+                // Adapt backend DTO (PascalCase) or frontend (camelCase)
+                const id = conn.id || conn.Id;
+                const sourceId = conn.sourceOperatorId || conn.SourceOperatorId || conn.source;
+                const targetId = conn.targetOperatorId || conn.TargetOperatorId || conn.target;
+
+                const sourcePortId = conn.sourcePortId || conn.SourcePortId;
+                const targetPortId = conn.targetPortId || conn.TargetPortId;
+
+                const sourceNode = this.nodes.get(sourceId);
+                const targetNode = this.nodes.get(targetId);
+
+                let sourcePortIndex = conn.sourcePort || 0;
+                let targetPortIndex = conn.targetPort || 0;
+
+                // Find index by Port ID if available (Backend/DTO usually provides IDs)
+                if (sourcePortId && sourceNode && sourceNode.outputs) {
+                    // Note: Node outputs might be objects with 'Id' or 'id' depending on how they were deserialized above
+                    // But we simply copied the array. Let's check the array content structure if it came from DTO
+                    // DTO InputPorts/OutputPorts have 'Id'. Frontend 'inputs/outputs' have 'id'.
+                    // We need to handle that map above?
+                    // Actually, in 'node' construction above, we assigned 'inputs' directly.
+                    // If it came from DTO, the objects inside have 'Id', 'Name', etc.
+                    // If it came from frontend, they have 'id', 'name'.
+                    // We should normalize ports too?
+                    // For now, let's just find by checking both 'id' and 'Id'.
+                    const idx = sourceNode.outputs.findIndex(p => (p.id === sourcePortId) || (p.Id === sourcePortId));
+                    if (idx !== -1) sourcePortIndex = idx;
+                }
+
+                if (targetPortId && targetNode && targetNode.inputs) {
+                    const idx = targetNode.inputs.findIndex(p => (p.id === targetPortId) || (p.Id === targetPortId));
+                    if (idx !== -1) targetPortIndex = idx;
+                }
+
+                return {
+                    id: id,
+                    source: sourceId,
+                    sourcePort: sourcePortIndex,
+                    target: targetId,
+                    targetPort: targetPortIndex
+                };
+            }).filter(conn => {
+                // 过滤掉无效的连接（source 或 target 为空、undefined 或空GUID）
+                const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
+                const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
+                if (!isValidSource || !isValidTarget) {
+                    console.warn('[FlowCanvas] 过滤掉无效连接:', conn);
+                }
+                return isValidSource && isValidTarget;
+            });
+        }
+
+        this.render();
     }
 
     /**

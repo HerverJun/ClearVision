@@ -137,18 +137,8 @@ public sealed class WebView2Host : IAsyncDisposable
         // 【科学方案一】开发环境禁用HTTP缓存，确保CSS/JS修改实时生效
 #if DEBUG
         // 通过请求拦截器添加Cache-Control头
-        core.WebResourceRequested += (sender, e) =>
-        {
-            // 只处理CSS和JS文件
-            if (e.Request.Uri.EndsWith(".css") || e.Request.Uri.EndsWith(".js"))
-            {
-                // 添加无缓存头
-                var headers = e.Request.Headers;
-                // 注：WebView2 WebResourceRequested不支持直接修改请求头
-                // 我们通过添加查询参数的方式实现缓存清除
-            }
-        };
-        
+        core.WebResourceRequested += OnWebResourceRequested;
+
         // 更可靠的方法：在导航时清除缓存
         _ = ClearCacheAsync();
         System.Diagnostics.Debug.WriteLine("[WebView2Host] DEBUG模式：已清除缓存并禁用HTTP缓存");
@@ -324,12 +314,12 @@ public sealed class WebView2Host : IAsyncDisposable
         // 使用与 Program.cs 相同的逻辑查找 wwwroot
         var wwwrootPath = GetWwwRootPath();
 
-        var indexPath = Path.Combine(wwwrootPath, "index.html");
+        var indexPath = Path.Combine(wwwrootPath, "launcher.html");
 
         if (File.Exists(indexPath))
         {
             // 使用虚拟主机名加载，支持ES6模块
-            _webView.Source = new Uri("http://app.local/index.html");
+            _webView.Source = new Uri("http://app.local/launcher.html");
         }
         else
         {
@@ -456,7 +446,7 @@ public sealed class WebView2Host : IAsyncDisposable
         try
         {
             var profile = _webView.CoreWebView2.Profile;
-            
+
             // 清除所有类型的缓存数据
             await profile.ClearBrowsingDataAsync(
                 CoreWebView2BrowsingDataKinds.DiskCache |           // 磁盘缓存
@@ -464,7 +454,7 @@ public sealed class WebView2Host : IAsyncDisposable
                 CoreWebView2BrowsingDataKinds.AllDomStorage |       // DOM存储
                 CoreWebView2BrowsingDataKinds.AllSite               // 站点数据
             );
-            
+
             System.Diagnostics.Debug.WriteLine("[WebView2Host] 缓存已清除");
         }
         catch (Exception ex)
@@ -485,10 +475,10 @@ public sealed class WebView2Host : IAsyncDisposable
 
         // 1. 清除缓存
         await ClearCacheAsync();
-        
+
         // 2. 重新加载当前页面（不使用缓存）
         _webView.CoreWebView2.Reload();
-        
+
         System.Diagnostics.Debug.WriteLine("[WebView2Host] 强制刷新完成");
     }
 
@@ -508,6 +498,21 @@ public sealed class WebView2Host : IAsyncDisposable
     }
 
     /// <summary>
+    /// 处理 Web 资源请求事件（提取为命名方法以避免内存泄漏）
+    /// </summary>
+    private void OnWebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+    {
+        // 只处理CSS和JS文件
+        if (e.Request.Uri.EndsWith(".css") || e.Request.Uri.EndsWith(".js"))
+        {
+            // 添加无缓存头
+            var headers = e.Request.Headers;
+            // 注：WebView2 WebResourceRequested不支持直接修改请求头
+            // 我们通过添加查询参数的方式实现缓存清除
+        }
+    }
+
+    /// <summary>
     /// 异步释放资源。
     /// </summary>
     public async ValueTask DisposeAsync()
@@ -523,6 +528,9 @@ public sealed class WebView2Host : IAsyncDisposable
         if (_webView.CoreWebView2 is not null)
         {
             _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+#if DEBUG
+            _webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+#endif
         }
 
         // 释放 WebView2 控件

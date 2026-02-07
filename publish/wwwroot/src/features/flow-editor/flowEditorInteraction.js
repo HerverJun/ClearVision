@@ -235,24 +235,26 @@ export class FlowEditorInteraction {
     getPortAt(x, y) {
         for (const [id, node] of this.canvas.nodes) {
             // 输入端口
-            node.inputs.forEach((input, index) => {
+            for (let i = 0; i < node.inputs.length; i++) {
+                const input = node.inputs[i];
                 const px = node.x;
                 const py = node.y + node.height / 2;
                 const dist = Math.sqrt(Math.pow(x - px, 2) + Math.pow(y - py, 2));
                 if (dist < 10) {
-                    return { nodeId: id, portIndex: index, type: 'input', port: input };
+                    return { nodeId: id, portIndex: i, type: 'input', port: input };
                 }
-            });
+            }
 
             // 输出端口
-            node.outputs.forEach((output, index) => {
+            for (let i = 0; i < node.outputs.length; i++) {
+                const output = node.outputs[i];
                 const px = node.x + node.width;
                 const py = node.y + node.height / 2;
                 const dist = Math.sqrt(Math.pow(x - px, 2) + Math.pow(y - py, 2));
                 if (dist < 10) {
-                    return { nodeId: id, portIndex: index, type: 'output', port: output };
+                    return { nodeId: id, portIndex: i, type: 'output', port: output };
                 }
-            });
+            }
         }
         return null;
     }

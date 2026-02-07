@@ -60,7 +60,7 @@ static class Program
         System.Windows.Forms.Application.Run(mainForm);
 
         // 关闭 Web 服务器
-        StopWebServer();
+        StopWebServer().Wait();
     }
 
     /// <summary>
@@ -304,7 +304,7 @@ static class Program
     /// <summary>
     /// 停止 Web 服务器
     /// </summary>
-    static async void StopWebServer()
+    static async Task StopWebServer()
     {
         if (_host != null)
         {

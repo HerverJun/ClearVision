@@ -44,7 +44,8 @@ public class Project : AggregateRoot
     {
         Name = string.Empty;
         Version = "1.0.0";
-        Flow = new OperatorFlow();
+        // 使用相同 ID 以满足 Table Splitting 要求
+        Flow = new OperatorFlow(Id, "默认流程");
         GlobalSettings = new Dictionary<string, string>();
     }
 

@@ -324,18 +324,29 @@ public class OperatorService : IOperatorService
 
     public Task<OperatorDto> CreateAsync(CreateOperatorRequest request)
     {
-        // 创建算子实例
-        var operatorEntity = new Operator(
-            request.Name,
+        // 使用工厂创建算子实例，确保端口和参数正确初始化
+        var operatorEntity = _operatorFactory.CreateOperator(
             request.Type,
+            request.Name,
             100, 100
         );
 
+        // 如果请求中提供了参数，覆盖默认值
         if (request.Parameters != null)
         {
             foreach (var param in request.Parameters)
             {
-                // 添加参数到算子
+                if (!string.IsNullOrEmpty(param.Name) && param.Value != null)
+                {
+                    try
+                    {
+                        operatorEntity.UpdateParameter(param.Name, param.Value);
+                    }
+                    catch (Exception)
+                    {
+                        // 记录日志或忽略无效参数
+                    }
+                }
             }
         }
 

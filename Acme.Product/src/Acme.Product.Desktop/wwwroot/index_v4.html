@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ClearVision - 工业视觉检测软件</title>
+        <!-- 【科学方案二】动态CSS版本号：通过JavaScript动态加载，使用后端注入的版本号 -->
+        <script>
+            // 动态加载CSS，自动附加版本号
+            (function() {
+                // 优先使用后端注入的版本号，如果没有则使用时间戳（开发模式）
+                const version = window.__CSS_VERSION__ || (new Date()).getTime();
+                const cssFiles = [
+                    'src/shared/styles/variables.css',
+                    'src/shared/styles/main.css',
+                    'src/shared/styles/ui-components.css',
+                    'src/shared/styles/settings.css',
+                    'src/shared/styles/property-panel.css',
+                    'src/shared/styles/settings-overrides.css',
+                    'src/shared/styles/handdrawn.css' /* Hand-drawn Theme */
+                ];
+                
+                cssFiles.forEach(function(file) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = file + '?v=' + version;
+                    document.head.appendChild(link);
+                });
+                
+                console.log('[CSS Loader] 已加载CSS文件，版本号:', version);
+            })();
+        </script>
+    </head>
+    <body>
+        <a href="#main-content" class="skip-link">跳转到主内容</a>
+        <div id="app">
+            <!-- 顶部工具栏 -->
+            <header class="toolbar">
+                <div class="toolbar-left">
+                    <h1 class="logo">ClearVision</h1>
+                    <nav class="main-nav" aria-label="主导航">
+                        <button class="nav-btn" data-view="project">
+                            工程
+                        </button>
+                        <button class="nav-btn active" data-view="flow">
+                            流程
+                        </button>
+                        <button class="nav-btn" data-view="inspection">
+                            检测
+                        </button>
+                        <button class="nav-btn" data-view="results">
+                            结果
+                        </button>
+                    </nav>
+                </div>
+                <div class="toolbar-right">
+                    <button id="btn-save" class="btn btn-primary">保存</button>
+                    <button id="btn-run" class="btn btn-success">运行</button>
+                    <button id="btn-theme-toggle" class="btn btn-icon" title="切换主题">🌓</button>
+                    <button id="btn-settings" class="btn btn-icon">⚙️</button>
+                </div>
+            </header>
+
+            <!-- 主内容区 -->
+            <main class="main-content" id="main-content">
+                <!-- 左侧面板 -->
+                <aside class="sidebar left">
+                    <div class="panel">
+                        <h3 class="panel-title">算子库</h3>
+                        <div class="operator-library" id="operator-library">
+                            <!-- 算子列表将动态加载 -->
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- 中间工作区 -->
+                <section class="workspace">
+                    <!-- 流程编辑器 -->
+                    <div class="flow-editor-container" id="flow-editor">
+                        <canvas id="flow-canvas"></canvas>
+                    </div>
+
+                    <!-- 图像查看器（默认隐藏） -->
+                    <div
+                        class="image-viewer-container hidden"
+                        id="image-viewer"
+                    ></div>
+
+                    <!-- 工程视图（默认隐藏） -->
+                    <div
+                        class="project-view-container hidden"
+                        id="project-view"
+                    >
+                        <div class="project-view-header">
+                            <div class="project-search">
+                                <input
+                                    type="text"
+                                    id="project-search-input"
+                                    placeholder="搜索工程..."
+                                    class="cv-input"
+                                />
+                                <button id="btn-search-project" class="btn">
+                                    搜索
+                                </button>
+                                <button id="btn-new-project-inline" class="btn btn-primary">
+                                    + 新建工程
+                                </button>
+                            </div>
+                            <div class="project-tabs">
+                                <button class="tab-btn active" data-tab="all">
+                                    全部工程
+                                </button>
+                                <button class="tab-btn" data-tab="recent">
+                                    最近打开
+                                </button>
+                            </div>
+                        </div>
+                        <div class="project-list" id="project-list">
+                            <!-- 动态加载工程卡片 -->
+                            <p class="empty-text">加载中...</p>
+                        </div>
+                    </div>
+
+                    <!-- 结果视图（默认隐藏） -->
+                    <div
+                        class="results-view-container hidden"
+                        id="results-view"
+                    >
+                        <div class="results-view-header">
+                            <h2>检测结果历史</h2>
+                            <div class="results-actions">
+                                <button
+                                    class="btn btn-secondary"
+                                    id="btn-clear-results"
+                                >
+                                    清空记录
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    id="btn-export-results"
+                                >
+                                    导出CSV
+                                </button>
+                            </div>
+                        </div>
+                        <div
+                            class="results-view-content"
+                            id="results-view-content"
+                        >
+                            <p class="empty-text">暂无检测记录</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 右侧面板 -->
+                <aside class="sidebar right">
+                    <div class="panel">
+                        <h3 class="panel-title">属性</h3>
+                        <div class="property-panel" id="property-panel">
+                            <p class="empty-text">选择一个算子查看属性</p>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3 class="panel-title">结果</h3>
+                        <div class="results-panel" id="results-panel">
+                            <div class="result-summary">
+                                <span class="result-ok">OK: 0</span>
+                                <span class="result-ng">NG: 0</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </main>
+
+            <!-- 底部状态栏 -->
+            <footer class="status-bar">
+                <div class="status-left">
+                    <span id="status-text">就绪</span>
+                </div>
+                <div class="status-right">
+                    <span id="project-name">未命名工程</span>
+                    <span id="version">v1.0.0</span>
+                </div>
+            </footer>
+        </div>
+
+        <!-- 加载核心模块 -->
+        <script
+            type="module"
+            src="src/core/messaging/webMessageBridge.js"
+        ></script>
+        <script type="module" src="src/core/messaging/httpClient.js"></script>
+        <script type="module" src="src/core/state/store.js"></script>
+        <script type="module" src="src/core/canvas/flowCanvas.js"></script>
+        <script type="module" src="src/core/canvas/imageCanvas.js"></script>
+
+        <!-- 加载功能模块 -->
+        <script
+            type="module"
+            src="src/features/operator-library/operatorLibrary.js"
+        ></script>
+        <script
+            type="module"
+            src="src/features/image-viewer/imageViewer.js"
+        ></script>
+        <script
+            type="module"
+            src="src/features/inspection/inspectionController.js"
+        ></script>
+        <script
+            type="module"
+            src="src/features/results/resultPanel.js"
+        ></script>
+
+        <!-- 加载主应用 -->
+        <script type="module" src="src/app.js"></script>
+    </body>
+</html>
+

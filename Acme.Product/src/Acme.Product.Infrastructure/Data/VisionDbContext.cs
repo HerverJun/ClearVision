@@ -50,27 +50,48 @@ public class VisionDbContext : DbContext
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.LastOpenedAt);
 
-            // 配置 Flow 为 Owned Entity（值对象模式）
-            entity.OwnsOne(e => e.Flow, flow =>
-            {
-                flow.Property(f => f.Name).IsRequired().HasMaxLength(200);
 
-                // 忽略 Operators 导航属性 - 这是运行时集合，Operator 实体已作为独立表配置
-                flow.Ignore(f => f.Operators);
 
-                // 配置 Flow.Connections 为 Owned Entity Collection
-                flow.OwnsMany(f => f.Connections, connection =>
-                {
-                    connection.HasKey("Id");
-                    connection.Property(c => c.SourceOperatorId).IsRequired();
-                    connection.Property(c => c.SourcePortId).IsRequired();
-                    connection.Property(c => c.TargetOperatorId).IsRequired();
-                    connection.Property(c => c.TargetPortId).IsRequired();
-                });
-            });
+            // 配置 Table Splitting: Project 与 OperatorFlow 共享 Projects 表
+            entity.HasOne(e => e.Flow)
+                .WithOne()
+                .HasForeignKey<OperatorFlow>(f => f.Id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.ToTable("Projects");
         });
 
 
+        // 配置 OperatorFlow 实体 (Table Splitting Part 2)
+        modelBuilder.Entity<OperatorFlow>(entity =>
+        {
+            entity.ToTable("Projects");
+            entity.HasKey(e => e.Id);
+
+            // 映射属性到指定列名 (保持与原来 OwnsOne 的命名习惯兼容)
+            entity.Property(e => e.Name).HasColumnName("Flow_Name").IsRequired().HasMaxLength(200);
+
+            // 解决共享列冲突：映射到不同列
+            entity.Property(e => e.CreatedAt).HasColumnName("Flow_CreatedAt");
+            entity.Property(e => e.ModifiedAt).HasColumnName("Flow_ModifiedAt");
+            entity.Property(e => e.IsDeleted).HasColumnName("Flow_IsDeleted");
+
+            // 配置与 Operator 的关系
+            entity.HasMany(e => e.Operators)
+                .WithOne()
+                .HasForeignKey(o => o.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // 配置 Connections (Owned Collection)
+            entity.OwnsMany(e => e.Connections, connection =>
+            {
+                connection.HasKey("Id");
+                connection.Property(c => c.SourceOperatorId).IsRequired();
+                connection.Property(c => c.SourcePortId).IsRequired();
+                connection.Property(c => c.TargetOperatorId).IsRequired();
+                connection.Property(c => c.TargetPortId).IsRequired();
+            });
+        });
         // 配置 Operator 实体
         modelBuilder.Entity<Operator>(entity =>
         {

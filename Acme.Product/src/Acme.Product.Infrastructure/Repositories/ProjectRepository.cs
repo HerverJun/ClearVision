@@ -60,7 +60,14 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
 
         return await _dbSet
             .Include(p => p.Flow)
-            .ThenInclude(f => f.Operators)
+                .ThenInclude(f => f.Operators)
+                    .ThenInclude(o => o.InputPorts)
+            .Include(p => p.Flow)
+                .ThenInclude(f => f.Operators)
+                    .ThenInclude(o => o.OutputPorts)
+            .Include(p => p.Flow)
+                .ThenInclude(f => f.Operators)
+                    .ThenInclude(o => o.Parameters)
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
     }
 }

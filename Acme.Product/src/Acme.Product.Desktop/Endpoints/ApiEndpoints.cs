@@ -113,9 +113,20 @@ public static class ApiEndpoints
         {
             try
             {
+                Console.WriteLine($"[DEBUG API] === START PUT /api/projects/{id}/flow ===");
+                Console.WriteLine($"[DEBUG API] Received Operators count: {request.Operators.Count}");
+                Console.WriteLine($"[DEBUG API] Received Operator IDs: {string.Join(", ", request.Operators.Select(o => $"{o.Name}({o.Id})"))}");
+                Console.WriteLine($"[DEBUG API] Received Connections count: {request.Connections.Count}");
+                
+                foreach (var conn in request.Connections)
+                {
+                    Console.WriteLine($"[DEBUG API] Connection: Source={conn.SourceOperatorId}, Target={conn.TargetOperatorId}");
+                }
+                
                 var project = await repository.GetWithFlowAsync(id);
                 if (project == null)
                 {
+                    Console.WriteLine($"[DEBUG API] Project {id} not found");
                     return Results.NotFound(new { Error = $"工程 {id} 不存在" });
                 }
 
@@ -124,6 +135,7 @@ public static class ApiEndpoints
                 
                 // 清除现有算子和连接
                 var existingOperators = flow.Operators.ToList();
+                Console.WriteLine($"[DEBUG API] Clearing {existingOperators.Count} existing operators");
                 foreach (var op in existingOperators)
                 {
                     flow.RemoveOperator(op.Id);
@@ -138,14 +150,20 @@ public static class ApiEndpoints
                         opDto.X,
                         opDto.Y
                     );
-                    
+
+                    // 保留前端传来的算子ID（用于连接关系匹配）
+                    if (opDto.Id != Guid.Empty)
+                    {
+                        typeof(Operator).GetProperty("Id")?.SetValue(op, opDto.Id);
+                    }
+
                     // 添加参数
                     if (opDto.Parameters != null)
                     {
                         foreach (var param in opDto.Parameters)
                         {
                             var parameter = new Parameter(
-                                Guid.NewGuid(),
+                                param.Id != Guid.Empty ? param.Id : Guid.NewGuid(),
                                 param.Name,
                                 param.DisplayName,
                                 param.Description ?? string.Empty,
@@ -162,21 +180,43 @@ public static class ApiEndpoints
                             op.AddParameter(parameter);
                         }
                     }
-                    
+
                     flow.AddOperator(op);
+                    Console.WriteLine($"[DEBUG API] Added operator: {op.Name} with ID {op.Id}");
                 }
+                
+                Console.WriteLine($"[DEBUG API] All operators added. Total in flow: {flow.Operators.Count}");
+                Console.WriteLine($"[DEBUG API] Operator IDs in flow: {string.Join(", ", flow.Operators.Select(o => o.Id.ToString()))}");
                 
                 // 添加连接
                 foreach (var connDto in request.Connections)
                 {
+                    // 验证连接数据有效性
+                    if (connDto.SourceOperatorId == Guid.Empty || connDto.TargetOperatorId == Guid.Empty)
+                    {
+                        Console.WriteLine($"[DEBUG API] 跳过无效连接: Source={connDto.SourceOperatorId}, Target={connDto.TargetOperatorId}");
+                        continue;
+                    }
+
                     var connection = new OperatorConnection(
                         connDto.SourceOperatorId,
-                        connDto.TargetOperatorId,
                         connDto.SourcePortId,
+                        connDto.TargetOperatorId,
                         connDto.TargetPortId
                     );
+
+                    // 保留前端传来的连接ID
+                    if (connDto.Id != Guid.Empty)
+                    {
+                        typeof(OperatorConnection).GetProperty("Id")?.SetValue(connection, connDto.Id);
+                    }
+
                     flow.AddConnection(connection);
+                    Console.WriteLine($"[DEBUG API] Added connection: {connection.SourceOperatorId} -> {connection.TargetOperatorId}");
                 }
+                
+                Console.WriteLine($"[DEBUG API] All connections added. Total in flow: {flow.Connections.Count}");
+                Console.WriteLine($"[DEBUG API] === END PUT /api/projects/{id}/flow ===");
                 
                 await repository.UpdateAsync(project);
                 

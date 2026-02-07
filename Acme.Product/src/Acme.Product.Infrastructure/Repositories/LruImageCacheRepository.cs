@@ -30,6 +30,12 @@ public class LruImageCacheRepository : IImageCacheRepository
         var id = Guid.NewGuid();
         var size = imageData.Length;
 
+        // 检查单体大小是否超过最大缓存限制
+        if (size > _maxSizeInBytes)
+        {
+            throw new ArgumentException($"图像大小 {size} 超过最大缓存限制 {_maxSizeInBytes}");
+        }
+
         lock (_lock)
         {
             // 检查是否需要淘汰

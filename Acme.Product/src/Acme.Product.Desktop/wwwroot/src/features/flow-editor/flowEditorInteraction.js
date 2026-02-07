@@ -235,24 +235,26 @@ export class FlowEditorInteraction {
     getPortAt(x, y) {
         for (const [id, node] of this.canvas.nodes) {
             // 输入端口
-            node.inputs.forEach((input, index) => {
+            for (let i = 0; i < node.inputs.length; i++) {
+                const input = node.inputs[i];
                 const px = node.x;
                 const py = node.y + node.height / 2;
                 const dist = Math.sqrt(Math.pow(x - px, 2) + Math.pow(y - py, 2));
                 if (dist < 10) {
-                    return { nodeId: id, portIndex: index, type: 'input', port: input };
+                    return { nodeId: id, portIndex: i, type: 'input', port: input };
                 }
-            });
+            }
 
             // 输出端口
-            node.outputs.forEach((output, index) => {
+            for (let i = 0; i < node.outputs.length; i++) {
+                const output = node.outputs[i];
                 const px = node.x + node.width;
                 const py = node.y + node.height / 2;
                 const dist = Math.sqrt(Math.pow(x - px, 2) + Math.pow(y - py, 2));
                 if (dist < 10) {
-                    return { nodeId: id, portIndex: index, type: 'output', port: output };
+                    return { nodeId: id, portIndex: i, type: 'output', port: output };
                 }
-            });
+            }
         }
         return null;
     }
@@ -320,11 +322,19 @@ export class FlowEditorInteraction {
      * 结束连线
      */
     endConnection(e) {
+        console.log('[DEBUG endConnection] === START CONNECTION ===');
+        console.log('[DEBUG endConnection] connectionStart:', JSON.stringify(this.connectionStart));
+        
         const rect = this.canvas.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left - this.canvas.offset.x) / this.canvas.scale;
         const y = (e.clientY - rect.top - this.canvas.offset.y) / this.canvas.scale;
 
+        console.log(`[DEBUG endConnection] Mouse position: x=${x}, y=${y}`);
+
         const endPort = this.getPortAt(x, y);
+        
+        console.log('[DEBUG endConnection] getPortAt result:', JSON.stringify(endPort));
+        console.log('[DEBUG endConnection] connectionEnd will be:', JSON.stringify({x, y, port: endPort}));
 
         if (endPort && endPort.type !== this.connectionStart.type) {
             // 确保从输出连接到输入
@@ -346,15 +356,25 @@ export class FlowEditorInteraction {
                 conn.targetPort === target.portIndex
             );
 
+            console.log('[DEBUG endConnection] Source:', JSON.stringify(source));
+            console.log('[DEBUG endConnection] Target:', JSON.stringify(target));
+            console.log('[DEBUG endConnection] Connection exists:', exists);
+            console.log('[DEBUG endConnection] Same node check:', source.nodeId === target.nodeId);
+
             if (!exists && source.nodeId !== target.nodeId) {
+                console.log(`[DEBUG endConnection] Adding connection: ${source.nodeId}:${source.portIndex} -> ${target.nodeId}:${target.portIndex}`);
                 this.canvas.addConnection(source.nodeId, source.portIndex, target.nodeId, target.portIndex);
                 this.saveState();
                 showToast('连接成功', 'success');
             } else {
+                console.log('[DEBUG endConnection] Connection skipped - exists or invalid');
                 showToast('连接已存在或无效', 'warning');
             }
+        } else {
+            console.log('[DEBUG endConnection] No valid end port found or same type port');
         }
 
+        console.log('[DEBUG endConnection] === END CONNECTION ===');
         this.cancelConnection();
     }
 

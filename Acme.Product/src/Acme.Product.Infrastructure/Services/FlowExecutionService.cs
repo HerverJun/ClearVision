@@ -13,7 +13,7 @@ namespace Acme.Product.Infrastructure.Services;
 /// </summary>
 public class FlowExecutionService : IFlowExecutionService
 {
-    private readonly Dictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
+    private readonly ConcurrentDictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
     private readonly Dictionary<OperatorType, IOperatorExecutor> _executors;
     private readonly ILogger<FlowExecutionService> _logger;
 

@@ -37,6 +37,15 @@ public class OperatorFlow : Entity
     }
 
     /// <summary>
+    /// 用于 Table Splitting 时同步 ID
+    /// </summary>
+    internal OperatorFlow(Guid id, string name = "默认流程")
+    {
+        Id = id;
+        Name = name;
+    }
+
+    /// <summary>
     /// 添加算子
     /// </summary>
     public void AddOperator(Operator op)
@@ -176,7 +185,7 @@ public class OperatorFlow : Entity
             return true;
 
         if (!visited.Add(current))
-            return false;
+            return true; // 已访问过，说明有环
 
         var nextOperators = _connections
             .Where(c => c.SourceOperatorId == current)

@@ -62,6 +62,11 @@ public class Operator : Entity
     /// </summary>
     public string? ErrorMessage { get; private set; }
 
+    /// <summary>
+    /// 所属项目ID（外键）
+    /// </summary>
+    public Guid ProjectId { get; private set; }
+
     private Operator()
     {
         Name = string.Empty;
@@ -119,6 +124,24 @@ public class Operator : Entity
         var port = new Port(Guid.NewGuid(), name, PortDirection.Output, dataType, false);
         _outputPorts.Add(port);
         MarkAsModified();
+    }
+
+    /// <summary>
+    /// 加载输入端口（用于反序列化/恢复数据）
+    /// </summary>
+    public void LoadInputPort(Guid id, string name, PortDataType dataType, bool isRequired)
+    {
+        var port = new Port(id, name, PortDirection.Input, dataType, isRequired);
+        _inputPorts.Add(port);
+    }
+
+    /// <summary>
+    /// 加载输出端口（用于反序列化/恢复数据）
+    /// </summary>
+    public void LoadOutputPort(Guid id, string name, PortDataType dataType)
+    {
+        var port = new Port(id, name, PortDirection.Output, dataType, false);
+        _outputPorts.Add(port);
     }
 
     /// <summary>

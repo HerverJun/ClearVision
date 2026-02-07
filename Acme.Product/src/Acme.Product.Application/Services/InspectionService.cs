@@ -46,6 +46,13 @@ public class InspectionService : IInspectionService
             var status = flowResult.IsSuccess ? InspectionStatus.OK : InspectionStatus.NG;
             result.SetResult(status, flowResult.ExecutionTimeMs);
 
+            // 提取输出图像用于 UI 显示
+            if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
+                && outputImage is byte[] imageBytes)
+            {
+                result.SetOutputImage(imageBytes);
+            }
+
             await _resultRepository.AddAsync(result);
 
             return result;

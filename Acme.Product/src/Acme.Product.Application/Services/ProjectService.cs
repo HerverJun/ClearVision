@@ -56,25 +56,64 @@ public class ProjectService
             throw new ProjectNotFoundException(id);
 
         project.UpdateInfo(request.Name, request.Description);
-        
+
         // 【修复】如果有流程数据，更新流程
         if (request.Flow != null)
         {
-            var flow = MapDtoToFlow(request.Flow);
+            // 传入 Project.Id 以确保 Table Splitting ID 一致
+            var flow = MapDtoToFlow(request.Flow, project.Id);
             project.UpdateFlow(flow);
         }
-        
+
         await _projectRepository.UpdateAsync(project);
         return MapToDto(project);
     }
-    
+
+    /// <summary>
+    /// 更新工程流程
+    /// </summary>
+    public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
+    {
+        // 使用 GetWithFlowAsync 确保加载现有关联数据
+        var project = await _projectRepository.GetWithFlowAsync(id);
+        if (project == null)
+            throw new ProjectNotFoundException(id);
+
+        // 构造流程DTO
+        var flowDto = new OperatorFlowDto
+        {
+            Name = project.Flow.Name, // 保持原有名称
+            Operators = request.Operators,
+            Connections = request.Connections
+        };
+
+        // 使用已修复的 MapDtoToFlow 逻辑 (包含端口恢复)
+        // 传入 Project.Id 以确保 Table Splitting ID 一致
+        var flow = MapDtoToFlow(flowDto, project.Id);
+
+        // 更新到实体
+        project.UpdateFlow(flow);
+
+        await _projectRepository.UpdateAsync(project);
+    }
+
     /// <summary>
     /// 将OperatorFlowDto转换为Core实体
     /// </summary>
-    private OperatorFlow MapDtoToFlow(OperatorFlowDto dto)
+    private OperatorFlow MapDtoToFlow(OperatorFlowDto dto, Guid? flowId = null)
     {
         var flow = new OperatorFlow(dto.Name);
-        
+
+        // 【关键修复】如果指定了 flowId (通常是 Project.Id)，强制设置它
+        // EF Core Table Splitting 要求 Project.Id == Flow.Id
+        if (flowId.HasValue)
+        {
+            // Flow继承自Entity，Id定义在Entity中
+            typeof(Acme.Product.Core.Entities.Base.Entity)
+                .GetProperty("Id")?
+                .SetValue(flow, flowId.Value);
+        }
+
         // 添加算子
         foreach (var opDto in dto.Operators)
         {
@@ -84,14 +123,26 @@ public class ProjectService
                 opDto.X,
                 opDto.Y
             );
-            
+
             // 设置ID（如果提供了）
             if (opDto.Id != Guid.Empty)
             {
                 // 使用反射设置ID，因为构造函数会生成新的ID
                 typeof(Operator).GetProperty("Id")?.SetValue(op, opDto.Id);
             }
-            
+
+            // 恢复输入端口（保留ID以维持连线）
+            foreach (var portDto in opDto.InputPorts)
+            {
+                op.LoadInputPort(portDto.Id, portDto.Name, portDto.DataType, portDto.IsRequired);
+            }
+
+            // 恢复输出端口（保留ID以维持连线）
+            foreach (var portDto in opDto.OutputPorts)
+            {
+                op.LoadOutputPort(portDto.Id, portDto.Name, portDto.DataType);
+            }
+
             // 添加参数
             foreach (var paramDto in opDto.Parameters)
             {
@@ -106,18 +157,18 @@ public class ProjectService
                     paramDto.MaxValue,
                     paramDto.IsRequired
                 );
-                
+
                 if (paramDto.Value != null)
                 {
                     param.SetValue(paramDto.Value);
                 }
-                
+
                 op.AddParameter(param);
             }
-            
+
             flow.AddOperator(op);
         }
-        
+
         // 添加连接
         foreach (var connDto in dto.Connections)
         {
@@ -127,16 +178,16 @@ public class ProjectService
                 connDto.SourcePortId,
                 connDto.TargetPortId
             );
-            
+
             // 设置连接ID
             if (connDto.Id != Guid.Empty)
             {
                 typeof(OperatorConnection).GetProperty("Id")?.SetValue(connection, connDto.Id);
             }
-            
+
             flow.AddConnection(connection);
         }
-        
+
         return flow;
     }
 

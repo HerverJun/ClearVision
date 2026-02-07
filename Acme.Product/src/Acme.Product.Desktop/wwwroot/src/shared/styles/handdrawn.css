@@ -1,0 +1,225 @@
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@400;700&family=Nunito:wght@400;600&display=swap');
+
+:root {
+    /* ==========================================================================
+       Theme: Paper Sketch (纸上速写)
+       Style: Hand-Drawn / Organic
+       Concept: Notebook Paper + Pencil/Marker Sketches + Fresh Colors
+       ========================================================================== */
+
+    /* Typography - Handwritten */
+    --font-display: 'Patrick Hand', cursive;
+    --font-heading: 'Caveat', cursive;
+    --font-mono: 'Patrick Hand', cursive; /* Keep it consistant even for code */
+
+    /* Color Palette - Fresh & Organic */
+    --paper-bg: #fffcf0;           /* Creamy Paper */
+    --paper-line: #e3e3e3;         /* Notebook Lines */
+    
+    /* Marker Pens */
+    --pen-ink: #2c3e50;            /* Dark Blue Ink */
+    --pen-highlight: #ffeb3b;      /* Highlighter Yellow */
+    
+    /* Fresh Accents */
+    --marker-green: #2ecc71;       /* Grass Green */
+    --marker-blue: #3498db;        /* Sky Blue */
+    --marker-orange: #e67e22;      /* Sunset Orange */
+    --marker-pink: #e84393;        /* Berry Pink */
+
+    /* Re-mapping */
+    --ink-primary: var(--paper-bg);
+    --ink-secondary: #ffffff;
+    --ink-tertiary: #f7f1e3;
+    --ink-deep: #2f3542;
+
+    --paper-white: var(--pen-ink);
+    --paper-dim: #57606f;
+    --ink-gray: #747d8c;
+
+    --cinnabar: var(--marker-pink);
+    --gold-accent: var(--marker-orange);
+    --success-jade: var(--marker-green);
+    --info-azure: var(--marker-blue);
+
+    /* Hand-Drawn Radius - Imperfect Circles */
+    --radius-sm: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    --radius-md: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    --radius-lg: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    --radius-xl: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    --radius-full: 95% 4% 97% 5% / 4% 94% 3% 95%;
+
+    /* Borders - Sketchy */
+    --border-sketch: 2px solid var(--pen-ink);
+    --border-sketch-thick: 3px solid var(--pen-ink);
+
+    /* Shadows - Scribbles */
+    --shadow-sketch: 4px 4px 0 rgba(44, 62, 80, 0.1);
+    --shadow-sketch-hover: 3px 3px 0 var(--pen-ink);
+    
+    --shadow-sm: var(--shadow-sketch);
+    --shadow-md: var(--shadow-sketch);
+    --shadow-lg: 5px 5px 0 var(--pen-ink);
+    --shadow-float: 8px 8px 0 rgba(44, 62, 80, 0.2);
+    --shadow-inset: inset 2px 2px 0 rgba(0,0,0,0.05);
+
+    --gradient-ink: none;
+    --gradient-card: none;
+    --gradient-cinnabar: linear-gradient(180deg, transparent 60%, var(--pen-highlight) 60%); /* Highlighter effect */
+
+    --glass-panel: #ffffff;
+    --glass-blur: none;
+    --glass-border: var(--pen-ink);
+
+    --card-padding: 20px;
+}
+
+/* Global Typography */
+h1, h2, h3, h4, h5, h6, .logo, .panel-title, .category-title {
+    font-family: var(--font-heading) !important;
+    font-weight: 700;
+    font-size: 1.4em;
+    letter-spacing: 1px;
+    transform: rotate(-1deg);
+}
+
+body {
+    background: var(--paper-bg);
+    color: var(--pen-ink);
+    /* Notebook Paper Logic */
+    background-image: linear-gradient(#e3e3e3 1px, transparent 1px);
+    background-size: 100% 1.5rem;
+}
+
+.logo {
+    font-family: 'Caveat', cursive;
+    font-size: 2rem;
+    color: var(--pen-ink);
+    background: none;
+    -webkit-text-fill-color: var(--pen-ink);
+    text-shadow: 2px 2px 0 var(--marker-orange);
+    transform: rotate(-2deg);
+}
+
+/* UI Structure */
+.toolbar, .panel, .project-card, .results-panel, .property-panel, .operator-library, .launcher-card {
+    background: white !important;
+    border: var(--border-sketch) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.1) !important;
+    transition: transform 0.2s ease;
+}
+
+.panel:hover, .project-card:hover {
+    transform: scale(1.01) rotate(0.5deg);
+    box-shadow: 4px 4px 0 var(--pen-ink) !important;
+}
+
+/* Navigation - Sketches */
+.nav-btn {
+    font-family: 'Patrick Hand', cursive !important;
+    font-size: 1.1rem !important;
+    border: 2px solid transparent !important;
+    color: var(--pen-ink) !important;
+}
+
+.nav-btn.active {
+    background: transparent !important;
+    font-weight: bold !important;
+    color: var(--marker-blue) !important;
+    text-decoration: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: var(--marker-blue);
+    box-shadow: none !important;
+}
+
+.nav-btn.active::after {
+    display: none;
+}
+
+/* Buttons - Doodle Style */
+.btn {
+    font-family: 'Patrick Hand', cursive !important;
+    border: var(--border-sketch) !important;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px !important;
+    background: white !important;
+    color: var(--pen-ink) !important;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.1) !important;
+    font-size: 1.1rem !important;
+}
+
+.btn:hover {
+    transform: translateY(-2px) rotate(-1deg) !important;
+    box-shadow: 4px 4px 0 var(--marker-orange) !important;
+}
+
+.btn-primary {
+    border-color: var(--marker-blue) !important;
+    color: var(--marker-blue) !important;
+}
+
+.btn-primary:hover {
+    background: var(--marker-blue) !important;
+    color: white !important;
+    box-shadow: 4px 4px 0 var(--pen-ink) !important;
+}
+
+.btn-success {
+    border-color: var(--marker-green) !important;
+    color: var(--marker-green) !important;
+}
+
+/* Inputs - Drawn Boxes */
+input, textarea {
+    background: white !important;
+    border: 2px solid var(--pen-ink) !important;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px !important;
+    font-family: 'Patrick Hand', cursive !important;
+    font-size: 1.1rem !important;
+    padding: 8px 16px !important;
+}
+
+input:focus {
+    border-color: var(--marker-blue) !important;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2) !important;
+    outline: none;
+}
+
+/* Operator Items */
+.operator-item {
+    border-bottom: 1px dashed var(--pen-ink) !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+}
+
+.operator-item:hover {
+    background: rgba(255, 235, 59, 0.3) !important; /* Highlighter look */
+    transform: translateX(5px);
+    border-bottom: 1px solid var(--pen-ink) !important;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border: 2px solid var(--paper-bg);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--marker-orange);
+}
+
+/* Titles Highlight */
+.panel-title {
+    background: linear-gradient(120deg, rgba(255, 235, 59, 0.5) 0%, rgba(255, 235, 59, 0) 100%) !important;
+    border: none !important;
+    padding-left: 10px !important;
+}
+
+.panel-title::after {
+    display: none;
+}

@@ -184,6 +184,167 @@ public class OperatorFactory : IOperatorFactory
                     false));
                 break;
 
+            case OperatorType.Morphology:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "Operation",
+                    "操作类型",
+                    "Erode/Dilate/Open/Close",
+                    "enum",
+                    "Erode",
+                    null,
+                    null,
+                    true));
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "KernelSize",
+                    "核大小",
+                    "结构元素大小",
+                    "int",
+                    3,
+                    1,
+                    21,
+                    true));
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "Iterations",
+                    "迭代次数",
+                    "操作重复次数",
+                    "int",
+                    1,
+                    1,
+                    10,
+                    true));
+                break;
+
+            case OperatorType.BlobAnalysis:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddOutputPort("Blobs", PortDataType.Contour);
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "MinArea",
+                    "最小面积",
+                    "Blob最小面积",
+                    "int",
+                    100,
+                    0,
+                    null,
+                    true));
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "MaxArea",
+                    "最大面积",
+                    "Blob最大面积",
+                    "int",
+                    100000,
+                    0,
+                    null,
+                    true));
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "Color",
+                    "目标颜色",
+                    "White/Black",
+                    "enum",
+                    "White",
+                    null,
+                    null,
+                    true));
+                break;
+
+            case OperatorType.TemplateMatching:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddInputPort("Template", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddOutputPort("Position", PortDataType.Point);
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "Method",
+                    "匹配方法",
+                    "NCC/SQDiff",
+                    "enum",
+                    "NCC",
+                    null,
+                    null,
+                    true));
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "Threshold",
+                    "匹配阈值",
+                    "匹配分数阈值",
+                    "double",
+                    0.8,
+                    0.0,
+                    1.0,
+                    true));
+                break;
+
+            case OperatorType.Measurement:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddOutputPort("Distance", PortDataType.Float);
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "MeasureType",
+                    "测量类型",
+                    "PointToPoint/Horizontal/Vertical",
+                    "enum",
+                    "PointToPoint",
+                    null,
+                    null,
+                    true));
+                break;
+
+            case OperatorType.ContourDetection:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "MinArea",
+                    "最小面积",
+                    "轮廓最小面积",
+                    "int",
+                    100,
+                    0,
+                    null,
+                    true));
+                break;
+
+            case OperatorType.CodeRecognition:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddOutputPort("Text", PortDataType.String);
+                break;
+
+            case OperatorType.DeepLearning:
+                op.AddInputPort("Image", PortDataType.Image, true);
+                op.AddOutputPort("Image", PortDataType.Image);
+                op.AddOutputPort("Defects", PortDataType.Contour);
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "ModelPath",
+                    "模型路径",
+                    "模型文件路径",
+                    "file",
+                    "",
+                    null,
+                    null,
+                    true));
+                op.AddParameter(new Parameter(
+                    Guid.NewGuid(),
+                    "Confidence",
+                    "置信度",
+                    "置信度阈值",
+                    "double",
+                    0.5,
+                    0.0,
+                    1.0,
+                    true));
+                break;
+
             case OperatorType.ResultOutput:
                 op.AddInputPort("Image", PortDataType.Image, false);
                 op.AddInputPort("Result", PortDataType.Any, false);
@@ -367,6 +528,15 @@ public class OperatorFactory : IOperatorFactory
             Description = "连通区域分析",
             Category = "特征提取",
             IconName = "blob",
+            InputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "图像", DataType = PortDataType.Image, IsRequired = true }
+            },
+            OutputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "标记图像", DataType = PortDataType.Image },
+                new() { Name = "Blobs", DisplayName = "Blob数据", DataType = PortDataType.Contour }
+            },
             Parameters = new List<ParameterDefinition>
             {
                 new() { Name = "MinArea", DisplayName = "最小面积", DataType = "int", DefaultValue = 100, MinValue = 0 },
@@ -383,6 +553,16 @@ public class OperatorFactory : IOperatorFactory
             Description = "图像模板匹配",
             Category = "匹配定位",
             IconName = "template",
+            InputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true },
+                new() { Name = "Template", DisplayName = "模板图像", DataType = PortDataType.Image, IsRequired = true }
+            },
+            OutputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image },
+                new() { Name = "Position", DisplayName = "匹配位置", DataType = PortDataType.Point }
+            },
             Parameters = new List<ParameterDefinition>
             {
                 new() { Name = "Method", DisplayName = "匹配方法", DataType = "enum", DefaultValue = "NCC", Options = new List<ParameterOption> { new() { Label = "归一化相关 (NCC)", Value = "NCC" }, new() { Label = "平方差 (SQDiff)", Value = "SQDiff" } } },
@@ -399,6 +579,15 @@ public class OperatorFactory : IOperatorFactory
             Description = "几何测量",
             Category = "检测",
             IconName = "measure",
+            InputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
+            },
+            OutputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image },
+                new() { Name = "Distance", DisplayName = "测量距离", DataType = PortDataType.Float }
+            },
             Parameters = new List<ParameterDefinition>
             {
                 new() { Name = "X1", DisplayName = "起点X", DataType = "int", DefaultValue = 0 },
@@ -442,7 +631,16 @@ public class OperatorFactory : IOperatorFactory
             DisplayName = "条码识别",
             Description = "一维码/二维码识别",
             Category = "识别",
-            IconName = "barcode"
+            IconName = "barcode",
+            InputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
+            },
+            OutputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image },
+                new() { Name = "Text", DisplayName = "识别内容", DataType = PortDataType.String }
+            }
         };
 
         // 深度学习
@@ -453,6 +651,15 @@ public class OperatorFactory : IOperatorFactory
             Description = "AI缺陷检测",
             Category = "AI检测",
             IconName = "ai",
+            InputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "输入图像", DataType = PortDataType.Image, IsRequired = true }
+            },
+            OutputPorts = new List<PortDefinition>
+            {
+                new() { Name = "Image", DisplayName = "结果图像", DataType = PortDataType.Image },
+                new() { Name = "Defects", DisplayName = "缺陷列表", DataType = PortDataType.Contour }
+            },
             Parameters = new List<ParameterDefinition>
             {
                 new() { Name = "ModelPath", DisplayName = "模型路径", DataType = "file", DefaultValue = "" },

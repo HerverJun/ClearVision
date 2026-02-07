@@ -45,6 +45,11 @@ public class InspectionResult : Entity
     public string? ErrorMessage { get; private set; }
 
     /// <summary>
+    /// 输出图像数据（处理后的图像）
+    /// </summary>
+    public byte[]? OutputImage { get; private set; }
+
+    /// <summary>
     /// 检测时间戳
     /// </summary>
     public DateTime InspectionTime { get; private set; }
@@ -103,6 +108,15 @@ public class InspectionResult : Entity
     /// 是否合格
     /// </summary>
     public bool IsOK => Status == InspectionStatus.OK && _defects.Count == 0;
+
+    /// <summary>
+    /// 设置输出图像
+    /// </summary>
+    public void SetOutputImage(byte[] imageData)
+    {
+        OutputImage = imageData;
+        MarkAsModified();
+    }
 }
 
 /// <summary>

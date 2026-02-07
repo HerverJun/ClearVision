@@ -227,7 +227,8 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
                     catch (Exception ex)
                     {
                         // 记录错误但继续采集
-                        Console.WriteLine($"[ImageAcquisitionService] 连续采集错误: {ex.Message}");
+                        // TODO: 使用 ILogger 替代 Console.WriteLine
+                        System.Diagnostics.Debug.WriteLine($"[ImageAcquisitionService] 连续采集错误: {ex.Message}");
                         await Task.Delay(frameInterval, cts.Token);
                     }
                 }

@@ -180,13 +180,19 @@ class InspectionController {
      */
     handleInspectionCompleted(result) {
         setLastResult(result);
-        
+
         setInspectionState({
             ...getInspectionState(),
             isRunning: false,
             progress: 100,
             status: result.status === 'Error' ? 'error' : 'completed'
         });
+
+        // 显示处理后的图像
+        if (result.outputImage && window.imageViewer) {
+            const imageData = `data:image/png;base64,${result.outputImage}`;
+            window.imageViewer.loadImage(imageData);
+        }
 
         // 触发事件
         this.onInspectionCompleted?.(result);

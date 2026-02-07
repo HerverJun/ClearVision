@@ -15,6 +15,46 @@ public class MatPool : IDisposable
     private long _rentCount;
     private long _returnCount;
     private long _createCount;
+    private bool _disposed;
+
+    ~MatPool()
+    {
+        Dispose(false);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                // 释放托管资源
+                Clear();
+            }
+            _disposed = true;
+        }
+    }
+
+    /// <summary>
+    /// 清空所有池
+    /// </summary>
+    public void Clear()
+    {
+        foreach (var pool in _pools.Values)
+        {
+            while (pool.TryTake(out var mat))
+            {
+                mat.Dispose();
+            }
+        }
+        _pools.Clear();
+    }
 
     /// <summary>
     /// 创建 MatPool 实例
@@ -93,23 +133,6 @@ public class MatPool : IDisposable
     /// <summary>
     /// 清空所有池
     /// </summary>
-    public void Clear()
-    {
-        foreach (var pool in _pools.Values)
-        {
-            while (pool.TryTake(out var mat))
-            {
-                mat.Dispose();
-            }
-        }
-        _pools.Clear();
-    }
-
-    public void Dispose()
-    {
-        Clear();
-    }
-
     /// <summary>
     /// Mat 尺寸和类型键
     /// </summary>
