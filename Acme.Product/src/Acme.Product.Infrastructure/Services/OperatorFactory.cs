@@ -20,342 +20,44 @@ public class OperatorFactory : IOperatorFactory
     public Operator CreateOperator(OperatorType type, string name, double x, double y)
     {
         var op = new Operator(name, type, x, y);
+        var metadata = GetMetadata(type);
 
-        // 根据算子类型添加默认端口和参数
-        switch (type)
+        if (metadata != null)
         {
-            case OperatorType.ImageAcquisition:
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "ImagePath",
-                    "图像路径",
-                    "要加载的图像文件路径",
-                    "string",
-                    "",
-                    null,
-                    null,
-                    false));
-                break;
+            // 根据元数据添加端口
+            foreach (var portDef in metadata.InputPorts)
+            {
+                op.AddInputPort(portDef.Name, portDef.DataType, portDef.IsRequired);
+            }
 
-            case OperatorType.Filtering:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "KernelSize",
-                    "核大小",
-                    "高斯核大小（奇数）",
-                    "int",
-                    5,
-                    1,
-                    31,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "SigmaX",
-                    "X方向标准差",
-                    "高斯核X方向标准差",
-                    "double",
-                    1.0,
-                    0.1,
-                    10.0,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "SigmaY",
-                    "Y方向标准差",
-                    "高斯核Y方向标准差(0表示与X相同)",
-                    "double",
-                    0.0,
-                    0.0,
-                    10.0,
-                    false));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "BorderType",
-                    "边界填充方式",
-                    "0=Constant,1=Replicate,2=Reflect,3=Wrap,4=Default",
-                    "int",
-                    4,
-                    0,
-                    4,
-                    false));
-                break;
+            foreach (var portDef in metadata.OutputPorts)
+            {
+                op.AddOutputPort(portDef.Name, portDef.DataType);
+            }
 
-            case OperatorType.EdgeDetection:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddOutputPort("Edges", PortDataType.Image);
-                op.AddParameter(new Parameter(
+            // 根据元数据添加参数
+            foreach (var paramDef in metadata.Parameters)
+            {
+                var parameter = new Parameter(
                     Guid.NewGuid(),
-                    "Threshold1",
-                    "低阈值",
-                    "Canny边缘检测低阈值",
-                    "double",
-                    50.0,
-                    0.0,
-                    255.0,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Threshold2",
-                    "高阈值",
-                    "Canny边缘检测高阈值",
-                    "double",
-                    150.0,
-                    0.0,
-                    255.0,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "EnableGaussianBlur",
-                    "启用高斯模糊",
-                    "是否在Canny前进行高斯模糊降噪",
-                    "bool",
-                    true,
-                    null,
-                    null,
-                    false));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "GaussianKernelSize",
-                    "高斯核大小",
-                    "预处理高斯模糊的核大小",
-                    "int",
-                    5,
-                    3,
-                    15,
-                    false));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "ApertureSize",
-                    "Sobel孔径大小",
-                    "Sobel算子的孔径大小",
-                    "int",
-                    3,
-                    3,
-                    7,
-                    false));
-                break;
-
-            case OperatorType.Thresholding:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Threshold",
-                    "阈值",
-                    "二值化阈值",
-                    "double",
-                    127.0,
-                    0.0,
-                    255.0,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "MaxValue",
-                    "最大值",
-                    "二值化最大值",
-                    "double",
-                    255.0,
-                    0.0,
-                    255.0,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Type",
-                    "阈值类型",
-                    "0=Binary, 1=BinaryInv, 2=Trunc, 3=ToZero, 4=ToZeroInv",
-                    "int",
-                    0,
-                    0,
-                    4,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "UseOtsu",
-                    "使用Otsu自动阈值",
-                    "是否使用Otsu算法自动计算最优阈值",
-                    "bool",
-                    false,
-                    null,
-                    null,
-                    false));
-                break;
-
-            case OperatorType.Morphology:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Operation",
-                    "操作类型",
-                    "Erode/Dilate/Open/Close",
-                    "enum",
-                    "Erode",
-                    null,
-                    null,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "KernelSize",
-                    "核大小",
-                    "结构元素大小",
-                    "int",
-                    3,
-                    1,
-                    21,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Iterations",
-                    "迭代次数",
-                    "操作重复次数",
-                    "int",
-                    1,
-                    1,
-                    10,
-                    true));
-                break;
-
-            case OperatorType.BlobAnalysis:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddOutputPort("Blobs", PortDataType.Contour);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "MinArea",
-                    "最小面积",
-                    "Blob最小面积",
-                    "int",
-                    100,
-                    0,
-                    null,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "MaxArea",
-                    "最大面积",
-                    "Blob最大面积",
-                    "int",
-                    100000,
-                    0,
-                    null,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Color",
-                    "目标颜色",
-                    "White/Black",
-                    "enum",
-                    "White",
-                    null,
-                    null,
-                    true));
-                break;
-
-            case OperatorType.TemplateMatching:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddInputPort("Template", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddOutputPort("Position", PortDataType.Point);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Method",
-                    "匹配方法",
-                    "NCC/SQDiff",
-                    "enum",
-                    "NCC",
-                    null,
-                    null,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Threshold",
-                    "匹配阈值",
-                    "匹配分数阈值",
-                    "double",
-                    0.8,
-                    0.0,
-                    1.0,
-                    true));
-                break;
-
-            case OperatorType.Measurement:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddOutputPort("Distance", PortDataType.Float);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "MeasureType",
-                    "测量类型",
-                    "PointToPoint/Horizontal/Vertical",
-                    "enum",
-                    "PointToPoint",
-                    null,
-                    null,
-                    true));
-                break;
-
-            case OperatorType.ContourDetection:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "MinArea",
-                    "最小面积",
-                    "轮廓最小面积",
-                    "int",
-                    100,
-                    0,
-                    null,
-                    true));
-                break;
-
-            case OperatorType.CodeRecognition:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddOutputPort("Text", PortDataType.String);
-                break;
-
-            case OperatorType.DeepLearning:
-                op.AddInputPort("Image", PortDataType.Image, true);
-                op.AddOutputPort("Image", PortDataType.Image);
-                op.AddOutputPort("Defects", PortDataType.Contour);
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "ModelPath",
-                    "模型路径",
-                    "模型文件路径",
-                    "file",
-                    "",
-                    null,
-                    null,
-                    true));
-                op.AddParameter(new Parameter(
-                    Guid.NewGuid(),
-                    "Confidence",
-                    "置信度",
-                    "置信度阈值",
-                    "double",
-                    0.5,
-                    0.0,
-                    1.0,
-                    true));
-                break;
-
-            case OperatorType.ResultOutput:
-                op.AddInputPort("Image", PortDataType.Image, false);
-                op.AddInputPort("Result", PortDataType.Any, false);
-                op.AddOutputPort("Output", PortDataType.Any);
-                break;
-
-            default:
-                // 为其他类型添加通用输入输出端口
-                op.AddInputPort("Input", PortDataType.Any, false);
-                op.AddOutputPort("Output", PortDataType.Any);
-                break;
+                    paramDef.Name,
+                    paramDef.DisplayName,
+                    paramDef.Description ?? string.Empty,
+                    paramDef.DataType,
+                    paramDef.DefaultValue,
+                    paramDef.MinValue,
+                    paramDef.MaxValue,
+                    paramDef.IsRequired,
+                    paramDef.Options
+                );
+                op.AddParameter(parameter);
+            }
+        }
+        else
+        {
+            // 为未知类型添加通用输入输出端口 (Fallback)
+            op.AddInputPort("Input", PortDataType.Any, false);
+            op.AddOutputPort("Output", PortDataType.Any);
         }
 
         return op;

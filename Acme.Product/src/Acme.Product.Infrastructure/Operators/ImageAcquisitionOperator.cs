@@ -17,24 +17,62 @@ public class ImageAcquisitionOperator : IOperatorExecutor
     {
         try
         {
-            // 从输入获取图像数据或文件路径
-            if (inputs != null && inputs.TryGetValue("ImagePath", out var pathObj) && pathObj is string imagePath)
+            // 优先获取 sourceType 和 filePath 参数
+            // 1. 尝试从连线输入获取
+            // 2. 如果没有连线输入，从算子自身的参数列表中获取 (Metadata-driven)
+            string? sourceType = null;
+            string? filePath = null;
+
+            if (inputs != null && inputs.TryGetValue("sourceType", out var stObj))
+                sourceType = stObj?.ToString();
+            if (sourceType == null)
             {
-                // 从文件加载图像
-                if (!File.Exists(imagePath))
+                var param = @operator.Parameters.FirstOrDefault(p => p.Name == "sourceType");
+                sourceType = param?.GetValue()?.ToString();
+            }
+
+            if (inputs != null && inputs.TryGetValue("filePath", out var fpObj))
+                filePath = fpObj?.ToString();
+            // 注意：旧代码使用的是 ImagePath，这里统一为 filePath 以对齐元数据和前端
+            if (string.IsNullOrEmpty(filePath))
+            {
+                var param = @operator.Parameters.FirstOrDefault(p => p.Name == "filePath");
+                filePath = param?.GetValue()?.ToString();
+            }
+
+            // 如果连线输入中有名为 Image 的字节数组，则直接使用（透传模式）
+            if (inputs != null && inputs.TryGetValue("Image", out var imgObj) && imgObj is byte[] rawData)
+            {
+                using var mat = Cv2.ImDecode(rawData, ImreadModes.Color);
+                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
                 {
-                    return Task.FromResult(OperatorExecutionOutput.Failure($"图像文件不存在: {imagePath}"));
+                    { "Image", rawData },
+                    { "Width", mat.Width },
+                    { "Height", mat.Height },
+                    { "Channels", mat.Channels() }
+                }));
+            }
+
+            // 如果是文件模式
+            if (sourceType?.ToLower() == "file" || !string.IsNullOrEmpty(filePath))
+            {
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    return Task.FromResult(OperatorExecutionOutput.Failure("未指定文件路径"));
                 }
 
-                using var mat = Cv2.ImRead(imagePath, ImreadModes.Color);
+                if (!File.Exists(filePath))
+                {
+                    return Task.FromResult(OperatorExecutionOutput.Failure($"图像文件不存在: {filePath}"));
+                }
+
+                using var mat = Cv2.ImRead(filePath, ImreadModes.Color);
                 if (mat.Empty())
                 {
-                    return Task.FromResult(OperatorExecutionOutput.Failure("无法加载图像文件"));
+                    return Task.FromResult(OperatorExecutionOutput.Failure("无法加载图像文件，格式可能不受支持"));
                 }
 
-                // 转换为字节数组
                 var imageData = mat.ToBytes(".png");
-
                 return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
                 {
                     { "Image", imageData },
@@ -43,23 +81,8 @@ public class ImageAcquisitionOperator : IOperatorExecutor
                     { "Channels", mat.Channels() }
                 }));
             }
-            else if (inputs != null && inputs.TryGetValue("Image", out var imgObj) && imgObj is byte[] imageData)
-            {
-                // 直接返回输入的图像数据
-                using var mat = Cv2.ImDecode(imageData, ImreadModes.Color);
 
-                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
-                {
-                    { "Image", imageData },
-                    { "Width", mat.Width },
-                    { "Height", mat.Height },
-                    { "Channels", mat.Channels() }
-                }));
-            }
-            else
-            {
-                return Task.FromResult(OperatorExecutionOutput.Failure("未提供图像数据或文件路径"));
-            }
+            return Task.FromResult(OperatorExecutionOutput.Failure("未提供图像数据或有效的采集设置"));
         }
         catch (Exception ex)
         {

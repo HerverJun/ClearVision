@@ -86,6 +86,14 @@ public class Operator : Entity
     }
 
     /// <summary>
+    /// 用于反序列化/DTO转换时的构造函数，保留原始ID
+    /// </summary>
+    public Operator(Guid id, string name, OperatorType type, double x, double y) : this(name, type, x, y)
+    {
+        Id = id;
+    }
+
+    /// <summary>
     /// 更新名称
     /// </summary>
     public void UpdateName(string name)

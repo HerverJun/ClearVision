@@ -77,6 +77,15 @@ public class OperatorFlow : Entity
     }
 
     /// <summary>
+    /// 清空所有算子
+    /// </summary>
+    public void ClearOperators()
+    {
+        _operators.Clear();
+        MarkAsModified();
+    }
+
+    /// <summary>
     /// 添加连接
     /// </summary>
     public void AddConnection(OperatorConnection connection)
@@ -97,6 +106,15 @@ public class OperatorFlow : Entity
     public void RemoveConnection(Guid connectionId)
     {
         _connections.RemoveAll(c => c.Id == connectionId);
+        MarkAsModified();
+    }
+
+    /// <summary>
+    /// 清空所有连接
+    /// </summary>
+    public void ClearConnections()
+    {
+        _connections.Clear();
         MarkAsModified();
     }
 

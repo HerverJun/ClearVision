@@ -117,8 +117,8 @@ export class ProjectView {
                     <span>修改: ${modifiedDate}</span>
                 </div>
                 <div class="project-card-actions">
-                    <button class="btn btn-primary btn-open">打开</button>
-                    <button class="btn btn-danger btn-delete">删除</button>
+                    <button class="cv-btn cv-btn-primary btn-open">打开</button>
+                    <button class="cv-btn cv-btn-danger btn-delete">删除</button>
                 </div>
             </div>
         `;

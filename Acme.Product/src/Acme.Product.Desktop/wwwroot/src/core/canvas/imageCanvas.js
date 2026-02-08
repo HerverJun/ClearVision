@@ -173,6 +173,12 @@ class ImageCanvas {
         const imageWidth = this.image.width;
         const imageHeight = this.image.height;
         
+        // 【关键修复】如果画布尺寸为0（容器隐藏时），不计算缩放，等到可见时再处理
+        if (canvasWidth === 0 || canvasHeight === 0) {
+            console.warn('[ImageCanvas] 画布尺寸为0, 延迟重置视图');
+            return;
+        }
+        
         // 计算适应画布的缩放比例
         const scaleX = canvasWidth / imageWidth;
         const scaleY = canvasHeight / imageHeight;

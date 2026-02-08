@@ -1,4 +1,5 @@
 using Acme.Product.Core.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Acme.Product.Core.ValueObjects;
 
@@ -65,6 +66,22 @@ public class Port : ValueObject
 }
 
 /// <summary>
+/// 参数选项（用于下拉列表）
+/// </summary>
+public class ParameterOption
+{
+    /// <summary>
+    /// 显示标签
+    /// </summary>
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 实际数值
+    /// </summary>
+    public string Value { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// 参数值对象 - 算子参数配置
 /// </summary>
 public class Parameter : ValueObject
@@ -74,10 +91,16 @@ public class Parameter : ValueObject
     public string DisplayName { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
     public string DataType { get; private set; } = string.Empty; // int, double, bool, string, enum, etc.
+    [NotMapped]
     public string? DefaultValueJson { get; private set; }
+    [NotMapped]
     public string? ValueJson { get; private set; }
+    [NotMapped]
     public string? MinValueJson { get; private set; }
+    [NotMapped]
     public string? MaxValueJson { get; private set; }
+    [NotMapped]
+    public string? OptionsJson { get; private set; }
     public bool IsRequired { get; private set; }
 
     // EF Core 需要的无参构造函数
@@ -94,7 +117,8 @@ public class Parameter : ValueObject
         object? defaultValue = null,
         object? minValue = null,
         object? maxValue = null,
-        bool isRequired = true)
+        bool isRequired = true,
+        List<ParameterOption>? options = null)
     {
         Id = id;
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -105,6 +129,7 @@ public class Parameter : ValueObject
         ValueJson = SerializeValue(defaultValue);
         MinValueJson = SerializeValue(minValue);
         MaxValueJson = SerializeValue(maxValue);
+        OptionsJson = SerializeValue(options);
         IsRequired = isRequired;
     }
 
@@ -118,10 +143,18 @@ public class Parameter : ValueObject
         return string.IsNullOrEmpty(json) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(json);
     }
 
+    [NotMapped]
     public object? DefaultValue => DeserializeValue(DefaultValueJson);
+    [NotMapped]
     public object? Value => DeserializeValue(ValueJson);
+    [NotMapped]
     public object? MinValue => DeserializeValue(MinValueJson);
+    [NotMapped]
     public object? MaxValue => DeserializeValue(MaxValueJson);
+    [NotMapped]
+    public List<ParameterOption>? Options => string.IsNullOrEmpty(OptionsJson)
+        ? null
+        : System.Text.Json.JsonSerializer.Deserialize<List<ParameterOption>>(OptionsJson);
 
     public void SetValue(object? value)
     {

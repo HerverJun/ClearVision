@@ -5,9 +5,11 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 
 namespace Acme.Product.Desktop.Endpoints;
 
@@ -109,121 +111,19 @@ public static class ApiEndpoints
         });
 
         // 更新流程
-        app.MapPut("/api/projects/{id:guid}/flow", async (Guid id, UpdateFlowRequest request, IProjectRepository repository) =>
+        app.MapPut("/api/projects/{id:guid}/flow", async (Guid id, UpdateFlowRequest request, ProjectService service) =>
         {
             try
             {
-                Console.WriteLine($"[DEBUG API] === START PUT /api/projects/{id}/flow ===");
-                Console.WriteLine($"[DEBUG API] Received Operators count: {request.Operators.Count}");
-                Console.WriteLine($"[DEBUG API] Received Operator IDs: {string.Join(", ", request.Operators.Select(o => $"{o.Name}({o.Id})"))}");
-                Console.WriteLine($"[DEBUG API] Received Connections count: {request.Connections.Count}");
-                
-                foreach (var conn in request.Connections)
-                {
-                    Console.WriteLine($"[DEBUG API] Connection: Source={conn.SourceOperatorId}, Target={conn.TargetOperatorId}");
-                }
-                
-                var project = await repository.GetWithFlowAsync(id);
-                if (project == null)
-                {
-                    Console.WriteLine($"[DEBUG API] Project {id} not found");
-                    return Results.NotFound(new { Error = $"工程 {id} 不存在" });
-                }
+                // 使用 ProjectService 处理更新，它现在使用文件存储
+                // 这种方式完全绕过了 EF Core 的复杂状态管理和 Table Splitting 问题
+                await service.UpdateFlowAsync(id, request);
 
-                // 获取现有流程或创建新流程
-                var flow = project.Flow;
-                
-                // 清除现有算子和连接
-                var existingOperators = flow.Operators.ToList();
-                Console.WriteLine($"[DEBUG API] Clearing {existingOperators.Count} existing operators");
-                foreach (var op in existingOperators)
-                {
-                    flow.RemoveOperator(op.Id);
-                }
-                
-                // 添加算子
-                foreach (var opDto in request.Operators)
-                {
-                    var op = new Operator(
-                        opDto.Name,
-                        opDto.Type,
-                        opDto.X,
-                        opDto.Y
-                    );
-
-                    // 保留前端传来的算子ID（用于连接关系匹配）
-                    if (opDto.Id != Guid.Empty)
-                    {
-                        typeof(Operator).GetProperty("Id")?.SetValue(op, opDto.Id);
-                    }
-
-                    // 添加参数
-                    if (opDto.Parameters != null)
-                    {
-                        foreach (var param in opDto.Parameters)
-                        {
-                            var parameter = new Parameter(
-                                param.Id != Guid.Empty ? param.Id : Guid.NewGuid(),
-                                param.Name,
-                                param.DisplayName,
-                                param.Description ?? string.Empty,
-                                param.DataType,
-                                param.DefaultValue,
-                                param.MinValue,
-                                param.MaxValue,
-                                param.IsRequired
-                            );
-                            if (param.Value != null)
-                            {
-                                parameter.SetValue(param.Value);
-                            }
-                            op.AddParameter(parameter);
-                        }
-                    }
-
-                    flow.AddOperator(op);
-                    Console.WriteLine($"[DEBUG API] Added operator: {op.Name} with ID {op.Id}");
-                }
-                
-                Console.WriteLine($"[DEBUG API] All operators added. Total in flow: {flow.Operators.Count}");
-                Console.WriteLine($"[DEBUG API] Operator IDs in flow: {string.Join(", ", flow.Operators.Select(o => o.Id.ToString()))}");
-                
-                // 添加连接
-                foreach (var connDto in request.Connections)
-                {
-                    // 验证连接数据有效性
-                    if (connDto.SourceOperatorId == Guid.Empty || connDto.TargetOperatorId == Guid.Empty)
-                    {
-                        Console.WriteLine($"[DEBUG API] 跳过无效连接: Source={connDto.SourceOperatorId}, Target={connDto.TargetOperatorId}");
-                        continue;
-                    }
-
-                    var connection = new OperatorConnection(
-                        connDto.SourceOperatorId,
-                        connDto.SourcePortId,
-                        connDto.TargetOperatorId,
-                        connDto.TargetPortId
-                    );
-
-                    // 保留前端传来的连接ID
-                    if (connDto.Id != Guid.Empty)
-                    {
-                        typeof(OperatorConnection).GetProperty("Id")?.SetValue(connection, connDto.Id);
-                    }
-
-                    flow.AddConnection(connection);
-                    Console.WriteLine($"[DEBUG API] Added connection: {connection.SourceOperatorId} -> {connection.TargetOperatorId}");
-                }
-                
-                Console.WriteLine($"[DEBUG API] All connections added. Total in flow: {flow.Connections.Count}");
-                Console.WriteLine($"[DEBUG API] === END PUT /api/projects/{id}/flow ===");
-                
-                await repository.UpdateAsync(project);
-                
-                return Results.Ok(new { Message = "流程已更新", OperatorCount = request.Operators.Count, ConnectionCount = request.Connections.Count });
+                return Results.Ok(new { Message = "流程已更新 (File Based)", OperatorCount = request.Operators.Count, ConnectionCount = request.Connections.Count });
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[ERROR] Save Logic Failed: {ex}");
                 return Results.BadRequest(new { Error = ex.Message });
             }
         });
@@ -249,7 +149,16 @@ public static class ApiEndpoints
                 }
                 else
                 {
-                    return Results.BadRequest(new { Error = "必须提供图像数据或相机ID" });
+                    // 【关键修复】如果前端提供了流程数据，则转换并使用
+                    // 这确保前端编辑的参数值能正确传递到后端执行
+                    OperatorFlow? flow = request.FlowData?.ToEntity();
+                    if (flow != null)
+                    {
+                        Console.WriteLine($"[ApiEndpoints] 收到前端流程数据，算子数: {flow.Operators?.Count ?? 0}");
+                    }
+
+                    var result = await service.ExecuteSingleAsync(request.ProjectId, (byte[])null!, flow);
+                    return Results.Ok(result);
                 }
             }
             catch (Exception ex)
@@ -260,12 +169,12 @@ public static class ApiEndpoints
 
         // 获取检测历史
         app.MapGet("/api/inspection/history/{projectId:guid}", async (
-            Guid projectId,
-            Core.Services.IInspectionService service,
-            DateTime? startTime,
-            DateTime? endTime,
-            int pageIndex = 0,
-            int pageSize = 20) =>
+        Guid projectId,
+        Core.Services.IInspectionService service,
+        DateTime? startTime,
+        DateTime? endTime,
+        int pageIndex = 0,
+        int pageSize = 20) =>
         {
             var results = await service.GetInspectionHistoryAsync(projectId, startTime, endTime, pageIndex, pageSize);
             return Results.Ok(results);
@@ -273,10 +182,10 @@ public static class ApiEndpoints
 
         // 获取统计信息
         app.MapGet("/api/inspection/statistics/{projectId:guid}", async (
-            Guid projectId,
-            Core.Services.IInspectionService service,
-            DateTime? startTime,
-            DateTime? endTime) =>
+        Guid projectId,
+        Core.Services.IInspectionService service,
+        DateTime? startTime,
+        DateTime? endTime) =>
         {
             var statistics = await service.GetStatisticsAsync(projectId, startTime, endTime);
             return Results.Ok(statistics);

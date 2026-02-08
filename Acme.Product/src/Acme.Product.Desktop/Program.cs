@@ -33,34 +33,41 @@ static class Program
     [STAThread]
     static void Main()
     {
-        // 添加全局异常处理
-        System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        System.Windows.Forms.Application.ThreadException += (s, e) =>
+        try
         {
-            MessageBox.Show($"UI线程异常:\n{e.Exception.Message}\n\n{e.Exception.StackTrace}",
-                "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        };
-        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            // 添加全局异常处理
+            System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            System.Windows.Forms.Application.ThreadException += (s, e) =>
+            {
+                MessageBox.Show($"UI线程异常:\n{e.Exception.Message}\n\n{e.Exception.StackTrace}",
+                    "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            };
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                MessageBox.Show($"未处理异常:\n{ex?.Message}\n\n{ex?.StackTrace}",
+                    "严重错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            };
+
+            // 启动本地 Web 服务器
+            StartWebServer();
+
+            // 配置应用程序
+            System.Windows.Forms.Application.EnableVisualStyles();
+            System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
+            System.Windows.Forms.Application.SetHighDpiMode(HighDpiMode.SystemAware);
+
+            // 启动主窗体
+            var mainForm = new MainForm();
+            System.Windows.Forms.Application.Run(mainForm);
+
+            // 关闭 Web 服务器
+            StopWebServer().Wait();
+        }
+        catch (Exception ex)
         {
-            var ex = e.ExceptionObject as Exception;
-            MessageBox.Show($"未处理异常:\n{ex?.Message}\n\n{ex?.StackTrace}",
-                "严重错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        };
-
-        // 启动本地 Web 服务器
-        StartWebServer();
-
-        // 配置应用程序
-        System.Windows.Forms.Application.EnableVisualStyles();
-        System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
-        System.Windows.Forms.Application.SetHighDpiMode(HighDpiMode.SystemAware);
-
-        // 启动主窗体
-        var mainForm = new MainForm();
-        System.Windows.Forms.Application.Run(mainForm);
-
-        // 关闭 Web 服务器
-        StopWebServer().Wait();
+            MessageBox.Show($"Startup Error: {ex}");
+        }
     }
 
     /// <summary>
@@ -78,6 +85,9 @@ static class Program
             // 配置服务
             builder.Services.AddVisionServices();
             builder.Services.AddSingleton<WebMessageHandler>();
+
+            // 注册文件存储服务 (Hybrid Persistence Strategy)
+            builder.Services.AddSingleton<Acme.Product.Core.Interfaces.IProjectFlowStorage, Acme.Product.Infrastructure.Services.JsonFileProjectFlowStorage>();
 
             // 配置 JSON 序列化为 camelCase（前端 JavaScript 标准）且枚举序列化为字符串
             builder.Services.ConfigureHttpJsonOptions(options =>

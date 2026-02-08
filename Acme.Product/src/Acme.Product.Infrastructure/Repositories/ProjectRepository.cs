@@ -68,6 +68,41 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
             .Include(p => p.Flow)
                 .ThenInclude(f => f.Operators)
                     .ThenInclude(o => o.Parameters)
+            .Include(p => p.Flow)
+                .ThenInclude(f => f.Connections)
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+    }
+
+    /// <summary>
+    /// 更新工程流程 - 显式处理 EF Core 变更追踪
+    /// </summary>
+    public async Task UpdateFlowAsync(Project project)
+    {
+        // 【修复】遍历流程中的所有算子，将新添加的算子添加到 Operators DbSet
+        // 对于 owned entities (Port, Parameter)，EF Core 会自动处理
+        foreach (var op in project.Flow.Operators)
+        {
+            var entry = _context.Entry(op);
+            // 如果实体状态是 Detached，说明是新创建的
+            if (entry.State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+            {
+                // 设置外键以关联到 Project/Flow
+                typeof(Operator).GetProperty("ProjectId")?.SetValue(op, project.Id);
+                // 添加到 DbSet，EF Core 会自动处理 owned entities
+                _context.Set<Operator>().Add(op);
+            }
+        }
+
+        // 【调试】打印所有被追踪的实体及其状态
+        Console.WriteLine("[DEBUG Repository] === Change Tracker Entries Before Save ===");
+        foreach (var entry in _context.ChangeTracker.Entries())
+        {
+            var idProp = entry.Metadata.FindProperty("Id");
+            var idValue = idProp != null ? entry.Property("Id")?.CurrentValue?.ToString() : "(no Id)";
+            Console.WriteLine($"[DEBUG Repository] Entity: {entry.Entity.GetType().Name}, State: {entry.State}, Id: {idValue}");
+        }
+        Console.WriteLine("[DEBUG Repository] === End Change Tracker Entries ===");
+
+        await _context.SaveChangesAsync();
     }
 }

@@ -172,19 +172,3 @@ public class ParameterDefinition
     /// </summary>
     public List<ParameterOption>? Options { get; set; }
 }
-
-/// <summary>
-/// 参数选项（用于下拉列表）
-/// </summary>
-public class ParameterOption
-{
-    /// <summary>
-    /// 显示标签
-    /// </summary>
-    public string Label { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 实际数值
-    /// </summary>
-    public string Value { get; set; } = string.Empty;
-}

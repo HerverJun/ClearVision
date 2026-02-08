@@ -18,6 +18,15 @@ public interface IInspectionService
     Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData);
 
     /// <summary>
+    /// 执行单次检测（使用前端提供的流程数据）
+    /// </summary>
+    /// <param name="projectId">工程ID</param>
+    /// <param name="imageData">图像数据</param>
+    /// <param name="flow">流程数据（含前端编辑过的参数）</param>
+    /// <returns>检测结果</returns>
+    Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData, OperatorFlow? flow);
+
+    /// <summary>
     /// 执行单次检测（使用相机采集）
     /// </summary>
     /// <param name="projectId">工程ID</param>

@@ -30,9 +30,26 @@ public class InspectionService : IInspectionService
 
     public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData)
     {
-        var project = await _projectRepository.GetWithFlowAsync(projectId);
-        if (project == null)
-            throw new ProjectNotFoundException(projectId);
+        // 原有方法：使用数据库加载的流程
+        return await ExecuteSingleAsync(projectId, imageData, null);
+    }
+
+    public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData, OperatorFlow? flow)
+    {
+        // 【关键修复】如果提供了前端流程数据，则使用它；否则从数据库加载
+        OperatorFlow actualFlow;
+        if (flow != null)
+        {
+            actualFlow = flow;
+            Console.WriteLine($"[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {flow.Operators?.Count ?? 0})");
+        }
+        else
+        {
+            var project = await _projectRepository.GetWithFlowAsync(projectId);
+            if (project == null)
+                throw new ProjectNotFoundException(projectId);
+            actualFlow = project.Flow;
+        }
 
         var result = new InspectionResult(projectId);
 
@@ -40,7 +57,7 @@ public class InspectionService : IInspectionService
         {
             // 执行检测流程
             var flowResult = await _flowExecutionService.ExecuteFlowAsync(
-                project.Flow,
+                actualFlow,
                 new Dictionary<string, object> { { "Image", imageData } });
 
             var status = flowResult.IsSuccess ? InspectionStatus.OK : InspectionStatus.NG;

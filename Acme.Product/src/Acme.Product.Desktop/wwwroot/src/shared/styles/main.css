@@ -429,6 +429,20 @@ body::before {
         var(--neon-jade);
 }
 
+/* Danger Button - Cinnabar */
+.btn-danger {
+    background: rgba(192, 57, 43, 0.15);
+    color: var(--error-cinnabar);
+    border: 1px solid rgba(192, 57, 43, 0.3);
+}
+
+.btn-danger:hover {
+    background: rgba(192, 57, 43, 0.25);
+    border-color: var(--error-cinnabar);
+    box-shadow: 0 0 20px rgba(192, 57, 43, 0.2);
+    color: var(--paper-white);
+}
+
 /* Icon Button */
 .btn-icon {
     padding: 8px;
@@ -626,7 +640,7 @@ body::before {
     cursor: pointer;
     transition: all var(--duration-normal) var(--ease-ink-bounce);
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden; -- Remove clipping to debug */
     animation: inkFadeIn var(--duration-slow) var(--ease-ink-smooth);
 }
 
@@ -695,6 +709,7 @@ body::before {
     margin-top: 16px;
 }
 
+.project-card-actions .cv-btn,
 .project-card-actions .btn {
     flex: 1;
     padding: 6px 12px;

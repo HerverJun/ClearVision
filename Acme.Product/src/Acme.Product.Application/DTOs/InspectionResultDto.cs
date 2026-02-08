@@ -123,4 +123,9 @@ public class ExecuteInspectionRequest
     /// 相机ID（如果使用相机采集）
     /// </summary>
     public string? CameraId { get; set; }
+
+    /// <summary>
+    /// 流程数据（包含前端编辑过的算子参数）
+    /// </summary>
+    public OperatorFlowDto? FlowData { get; set; }
 }

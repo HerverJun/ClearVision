@@ -1,0 +1,17 @@
+  正在确定要还原的项目…
+C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Acme.Product.Application.csproj : warning NU1903: 包 "Microsoft.Extensions.Caching.Memory" 8.0.0 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-qj66-m88j-hmgj
+  所有项目均是最新的，无法还原。
+C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Acme.Product.Application.csproj : warning NU1903: 包 "Microsoft.Extensions.Caching.Memory" 8.0.0 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-qj66-m88j-hmgj
+  Acme.Product.Core -> C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Core\bin\Debug\net8.0\Acme.Product.Core.dll
+  Acme.Product.Contracts -> C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Contracts\bin\Debug\net8.0\Acme.Product.Contracts.dll
+C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Services\ProjectService.cs(69,18): error CS1513: 应输入 } [C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Acme.Product.Application.csproj]
+
+生成失败。
+
+C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Acme.Product.Application.csproj : warning NU1903: 包 "Microsoft.Extensions.Caching.Memory" 8.0.0 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-qj66-m88j-hmgj
+C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Acme.Product.Application.csproj : warning NU1903: 包 "Microsoft.Extensions.Caching.Memory" 8.0.0 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-qj66-m88j-hmgj
+C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Services\ProjectService.cs(69,18): error CS1513: 应输入 } [C:\Users\11234\Desktop\ClearVision\Acme.Product\src\Acme.Product.Application\Acme.Product.Application.csproj]
+    2 个警告
+    1 个错误
+
+已用时间 00:00:00.85

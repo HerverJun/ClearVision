@@ -1,4 +1,5 @@
 using Acme.Product.Core.Enums;
+using Acme.Product.Core.ValueObjects;
 
 namespace Acme.Product.Application.DTOs;
 
@@ -95,6 +96,7 @@ public class ParameterDto
     public object? MinValue { get; set; }
     public object? MaxValue { get; set; }
     public bool IsRequired { get; set; }
+    public List<ParameterOption>? Options { get; set; }
 }
 
 /// <summary>

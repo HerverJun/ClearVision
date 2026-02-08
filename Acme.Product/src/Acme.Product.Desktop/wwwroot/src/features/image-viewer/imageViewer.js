@@ -242,6 +242,25 @@ export class ImageViewerComponent {
     }
 
     /**
+     * 通用图像加载方法 - 支持 data URL 和 raw base64
+     * @param {string} source - data URL (如 "data:image/png;base64,...") 或者 raw base64 字符串
+     */
+    loadImage(source) {
+        if (!source) {
+            console.warn('[ImageViewer] loadImage: source is empty');
+            return Promise.reject(new Error('Image source is empty'));
+        }
+
+        // 如果是 data URL，直接当作 URL 加载
+        if (source.startsWith('data:')) {
+            return this.loadFromUrl(source);
+        }
+        
+        // 如果是 raw base64，使用 loadFromBase64
+        return this.loadFromBase64(source);
+    }
+
+    /**
      * 显示缺陷标注
      */
     showDefects(defects) {

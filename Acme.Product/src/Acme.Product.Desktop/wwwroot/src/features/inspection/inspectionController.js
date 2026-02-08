@@ -100,7 +100,18 @@ class InspectionController {
                     cameraId: this.cameraId
                 });
             } else {
-                throw new Error('未提供图像数据或相机');
+                // 【关键修复】将当前流程数据（含最新参数）一起发送给后端
+                // 这确保后端使用的是前端编辑过的参数值，而非数据库中的过时数据
+                let flowData = null;
+                if (window.flowCanvas && typeof window.flowCanvas.serialize === 'function') {
+                    flowData = window.flowCanvas.serialize();
+                    console.log('[InspectionController] 携带流程数据执行检测:', flowData);
+                }
+                
+                result = await httpClient.post('/inspection/execute', {
+                    projectId: this.projectId,
+                    flowData: flowData
+                });
             }
 
             this.handleInspectionCompleted(result);

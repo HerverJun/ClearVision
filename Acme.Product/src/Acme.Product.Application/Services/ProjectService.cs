@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Exceptions;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
 
 namespace Acme.Product.Application.Services;
@@ -12,10 +14,14 @@ namespace Acme.Product.Application.Services;
 public class ProjectService
 {
     private readonly IProjectRepository _projectRepository;
+    private readonly IProjectFlowStorage _flowStorage;
+    private readonly IOperatorFactory _operatorFactory;
 
-    public ProjectService(IProjectRepository projectRepository)
+    public ProjectService(IProjectRepository projectRepository, IProjectFlowStorage flowStorage, IOperatorFactory operatorFactory)
     {
         _projectRepository = projectRepository;
+        _flowStorage = flowStorage;
+        _operatorFactory = operatorFactory;
     }
 
     /// <summary>
@@ -25,6 +31,14 @@ public class ProjectService
     {
         var project = new Project(request.Name, request.Description);
         await _projectRepository.AddAsync(project);
+
+        // 如果创建时带有流程（通常是空的，但为了完整性）
+        if (request.Flow != null)
+        {
+            var json = JsonSerializer.Serialize(request.Flow);
+            await _flowStorage.SaveFlowJsonAsync(project.Id, json);
+        }
+
         return MapToDto(project);
     }
 
@@ -34,7 +48,61 @@ public class ProjectService
     public async Task<ProjectDto?> GetByIdAsync(Guid id)
     {
         var project = await _projectRepository.GetByIdAsync(id);
-        return project != null ? MapToDto(project) : null;
+        if (project == null)
+            return null;
+
+        var dto = MapToDto(project);
+
+        // 从文件加载流程数据覆盖 DB 数据 (如果有)
+        var flowJson = await _flowStorage.LoadFlowJsonAsync(id);
+        if (!string.IsNullOrEmpty(flowJson))
+        {
+            try
+            {
+                var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson);
+                if (flowDto != null)
+                {
+                    dto.Flow = flowDto;
+                }
+            }
+            catch
+            {
+                // 忽略反序列化错误，回退到 DB 数据
+            }
+        }
+
+        // 【统一修复】无论数据来自 DB 还是 JSON，都尝试回填缺失的 Options
+        if (dto.Flow != null)
+        {
+            EnrichFlowDtoWithMetadata(dto.Flow);
+        }
+
+        return dto;
+    }
+
+    private void EnrichFlowDtoWithMetadata(OperatorFlowDto flowDto)
+    {
+        foreach (var opDto in flowDto.Operators)
+        {
+            var metadata = _operatorFactory.GetMetadata(opDto.Type);
+            if (metadata == null)
+                continue;
+
+            foreach (var paramDto in opDto.Parameters)
+            {
+                // 如果 Options 为空且 DataType 是 enum，尝试从元数据恢复
+                if ((paramDto.Options == null || paramDto.Options.Count == 0) &&
+                    (paramDto.DataType.Equals("enum", StringComparison.OrdinalIgnoreCase) ||
+                     paramDto.DataType.Equals("select", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var paramDef = metadata.Parameters.FirstOrDefault(p => p.Name == paramDto.Name);
+                    if (paramDef != null && paramDef.Options != null)
+                    {
+                        paramDto.Options = paramDef.Options;
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -43,6 +111,8 @@ public class ProjectService
     public async Task<IEnumerable<ProjectDto>> GetAllAsync()
     {
         var projects = await _projectRepository.GetAllAsync();
+        // GetAll 通常不返回详细的 Flow 内容以优化性能，或者我们可以选择加载
+        // 这里暂时保持原样，仅返回轻量级列表
         return projects.Select(MapToDto);
     }
 
@@ -57,12 +127,11 @@ public class ProjectService
 
         project.UpdateInfo(request.Name, request.Description);
 
-        // 【修复】如果有流程数据，更新流程
+        // 如果有流程数据，更新到文件
         if (request.Flow != null)
         {
-            // 传入 Project.Id 以确保 Table Splitting ID 一致
-            var flow = MapDtoToFlow(request.Flow, project.Id);
-            project.UpdateFlow(flow);
+            var json = JsonSerializer.Serialize(request.Flow);
+            await _flowStorage.SaveFlowJsonAsync(id, json);
         }
 
         await _projectRepository.UpdateAsync(project);
@@ -74,27 +143,26 @@ public class ProjectService
     /// </summary>
     public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
-        // 使用 GetWithFlowAsync 确保加载现有关联数据
-        var project = await _projectRepository.GetWithFlowAsync(id);
+        // 1. 验证工程存在
+        var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             throw new ProjectNotFoundException(id);
 
-        // 构造流程DTO
+        // 2. 构造流程DTO
         var flowDto = new OperatorFlowDto
         {
-            Name = project.Flow.Name, // 保持原有名称
+            Name = "MainFlow", // 保持默认名称或从某处获取
             Operators = request.Operators,
             Connections = request.Connections
         };
 
-        // 使用已修复的 MapDtoToFlow 逻辑 (包含端口恢复)
-        // 传入 Project.Id 以确保 Table Splitting ID 一致
-        var flow = MapDtoToFlow(flowDto, project.Id);
+        // 3. 序列化并保存到文件
+        var json = JsonSerializer.Serialize(flowDto);
+        await _flowStorage.SaveFlowJsonAsync(id, json);
 
-        // 更新到实体
-        project.UpdateFlow(flow);
-
-        await _projectRepository.UpdateAsync(project);
+        // 4. 更新工程修改时间 (可选，但推荐)
+        // project.LastModified = DateTime.UtcNow; // 如果 Project 有这个字段
+        // await _projectRepository.UpdateAsync(project);
     }
 
     /// <summary>
@@ -155,7 +223,8 @@ public class ProjectService
                     paramDto.DefaultValue,
                     paramDto.MinValue,
                     paramDto.MaxValue,
-                    paramDto.IsRequired
+                    paramDto.IsRequired,
+                    paramDto.Options
                 );
 
                 if (paramDto.Value != null)
@@ -172,10 +241,11 @@ public class ProjectService
         // 添加连接
         foreach (var connDto in dto.Connections)
         {
+            // 【修复】修正参数顺序：sourceOperatorId, sourcePortId, targetOperatorId, targetPortId
             var connection = new OperatorConnection(
                 connDto.SourceOperatorId,
-                connDto.TargetOperatorId,
-                connDto.SourcePortId,
+                connDto.SourcePortId,        // ✅ 修正：第2个参数应该是 SourcePortId
+                connDto.TargetOperatorId,    // ✅ 修正：第3个参数应该是 TargetOperatorId
                 connDto.TargetPortId
             );
 
@@ -233,7 +303,96 @@ public class ProjectService
             CreatedAt = project.CreatedAt,
             ModifiedAt = project.ModifiedAt,
             LastOpenedAt = project.LastOpenedAt,
-            GlobalSettings = project.GlobalSettings
+            GlobalSettings = project.GlobalSettings,
+            // 修复：添加 Flow 字段映射
+            Flow = project.Flow != null ? MapFlowToDto(project.Flow) : null
+        };
+    }
+
+    /// <summary>
+    /// 将 OperatorFlow 实体映射为 DTO
+    /// </summary>
+    private OperatorFlowDto MapFlowToDto(OperatorFlow flow)
+    {
+        return new OperatorFlowDto
+        {
+            Id = flow.Id,
+            Name = flow.Name,
+            Operators = flow.Operators.Select(MapOperatorToDto).ToList(),
+            Connections = flow.Connections.Select(MapConnectionToDto).ToList()
+        };
+    }
+
+    /// <summary>
+    /// 将 Operator 实体映射为 DTO
+    /// </summary>
+    private OperatorDto MapOperatorToDto(Operator op)
+    {
+        return new OperatorDto
+        {
+            Id = op.Id,
+            Name = op.Name,
+            Type = op.Type,
+            X = op.Position.X,
+            Y = op.Position.Y,
+            InputPorts = op.InputPorts.Select(MapPortToDto).ToList(),
+            OutputPorts = op.OutputPorts.Select(MapPortToDto).ToList(),
+            Parameters = op.Parameters.Select(MapParameterToDto).ToList(),
+            IsEnabled = op.IsEnabled,
+            ExecutionStatus = op.ExecutionStatus,
+            ExecutionTimeMs = op.ExecutionTimeMs,
+            ErrorMessage = op.ErrorMessage
+        };
+    }
+
+    /// <summary>
+    /// 将 Port 值对象映射为 DTO
+    /// </summary>
+    private PortDto MapPortToDto(Port port)
+    {
+        return new PortDto
+        {
+            Id = port.Id,
+            Name = port.Name,
+            Direction = port.Direction,
+            DataType = port.DataType,
+            IsRequired = port.IsRequired
+        };
+    }
+
+    /// <summary>
+    /// 将 Parameter 值对象映射为 DTO
+    /// </summary>
+    private ParameterDto MapParameterToDto(Parameter param)
+    {
+        return new ParameterDto
+        {
+            Id = param.Id,
+            Name = param.Name,
+            DisplayName = param.DisplayName,
+            Description = param.Description,
+            DataType = param.DataType,
+            Value = param.GetValue(),
+            DefaultValue = param.DefaultValue,
+            MinValue = param.MinValue,
+            MaxValue = param.MaxValue,
+            IsRequired = param.IsRequired,
+            Options = param.Options
+        };
+    }
+
+    /// <summary>
+    /// 将 OperatorConnection 值对象映射为 DTO
+    /// </summary>
+    private OperatorConnectionDto MapConnectionToDto(OperatorConnection conn)
+    {
+        return new OperatorConnectionDto
+        {
+            Id = conn.Id,
+            SourceOperatorId = conn.SourceOperatorId,
+            SourcePortId = conn.SourcePortId,
+            TargetOperatorId = conn.TargetOperatorId,
+            TargetPortId = conn.TargetPortId
         };
     }
 }

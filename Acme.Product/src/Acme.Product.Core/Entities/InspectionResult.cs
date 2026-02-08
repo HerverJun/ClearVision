@@ -1,5 +1,6 @@
 using Acme.Product.Core.Entities.Base;
 using Acme.Product.Core.Enums;
+using System.Text.Json.Serialization;
 
 namespace Acme.Product.Core.Entities;
 
@@ -27,6 +28,7 @@ public class InspectionResult : Entity
     /// <summary>
     /// 处理时间（毫秒）
     /// </summary>
+    [JsonInclude]
     public long ProcessingTimeMs { get; private set; }
 
     /// <summary>
@@ -47,6 +49,7 @@ public class InspectionResult : Entity
     /// <summary>
     /// 输出图像数据（处理后的图像）
     /// </summary>
+    [JsonInclude]
     public byte[]? OutputImage { get; private set; }
 
     /// <summary>

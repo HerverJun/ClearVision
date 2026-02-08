@@ -179,6 +179,17 @@ function switchView(view) {
             break;
         case 'inspection':
             imageViewerContainer?.classList.remove('hidden');
+            // 【关键修复】视图可见后，重新计算画布尺寸
+            if (window.imageViewer && window.imageViewer.imageCanvas) {
+                // 延迟一帧以确保DOM已完成布局
+                requestAnimationFrame(() => {
+                    window.imageViewer.imageCanvas.resize();
+                    // 如果已有图像，重新适应屏幕
+                    if (window.imageViewer.imageCanvas.image) {
+                        window.imageViewer.imageCanvas.resetView();
+                    }
+                });
+            }
             break;
         case 'results':
             resultsViewContainer?.classList.remove('hidden');
@@ -240,6 +251,7 @@ function initializeImageViewer() {
     
     // 清空容器并初始化图像查看器组件
     imageViewer = new ImageViewerComponent('image-viewer');
+    window.imageViewer = imageViewer;
     
     // 设置图像加载回调
     imageViewer.onImageLoaded = (img) => {
@@ -262,6 +274,12 @@ function initializeInspectionController() {
     inspectionController.onInspectionCompleted = (result) => {
         console.log('[App] 检测完成:', result);
 
+        // 如果有处理后的图像，在查看器中显示
+        if (result.outputImage && window.imageViewer) {
+            const imageData = `data:image/png;base64,${result.outputImage}`;
+            window.imageViewer.loadImage(imageData);
+        }
+
         // 添加结果到数显面板
         if (resultPanel) {
             resultPanel.addResult({
@@ -270,7 +288,7 @@ function initializeInspectionController() {
                 processingTime: result.processingTimeMs,
                 timestamp: new Date().toISOString(),
                 confidenceScore: result.confidenceScore,
-                imageData: result.imageData
+                imageData: result.outputImage // 使用 outputImage
             });
         }
 
@@ -278,8 +296,8 @@ function initializeInspectionController() {
         updateResultsPanel(result);
 
         // 如果有缺陷，在图像查看器中显示
-        if (result.defects && result.defects.length > 0 && imageViewer) {
-            imageViewer.showDefects(result.defects);
+        if (result.defects && result.defects.length > 0 && window.imageViewer) {
+            window.imageViewer.showDefects(result.defects);
         }
 
         // 显示结果提示
@@ -867,11 +885,11 @@ function initializeToolbar() {
                 if (testImage) {
                     showToast('使用导入图像执行检测...', 'info');
                     await inspectionController.executeSingle(testImage);
-                } else if (imageViewer && imageViewer.getCurrentImage()) {
+                } else {
+                    // 【关键修复】即使没有显式加载图像，也允许执行。
+                    // 图像可能由流程内部的“图像采集”算子从文件加载。
                     showToast('开始执行检测流程...', 'info');
                     await inspectionController.executeSingle();
-                } else {
-                    showToast('请先加载图像', 'warning');
                 }
             } catch (error) {
                 console.error('[App] 运行检测失败:', error);

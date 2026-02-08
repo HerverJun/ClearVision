@@ -26,4 +26,9 @@ public interface IProjectRepository : IRepository<Project>
     /// 获取工程及其流程
     /// </summary>
     Task<Project?> GetWithFlowAsync(Guid id);
+
+    /// <summary>
+    /// 更新工程流程
+    /// </summary>
+    Task UpdateFlowAsync(Project project);
 }

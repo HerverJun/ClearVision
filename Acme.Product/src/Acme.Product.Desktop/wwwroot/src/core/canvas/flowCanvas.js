@@ -637,6 +637,25 @@ class FlowCanvas {
      * 后端 Program.cs 配置 JsonNamingPolicy.CamelCase，所以必须使用小驼峰
      */
     serialize() {
+        // 【修复】先确保所有节点的端口都有稳定的 ID
+        // 这样 operators 和 connections 都会使用相同的 ID
+        for (const node of this.nodes.values()) {
+            if (node.inputs) {
+                for (const port of node.inputs) {
+                    if (!port.id) {
+                        port.id = this.generateUUID();
+                    }
+                }
+            }
+            if (node.outputs) {
+                for (const port of node.outputs) {
+                    if (!port.id) {
+                        port.id = this.generateUUID();
+                    }
+                }
+            }
+        }
+
         // 构建 Operators 列表 (camelCase)
         const operators = Array.from(this.nodes.values()).map(node => ({
             id: node.id,
@@ -645,14 +664,14 @@ class FlowCanvas {
             x: node.x,
             y: node.y,
             inputPorts: (node.inputs || []).map(p => ({
-                id: p.id || this.generateUUID(),
+                id: p.id || p.Id || this.generateUUID(), // 【修复】同时检查大小写
                 name: p.name,
                 dataType: p.type || 0, // PortDataType enum
                 direction: 0, // Input
                 isRequired: false
             })),
             outputPorts: (node.outputs || []).map(p => ({
-                id: p.id || this.generateUUID(),
+                id: p.id || p.Id || this.generateUUID(), // 【修复】同时检查大小写
                 name: p.name,
                 dataType: p.type || 0,
                 direction: 1, // Output
@@ -685,23 +704,54 @@ class FlowCanvas {
                 console.log(`[DEBUG serialize] Processing connection: source=${conn.source}, target=${conn.target}`);
                 console.log(`[DEBUG serialize]   sourceNode exists: ${!!sourceNode}, targetNode exists: ${!!targetNode}`);
 
-                // 查找端口 ID
-                const sourcePortId = sourceNode?.outputs[conn.sourcePort]?.id;
-                const targetPortId = targetNode?.inputs[conn.targetPort]?.id;
+                // 【修复】添加端口索引边界检查，并同时检查 id/Id 属性
+                let sourcePortId = null;
+                let targetPortId = null;
+
+                if (sourceNode && conn.sourcePort >= 0 && conn.sourcePort < sourceNode.outputs.length) {
+                    const port = sourceNode.outputs[conn.sourcePort];
+                    sourcePortId = port?.id || port?.Id;
+                    if (!sourcePortId) {
+                        console.error(`[DEBUG serialize] 源端口索引 ${conn.sourcePort} 存在但没有ID，生成新ID`);
+                        port.id = this.generateUUID(); // 为端口分配ID
+                        sourcePortId = port.id;
+                    }
+                } else {
+                    console.error(`[DEBUG serialize] 源端口索引越界: ${conn.sourcePort}, 可用端口数: ${sourceNode?.outputs?.length || 0}`);
+                }
+
+                if (targetNode && conn.targetPort >= 0 && conn.targetPort < targetNode.inputs.length) {
+                    const port = targetNode.inputs[conn.targetPort];
+                    targetPortId = port?.id || port?.Id;
+                    if (!targetPortId) {
+                        console.error(`[DEBUG serialize] 目标端口索引 ${conn.targetPort} 存在但没有ID，生成新ID`);
+                        port.id = this.generateUUID(); // 为端口分配ID
+                        targetPortId = port.id;
+                    }
+                } else {
+                    console.error(`[DEBUG serialize] 目标端口索引越界: ${conn.targetPort}, 可用端口数: ${targetNode?.inputs?.length || 0}`);
+                }
 
                 console.log(`[DEBUG serialize]   sourcePortId: ${sourcePortId}, targetPortId: ${targetPortId}`);
+
+                // 【修复】如果无法获取端口ID，跳过此连接而不是生成错误的UUID
+                if (!sourcePortId || !targetPortId) {
+                    console.error(`[DEBUG serialize] 跳过无效连接: sourcePortId=${sourcePortId}, targetPortId=${targetPortId}`);
+                    return null;
+                }
 
                 const result = {
                     id: conn.id,
                     sourceOperatorId: conn.source,
-                    sourcePortId: sourcePortId || this.generateUUID(),
+                    sourcePortId: sourcePortId,
                     targetOperatorId: conn.target,
-                    targetPortId: targetPortId || this.generateUUID()
+                    targetPortId: targetPortId
                 };
 
                 console.log(`[DEBUG serialize]   Serialized connection:`, JSON.stringify(result));
                 return result;
-            });
+            })
+            .filter(conn => conn !== null); // 过滤掉无效的连接
 
         // UpdateFlowRequest 期望的结构 (camelCase 会被后端自动映射)
         const result = {
@@ -736,16 +786,26 @@ class FlowCanvas {
                 const type = op.type || op.Type;
                 const title = op.name || op.Name || op.title || type;
                 
+                // 【修复】标准化端口数据，统一使用小写属性名（id/name/type）
+                const normalizePort = (p) => ({
+                    id: p.id || p.Id || this.generateUUID(),
+                    name: p.name || p.Name,
+                    type: p.type || p.Type || p.dataType || p.DataType || 0
+                });
+
+                const inputs = (op.inputPorts || op.InputPorts || op.inputs || []).map(normalizePort);
+                const outputs = (op.outputPorts || op.OutputPorts || op.outputs || []).map(normalizePort);
+
                 const node = {
                     id: id,
-                    type: type, 
+                    type: type,
                     x: op.x || op.X || 0,
                     y: op.y || op.Y || 0,
                     width: 140,
                     height: 60,
                     title: title,
-                    inputs: op.inputPorts || op.InputPorts || op.inputs || [],
-                    outputs: op.outputPorts || op.OutputPorts || op.outputs || [],
+                    inputs: inputs,
+                    outputs: outputs,
                     parameters: op.parameters || op.Parameters || [],
                     color: '#1890ff' // Default
                 };
@@ -983,35 +1043,6 @@ class FlowCanvas {
         this.nodes.clear();
         this.connections = [];
         this.selectedNode = null;
-        this.render();
-    }
-
-    /**
-     * 序列化流程数据
-     */
-    serialize() {
-        return {
-            nodes: Array.from(this.nodes.values()),
-            connections: this.connections
-        };
-    }
-
-    /**
-     * 反序列化流程数据
-     */
-    deserialize(data) {
-        this.clear();
-
-        if (data.nodes) {
-            data.nodes.forEach(node => {
-                this.nodes.set(node.id, node);
-            });
-        }
-
-        if (data.connections) {
-            this.connections = data.connections;
-        }
-
         this.render();
     }
 

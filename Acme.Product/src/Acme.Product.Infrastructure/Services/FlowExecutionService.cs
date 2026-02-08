@@ -157,7 +157,8 @@ public class FlowExecutionService : IFlowExecutionService
 
         foreach (var layer in executionLayers)
         {
-            if (failed) break;
+            if (failed)
+                break;
 
             // 更新状态
             status.CurrentOperatorId = layer.First().Id;
@@ -182,7 +183,7 @@ public class FlowExecutionService : IFlowExecutionService
 
                 // 执行算子
                 var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs);
-                
+
                 if (opResult.IsSuccess)
                 {
                     operatorOutputs[op.Id] = opResult.OutputData ?? new Dictionary<string, object>();
@@ -242,7 +243,7 @@ public class FlowExecutionService : IFlowExecutionService
             }
 
             layers.Add(currentLayer);
-            
+
             foreach (var op in currentLayer)
             {
                 executed.Add(op.Id);
@@ -412,6 +413,16 @@ public class FlowExecutionService : IFlowExecutionService
     private Dictionary<string, object> PrepareOperatorInputs(OperatorFlow flow, Operator op, IDictionary<Guid, Dictionary<string, object>> operatorOutputs)
     {
         var inputs = new Dictionary<string, object>();
+
+        // 【关键修复】首先将算子自身的参数合并到输入中作为默认值
+        // 这确保了如果没有外部连线，算子依然能拿到 UI 属性面板设置的值 (如 filePath)
+        foreach (var param in op.Parameters)
+        {
+            if (param.Value != null)
+            {
+                inputs[param.Name] = param.Value;
+            }
+        }
 
         // 查找连接到该算子的所有连接
         var incomingConnections = flow.Connections

@@ -58,6 +58,11 @@ public class CreateProjectRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    /// <summary>
+    /// 算子流程（可选）
+    /// </summary>
+    public OperatorFlowDto? Flow { get; set; }
 }
 
 /// <summary>
@@ -67,7 +72,7 @@ public class UpdateProjectRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    
+
     /// <summary>
     /// 算子流程（可选）
     /// </summary>
