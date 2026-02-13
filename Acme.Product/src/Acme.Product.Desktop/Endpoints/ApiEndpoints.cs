@@ -123,7 +123,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] Save Logic Failed: {ex}");
+                // 日志已由全局异常中间件记录
                 return Results.BadRequest(new { Error = ex.Message });
             }
         });
@@ -152,10 +152,7 @@ public static class ApiEndpoints
                     // 【关键修复】如果前端提供了流程数据，则转换并使用
                     // 这确保前端编辑的参数值能正确传递到后端执行
                     OperatorFlow? flow = request.FlowData?.ToEntity();
-                    if (flow != null)
-                    {
-                        Console.WriteLine($"[ApiEndpoints] 收到前端流程数据，算子数: {flow.Operators?.Count ?? 0}");
-                    }
+                    // 前端流程数据已通过日志中间件记录
 
                     var result = await service.ExecuteSingleAsync(request.ProjectId, (byte[])null!, flow);
                     return Results.Ok(result);

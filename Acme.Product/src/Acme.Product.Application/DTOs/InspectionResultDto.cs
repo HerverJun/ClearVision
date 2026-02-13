@@ -51,6 +51,11 @@ public class InspectionResultDto
     /// 检测时间戳
     /// </summary>
     public DateTime InspectionTime { get; set; }
+
+    /// <summary>
+    /// 输出图像（Base64编码）
+    /// </summary>
+    public string? OutputImage { get; set; }
 }
 
 /// <summary>

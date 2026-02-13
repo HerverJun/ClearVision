@@ -74,7 +74,9 @@ public static class ImageStreamUtility
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ImageStreamUtility] 图像压缩失败: {ex.Message}");
+            // 注意：此类为静态工具类，无法直接注入ILogger
+            // 异常应向上抛出由调用方处理，或可考虑传入ILogger参数
+            // 临时方案：返回原始数据，异常由调用方捕获并记录
             // 失败时返回原始数据的Base64
             return Convert.ToBase64String(imageData);
         }
@@ -125,7 +127,8 @@ public static class ImageStreamUtility
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ImageStreamUtility] Mat转换失败: {ex.Message}");
+            // 注意：此类为静态工具类，无法直接注入ILogger
+            // 异常向上抛出，由调用方使用ILogger记录
             throw;
         }
     }

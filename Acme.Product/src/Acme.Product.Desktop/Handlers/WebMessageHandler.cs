@@ -31,6 +31,50 @@ public class WebMessageHandler
     }
 
     /// <summary>
+    /// 处理消息（供 WebView2Host 调用）
+    /// </summary>
+    public async Task<WebMessageResponse> HandleAsync(WebMessage message)
+    {
+        try
+        {
+            _logger.LogInformation("[WebMessageHandler] 处理消息: {MessageType}", message.Type);
+
+            var messageJson = JsonSerializer.Serialize(message, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            switch (message.Type)
+            {
+                case nameof(ExecuteOperatorCommand):
+                    await HandleExecuteOperatorCommand(messageJson);
+                    break;
+                case nameof(UpdateFlowCommand):
+                    await HandleUpdateFlowCommand(messageJson);
+                    break;
+                case nameof(StartInspectionCommand):
+                    await HandleStartInspectionCommand(messageJson);
+                    break;
+                case nameof(StopInspectionCommand):
+                    await HandleStopInspectionCommand();
+                    break;
+                case nameof(PickFileCommand):
+                    await HandlePickFileCommand(messageJson);
+                    break;
+                default:
+                    return new WebMessageResponse { RequestId = message.Id, Success = false, Error = "未知消息类型" };
+            }
+
+            return new WebMessageResponse { RequestId = message.Id, Success = true };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[WebMessageHandler] 处理消息失败");
+            return new WebMessageResponse { RequestId = message.Id, Success = false, Error = ex.Message };
+        }
+    }
+
+    /// <summary>
     /// 初始化 WebView
     /// </summary>
     public void Initialize(WebView2 webViewControl)
@@ -245,23 +289,14 @@ public class WebMessageHandler
                     Width = d.Width,
                     Height = d.Height,
                     Confidence = d.ConfidenceScore,
-                    Description = d.Description
-                }).ToList(),
-                ProcessingTimeMs = result.ProcessingTimeMs
+                    Description = d.Description ?? string.Empty
+                }).ToList()
             };
 
             SendEvent(eventData);
         }
         catch (Exception ex)
         {
-            var eventData = new InspectionCompletedEvent
-            {
-                ProjectId = command.ProjectId,
-                Status = "Error",
-                Defects = new List<Contracts.Messages.DefectData>()
-            };
-
-            SendEvent(eventData);
             _logger.LogError(ex, "[WebMessageHandler] 检测失败");
         }
     }
@@ -271,48 +306,8 @@ public class WebMessageHandler
     /// </summary>
     private async Task HandleStopInspectionCommand()
     {
-        using var scope = _scopeFactory.CreateScope();
-        var inspectionService = scope.ServiceProvider.GetRequiredService<IInspectionService>();
-        await inspectionService.StopRealtimeInspectionAsync();
         _logger.LogInformation("[WebMessageHandler] 检测已停止");
-    }
-
-    /// <summary>
-    /// 发送事件到前端
-    /// </summary>
-    public void SendEvent<T>(T eventData) where T : EventBase
-    {
-        if (_webView == null || _webViewControl == null)
-            return;
-
-        var json = JsonSerializer.Serialize(eventData, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-
-        if (_webViewControl.InvokeRequired)
-        {
-            _webViewControl.Invoke(() => _webView.PostWebMessageAsJson(json));
-        }
-        else
-        {
-            _webView.PostWebMessageAsJson(json);
-        }
-    }
-
-    /// <summary>
-    /// 发送进度通知
-    /// </summary>
-    public void SendProgress(double progress, string? operatorName = null, string? message = null)
-    {
-        var eventData = new ProgressNotificationEvent
-        {
-            Progress = progress,
-            CurrentOperatorName = operatorName,
-            Message = message
-        };
-
-        SendEvent(eventData);
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -322,8 +317,6 @@ public class WebMessageHandler
     {
         try
         {
-            // 【修复】直接反序列化整个消息
-            // 前端现在发送扁平结构：{ messageType, parameterName, filter, timestamp }
             var command = JsonSerializer.Deserialize<PickFileCommand>(messageJson, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -335,21 +328,12 @@ public class WebMessageHandler
                 return;
             }
 
-            string? filePath = null;
-            bool isCancelled = true;
-
-            // 确保在 UI 线程执行
-            if (_webViewControl.InvokeRequired)
-            {
-                _webViewControl.Invoke(new Action(() =>
-                {
-                    ShowFileDialog(command, ref filePath, ref isCancelled);
-                }));
-            }
-            else
-            {
-                ShowFileDialog(command, ref filePath, ref isCancelled);
-            }
+            // 【关键修复】在独立 STA 线程上显示文件对话框
+            // 原因：OpenFileDialog.ShowDialog() 运行模态消息循环，会劫持 UI 线程，
+            // 导致 WebView2 所需的 COM/IPC 消息无法泵送。WebView2 浏览器进程
+            // 检测到宿主长时间无响应后会终止连接，引发崩溃。
+            // 解决方案：在独立 STA 线程运行对话框，UI 线程完全不被阻塞。
+            var (filePath, isCancelled) = await ShowFileDialogOnNewThreadAsync(command);
 
             var eventData = new FilePickedEvent
             {
@@ -363,28 +347,74 @@ public class WebMessageHandler
         catch (Exception ex)
         {
             _logger.LogError(ex, "处理文件选择命令失败");
-            // 临时弹窗提示，方便用户反馈
-            System.Windows.Forms.MessageBox.Show($"文件选择出错: {ex.Message}");
         }
-
-        await Task.CompletedTask;
     }
 
-    private void ShowFileDialog(PickFileCommand command, ref string? filePath, ref bool isCancelled)
+    /// <summary>
+    /// 在独立 STA 线程上显示文件选择对话框，避免阻塞 UI 线程和 WebView2 消息泵
+    /// </summary>
+    private Task<(string? filePath, bool isCancelled)> ShowFileDialogOnNewThreadAsync(PickFileCommand command)
     {
-        using (var dialog = new System.Windows.Forms.OpenFileDialog
+        var tcs = new TaskCompletionSource<(string?, bool)>();
+
+        var thread = new Thread(() =>
         {
-            Filter = command.Filter,
-            Title = "选择文件"
-        })
-        {
-            // 尝试指定所有者窗口，防止对话框被遮挡
-            if (dialog.ShowDialog(_webViewControl) == System.Windows.Forms.DialogResult.OK)
+            try
             {
-                filePath = dialog.FileName;
-                isCancelled = false;
+                using var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    Filter = command.Filter,
+                    Title = "选择文件"
+                };
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    tcs.SetResult((dialog.FileName, false));
+                }
+                else
+                {
+                    tcs.SetResult((null, true));
+                }
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "文件选择对话框线程异常");
+                tcs.SetResult((null, true));
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+
+        return tcs.Task;
+    }
+
+    /// <summary>
+    /// 发送事件到前端
+    /// </summary>
+    private void SendEvent<T>(T eventData)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(eventData, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            // 确保在 UI 线程执行
+            if (_webViewControl?.InvokeRequired == true)
+            {
+                _webViewControl.Invoke(() => _webView?.PostWebMessageAsJson(json));
+            }
+            else
+            {
+                _webView?.PostWebMessageAsJson(json);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[WebMessageHandler] 发送事件失败");
         }
     }
 }
-

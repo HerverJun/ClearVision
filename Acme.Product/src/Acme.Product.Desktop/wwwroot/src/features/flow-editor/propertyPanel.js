@@ -60,7 +60,9 @@ class PropertyPanel {
             return;
         }
 
-        const { title, type, parameters = [] } = this.currentOperator;
+        // 兼容 title (画布节点) 和 displayName (算子库)
+        const title = this.currentOperator.title || this.currentOperator.displayName || this.currentOperator.type;
+        const { type, parameters = [] } = this.currentOperator;
         
         let html = `
             <div class="property-header">

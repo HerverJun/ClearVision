@@ -1,13 +1,40 @@
 using System.Collections.Concurrent;
 using OpenCvSharp;
+using Mat = OpenCvSharp.Mat;
+using MatType = OpenCvSharp.MatType;
+using Size = OpenCvSharp.Size;
 
 namespace Acme.Product.Infrastructure.ImageProcessing;
 
 /// <summary>
-/// Mat 对象池 - 用于重用 OpenCV Mat 对象，减少 GC 压力
-/// Sprint 5: S5-004 实现
+/// Mat对象池接口 - P3阶段O3.2内存池优化
 /// </summary>
-public class MatPool : IDisposable
+public interface IMatPool : IDisposable
+{
+    /// <summary>从池中租用Mat</summary>
+    Mat Rent(int rows, int cols, MatType type);
+    
+    /// <summary>从池中租用Mat（指定尺寸）</summary>
+    Mat Rent(Size size, MatType type);
+    
+    /// <summary>归还Mat到池</summary>
+    void Return(Mat mat);
+    
+    /// <summary>获取统计信息</summary>
+    MatPoolStatistics GetStatistics();
+    
+    /// <summary>清空池</summary>
+    void Clear();
+    
+    /// <summary>池是否启用</summary>
+    bool IsEnabled { get; }
+}
+
+/// <summary>
+/// Mat 对象池 - 用于重用 OpenCV Mat 对象，减少 GC 压力
+/// P3阶段O3.2增强版：实现IMatPool接口，支持分层池
+/// </summary>
+public class MatPool : IMatPool
 {
     private readonly ConcurrentDictionary<MatKey, ConcurrentBag<OpenCvSharp.Mat>> _pools = new();
     private readonly int _maxSizePerKey;
@@ -66,9 +93,35 @@ public class MatPool : IDisposable
     }
 
     /// <summary>
-    /// 从池中获取 Mat 对象
+    /// 池是否启用（P3-O3.2新增：IMatPool接口要求）
+    /// </summary>
+    public bool IsEnabled => !_disposed && _maxSizePerKey > 0;
+
+    /// <summary>
+    /// 从池中获取 Mat 对象（显式接口实现）
+    /// </summary>
+    Mat IMatPool.Rent(int rows, int cols, MatType type)
+    {
+        return RentInternal(rows, cols, type);
+    }
+
+    /// <summary>
+    /// 从池中获取 Mat 对象（P3-O3.2新增：按尺寸租用，显式接口实现）
+    /// </summary>
+    Mat IMatPool.Rent(Size size, MatType type)
+    {
+        return RentInternal(size.Height, size.Width, type);
+    }
+
+    /// <summary>
+    /// 从池中获取 Mat 对象（公共方法，使用OpenCvSharp类型）
     /// </summary>
     public OpenCvSharp.Mat Rent(int rows, int cols, OpenCvSharp.MatType type)
+    {
+        return RentInternal(rows, cols, type);
+    }
+
+    private OpenCvSharp.Mat RentInternal(int rows, int cols, OpenCvSharp.MatType type)
     {
         var key = new MatKey(rows, cols, type);
         
@@ -86,7 +139,15 @@ public class MatPool : IDisposable
     }
 
     /// <summary>
-    /// 将 Mat 对象归还到池中
+    /// 将 Mat 对象归还到池中（显式接口实现）
+    /// </summary>
+    void IMatPool.Return(Mat mat)
+    {
+        Return(mat as OpenCvSharp.Mat);
+    }
+
+    /// <summary>
+    /// 将 Mat 对象归还到池中（公共方法）
     /// </summary>
     public void Return(OpenCvSharp.Mat mat)
     {

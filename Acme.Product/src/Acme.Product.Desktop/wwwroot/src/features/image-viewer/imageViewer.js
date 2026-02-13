@@ -268,23 +268,33 @@ export class ImageViewerComponent {
         this.defects = defects;
         
         defects.forEach((defect, index) => {
-            const color = this.getDefectColor(defect.type);
+            const id = this.getDefectProp(defect, 'id') || index;
+            const type = this.getDefectProp(defect, 'type');
+            const description = this.getDefectProp(defect, 'description');
+            const x = this.getDefectProp(defect, 'x');
+            const y = this.getDefectProp(defect, 'y');
+            const width = this.getDefectProp(defect, 'width');
+            const height = this.getDefectProp(defect, 'height');
+
+            const displayType = description || type || 'Unknown';
+            const color = this.getDefectColor(type);
+            
             const overlay = this.imageCanvas.addOverlay(
                 'rectangle',
-                defect.x,
-                defect.y,
-                defect.width,
-                defect.height,
+                x,
+                y,
+                width,
+                height,
                 {
                     color: color,
                     lineWidth: 3,
-                    text: `${index + 1}. ${defect.type}`,
+                    text: `${index + 1}. ${displayType}`,
                     fill: true,
                     fillColor: color + '33', // 20%透明度
                     data: defect
                 }
             );
-            overlay.defectId = defect.id || index;
+            overlay.defectId = id;
         });
         
         this.renderDefectList();
@@ -295,6 +305,7 @@ export class ImageViewerComponent {
      */
     getDefectColor(type) {
         const colors = {
+            // 中文映射
             '划痕': '#ff4d4f',
             '污渍': '#faad14',
             '异物': '#52c41a',
@@ -302,9 +313,49 @@ export class ImageViewerComponent {
             '变形': '#722ed1',
             '尺寸偏差': '#eb2f96',
             '颜色异常': '#13c2c2',
-            '其他': '#8c8c8c'
+            '其他': '#8c8c8c',
+            
+            // 英文映射 (PascalCase)
+            'Scratch': '#ff4d4f',
+            'Stain': '#faad14',
+            'ForeignObject': '#52c41a',
+            'Missing': '#1890ff',
+            'Deformation': '#722ed1',
+            'DimensionalDeviation': '#eb2f96',
+            'ColorAbnormality': '#13c2c2',
+            'Other': '#8c8c8c',
+            
+            // 数字映射 (String)
+            '0': '#ff4d4f',
+            '1': '#faad14',
+            '2': '#52c41a',
+            '3': '#1890ff',
+            '4': '#722ed1',
+            '5': '#eb2f96',
+            '6': '#13c2c2',
+            '99': '#8c8c8c'
         };
-        return colors[type] || '#ff4d4f';
+        return colors[String(type)] || '#ff4d4f';
+    }
+
+    /**
+     * 获取缺陷属性（兼容 camelCase 和 PascalCase）
+     */
+    getDefectProp(defect, propName) {
+        if (!defect) return undefined;
+        // 尝试 camelCase
+        const camel = propName.charAt(0).toLowerCase() + propName.slice(1);
+        if (defect[camel] !== undefined) return defect[camel];
+        
+        // 尝试 PascalCase
+        const pascal = propName.charAt(0).toUpperCase() + propName.slice(1);
+        if (defect[pascal] !== undefined) return defect[pascal];
+        
+        // 特殊处理
+        if (propName === 'description' && defect.className) return defect.className;
+        if (propName === 'confidenceScore' && defect.confidence) return defect.confidence;
+        
+        return undefined;
     }
 
     /**
@@ -318,16 +369,27 @@ export class ImageViewerComponent {
             return;
         }
         
-        list.innerHTML = this.defects.map((defect, index) => `
-            <div class="defect-item" data-id="${defect.id || index}">
-                <span class="defect-index" style="background: ${this.getDefectColor(defect.type)}">${index + 1}</span>
+        list.innerHTML = this.defects.map((defect, index) => {
+            const id = this.getDefectProp(defect, 'id') || index;
+            const type = this.getDefectProp(defect, 'type');
+            const description = this.getDefectProp(defect, 'description');
+            const x = this.getDefectProp(defect, 'x');
+            const y = this.getDefectProp(defect, 'y');
+            const confidenceScore = this.getDefectProp(defect, 'confidenceScore');
+            
+            const displayType = description || type || 'Unknown';
+            const displayConf = confidenceScore !== undefined ? (confidenceScore * 100).toFixed(1) : '0.0';
+            
+            return `
+            <div class="defect-item" data-id="${id}">
+                <span class="defect-index" style="background: ${this.getDefectColor(type)}">${index + 1}</span>
                 <div class="defect-info">
-                    <span class="defect-type">${defect.type}</span>
-                    <span class="defect-position">位置: (${defect.x}, ${defect.y})</span>
-                    <span class="defect-confidence">置信度: ${(defect.confidence * 100).toFixed(1)}%</span>
+                    <span class="defect-type">${displayType}</span>
+                    <span class="defect-position">位置: (${Math.round(x)}, ${Math.round(y)})</span>
+                    <span class="defect-confidence">置信度: ${displayConf}%</span>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
         
         // 绑定点击事件
         list.querySelectorAll('.defect-item').forEach(item => {
@@ -349,12 +411,18 @@ export class ImageViewerComponent {
         
         // 高亮标注
         this.imageCanvas.overlays.forEach(overlay => {
-            if (overlay.defectId === defectId) {
+            // overlay.defectId 可能也是 PascalCase 问题，但通常 overlay 是前端创建的对象
+            // 但如果 overlay 是从 loadAnnotations 来的...
+            // 假设 overlay 结构是前端控制的，暂不处理
+            
+            if (String(overlay.defectId) === String(defectId)) {
                 overlay.lineWidth = 5;
                 overlay.color = '#ffffff';
             } else {
                 overlay.lineWidth = 3;
-                overlay.color = this.getDefectColor(overlay.data?.type);
+                // overlay.data 可能包含原始缺陷数据
+                const type = overlay.data ? this.getDefectProp(overlay.data, 'type') : overlay.type; // fallback
+                overlay.color = this.getDefectColor(type);
             }
         });
         

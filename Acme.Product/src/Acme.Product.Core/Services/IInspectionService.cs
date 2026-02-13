@@ -45,7 +45,8 @@ public interface IInspectionService
     /// <summary>
     /// 停止实时检测
     /// </summary>
-    Task StopRealtimeInspectionAsync();
+    /// <param name="projectId">工程ID</param>
+    Task StopRealtimeInspectionAsync(Guid projectId);
 
     /// <summary>
     /// 获取检测历史

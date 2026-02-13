@@ -48,6 +48,7 @@ import webMessageBridge from './core/messaging/webMessageBridge.js';
 import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
 import FlowCanvas from './core/canvas/flowCanvas.js';
+import { FlowEditorInteraction } from './features/flow-editor/flowEditorInteraction.js';
 import { ImageViewerComponent } from './features/image-viewer/imageViewer.js';
 import { OperatorLibraryPanel } from './features/operator-library/operatorLibrary.js';
 import inspectionController from './features/inspection/inspectionController.js';
@@ -68,9 +69,14 @@ const [getCurrentProject, setCurrentProject, subscribeCurrentProject] = createSi
 let imageViewer = null;
 let operatorLibraryPanel = null;
 let flowCanvas = null;
+let flowEditorInteraction = null;
 let propertyPanel = null;
 let projectView = null;
 let resultPanel = null;
+
+// 自动保存定时器
+let autoSaveInterval = null;
+const AUTO_SAVE_DELAY = 5 * 60 * 1000; // 5分钟
 
 /**
  * 初始化应用
@@ -301,10 +307,20 @@ function initializeInspectionController() {
         }
 
         // 显示结果提示
-        const status = result.status === 'OK' ? 'success' : 'warning';
-        const message = result.status === 'OK'
-            ? '检测通过 (OK)'
-            : `检测到 ${result.defects?.length || 0} 个缺陷`;
+        // 显示结果提示
+        let status = 'info';
+        let message = '';
+
+        if (result.status === 'OK') {
+            status = 'success';
+            message = '检测通过 (OK)';
+        } else if (result.status === 'Error') {
+            status = 'error';
+            message = `检测错误: ${result.errorMessage || '未知错误'}`;
+        } else {
+            status = 'warning';
+            message = `检测到 ${result.defects?.length || 0} 个缺陷`;
+        }
         showToast(message, status);
     };
     
@@ -507,7 +523,23 @@ function updateResultsPanel(data) {
             defectsList.className = 'defects-list';
             data.defects.forEach(defect => {
                 const li = document.createElement('li');
-                li.textContent = `${defect.type}: 置信度 ${(defect.confidence * 100).toFixed(1)}%`;
+                
+                // 兼容字段名 (camelCase/PascalCase)
+                const getProp = (d, key) => {
+                    const camel = key.charAt(0).toLowerCase() + key.slice(1);
+                    const pascal = key.charAt(0).toUpperCase() + key.slice(1);
+                    return d[camel] !== undefined ? d[camel] : d[pascal];
+                };
+
+                const type = getProp(defect, 'type');
+                const description = getProp(defect, 'description');
+                // 后端实体为 ConfidenceScore, 字典中可能为 Confidence
+                const confidence = getProp(defect, 'confidenceScore') ?? getProp(defect, 'confidence');
+
+                const displayLabel = description || type || 'Unknown';
+                const displayConf = confidence !== undefined ? (confidence * 100).toFixed(1) : 'NaN';
+
+                li.textContent = `${displayLabel}: 置信度 ${displayConf}%`;
                 defectsList.appendChild(li);
             });
             resultsPanel.appendChild(defectsList);
@@ -618,12 +650,14 @@ function initializeFlowEditor() {
     flowCanvas.onNodeSelected = (node) => {
         if (node) {
             console.log('[App] 节点选中:', node.title || node.type);
-            // 构造算子数据传递给属性面板
+            // 【修复】构造算子数据传递给属性面板 —— 使用算子库定义补全信息
+            const operatorDef = findOperatorDefinition(node.type);
             setSelectedOperator({
                 id: node.id,
                 type: node.type,
-                title: node.title,
-                parameters: node.parameters || []
+                title: node.title || operatorDef?.displayName || node.type,
+                displayName: operatorDef?.displayName || node.title || node.type,
+                parameters: mergeParameters(operatorDef?.parameters, node.parameters)
             });
         } else {
             setSelectedOperator(null);
@@ -632,6 +666,14 @@ function initializeFlowEditor() {
     
     // 保存到全局以便其他函数使用
     window.flowCanvas = flowCanvas;
+    
+    // 【阶段B】初始化流程编辑器交互增强（撤销/重做/复制/粘贴/框选）
+    flowEditorInteraction = new FlowEditorInteraction(flowCanvas);
+    window.flowEditorInteraction = flowEditorInteraction;
+    console.log('[App] 流程编辑器交互增强已启用');
+    
+    // 【阶段B】启动自动保存
+    startAutoSave();
     
     // 添加拖放支持
     canvas.addEventListener('dragover', (e) => {
@@ -687,9 +729,7 @@ function initializeFlowEditor() {
     console.log('[App] 流程编辑器初始化完成');
 }
 
-/**
- * 添加算子到流程
- */
+
 /**
  * 添加算子到流程
  */
@@ -712,7 +752,20 @@ function addOperatorToFlow(type, x, y, data = null) {
         'TemplateMatching': { title: '模板匹配', color: '#f5222d', icon: '🎯' },
         'Measurement': { title: '测量', color: '#2f54eb', icon: '📏' },
         'DeepLearning': { title: '深度学习', color: '#a0d911', icon: '🧠' },
-        'ResultOutput': { title: '结果输出', color: '#595959', icon: '📤' }
+        'ResultOutput': { title: '结果输出', color: '#595959', icon: '📤' },
+        // Phase 3-5 新增算子
+        'ColorDetection': { title: '颜色检测', color: '#fa541c', icon: '🎨' },
+        'SerialCommunication': { title: '串口通信', color: '#13c2c2', icon: '🔌' },
+        'GeometricFitting': { title: '几何拟合', color: '#eb2f96', icon: '📐' },
+        'RoiManager': { title: 'ROI管理器', color: '#1890ff', icon: '⬜' },
+        'ShapeMatching': { title: '形状匹配', color: '#52c41a', icon: '🔍' },
+        'SubpixelEdgeDetection': { title: '亚像素边缘', color: '#722ed1', icon: '🎯' },
+        'ColorConversion': { title: '颜色空间转换', color: '#fa8c16', icon: '🌈' },
+        'AdaptiveThreshold': { title: '自适应阈值', color: '#eb2f96', icon: '⚪' },
+        'HistogramEqualization': { title: '直方图均衡化', color: '#2f54eb', icon: '📊' },
+        'ModbusCommunication': { title: 'Modbus通信', color: '#13c2c2', icon: '📡' },
+        'TcpCommunication': { title: 'TCP通信', color: '#13c2c2', icon: '🌐' },
+        'DatabaseWrite': { title: '数据库写入', color: '#595959', icon: '🗄️' }
     };
     
     // 优先使用传入数据的配置，否则使用默认配置
@@ -813,6 +866,24 @@ function handleNewProject() {
 function initializeToolbar() {
     // 注意："新建"和"导入图片"按钮已移至工程分页
     // 由 projectView.js 处理
+    
+    // 【阶段B-B5】导入按钮
+    const importBtn = document.getElementById('btn-import');
+    if (importBtn) {
+        importBtn.addEventListener('click', () => {
+            console.log('[App] 导入工程');
+            showImportDialog();
+        });
+    }
+    
+    // 【阶段B-B5】导出按钮
+    const exportBtn = document.getElementById('btn-export');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            console.log('[App] 导出工程');
+            exportProjectToJson();
+        });
+    }
     
     // 保存按钮
     const saveBtn = document.getElementById('btn-save');
@@ -1020,6 +1091,215 @@ function toggleTheme() {
     showToast(message, 'info');
 }
 
+/**
+ * 【阶段B-B4】启动自动保存
+ */
+function startAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+    }
+    
+    autoSaveInterval = setInterval(async () => {
+        const project = getCurrentProject();
+        if (project && window.flowCanvas && window.flowCanvas.nodes.size > 0) {
+            try {
+                // 更新流程数据
+                project.flow = window.flowCanvas.serialize();
+                // 保存到本地存储作为备份
+                localStorage.setItem('cv_autosave_backup', JSON.stringify({
+                    projectId: project.id,
+                    timestamp: new Date().toISOString(),
+                    flow: project.flow
+                }));
+                console.log('[AutoSave] 自动保存完成:', new Date().toLocaleTimeString());
+            } catch (err) {
+                console.error('[AutoSave] 自动保存失败:', err);
+            }
+        }
+    }, AUTO_SAVE_DELAY);
+    
+    console.log('[AutoSave] 自动保存已启动，间隔:', AUTO_SAVE_DELAY / 1000 / 60, '分钟');
+}
+
+/**
+ * 【阶段B-B4】停止自动保存
+ */
+function stopAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+        console.log('[AutoSave] 自动保存已停止');
+    }
+}
+
+/**
+ * 【阶段B-B4】立即执行自动保存
+ */
+async function triggerAutoSave() {
+    const project = getCurrentProject();
+    if (project && window.flowCanvas) {
+        try {
+            project.flow = window.flowCanvas.serialize();
+            localStorage.setItem('cv_autosave_backup', JSON.stringify({
+                projectId: project.id,
+                timestamp: new Date().toISOString(),
+                flow: project.flow
+            }));
+            console.log('[AutoSave] 手动触发保存完成');
+            showToast('工程已自动保存', 'success');
+        } catch (err) {
+            console.error('[AutoSave] 手动保存失败:', err);
+            showToast('自动保存失败', 'error');
+        }
+    }
+}
+
+/**
+ * 【阶段B-B5】导出工程为JSON文件
+ */
+function exportProjectToJson() {
+    const project = getCurrentProject();
+    if (!project) {
+        showToast('没有可导出的工程', 'warning');
+        return;
+    }
+    
+    try {
+        // 准备导出数据
+        const exportData = {
+            version: '1.0',
+            exportTime: new Date().toISOString(),
+            project: {
+                id: project.id,
+                name: project.name,
+                description: project.description,
+                createdAt: project.createdAt,
+                updatedAt: new Date().toISOString(),
+                flow: window.flowCanvas ? window.flowCanvas.serialize() : project.flow
+            }
+        };
+        
+        // 创建下载链接
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.name || 'project'}_${new Date().toISOString().slice(0, 10)}.cvproj.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showToast('工程导出成功', 'success');
+        console.log('[Export] 工程已导出:', project.name);
+    } catch (err) {
+        console.error('[Export] 导出失败:', err);
+        showToast('工程导出失败', 'error');
+    }
+}
+
+/**
+ * 【修复】根据算子类型查找算子库中的定义数据
+ * @param {string} type - 算子类型
+ * @returns {Object|null} 算子定义数据
+ */
+function findOperatorDefinition(type) {
+    if (!operatorLibraryPanel) return null;
+    const operators = operatorLibraryPanel.getOperators ? operatorLibraryPanel.getOperators() : [];
+    return operators.find(op => op.type === type) || null;
+}
+
+/**
+ * 【修复】合并参数定义与参数值
+ * @param {Array} defParams - 算子库中的参数定义（基准）
+ * @param {Array} nodeParams - 画布节点保存的参数值
+ * @returns {Array} 合并后的参数列表
+ */
+function mergeParameters(defParams, nodeParams) {
+    if (!defParams || defParams.length === 0) return nodeParams || [];
+    if (!nodeParams || nodeParams.length === 0) {
+        return defParams.map(p => ({...p}));
+    }
+    // 以定义为基础，用节点中保存的值覆盖 defaultValue
+    return defParams.map(defP => {
+        const nodeP = nodeParams.find(np => np.name === defP.name);
+        if (nodeP) {
+            return { ...defP, defaultValue: nodeP.defaultValue ?? nodeP.value ?? defP.defaultValue };
+        }
+        return { ...defP };
+    });
+}
+
+/**
+ * 【阶段B-B5】从JSON文件导入工程
+ * @param {File} file - 用户选择的文件
+ */
+async function importProjectFromJson(file) {
+    if (!file) return;
+    
+    try {
+        const content = await file.text();
+        const importData = JSON.parse(content);
+        
+        // 验证文件格式
+        if (!importData.project || !importData.project.flow) {
+            throw new Error('无效的工程文件格式');
+        }
+        
+        // 确认导入
+        const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n当前未保存的更改将会丢失。`);
+        if (!confirmed) return;
+        
+        // 创建新工程或更新当前工程
+        const newProject = {
+            id: crypto.randomUUID(),
+            name: importData.project.name + ' (导入)',
+            description: importData.project.description || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            flow: importData.project.flow
+        };
+        
+        // 加载到画布
+        if (window.flowCanvas) {
+            window.flowCanvas.deserialize(newProject.flow);
+        }
+        
+        // 设置当前工程
+        setCurrentProject(newProject);
+        
+        // 保存到后端
+        await projectManager.saveProject(newProject);
+        
+        showToast('工程导入成功', 'success');
+        console.log('[Import] 工程已导入:', newProject.name);
+        
+        // 刷新工程列表
+        if (projectView) {
+            projectView.refreshProjectList();
+        }
+    } catch (err) {
+        console.error('[Import] 导入失败:', err);
+        showToast('工程导入失败: ' + err.message, 'error');
+    }
+}
+
+/**
+ * 【阶段B-B5】显示导入对话框
+ */
+function showImportDialog() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.cvproj.json,.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            importProjectFromJson(file);
+        }
+    };
+    input.click();
+}
+
 // 启动应用
 document.addEventListener('DOMContentLoaded', initializeApp);
 
@@ -1034,5 +1314,10 @@ export {
     createProject,
     imageViewer,
     operatorLibraryPanel,
-    flowCanvas
+    flowCanvas,
+    flowEditorInteraction,
+    exportProjectToJson,
+    importProjectFromJson,
+    showImportDialog,
+    triggerAutoSave
 };

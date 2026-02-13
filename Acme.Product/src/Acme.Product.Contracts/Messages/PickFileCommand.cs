@@ -3,7 +3,7 @@ namespace Acme.Product.Contracts.Messages;
 /// <summary>
 /// 请求选择文件命令
 /// </summary>
-public class PickFileCommand : MessageBase
+public class PickFileCommand : CommandBase
 {
     public PickFileCommand()
     {

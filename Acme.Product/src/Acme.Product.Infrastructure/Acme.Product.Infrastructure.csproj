@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
     <RootNamespace>Acme.Product.Infrastructure</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,11 +15,34 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="NModbus" Version="3.0.81" />
     
     <!-- 图像处理 -->
     <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
+    <!-- 【P3-O3.1 GPU加速】根据目标平台选择运行时： -->
+    <!-- CPU版本（默认）：OpenCvSharp4.runtime.win -->
+    <!-- GPU版本（需NVIDIA GPU + CUDA）：OpenCvSharp4.runtime.win_gpu -->
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+    <!-- <PackageReference Include="OpenCvSharp4.runtime.win_gpu" Version="4.9.0.20240103" /> -->
+    
+    <!-- 条码识别 -->
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
+    
+    <!-- Modbus通信 -->
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    
+    <!-- SQLite -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    
+    <!-- ONNX Runtime -->
+    <!-- 【P3-O3.1 GPU加速】CPU版本（默认） -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.17.0" />
+    <!-- 【P3-O3.1 GPU加速】GPU版本（启用时需替换CPU包） -->
+    <!-- CUDA支持：Microsoft.ML.OnnxRuntime.Gpu -->
+    <!-- TensorRT支持：Microsoft.ML.OnnxRuntime.TensorRT -->
+    <!-- DirectML支持：Microsoft.ML.OnnxRuntime.DirectML -->
     
     <!-- 文件处理 -->
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />

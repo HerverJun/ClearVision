@@ -6,6 +6,8 @@ using Acme.Product.Infrastructure.Utilities;
 using OpenCvSharp;
 using System.Collections.Concurrent;
 
+using Microsoft.Extensions.Logging;
+
 namespace Acme.Product.Infrastructure.Services;
 
 /// <summary>
@@ -15,14 +17,16 @@ namespace Acme.Product.Infrastructure.Services;
 public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
 {
     private readonly ICameraManager _cameraManager;
+    private readonly ILogger<ImageAcquisitionService> _logger;
     private readonly Dictionary<Guid, Mat> _imageCache = new();
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _continuousAcquisitionTokens = new();
     private bool _disposed;
 
-    public ImageAcquisitionService(ICameraManager cameraManager)
+    public ImageAcquisitionService(ICameraManager cameraManager, ILogger<ImageAcquisitionService> logger)
     {
         _cameraManager = cameraManager;
+        _logger = logger;
     }
 
     public async Task<ImageDto> LoadFromFileAsync(string filePath, CancellationToken cancellationToken = default)
@@ -107,7 +111,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         {
             // 采集单帧图像
             var frameData = await camera.AcquireSingleFrameAsync();
-            
+
             // 解码图像数据
             using var mat = Cv2.ImDecode(frameData, ImreadModes.Unchanged);
             if (mat.Empty())
@@ -227,8 +231,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
                     catch (Exception ex)
                     {
                         // 记录错误但继续采集
-                        // TODO: 使用 ILogger 替代 Console.WriteLine
-                        System.Diagnostics.Debug.WriteLine($"[ImageAcquisitionService] 连续采集错误: {ex.Message}");
+                        _logger.LogWarning(ex, "连续采集错误: {Message}. 将在 {Interval}ms 后重试", ex.Message, frameInterval.TotalMilliseconds);
                         await Task.Delay(frameInterval, cts.Token);
                     }
                 }
@@ -373,7 +376,8 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
                 {
                     using var filteredMat = new Mat();
                     var kernelSize = options.FilterKernelSize;
-                    if (kernelSize % 2 == 0) kernelSize++; // 确保奇数
+                    if (kernelSize % 2 == 0)
+                        kernelSize++; // 确保奇数
 
                     switch (options.FilterType?.ToLower())
                     {
@@ -570,7 +574,8 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
 
     private string? GetFormatFromFileName(string? fileName)
     {
-        if (string.IsNullOrEmpty(fileName)) return null;
+        if (string.IsNullOrEmpty(fileName))
+            return null;
         var ext = Path.GetExtension(fileName).ToLower();
         return ext.TrimStart('.');
     }
@@ -580,7 +585,8 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
 
         // 停止所有连续采集任务
         foreach (var cts in _continuousAcquisitionTokens.Values)

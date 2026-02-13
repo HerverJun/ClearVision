@@ -55,6 +55,24 @@ public class ExecuteInspectionCommandHandler : IRequestHandler<ExecuteInspection
         // 缺陷数据从流程执行结果的OutputData中提取
         // 实际实现需要根据具体的缺陷数据结构进行映射
 
+        // 保存输出图像（如果存在）
+        if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
+            && outputImage is byte[] imageBytes)
+        {
+            inspectionResult.SetOutputImage(imageBytes);
+        }
+
+        // 保存缺陷数量（从 DefectCount 获取）
+        if (flowResult.OutputData?.TryGetValue("DefectCount", out var defectCount) == true
+            && defectCount is int count && count > 0)
+        {
+            // 更新状态为 NG
+            inspectionResult.SetResult(
+                Core.Enums.InspectionStatus.NG,
+                flowResult.ExecutionTimeMs,
+                1.0);
+        }
+
         await _resultRepository.AddAsync(inspectionResult);
         
         return _mapper.Map<InspectionResultDto>(inspectionResult);

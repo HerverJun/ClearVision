@@ -360,22 +360,21 @@ static class Program
     /// </summary>
     static string GetWwwRootPath()
     {
-        // 开发环境：使用项目目录
-        var devPath = Path.Combine(
-            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "",
-            "..", "..", "..", "wwwroot");
+        // 优先使用 AppContext.BaseDirectory，它在单文件发布模式下指向解压后的临时目录或exe所在目录
+        var basePath = AppContext.BaseDirectory;
 
+        // 开发环境检查：尝试向上查找项目源码目录
+        var devPath = Path.Combine(basePath, "..", "..", "..", "wwwroot");
         if (Directory.Exists(devPath))
         {
             return Path.GetFullPath(devPath);
         }
 
-        // 生产环境：使用执行目录
-        var prodPath = Path.Combine(
-            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "",
-            "wwwroot");
+        // 生产环境：使用执行目录下的 wwwroot
+        var prodPath = Path.Combine(basePath, "wwwroot");
 
-        return prodPath;
+        // 确保返回绝对路径 (即使 Path.Combine 已经生成了绝对路径，GetFullPath 也是个双重保险)
+        return Path.GetFullPath(prodPath);
     }
 
     /// <summary>

@@ -18,8 +18,12 @@ public interface IOperatorExecutor
     /// </summary>
     /// <param name="operator">算子实体</param>
     /// <param name="inputs">输入数据</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>执行结果</returns>
-    Task<OperatorExecutionOutput> ExecuteAsync(Operator @operator, Dictionary<string, object>? inputs = null);
+    Task<OperatorExecutionOutput> ExecuteAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 验证算子参数

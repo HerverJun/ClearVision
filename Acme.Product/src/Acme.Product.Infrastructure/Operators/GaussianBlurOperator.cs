@@ -1,6 +1,7 @@
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
+using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
 namespace Acme.Product.Infrastructure.Operators;
@@ -8,82 +9,72 @@ namespace Acme.Product.Infrastructure.Operators;
 /// <summary>
 /// 高斯模糊算子
 /// </summary>
-public class GaussianBlurOperator : IOperatorExecutor
+public class GaussianBlurOperator : OperatorBase
 {
-    public OperatorType OperatorType => OperatorType.Filtering;
+    /// <summary>
+    /// 算子类型
+    /// </summary>
+    public override OperatorType OperatorType => OperatorType.Filtering;
 
-    public Task<OperatorExecutionOutput> ExecuteAsync(Operator @operator, Dictionary<string, object>? inputs = null)
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="logger">日志记录器</param>
+    public GaussianBlurOperator(ILogger<GaussianBlurOperator> logger) : base(logger)
     {
-        try
-        {
-            if (inputs == null || !inputs.TryGetValue("Image", out var imgObj) || imgObj is not byte[] imageData)
-            {
-                return Task.FromResult(OperatorExecutionOutput.Failure("未提供输入图像"));
-            }
-
-            // 获取参数
-            var kernelSize = GetParameterValue(@operator, "KernelSize", 5);
-            var sigmaX = GetParameterValue(@operator, "SigmaX", 1.0);
-            var sigmaY = GetParameterValue(@operator, "SigmaY", 0.0); // 0表示与sigmaX相同
-            var borderType = GetParameterValue(@operator, "BorderType", 4); // 默认BORDER_DEFAULT
-
-            // 确保核大小为奇数
-            if (kernelSize % 2 == 0)
-                kernelSize++;
-
-            // sigmaY为0时，自动设为sigmaX的值（OpenCV标准行为）
-            if (sigmaY == 0)
-                sigmaY = sigmaX;
-
-            using var src = Cv2.ImDecode(imageData, ImreadModes.Color);
-            if (src.Empty())
-            {
-                return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
-            }
-
-            using var dst = new Mat();
-            var borderMode = (BorderTypes)borderType;
-            Cv2.GaussianBlur(src, dst, new Size(kernelSize, kernelSize), sigmaX, sigmaY, borderMode);
-
-            var outputData = dst.ToBytes(".png");
-
-            return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
-            {
-                { "Image", outputData },
-                { "Width", dst.Width },
-                { "Height", dst.Height }
-            }));
-        }
-        catch (Exception ex)
-        {
-            return Task.FromResult(OperatorExecutionOutput.Failure($"高斯模糊失败: {ex.Message}"));
-        }
     }
 
-    public ValidationResult ValidateParameters(Operator @operator)
+    /// <summary>
+    /// 执行核心逻辑
+    /// </summary>
+    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs,
+        CancellationToken cancellationToken)
     {
-        var kernelSize = GetParameterValue(@operator, "KernelSize", 5);
+        // 获取输入图像
+        if (!TryGetInputImage(inputs, "Image", out var imageWrapper) || imageWrapper == null)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("未提供输入图像"));
+        }
+
+        // 获取参数（使用基类方法）
+        var kernelSize = GetIntParam(@operator, "KernelSize", 5, min: 1, max: 31);
+        var sigmaX = GetDoubleParam(@operator, "SigmaX", 1.0);
+        var sigmaY = GetDoubleParam(@operator, "SigmaY", 0.0); // 0表示与sigmaX相同
+        var borderType = GetIntParam(@operator, "BorderType", 4, min: 0, max: 7); // 默认BORDER_DEFAULT
+
+        // 确保核大小为奇数
+        if (kernelSize % 2 == 0)
+            kernelSize++;
+
+        // 【优化】不再手动覆盖sigmaY。OpenCV本身支持sigmaY=0时自动使用sigmaX
+        // 手动覆盖反而去除了使用不同sigmaX/sigmaY的灵活性
+
+        using var src = imageWrapper.GetMat();
+        if (src.Empty())
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
+        }
+
+        using var dst = new Mat();
+        var borderMode = (BorderTypes)borderType;
+        Cv2.GaussianBlur(src, dst, new Size(kernelSize, kernelSize), sigmaX, sigmaY, borderMode);
+
+        // P0: 使用ImageWrapper实现零拷贝输出
+        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));
+    }
+
+    /// <summary>
+    /// 验证参数
+    /// </summary>
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        var kernelSize = GetIntParam(@operator, "KernelSize", 5);
         if (kernelSize < 1 || kernelSize > 31)
         {
             return ValidationResult.Invalid("核大小必须在 1-31 之间");
         }
         return ValidationResult.Valid();
-    }
-
-    private T GetParameterValue<T>(Operator @operator, string paramName, T defaultValue)
-    {
-        var param = @operator.Parameters.FirstOrDefault(p => p.Name == paramName);
-        if (param?.Value != null)
-        {
-            try
-            {
-                return (T)Convert.ChangeType(param.Value, typeof(T));
-            }
-            catch
-            {
-                return defaultValue;
-            }
-        }
-        return defaultValue;
     }
 }

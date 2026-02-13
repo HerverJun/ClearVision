@@ -2,6 +2,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Acme.Product.Infrastructure.Operators;
 
@@ -9,13 +10,16 @@ namespace Acme.Product.Infrastructure.Operators;
 /// 结果输出算子执行器
 /// 透传输入数据作为输出，用于流程最终结果输出
 /// </summary>
-public class ResultOutputOperator : IOperatorExecutor
+public class ResultOutputOperator : OperatorBase
 {
-    public OperatorType OperatorType => OperatorType.ResultOutput;
+    public override OperatorType OperatorType => OperatorType.ResultOutput;
 
-    public Task<OperatorExecutionOutput> ExecuteAsync(
+    public ResultOutputOperator(ILogger<ResultOutputOperator> logger) : base(logger) { }
+
+    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
-        Dictionary<string, object>? inputs = null)
+        Dictionary<string, object>? inputs,
+        CancellationToken cancellationToken)
     {
         // 直接传递输入作为输出（透传模式）
         var output = new Dictionary<string, object>();
@@ -41,7 +45,7 @@ public class ResultOutputOperator : IOperatorExecutor
         return Task.FromResult(OperatorExecutionOutput.Success(output));
     }
 
-    public ValidationResult ValidateParameters(Operator @operator)
+    public override ValidationResult ValidateParameters(Operator @operator)
     {
         // 结果输出算子不需要特定参数验证
         return ValidationResult.Valid();

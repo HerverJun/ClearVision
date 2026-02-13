@@ -3,6 +3,7 @@ using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace Acme.Product.Tests.Integration;
@@ -19,7 +20,8 @@ public class ImageAcquisitionServiceIntegrationTests
     public ImageAcquisitionServiceIntegrationTests()
     {
         _cameraManager = Substitute.For<ICameraManager>();
-        _acquisitionService = new ImageAcquisitionService(_cameraManager);
+        var logger = Substitute.For<ILogger<ImageAcquisitionService>>();
+        _acquisitionService = new ImageAcquisitionService(_cameraManager, logger);
     }
 
     [Fact]

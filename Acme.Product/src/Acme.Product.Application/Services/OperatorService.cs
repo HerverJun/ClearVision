@@ -262,8 +262,19 @@ public class OperatorService : IOperatorService
                 },
                 Parameters = new List<ParameterDefinitionDto>
                 {
-                    new() { Name = "model", DisplayName = "模型路径", DataType = "string", DefaultValue = "", IsRequired = true },
-                    new() { Name = "confidence", DisplayName = "置信度阈值", DataType = "double", DefaultValue = 0.5, MinValue = 0.0, MaxValue = 1.0, IsRequired = true }
+                    new() { Name = "ModelPath", DisplayName = "模型路径", DataType = "file", DefaultValue = "", IsRequired = true },
+                    new() { Name = "Confidence", DisplayName = "置信度阈值", DataType = "double", DefaultValue = 0.5, MinValue = 0.0, MaxValue = 1.0, IsRequired = true },
+                    new() { Name = "ModelVersion", DisplayName = "YOLO版本", DataType = "enum", DefaultValue = "Auto", IsRequired = true, 
+                        Options = new List<ParameterOptionDto> 
+                        { 
+                            new() { Label = "自动检测", Value = "Auto" },
+                            new() { Label = "YOLOv5", Value = "YOLOv5" },
+                            new() { Label = "YOLOv6", Value = "YOLOv6" },
+                            new() { Label = "YOLOv8", Value = "YOLOv8" },
+                            new() { Label = "YOLOv11", Value = "YOLOv11" }
+                        } 
+                    },
+                    new() { Name = "InputSize", DisplayName = "输入尺寸", DataType = "int", DefaultValue = 640, MinValue = 320, MaxValue = 1280, IsRequired = true }
                 }
             },
             new()

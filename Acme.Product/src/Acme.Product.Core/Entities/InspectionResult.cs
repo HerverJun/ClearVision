@@ -84,11 +84,12 @@ public class InspectionResult : Entity
     /// <summary>
     /// 设置检测结果
     /// </summary>
-    public void SetResult(InspectionStatus status, long processingTimeMs, double? confidenceScore = null)
+    public void SetResult(InspectionStatus status, long processingTimeMs, double? confidenceScore = null, string? errorMessage = null)
     {
         Status = status;
         ProcessingTimeMs = processingTimeMs;
         ConfidenceScore = confidenceScore;
+        ErrorMessage = errorMessage;
         MarkAsModified();
     }
 

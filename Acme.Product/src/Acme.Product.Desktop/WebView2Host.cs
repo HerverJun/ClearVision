@@ -3,6 +3,7 @@ using System.Text.Json;
 using Acme.Product.Contracts.Messages;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Acme.Product.Desktop.Handlers;
 
 namespace Acme.Product.Desktop;
 
@@ -16,6 +17,7 @@ public sealed class WebView2Host : IAsyncDisposable
     private CoreWebView2Environment? _environment;
     private bool _isInitialized;
     private bool _isDisposed;
+    private readonly WebMessageHandler? _messageHandler;
 
     /// <summary>
     /// WebView2 初始化完成事件。
@@ -41,9 +43,11 @@ public sealed class WebView2Host : IAsyncDisposable
     /// 创建 WebView2 宿主实例。
     /// </summary>
     /// <param name="webView">WebView2 控件实例</param>
-    public WebView2Host(WebView2 webView)
+    /// <param name="messageHandler">Web 消息处理器</param>
+    public WebView2Host(WebView2 webView, WebMessageHandler? messageHandler = null)
     {
         _webView = webView ?? throw new ArgumentNullException(nameof(webView));
+        _messageHandler = messageHandler;
     }
 
     /// <summary>
@@ -186,7 +190,13 @@ public sealed class WebView2Host : IAsyncDisposable
     /// </summary>
     private void RegisterMessageHandlers()
     {
-        _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+        // 【修复】移除重复的 WebMessageReceived 订阅
+        // WebMessageHandler.Initialize() 已注册此事件，并能灵活匹配
+        // 前端发送的 messageType/type/Type 等不同字段名。
+        // WebView2Host 的 OnWebMessageReceived 将 JSON 反序列化为 WebMessage（期望 Type 属性），
+        // 但前端实际使用 messageType 字段名，导致 Type 为空、消息匹配失败。
+        // 保留此方法以便未来需要时重新启用。
+        // _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
     }
 
     /// <summary>
@@ -228,15 +238,22 @@ public sealed class WebView2Host : IAsyncDisposable
     {
         try
         {
-            // TODO: 实现消息路由和处理逻辑
-            var response = new WebMessageResponse
+            if (_messageHandler != null)
             {
-                RequestId = message.Id,
-                Success = true,
-                Data = null
-            };
-
-            await SendMessageAsync(response);
+                // 委托给 WebMessageHandler 处理
+                var result = await _messageHandler.HandleAsync(message);
+                await SendMessageAsync(result);
+            }
+            else
+            {
+                // 如果没有处理器，返回错误
+                await SendMessageAsync(new WebMessageResponse
+                {
+                    RequestId = message.Id,
+                    Success = false,
+                    Error = "消息处理器未初始化"
+                });
+            }
         }
         catch (Exception ex)
         {

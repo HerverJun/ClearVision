@@ -292,6 +292,14 @@ class ImageCanvas {
                         this.ctx.fill();
                     }
                     this.ctx.stroke();
+                    
+                    // 绘制标签文本
+                    if (overlay.text) {
+                        this.ctx.fillStyle = overlay.color;
+                        this.ctx.font = '14px sans-serif';
+                        this.ctx.textBaseline = 'bottom';
+                        this.ctx.fillText(overlay.text, overlay.x, overlay.y - 2);
+                    }
                     break;
                     
                 case 'circle':

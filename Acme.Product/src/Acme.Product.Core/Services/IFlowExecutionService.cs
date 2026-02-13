@@ -14,8 +14,9 @@ public interface IFlowExecutionService
     /// <param name="flow">算子流程</param>
     /// <param name="inputData">输入数据</param>
     /// <param name="enableParallel">是否启用并行执行</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>执行结果</returns>
-    Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false);
+    Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, System.Threading.CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 执行单个算子

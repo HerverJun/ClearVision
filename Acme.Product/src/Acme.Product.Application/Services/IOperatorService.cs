@@ -101,6 +101,16 @@ public class ParameterDefinitionDto
     public object? MinValue { get; set; }
     public object? MaxValue { get; set; }
     public bool IsRequired { get; set; } = true;
+    public List<ParameterOptionDto>? Options { get; set; }
+}
+
+/// <summary>
+/// 参数选项DTO
+/// </summary>
+public class ParameterOptionDto
+{
+    public string Label { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
 }
 
 /// <summary>

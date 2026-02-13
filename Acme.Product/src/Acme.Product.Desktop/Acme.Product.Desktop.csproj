@@ -10,6 +10,40 @@
     <RootNamespace>Acme.Product.Desktop</RootNamespace>
     <ApplicationIcon />
     <StartupObject>Acme.Product.Desktop.Program</StartupObject>
+    
+    <!-- 【阶段D】发布配置 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    
+    <!-- 应用信息 -->
+    <AssemblyTitle>ClearVision</AssemblyTitle>
+    <AssemblyDescription>工业视觉检测软件</AssemblyDescription>
+    <AssemblyCompany>Acme</AssemblyCompany>
+    <AssemblyProduct>ClearVision</AssemblyProduct>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- 【阶段D】Release配置优化 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Optimize>true</Optimize>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <UseWindowsForms>true</UseWindowsForms>
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+  </PropertyGroup>
+
+  <!-- 【阶段D】发布输出配置 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishDir>$(SolutionDir)..\publish\ClearVision-$(AssemblyVersion)</PublishDir>
   </PropertyGroup>
 
 
@@ -18,8 +52,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 

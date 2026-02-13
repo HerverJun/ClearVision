@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <UseWinUI>false</UseWinUI>
+    
+    <!-- MSIX 打包配置 -->
+    <PublishProfile>Properties\PublishProfiles\MSIX.pubxml</PublishProfile>
+    <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    
+    <!-- 应用信息 -->
+    <ApplicationTitle>ClearVision</ApplicationTitle>
+    <ApplicationDescription>工业视觉检测软件 - 基于.NET 8和WebView2的现代桌面应用</ApplicationDescription>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    
+    <!-- 发布配置 -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Acme.Product.Desktop\Acme.Product.Desktop.csproj" />
+  </ItemGroup>
+
+  <!-- MSIX 清单文件 -->
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <!-- 资源文件 -->
+  <ItemGroup>
+    <Content Include="Images\*.png" />
+    <Content Include="Images\*.jpg" />
+    <Content Include="Images\*.ico" />
+  </ItemGroup>
+
+</Project>

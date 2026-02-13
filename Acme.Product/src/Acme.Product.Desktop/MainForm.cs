@@ -23,7 +23,8 @@ public partial class MainForm : Form
         Controls.Add(_webView);
 
         // 创建 WebView2 宿主
-        _webView2Host = new WebView2Host(_webView);
+        var messageHandler = Program.ServiceProvider?.GetService<Handlers.WebMessageHandler>();
+        _webView2Host = new WebView2Host(_webView, messageHandler);
 
         // 窗体加载时初始化 WebView2
         Load += MainForm_Load;
@@ -36,7 +37,7 @@ public partial class MainForm : Form
         {
             // 初始化菜单栏（在WebView2初始化之前）
             InitializeMenu();
-            
+
             await _webView2Host.InitializeAsync();
 
             // S4-006: 初始化 WebMessage 处理器，挂载到 WebView2
@@ -55,17 +56,17 @@ public partial class MainForm : Form
                 MessageBoxIcon.Error);
         }
     }
-    
+
     /// <summary>
     /// 初始化菜单栏
     /// </summary>
     private void InitializeMenu()
     {
         var menuStrip = new MenuStrip();
-        
+
         // 视图菜单
         var viewMenu = new ToolStripMenuItem("视图");
-        
+
         // 【科学方案三】强制刷新菜单项
         var refreshMenuItem = new ToolStripMenuItem("强制刷新 (清除缓存)", null, async (s, e) =>
         {
@@ -81,20 +82,20 @@ public partial class MainForm : Form
         });
         refreshMenuItem.ShortcutKeys = Keys.F5 | Keys.Control;
         refreshMenuItem.ToolTipText = "Ctrl+F5 强制刷新";
-        
+
         viewMenu.DropDownItems.Add(refreshMenuItem);
-        
+
         // 开发工具菜单项（仅DEBUG模式）
 #if DEBUG
         viewMenu.DropDownItems.Add(new ToolStripSeparator());
-        
+
         var devToolsMenuItem = new ToolStripMenuItem("开发者工具", null, (s, e) =>
         {
             _webView.CoreWebView2?.OpenDevToolsWindow();
         });
         devToolsMenuItem.ShortcutKeys = Keys.F12;
         viewMenu.DropDownItems.Add(devToolsMenuItem);
-        
+
         // 清除缓存菜单项
         var clearCacheMenuItem = new ToolStripMenuItem("清除缓存", null, async (s, e) =>
         {
@@ -110,9 +111,9 @@ public partial class MainForm : Form
         });
         viewMenu.DropDownItems.Add(clearCacheMenuItem);
 #endif
-        
+
         menuStrip.Items.Add(viewMenu);
-        
+
         // 将菜单栏添加到窗体
         Controls.Add(menuStrip);
         MainMenuStrip = menuStrip;

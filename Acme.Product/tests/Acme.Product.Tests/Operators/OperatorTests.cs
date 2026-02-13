@@ -2,6 +2,8 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -14,7 +16,7 @@ public class ImageAcquisitionOperatorTests
 
     public ImageAcquisitionOperatorTests()
     {
-        _operator = new ImageAcquisitionOperator();
+        _operator = new ImageAcquisitionOperator(Substitute.For<ILogger<ImageAcquisitionOperator>>());
     }
 
     [Fact]
@@ -82,7 +84,7 @@ public class GaussianBlurOperatorTests
 
     public GaussianBlurOperatorTests()
     {
-        _operator = new GaussianBlurOperator();
+        _operator = new GaussianBlurOperator(Substitute.For<ILogger<GaussianBlurOperator>>());
     }
 
     [Fact]
@@ -153,7 +155,7 @@ public class CannyEdgeOperatorTests
 
     public CannyEdgeOperatorTests()
     {
-        _operator = new CannyEdgeOperator();
+        _operator = new CannyEdgeOperator(Substitute.For<ILogger<CannyEdgeOperator>>());
     }
 
     [Fact]
@@ -211,7 +213,7 @@ public class ThresholdOperatorTests
 
     public ThresholdOperatorTests()
     {
-        _operator = new ThresholdOperator();
+        _operator = new ThresholdOperator(Substitute.For<ILogger<ThresholdOperator>>());
     }
 
     [Fact]

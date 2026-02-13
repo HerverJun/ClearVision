@@ -27,13 +27,13 @@ public class FlowExecutionServiceIntegrationTests
         // 创建所有算子执行器
         var executors = new List<IOperatorExecutor>
         {
-            new ImageAcquisitionOperator(),
-            new GaussianBlurOperator(),
-            new CannyEdgeOperator(),
-            new ThresholdOperator(),
-            new MorphologyOperator(),
-            new BlobDetectionOperator(),
-            new FindContoursOperator()
+            new ImageAcquisitionOperator(Substitute.For<ILogger<ImageAcquisitionOperator>>()),
+            new GaussianBlurOperator(Substitute.For<ILogger<GaussianBlurOperator>>()),
+            new CannyEdgeOperator(Substitute.For<ILogger<CannyEdgeOperator>>()),
+            new ThresholdOperator(Substitute.For<ILogger<ThresholdOperator>>()),
+            new MorphologyOperator(Substitute.For<ILogger<MorphologyOperator>>()),
+            new BlobDetectionOperator(Substitute.For<ILogger<BlobDetectionOperator>>()),
+            new FindContoursOperator(Substitute.For<ILogger<FindContoursOperator>>())
         };
 
         _flowExecutionService = new FlowExecutionService(executors, _logger);

@@ -93,15 +93,7 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
             }
         }
 
-        // 【调试】打印所有被追踪的实体及其状态
-        Console.WriteLine("[DEBUG Repository] === Change Tracker Entries Before Save ===");
-        foreach (var entry in _context.ChangeTracker.Entries())
-        {
-            var idProp = entry.Metadata.FindProperty("Id");
-            var idValue = idProp != null ? entry.Property("Id")?.CurrentValue?.ToString() : "(no Id)";
-            Console.WriteLine($"[DEBUG Repository] Entity: {entry.Entity.GetType().Name}, State: {entry.State}, Id: {idValue}");
-        }
-        Console.WriteLine("[DEBUG Repository] === End Change Tracker Entries ===");
+
 
         await _context.SaveChangesAsync();
     }

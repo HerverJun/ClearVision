@@ -52,7 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IFlowExecutionService, FlowExecutionService>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
 
-        // 算子执行器
+        // 算子执行器 - 基础算子
         services.AddSingleton<IOperatorExecutor, ImageAcquisitionOperator>();
         services.AddSingleton<IOperatorExecutor, GaussianBlurOperator>();
         services.AddSingleton<IOperatorExecutor, CannyEdgeOperator>();
@@ -63,6 +63,47 @@ public static class DependencyInjection
         services.AddSingleton<IOperatorExecutor, FindContoursOperator>();
         services.AddSingleton<IOperatorExecutor, MeasureDistanceOperator>();
         services.AddSingleton<IOperatorExecutor, ResultOutputOperator>();
+        services.AddSingleton<IOperatorExecutor, DeepLearningOperator>();
+
+        // Phase 1 新增算子
+        services.AddSingleton<IOperatorExecutor, MedianBlurOperator>();
+        services.AddSingleton<IOperatorExecutor, BilateralFilterOperator>();
+        services.AddSingleton<IOperatorExecutor, ImageResizeOperator>();
+        services.AddSingleton<IOperatorExecutor, ImageCropOperator>();
+        services.AddSingleton<IOperatorExecutor, ImageRotateOperator>();
+        services.AddSingleton<IOperatorExecutor, PerspectiveTransformOperator>();
+        services.AddSingleton<IOperatorExecutor, CodeRecognitionOperator>();
+        services.AddSingleton<IOperatorExecutor, CircleMeasurementOperator>();
+        services.AddSingleton<IOperatorExecutor, LineMeasurementOperator>();
+        services.AddSingleton<IOperatorExecutor, ContourMeasurementOperator>();
+
+        // Phase 2 新增算子
+        services.AddSingleton<IOperatorExecutor, AngleMeasurementOperator>();
+        services.AddSingleton<IOperatorExecutor, GeometricToleranceOperator>();
+        services.AddSingleton<IOperatorExecutor, CameraCalibrationOperator>();
+        services.AddSingleton<IOperatorExecutor, UndistortOperator>();
+        services.AddSingleton<IOperatorExecutor, CoordinateTransformOperator>();
+
+        // Phase 3 新增算子
+        services.AddSingleton<IOperatorExecutor, ModbusCommunicationOperator>();
+        services.AddSingleton<IOperatorExecutor, TcpCommunicationOperator>();
+        services.AddSingleton<IOperatorExecutor, DatabaseWriteOperator>();
+        services.AddSingleton<IOperatorExecutor, ConditionalBranchOperator>();
+
+        // 孤立算子修复（原复用枚举，现分配独立枚举值 38-40）
+        services.AddSingleton<IOperatorExecutor, ColorConversionOperator>();
+        services.AddSingleton<IOperatorExecutor, AdaptiveThresholdOperator>();
+        services.AddSingleton<IOperatorExecutor, HistogramEqualizationOperator>();
+
+        // Phase 1 关键能力补齐
+        services.AddSingleton<IOperatorExecutor, GeometricFittingOperator>();
+        services.AddSingleton<IOperatorExecutor, RoiManagerOperator>();
+        services.AddSingleton<IOperatorExecutor, ShapeMatchingOperator>();
+        services.AddSingleton<IOperatorExecutor, SubpixelEdgeDetectionOperator>();
+
+        // Phase 3 新增算子（算法深度提升）
+        services.AddSingleton<IOperatorExecutor, ColorDetectionOperator>();
+        services.AddSingleton<IOperatorExecutor, SerialCommunicationOperator>();
 
         // 应用服务 - Sprint 4新增
         services.AddScoped<IOperatorService, OperatorService>();
