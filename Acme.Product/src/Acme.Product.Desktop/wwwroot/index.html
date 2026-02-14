@@ -7,26 +7,32 @@
         <!-- 【科学方案二】动态CSS版本号：通过JavaScript动态加载，使用后端注入的版本号 -->
         <script>
             // 动态加载CSS，自动附加版本号
-            (function() {
+            (function () {
                 // 优先使用后端注入的版本号，如果没有则使用时间戳（开发模式）
-                const version = window.__CSS_VERSION__ || (new Date()).getTime();
+                const version = window.__CSS_VERSION__ || new Date().getTime();
                 const cssFiles = [
-                    'src/shared/styles/variables.css',
-                    'src/shared/styles/main.css',
-                    'src/shared/styles/ui-components.css',
-                    'src/shared/styles/settings.css',
-                    'src/shared/styles/property-panel.css',
-                    'src/shared/styles/settings-overrides.css'
+                    "src/shared/styles/variables.css",
+                    "src/shared/styles/main.css",
+                    "src/shared/styles/ui-components.css",
+                    "src/shared/styles/settings.css",
+                    "src/shared/styles/property-panel.css",
+                    "src/shared/styles/property-panel-enhancements.css",
+                    "src/shared/styles/settings-overrides.css",
+                    "src/shared/styles/inspection.css",
+                    "src/shared/styles/results.css",
+                    "src/shared/styles/project-view.css",
+                    "src/shared/styles/global-enhancements.css",
+                    "src/shared/styles/operator-library.css",
                 ];
-                
-                cssFiles.forEach(function(file) {
-                    const link = document.createElement('link');
-                    link.rel = 'stylesheet';
-                    link.href = file + '?v=' + version;
+
+                cssFiles.forEach(function (file) {
+                    const link = document.createElement("link");
+                    link.rel = "stylesheet";
+                    link.href = file + "?v=" + version;
                     document.head.appendChild(link);
                 });
-                
-                console.log('[CSS Loader] 已加载CSS文件，版本号:', version);
+
+                console.log("[CSS Loader] 已加载CSS文件，版本号:", version);
             })();
         </script>
     </head>
@@ -53,12 +59,112 @@
                     </nav>
                 </div>
                 <div class="toolbar-right">
-                    <button id="btn-import" class="btn btn-secondary" title="导入工程 (Ctrl+I)">导入</button>
-                    <button id="btn-export" class="btn btn-secondary" title="导出工程 (Ctrl+E)">导出</button>
-                    <button id="btn-save" class="btn btn-primary">保存</button>
-                    <button id="btn-run" class="btn btn-success">运行</button>
-                    <button id="btn-theme-toggle" class="btn btn-icon" title="切换主题">🌓</button>
-                    <button id="btn-settings" class="btn btn-icon">⚙️</button>
+                    <button
+                        id="btn-import"
+                        class="btn btn-secondary btn-with-icon"
+                        data-tooltip="导入工程"
+                        data-shortcut="Ctrl+I"
+                    >
+                        <svg
+                            class="btn-icon-svg"
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            fill="currentColor"
+                        >
+                            <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                        </svg>
+                        <span>导入</span>
+                    </button>
+                    <button
+                        id="btn-export"
+                        class="btn btn-secondary btn-with-icon"
+                        data-tooltip="导出工程"
+                        data-shortcut="Ctrl+E"
+                    >
+                        <svg
+                            class="btn-icon-svg"
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+                            />
+                        </svg>
+                        <span>导出</span>
+                    </button>
+                    <div class="toolbar-divider"></div>
+                    <button
+                        id="btn-save"
+                        class="btn btn-primary btn-with-icon"
+                        data-tooltip="保存工程"
+                        data-shortcut="Ctrl+S"
+                    >
+                        <svg
+                            class="btn-icon-svg"
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
+                            />
+                        </svg>
+                        <span>保存</span>
+                    </button>
+                    <button
+                        id="btn-run"
+                        class="btn btn-success btn-with-icon btn-run-pulse"
+                        data-tooltip="运行检测"
+                        data-shortcut="F5"
+                    >
+                        <svg
+                            class="btn-icon-svg"
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            fill="currentColor"
+                        >
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
+                        <span>运行</span>
+                    </button>
+                    <div class="toolbar-divider"></div>
+                    <button
+                        id="btn-theme-toggle"
+                        class="btn btn-icon"
+                        data-tooltip="切换主题"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="20"
+                            height="20"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        id="btn-settings"
+                        class="btn btn-icon"
+                        data-tooltip="设置"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="20"
+                            height="20"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.03 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                            />
+                        </svg>
+                    </button>
                 </div>
             </header>
 
@@ -87,6 +193,71 @@
                         id="image-viewer"
                     ></div>
 
+                    <!-- 检测视图（默认隐藏） -->
+                    <div
+                        class="inspection-view-container hidden"
+                        id="inspection-view"
+                    >
+                        <!-- 检测控制面板 - 左侧 -->
+                        <aside
+                            class="inspection-control-panel"
+                            id="inspection-control-panel"
+                        >
+                            <!-- 由 inspectionPanel.js 动态填充 -->
+                        </aside>
+
+                        <!-- 图像查看器区域 - 中间 -->
+                        <section
+                            class="inspection-image-area"
+                            id="inspection-image-area"
+                        >
+                            <!-- 图像内容将由 imageViewer.js 填充 -->
+                        </section>
+
+                        <!-- 结果面板 - 右侧 -->
+                        <aside
+                            class="inspection-results-panel"
+                            id="inspection-results-panel"
+                        >
+                            <div class="panel">
+                                <h3 class="panel-title">实时结果</h3>
+                                <div
+                                    class="inspection-results-content"
+                                    id="inspection-results-content"
+                                >
+                                    <div class="result-summary-large">
+                                        <div class="result-summary-item ok">
+                                            <span class="result-summary-label"
+                                                >OK</span
+                                            >
+                                            <span
+                                                class="result-summary-value"
+                                                id="inspection-ok-count"
+                                                >0</span
+                                            >
+                                        </div>
+                                        <div class="result-summary-item ng">
+                                            <span class="result-summary-label"
+                                                >NG</span
+                                            >
+                                            <span
+                                                class="result-summary-value"
+                                                id="inspection-ng-count"
+                                                >0</span
+                                            >
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="results-panel-detail"
+                                        id="inspection-results-detail"
+                                    >
+                                        <p class="empty-text">等待检测...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+
                     <!-- 工程视图（默认隐藏） -->
                     <div
                         class="project-view-container hidden"
@@ -100,20 +271,92 @@
                                     placeholder="搜索工程..."
                                     class="cv-input"
                                 />
-                                <button id="btn-search-project" class="btn">
-                                    搜索
+                                <button
+                                    id="btn-search-project"
+                                    class="btn btn-secondary btn-with-icon"
+                                >
+                                    <svg
+                                        class="btn-icon-svg"
+                                        viewBox="0 0 24 24"
+                                        width="16"
+                                        height="16"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                                        />
+                                    </svg>
+                                    <span>搜索</span>
                                 </button>
-                                <button id="btn-new-project-inline" class="btn btn-primary">
-                                    + 新建工程
+                                <button
+                                    id="btn-new-project-inline"
+                                    class="btn btn-primary btn-with-icon"
+                                >
+                                    <svg
+                                        class="btn-icon-svg"
+                                        viewBox="0 0 24 24"
+                                        width="16"
+                                        height="16"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
+                                        />
+                                    </svg>
+                                    <span>新建工程</span>
                                 </button>
                             </div>
-                            <div class="project-tabs">
-                                <button class="tab-btn active" data-tab="all">
-                                    全部工程
-                                </button>
-                                <button class="tab-btn" data-tab="recent">
-                                    最近打开
-                                </button>
+                            <div class="project-view-controls">
+                                <div class="view-toggle">
+                                    <button
+                                        class="view-toggle-btn active"
+                                        data-view="grid"
+                                        title="网格视图"
+                                    >
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            width="16"
+                                            height="16"
+                                            fill="currentColor"
+                                        >
+                                            <path
+                                                d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"
+                                            />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        class="view-toggle-btn"
+                                        data-view="list"
+                                        title="列表视图"
+                                    >
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            width="16"
+                                            height="16"
+                                            fill="currentColor"
+                                        >
+                                            <path
+                                                d="M3 4h18v2H3zm0 7h18v2H3zm0 7h18v2H3z"
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <select class="sort-select">
+                                    <option value="modifiedAt">最近修改</option>
+                                    <option value="createdAt">创建时间</option>
+                                    <option value="name">名称</option>
+                                </select>
+                                <div class="project-tabs">
+                                    <button
+                                        class="tab-btn active"
+                                        data-tab="all"
+                                    >
+                                        全部工程
+                                    </button>
+                                    <button class="tab-btn" data-tab="recent">
+                                        最近打开
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="project-list" id="project-list">
@@ -127,28 +370,284 @@
                         class="results-view-container hidden"
                         id="results-view"
                     >
+                        <!-- 头部标题和时间范围选择 -->
                         <div class="results-view-header">
                             <h2>检测结果历史</h2>
-                            <div class="results-actions">
+                            <div class="time-range-selector">
                                 <button
-                                    class="btn btn-secondary"
-                                    id="btn-clear-results"
+                                    class="time-range-btn active"
+                                    data-range="today"
                                 >
-                                    清空记录
+                                    今天
                                 </button>
                                 <button
-                                    class="btn btn-primary"
-                                    id="btn-export-results"
+                                    class="time-range-btn"
+                                    data-range="week"
                                 >
-                                    导出CSV
+                                    本周
+                                </button>
+                                <button
+                                    class="time-range-btn"
+                                    data-range="month"
+                                >
+                                    本月
+                                </button>
+                                <button
+                                    class="time-range-btn"
+                                    data-range="custom"
+                                >
+                                    自定义
                                 </button>
                             </div>
                         </div>
+
+                        <!-- 仪表板区域 -->
+                        <div class="results-dashboard" id="results-dashboard">
+                            <!-- 左侧：KPI卡片和图表 -->
+                            <div class="dashboard-left">
+                                <!-- KPI卡片组 -->
+                                <div class="kpi-cards" id="kpi-cards">
+                                    <div class="kpi-card">
+                                        <span
+                                            class="kpi-value total"
+                                            id="kpi-total"
+                                            >0</span
+                                        >
+                                        <span class="kpi-label">总检测数</span>
+                                    </div>
+                                    <div class="kpi-card">
+                                        <span class="kpi-value ok" id="kpi-ok"
+                                            >0</span
+                                        >
+                                        <span class="kpi-label">OK</span>
+                                    </div>
+                                    <div class="kpi-card">
+                                        <span class="kpi-value ng" id="kpi-ng"
+                                            >0</span
+                                        >
+                                        <span class="kpi-label">NG</span>
+                                    </div>
+                                    <div class="kpi-card">
+                                        <span
+                                            class="kpi-value yield"
+                                            id="kpi-yield"
+                                            >0%</span
+                                        >
+                                        <span class="kpi-label">良率</span>
+                                    </div>
+                                    <div class="kpi-card">
+                                        <span
+                                            class="kpi-value time"
+                                            id="kpi-avg-time"
+                                            >0ms</span
+                                        >
+                                        <span class="kpi-label">平均耗时</span>
+                                    </div>
+                                </div>
+
+                                <!-- 良率环形图 -->
+                                <div class="yield-chart-container">
+                                    <div class="yield-chart-title">
+                                        良率统计
+                                    </div>
+                                    <div class="yield-chart" id="yield-chart">
+                                        <svg
+                                            viewBox="0 0 150 150"
+                                            width="150"
+                                            height="150"
+                                        >
+                                            <defs>
+                                                <linearGradient
+                                                    id="yield-gradient"
+                                                    x1="0%"
+                                                    y1="0%"
+                                                    x2="100%"
+                                                    y2="0%"
+                                                >
+                                                    <stop
+                                                        offset="0%"
+                                                        style="
+                                                            stop-color: #2ecc71;
+                                                        "
+                                                    />
+                                                    <stop
+                                                        offset="50%"
+                                                        style="
+                                                            stop-color: #f1c40f;
+                                                        "
+                                                    />
+                                                    <stop
+                                                        offset="100%"
+                                                        style="
+                                                            stop-color: #e74c3c;
+                                                        "
+                                                    />
+                                                </linearGradient>
+                                            </defs>
+                                            <circle
+                                                class="yield-chart-bg"
+                                                cx="75"
+                                                cy="75"
+                                                r="60"
+                                            />
+                                            <circle
+                                                class="yield-chart-fill"
+                                                id="yield-chart-fill"
+                                                cx="75"
+                                                cy="75"
+                                                r="60"
+                                                stroke-dasharray="377"
+                                                stroke-dashoffset="377"
+                                            />
+                                        </svg>
+                                        <div class="yield-chart-center">
+                                            <div
+                                                class="yield-percentage"
+                                                id="yield-percentage"
+                                            >
+                                                0%
+                                            </div>
+                                            <div class="yield-label">良率</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 缺陷类型分布 -->
+                                <div class="defect-distribution">
+                                    <div class="defect-distribution-title">
+                                        缺陷类型分布
+                                    </div>
+                                    <div class="defect-bars" id="defect-bars">
+                                        <!-- 动态生成 -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 右侧：趋势折线图 -->
+                            <div class="dashboard-right">
+                                <div class="trend-chart-container">
+                                    <div class="trend-chart-title">
+                                        检测趋势
+                                    </div>
+                                    <div class="trend-chart-wrapper">
+                                        <canvas
+                                            class="trend-chart-canvas"
+                                            id="trend-canvas"
+                                            width="800"
+                                            height="300"
+                                        ></canvas>
+                                    </div>
+                                    <div class="trend-chart-legend">
+                                        <span class="legend-item"
+                                            ><span
+                                                class="legend-color ok"
+                                            ></span>
+                                            OK</span
+                                        >
+                                        <span class="legend-item"
+                                            ><span
+                                                class="legend-color ng"
+                                            ></span>
+                                            NG</span
+                                        >
+                                        <span class="legend-item"
+                                            ><span
+                                                class="legend-color yield"
+                                            ></span>
+                                            良率</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 筛选栏 -->
                         <div
-                            class="results-view-content"
-                            id="results-view-content"
+                            class="results-filters-bar"
+                            id="results-filters-bar"
                         >
-                            <p class="empty-text">暂无检测记录</p>
+                            <div class="filter-group">
+                                <label>状态:</label>
+                                <select
+                                    class="filter-select"
+                                    id="filter-status"
+                                >
+                                    <option value="all">全部</option>
+                                    <option value="ok">OK</option>
+                                    <option value="ng">NG</option>
+                                    <option value="error">错误</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>缺陷类型:</label>
+                                <select
+                                    class="filter-select"
+                                    id="filter-defect-type"
+                                >
+                                    <option value="all">全部</option>
+                                    <!-- 动态生成 -->
+                                </select>
+                            </div>
+                            <div class="export-dropdown" id="export-dropdown">
+                                <button
+                                    class="export-btn"
+                                    id="btn-export-results"
+                                >
+                                    <span>导出</span>
+                                    <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 24 24"
+                                        fill="currentColor"
+                                    >
+                                        <path d="M7 10l5 5 5-5z" />
+                                    </svg>
+                                </button>
+                                <div class="export-menu">
+                                    <div
+                                        class="export-menu-item"
+                                        data-format="csv"
+                                    >
+                                        导出 CSV
+                                    </div>
+                                    <div
+                                        class="export-menu-item"
+                                        data-format="json"
+                                    >
+                                        导出 JSON
+                                    </div>
+                                    <div
+                                        class="export-menu-item"
+                                        data-format="excel"
+                                    >
+                                        导出 Excel
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                class="btn btn-secondary"
+                                id="btn-clear-results"
+                            >
+                                清空记录
+                            </button>
+                        </div>
+
+                        <!-- 结果列表 -->
+                        <div
+                            class="results-list-container"
+                            id="results-list-container"
+                        >
+                            <div class="results-info-bar">
+                                <span id="results-count-info">共 0 条记录</span>
+                            </div>
+                            <div class="results-grid" id="results-grid">
+                                <!-- 动态生成结果卡片 -->
+                            </div>
+                        </div>
+
+                        <!-- 分页 -->
+                        <div class="results-pagination" id="results-pagination">
+                            <!-- 动态生成 -->
                         </div>
                     </div>
                 </section>
@@ -161,27 +660,57 @@
                             <p class="empty-text">选择一个算子查看属性</p>
                         </div>
                     </div>
-
-                    <div class="panel">
-                        <h3 class="panel-title">结果</h3>
-                        <div class="results-panel" id="results-panel">
-                            <div class="result-summary">
-                                <span class="result-ok">OK: 0</span>
-                                <span class="result-ng">NG: 0</span>
-                            </div>
-                        </div>
-                    </div>
                 </aside>
             </main>
 
             <!-- 底部状态栏 -->
             <footer class="status-bar">
                 <div class="status-left">
-                    <span id="status-text">就绪</span>
+                    <div
+                        class="status-indicator-led online"
+                        id="connection-status"
+                        title="连接状态"
+                    ></div>
+                    <span class="status-text" id="status-text">就绪</span>
+                    <div class="status-divider"></div>
+                    <div class="status-metric" id="memory-usage">
+                        <svg
+                            class="metric-icon"
+                            viewBox="0 0 24 24"
+                            width="14"
+                            height="14"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"
+                            ></path>
+                        </svg>
+                        <span class="metric-value">-- MB</span>
+                    </div>
+                    <div class="status-metric" id="fps-counter">
+                        <svg
+                            class="metric-icon"
+                            viewBox="0 0 24 24"
+                            width="14"
+                            height="14"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+                            ></path>
+                        </svg>
+                        <span class="metric-value">-- FPS</span>
+                    </div>
                 </div>
                 <div class="status-right">
-                    <span id="project-name">未命名工程</span>
-                    <span id="version">v1.0.0</span>
+                    <span class="status-breadcrumb" id="status-breadcrumb"
+                        >ClearVision</span
+                    >
+                    <span class="status-divider"> </span>
+                    <span class="project-name" id="project-name"
+                        >未命名工程</span
+                    >
+                    <span class="version" id="version">v1.0.0</span>
                 </div>
             </footer>
         </div>
@@ -211,8 +740,15 @@
         ></script>
         <script
             type="module"
+            src="src/features/inspection/inspectionPanel.js"
+        ></script>
+        <script
+            type="module"
             src="src/features/results/resultPanel.js"
         ></script>
+
+        <!-- 加载共享组件 -->
+        <script type="module" src="src/shared/components/tooltip.js"></script>
 
         <!-- 加载主应用 -->
         <script type="module" src="src/app.js"></script>

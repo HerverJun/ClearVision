@@ -1,6 +1,6 @@
 /**
- * 工程视图组件
- * 展示工程列表，支持搜索、打开、删除
+ * 工程视图组件 - 阶段三增强版
+ * 展示工程列表，支持搜索、打开、删除、排序、视图切换
  */
 
 import projectManager from './projectManager.js';
@@ -11,6 +11,10 @@ export class ProjectView {
         this.container = document.getElementById(containerId);
         this.currentTab = 'all'; // 'all' | 'recent'
         this.projects = [];
+        this.filteredProjects = [];
+        this.viewMode = 'grid'; // 'grid' | 'list'
+        this.sortBy = 'modifiedAt'; // 'name' | 'createdAt' | 'modifiedAt'
+        this.sortOrder = 'desc'; // 'asc' | 'desc'
         
         if (!this.container) {
             console.error('[ProjectView] 容器未找到:', containerId);
@@ -53,13 +57,34 @@ export class ProjectView {
                 this.loadProjects();
             });
         });
+        
+        // 视图切换按钮
+        const viewToggleBtns = this.container.querySelectorAll('.view-toggle-btn');
+        viewToggleBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                viewToggleBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.viewMode = btn.dataset.view;
+                this.renderProjects(document.getElementById('project-list'));
+            });
+        });
+        
+        // 排序选择器
+        const sortSelect = this.container.querySelector('.sort-select');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', (e) => {
+                this.sortBy = e.target.value;
+                this.sortProjects();
+                this.renderProjects(document.getElementById('project-list'));
+            });
+        }
     }
     
     async loadProjects() {
         const listContainer = document.getElementById('project-list');
         if (!listContainer) return;
         
-        listContainer.innerHTML = '<p class="loading-text">加载中...</p>';
+        listContainer.innerHTML = this.renderSkeletonLoading();
         
         try {
             if (this.currentTab === 'recent') {
@@ -68,23 +93,217 @@ export class ProjectView {
                 this.projects = await projectManager.getProjectList();
             }
             
+            this.filteredProjects = [...this.projects];
+            this.sortProjects();
             this.renderProjects(listContainer);
         } catch (error) {
             console.error('[ProjectView] 加载工程列表失败:', error);
-            listContainer.innerHTML = '<p class="error-text">加载失败，请重试</p>';
+            listContainer.innerHTML = this.renderEmptyState();
         }
     }
     
+    /**
+     * 渲染骨架屏加载状态
+     */
+    renderSkeletonLoading() {
+        return `
+            <div class="skeleton-grid">
+                ${Array(6).fill(0).map(() => `
+                    <div class="skeleton-card">
+                        <div class="skeleton-header"></div>
+                        <div class="skeleton-body"></div>
+                        <div class="skeleton-footer"></div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染空状态
+     */
+    renderEmptyState() {
+        return `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <h3 class="empty-state-title">还没有工程</h3>
+                <p class="empty-state-desc">创建您的第一个工程开始视觉检测之旅</p>
+                <button class="btn btn-primary empty-state-action" onclick="document.getElementById('btn-new-project-inline').click()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    创建新工程
+                </button>
+            </div>
+        `;
+    }
+    
+    /**
+     * 排序工程列表
+     */
+    sortProjects() {
+        this.filteredProjects.sort((a, b) => {
+            let valueA, valueB;
+            
+            switch (this.sortBy) {
+                case 'name':
+                    valueA = a.name?.toLowerCase() || '';
+                    valueB = b.name?.toLowerCase() || '';
+                    break;
+                case 'createdAt':
+                    valueA = new Date(a.createdAt).getTime();
+                    valueB = new Date(b.createdAt).getTime();
+                    break;
+                case 'modifiedAt':
+                default:
+                    valueA = new Date(a.modifiedAt).getTime();
+                    valueB = new Date(b.modifiedAt).getTime();
+                    break;
+            }
+            
+            if (this.sortOrder === 'asc') {
+                return valueA > valueB ? 1 : -1;
+            } else {
+                return valueA < valueB ? 1 : -1;
+            }
+        });
+    }
+    
     renderProjects(container) {
-        if (!this.projects || this.projects.length === 0) {
-            container.innerHTML = '<p class="empty-text">暂无工程，点击"新建"创建第一个工程</p>';
+        if (!this.filteredProjects || this.filteredProjects.length === 0) {
+            container.innerHTML = this.renderEmptyState();
             return;
         }
         
-        container.innerHTML = this.projects.map(project => this.createProjectCard(project)).join('');
+        if (this.viewMode === 'list') {
+            container.innerHTML = this.renderListView();
+        } else {
+            container.innerHTML = this.renderGridView();
+        }
         
         // 绑定卡片事件
-        container.querySelectorAll('.project-card').forEach(card => {
+        this.bindCardEvents(container);
+    }
+    
+    /**
+     * 渲染网格视图
+     */
+    renderGridView() {
+        return `
+            <div class="projects-grid">
+                ${this.filteredProjects.map(project => this.createProjectCardGrid(project)).join('')}
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染列表视图
+     */
+    renderListView() {
+        return `
+            <div class="projects-list">
+                ${this.filteredProjects.map(project => this.createProjectCardList(project)).join('')}
+            </div>
+        `;
+    }
+    
+    /**
+     * 创建工程卡片（网格视图）
+     */
+    createProjectCardGrid(project) {
+        const createdDate = new Date(project.createdAt).toLocaleDateString('zh-CN');
+        const modifiedDate = new Date(project.modifiedAt).toLocaleDateString('zh-CN');
+        const status = project.status || 'ready';
+        const statusConfig = this.getStatusConfig(status);
+        
+        return `
+            <div class="project-card" data-id="${project.id}">
+                <div class="project-card-thumbnail">
+                    <div class="project-thumbnail-placeholder">
+                        <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor" opacity="0.3">
+                            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                        </svg>
+                    </div>
+                    <span class="project-status-badge" style="background:${statusConfig.color};">${statusConfig.label}</span>
+                </div>
+                <div class="project-card-body">
+                    <div class="project-card-title">${this.escapeHtml(project.name)}</div>
+                    <div class="project-card-desc">${this.escapeHtml(project.description || '暂无描述')}</div>
+                </div>
+                <div class="project-card-footer">
+                    <div class="project-card-meta">
+                        <span>创建: ${createdDate}</span>
+                        <span>修改: ${modifiedDate}</span>
+                    </div>
+                    <div class="project-card-actions">
+                        <button class="cv-btn cv-btn-primary btn-open" title="打开工程">打开</button>
+                        <button class="cv-btn cv-btn-danger btn-delete" title="删除工程">删除</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 创建工程卡片（列表视图）
+     */
+    createProjectCardList(project) {
+        const createdDate = new Date(project.createdAt).toLocaleDateString('zh-CN');
+        const modifiedDate = new Date(project.modifiedAt).toLocaleDateString('zh-CN');
+        const status = project.status || 'ready';
+        const statusConfig = this.getStatusConfig(status);
+        
+        return `
+            <div class="project-list-item" data-id="${project.id}">
+                <div class="project-list-thumbnail">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                    </svg>
+                </div>
+                <div class="project-list-info">
+                    <div class="project-list-title">${this.escapeHtml(project.name)}</div>
+                    <div class="project-list-desc">${this.escapeHtml(project.description || '暂无描述')}</div>
+                </div>
+                <div class="project-list-meta">
+                    <span>${modifiedDate}</span>
+                    <span class="project-status-dot" style="color:${statusConfig.color};font-size:12px;">● ${statusConfig.label}</span>
+                </div>
+                <div class="project-list-actions">
+                    <button class="action-btn btn-open" title="打开">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                    </button>
+                    <button class="action-btn btn-delete" title="删除">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2v-7H6v7zM19 4h-3.5l-1-1h-5.7l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 获取状态配置
+     */
+    getStatusConfig(status) {
+        const configs = {
+            'ready': { label: '就绪', color: '#2ecc71' },
+            'running': { label: '运行中', color: '#3498db' },
+            'error': { label: '错误', color: '#e74c3c' },
+            'draft': { label: '草稿', color: '#95a5a6' }
+        };
+        return configs[status] || configs['ready'];
+    }
+    
+    /**
+     * 绑定卡片事件
+     */
+    bindCardEvents(container) {
+        // 同时选择网格卡片和列表行
+        const items = container.querySelectorAll('.project-card, .project-list-item');
+        items.forEach(card => {
             const projectId = card.dataset.id;
             
             // 双击打开
@@ -99,29 +318,12 @@ export class ProjectView {
             // 删除按钮
             card.querySelector('.btn-delete')?.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.confirmDelete(projectId, card.querySelector('.project-card-title').textContent);
+                const name = card.querySelector('.project-card-title')?.textContent 
+                          || card.querySelector('.project-list-title')?.textContent 
+                          || '未知工程';
+                this.confirmDelete(projectId, name);
             });
         });
-    }
-    
-    createProjectCard(project) {
-        const createdDate = new Date(project.createdAt).toLocaleDateString('zh-CN');
-        const modifiedDate = new Date(project.modifiedAt).toLocaleDateString('zh-CN');
-        
-        return `
-            <div class="project-card" data-id="${project.id}">
-                <div class="project-card-title">${this.escapeHtml(project.name)}</div>
-                <div class="project-card-desc">${this.escapeHtml(project.description || '暂无描述')}</div>
-                <div class="project-card-meta">
-                    <span>创建: ${createdDate}</span>
-                    <span>修改: ${modifiedDate}</span>
-                </div>
-                <div class="project-card-actions">
-                    <button class="cv-btn cv-btn-primary btn-open">打开</button>
-                    <button class="cv-btn cv-btn-danger btn-delete">删除</button>
-                </div>
-            </div>
-        `;
     }
     
     async openProject(projectId) {
@@ -185,14 +387,16 @@ export class ProjectView {
         const listContainer = document.getElementById('project-list');
         if (!listContainer) return;
         
-        listContainer.innerHTML = '<p class="loading-text">搜索中...</p>';
+        listContainer.innerHTML = this.renderSkeletonLoading();
         
         try {
             this.projects = await projectManager.searchProjects(keyword);
+            this.filteredProjects = [...this.projects];
+            this.sortProjects();
             this.renderProjects(listContainer);
         } catch (error) {
             console.error('[ProjectView] 搜索失败:', error);
-            listContainer.innerHTML = '<p class="error-text">搜索失败，请重试</p>';
+            listContainer.innerHTML = this.renderEmptyState();
         }
     }
     

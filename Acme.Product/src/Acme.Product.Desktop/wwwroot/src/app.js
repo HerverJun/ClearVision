@@ -8,13 +8,22 @@ import { Dialog } from './shared/components/dialog.js';
 // ============================================
 // 全局错误捕获 - 用于调试
 // ============================================
-// 存储错误日志
+// 存储错误日志（限制最大条目数防止内存泄漏）
 window._errorLogs = [];
+const MAX_ERROR_LOGS = 100;  // 【修复】限制错误日志最大数量
+
+function addErrorLog(logEntry) {
+    window._errorLogs.push(logEntry);
+    // 【修复】当超过最大限制时，移除最旧的日志
+    if (window._errorLogs.length > MAX_ERROR_LOGS) {
+        window._errorLogs.shift();
+    }
+}
 
 window.onerror = function(message, source, lineno, colno, error) {
     const errorInfo = `[Global Error] ${message} at ${source}:${lineno}`;
     console.error(errorInfo);
-    window._errorLogs.push({
+    addErrorLog({
         type: 'Error',
         message: message,
         source: source,
@@ -23,7 +32,15 @@ window.onerror = function(message, source, lineno, colno, error) {
     });
     const debugDiv = document.getElementById('debug-errors');
     if (debugDiv) {
-        debugDiv.innerHTML += `<div style="color:red;margin:2px 0">❌ ${message} (Line ${lineno})</div>`;
+        // 【修复】限制调试面板的DOM元素数量
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'color:red;margin:2px 0';
+        errorDiv.textContent = `❌ ${message} (Line ${lineno})`;
+        debugDiv.appendChild(errorDiv);
+        // 保持最多50条DOM记录
+        while (debugDiv.children.length > 50) {
+            debugDiv.removeChild(debugDiv.firstChild);
+        }
     }
     return false;
 };
@@ -31,14 +48,21 @@ window.onerror = function(message, source, lineno, colno, error) {
 window.addEventListener('unhandledrejection', function(event) {
     const errorMsg = event.reason?.message || event.reason;
     console.error('[Unhandled Promise Rejection]', errorMsg);
-    window._errorLogs.push({
+    addErrorLog({
         type: 'Promise',
         message: errorMsg,
         time: new Date().toLocaleTimeString()
     });
     const debugDiv = document.getElementById('debug-errors');
     if (debugDiv) {
-        debugDiv.innerHTML += `<div style="color:orange;margin:2px 0">⚠️ Promise: ${errorMsg}</div>`;
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'color:orange;margin:2px 0';
+        errorDiv.textContent = `⚠️ Promise: ${errorMsg}`;
+        debugDiv.appendChild(errorDiv);
+        // 【修复】限制调试面板的DOM元素数量
+        while (debugDiv.children.length > 50) {
+            debugDiv.removeChild(debugDiv.firstChild);
+        }
     }
 });
 
@@ -52,6 +76,7 @@ import { FlowEditorInteraction } from './features/flow-editor/flowEditorInteract
 import { ImageViewerComponent } from './features/image-viewer/imageViewer.js';
 import { OperatorLibraryPanel } from './features/operator-library/operatorLibrary.js';
 import inspectionController from './features/inspection/inspectionController.js';
+import { InspectionPanel } from './features/inspection/inspectionPanel.js';
 import { showToast, createModal, closeModal, createInput, createLabeledInput, createButton } from './shared/components/uiComponents.js';
 import { PropertyPanel } from './features/flow-editor/propertyPanel.js';
 import { ProjectView } from './features/project/projectView.js';
@@ -65,6 +90,16 @@ const [getSelectedOperator, setSelectedOperator, subscribeSelectedOperator] = cr
 const [getOperatorLibrary, setOperatorLibrary, subscribeOperatorLibrary] = createSignal([]);
 const [getCurrentProject, setCurrentProject, subscribeCurrentProject] = createSignal(null);
 
+// 【修复】订阅管理器，防止内存泄漏
+const subscriptions = [];
+
+// 【修复】包装订阅函数，自动跟踪取消函数
+function trackedSubscribe(subscribeFn, callback) {
+    const unsubscribe = subscribeFn(callback);
+    subscriptions.push(unsubscribe);
+    return unsubscribe;
+}
+
 // 组件实例
 let imageViewer = null;
 let operatorLibraryPanel = null;
@@ -73,6 +108,7 @@ let flowEditorInteraction = null;
 let propertyPanel = null;
 let projectView = null;
 let resultPanel = null;
+let inspectionPanel = null;
 
 // 自动保存定时器
 let autoSaveInterval = null;
@@ -83,6 +119,9 @@ const AUTO_SAVE_DELAY = 5 * 60 * 1000; // 5分钟
  */
 function initializeApp() {
     console.log('[App] 初始化应用...');
+    
+    // 显示加载骨架屏
+    showLoadingScreen();
     
     // 添加错误显示区域
     const debugErrors = document.createElement('div');
@@ -140,6 +179,10 @@ function initializeApp() {
     // 初始化工具栏按钮
     initializeToolbar();
     
+    // 【修复】启动状态栏更新（内存、FPS）
+    startStatusBarUpdates();
+    console.log('[App] 状态栏更新已启动');
+    
     // 显示欢迎消息
     showToast('ClearVision 已就绪', 'success');
 }
@@ -170,38 +213,47 @@ function initializeNavigation() {
 function switchView(view) {
     const flowEditor = document.getElementById('flow-editor');
     const imageViewerContainer = document.getElementById('image-viewer');
+    const inspectionViewContainer = document.getElementById('inspection-view');
     const resultsViewContainer = document.getElementById('results-view');
     const projectViewContainer = document.getElementById('project-view');
 
     // 隐藏所有视图
     flowEditor?.classList.add('hidden');
     imageViewerContainer?.classList.add('hidden');
+    inspectionViewContainer?.classList.add('hidden');
     resultsViewContainer?.classList.add('hidden');
     projectViewContainer?.classList.add('hidden');
+
+    // 获取侧边栏元素
+    const leftSidebar = document.querySelector('.sidebar.left');
+    const rightSidebar = document.querySelector('.sidebar.right');
+
+    // 控制侧边栏可见性：仅流程视图显示
+    if (view === 'flow') {
+        leftSidebar?.classList.remove('hidden');
+        rightSidebar?.classList.remove('hidden');
+    } else {
+        leftSidebar?.classList.add('hidden');
+        rightSidebar?.classList.add('hidden');
+    }
 
     switch (view) {
         case 'flow':
             flowEditor?.classList.remove('hidden');
             break;
         case 'inspection':
-            imageViewerContainer?.classList.remove('hidden');
-            // 【关键修复】视图可见后，重新计算画布尺寸
-            if (window.imageViewer && window.imageViewer.imageCanvas) {
-                // 延迟一帧以确保DOM已完成布局
-                requestAnimationFrame(() => {
-                    window.imageViewer.imageCanvas.resize();
-                    // 如果已有图像，重新适应屏幕
-                    if (window.imageViewer.imageCanvas.image) {
-                        window.imageViewer.imageCanvas.resetView();
-                    }
-                });
-            }
+            inspectionViewContainer?.classList.remove('hidden');
+            // 初始化检测控制面板
+            initializeInspectionPanel();
+            // 初始化检测图像查看器
+            initializeInspectionImageViewer();
             break;
         case 'results':
             resultsViewContainer?.classList.remove('hidden');
             console.log('[App] 切换到结果视图');
-            // 加载历史检测数据
+            // 初始化并刷新结果面板
             if (resultPanel) {
+                resultPanel.render();
                 loadInspectionHistory();
             }
             break;
@@ -216,6 +268,181 @@ function switchView(view) {
         default:
             flowEditor?.classList.remove('hidden');
             break;
+    }
+}
+
+/**
+ * 初始化检测控制面板
+ */
+function initializeInspectionPanel() {
+    const container = document.getElementById('inspection-control-panel');
+    if (!container) {
+        console.warn('[App] 检测控制面板容器未找到');
+        return;
+    }
+    
+    // 如果面板已初始化，刷新显示
+    if (inspectionPanel) {
+        inspectionPanel.refresh();
+        return;
+    }
+    
+    try {
+        inspectionPanel = new InspectionPanel('inspection-control-panel');
+        window.inspectionPanel = inspectionPanel;
+        console.log('[App] 检测控制面板初始化完成');
+    } catch (error) {
+        console.error('[App] 检测控制面板初始化失败:', error);
+    }
+}
+
+/**
+ * 初始化检测图像查看器
+ */
+function initializeInspectionImageViewer() {
+    const container = document.getElementById('inspection-image-area');
+    if (!container) {
+        console.warn('[App] 检测图像查看器容器未找到');
+        return;
+    }
+    
+    // 如果查看器已存在且已初始化，只需调整大小
+    if (window.inspectionImageViewer) {
+        requestAnimationFrame(() => {
+            window.inspectionImageViewer.imageCanvas?.resize();
+            if (window.inspectionImageViewer.imageCanvas?.image) {
+                window.inspectionImageViewer.imageCanvas.resetView();
+            }
+        });
+        return;
+    }
+    
+    try {
+        // 复用现有的 ImageViewerComponent
+        const inspectionImageViewer = new ImageViewerComponent('inspection-image-area');
+        window.inspectionImageViewer = inspectionImageViewer;
+        
+        // 将检测图像查看器与检测控制器关联
+        inspectionController.onInspectionCompleted = (result) => {
+            console.log('[App] 检测完成:', result);
+
+            // 显示处理后的图像
+            if (result.outputImage && window.inspectionImageViewer) {
+                const imageData = `data:image/png;base64,${result.outputImage}`;
+                window.inspectionImageViewer.loadImage(imageData);
+            }
+
+            // 更新检测面板
+            if (inspectionPanel) {
+                inspectionPanel.handleInspectionResult(result);
+            }
+
+            // 添加结果到数显面板
+            if (resultPanel) {
+                resultPanel.addResult({
+                    status: result.status,
+                    defects: result.defects || [],
+                    processingTime: result.processingTimeMs,
+                    timestamp: new Date().toISOString(),
+                    confidenceScore: result.confidenceScore,
+                    imageData: result.outputImage
+                });
+            }
+
+            // 更新右侧结果面板（简化显示）
+            updateResultsPanel(result);
+
+            // 更新检测结果面板
+            updateInspectionResultsPanel(result);
+
+            // 显示结果提示
+            let status = 'info';
+            let message = '';
+
+            if (result.status === 'OK') {
+                status = 'success';
+                message = '检测通过 (OK)';
+            } else if (result.status === 'Error') {
+                status = 'error';
+                message = `检测错误: ${result.errorMessage || '未知错误'}`;
+            } else {
+                status = 'warning';
+                message = `检测到 ${result.defects?.length || 0} 个缺陷`;
+            }
+            showToast(message, status);
+        };
+        
+        console.log('[App] 检测图像查看器初始化完成');
+    } catch (error) {
+        console.error('[App] 检测图像查看器初始化失败:', error);
+    }
+}
+
+/**
+ * 更新检测视图结果面板
+ */
+function updateInspectionResultsPanel(result) {
+    const okCountEl = document.getElementById('inspection-ok-count');
+    const ngCountEl = document.getElementById('inspection-ng-count');
+    const detailEl = document.getElementById('inspection-results-detail');
+    
+    if (okCountEl && ngCountEl) {
+        // 获取当前计数
+        let okCount = parseInt(okCountEl.textContent) || 0;
+        let ngCount = parseInt(ngCountEl.textContent) || 0;
+        
+        // 更新计数
+        if (result.status === 'OK') {
+            okCount++;
+        } else if (result.status !== 'Error') {
+            ngCount++;
+        }
+        
+        okCountEl.textContent = okCount;
+        ngCountEl.textContent = ngCount;
+        
+        // 添加动画效果
+        okCountEl.classList.add('changing');
+        ngCountEl.classList.add('changing');
+        setTimeout(() => {
+            okCountEl.classList.remove('changing');
+            ngCountEl.classList.remove('changing');
+        }, 300);
+    }
+    
+    if (detailEl) {
+        // 显示检测结果详情
+        let html = `
+            <div class="result-detail-item">
+                <span class="detail-label">检测状态</span>
+                <span class="detail-value ${result.status === 'OK' ? 'text-ok' : 'text-ng'}">${result.status}</span>
+            </div>
+        `;
+        
+        if (result.processingTimeMs) {
+            html += `
+                <div class="result-detail-item">
+                    <span class="detail-label">处理时间</span>
+                    <span class="detail-value">${result.processingTimeMs} ms</span>
+                </div>
+            `;
+        }
+        
+        if (result.defects && result.defects.length > 0) {
+            html += `<div class="defects-list"><h4>缺陷详情</h4>`;
+            result.defects.forEach(defect => {
+                const confidence = defect.confidenceScore || defect.confidence || 0;
+                html += `
+                    <div class="defect-detail-item">
+                        <span class="defect-type">${defect.type || defect.description || '未知缺陷'}</span>
+                        <span class="defect-confidence">${(confidence * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+        
+        detailEl.innerHTML = html;
     }
 }
 
@@ -280,10 +507,21 @@ function initializeInspectionController() {
     inspectionController.onInspectionCompleted = (result) => {
         console.log('[App] 检测完成:', result);
 
-        // 如果有处理后的图像，在查看器中显示
-        if (result.outputImage && window.imageViewer) {
-            const imageData = `data:image/png;base64,${result.outputImage}`;
-            window.imageViewer.loadImage(imageData);
+        // 如果在检测视图，更新检测面板和图像查看器
+        if (getCurrentView() === 'inspection') {
+            // 显示处理后的图像
+            if (result.outputImage && window.inspectionImageViewer) {
+                const imageData = `data:image/png;base64,${result.outputImage}`;
+                window.inspectionImageViewer.loadImage(imageData);
+            }
+
+            // 更新检测面板
+            if (inspectionPanel) {
+                inspectionPanel.handleInspectionResult(result);
+            }
+
+            // 更新结果面板
+            updateInspectionResultsPanel(result);
         }
 
         // 添加结果到数显面板
@@ -294,19 +532,13 @@ function initializeInspectionController() {
                 processingTime: result.processingTimeMs,
                 timestamp: new Date().toISOString(),
                 confidenceScore: result.confidenceScore,
-                imageData: result.outputImage // 使用 outputImage
+                imageData: result.outputImage
             });
         }
 
         // 更新右侧结果面板（简化显示）
         updateResultsPanel(result);
 
-        // 如果有缺陷，在图像查看器中显示
-        if (result.defects && result.defects.length > 0 && window.imageViewer) {
-            window.imageViewer.showDefects(result.defects);
-        }
-
-        // 显示结果提示
         // 显示结果提示
         let status = 'info';
         let message = '';
@@ -328,6 +560,12 @@ function initializeInspectionController() {
     inspectionController.onInspectionError = (error) => {
         console.error('[App] 检测错误:', error);
         showToast('检测失败: ' + error.message, 'error');
+        
+        // 更新检测面板状态
+        if (inspectionPanel) {
+            inspectionPanel.updateStatus('error', '检测错误');
+            inspectionPanel.setButtonsState(false);
+        }
     };
     
     console.log('[App] 检测控制器初始化完成');
@@ -345,8 +583,8 @@ function initializePropertyPanel() {
 
     propertyPanel = new PropertyPanel('property-panel');
 
-    // 订阅选中算子变化
-    subscribeSelectedOperator((operator) => {
+    // 【修复】订阅选中算子变化，使用trackedSubscribe防止内存泄漏
+    trackedSubscribe(subscribeSelectedOperator, (operator) => {
         if (operator) {
             console.log('[App] 选中算子变化:', operator.title || operator.type);
             propertyPanel.setOperator(operator);
@@ -424,32 +662,24 @@ function initializeProjectView() {
  * 初始化结果面板（数显功能）
  */
 function initializeResultPanel() {
-    const container = document.getElementById('results-view-content');
+    const container = document.getElementById('results-list-container');
     if (!container) {
         console.warn('[App] 结果视图容器未找到');
         return;
     }
 
-    resultPanel = new ResultPanel('results-view-content');
+    // 初始化结果面板（不传入容器ID，面板会管理整个视图）
+    resultPanel = new ResultPanel('results-list-container');
+    window.resultPanel = resultPanel;
 
     // 设置结果点击回调
     resultPanel.onResultClick = (result) => {
         console.log('[App] 点击结果:', result);
-        // 可以在这里显示结果详情或跳转到图像查看器
-        if (result.imageData && imageViewer) {
-            imageViewer.loadImage(result.imageData);
-            setCurrentView('inspection');
-            switchView('inspection');
+        // 显示详情弹窗
+        if (resultPanel && result) {
+            resultPanel.showResultDetail(result);
         }
     };
-
-    // 绑定导出按钮
-    const exportBtn = document.getElementById('btn-export-results');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', () => {
-            resultPanel.exportResults('csv');
-        });
-    }
 
     // 绑定清空按钮
     const clearBtn = document.getElementById('btn-clear-results');
@@ -462,7 +692,7 @@ function initializeResultPanel() {
         });
     }
 
-    console.log('[App] 结果面板初始化完成（数显功能）');
+    console.log('[App] 结果面板初始化完成（现代化仪表板）');
 }
 
 /**
@@ -675,63 +905,16 @@ function initializeFlowEditor() {
     // 【阶段B】启动自动保存
     startAutoSave();
     
-    // 添加拖放支持
-    canvas.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        canvas.classList.add('drag-over');
-    });
-    
-    canvas.addEventListener('dragleave', () => {
-        canvas.classList.remove('drag-over');
-    });
-    
-    canvas.addEventListener('drop', (e) => {
-        e.preventDefault();
-        canvas.classList.remove('drag-over');
-        
-        let operatorData = null;
-        
-        // 尝试从 dataTransfer 获取算子类型
-        let operatorType = e.dataTransfer.getData('operatorType');
-        
-        // 如果从 operator-library 拖拽，数据格式可能不同
-        if (!operatorType) {
-            try {
-                // 优先从全局变量获取备选数据 (针对 WebView2 环境)
-                if (window.__draggingOperatorData) {
-                    operatorData = window.__draggingOperatorData;
-                    operatorType = operatorData.type;
-                    console.log('[App] 从全局变量获取拖拽数据:', operatorType);
-                    // 使用完立即清理
-                    window.__draggingOperatorData = null;
-                } else {
-                    const jsonStr = e.dataTransfer.getData('application/json');
-                    if (jsonStr) {
-                        operatorData = JSON.parse(jsonStr);
-                        operatorType = operatorData.type;
-                        console.log('[App] 从 dataTransfer 获取拖拽数据:', operatorType);
-                    }
-                }
-            } catch (err) {
-                console.warn('[App] 无法解析拖拽数据');
-            }
-        }
-        
-        if (operatorType) {
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left - flowCanvas.offset.x) / flowCanvas.scale;
-            const y = (e.clientY - rect.top - flowCanvas.offset.y) / flowCanvas.scale;
-            addOperatorToFlow(operatorType, x, y, operatorData);
-        }
-    });
+    // 注意：拖放支持已由 FlowEditorInteraction 类统一接管
+    // 移除了此处重复的 dragover, dragleave, drop 事件监听
+    // 避免出现重复添加算子的问题
     
     console.log('[App] 流程编辑器初始化完成');
 }
 
 
 /**
- * 添加算子到流程
+ * 添加算子到流程（保留作为备用入口）
  */
 function addOperatorToFlow(type, x, y, data = null) {
     console.log('[App] 添加算子:', type, '位置:', x, y);
@@ -743,38 +926,53 @@ function addOperatorToFlow(type, x, y, data = null) {
     
     // 算子配置
     const operatorConfigs = {
-        'ImageAcquisition': { title: '图像采集', color: '#52c41a', icon: '📷' },
-        'Filtering': { title: '滤波', color: '#1890ff', icon: '🔍' },
-        'EdgeDetection': { title: '边缘检测', color: '#722ed1', icon: '〰️' },
-        'Thresholding': { title: '二值化', color: '#eb2f96', icon: '⚫' },
-        'Morphology': { title: '形态学', color: '#fa8c16', icon: '🔄' },
-        'BlobAnalysis': { title: 'Blob分析', color: '#13c2c2', icon: '🔵' },
-        'TemplateMatching': { title: '模板匹配', color: '#f5222d', icon: '🎯' },
-        'Measurement': { title: '测量', color: '#2f54eb', icon: '📏' },
-        'DeepLearning': { title: '深度学习', color: '#a0d911', icon: '🧠' },
-        'ResultOutput': { title: '结果输出', color: '#595959', icon: '📤' },
-        // Phase 3-5 新增算子
-        'ColorDetection': { title: '颜色检测', color: '#fa541c', icon: '🎨' },
-        'SerialCommunication': { title: '串口通信', color: '#13c2c2', icon: '🔌' },
-        'GeometricFitting': { title: '几何拟合', color: '#eb2f96', icon: '📐' },
-        'RoiManager': { title: 'ROI管理器', color: '#1890ff', icon: '⬜' },
-        'ShapeMatching': { title: '形状匹配', color: '#52c41a', icon: '🔍' },
-        'SubpixelEdgeDetection': { title: '亚像素边缘', color: '#722ed1', icon: '🎯' },
-        'ColorConversion': { title: '颜色空间转换', color: '#fa8c16', icon: '🌈' },
-        'AdaptiveThreshold': { title: '自适应阈值', color: '#eb2f96', icon: '⚪' },
-        'HistogramEqualization': { title: '直方图均衡化', color: '#2f54eb', icon: '📊' },
-        'ModbusCommunication': { title: 'Modbus通信', color: '#13c2c2', icon: '📡' },
-        'TcpCommunication': { title: 'TCP通信', color: '#13c2c2', icon: '🌐' },
-        'DatabaseWrite': { title: '数据库写入', color: '#595959', icon: '🗄️' }
+        // 输入
+        'ImageAcquisition': { title: '图像采集', color: '#52c41a', iconPath: 'M9 3L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2h-3.17L15 3H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z' },
+        
+        // 预处理
+        'Filtering': { title: '滤波', color: '#1890ff', iconPath: 'M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z' },
+        'Thresholding': { title: '二值化', color: '#eb2f96', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z' },
+        'Morphology': { title: '形态学', color: '#fa8c16', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z' },
+        'ColorConversion': { title: '颜色空间转换', color: '#fa8c16', iconPath: 'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z' },
+        'AdaptiveThreshold': { title: '自适应阈值', color: '#eb2f96', iconPath: 'M3 5H1v16c0 1.1.9 2 2 2h16v-2H3V5zm18-4H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 16H7V3h14v14z' },
+        'HistogramEqualization': { title: '直方图均衡化', color: '#2f54eb', iconPath: 'M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z' },
+        
+        // 特征提取
+        'EdgeDetection': { title: '边缘检测', color: '#722ed1', iconPath: 'M3 17h18v2H3zm0-7h18v5H3zm0-7h18v5H3z' },
+        'SubpixelEdgeDetection': { title: '亚像素边缘', color: '#722ed1', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z' },
+        'BlobAnalysis': { title: 'Blob分析', color: '#13c2c2', iconPath: 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z' },
+        
+        // 检测 / 匹配
+        'TemplateMatching': { title: '模板匹配', color: '#f5222d', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13h4v-2h-4v2zm0-4h4V9h-4v2z' },
+        'ShapeMatching': { title: '形状匹配', color: '#52c41a', iconPath: 'M12 6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6 2.69-6 6-6m0-2c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8z' },
+        'Measurement': { title: '测量', color: '#2f54eb', iconPath: 'M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h2v4h2V8h2v4h2V8h2v4h2V8h2v8z' },
+        'GeometricFitting': { title: '几何拟合', color: '#eb2f96', iconPath: 'M12 6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6 2.69-6 6-6m0-2c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8z' },
+        'ColorDetection': { title: '颜色检测', color: '#fa541c', iconPath: 'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z' },
+
+        // AI
+        'DeepLearning': { title: '深度学习', color: '#a0d911', iconPath: 'M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H6v-2h8v2zm4-4H6v-2h12v2z' },
+        
+        // ROI / 标定
+        'RoiManager': { title: 'ROI管理器', color: '#1890ff', iconPath: 'M3 5v4h2V5h4V3H5c-1.1 0-2 .9-2 2zm2 10H3v4c0 1.1.9 2 2 2h4v-2H5v-4zm14 4h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zm0-16h-4v2h4v4h2V5c0-1.1-.9-2-2-2z' },
+
+        // 通信
+        'SerialCommunication': { title: '串口通信', color: '#13c2c2', iconPath: 'M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z' },
+        'ModbusCommunication': { title: 'Modbus通信', color: '#13c2c2', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z' },
+        'TcpCommunication': { title: 'TCP通信', color: '#13c2c2', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z' },
+        
+        // 输出
+        'ResultOutput': { title: '结果输出', color: '#595959', iconPath: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
+        'DatabaseWrite': { title: '数据库写入', color: '#595959', iconPath: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z' }
     };
     
     // 优先使用传入数据的配置，否则使用默认配置
-    const defaultConfig = operatorConfigs[type] || { title: type, color: '#1890ff', icon: '📦' };
+    const defaultConfig = operatorConfigs[type] || { title: type, color: '#1890ff', iconPath: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.03 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z' };
     
     const nodeConfig = {
         title: data?.displayName || defaultConfig.title,
         color: defaultConfig.color,
-        icon: data?.icon || defaultConfig.icon,
+        iconPath: data?.iconPath || defaultConfig.iconPath,
+        // icon: data?.icon || defaultConfig.icon, // Removed legacy icon
         // 传递参数 - 使用深拷贝确保每个节点有独立的参数副本
         parameters: data?.parameters?.map(p => ({...p})) || [],
         // 传递端口配置 (如果有) 或使用默认值
@@ -949,19 +1147,32 @@ function initializeToolbar() {
                 // 设置当前工程
                 inspectionController.setProject(project.id);
                 
-                // 如果有加载的图像，执行检测
-                // 优先使用导入的测试图像
-                const testImage = imageViewer?.currentTestImage;
-                
-                if (testImage) {
-                    showToast('使用导入图像执行检测...', 'info');
-                    await inspectionController.executeSingle(testImage);
-                } else {
-                    // 【关键修复】即使没有显式加载图像，也允许执行。
-                    // 图像可能由流程内部的“图像采集”算子从文件加载。
-                    showToast('开始执行检测流程...', 'info');
-                    await inspectionController.executeSingle();
-                }
+                // 初始化检测面板并执行检测
+                setTimeout(async () => {
+                    // 确保检测面板已初始化
+                    initializeInspectionPanel();
+                    initializeInspectionImageViewer();
+                    
+                    // 更新检测面板状态
+                    if (inspectionPanel) {
+                        inspectionPanel.updateStatus('running', '运行中...');
+                        inspectionPanel.setButtonsState(true);
+                    }
+                    
+                    // 如果有加载的图像，执行检测
+                    // 优先使用导入的测试图像
+                    const testImage = imageViewer?.currentTestImage;
+                    
+                    if (testImage) {
+                        showToast('使用导入图像执行检测...', 'info');
+                        await inspectionController.executeSingle(testImage);
+                    } else {
+                        // 【关键修复】即使没有显式加载图像，也允许执行。
+                        // 图像可能由流程内部的"图像采集"算子从文件加载。
+                        showToast('开始执行检测流程...', 'info');
+                        await inspectionController.executeSingle();
+                    }
+                }, 100);
             } catch (error) {
                 console.error('[App] 运行检测失败:', error);
                 showToast('检测失败: ' + error.message, 'error');
@@ -1093,11 +1304,11 @@ function toggleTheme() {
 
 /**
  * 【阶段B-B4】启动自动保存
+ * 【修复】防止重复启动定时器
  */
 function startAutoSave() {
-    if (autoSaveInterval) {
-        clearInterval(autoSaveInterval);
-    }
+    // 【修复】确保先停止现有的定时器
+    stopAutoSave();
     
     autoSaveInterval = setInterval(async () => {
         const project = getCurrentProject();
@@ -1300,8 +1511,188 @@ function showImportDialog() {
     input.click();
 }
 
+// ==========================================================================
+// 阶段五：状态栏更新功能
+// ==========================================================================
+
+/**
+ * 更新状态栏指标
+ */
+function updateStatusBar() {
+    // 更新内存使用
+    if (performance && performance.memory) {
+        const memoryMB = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+        const memoryEl = document.querySelector('#memory-usage .metric-value');
+        if (memoryEl) memoryEl.textContent = `${memoryMB} MB`;
+    }
+}
+
+/**
+ * FPS 计数器
+ */
+let fpsCounter = {
+    frames: 0,
+    lastTime: performance.now()
+};
+
+function updateFPS() {
+    const now = performance.now();
+    fpsCounter.frames++;
+    
+    if (now - fpsCounter.lastTime >= 1000) {
+        const fps = Math.round(fpsCounter.frames * 1000 / (now - fpsCounter.lastTime));
+        const fpsEl = document.querySelector('#fps-counter .metric-value');
+        if (fpsEl) fpsEl.textContent = `${fps} FPS`;
+        
+        fpsCounter.frames = 0;
+        fpsCounter.lastTime = now;
+    }
+    
+    requestAnimationFrame(updateFPS);
+}
+
+// 启动状态栏更新
+function startStatusBarUpdates() {
+    // 每秒更新内存
+    setInterval(updateStatusBar, 1000);
+    // 启动 FPS 计数
+    requestAnimationFrame(updateFPS);
+}
+
+// ==========================================================================
+// 阶段五：视图切换过渡动画
+// ==========================================================================
+
+/**
+ * 切换视图（带过渡动画）
+ */
+function switchViewWithTransition(view) {
+    const views = ['flow', 'inspection', 'results', 'project'];
+    const currentView = getCurrentView();
+    
+    if (currentView === view) return;
+    
+    // 获取当前显示的视图容器
+    const currentContainer = document.getElementById(`${currentView}-view`) || 
+                            document.getElementById(`${currentView}-editor`) ||
+                            document.getElementById('flow-editor');
+    
+    if (currentContainer) {
+        // 添加退出动画
+        currentContainer.classList.add('view-exit');
+        
+        setTimeout(() => {
+            currentContainer.classList.remove('view-exit');
+            currentContainer.classList.add('hidden');
+            
+            // 显示新视图
+            switchView(view);
+            
+            const newContainer = document.getElementById(`${view}-view`) || 
+                               document.getElementById(`${view}-editor`) ||
+                               document.getElementById('flow-editor');
+            
+            if (newContainer) {
+                newContainer.classList.remove('hidden');
+                newContainer.classList.add('view-enter');
+                
+                setTimeout(() => {
+                    newContainer.classList.remove('view-enter');
+                }, 300);
+            }
+        }, 300);
+    } else {
+        // 无动画直接切换
+        switchView(view);
+    }
+}
+
+// ==========================================================================
+// 阶段五：加载骨架屏
+// ==========================================================================
+
+/**
+ * 显示加载骨架屏
+ */
+function showLoadingScreen() {
+    const loadingScreen = document.createElement('div');
+    loadingScreen.id = 'loading-screen';
+    loadingScreen.className = 'loading-screen';
+    loadingScreen.innerHTML = `
+        <div class="loading-logo">ClearVision</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载...</div>
+    `;
+    document.body.appendChild(loadingScreen);
+}
+
+/**
+ * 隐藏加载骨架屏
+ */
+function hideLoadingScreen() {
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+        loadingScreen.classList.add('hidden');
+        setTimeout(() => loadingScreen.remove(), 500);
+    }
+}
+
+// ==========================================================================
+// 阶段五：欢迎/引导页
+// ==========================================================================
+
+/**
+ * 显示欢迎页
+ */
+function showWelcomeScreen() {
+    // 检查是否首次运行
+    const hasSeenWelcome = localStorage.getItem('cv_welcome_shown');
+    if (hasSeenWelcome) return;
+    
+    const welcomeOverlay = document.createElement('div');
+    welcomeOverlay.className = 'welcome-overlay';
+    welcomeOverlay.innerHTML = `
+        <div class="welcome-content">
+            <h2 class="welcome-title">欢迎使用 ClearVision</h2>
+            <p class="welcome-desc">工业级视觉检测平台，零代码搭建检测流程</p>
+            <div class="welcome-features">
+                <div class="welcome-feature">
+                    <div class="welcome-feature-icon">🎨</div>
+                    <div class="welcome-feature-title">拖拽式流程编排</div>
+                </div>
+                <div class="welcome-feature">
+                    <div class="welcome-feature-icon">🔍</div>
+                    <div class="welcome-feature-title">实时检测分析</div>
+                </div>
+                <div class="welcome-feature">
+                    <div class="welcome-feature-icon">📊</div>
+                    <div class="welcome-feature-title">数据可视化</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="btn-welcome-start">开始使用</button>
+        </div>
+    `;
+    
+    document.body.appendChild(welcomeOverlay);
+    
+    document.getElementById('btn-welcome-start').addEventListener('click', () => {
+        localStorage.setItem('cv_welcome_shown', 'true');
+        welcomeOverlay.style.opacity = '0';
+        setTimeout(() => welcomeOverlay.remove(), 300);
+    });
+}
+
 // 启动应用
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    startStatusBarUpdates();
+    
+    // 延迟显示欢迎页
+    setTimeout(() => {
+        hideLoadingScreen();
+        showWelcomeScreen();
+    }, 500);
+});
 
 export { 
     getCurrentView, 

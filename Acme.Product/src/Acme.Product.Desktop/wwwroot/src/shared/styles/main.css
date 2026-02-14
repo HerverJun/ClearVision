@@ -297,7 +297,7 @@ body::before {
     width: 100%;
     height: 100%;
     cursor: grab;
-    background: transparent;
+    background: #f8f9fa; /* 浅色背景 */
 }
 
 #flow-canvas:active {
@@ -305,10 +305,9 @@ body::before {
 }
 
 /* Canvas Grid Pattern */
+/* Canvas Grid Pattern - Removed for cleaner look */
 #flow-canvas {
-    background-image: 
-        radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: none;
 }
 
 /* Image Viewer Container */
@@ -320,6 +319,341 @@ body::before {
     background: var(--ink-deep);
     border-radius: var(--radius-xl);
     overflow: hidden;
+}
+
+/* ==========================================================================
+   Inspection View - Three Column Layout
+   ========================================================================== */
+
+/* 检测视图容器 - 三栏布局 */
+.inspection-view-container {
+    flex: 1;
+    display: flex;
+    gap: var(--content-gap);
+    padding: var(--content-gap);
+    overflow: hidden;
+    background: transparent;
+}
+
+/* 检测控制面板 - 左侧面板 */
+.inspection-control-panel {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--gradient-card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    animation: slideInLeft var(--duration-slow) var(--ease-ink-smooth);
+}
+
+/* 图像查看器区域 - 中间 */
+.inspection-image-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--ink-deep);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+}
+
+/* 结果面板 - 右侧面板 */
+.inspection-results-panel {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--gradient-card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    animation: slideInRight var(--duration-slow) var(--ease-ink-smooth);
+}
+
+/* 检测结果内容区域 */
+.inspection-results-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--card-padding);
+}
+
+/* 检测结果大数字显示 */
+.result-summary-large {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.result-summary-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--ink-secondary);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    transition: all var(--duration-fast);
+}
+
+.result-summary-item.ok {
+    border-left: 3px solid var(--success-jade);
+}
+
+.result-summary-item.ng {
+    border-left: 3px solid var(--error-cinnabar);
+}
+
+.result-summary-label {
+    font-size: var(--font-size-sm);
+    color: var(--ink-gray);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.result-summary-value {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+}
+
+.result-summary-item.ok .result-summary-value {
+    color: var(--success-jade);
+    text-shadow: 0 0 15px rgba(46, 204, 113, 0.3);
+}
+
+.result-summary-item.ng .result-summary-value {
+    color: var(--error-cinnabar);
+    text-shadow: 0 0 15px rgba(192, 57, 43, 0.3);
+}
+
+/* 滑动动画 */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ==========================================================================
+   LED Status Indicator Animations
+   ========================================================================== */
+
+/* LED 状态指示灯基础样式 */
+.status-led {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ink-gray);
+    transition: all var(--duration-fast);
+}
+
+/* 空闲状态 - 灰色 */
+.status-led.status-idle {
+    background: #95a5a6;
+    box-shadow: 0 0 8px rgba(149, 165, 166, 0.5);
+}
+
+/* 运行状态 - 黄色脉冲 */
+.status-led.status-running {
+    background: #f1c40f;
+    box-shadow: 0 0 15px #f1c40f, 0 0 30px rgba(241, 196, 15, 0.5);
+    animation: led-pulse-yellow 1.5s ease-in-out infinite;
+}
+
+/* OK状态 - 绿色 */
+.status-led.status-ok {
+    background: var(--success-jade);
+    box-shadow: 0 0 15px var(--success-jade), 0 0 30px rgba(46, 204, 113, 0.5);
+}
+
+/* NG状态 - 红色 */
+.status-led.status-ng {
+    background: var(--error-cinnabar);
+    box-shadow: 0 0 15px var(--error-cinnabar), 0 0 30px rgba(192, 57, 43, 0.5);
+    animation: led-pulse-red 1s ease-in-out infinite;
+}
+
+/* 错误状态 - 红色闪烁 */
+.status-led.status-error {
+    background: var(--error-cinnabar);
+    box-shadow: 0 0 15px var(--error-cinnabar), 0 0 30px rgba(192, 57, 43, 0.5);
+    animation: led-blink-red 0.5s ease-in-out infinite alternate;
+}
+
+/* LED 动画关键帧 */
+@keyframes led-pulse-yellow {
+    0%, 100% {
+        box-shadow: 0 0 15px #f1c40f, 0 0 30px rgba(241, 196, 15, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 25px #f1c40f, 0 0 50px rgba(241, 196, 15, 0.8);
+    }
+}
+
+@keyframes led-pulse-red {
+    0%, 100% {
+        box-shadow: 0 0 15px var(--error-cinnabar), 0 0 30px rgba(192, 57, 43, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 25px var(--error-cinnabar), 0 0 50px rgba(192, 57, 43, 0.8);
+    }
+}
+
+@keyframes led-blink-red {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.4;
+    }
+}
+
+/* ==========================================================================
+   Progress Bar with Shimmer Effect
+   ========================================================================== */
+
+.progress-bar {
+    position: relative;
+    height: 8px;
+    background: var(--ink-secondary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cinnabar), #ff6b6b);
+    border-radius: var(--radius-full);
+    transition: width var(--duration-fast) var(--ease-ink);
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* ==========================================================================
+   Counter Animations
+   ========================================================================== */
+
+.counter-value {
+    font-family: 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+    transition: all var(--duration-fast);
+}
+
+.counter-value.changing {
+    animation: counter-pop 0.3s ease-out;
+}
+
+@keyframes counter-pop {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* ==========================================================================
+   Light Theme Overrides for Inspection View
+   ========================================================================== */
+
+[data-theme="light"] .inspection-control-panel,
+[data-theme="light"] .inspection-results-panel {
+    background: var(--gradient-card);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .inspection-image-area {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .result-summary-item {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .result-summary-item.ok .result-summary-value,
+[data-theme="light"] .result-summary-item.ng .result-summary-value {
+    text-shadow: none;
+}
+
+/* ==========================================================================
+   Responsive Design for Inspection View
+   ========================================================================== */
+
+@media (max-width: 1280px) {
+    .inspection-control-panel {
+        width: 260px;
+    }
+    
+    .inspection-results-panel {
+        width: 240px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .inspection-view-container {
+        flex-direction: column;
+    }
+    
+    .inspection-control-panel,
+    .inspection-results-panel {
+        width: 100%;
+        max-height: 280px;
+    }
+    
+    .inspection-image-area {
+        min-height: 300px;
+    }
 }
 
 /* View Containers */
@@ -623,8 +957,8 @@ body::before {
 }
 
 .project-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: var(--card-padding);
     overflow-y: auto;
     flex: 1;
@@ -636,11 +970,10 @@ body::before {
     background: var(--gradient-card);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
-    padding: var(--card-padding);
     cursor: pointer;
     transition: all var(--duration-normal) var(--ease-ink-bounce);
     position: relative;
-    /* overflow: hidden; -- Remove clipping to debug */
+    overflow: hidden;
     animation: inkFadeIn var(--duration-slow) var(--ease-ink-smooth);
 }
 
@@ -1217,3 +1550,6 @@ body::before {
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background: rgba(231, 76, 60, 0.4);
 }
+
+/* ==========================================================================
+

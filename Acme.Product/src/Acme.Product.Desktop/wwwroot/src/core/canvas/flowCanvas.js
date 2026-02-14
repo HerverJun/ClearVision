@@ -17,7 +17,7 @@ class FlowCanvas {
 
         // 网格设置
         this.gridSize = 20;
-        this.gridColor = '#e5e5e5'; // 浅色主题网格
+        this.gridColor = 'rgba(0, 0, 0, 0.08)'; // 浅色网格 (适配浅色背景)
         
         // 事件回调
         this.onNodeSelected = null;
@@ -37,12 +37,21 @@ class FlowCanvas {
         this._wheelHandler = this.handleWheel.bind(this);
         this._contextMenuHandler = this.handleContextMenu.bind(this);
         this._keyDownHandler = this.handleKeyDown.bind(this);
+        // 【修复】页面可见性变化处理器
+        this._visibilityHandler = this.handleVisibilityChange.bind(this);
 
         // 动画帧ID
         this._animationFrameId = null;
+        
+        // 【修复】渲染暂停标志
+        this._isPaused = false;
 
         // 选中的连接
         this.selectedConnection = null;
+
+        // 右键菜单
+        this.contextMenu = null;
+        this._clickOutsideHandler = this.hideContextMenu.bind(this);
 
         this.initialize();
     }
@@ -62,8 +71,33 @@ class FlowCanvas {
         this.canvas.addEventListener('contextmenu', this._contextMenuHandler);
         window.addEventListener('keydown', this._keyDownHandler);
 
+        // 【修复】监听页面可见性变化，后台时暂停渲染
+        document.addEventListener('visibilitychange', this._visibilityHandler);
+
         // 开始渲染循环
         this.render();
+
+        // 初始化小地图
+        this.initMinimap();
+    }
+
+    /**
+     * 【修复】处理页面可见性变化
+     */
+    handleVisibilityChange() {
+        if (document.hidden) {
+            // 页面隐藏时暂停渲染
+            this._isPaused = true;
+            console.log('[FlowCanvas] 页面进入后台，暂停渲染');
+        } else {
+            // 页面显示时恢复渲染
+            this._isPaused = false;
+            console.log('[FlowCanvas] 页面回到前台，恢复渲染');
+            // 触发一次渲染
+            if (!this._animationFrameId) {
+                this.render();
+            }
+        }
     }
 
     /**
@@ -79,6 +113,9 @@ class FlowCanvas {
         // 移除窗口事件监听
         window.removeEventListener('resize', this._resizeHandler);
         window.removeEventListener('keydown', this._keyDownHandler);
+        
+        // 【修复】移除页面可见性监听
+        document.removeEventListener('visibilitychange', this._visibilityHandler);
 
         // 移除画布事件监听
         this.canvas.removeEventListener('mousedown', this._mouseDownHandler);
@@ -93,6 +130,15 @@ class FlowCanvas {
         this.selectedNode = null;
         this.draggedNode = null;
         this.selectedConnection = null;
+        
+        // 清理小地图
+        if (this.minimap) {
+            this.minimap.remove();
+            this.minimap = null;
+        }
+        
+        // 清理右键菜单
+        this.hideContextMenu();
     }
 
     /**
@@ -195,17 +241,22 @@ class FlowCanvas {
         const startX = Math.floor(this.offset.x / this.gridSize) * this.gridSize;
         const startY = Math.floor(this.offset.y / this.gridSize) * this.gridSize;
         
+        // 计算当前缩放下的可视区域宽度
+        // 之前只考虑 offset.x 没除以 scale，导致缩小时网格绘制范围不足
+        const visibleWidth = width / this.scale;
+        const visibleHeight = height / this.scale;
+        
         this.ctx.beginPath();
         
-        // 垂直线
-        for (let x = startX; x < width + this.offset.x; x += this.gridSize) {
+        // 垂直线 (渲染范围需覆盖 offset + visibleWidth)
+        for (let x = startX; x < this.offset.x + visibleWidth; x += this.gridSize) {
             const screenX = (x - this.offset.x) * this.scale;
             this.ctx.moveTo(screenX, 0);
             this.ctx.lineTo(screenX, height);
         }
         
         // 水平线
-        for (let y = startY; y < height + this.offset.y; y += this.gridSize) {
+        for (let y = startY; y < this.offset.y + visibleHeight; y += this.gridSize) {
             const screenY = (y - this.offset.y) * this.scale;
             this.ctx.moveTo(0, screenY);
             this.ctx.lineTo(width, screenY);
@@ -215,68 +266,120 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制节点
+     * 绘制节点 - 阶段四增强版
+     * 渐变填充 + 图标 + 状态发光效果
      */
     drawNode(node) {
         const x = (node.x - this.offset.x) * this.scale;
         const y = (node.y - this.offset.y) * this.scale;
         const w = node.width * this.scale;
         const h = node.height * this.scale;
+        const isSelected = this.selectedNode === node.id;
 
-        // 根据状态调整边框颜色
-        let borderColor = this.selectedNode === node.id ? node.color : '#434343';
-        let borderWidth = this.selectedNode === node.id ? 2 : 1;
+        // 根据状态调整边框颜色和发光效果
+        let borderColor = isSelected ? node.color : 'rgba(255, 255, 255, 0.1)';
+        let borderWidth = isSelected ? 3 : 1;
+        let glowColor = null;
 
         if (node.status === 'running') {
-            borderColor = '#1890ff';
+            borderColor = '#3498db';
             borderWidth = 3;
+            glowColor = 'rgba(52, 152, 219, 0.6)';
         } else if (node.status === 'success') {
-            borderColor = '#52c41a';
+            borderColor = '#2ecc71';
+            glowColor = 'rgba(46, 204, 113, 0.5)';
         } else if (node.status === 'error') {
-            borderColor = '#f5222d';
+            borderColor = '#e74c3c';
+            glowColor = 'rgba(231, 76, 60, 0.5)';
+        } else if (isSelected) {
+            glowColor = `${node.color}80`; // 50% opacity
         }
 
-        // 节点阴影
-        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.shadowBlur = 8;
-        this.ctx.shadowOffsetX = 2;
-        this.ctx.shadowOffsetY = 2;
+        // 状态发光效果
+        if (glowColor) {
+            this.ctx.shadowColor = glowColor;
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowOffsetX = 0;
+            this.ctx.shadowOffsetY = 0;
+        } else {
+            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.shadowBlur = 8;
+            this.ctx.shadowOffsetX = 2;
+            this.ctx.shadowOffsetY = 2;
+        }
 
-        // 节点背景
-        this.ctx.fillStyle = this.selectedNode === node.id ? '#2c2c2c' : '#1f1f1f';
+        // 节点背景 - 渐变填充
+        const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
+        gradient.addColorStop(0, isSelected ? 'rgba(45, 74, 94, 0.9)' : 'rgba(26, 58, 82, 0.8)');
+        gradient.addColorStop(1, isSelected ? 'rgba(26, 58, 82, 0.95)' : 'rgba(13, 27, 42, 0.9)');
+        
+        this.ctx.fillStyle = gradient;
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = borderWidth;
 
         // 绘制圆角矩形
-        this.roundRect(x, y, w, h, 6);
+        this.roundRect(x, y, w, h, 8);
         this.ctx.fill();
         this.ctx.stroke();
 
         // 重置阴影
         this.ctx.shadowColor = 'transparent';
 
-        // 标题栏
-        this.ctx.fillStyle = node.color;
-        this.ctx.fillRect(x, y, w, 20 * this.scale);
+        // 标题栏 - 渐变
+        const headerGradient = this.ctx.createLinearGradient(x, y, x + w, y);
+        headerGradient.addColorStop(0, node.color);
+        headerGradient.addColorStop(1, this.adjustColor(node.color, -20));
+        this.ctx.fillStyle = headerGradient;
+        this.roundRect(x, y, w, 24 * this.scale, { tl: 8, tr: 8, bl: 0, br: 0 });
+        this.ctx.fill();
+
+        // 图标
+        if (node.iconPath) {
+            const targetSize = 16 * this.scale;
+            const scaleFactor = targetSize / 24; // ViewBox 24x24
+            
+            this.ctx.save();
+            this.ctx.translate(x + 8 * this.scale, y + 4 * this.scale);
+            this.ctx.scale(scaleFactor, scaleFactor);
+            this.ctx.fillStyle = '#ffffff'; // 图标永远白色
+            const path = new Path2D(node.iconPath);
+            this.ctx.fill(path);
+            this.ctx.restore();
+        } else if (node.icon) {
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = `${14 * this.scale}px sans-serif`;
+            this.ctx.textAlign = 'left';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(node.icon, x + 8 * this.scale, y + 12 * this.scale);
+        }
 
         // 标题文字
         this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = `${12 * this.scale}px sans-serif`;
-        this.ctx.textAlign = 'center';
+        this.ctx.font = `bold ${11 * this.scale}px sans-serif`;
+        this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(node.title, x + w / 2, y + 10 * this.scale);
+        const titleX = (node.icon || node.iconPath) ? x + 28 * this.scale : x + 10 * this.scale;
+        this.ctx.fillText(node.title, titleX, y + 12 * this.scale);
 
         // 绘制状态指示器
-        if (node.status === 'running') {
-            this.drawStatusIndicator(x + w - 15 * this.scale, y + 35 * this.scale, 'running');
-        } else if (node.status === 'success') {
-            this.drawStatusIndicator(x + w - 15 * this.scale, y + 35 * this.scale, 'success');
-        } else if (node.status === 'error') {
-            this.drawStatusIndicator(x + w - 15 * this.scale, y + 35 * this.scale, 'error');
+        if (node.status) {
+            const indicatorY = y + 40 * this.scale;
+            this.drawStatusIndicator(x + w - 12 * this.scale, indicatorY, node.status);
         }
 
         // 绘制端口
         this.drawPorts(node, x, y, w, h);
+    }
+
+    /**
+     * 调整颜色亮度
+     */
+    adjustColor(color, amount) {
+        const hex = color.replace('#', '');
+        const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
+        const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
+        const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
+        return `rgb(${r}, ${g}, ${b})`;
     }
 
     /**
@@ -553,7 +656,7 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制连接线
+     * 绘制连接线 - 阶段四增强版，带数据流动粒子动画
      */
     drawConnection(connection) {
         const sourceNode = this.nodes.get(connection.source);
@@ -566,24 +669,90 @@ class FlowCanvas {
         const endX = (targetNode.x - this.offset.x) * this.scale;
         const endY = (targetNode.y + targetNode.height / 2 - this.offset.y) * this.scale;
         
-        // 绘制贝塞尔曲线
-        this.ctx.beginPath();
-        this.ctx.moveTo(startX, startY);
-        
         const controlPoint1X = startX + (endX - startX) / 2;
         const controlPoint1Y = startY;
         const controlPoint2X = startX + (endX - startX) / 2;
         const controlPoint2Y = endY;
         
+        // 绘制贝塞尔曲线基础线
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, startY);
         this.ctx.bezierCurveTo(
             controlPoint1X, controlPoint1Y,
             controlPoint2X, controlPoint2Y,
             endX, endY
         );
         
-        this.ctx.strokeStyle = '#1890ff';
+        // 根据连接状态设置样式
+        if (connection.status === 'active') {
+            this.ctx.strokeStyle = '#2ecc71';
+            this.ctx.shadowColor = 'rgba(46, 204, 113, 0.5)';
+            this.ctx.shadowBlur = 10;
+        } else if (connection.status === 'error') {
+            this.ctx.strokeStyle = '#e74c3c';
+            this.ctx.shadowColor = 'rgba(231, 76, 60, 0.5)';
+            this.ctx.shadowBlur = 10;
+        } else {
+            this.ctx.strokeStyle = '#3498db';
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
+        }
+        
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
+        
+        // 绘制数据流动粒子动画
+        if (connection.status === 'active' || connection.status === 'flowing') {
+            this.drawFlowParticles(startX, startY, controlPoint1X, controlPoint1Y, 
+                                   controlPoint2X, controlPoint2Y, endX, endY, connection);
+        }
+    }
+    
+    /**
+     * 绘制数据流动粒子 - 阶段四增强
+     */
+    drawFlowParticles(startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY, connection) {
+        // 初始化粒子系统
+        if (!connection.particles) {
+            connection.particles = [];
+            for (let i = 0; i < 5; i++) {
+                connection.particles.push({
+                    t: i / 5,
+                    speed: 0.005 + Math.random() * 0.003
+                });
+            }
+        }
+        
+        // 更新和绘制粒子
+        connection.particles.forEach(particle => {
+            // 更新位置
+            particle.t += particle.speed;
+            if (particle.t > 1) particle.t = 0;
+            
+            // 计算贝塞尔曲线上的点
+            const t = particle.t;
+            const mt = 1 - t;
+            const x = mt * mt * mt * startX + 
+                     3 * mt * mt * t * cp1x + 
+                     3 * mt * t * t * cp2x + 
+                     t * t * t * endX;
+            const y = mt * mt * mt * startY + 
+                     3 * mt * mt * t * cp1y + 
+                     3 * mt * t * t * cp2y + 
+                     t * t * t * endY;
+            
+            // 绘制发光粒子
+            const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, 6 * this.scale);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.5, 'rgba(52, 152, 219, 0.8)');
+            gradient.addColorStop(1, 'rgba(52, 152, 219, 0)');
+            
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, 6 * this.scale, 0, Math.PI * 2);
+            this.ctx.fillStyle = gradient;
+            this.ctx.fill();
+        });
     }
 
     /**
@@ -607,6 +776,12 @@ class FlowCanvas {
      * 渲染循环
      */
     render() {
+        // 【修复】如果暂停，不执行渲染
+        if (this._isPaused) {
+            this._animationFrameId = null;
+            return;
+        }
+        
         // 清空画布
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -630,6 +805,9 @@ class FlowCanvas {
         }
 
         this._animationFrameId = requestAnimationFrame(() => this.render());
+        
+        // 绘制小地图
+        this.drawMinimap();
     }
 
     /**
@@ -1022,7 +1200,8 @@ class FlowCanvas {
         e.preventDefault();
         
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        const newScale = Math.max(0.5, Math.min(2, this.scale * delta));
+        // 调整缩放范围：0.2 (20%) - 2.0 (200%) - 用户反馈缩放过小不方便定位
+        const newScale = Math.max(0.2, Math.min(2.0, this.scale * delta));
         
         if (newScale !== this.scale) {
             const rect = this.canvas.getBoundingClientRect();
@@ -1187,6 +1366,328 @@ class FlowCanvas {
             node.status = 'idle';
         });
         this.render();
+    }
+
+    // ==========================================================================
+    // 阶段四增强：右键菜单功能
+    // ==========================================================================
+
+    /**
+     * 处理右键菜单事件
+     */
+    handleContextMenu(e) {
+        e.preventDefault();
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / this.scale + this.offset.x;
+        const y = (e.clientY - rect.top) / this.scale + this.offset.y;
+        
+        // 查找右键点击的节点
+        let clickedNode = null;
+        for (const [id, node] of this.nodes) {
+            if (x >= node.x && x <= node.x + node.width &&
+                y >= node.y && y <= node.y + node.height) {
+                clickedNode = { id, node };
+                break;
+            }
+        }
+        
+        if (clickedNode) {
+            this.showNodeContextMenu(e.clientX, e.clientY, clickedNode.id);
+        }
+    }
+
+    /**
+     * 显示节点右键菜单
+     */
+    showNodeContextMenu(x, y, nodeId) {
+        this.hideContextMenu();
+        
+        const node = this.nodes.get(nodeId);
+        if (!node) return;
+        
+        const menu = document.createElement('div');
+        menu.className = 'flow-context-menu';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            background: rgba(15, 36, 53, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 160px;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: contextMenuFadeIn 0.15s ease-out;
+        `;
+        
+        const menuItems = [
+            { icon: '▶️', label: '运行', action: () => this.runNode(nodeId) },
+            { icon: '📋', label: '复制', action: () => this.duplicateNode(nodeId) },
+            { icon: '❌', label: '删除', action: () => this.deleteNode(nodeId), danger: true },
+            { icon: '🚫', label: node.disabled ? '启用' : '禁用', action: () => this.toggleNodeDisabled(nodeId) },
+            { icon: '❓', label: '查看帮助', action: () => this.showNodeHelp(node) }
+        ];
+        
+        menuItems.forEach(item => {
+            const menuItem = document.createElement('div');
+            menuItem.className = 'context-menu-item';
+            menuItem.style.cssText = `
+                padding: 8px 16px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 13px;
+                color: ${item.danger ? '#e74c3c' : '#fdfbf7'};
+                transition: all 0.2s;
+            `;
+            menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
+            menuItem.addEventListener('mouseenter', () => {
+                menuItem.style.background = item.danger ? 'rgba(231, 76, 60, 0.2)' : 'rgba(231, 76, 60, 0.1)';
+            });
+            menuItem.addEventListener('mouseleave', () => {
+                menuItem.style.background = 'transparent';
+            });
+            menuItem.addEventListener('click', () => {
+                item.action();
+                this.hideContextMenu();
+            });
+            menu.appendChild(menuItem);
+        });
+        
+        document.body.appendChild(menu);
+        this.contextMenu = menu;
+        
+        // 添加动画样式
+        if (!document.getElementById('contextMenuStyles')) {
+            const style = document.createElement('style');
+            style.id = 'contextMenuStyles';
+            style.textContent = `
+                @keyframes contextMenuFadeIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // 点击外部关闭菜单
+        setTimeout(() => {
+            document.addEventListener('click', this._clickOutsideHandler);
+        }, 0);
+    }
+
+    /**
+     * 隐藏右键菜单
+     */
+    hideContextMenu() {
+        if (this.contextMenu) {
+            this.contextMenu.remove();
+            this.contextMenu = null;
+        }
+        document.removeEventListener('click', this._clickOutsideHandler);
+    }
+
+    /**
+     * 运行单个节点
+     */
+    runNode(nodeId) {
+        console.log('[FlowCanvas] 运行节点:', nodeId);
+        this.setNodeStatus(nodeId, 'running');
+        // 这里可以触发实际的节点执行逻辑
+        setTimeout(() => {
+            this.setNodeStatus(nodeId, 'success');
+        }, 1000);
+    }
+
+    /**
+     * 复制节点
+     */
+    duplicateNode(nodeId) {
+        const node = this.nodes.get(nodeId);
+        if (!node) return;
+        
+        const newNode = {
+            ...node,
+            id: this.generateUUID(),
+            x: node.x + 30,
+            y: node.y + 30,
+            title: node.title + ' (副本)'
+        };
+        
+        this.nodes.set(newNode.id, newNode);
+        this.selectedNode = newNode.id;
+        this.render();
+    }
+
+    /**
+     * 删除节点
+     */
+    deleteNode(nodeId) {
+        // 删除相关连接
+        this.connections = this.connections.filter(conn => 
+            conn.source !== nodeId && conn.target !== nodeId
+        );
+        
+        this.nodes.delete(nodeId);
+        if (this.selectedNode === nodeId) {
+            this.selectedNode = null;
+        }
+        this.render();
+    }
+
+    /**
+     * 切换节点禁用状态
+     */
+    toggleNodeDisabled(nodeId) {
+        const node = this.nodes.get(nodeId);
+        if (node) {
+            node.disabled = !node.disabled;
+            this.render();
+        }
+    }
+
+    /**
+     * 显示节点帮助
+     */
+    showNodeHelp(node) {
+        alert(`节点类型: ${node.type}\n名称: ${node.title}\n\n这是一个 ${node.type} 算子节点。`);
+    }
+
+    // ==========================================================================
+    // 阶段四增强：小地图功能
+    // ==========================================================================
+
+    /**
+     * 初始化小地图
+     */
+    initMinimap() {
+        if (this.minimap) return;
+        
+        this.minimap = document.createElement('div');
+        this.minimap.className = 'flow-minimap';
+        this.minimap.style.cssText = `
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            width: 200px;
+            height: 150px;
+            background: rgba(15, 36, 53, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        `;
+        
+        this.minimapCanvas = document.createElement('canvas');
+        this.minimapCanvas.width = 200;
+        this.minimapCanvas.height = 150;
+        this.minimap.appendChild(this.minimapCanvas);
+        
+        this.canvas.parentElement.appendChild(this.minimap);
+        
+        // 点击小地图导航
+        this.minimapCanvas.addEventListener('click', (e) => {
+            const rect = this.minimapCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            
+            // 计算视口中心位置
+            const bounds = this.getNodesBounds();
+            if (bounds) {
+                const targetX = bounds.minX + x * (bounds.maxX - bounds.minX + bounds.width);
+                const targetY = bounds.minY + y * (bounds.maxY - bounds.minY + bounds.height);
+                
+                this.offset.x = targetX - this.canvas.width / 2 / this.scale;
+                this.offset.y = targetY - this.canvas.height / 2 / this.scale;
+                this.render();
+            }
+        });
+    }
+
+    /**
+     * 获取所有节点的边界
+     */
+    getNodesBounds() {
+        if (this.nodes.size === 0) return null;
+        
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+        
+        this.nodes.forEach(node => {
+            minX = Math.min(minX, node.x);
+            minY = Math.min(minY, node.y);
+            maxX = Math.max(maxX, node.x + node.width);
+            maxY = Math.max(maxY, node.y + node.height);
+        });
+        
+        return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+    }
+
+    /**
+     * 绘制小地图
+     */
+    drawMinimap() {
+        if (!this.minimapCanvas) return;
+        
+        const ctx = this.minimapCanvas.getContext('2d');
+        const width = this.minimapCanvas.width;
+        const height = this.minimapCanvas.height;
+        
+        // 清空
+        ctx.clearRect(0, 0, width, height);
+        
+        const bounds = this.getNodesBounds();
+        if (!bounds) return;
+        
+        // 添加内边距
+        const padding = 20;
+        const scaleX = width / (bounds.width + padding * 2);
+        const scaleY = height / (bounds.height + padding * 2);
+        const scale = Math.min(scaleX, scaleY);
+        
+        const offsetX = (width - (bounds.width + padding * 2) * scale) / 2 + padding * scale;
+        const offsetY = (height - (bounds.height + padding * 2) * scale) / 2 + padding * scale;
+        
+        // 绘制节点
+        this.nodes.forEach(node => {
+            const x = offsetX + (node.x - bounds.minX) * scale;
+            const y = offsetY + (node.y - bounds.minY) * scale;
+            const w = Math.max(4, node.width * scale);
+            const h = Math.max(3, node.height * scale);
+            
+            ctx.fillStyle = node.disabled ? '#666' : (node.color || '#1890ff');
+            ctx.fillRect(x, y, w, h);
+            
+            // 选中高亮
+            if (node.id === this.selectedNode) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+            }
+        });
+        
+        // 绘制视口框
+        const viewportX = offsetX + (this.offset.x - bounds.minX) * scale;
+        const viewportY = offsetY + (this.offset.y - bounds.minY) * scale;
+        const viewportW = this.canvas.width / this.scale * scale;
+        const viewportH = this.canvas.height / this.scale * scale;
+        
+        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(viewportX, viewportY, viewportW, viewportH);
+    }
+
+    /**
+     * 更新渲染循环以包含小地图
+     */
+    renderWithMinimap() {
+        this.render();
+        this.drawMinimap();
     }
 }
 

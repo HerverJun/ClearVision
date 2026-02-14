@@ -206,7 +206,7 @@ class InspectionController {
         }
 
         // 触发事件
-        this.onInspectionCompleted?.(result);
+        this._onCompletedCallback?.(result);
     }
 
     /**
@@ -221,7 +221,7 @@ class InspectionController {
         });
 
         // 触发事件
-        this.onInspectionError?.(error);
+        this._onErrorCallback?.(error);
     }
 
     /**
@@ -293,14 +293,14 @@ class InspectionController {
      * 设置检测完成回调
      */
     onInspectionCompleted(callback) {
-        this.onInspectionCompleted = callback;
+        this._onCompletedCallback = callback;
     }
 
     /**
      * 设置检测错误回调
      */
     onInspectionError(callback) {
-        this.onInspectionError = callback;
+        this._onErrorCallback = callback;
     }
 
     /**

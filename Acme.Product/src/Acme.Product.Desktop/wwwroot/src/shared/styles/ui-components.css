@@ -1143,3 +1143,57 @@
     border-color: rgba(212, 175, 55, 0.3);
     color: var(--gold-accent);
 }
+
+/* ==========================================================================
+   ☀️ Light Theme — Image Viewer & Defect Sidebar
+   ========================================================================== */
+
+[data-theme="light"] .image-viewer-wrapper {
+    background: #f1f5f9;
+}
+
+[data-theme="light"] .viewer-canvas-container {
+    background: #e2e8f0;
+    box-shadow: none;
+}
+
+[data-theme="light"] .viewer-canvas-container::before {
+    display: none; /* Hide dark grid pattern in light mode */
+}
+
+[data-theme="light"] .viewer-placeholder {
+    border-color: #cbd5e1;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="light"] .placeholder-content {
+    color: #64748b;
+}
+
+[data-theme="light"] .placeholder-content p {
+    color: #64748b;
+}
+
+[data-theme="light"] .viewer-toolbar {
+    background: #ffffff;
+    border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] .defect-sidebar {
+    background: #ffffff;
+    border-left-color: #e2e8f0;
+}
+
+[data-theme="light"] .defect-sidebar h4 {
+    color: #334155;
+}
+
+[data-theme="light"] .defect-item {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+[data-theme="light"] .defect-item:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}

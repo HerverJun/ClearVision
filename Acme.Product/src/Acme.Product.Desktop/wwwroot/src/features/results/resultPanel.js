@@ -1,7 +1,9 @@
 /**
- * 结果面板组件 - 阶段C增强版
- * 显示检测统计、缺陷列表、趋势图，支持翻页和筛选
+ * 结果面板组件 - 阶段二增强版
+ * 现代化数据可视化仪表板
  */
+
+import httpClient from '../../core/messaging/httpClient.js';
 
 class ResultPanel {
     constructor(containerId) {
@@ -12,34 +14,134 @@ class ResultPanel {
             total: 0,
             ok: 0,
             ng: 0,
-            error: 0
+            error: 0,
+            avgTime: 0
         };
         
         // 分页
         this.currentPage = 1;
-        this.pageSize = 10;
+        this.pageSize = 12;
         this.totalPages = 1;
         
         // 筛选
         this.filters = {
-            status: 'all', // all, ok, ng, error
+            status: 'all',
+            defectType: 'all',
             startTime: null,
             endTime: null
         };
         
+        // 时间范围
+        this.timeRange = 'today';
+        
         // 趋势图数据
         this.trendData = [];
+        
+        // 缺陷类型统计
+        this.defectTypes = {};
+        
+        // 绑定事件
+        this.bindEvents();
+        
+        console.log('[ResultPanel] 结果面板初始化完成');
     }
-
+    
+    /**
+     * 绑定事件
+     */
+    bindEvents() {
+        // 时间范围选择
+        document.querySelectorAll('.time-range-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.setTimeRange(e.target.dataset.range);
+            });
+        });
+        
+        // 状态筛选
+        const statusFilter = document.getElementById('filter-status');
+        if (statusFilter) {
+            statusFilter.addEventListener('change', (e) => {
+                this.setFilter('status', e.target.value);
+            });
+        }
+        
+        // 缺陷类型筛选
+        const defectTypeFilter = document.getElementById('filter-defect-type');
+        if (defectTypeFilter) {
+            defectTypeFilter.addEventListener('change', (e) => {
+                this.setFilter('defectType', e.target.value);
+            });
+        }
+        
+        // 导出下拉菜单
+        const exportDropdown = document.getElementById('export-dropdown');
+        const exportBtn = document.getElementById('btn-export-results');
+        if (exportBtn && exportDropdown) {
+            exportBtn.addEventListener('click', () => {
+                exportDropdown.classList.toggle('open');
+            });
+            
+            // 导出选项
+            exportDropdown.querySelectorAll('.export-menu-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const format = item.dataset.format;
+                    this.exportResults(format);
+                    exportDropdown.classList.remove('open');
+                });
+            });
+            
+            // 点击外部关闭
+            document.addEventListener('click', (e) => {
+                if (!exportDropdown.contains(e.target)) {
+                    exportDropdown.classList.remove('open');
+                }
+            });
+        }
+    }
+    
+    /**
+     * 设置时间范围
+     */
+    setTimeRange(range) {
+        this.timeRange = range;
+        const now = new Date();
+        
+        switch (range) {
+            case 'today':
+                this.filters.startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                this.filters.endTime = now;
+                break;
+            case 'week':
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - now.getDay());
+                weekStart.setHours(0, 0, 0, 0);
+                this.filters.startTime = weekStart;
+                this.filters.endTime = now;
+                break;
+            case 'month':
+                this.filters.startTime = new Date(now.getFullYear(), now.getMonth(), 1);
+                this.filters.endTime = now;
+                break;
+            case 'custom':
+                // 保持当前筛选或重置
+                break;
+        }
+        
+        this.applyFilters();
+        this.render();
+    }
+    
     /**
      * 更新统计
      */
     updateStatistics(stats) {
         this.statistics = { ...this.statistics, ...stats };
-        this.renderStatistics();
-        this.renderTrendChart();
+        this.renderKPIs();
+        this.renderYieldChart();
     }
-
+    
     /**
      * 添加结果
      */
@@ -57,7 +159,14 @@ class ResultPanel {
             this.statistics.error++;
         }
         
-        // 更新趋势图数据（只保留最近100个点）
+        // 更新平均耗时
+        if (result.processingTime) {
+            const validResults = this.results.filter(r => r.processingTime);
+            const totalTime = validResults.reduce((sum, r) => sum + r.processingTime, 0);
+            this.statistics.avgTime = validResults.length > 0 ? Math.round(totalTime / validResults.length) : 0;
+        }
+        
+        // 更新趋势图数据
         this.trendData.push({
             time: new Date(result.timestamp || Date.now()),
             status: result.status,
@@ -67,37 +176,78 @@ class ResultPanel {
             this.trendData.shift();
         }
         
+        // 更新缺陷类型统计
+        if (result.defects) {
+            result.defects.forEach(defect => {
+                const type = defect.type || defect.description || '未知';
+                this.defectTypes[type] = (this.defectTypes[type] || 0) + 1;
+            });
+        }
+        
         this.render();
     }
-
+    
     /**
-     * 加载历史结果（支持翻页）
+     * 加载历史结果
      */
     loadResults(results, total = null) {
         this.results = results;
         this.applyFilters();
-        
-        // 重新计算统计
         this.calculateStatistics();
-        
-        // 更新趋势图数据
         this.updateTrendData();
-        
         this.render();
     }
-
+    
     /**
      * 计算统计
      */
     calculateStatistics() {
-        this.statistics = {
-            total: this.results.length,
-            ok: this.results.filter(r => r.status === 'OK').length,
-            ng: this.results.filter(r => r.status === 'NG').length,
-            error: this.results.filter(r => r.status === 'Error').length
-        };
+        const total = this.results.length;
+        const ok = this.results.filter(r => r.status === 'OK').length;
+        const ng = this.results.filter(r => r.status === 'NG').length;
+        const error = this.results.filter(r => r.status === 'Error').length;
+        
+        const validResults = this.results.filter(r => r.processingTime);
+        const totalTime = validResults.reduce((sum, r) => sum + (r.processingTime || 0), 0);
+        const avgTime = validResults.length > 0 ? Math.round(totalTime / validResults.length) : 0;
+        
+        this.statistics = { total, ok, ng, error, avgTime };
+        
+        // 重新计算缺陷类型
+        this.defectTypes = {};
+        this.results.forEach(r => {
+            if (r.defects) {
+                r.defects.forEach(defect => {
+                    const type = defect.type || defect.description || '未知';
+                    this.defectTypes[type] = (this.defectTypes[type] || 0) + 1;
+                });
+            }
+        });
+        
+        // 更新缺陷类型下拉框
+        this.updateDefectTypeFilter();
     }
-
+    
+    /**
+     * 更新缺陷类型筛选器
+     */
+    updateDefectTypeFilter() {
+        const select = document.getElementById('filter-defect-type');
+        if (!select) return;
+        
+        const currentValue = select.value;
+        select.innerHTML = '<option value="all">全部</option>';
+        
+        Object.keys(this.defectTypes).forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = `${type} (${this.defectTypes[type]})`;
+            select.appendChild(option);
+        });
+        
+        select.value = currentValue;
+    }
+    
     /**
      * 更新趋势图数据
      */
@@ -111,15 +261,20 @@ class ResultPanel {
             }))
             .reverse();
     }
-
-    /**
-     * 应用筛选
-     */
+    
     applyFilters() {
         this.filteredResults = this.results.filter(r => {
             // 状态筛选
             if (this.filters.status !== 'all' && r.status?.toLowerCase() !== this.filters.status) {
                 return false;
+            }
+            
+            // 缺陷类型筛选
+            if (this.filters.defectType !== 'all') {
+                const hasDefectType = r.defects?.some(d => 
+                    (d.type || d.description || '未知') === this.filters.defectType
+                );
+                if (!hasDefectType) return false;
             }
             
             // 时间范围筛选
@@ -148,17 +303,17 @@ class ResultPanel {
             this.currentPage = this.totalPages;
         }
     }
-
+    
     /**
      * 设置筛选条件
      */
     setFilter(type, value) {
         this.filters[type] = value;
-        this.currentPage = 1; // 重置到第一页
+        this.currentPage = 1;
         this.applyFilters();
         this.render();
     }
-
+    
     /**
      * 翻页
      */
@@ -167,7 +322,7 @@ class ResultPanel {
         this.currentPage = page;
         this.render();
     }
-
+    
     /**
      * 清空结果
      */
@@ -175,149 +330,131 @@ class ResultPanel {
         this.results = [];
         this.filteredResults = [];
         this.trendData = [];
-        this.statistics = { total: 0, ok: 0, ng: 0, error: 0 };
+        this.defectTypes = {};
+        this.statistics = { total: 0, ok: 0, ng: 0, error: 0, avgTime: 0 };
         this.currentPage = 1;
         this.applyFilters();
         this.render();
     }
-
+    
     /**
      * 渲染面板
      */
     render() {
-        this.renderStatistics();
-        this.renderFilters();
+        this.renderKPIs();
+        this.renderYieldChart();
+        this.renderDefectDistribution();
         this.renderTrendChart();
         this.renderResultsList();
         this.renderPagination();
     }
-
+    
     /**
-     * 渲染筛选控件
+     * 渲染KPI卡片
      */
-    renderFilters() {
-        let filtersContainer = this.container.querySelector('.results-filters');
-        if (!filtersContainer) {
-            filtersContainer = document.createElement('div');
-            filtersContainer.className = 'results-filters';
-            this.container.insertBefore(filtersContainer, this.container.firstChild?.nextSibling);
+    renderKPIs() {
+        const { total, ok, ng, error, avgTime } = this.statistics;
+        const yieldRate = total > 0 ? ((ok / total) * 100).toFixed(1) : '0';
+        
+        const kpiTotal = document.getElementById('kpi-total');
+        const kpiOk = document.getElementById('kpi-ok');
+        const kpiNg = document.getElementById('kpi-ng');
+        const kpiYield = document.getElementById('kpi-yield');
+        const kpiAvgTime = document.getElementById('kpi-avg-time');
+        
+        if (kpiTotal) kpiTotal.textContent = total;
+        if (kpiOk) kpiOk.textContent = ok;
+        if (kpiNg) kpiNg.textContent = ng;
+        if (kpiYield) kpiYield.textContent = `${yieldRate}%`;
+        if (kpiAvgTime) kpiAvgTime.textContent = `${avgTime}ms`;
+    }
+    
+    /**
+     * 渲染良率环形图
+     */
+    renderYieldChart() {
+        const { total, ok } = this.statistics;
+        const yieldRate = total > 0 ? (ok / total) : 0;
+        const percentage = (yieldRate * 100).toFixed(1);
+        
+        // 更新百分比文字
+        const yieldPercentage = document.getElementById('yield-percentage');
+        if (yieldPercentage) yieldPercentage.textContent = `${percentage}%`;
+        
+        // 更新SVG环形图
+        const fillCircle = document.getElementById('yield-chart-fill');
+        if (fillCircle) {
+            const circumference = 2 * Math.PI * 60; // r=60
+            const offset = circumference * (1 - yieldRate);
+            fillCircle.style.strokeDasharray = circumference;
+            fillCircle.style.strokeDashoffset = offset;
+            fillCircle.style.stroke = yieldRate > 0.9 ? '#2ecc71' : yieldRate > 0.7 ? '#f1c40f' : '#e74c3c';
+            fillCircle.style.transition = 'stroke-dashoffset 0.5s ease';
+        }
+    }
+    
+    /**
+     * 渲染缺陷类型分布
+     */
+    renderDefectDistribution() {
+        const container = document.getElementById('defect-bars');
+        if (!container) return;
+        
+        const types = Object.entries(this.defectTypes);
+        if (types.length === 0) {
+            container.innerHTML = '<p class="empty-text">暂无缺陷数据</p>';
+            return;
         }
         
-        filtersContainer.innerHTML = `
-            <div class="filter-group">
-                <label>状态筛选:</label>
-                <select class="filter-status" onchange="resultPanel.setFilter('status', this.value)">
-                    <option value="all" ${this.filters.status === 'all' ? 'selected' : ''}>全部</option>
-                    <option value="ok" ${this.filters.status === 'ok' ? 'selected' : ''}>OK</option>
-                    <option value="ng" ${this.filters.status === 'ng' ? 'selected' : ''}>NG</option>
-                    <option value="error" ${this.filters.status === 'error' ? 'selected' : ''}>Error</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>时间范围:</label>
-                <input type="datetime-local" class="filter-start" 
-                    value="${this.filters.startTime ? this.toDateTimeLocal(this.filters.startTime) : ''}"
-                    onchange="resultPanel.setFilter('startTime', this.value ? new Date(this.value) : null)">
-                <span>至</span>
-                <input type="datetime-local" class="filter-end"
-                    value="${this.filters.endTime ? this.toDateTimeLocal(this.filters.endTime) : ''}"
-                    onchange="resultPanel.setFilter('endTime', this.value ? new Date(this.value) : null)">
-            </div>
-            <div class="filter-group">
-                <button onclick="resultPanel.exportResults('csv')" class="btn btn-secondary">导出CSV</button>
-                <button onclick="resultPanel.exportResults('json')" class="btn btn-secondary">导出JSON</button>
-            </div>
-        `;
-    }
-
-    /**
-     * 辅助函数：Date 转 datetime-local 格式
-     */
-    toDateTimeLocal(date) {
-        const d = new Date(date);
-        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-        return d.toISOString().slice(0, 16);
-    }
-
-    /**
-     * 渲染统计信息
-     */
-    renderStatistics() {
-        const { total, ok, ng, error } = this.statistics;
-        const okRate = total > 0 ? ((ok / total) * 100).toFixed(1) : 0;
+        const maxCount = Math.max(...types.map(([, count]) => count));
         
-        const statsHtml = `
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-value stat-total">${total}</span>
-                    <span class="stat-label">总数</span>
+        container.innerHTML = types.map(([type, count]) => `
+            <div class="defect-bar-item">
+                <div class="defect-bar-header">
+                    <span class="defect-bar-label">${type}</span>
+                    <span class="defect-bar-value">${count}</span>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-value stat-ok">${ok}</span>
-                    <span class="stat-label">OK</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value stat-ng">${ng}</span>
-                    <span class="stat-label">NG</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value stat-rate">${okRate}%</span>
-                    <span class="stat-label">良率</span>
+                <div class="defect-bar-track">
+                    <div class="defect-bar-fill" style="width:${(count/maxCount*100).toFixed(1)}%"></div>
                 </div>
             </div>
-            ${error > 0 ? `<div class="stat-error">错误: ${error}</div>` : ''}
-        `;
-        
-        let statsContainer = this.container.querySelector('.results-statistics');
-        if (!statsContainer) {
-            statsContainer = document.createElement('div');
-            statsContainer.className = 'results-statistics';
-            this.container.insertBefore(statsContainer, this.container.firstChild);
-        }
-        statsContainer.innerHTML = statsHtml;
+        `).join('');
     }
-
+    
     /**
      * 渲染趋势图
      */
     renderTrendChart() {
-        let chartContainer = this.container.querySelector('.results-trend-chart');
-        if (!chartContainer) {
-            chartContainer = document.createElement('div');
-            chartContainer.className = 'results-trend-chart';
-            this.container.insertBefore(chartContainer, this.container.querySelector('.results-list') || null);
-        }
-        
-        if (this.trendData.length < 2) {
-            chartContainer.innerHTML = '<p class="empty-text">数据不足，无法显示趋势图</p>';
-            return;
-        }
-        
-        // 创建 canvas
-        const canvasId = 'trend-canvas';
-        chartContainer.innerHTML = `
-            <h4 class="chart-title">检测趋势（最近${this.trendData.length}次）</h4>
-            <canvas id="${canvasId}" width="600" height="200"></canvas>
-            <div class="chart-legend">
-                <span class="legend-item"><span class="legend-color ok"></span> OK</span>
-                <span class="legend-item"><span class="legend-color ng"></span> NG</span>
-                <span class="legend-item"><span class="legend-color error"></span> Error</span>
-            </div>
-        `;
-        
-        const canvas = document.getElementById(canvasId);
+        const canvas = document.getElementById('trend-canvas');
         if (!canvas) return;
         
+        // Optimize for Retina display
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        
         const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = 30;
+        ctx.scale(dpr, dpr);
+        
+        const width = rect.width;
+        const height = rect.height;
+        const padding = 20;
         
         // 清空画布
         ctx.clearRect(0, 0, width, height);
         
+        if (this.trendData.length < 2) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('数据不足，无法显示趋势图', width / 2, height / 2);
+            return;
+        }
+        
         // 绘制背景网格
-        ctx.strokeStyle = '#e5e5e5';
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
         ctx.lineWidth = 1;
         for (let i = 0; i <= 5; i++) {
             const y = padding + (height - 2 * padding) * i / 5;
@@ -327,7 +464,6 @@ class ResultPanel {
             ctx.stroke();
         }
         
-        // 绘制数据线
         const chartWidth = width - 2 * padding;
         const chartHeight = height - 2 * padding;
         const stepX = chartWidth / (this.trendData.length - 1);
@@ -340,7 +476,7 @@ class ResultPanel {
         };
         
         // 绘制连线
-        ctx.strokeStyle = '#1890ff';
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         
@@ -361,42 +497,42 @@ class ResultPanel {
             const x = padding + index * stepX;
             const y = statusY[point.status] || padding + chartHeight * 0.5;
             
-            // 根据状态设置颜色
             if (point.status === 'OK') {
-                ctx.fillStyle = '#52c41a';
+                ctx.fillStyle = '#10b981';
             } else if (point.status === 'NG') {
-                ctx.fillStyle = '#f5222d';
+                ctx.fillStyle = '#ef4444';
             } else {
-                ctx.fillStyle = '#faad14';
+                ctx.fillStyle = '#f59e0b';
             }
             
             ctx.beginPath();
-            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
             ctx.fill();
         });
         
         // 绘制Y轴标签
-        ctx.fillStyle = '#666';
+        ctx.fillStyle = '#94a3b8';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('OK', padding - 5, padding + chartHeight * 0.2 + 4);
-        ctx.fillText('NG', padding - 5, padding + chartHeight * 0.5 + 4);
-        ctx.fillText('Error', padding - 5, padding + chartHeight * 0.8 + 4);
+        ctx.fillText('OK', padding - 8, padding + chartHeight * 0.2 + 4);
+        ctx.fillText('NG', padding - 8, padding + chartHeight * 0.5 + 4);
+        ctx.fillText('Error', padding - 8, padding + chartHeight * 0.8 + 4);
     }
-
+    
     /**
      * 渲染结果列表
      */
     renderResultsList() {
-        let listContainer = this.container.querySelector('.results-list');
-        if (!listContainer) {
-            listContainer = document.createElement('div');
-            listContainer.className = 'results-list';
-            this.container.appendChild(listContainer);
+        const gridContainer = document.getElementById('results-grid');
+        const countInfo = document.getElementById('results-count-info');
+        if (!gridContainer) return;
+        
+        if (countInfo) {
+            countInfo.textContent = `共 ${this.filteredResults.length} 条记录`;
         }
         
         if (this.filteredResults.length === 0) {
-            listContainer.innerHTML = '<p class="empty-text">暂无检测结果</p>';
+            gridContainer.innerHTML = '<p class="empty-text">暂无检测结果</p>';
             return;
         }
         
@@ -405,68 +541,48 @@ class ResultPanel {
         const endIndex = Math.min(startIndex + this.pageSize, this.filteredResults.length);
         const pageResults = this.filteredResults.slice(startIndex, endIndex);
         
-        const listHtml = pageResults.map((result, index) => {
+        gridContainer.innerHTML = pageResults.map((result, index) => {
             const statusClass = result.status?.toLowerCase() || 'unknown';
             const time = result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : '--:--:--';
+            const processingTime = result.processingTime || result.executionTimeMs || '--';
             const globalIndex = startIndex + index;
             
             return `
-                <div class="result-item result-${statusClass}" data-index="${globalIndex}">
-                    <div class="result-header">
-                        <span class="result-status">${result.status || 'Unknown'}</span>
+                <div class="result-card result-${statusClass}" data-index="${globalIndex}" style="cursor:pointer;">
+                    <div class="result-card-header">
+                        <span class="result-status-badge ${statusClass}">${result.status || 'Unknown'}</span>
                         <span class="result-time">${time}</span>
                     </div>
-                    ${result.defects?.length > 0 ? `
-                        <div class="result-defects">
-                            ${result.defects.map(defect => `
-                                <div class="defect-item">
-                                    <span class="defect-type">${defect.type}</span>
-                                    <span class="defect-confidence">${(defect.confidence * 100).toFixed(1)}%</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                    ${result.executionTimeMs ? `
-                        <div class="result-meta">
-                            处理时间: ${result.executionTimeMs}ms
-                        </div>
-                    ` : ''}
+                    <div class="result-card-body">
+                        <span class="result-processing-time">${processingTime}ms</span>
+                        ${result.defects?.length > 0 ? `<span class="result-defect-count">${result.defects.length} 缺陷</span>` : ''}
+                    </div>
                 </div>
             `;
         }).join('');
         
-        listContainer.innerHTML = `
-            <div class="results-info">
-                显示 ${startIndex + 1}-${endIndex} 条，共 ${this.filteredResults.length} 条
-                ${this.results.length !== this.filteredResults.length ? ` (已筛选，总计 ${this.results.length} 条)` : ''}
-            </div>
-            ${listHtml}
-        `;
-        
         // 绑定点击事件
-        listContainer.querySelectorAll('.result-item').forEach(item => {
-            item.addEventListener('click', (e) => {
+        gridContainer.querySelectorAll('.result-card').forEach(card => {
+            card.addEventListener('click', (e) => {
                 const index = parseInt(e.currentTarget.dataset.index);
-                this.onResultClick?.(this.filteredResults[index]);
+                const result = this.filteredResults[index];
+                if (result) {
+                    this.showResultDetail(result);
+                }
             });
         });
     }
-
+    
     /**
      * 渲染分页控件
      */
     renderPagination() {
-        if (this.filteredResults.length === 0) {
-            const existingPagination = this.container.querySelector('.results-pagination');
-            if (existingPagination) existingPagination.remove();
-            return;
-        }
+        const paginationContainer = document.getElementById('results-pagination');
+        if (!paginationContainer) return;
         
-        let paginationContainer = this.container.querySelector('.results-pagination');
-        if (!paginationContainer) {
-            paginationContainer = document.createElement('div');
-            paginationContainer.className = 'results-pagination';
-            this.container.appendChild(paginationContainer);
+        if (this.totalPages <= 1) {
+            paginationContainer.innerHTML = '';
+            return;
         }
         
         let pageButtons = '';
@@ -478,61 +594,39 @@ class ResultPanel {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
         
-        // 上一页按钮
-        pageButtons += `
-            <button class="page-btn ${this.currentPage === 1 ? 'disabled' : ''}" 
-                onclick="resultPanel.goToPage(${this.currentPage - 1})"
-                ${this.currentPage === 1 ? 'disabled' : ''}>
-                上一页
-            </button>
-        `;
+        // 上一页
+        pageButtons += `<button class="page-btn ${this.currentPage === 1 ? 'disabled' : ''}" 
+            ${this.currentPage === 1 ? 'disabled' : ''} data-page="${this.currentPage - 1}">«</button>`;
         
-        // 第一页
         if (startPage > 1) {
-            pageButtons += `<button class="page-btn" onclick="resultPanel.goToPage(1)">1</button>`;
-            if (startPage > 2) {
-                pageButtons += `<span class="page-ellipsis">...</span>`;
-            }
+            pageButtons += `<button class="page-btn" data-page="1">1</button>`;
+            if (startPage > 2) pageButtons += `<span class="page-ellipsis">...</span>`;
         }
         
-        // 页码按钮
         for (let i = startPage; i <= endPage; i++) {
-            pageButtons += `
-                <button class="page-btn ${i === this.currentPage ? 'active' : ''}" 
-                    onclick="resultPanel.goToPage(${i})">
-                    ${i}
-                </button>
-            `;
+            pageButtons += `<button class="page-btn ${i === this.currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
         }
         
-        // 最后一页
         if (endPage < this.totalPages) {
-            if (endPage < this.totalPages - 1) {
-                pageButtons += `<span class="page-ellipsis">...</span>`;
-            }
-            pageButtons += `<button class="page-btn" onclick="resultPanel.goToPage(${this.totalPages})">${this.totalPages}</button>`;
+            if (endPage < this.totalPages - 1) pageButtons += `<span class="page-ellipsis">...</span>`;
+            pageButtons += `<button class="page-btn" data-page="${this.totalPages}">${this.totalPages}</button>`;
         }
         
-        // 下一页按钮
-        pageButtons += `
-            <button class="page-btn ${this.currentPage === this.totalPages ? 'disabled' : ''}" 
-                onclick="resultPanel.goToPage(${this.currentPage + 1})"
-                ${this.currentPage === this.totalPages ? 'disabled' : ''}>
-                下一页
-            </button>
-        `;
-        
-        // 页码跳转
-        pageButtons += `
-            <span class="page-jump">
-                跳至 <input type="number" min="1" max="${this.totalPages}" value="${this.currentPage}" 
-                    onchange="resultPanel.goToPage(Math.min(Math.max(1, parseInt(this.value) || 1), ${this.totalPages}))"> 页
-            </span>
-        `;
+        // 下一页
+        pageButtons += `<button class="page-btn ${this.currentPage === this.totalPages ? 'disabled' : ''}" 
+            ${this.currentPage === this.totalPages ? 'disabled' : ''} data-page="${this.currentPage + 1}">»</button>`;
         
         paginationContainer.innerHTML = pageButtons;
+        
+        // 绑定分页事件
+        paginationContainer.querySelectorAll('.page-btn:not(.disabled)').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const page = parseInt(btn.dataset.page);
+                if (page) this.goToPage(page);
+            });
+        });
     }
-
+    
     /**
      * 导出结果
      */
@@ -550,18 +644,16 @@ class ResultPanel {
                 filename = `inspection_results_${Date.now()}.json`;
                 mimeType = 'application/json';
                 break;
-                
             case 'csv':
+            case 'excel':
                 content = this.convertToCSV(this.filteredResults);
                 filename = `inspection_results_${Date.now()}.csv`;
                 mimeType = 'text/csv';
                 break;
-                
             default:
                 throw new Error(`不支持的导出格式: ${format}`);
         }
         
-        // 下载文件
         const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -572,7 +664,7 @@ class ResultPanel {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-
+    
     /**
      * 转换为 CSV
      */
@@ -582,27 +674,28 @@ class ResultPanel {
             r.timestamp ? new Date(r.timestamp).toISOString() : '',
             r.status,
             r.defects?.length || 0,
-            r.executionTimeMs || '',
-            r.defects?.[0]?.confidence ? (r.defects[0].confidence * 100).toFixed(1) + '%' : ''
+            r.processingTime || r.executionTimeMs || '',
+            r.defects?.[0]?.confidenceScore ? (r.defects[0].confidenceScore * 100).toFixed(1) + '%' : ''
         ]);
         
         return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     }
-
+    
     /**
-     * 设置结果点击回调
+     * 显示结果详情
      */
-    onResultClick(callback) {
-        this.onResultClick = callback;
+    showResultDetail(result) {
+        console.log('[ResultPanel] 查看结果详情:', result);
+        // 可扩展为弹窗展示
     }
-
+    
     /**
      * 获取最新结果
      */
     getLatestResult() {
         return this.filteredResults[0] || null;
     }
-
+    
     /**
      * 获取所有结果
      */

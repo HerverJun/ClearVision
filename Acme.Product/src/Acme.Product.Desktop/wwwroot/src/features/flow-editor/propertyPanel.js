@@ -52,7 +52,7 @@ class PropertyPanel {
     }
 
     /**
-     * 渲染面板
+     * 渲染面板 - 阶段四增强版，支持参数分组折叠
      */
     render() {
         if (!this.currentOperator) {
@@ -62,12 +62,19 @@ class PropertyPanel {
 
         // 兼容 title (画布节点) 和 displayName (算子库)
         const title = this.currentOperator.title || this.currentOperator.displayName || this.currentOperator.type;
-        const { type, parameters = [] } = this.currentOperator;
+        const { type, parameters = [], iconPath, icon } = this.currentOperator;
         
+        const iconHtml = iconPath 
+            ? `<div class="property-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="${iconPath}"/></svg></div>`
+            : (icon ? `<div class="property-icon text-icon">${icon}</div>` : '');
+
         let html = `
             <div class="property-header">
-                <h4>${title}</h4>
-                <span class="property-type">${type}</span>
+                ${iconHtml}
+                <div class="header-text">
+                    <h4>${title}</h4>
+                    <span class="property-type">${type}</span>
+                </div>
             </div>
             <div class="property-content">
         `;
@@ -75,10 +82,31 @@ class PropertyPanel {
         if (parameters.length === 0) {
             html += '<p class="empty-text">该算子没有可配置参数</p>';
         } else {
+            // 按分组组织参数
+            const groupedParams = this.groupParameters(parameters);
+            
             html += '<form class="property-form" id="property-form">';
             
-            parameters.forEach(param => {
-                html += this.renderParameter(param);
+            // 渲染每个分组
+            Object.entries(groupedParams).forEach(([groupName, params], index) => {
+                const groupId = `param-group-${index}`;
+                const isExpanded = index === 0; // 默认展开第一个分组
+                
+                html += `
+                    <div class="param-group ${isExpanded ? 'expanded' : ''}" data-group="${groupId}">
+                        <div class="param-group-header" onclick="this.closest('.param-group').classList.toggle('expanded')">
+                            <span class="group-toggle-icon">${isExpanded ? '▼' : '▶'}</span>
+                            <span class="group-title">${groupName}</span>
+                            <span class="group-count">${params.length}</span>
+                        </div>
+                        <div class="param-group-content">
+                `;
+                
+                params.forEach(param => {
+                    html += this.renderParameterEnhanced(param);
+                });
+                
+                html += '</div></div>';
             });
             
             html += `
@@ -96,6 +124,26 @@ class PropertyPanel {
 
         // 绑定事件
         this.bindEvents();
+        this.initSliders();
+    }
+    
+    /**
+     * 按分组组织参数
+     */
+    groupParameters(parameters) {
+        const groups = { '基本参数': [] };
+        
+        parameters.forEach(param => {
+            const group = param.group || param.category || '基本参数';
+            if (!groups[group]) {
+                groups[group] = [];
+            }
+            groups[group].push(param);
+        });
+        
+        // 如果只有基本参数且有多个，保持原样
+        // 否则返回所有分组
+        return groups;
     }
 
     /**
@@ -185,14 +233,13 @@ class PropertyPanel {
                 
             case 'file':
                 inputHtml = `
-                    <div style="display: flex; gap: 5px;">
+                    <div class="file-picker-wrapper">
                         <input type="text" 
                                id="param-${name}" 
                                name="${name}" 
                                value="${value !== undefined ? value : defaultValue || ''}"
                                class="form-input"
                                readonly
-                               style="flex: 1;"
                                data-type="file">
                         <button type="button" class="btn btn-sm btn-secondary btn-pick-file" data-param="${name}">...</button>
                     </div>
@@ -219,6 +266,108 @@ class PropertyPanel {
                 ${description ? `<p class="form-description">${description}</p>` : ''}
             </div>
         `;
+    }
+
+    /**
+     * 渲染增强版参数控件 - 带滑块和颜色选择器
+     */
+    renderParameterEnhanced(param) {
+        const { name, displayName, description, dataType, value, defaultValue, min, max, isRequired, step } = param;
+        
+        const requiredMark = isRequired ? '<span class="required">*</span>' : '';
+        const currentValue = value !== undefined ? value : defaultValue;
+        let inputHtml = '';
+        
+        switch (dataType) {
+            case 'int':
+            case 'double':
+            case 'float':
+                // 数值类型：输入框 + 滑块
+                const hasRange = min !== undefined && max !== undefined;
+                const stepValue = step || (dataType === 'int' ? 1 : 0.1);
+                
+                inputHtml = `
+                    <div class="number-input-wrapper">
+                        <input type="number" 
+                               id="param-${name}" 
+                               name="${name}" 
+                               value="${currentValue}"
+                               ${min !== undefined ? `min="${min}"` : ''}
+                               ${max !== undefined ? `max="${max}"` : ''}
+                               step="${stepValue}"
+                               class="form-input number-input"
+                               data-type="${dataType}">
+                        ${hasRange ? `
+                            <input type="range" 
+                                   class="param-slider"
+                                   min="${min}" 
+                                   max="${max}" 
+                                   step="${stepValue}"
+                                   value="${currentValue}"
+                                   oninput="document.getElementById('param-${name}').value = this.value; document.getElementById('param-${name}').dispatchEvent(new Event('change'));">
+                        ` : ''}
+                    </div>
+                `;
+                break;
+                
+            case 'color':
+                // 增强的颜色选择器
+                inputHtml = `
+                    <div class="color-picker-wrapper">
+                        <input type="color" 
+                               id="param-${name}" 
+                               name="${name}" 
+                               value="${currentValue || '#000000'}"
+                               class="form-color-hidden"
+                               data-type="color">
+                        <div class="color-preview-box" onclick="document.getElementById('param-${name}').click()" style="background-color: ${currentValue || '#000000'}">
+                            <span class="color-value">${currentValue || '#000000'}</span>
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            default:
+                // 其他类型使用默认渲染
+                return this.renderParameter(param);
+        }
+        
+        return `
+            <div class="form-group param-enhanced">
+                <label for="param-${name}" class="form-label">
+                    ${displayName || name} ${requiredMark}
+                </label>
+                ${inputHtml}
+                ${description ? `<p class="form-description">${description}</p>` : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * 初始化滑块同步
+     */
+    initSliders() {
+        const sliders = this.container.querySelectorAll('.param-slider');
+        sliders.forEach(slider => {
+            const targetInput = slider.parentElement.querySelector('input[type="number"]');
+            if (targetInput) {
+                // 输入框改变时更新滑块
+                targetInput.addEventListener('input', () => {
+                    slider.value = targetInput.value;
+                });
+            }
+        });
+        
+        // 颜色选择器预览更新
+        const colorInputs = this.container.querySelectorAll('input[type="color"]');
+        colorInputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                const preview = input.parentElement.querySelector('.color-preview-box');
+                const valueText = input.parentElement.querySelector('.color-value');
+                if (preview) preview.style.backgroundColor = e.target.value;
+                if (valueText) valueText.textContent = e.target.value;
+            });
+        });
     }
 
     /**

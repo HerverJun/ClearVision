@@ -218,49 +218,49 @@
    ========================================================================== */
 
 [data-theme="light"] {
-    /* Primary Palette - Light Mode */
-    --ink-primary: #f5f3ed;        /* Rice paper background */
-    --ink-secondary: #ebe8df;      /* Secondary background */
-    --ink-tertiary: #e0dcd0;       /* Hover states */
-    --ink-deep: #ffffff;           /* Pure white for deepest areas */
+    /* Primary Palette - Light Mode (Bright & Clean) */
+    --ink-primary: #f8fafc;        /* Very light slate - clean background */
+    --ink-secondary: #ffffff;      /* Pure white - content areas */
+    --ink-tertiary: #eff6ff;       /* Very light blue - hover states */
+    --ink-deep: #1e293b;           /* Slate 800 - primary text */
     
-    /* Neutral Colors - Dark Ink on Light Paper */
-    --paper-white: #1a1a1a;        /* Primary text - dark ink */
-    --paper-dim: #4a4a4a;          /* Secondary text */
-    --ink-gray: #6b7280;           /* Muted text */
-    --mist-gray: rgba(0, 0, 0, 0.08);  /* Borders/dividers */
+    /* Neutral Colors - Modern Clean */
+    --paper-white: #0f172a;        /* Slate 900 - primary text */
+    --paper-dim: #475569;          /* Slate 600 - secondary text */
+    --ink-gray: #94a3b8;           /* Slate 400 - muted text */
+    --mist-gray: #e2e8f0;          /* Slate 200 - borders/dividers */
     
-    /* Glassmorphism - Lighter */
+    /* Glassmorphism - Crystalline */
     --glass-panel: rgba(255, 255, 255, 0.85);
-    --glass-card: rgba(255, 255, 255, 0.7);
-    --glass-blur: blur(20px) saturate(180%);
-    --glass-border: rgba(0, 0, 0, 0.08);
-    --glass-border-light: rgba(0, 0, 0, 0.04);
+    --glass-card: rgba(255, 255, 255, 0.95);
+    --glass-blur: blur(24px) saturate(120%);
+    --glass-border: rgba(255, 255, 255, 0.6);
+    --glass-border-light: rgba(255, 255, 255, 0.4);
     
-    /* Shadows - Softer for light mode */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
-    --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.12);
-    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    /* Shadows - Soft & Diffused (Elegant) */
+    --shadow-sm: 0 2px 4px rgba(148, 163, 184, 0.05);
+    --shadow-md: 0 8px 16px rgba(148, 163, 184, 0.08);
+    --shadow-lg: 0 16px 32px rgba(148, 163, 184, 0.08);
+    --shadow-float: 0 20px 40px rgba(148, 163, 184, 0.12);
+    --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.01);
     
-    /* Gradients - Light Mode */
+    /* Gradients - Subtle & Airy */
     --gradient-ink: linear-gradient(
         180deg,
-        rgba(245, 243, 237, 0.98) 0%,
-        rgba(255, 255, 255, 1) 100%
+        #f8fafc 0%,
+        #f1f5f9 100%
     );
     
     --gradient-card: linear-gradient(
-        145deg,
-        rgba(255, 255, 255, 0.9) 0%,
-        rgba(245, 243, 237, 0.8) 100%
+        180deg,
+        #ffffff 0%,
+        #f8fafc 100%
     );
     
-    /* Neon Glow - Adjusted for light background */
-    --neon-cinnabar: 0 0 10px rgba(231, 76, 60, 0.3);
-    --neon-cinnabar-strong: 0 0 20px rgba(231, 76, 60, 0.4), 0 0 40px rgba(231, 76, 60, 0.2);
-    --neon-gold: 0 0 10px rgba(212, 175, 55, 0.4);
-    --neon-gold-strong: 0 0 20px rgba(212, 175, 55, 0.5);
-    --neon-jade: 0 0 15px rgba(46, 204, 113, 0.3);
+    /* Neon Glow - Refined for Light Mode */
+    --neon-cinnabar: 0 2px 8px rgba(239, 68, 68, 0.25);
+    --neon-cinnabar-strong: 0 4px 12px rgba(239, 68, 68, 0.35);
+    --neon-gold: 0 2px 8px rgba(234, 179, 8, 0.25);
+    --neon-gold-strong: 0 4px 12px rgba(234, 179, 8, 0.35);
+    --neon-jade: 0 2px 8px rgba(16, 185, 129, 0.25);
 }
