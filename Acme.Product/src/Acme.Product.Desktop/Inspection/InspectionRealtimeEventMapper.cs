@@ -53,11 +53,13 @@ public static class InspectionRealtimeEventMapper
                         projectId = result.ProjectId,
                         sessionId = result.SessionId,
                         resultId = result.ResultId,
+                        imageId = result.ImageId,
                         status = result.Status,
                         defectCount = result.DefectCount,
                         processingTimeMs = result.ProcessingTimeMs,
                         outputImageBase64 = result.OutputImageBase64,
                         outputData = result.OutputData,
+                        analysisData = result.AnalysisData,
                         timestamp = result.Timestamp
                     })
             },

@@ -109,16 +109,68 @@ public class GenerateFlowMessageHandlerTests
         _ = await handler.HandleAsync(
             description: "demo",
             attachments: [@"C:\temp\template.png", @"C:\temp\bad.txt"],
+            requestId: "req-attachment-1",
             onMessage: (type, payload) => receivedMessages.Add((type, payload)));
 
         // Assert
         receivedMessages.Should().Contain(message => message.Type == "GenerateFlowAttachmentReport");
         var payloadJson = receivedMessages.First(message => message.Type == "GenerateFlowAttachmentReport").Payload;
         using var payloadDoc = JsonDocument.Parse(payloadJson);
+        payloadDoc.RootElement.GetProperty("requestId").GetString().Should().Be("req-attachment-1");
         payloadDoc.RootElement.GetProperty("sent").GetArrayLength().Should().Be(1);
         payloadDoc.RootElement.GetProperty("skipped").GetArrayLength().Should().Be(1);
         payloadDoc.RootElement.GetProperty("skipped")[0].GetProperty("reason").GetString()
             .Should().Be("unsupported_format");
+    }
+
+    [Fact(DisplayName = "GenerateFlowMessageHandler should include requestId in progress and stream callbacks")]
+    public async Task HandleAsync_ShouldIncludeRequestIdInRealtimeMessages()
+    {
+        // Arrange
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+        var receivedMessages = new List<(string Type, string Payload)>();
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(callInfo =>
+            {
+                var progressCallback = callInfo.ArgAt<Action<string>>(1);
+                var chunkCallback = callInfo.ArgAt<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(2);
+
+                progressCallback("正在分析需求...");
+                chunkCallback(new Acme.Product.Contracts.Messages.AiStreamChunk("thinking", "step-1"));
+
+                return Task.FromResult(new AiFlowGenerationResult
+                {
+                    Success = true,
+                    Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() }
+                });
+            });
+
+        // Act
+        _ = await handler.HandleAsync(
+            description: "demo",
+            requestId: "req-stream-1",
+            onMessage: (type, payload) => receivedMessages.Add((type, payload)));
+
+        // Assert
+        receivedMessages.Should().Contain(message => message.Type == "GenerateFlowProgress");
+        receivedMessages.Should().Contain(message => message.Type == "GenerateFlowStreamChunk");
+
+        var progressPayload = receivedMessages.Last(message => message.Type == "GenerateFlowProgress").Payload;
+        using var progressDoc = JsonDocument.Parse(progressPayload);
+        progressDoc.RootElement.GetProperty("requestId").GetString().Should().Be("req-stream-1");
+
+        var streamPayload = receivedMessages.Single(message => message.Type == "GenerateFlowStreamChunk").Payload;
+        using var streamDoc = JsonDocument.Parse(streamPayload);
+        streamDoc.RootElement.GetProperty("requestId").GetString().Should().Be("req-stream-1");
+        streamDoc.RootElement.GetProperty("chunkType").GetString().Should().Be("thinking");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should serialize OperatorType as string")]
@@ -164,4 +216,128 @@ public class GenerateFlowMessageHandlerTests
         firstOp.GetProperty("type").ValueKind.Should().Be(JsonValueKind.String);
         firstOp.GetProperty("type").GetString().Should().Be("ImageAcquisition");
     }
+
+    [Fact(DisplayName = "GenerateFlowMessageHandler should include template-first structured fields")]
+    public async Task HandleAsync_ShouldSerializeTemplateFirstStructuredPayload()
+    {
+        // Arrange
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = true,
+                Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
+                RecommendedTemplate = new AiRecommendedTemplateInfo
+                {
+                    TemplateId = Guid.NewGuid().ToString(),
+                    TemplateName = "端子线序检测",
+                    MatchReason = "命中关键词：线序、端子",
+                    MatchMode = "template-first",
+                    Confidence = 0.91
+                },
+                PendingParameters =
+                [
+                    new AiPendingParameterInfo
+                    {
+                        OperatorId = "op_3",
+                        ParameterNames = ["ModelPath", "Confidence"]
+                    }
+                ],
+                MissingResources =
+                [
+                    new AiMissingResourceInfo
+                    {
+                        ResourceType = "Model",
+                        ResourceKey = "DeepLearning.ModelPath",
+                        Description = "缺少模型文件路径"
+                    }
+                ]
+            }));
+
+        // Act
+        var resultJson = await handler.HandleAsync("线序检测");
+
+        // Assert
+        using var doc = JsonDocument.Parse(resultJson);
+        var root = doc.RootElement;
+        root.GetProperty("recommendedTemplate").GetProperty("templateName").GetString()
+            .Should().Be("端子线序检测");
+        root.GetProperty("recommendedTemplate").GetProperty("matchMode").GetString()
+            .Should().Be("template-first");
+        root.GetProperty("pendingParameters").GetArrayLength().Should().Be(1);
+        root.GetProperty("pendingParameters")[0].GetProperty("operatorId").GetString().Should().Be("op_3");
+        root.GetProperty("missingResources").GetArrayLength().Should().Be(1);
+        root.GetProperty("missingResources")[0].GetProperty("resourceKey").GetString()
+            .Should().Be("DeepLearning.ModelPath");
+    }
+
+    [Fact(DisplayName = "GenerateFlowMessageHandler should serialize cancelled completion status")]
+    public async Task HandleAsync_ShouldSerializeCancelledCompletionStatus()
+    {
+        // Arrange
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = false,
+                ErrorMessage = "用户已取消本次生成。",
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusCancelled,
+                FailureType = AiFlowGenerationResult.FailureTypeUserCancelled,
+                FailureSummary = new AiFailureSummary
+                {
+                    Category = "execution",
+                    Code = "user_cancelled",
+                    Message = "用户已取消本次生成。"
+                },
+                LastAttemptDiagnostics =
+                [
+                    new AiAttemptDiagnostic
+                    {
+                        AttemptNumber = 1,
+                        Stage = "execution",
+                        Summary = "用户主动取消",
+                        Issues =
+                        [
+                            new AiValidationDiagnostic
+                            {
+                                Severity = AiValidationSeverity.Error,
+                                Code = "user_cancelled",
+                                Category = "execution",
+                                Message = "用户主动取消"
+                            }
+                        ]
+                    }
+                ]
+            }));
+
+        // Act
+        var resultJson = await handler.HandleAsync("取消测试", requestId: "req-cancel-1");
+
+        // Assert
+        using var doc = JsonDocument.Parse(resultJson);
+        var root = doc.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusCancelled);
+        root.GetProperty("failureType").GetString().Should().Be(AiFlowGenerationResult.FailureTypeUserCancelled);
+        root.GetProperty("failureSummary").GetString().Should().Be("用户已取消本次生成。");
+        root.GetProperty("lastAttemptDiagnostics").GetArrayLength().Should().Be(1);
+        root.GetProperty("requestId").GetString().Should().Be("req-cancel-1");
+    }
+
 }

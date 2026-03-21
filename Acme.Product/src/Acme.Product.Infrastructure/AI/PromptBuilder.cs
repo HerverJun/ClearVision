@@ -37,6 +37,8 @@ public class PromptBuilder
         sb.AppendLine();
         sb.AppendLine(GetDomainKnowledge());
         sb.AppendLine();
+        sb.AppendLine(GetTemplateFirstStrategy());
+        sb.AppendLine();
         sb.AppendLine(GetPhase1OperatorExtensions());
         sb.AppendLine();
         sb.AppendLine(GetPhase2OperatorExtensions());
@@ -136,6 +138,19 @@ public class PromptBuilder
            工业图像通常有噪声，直接做边缘检测或Blob分析会产生大量误检，应先 Filtering
         """;
 
+    private string GetTemplateFirstStrategy() => """
+        # 模板优先策略（高频场景）
+
+        当用户描述命中以下关键词时，优先走“模板优先”而不是“全量自由编排”：
+        - 线序 / 端子 / 接线顺序 / 排针顺序
+        - wire sequence / terminal order / connector order
+
+        对命中场景的要求：
+        1. 优先复用与场景最匹配的模板结构，再补充必要算子与参数。
+        2. 不要从零开始构造无关算子链，保持模板主干稳定。
+        3. 输出中应包含推荐模板、待确认参数、缺失资源信息，便于工程师快速落地。
+        """;
+
     private string GetPhase1OperatorExtensions() => """
         # Phase 1 Operator Extensions
         ## New workflow patterns
@@ -143,6 +158,8 @@ public class PromptBuilder
            ImageAcquisition -> Filtering -> CaliperTool -> WidthMeasurement -> UnitConvert -> ResultJudgment -> ResultOutput
         2. AI post-processing:
            ImageAcquisition -> DeepLearning -> BoxNms -> BoxFilter -> ResultJudgment -> ResultOutput
+        2.1. Detection sequence judgment:
+            ImageAcquisition -> DeepLearning -> BoxNms -> DetectionSequenceJudge -> ConditionalBranch/ResultOutput
         3. Image quality gate:
            ImageAcquisition -> SharpnessEvaluation -> ConditionalBranch -> (continue or reject)
         4. Position-first inspection:
@@ -156,6 +173,7 @@ public class PromptBuilder
         - "line to line distance/parallelism" => LineLineDistance
         - "remove duplicate boxes / NMS" => BoxNms
         - "filter detections by class/area/score" => BoxFilter
+        - "wire sequence / terminal order / connector order" => DetectionSequenceJudge
         - "is image sharp / focus check / blur" => SharpnessEvaluation
         - "correct ROI position / offset compensation" => PositionCorrection
         - "N-point calibration / affine calibration" => NPointCalibration
@@ -551,19 +569,55 @@ public class PromptBuilder
           ],
           "parametersNeedingReview": {
             "op_3": ["ModelPath", "Confidence"]
-          }
+          },
+          "recommendedTemplate": {
+            "templateId": "template-guid-or-empty",
+            "templateName": "端子线序检测",
+            "matchReason": "命中关键词：线序、端子、接线顺序",
+            "matchMode": "template-first",
+            "confidence": 0.92
+          },
+          "pendingParameters": [
+            {
+              "operatorId": "op_3",
+              "parameterNames": ["ModelPath", "Confidence", "TargetClasses"]
+            }
+          ],
+          "missingResources": [
+            {
+              "resourceType": "Model",
+              "resourceKey": "DeepLearning.ModelPath",
+              "description": "缺少可用模型文件路径"
+            }
+          ]
         }
         ```
+
+        > `recommendedTemplate` / `pendingParameters` / `missingResources` 为可选字段。
+        > 若未命中高频模板场景，可输出空对象或空数组。
 
         ## 关于参数配置 (parameters)
         - 根据用户的描述推断合理的参数值。如果描述中包含数量、尺寸、大小等信息，应转换为相应的数值
         - 数值类型参数的 value 必须在对应算子信息的 `min_value` 到 `max_value` 之间
         - 枚举(enum)类型参数的 value 必须是对应算子信息的 `options` 数组中列出的 `value` 之一
+        - 为了兼容不同模型，`parameters` 中的值优先使用字符串；如果输出了 JSON 标量（数字/布尔），系统也会尽量兼容解析
         - 未在 user 提示中明确或无法推断的参数，如果它有 `default_value`，可以省略或填入默认值
 
         ## 关于 parametersNeedingReview
         列出你无法从用户描述中确定明确值、必须由用户提供真实环境数据的参数。
         例如：文件路径、IP 地址、模型文件路径、特定尺寸阈值等。
+
+        ## 关于 pendingParameters
+        - 与 `parametersNeedingReview` 保持语义一致，但结构更适合前端直接渲染。
+        - 每项包含 `operatorId` 和需要确认的 `parameterNames`。
+
+        ## 关于 missingResources
+        - 用于表达模板落地缺口，如模型文件、标签文件、PLC 地址、标定文件等。
+        - 每项包含 `resourceType` / `resourceKey` / `description`。
+
+        ## 关于 recommendedTemplate
+        - 高频场景（如线序/端子）应优先给出模板推荐信息。
+        - `matchMode` 推荐固定为 `template-first`。
 
         ## 关于 tempId
         格式固定为 op_1, op_2, op_3...，按算子在流程中的执行顺序递增。
@@ -585,11 +639,11 @@ public class PromptBuilder
         {
           "explanation": "相机采集图像，预处理降噪，二值化分离缺陷，Blob分析统计缺陷数量，最终输出结果",
           "operators": [
-            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"sourceType": "camera", "triggerMode": "Hardware"}},
+            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"SourceType": "Camera", "TriggerMode": "Software"}},
             {"tempId": "op_2", "operatorType": "Filtering", "displayName": "高斯滤波", "parameters": {"KernelSize": "5"}},
             {"tempId": "op_3", "operatorType": "Thresholding", "displayName": "二值化", "parameters": {"UseOtsu": "true"}},
             {"tempId": "op_4", "operatorType": "BlobAnalysis", "displayName": "缺陷Blob分析", "parameters": {"MinArea": "50", "MaxArea": "5000"}},
-            {"tempId": "op_5", "operatorType": "ResultOutput", "displayName": "检测结果", "parameters": {}}
+            {"tempId": "op_5", "operatorType": "ResultOutput", "displayName": "检测结果", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [
             {"sourceTempId": "op_1", "sourcePortName": "Image", "targetTempId": "op_2", "targetPortName": "Image"},
@@ -603,109 +657,107 @@ public class PromptBuilder
         }
 
         ## 示例 2
-        用户描述："扫描产品二维码，通过Modbus发给PLC"
+        用户描述："扫描产品二维码，通过Modbus发给PLC，并输出通信结果"
 
         正确输出：
         {
-          "explanation": "相机采集，条码识别提取文本，Modbus TCP协议发送给PLC",
+          "explanation": "相机采集图像，条码识别提取文本，通过 Modbus TCP 写入 PLC，并把通信响应汇总输出",
           "operators": [
-            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"sourceType": "camera", "triggerMode": "Hardware"}},
+            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"SourceType": "Camera", "TriggerMode": "Software"}},
             {"tempId": "op_2", "operatorType": "CodeRecognition", "displayName": "二维码识别", "parameters": {"CodeType": "QR", "MaxResults": "1"}},
-            {"tempId": "op_3", "operatorType": "ModbusCommunication", "displayName": "Modbus发送", "parameters": {"Protocol": "TCP", "Port": "502", "FunctionCode": "WriteMultiple"}}
+            {"tempId": "op_3", "operatorType": "ModbusCommunication", "displayName": "Modbus发送", "parameters": {"Protocol": "TCP", "Port": "502", "FunctionCode": "WriteMultiple"}},
+            {"tempId": "op_4", "operatorType": "ResultOutput", "displayName": "输出通信结果", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [
             {"sourceTempId": "op_1", "sourcePortName": "Image", "targetTempId": "op_2", "targetPortName": "Image"},
-            {"sourceTempId": "op_2", "sourcePortName": "Text", "targetTempId": "op_3", "targetPortName": "Data"}
+            {"sourceTempId": "op_2", "sourcePortName": "Text", "targetTempId": "op_3", "targetPortName": "Data"},
+            {"sourceTempId": "op_3", "sourcePortName": "Response", "targetTempId": "op_4", "targetPortName": "Text"}
           ],
           "parametersNeedingReview": {
-            "op_3": ["IpAddress"]
+            "op_3": ["IpAddress", "SlaveId", "RegisterAddress"]
           }
         }
 
         ## 示例 3
-        用户描述："用AI模型检测产品缺陷，有缺陷发NG信号，没缺陷发OK信号给PLC"
+        用户描述："用AI模型检测产品缺陷，没缺陷发OK信号，有缺陷发NG信号给PLC"
 
         正确输出：
         {
-          "explanation": "相机采集后缩放至AI输入尺寸，深度学习推理检测缺陷，条件分支判断缺陷数量，分别通过Modbus发送NG/OK信号",
+          "explanation": "相机采集后缩放至 AI 输入尺寸，深度学习推理输出缺陷数量，结果判定缺陷数是否为 0，再通过条件分支分别发送 OK/NG 信号，并输出最终判定",
           "operators": [
-            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"sourceType": "camera", "triggerMode": "Hardware"}},
+            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"SourceType": "Camera", "TriggerMode": "Software"}},
             {"tempId": "op_2", "operatorType": "ImageResize", "displayName": "图像缩放", "parameters": {"Width": "640", "Height": "640"}},
             {"tempId": "op_3", "operatorType": "DeepLearning", "displayName": "AI缺陷检测", "parameters": {"Confidence": "0.5", "UseGpu": "true"}},
-            {"tempId": "op_4", "operatorType": "ConditionalBranch", "displayName": "缺陷判断", "parameters": {"FieldName": "DefectCount", "Condition": "GreaterThan", "CompareValue": "0"}},
-            {"tempId": "op_5", "operatorType": "ModbusCommunication", "displayName": "发送NG", "parameters": {"FunctionCode": "WriteSingle", "RegisterAddress": "1", "WriteValue": "1"}},
-            {"tempId": "op_6", "operatorType": "ModbusCommunication", "displayName": "发送OK", "parameters": {"FunctionCode": "WriteSingle", "RegisterAddress": "1", "WriteValue": "0"}},
-            {"tempId": "op_7", "operatorType": "ResultOutput", "displayName": "检测结果", "parameters": {}}
+            {"tempId": "op_4", "operatorType": "ResultJudgment", "displayName": "缺陷判定", "parameters": {"Condition": "Equal", "ExpectValue": "0"}},
+            {"tempId": "op_5", "operatorType": "ConditionalBranch", "displayName": "OK/NG分支", "parameters": {"Condition": "Equal", "CompareValue": "true"}},
+            {"tempId": "op_6", "operatorType": "ModbusCommunication", "displayName": "发送OK", "parameters": {"FunctionCode": "WriteSingle", "RegisterAddress": "1", "WriteValue": "1"}},
+            {"tempId": "op_7", "operatorType": "ModbusCommunication", "displayName": "发送NG", "parameters": {"FunctionCode": "WriteSingle", "RegisterAddress": "1", "WriteValue": "0"}},
+            {"tempId": "op_8", "operatorType": "ResultOutput", "displayName": "检测结果", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [
             {"sourceTempId": "op_1", "sourcePortName": "Image", "targetTempId": "op_2", "targetPortName": "Image"},
             {"sourceTempId": "op_2", "sourcePortName": "Image", "targetTempId": "op_3", "targetPortName": "Image"},
             {"sourceTempId": "op_3", "sourcePortName": "DefectCount", "targetTempId": "op_4", "targetPortName": "Value"},
-            {"sourceTempId": "op_4", "sourcePortName": "True", "targetTempId": "op_5", "targetPortName": "Data"},
-            {"sourceTempId": "op_4", "sourcePortName": "False", "targetTempId": "op_6", "targetPortName": "Data"},
-            {"sourceTempId": "op_3", "sourcePortName": "Image", "targetTempId": "op_7", "targetPortName": "Image"}
+            {"sourceTempId": "op_4", "sourcePortName": "IsOk", "targetTempId": "op_5", "targetPortName": "Value"},
+            {"sourceTempId": "op_5", "sourcePortName": "True", "targetTempId": "op_6", "targetPortName": "Data"},
+            {"sourceTempId": "op_5", "sourcePortName": "False", "targetTempId": "op_7", "targetPortName": "Data"},
+            {"sourceTempId": "op_4", "sourcePortName": "IsOk", "targetTempId": "op_8", "targetPortName": "Result"}
           ],
           "parametersNeedingReview": {
-            "op_3": ["ModelPath", "InputSize"],
-            "op_5": ["IpAddress", "Port"],
-            "op_6": ["IpAddress", "Port"]
+            "op_3": ["ModelPath", "InputSize", "TargetClasses"],
+            "op_6": ["IpAddress", "Port", "SlaveId"],
+            "op_7": ["IpAddress", "Port", "SlaveId"]
           }
         }
 
         ## 示例 4
-        用户描述："测量零件上两孔之间的距离，结果转换为毫米并输出"
+        用户描述："测量两点之间的距离，结果转换为毫米并输出"
 
         正确输出：
         {
-          "explanation": "相机采集图像，高斯滤波降噪，Canny边缘检测，检测两个圆形孔，测量距离，坐标转换为物理尺寸，输出结果",
+          "explanation": "相机采集图像后做滤波预处理，使用测量算子输出像素距离，再通过坐标转换将像素距离换算为毫米，最后输出结果",
           "operators": [
-            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"sourceType": "camera", "exposureTime": "10000"}},
-            {"tempId": "op_2", "operatorType": "GaussianBlur", "displayName": "高斯滤波", "parameters": {"KernelSize": "5"}},
-            {"tempId": "op_3", "operatorType": "EdgeDetection", "displayName": "边缘检测", "parameters": {"Threshold1": "50", "Threshold2": "150", "ApertureSize": "3"}},
-            {"tempId": "op_4", "operatorType": "CircleMeasurement", "displayName": "圆孔检测", "parameters": {"MinRadius": "10", "MaxRadius": "100", "Method": "HoughCircle"}},
-            {"tempId": "op_5", "operatorType": "Measurement", "displayName": "距离测量", "parameters": {"MeasureType": "PointToPoint"}},
-            {"tempId": "op_6", "operatorType": "CoordinateTransform", "displayName": "坐标转换", "parameters": {"PixelSize": "0.02"}},
-            {"tempId": "op_7", "operatorType": "ResultOutput", "displayName": "测量结果", "parameters": {}}
+            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"SourceType": "Camera", "ExposureTime": "10000"}},
+            {"tempId": "op_2", "operatorType": "Filtering", "displayName": "高斯滤波", "parameters": {"KernelSize": "5"}},
+            {"tempId": "op_3", "operatorType": "Measurement", "displayName": "距离测量", "parameters": {"X1": "120", "Y1": "160", "X2": "420", "Y2": "160", "MeasureType": "PointToPoint"}},
+            {"tempId": "op_4", "operatorType": "CoordinateTransform", "displayName": "坐标转换", "parameters": {"PixelSize": "0.02"}},
+            {"tempId": "op_5", "operatorType": "ResultOutput", "displayName": "测量结果", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [
             {"sourceTempId": "op_1", "sourcePortName": "Image", "targetTempId": "op_2", "targetPortName": "Image"},
             {"sourceTempId": "op_2", "sourcePortName": "Image", "targetTempId": "op_3", "targetPortName": "Image"},
-            {"sourceTempId": "op_3", "sourcePortName": "Image", "targetTempId": "op_4", "targetPortName": "Image"},
-            {"sourceTempId": "op_4", "sourcePortName": "Center", "targetTempId": "op_5", "targetPortName": "Image"},
-            {"sourceTempId": "op_5", "sourcePortName": "Distance", "targetTempId": "op_6", "targetPortName": "PixelX"},
-            {"sourceTempId": "op_6", "sourcePortName": "PhysicalX", "targetTempId": "op_7", "targetPortName": "Result"}
+            {"sourceTempId": "op_3", "sourcePortName": "Distance", "targetTempId": "op_4", "targetPortName": "PixelX"},
+            {"sourceTempId": "op_4", "sourcePortName": "PhysicalX", "targetTempId": "op_5", "targetPortName": "Result"}
           ],
           "parametersNeedingReview": {
-            "op_4": ["MinRadius", "MaxRadius"],
-            "op_6": ["PixelSize", "CalibrationFile"]
+            "op_3": ["X1", "Y1", "X2", "Y2"],
+            "op_4": ["PixelSize", "CalibrationFile"]
           }
         }
 
         ## 示例 5
-        用户描述："对产品连续拍照10次，记录每次的检测结果到数据库"
+        用户描述："检测结果写入数据库，并输出记录ID"
 
         正确输出：
         {
-          "explanation": "循环计数器控制10次拍照，每次采集后二值化分析，结果写入数据库，计数递增",
+          "explanation": "相机采集后进行二值化和 Blob 分析，结果判定后将判定结果写入数据库，并把记录 ID 输出给前端或上游系统",
           "operators": [
-            {"tempId": "op_1", "operatorType": "CycleCounter", "displayName": "循环计数", "parameters": {"CycleLimit": "10", "AutoReset": "true"}},
-            {"tempId": "op_2", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"sourceType": "camera"}},
-            {"tempId": "op_3", "operatorType": "Thresholding", "displayName": "二值化", "parameters": {"UseOtsu": "true"}},
-            {"tempId": "op_4", "operatorType": "BlobAnalysis", "displayName": "缺陷分析", "parameters": {"MinArea": "100"}},
-            {"tempId": "op_5", "operatorType": "ResultJudgment", "displayName": "OK/NG判定", "parameters": {"FieldName": "BlobCount", "Condition": "LessThanOrEqual", "ThresholdValue": "0"}},
-            {"tempId": "op_6", "operatorType": "DatabaseWrite", "displayName": "记录到数据库", "parameters": {"DbType": "SQLite", "TableName": "InspectionResults"}},
-            {"tempId": "op_7", "operatorType": "ResultOutput", "displayName": "输出结果", "parameters": {}}
+            {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "相机采集", "parameters": {"SourceType": "Camera", "TriggerMode": "Software"}},
+            {"tempId": "op_2", "operatorType": "Thresholding", "displayName": "二值化", "parameters": {"UseOtsu": "true"}},
+            {"tempId": "op_3", "operatorType": "BlobAnalysis", "displayName": "缺陷分析", "parameters": {"MinArea": "100", "MaxArea": "5000"}},
+            {"tempId": "op_4", "operatorType": "ResultJudgment", "displayName": "OK/NG判定", "parameters": {"Condition": "Equal", "ExpectValue": "0"}},
+            {"tempId": "op_5", "operatorType": "DatabaseWrite", "displayName": "记录到数据库", "parameters": {"DbType": "SQLite", "TableName": "InspectionResults"}},
+            {"tempId": "op_6", "operatorType": "ResultOutput", "displayName": "输出结果", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [
-            {"sourceTempId": "op_1", "sourcePortName": "CycleCount", "targetTempId": "op_7", "targetPortName": "Result"},
+            {"sourceTempId": "op_1", "sourcePortName": "Image", "targetTempId": "op_2", "targetPortName": "Image"},
             {"sourceTempId": "op_2", "sourcePortName": "Image", "targetTempId": "op_3", "targetPortName": "Image"},
-            {"sourceTempId": "op_3", "sourcePortName": "Image", "targetTempId": "op_4", "targetPortName": "Image"},
-            {"sourceTempId": "op_4", "sourcePortName": "BlobCount", "targetTempId": "op_5", "targetPortName": "Value"},
-            {"sourceTempId": "op_5", "sourcePortName": "IsOk", "targetTempId": "op_6", "targetPortName": "Data"}
+            {"sourceTempId": "op_3", "sourcePortName": "BlobCount", "targetTempId": "op_4", "targetPortName": "Value"},
+            {"sourceTempId": "op_4", "sourcePortName": "JudgmentValue", "targetTempId": "op_5", "targetPortName": "Data"},
+            {"sourceTempId": "op_5", "sourcePortName": "RecordId", "targetTempId": "op_6", "targetPortName": "Text"}
           ],
           "parametersNeedingReview": {
-            "op_4": ["MinArea", "MaxArea"],
-            "op_6": ["ConnectionString", "TableName"]
+            "op_5": ["ConnectionString", "TableName"]
           }
         }
         """;

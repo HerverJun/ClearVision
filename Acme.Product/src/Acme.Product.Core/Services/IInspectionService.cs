@@ -80,10 +80,12 @@ public interface IInspectionService
     /// <param name="endTime">结束时间</param>
     /// <param name="pageIndex">页码</param>
     /// <param name="pageSize">每页大小</param>
-    Task<IEnumerable<InspectionResult>> GetInspectionHistoryAsync(
+    Task<InspectionHistoryPage> GetInspectionHistoryAsync(
         Guid projectId,
         DateTime? startTime = null,
         DateTime? endTime = null,
+        string? status = null,
+        string? defectType = null,
         int pageIndex = 0,
         int pageSize = 20);
 
@@ -96,5 +98,7 @@ public interface IInspectionService
     Task<InspectionStatistics> GetStatisticsAsync(
         Guid projectId,
         DateTime? startTime = null,
-        DateTime? endTime = null);
+        DateTime? endTime = null,
+        string? status = null,
+        string? defectType = null);
 }

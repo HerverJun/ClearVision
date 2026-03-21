@@ -10,6 +10,12 @@ class ResultPanel {
         this.container = document.getElementById(containerId);
         this.results = [];
         this.filteredResults = [];
+        this.projectId = null;
+        this.serverReport = null;
+        this.serverAnalysis = null;
+        this.serverAnalysisSource = 'local';
+        this._analyticsRefreshTimer = null;
+        this._historyRefreshTimer = null;
         this.statistics = {
             total: 0,
             ok: 0,
@@ -22,6 +28,10 @@ class ResultPanel {
         this.currentPage = 1;
         this.pageSize = 12;
         this.totalPages = 1;
+        this.totalResultCount = 0;
+        this.serverPageIndex = 0;
+        this.serverPaged = false;
+        this.historyLoader = null;
         
         // 筛选
         this.filters = {
@@ -106,30 +116,347 @@ class ResultPanel {
      */
     setTimeRange(range) {
         this.timeRange = range;
-        const now = new Date();
+        const { startTime, endTime } = this.getTimeRangeBounds(range);
+        this.filters.startTime = startTime;
+        this.filters.endTime = endTime;
+        this.currentPage = 1;
         
+        this.applyFilters();
+        this.render();
+
+        if (this.projectId && this.historyLoader) {
+            this.requestHistoryPage(0).catch(error => {
+                console.warn('[ResultPanel] 刷新服务端历史失败:', error);
+            });
+        }
+
+        if (this.projectId) {
+            this.loadServerAnalytics().catch(error => {
+                console.warn('[ResultPanel] 刷新服务端分析失败:', error);
+            });
+        }
+    }
+    getTimeRangeBounds(range = this.timeRange) {
+        const now = new Date();
+
         switch (range) {
             case 'today':
-                this.filters.startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                this.filters.endTime = now;
-                break;
-            case 'week':
+                return {
+                    startTime: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+                    endTime: now
+                };
+            case 'week': {
                 const weekStart = new Date(now);
                 weekStart.setDate(now.getDate() - now.getDay());
                 weekStart.setHours(0, 0, 0, 0);
-                this.filters.startTime = weekStart;
-                this.filters.endTime = now;
-                break;
+                return {
+                    startTime: weekStart,
+                    endTime: now
+                };
+            }
             case 'month':
-                this.filters.startTime = new Date(now.getFullYear(), now.getMonth(), 1);
-                this.filters.endTime = now;
-                break;
+                return {
+                    startTime: new Date(now.getFullYear(), now.getMonth(), 1),
+                    endTime: now
+                };
             case 'custom':
-                // 保持当前筛选或重置
-                break;
+                return {
+                    startTime: this.filters.startTime,
+                    endTime: this.filters.endTime
+                };
+            default:
+                return {
+                    startTime: null,
+                    endTime: null
+                };
         }
-        
-        this.applyFilters();
+    }
+
+    setProjectContext(projectId) {
+        const normalizedProjectId = projectId || null;
+        if (this.projectId !== normalizedProjectId) {
+            this.projectId = normalizedProjectId;
+            this.serverReport = null;
+            this.serverAnalysis = null;
+            this.serverAnalysisSource = 'local';
+            this.totalResultCount = 0;
+            this.serverPageIndex = 0;
+            this.serverPaged = false;
+        }
+    }
+
+    setHistoryLoader(loader) {
+        this.historyLoader = typeof loader === 'function' ? loader : null;
+    }
+
+    hasLocalPageFilters() {
+        return !this.serverPaged && (this.filters.status !== 'all' || this.filters.defectType !== 'all');
+    }
+
+    isServerPaginationActive() {
+        return this.serverPaged && !this.hasLocalPageFilters();
+    }
+
+    isClientFilteringServerPage() {
+        return this.serverPaged && this.hasLocalPageFilters();
+    }
+
+    getVisiblePageResults() {
+        return this.serverPaged
+            ? this.filteredResults
+            : this.filteredResults.slice(
+                (this.currentPage - 1) * this.pageSize,
+                Math.min(this.currentPage * this.pageSize, this.filteredResults.length)
+            );
+    }
+
+    getResultsScopeSummary(pageResults = this.getVisiblePageResults()) {
+        if (this.isClientFilteringServerPage()) {
+            return `当前仅筛选已加载页：本页命中 ${this.filteredResults.length} 条，未覆盖其余 ${Math.max(this.totalResultCount - pageResults.length, 0)} 条历史记录`;
+        }
+
+        if (this.serverPaged) {
+            return `当前页 ${pageResults.length} 条 / 共 ${this.totalResultCount} 条记录`;
+        }
+
+        return `共 ${this.filteredResults.length} 条记录`;
+    }
+
+    requestHistoryPage(pageIndex = 0) {
+        if (!this.historyLoader || !this.projectId) {
+            return Promise.resolve(false);
+        }
+
+        return this.historyLoader({
+            pageIndex,
+            pageSize: this.pageSize,
+            ...this.getAnalyticsQueryParams()
+        });
+    }
+    getAnalyticsQueryParams() {
+        const { startTime, endTime } = this.getTimeRangeBounds(this.timeRange);
+        const params = {};
+
+        if (startTime instanceof Date && !Number.isNaN(startTime.getTime())) {
+            params.startTime = startTime.toISOString();
+        }
+
+        if (endTime instanceof Date && !Number.isNaN(endTime.getTime())) {
+            params.endTime = endTime.toISOString();
+        }
+
+        if (this.filters.status && this.filters.status !== 'all') {
+            params.status = this.filters.status;
+        }
+
+        if (this.filters.defectType && this.filters.defectType !== 'all') {
+            params.defectType = this.filters.defectType;
+        }
+
+        return params;
+    }
+
+    queueServerAnalyticsRefresh(delayMs = 800) {
+        if (!this.projectId) {
+            return;
+        }
+
+        if (this._analyticsRefreshTimer) {
+            clearTimeout(this._analyticsRefreshTimer);
+        }
+
+        this._analyticsRefreshTimer = window.setTimeout(() => {
+            this._analyticsRefreshTimer = null;
+            this.loadServerAnalytics().catch(error => {
+                console.warn('[ResultPanel] Server analytics refresh failed:', error);
+            });
+        }, delayMs);
+    }
+
+    queueServerHistoryRefresh(delayMs = 400) {
+        if (!this.projectId || !this.historyLoader) {
+            return;
+        }
+
+        if (this._historyRefreshTimer) {
+            clearTimeout(this._historyRefreshTimer);
+        }
+
+        this._historyRefreshTimer = window.setTimeout(() => {
+            this._historyRefreshTimer = null;
+            this.requestHistoryPage(0).catch(error => {
+                console.warn('[ResultPanel] Server history refresh failed:', error);
+            });
+        }, delayMs);
+    }
+
+    normalizeStatistics(statistics) {
+        if (!statistics || typeof statistics !== 'object') {
+            return null;
+        }
+
+        return {
+            total: statistics.totalCount ?? statistics.TotalCount ?? 0,
+            ok: statistics.okCount ?? statistics.OKCount ?? 0,
+            ng: statistics.ngCount ?? statistics.NGCount ?? 0,
+            error: statistics.errorCount ?? statistics.ErrorCount ?? 0,
+            avgTime: Math.round(statistics.averageProcessingTimeMs ?? statistics.AverageProcessingTimeMs ?? 0)
+        };
+    }
+
+    normalizeDefectDistribution(defectDistribution) {
+        const items = defectDistribution?.items || defectDistribution?.Items || [];
+        return items.reduce((accumulator, item) => {
+            const defectType = item.defectType || item.DefectType || '未知';
+            const count = item.count ?? item.Count ?? 0;
+            accumulator[defectType] = count;
+            return accumulator;
+        }, {});
+    }
+
+    normalizeTrendPoints(trend) {
+        const points = trend?.dataPoints || trend?.DataPoints || [];
+        return points.map(point => ({
+            time: new Date(point.timestamp || point.Timestamp || Date.now()),
+            status: (point.ngCount ?? point.NGCount ?? 0) > 0
+                ? 'NG'
+                : ((point.errorCount ?? point.ErrorCount ?? 0) > 0 ? 'Error' : 'OK'),
+            defectCount: point.defectCount ?? point.DefectCount ?? 0
+        }));
+    }
+
+    applyServerAnalysis({ report = null, statistics = null, defectDistribution = null, trend = null } = {}) {
+        const normalizedStatistics = this.normalizeStatistics(
+            report?.summary || report?.Summary || statistics
+        );
+        const normalizedDefects = this.normalizeDefectDistribution(
+            report?.defectDistribution || report?.DefectDistribution || defectDistribution
+        );
+        const normalizedTrend = this.normalizeTrendPoints(
+            report?.hourlyTrend || report?.HourlyTrend || trend
+        );
+
+        if (normalizedStatistics) {
+            this.statistics = normalizedStatistics;
+        }
+
+        if (Object.keys(normalizedDefects).length > 0) {
+            this.defectTypes = normalizedDefects;
+            this.updateDefectTypeFilter();
+        }
+
+        if (normalizedTrend.length > 0) {
+            this.trendData = normalizedTrend;
+        }
+
+        this.serverReport = report || this.serverReport;
+        this.serverAnalysis = {
+            statistics: normalizedStatistics,
+            defectTypes: normalizedDefects,
+            trendData: normalizedTrend
+        };
+        this.serverAnalysisSource = 'server';
+    }
+
+    async loadServerAnalytics(projectId = this.projectId) {
+        if (!projectId) {
+            return;
+        }
+
+        const commonParams = this.getAnalyticsQueryParams();
+
+        const reportPromise = httpClient.get(`/analysis/report/${projectId}`, commonParams)
+            .catch(error => {
+                console.warn('[ResultPanel] Failed to load analysis report:', error);
+                return null;
+            });
+
+        const statisticsPromise = httpClient.get(`/analysis/statistics/${projectId}`, commonParams)
+            .catch(error => {
+                console.warn('[ResultPanel] Failed to load statistics:', error);
+                return null;
+            });
+        const defectDistributionPromise = httpClient.get(`/analysis/defect-distribution/${projectId}`, commonParams)
+            .catch(error => {
+                console.warn('[ResultPanel] 获取缺陷分布失败:', error);
+                return null;
+            });
+
+        const trendPromise = commonParams.startTime && commonParams.endTime
+            ? httpClient.get(`/analysis/trend/${projectId}`, {
+                interval: this.timeRange === 'today' ? 'Hour' : 'Day',
+                startTime: commonParams.startTime,
+                endTime: commonParams.endTime
+            }).catch(error => {
+                console.warn('[ResultPanel] 获取趋势分析失败:', error);
+                return null;
+            })
+            : Promise.resolve(null);
+
+        const [report, statistics, defectDistribution, trend] = await Promise.all([
+            reportPromise,
+            statisticsPromise,
+            defectDistributionPromise,
+            trendPromise
+        ]);
+
+        if (report || statistics || defectDistribution || trend) {
+            this.applyServerAnalysis({ report, statistics, defectDistribution, trend });
+            this.render();
+            return;
+        }
+
+        if (this.serverPaged) {
+            this.serverReport = null;
+            this.serverAnalysis = null;
+            this.serverAnalysisSource = 'server-unavailable';
+            this.statistics = {
+                total: 0,
+                ok: 0,
+                ng: 0,
+                error: 0,
+                avgTime: 0
+            };
+            this.defectTypes = {};
+            this.trendData = [];
+            this.updateDefectTypeFilter();
+            this.render();
+            return;
+        }
+
+        this.serverAnalysisSource = 'local';
+
+        if (statistics) {
+            this.statistics = {
+                total: statistics.totalCount ?? statistics.TotalCount ?? this.statistics.total,
+                ok: statistics.okCount ?? statistics.OKCount ?? this.statistics.ok,
+                ng: statistics.ngCount ?? statistics.NGCount ?? this.statistics.ng,
+                error: statistics.errorCount ?? statistics.ErrorCount ?? this.statistics.error,
+                avgTime: Math.round(statistics.averageProcessingTimeMs ?? statistics.AverageProcessingTimeMs ?? this.statistics.avgTime ?? 0)
+            };
+        }
+
+        if (defectDistribution?.items || defectDistribution?.Items) {
+            const items = defectDistribution.items || defectDistribution.Items || [];
+            this.defectTypes = items.reduce((accumulator, item) => {
+                const defectType = item.defectType || item.DefectType || '未知';
+                const count = item.count ?? item.Count ?? 0;
+                accumulator[defectType] = count;
+                return accumulator;
+            }, {});
+        }
+
+        if (trend?.dataPoints || trend?.DataPoints) {
+            const points = trend.dataPoints || trend.DataPoints || [];
+            this.trendData = points.map(point => ({
+                time: new Date(point.timestamp || point.Timestamp || Date.now()),
+                status: (point.ngCount ?? point.NGCount ?? 0) > 0
+                    ? 'NG'
+                    : ((point.errorCount ?? point.ErrorCount ?? 0) > 0 ? 'Error' : 'OK'),
+                defectCount: point.defectCount ?? point.DefectCount ?? 0
+            }));
+        }
+
         this.render();
     }
     
@@ -146,6 +473,14 @@ class ResultPanel {
      * 添加结果
      */
     addResult(result) {
+        if (this.serverPaged) {
+            if (this.projectId) {
+                this.queueServerHistoryRefresh();
+                this.queueServerAnalyticsRefresh();
+            }
+            return;
+        }
+
         this.results.unshift(result);
         this.applyFilters();
         
@@ -183,21 +518,35 @@ class ResultPanel {
                 this.defectTypes[type] = (this.defectTypes[type] || 0) + 1;
             });
         }
-        
+
+        if (this.projectId) {
+            this.queueServerAnalyticsRefresh();
+        }
+
         this.render();
     }
     
     /**
      * 加载历史结果
      */
-    loadResults(results, total = null) {
-        this.results = results;
+    loadResults(results, { totalCount = null, pageIndex = 0, pageSize = this.pageSize, serverPaged = false } = {}) {
+        this.results = Array.isArray(results) ? results : [];
+        this.serverPaged = !!serverPaged;
+        this.serverPageIndex = Math.max(0, pageIndex);
+        this.pageSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : this.pageSize;
+        this.totalResultCount = Number.isFinite(totalCount) ? totalCount : this.results.length;
+        this.currentPage = this.serverPaged ? this.serverPageIndex + 1 : 1;
         this.applyFilters();
-        this.calculateStatistics();
-        this.updateTrendData();
+
+        if (!this.serverPaged) {
+            this.calculateStatistics();
+            this.updateTrendData();
+        } else if (this.serverAnalysisSource === 'server') {
+            this.updateDefectTypeFilter();
+        }
+
         this.render();
     }
-    
     /**
      * 计算统计
      */
@@ -263,6 +612,13 @@ class ResultPanel {
     }
     
     applyFilters() {
+        if (this.serverPaged) {
+            this.filteredResults = [...this.results];
+            this.totalPages = Math.ceil(this.totalResultCount / this.pageSize) || 1;
+            this.currentPage = this.serverPageIndex + 1;
+            return;
+        }
+
         this.filteredResults = this.results.filter(r => {
             // 状态筛选
             if (this.filters.status !== 'all' && r.status?.toLowerCase() !== this.filters.status) {
@@ -294,11 +650,9 @@ class ResultPanel {
             
             return true;
         });
-        
-        // 重新计算总页数
+
         this.totalPages = Math.ceil(this.filteredResults.length / this.pageSize) || 1;
         
-        // 确保当前页有效
         if (this.currentPage > this.totalPages) {
             this.currentPage = this.totalPages;
         }
@@ -310,6 +664,16 @@ class ResultPanel {
     setFilter(type, value) {
         this.filters[type] = value;
         this.currentPage = 1;
+        if (this.serverPaged && this.projectId) {
+            this.requestHistoryPage(0).catch(error => {
+                console.warn('[ResultPanel] 刷新服务端历史失败:', error);
+            });
+            this.loadServerAnalytics().catch(error => {
+                console.warn('[ResultPanel] 刷新服务端分析失败:', error);
+            });
+            return;
+        }
+
         this.applyFilters();
         this.render();
     }
@@ -319,6 +683,14 @@ class ResultPanel {
      */
     goToPage(page) {
         if (page < 1 || page > this.totalPages) return;
+
+        if (this.isServerPaginationActive()) {
+            this.requestHistoryPage(page - 1).catch(error => {
+                console.warn('[ResultPanel] 翻页加载服务端历史失败:', error);
+            });
+            return;
+        }
+
         this.currentPage = page;
         this.render();
     }
@@ -332,9 +704,43 @@ class ResultPanel {
         this.trendData = [];
         this.defectTypes = {};
         this.statistics = { total: 0, ok: 0, ng: 0, error: 0, avgTime: 0 };
+        this.serverReport = null;
+        this.serverAnalysis = null;
+        this.serverAnalysisSource = 'local';
+        if (this._analyticsRefreshTimer) {
+            clearTimeout(this._analyticsRefreshTimer);
+            this._analyticsRefreshTimer = null;
+        }
+        if (this._historyRefreshTimer) {
+            clearTimeout(this._historyRefreshTimer);
+            this._historyRefreshTimer = null;
+        }
+        this.totalResultCount = 0;
+        this.serverPageIndex = 0;
+        this.serverPaged = false;
         this.currentPage = 1;
         this.applyFilters();
         this.render();
+    }
+
+    getResultImageSrc(result) {
+        if (!result) {
+            return '';
+        }
+
+        if (result.imageUrl) {
+            return result.imageUrl;
+        }
+
+        if (result.imageId) {
+            return httpClient.buildRequestUrl(`/images/${result.imageId}`);
+        }
+
+        if (result.imageData) {
+            return `data:image/png;base64,${result.imageData}`;
+        }
+
+        return '';
     }
     
     /**
@@ -526,30 +932,29 @@ class ResultPanel {
         const gridContainer = document.getElementById('results-grid');
         const countInfo = document.getElementById('results-count-info');
         if (!gridContainer) return;
-        
+
+        const pageResults = this.getVisiblePageResults();
+
         if (countInfo) {
-            countInfo.textContent = `共 ${this.filteredResults.length} 条记录`;
+            countInfo.textContent = this.getResultsScopeSummary(pageResults);
         }
-        
-        if (this.filteredResults.length === 0) {
-            gridContainer.innerHTML = '<p class="empty-text">暂无检测结果</p>';
+
+        if (pageResults.length === 0) {
+            const emptyText = this.isClientFilteringServerPage()
+                ? '当前页未命中筛选条件。当前筛选只作用于已加载页，可调整时间范围后重新翻页加载。'
+                : '暂无检测结果';
+            gridContainer.innerHTML = `<p class="empty-text">${emptyText}</p>`;
             return;
         }
-        
-        // 计算当前页的数据
-        const startIndex = (this.currentPage - 1) * this.pageSize;
-        const endIndex = Math.min(startIndex + this.pageSize, this.filteredResults.length);
-        const pageResults = this.filteredResults.slice(startIndex, endIndex);
-        
+
         gridContainer.innerHTML = pageResults.map((result, index) => {
             const statusClass = result.status?.toLowerCase() || 'unknown';
             const time = result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : '--:--:--';
             const processingTime = result.processingTime || result.executionTimeMs || '--';
-            const globalIndex = startIndex + index;
-            const outputDataHtml = this.renderOutputDataPreview(result.outputData);
-            
+            const outputDataHtml = this.renderAnalysisDataPreview(result.analysisData);
+
             return `
-                <div class="result-card result-${statusClass}" data-index="${globalIndex}" style="cursor:pointer;">
+                <div class="result-card result-${statusClass}" data-index="${index}" style="cursor:pointer;">
                     <div class="result-card-header">
                         <span class="result-status-badge ${statusClass}">${result.status || 'Unknown'}</span>
                         <span class="result-time">${time}</span>
@@ -562,12 +967,11 @@ class ResultPanel {
                 </div>
             `;
         }).join('');
-        
-        // 绑定点击事件
+
         gridContainer.querySelectorAll('.result-card').forEach(card => {
             card.addEventListener('click', (e) => {
-                const index = parseInt(e.currentTarget.dataset.index);
-                const result = this.filteredResults[index];
+                const index = parseInt(e.currentTarget.dataset.index, 10);
+                const result = pageResults[index];
                 if (result) {
                     this.showResultDetail(result);
                 }
@@ -581,6 +985,15 @@ class ResultPanel {
     renderPagination() {
         const paginationContainer = document.getElementById('results-pagination');
         if (!paginationContainer) return;
+
+        if (this.isClientFilteringServerPage()) {
+            paginationContainer.innerHTML = `
+                <div class="empty-text" style="margin:0; text-align:center;">
+                    当前筛选仅作用于已加载页，分页已暂停以避免误认为正在筛选全量历史。
+                </div>
+            `;
+            return;
+        }
         
         if (this.totalPages <= 1) {
             paginationContainer.innerHTML = '';
@@ -633,23 +1046,49 @@ class ResultPanel {
      * 导出结果
      */
     exportResults(format = 'json') {
+        if (this.isClientFilteringServerPage()) {
+            window.alert('当前导出仅包含已加载页中的筛选结果，并非全量历史记录。');
+        }
+
+        const exportContext = this.getExportPayload(format);
+        if (exportContext) {
+            const blob = new Blob([exportContext.content], { type: exportContext.mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = exportContext.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            return;
+        }
+
+        if (this.projectId && this.serverPaged) {
+            window.alert('服务端报告尚未就绪，当前结果页不再回退导出本地页数据。请稍后重试或先确认服务端分析链路正常。');
+            return;
+        }
+
         if (this.filteredResults.length === 0) {
             alert('没有可导出的结果');
             return;
         }
         
         let content, filename, mimeType;
+        const filenamePrefix = this.isClientFilteringServerPage()
+            ? 'inspection_results_current_page'
+            : 'inspection_results';
         
         switch (format) {
             case 'json':
                 content = JSON.stringify(this.filteredResults, null, 2);
-                filename = `inspection_results_${Date.now()}.json`;
+                filename = `${filenamePrefix}_${Date.now()}.json`;
                 mimeType = 'application/json';
                 break;
             case 'csv':
             case 'excel':
                 content = this.convertToCSV(this.filteredResults);
-                filename = `inspection_results_${Date.now()}.csv`;
+                filename = `${filenamePrefix}_${Date.now()}.csv`;
                 mimeType = 'text/csv';
                 break;
             default:
@@ -670,6 +1109,31 @@ class ResultPanel {
     /**
      * 转换为 CSV
      */
+    getExportPayload(format = 'json') {
+        const timestamp = Date.now();
+        const report = this.serverReport;
+
+        if (report && this.projectId) {
+            if (format === 'json') {
+                return {
+                    content: JSON.stringify(report, null, 2),
+                    filename: `inspection_report_${timestamp}.json`,
+                    mimeType: 'application/json'
+                };
+            }
+
+            if (format === 'csv' || format === 'excel') {
+                return {
+                    content: this.convertReportToCSV(report),
+                    filename: `inspection_report_${timestamp}.csv`,
+                    mimeType: 'text/csv'
+                };
+            }
+        }
+
+        return null;
+    }
+
     convertToCSV(results) {
         const headers = ['时间', '状态', '缺陷数', '处理时间(ms)', '置信度'];
         const rows = results.map(r => [
@@ -686,6 +1150,47 @@ class ResultPanel {
     /**
      * 显示结果详情
      */
+    convertReportToCSV(report) {
+        const summary = report?.summary || report?.Summary || {};
+        const period = report?.period || report?.Period || {};
+        const recommendations = report?.recommendations || report?.Recommendations || [];
+        const defectItems = report?.defectDistribution?.items
+            || report?.defectDistribution?.Items
+            || report?.DefectDistribution?.Items
+            || [];
+        const trendItems = report?.hourlyTrend?.dataPoints
+            || report?.hourlyTrend?.DataPoints
+            || report?.HourlyTrend?.DataPoints
+            || [];
+
+        const lines = [
+            'Section,Key,Value',
+            `Summary,ProjectId,${report?.projectId || report?.ProjectId || this.projectId || ''}`,
+            `Summary,GeneratedAt,${report?.generatedAt || report?.GeneratedAt || ''}`,
+            `Summary,StartTime,${period.startTime || period.StartTime || ''}`,
+            `Summary,EndTime,${period.endTime || period.EndTime || ''}`,
+            `Summary,TotalCount,${summary.totalCount ?? summary.TotalCount ?? 0}`,
+            `Summary,OKCount,${summary.okCount ?? summary.OKCount ?? 0}`,
+            `Summary,NGCount,${summary.ngCount ?? summary.NGCount ?? 0}`,
+            `Summary,ErrorCount,${summary.errorCount ?? summary.ErrorCount ?? 0}`,
+            `Summary,AverageProcessingTimeMs,${summary.averageProcessingTimeMs ?? summary.AverageProcessingTimeMs ?? 0}`
+        ];
+
+        defectItems.forEach(item => {
+            lines.push(`DefectDistribution,${item.defectType || item.DefectType || '未知'},${item.count ?? item.Count ?? 0}`);
+        });
+
+        trendItems.forEach(point => {
+            lines.push(`Trend,${point.timestamp || point.Timestamp || ''},${point.totalCount ?? point.TotalCount ?? 0}`);
+        });
+
+        recommendations.forEach((recommendation, index) => {
+            lines.push(`Recommendation,${index + 1},"${String(recommendation).replace(/"/g, '""')}"`);
+        });
+
+        return lines.join('\n');
+    }
+
     showResultDetail(result) {
         console.log('[ResultPanel] 查看结果详情:', result);
         
@@ -695,6 +1200,7 @@ class ResultPanel {
         const statusClass = result.status?.toLowerCase() || 'unknown';
         const time = result.timestamp ? new Date(result.timestamp).toLocaleString() : '--';
         const processingTime = result.processingTime || result.executionTimeMs || '--';
+        const imageSrc = this.getResultImageSrc(result);
         
         modal.innerHTML = `
             <div class="result-detail-overlay"></div>
@@ -705,13 +1211,14 @@ class ResultPanel {
                     <button class="result-detail-close">✕</button>
                 </div>
                 <div class="result-detail-body">
-                    ${result.imageData ? `<div class="result-detail-image"><img src="data:image/png;base64,${result.imageData}" alt="检测结果图像" /></div>` : ''}
+                    ${imageSrc ? `<div class="result-detail-image"><img src="${imageSrc}" alt="检测结果图像" /></div>` : ''}
                     <div class="result-detail-data">
                         <div class="detail-section">
                             <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value status-${statusClass}">${result.status || '--'}</span></div>
                             <div class="detail-item"><span class="detail-label">时间</span><span class="detail-value">${time}</span></div>
                             <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${processingTime}ms</span></div>
                         </div>
+                        ${this.renderAnalysisDataSection(result.analysisData)}
                         ${this.renderOutputDataTable(result.outputData)}
                         ${result.defects?.length > 0 ? `
                             <div class="detail-section">
@@ -741,39 +1248,20 @@ class ResultPanel {
         modal.querySelector('.result-detail-overlay').addEventListener('click', closeModal);
     }
     
-    /**
-     * 渲染输出数据预览（卡片内简略展示）
-     */
-    renderOutputDataPreview(outputData) {
-        if (!outputData || typeof outputData !== 'object' || Object.keys(outputData).length === 0) return '';
-        
-        const items = [];
-        for (const [key, value] of Object.entries(outputData)) {
-            // 跳过 Image 类型的数据（已在缩略图中展示）
-            if (key === 'Image' || key === 'image') continue;
-            // 跳过超长字符串（可能是 base64 图像数据）
-            if (typeof value === 'string' && value.length > 500) continue;
-            
-            if (typeof value === 'string') {
-                items.push(`<div class="output-data-item output-text">
-                    <span class="output-label">${this.escapeHtml(key)}</span>
-                    <span class="output-value" title="${this.escapeHtml(value)}">${this.escapeHtml(value.length > 30 ? value.substring(0, 30) + '...' : value)}</span>
-                </div>`);
-            } else if (typeof value === 'number') {
-                items.push(`<div class="output-data-item output-number">
-                    <span class="output-label">${this.escapeHtml(key)}</span>
-                    <span class="output-value">${Number.isInteger(value) ? value : value.toFixed(3)}</span>
-                </div>`);
-            } else if (typeof value === 'boolean') {
-                items.push(`<div class="output-data-item output-boolean">
-                    <span class="output-label">${this.escapeHtml(key)}</span>
-                    <span class="output-value ${value ? 'bool-true' : 'bool-false'}">${value ? '✓' : '✗'}</span>
-                </div>`);
-            }
-            
-            if (items.length >= 3) break;  // 卡片内最多展示3条
+    renderAnalysisDataPreview(analysisData) {
+        const cards = Array.isArray(analysisData?.cards) ? analysisData.cards : [];
+        if (cards.length === 0) {
+            return '';
         }
-        
+
+        const items = cards.slice(0, 3).map(card => {
+            const summary = this.getAnalysisCardSummary(card);
+            return `<div class="output-data-item output-text">
+                <span class="output-label">${this.escapeHtml(card.title || card.category || '分析卡片')}</span>
+                <span class="output-value" title="${this.escapeHtml(summary)}">${this.escapeHtml(summary.length > 30 ? summary.substring(0, 30) + '...' : summary)}</span>
+            </div>`;
+        });
+
         return items.length > 0 ? `<div class="output-data-preview">${items.join('')}</div>` : '';
     }
     
@@ -784,9 +1272,12 @@ class ResultPanel {
         if (!outputData || typeof outputData !== 'object' || Object.keys(outputData).length === 0) return '';
         
         const rows = [];
+        let hiddenCount = 0;
         for (const [key, value] of Object.entries(outputData)) {
-            if (key === 'Image' || key === 'image') continue;
-            if (typeof value === 'string' && value.length > 500) continue;
+            if (this.shouldHideOutputDetailEntry(key, value, outputData)) {
+                hiddenCount += 1;
+                continue;
+            }
             
             let displayValue = '';
             let typeClass = '';
@@ -811,8 +1302,145 @@ class ResultPanel {
             rows.push(`<div class="detail-item ${typeClass}"><span class="detail-label">${this.escapeHtml(key)}</span><span class="detail-value">${displayValue}</span></div>`);
         }
         
-        if (rows.length === 0) return '';
-        return `<div class="detail-section"><div class="detail-section-title">算子输出数据</div>${rows.join('')}</div>`;
+        if (rows.length === 0 && hiddenCount === 0) return '';
+
+        const hiddenNotice = hiddenCount > 0
+            ? `<div class="detail-item type-null"><span class="detail-label">说明</span><span class="detail-value">已隐藏 ${hiddenCount} 个导出/技术字段</span></div>`
+            : '';
+
+        return `<div class="detail-section"><div class="detail-section-title">原始输出数据（调试）</div>${rows.join('')}${hiddenNotice}</div>`;
+    }
+
+    renderAnalysisDataSection(analysisData) {
+        const cards = Array.isArray(analysisData?.cards) ? analysisData.cards : [];
+        if (cards.length === 0) {
+            return '';
+        }
+
+        const sections = cards.map(card => {
+            const fields = Array.isArray(card?.fields) ? card.fields : [];
+            const rows = fields.map(field => `<div class="detail-item">
+                <span class="detail-label">${this.escapeHtml(field.label || field.key || '--')}</span>
+                <span class="detail-value">${this.escapeHtml(this.formatAnalysisFieldValue(field.value))}${field.unit ? ` ${this.escapeHtml(field.unit)}` : ''}</span>
+            </div>`).join('');
+
+            return `
+                <div class="detail-section">
+                    <div class="detail-section-title">${this.escapeHtml(card.title || card.category || '分析卡片')}</div>
+                    ${rows || '<div class="detail-item"><span class="detail-label">内容</span><span class="detail-value">--</span></div>'}
+                </div>
+            `;
+        }).join('');
+
+        return sections;
+    }
+
+    getAnalysisCardSummary(card) {
+        const fields = Array.isArray(card?.fields) ? card.fields : [];
+        const firstField = fields.find(field => field && field.value !== undefined && field.value !== null);
+        if (!firstField) {
+            return card?.status || '--';
+        }
+
+        const label = firstField.label || firstField.key || '值';
+        const value = this.formatAnalysisFieldValue(firstField.value);
+        return `${label}: ${value}`;
+    }
+
+    formatAnalysisFieldValue(value) {
+        if (typeof value === 'number') {
+            return Number.isInteger(value) ? String(value) : value.toFixed(3);
+        }
+
+        if (typeof value === 'boolean') {
+            return value ? 'True' : 'False';
+        }
+
+        if (value === null || value === undefined) {
+            return '--';
+        }
+
+        if (typeof value === 'object') {
+            return JSON.stringify(value);
+        }
+
+        return String(value);
+    }
+
+    isMeaningfulRecognitionText(value, outputData, sourceKey = '') {
+        if (typeof value !== 'string') {
+            return false;
+        }
+
+        const text = value.trim();
+        if (!text || text.length >= 200) {
+            return false;
+        }
+
+        return !this.isStructuredExportText(text, outputData, sourceKey);
+    }
+
+    isStructuredExportText(value, outputData, sourceKey = '') {
+        const text = String(value || '').trim();
+        if (!text) {
+            return false;
+        }
+
+        if (this.isExportMetadataKey(sourceKey)) {
+            return true;
+        }
+
+        const looksLikeStructuredPayload =
+            (text.startsWith('{') && text.endsWith('}')) ||
+            (text.startsWith('[') && text.endsWith(']'));
+        if (!looksLikeStructuredPayload) {
+            return false;
+        }
+
+        const exportHintKeys = ['Format', 'format', 'SaveToFile', 'saveToFile', 'Output', 'output', 'FilePath', 'filePath', 'SaveError', 'saveError'];
+        const hasExportHints = Object.keys(outputData || {}).some(key => exportHintKeys.includes(key));
+        if (hasExportHints) {
+            return true;
+        }
+
+        return text.includes('"Format"')
+            || text.includes('"SaveToFile"')
+            || text.includes('"FilePath"')
+            || text.includes('"SaveError"');
+    }
+
+    isExportMetadataKey(key) {
+        return [
+            'format',
+            'savetofile',
+            'output',
+            'filepath',
+            'saveerror',
+            'success'
+        ].includes(String(key || '').toLowerCase());
+    }
+
+    shouldHideOutputDetailEntry(key, value, outputData) {
+        const normalizedKey = String(key || '').toLowerCase();
+        if (normalizedKey === 'image') {
+            return true;
+        }
+
+        if (this.isExportMetadataKey(normalizedKey)) {
+            return true;
+        }
+
+        if (typeof value === 'string') {
+            if (value.length > 500) {
+                return true;
+            }
+
+            if (this.isStructuredExportText(value, outputData, key)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     /**
@@ -844,3 +1472,4 @@ let resultPanel = null;
 
 export default ResultPanel;
 export { ResultPanel };
+

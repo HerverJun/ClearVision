@@ -4,6 +4,7 @@
 // 生命周期：Scoped（无状态，不保存运行时状态）
 // 作者：蘅芜君 + 架构修复方案 v2
 
+using Acme.Product.Application.Analysis;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Exceptions;
@@ -11,7 +12,6 @@ using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 using System.Collections;
-using System.Text.Json;
 
 // 【架构修复 v2】IInspectionWorker 从 Infrastructure 移到 Core
 
@@ -32,6 +32,8 @@ public class InspectionService : IInspectionService
     private readonly IConfigurationService _configurationService;
     private readonly IInspectionRuntimeCoordinator _coordinator;
     private readonly IInspectionWorker _worker;
+    private readonly IImageCacheRepository _imageCacheRepository;
+    private readonly IAnalysisDataBuilder _analysisDataBuilder;
     private readonly ILogger<InspectionService> _logger;
 
     public InspectionService(
@@ -42,6 +44,8 @@ public class InspectionService : IInspectionService
         IConfigurationService configurationService,
         IInspectionRuntimeCoordinator coordinator,
         IInspectionWorker worker,
+        IImageCacheRepository imageCacheRepository,
+        IAnalysisDataBuilder analysisDataBuilder,
         ILogger<InspectionService> logger)
     {
         _resultRepository = resultRepository;
@@ -51,7 +55,80 @@ public class InspectionService : IInspectionService
         _configurationService = configurationService;
         _coordinator = coordinator;
         _worker = worker;
+        _imageCacheRepository = imageCacheRepository;
+        _analysisDataBuilder = analysisDataBuilder;
         _logger = logger;
+    }
+
+    public InspectionService(
+        IInspectionResultRepository resultRepository,
+        IProjectRepository projectRepository,
+        IFlowExecutionService flowExecutionService,
+        IImageAcquisitionService imageAcquisitionService,
+        IConfigurationService configurationService,
+        IInspectionRuntimeCoordinator coordinator,
+        IInspectionWorker worker,
+        IImageCacheRepository imageCacheRepository,
+        ILogger<InspectionService> logger)
+        : this(
+            resultRepository,
+            projectRepository,
+            flowExecutionService,
+            imageAcquisitionService,
+            configurationService,
+            coordinator,
+            worker,
+            imageCacheRepository,
+            new AnalysisDataBuilder(),
+            logger)
+    {
+    }
+
+    public InspectionService(
+        IInspectionResultRepository resultRepository,
+        IProjectRepository projectRepository,
+        IFlowExecutionService flowExecutionService,
+        IImageAcquisitionService imageAcquisitionService,
+        IConfigurationService configurationService,
+        IInspectionRuntimeCoordinator coordinator,
+        IInspectionWorker worker,
+        IAnalysisDataBuilder analysisDataBuilder,
+        ILogger<InspectionService> logger)
+        : this(
+            resultRepository,
+            projectRepository,
+            flowExecutionService,
+            imageAcquisitionService,
+            configurationService,
+            coordinator,
+            worker,
+            new NoOpImageCacheRepository(),
+            analysisDataBuilder,
+            logger)
+    {
+    }
+
+    public InspectionService(
+        IInspectionResultRepository resultRepository,
+        IProjectRepository projectRepository,
+        IFlowExecutionService flowExecutionService,
+        IImageAcquisitionService imageAcquisitionService,
+        IConfigurationService configurationService,
+        IInspectionRuntimeCoordinator coordinator,
+        IInspectionWorker worker,
+        ILogger<InspectionService> logger)
+        : this(
+            resultRepository,
+            projectRepository,
+            flowExecutionService,
+            imageAcquisitionService,
+            configurationService,
+            coordinator,
+            worker,
+            new NoOpImageCacheRepository(),
+            new AnalysisDataBuilder(),
+            logger)
+    {
     }
 
     #region 单次检测
@@ -128,8 +205,11 @@ public class InspectionService : IInspectionService
                 }
             }
 
-            TrySetOutputDataJson(result, flowResult.OutputData);
+            var analysisData = _analysisDataBuilder.Build(actualFlow, flowResult, status);
+            AnalysisPayloadSerialization.TrySetOutputDataJson(result, flowResult.OutputData, _logger);
+            AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
             await PersistResultImageAsync(result, CancellationToken.None);
+            await CacheResultImageAsync(result);
             await _resultRepository.AddAsync(result);
 
             return result;
@@ -302,22 +382,26 @@ public class InspectionService : IInspectionService
 
     #region 查询方法
 
-    public async Task<IEnumerable<InspectionResult>> GetInspectionHistoryAsync(
-        Guid projectId, DateTime? startTime, DateTime? endTime, int pageIndex, int pageSize)
+    public async Task<InspectionHistoryPage> GetInspectionHistoryAsync(
+        Guid projectId,
+        DateTime? startTime,
+        DateTime? endTime,
+        string? status,
+        string? defectType,
+        int pageIndex,
+        int pageSize)
     {
-        if (startTime.HasValue && endTime.HasValue)
-        {
-            return await _resultRepository.GetByTimeRangeAsync(projectId, startTime.Value, endTime.Value);
-        }
-        else
-        {
-            return await _resultRepository.GetByProjectIdAsync(projectId, pageIndex, pageSize);
-        }
+        return await _resultRepository.GetHistoryPageAsync(projectId, startTime, endTime, status, defectType, pageIndex, pageSize);
     }
 
-    public async Task<InspectionStatistics> GetStatisticsAsync(Guid projectId, DateTime? startTime, DateTime? endTime)
+    public async Task<InspectionStatistics> GetStatisticsAsync(
+        Guid projectId,
+        DateTime? startTime,
+        DateTime? endTime,
+        string? status,
+        string? defectType)
     {
-        return await _resultRepository.GetStatisticsAsync(projectId, startTime, endTime);
+        return await _resultRepository.GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
     }
 
     #endregion
@@ -401,6 +485,28 @@ public class InspectionService : IInspectionService
         }
     }
 
+    private async Task CacheResultImageAsync(InspectionResult result)
+    {
+        if (result.OutputImage == null || result.OutputImage.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var format = GuessImageFormat(result.OutputImage);
+            var imageId = await _imageCacheRepository.AddAsync(result.OutputImage, format);
+            if (imageId != Guid.Empty)
+            {
+                result.SetImageId(imageId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionService] 结果图像缓存失败");
+        }
+    }
+
     private static bool ShouldPersistImage(string? savePolicy, InspectionStatus status)
     {
         var policy = (savePolicy ?? "NgOnly").Trim();
@@ -454,179 +560,32 @@ public class InspectionService : IInspectionService
         return ".bin";
     }
 
-    private void TrySetOutputDataJson(InspectionResult result, Dictionary<string, object>? outputData)
+    private static string GuessImageFormat(byte[] bytes)
     {
-        if (outputData == null || outputData.Count == 0)
-            return;
-
-        var serializableData = BuildSerializableOutputData(outputData);
-        if (serializableData.Count == 0)
-            return;
-
-        try
-        {
-            var json = JsonSerializer.Serialize(serializableData);
-            result.SetOutputDataJson(json);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[InspectionService] 序列化输出数据失败");
-        }
+        return GuessImageExtension(bytes).TrimStart('.');
     }
 
-    private static Dictionary<string, object?> BuildSerializableOutputData(Dictionary<string, object> outputData)
+    private sealed class NoOpImageCacheRepository : IImageCacheRepository
     {
-        var serializable = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var kvp in outputData)
+        public Task<Guid> AddAsync(byte[] imageData, string format)
         {
-            if (IsExcludedOutput(kvp.Key, kvp.Value))
-                continue;
-
-            if (TryConvertOutputValue(kvp.Value, out var converted))
-            {
-                serializable[kvp.Key] = converted;
-            }
+            return Task.FromResult(Guid.Empty);
         }
 
-        return serializable;
-    }
-
-    private static bool IsExcludedOutput(string key, object? value)
-    {
-        if (key.Equals("Image", StringComparison.OrdinalIgnoreCase) ||
-            key.Equals("Defects", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (value is byte[])
-            return true;
-
-        if (value == null)
-            return false;
-
-        return IsKnownImageCarrierType(value.GetType());
-    }
-
-    private static bool TryConvertOutputValue(object? value, out object? converted, int depth = 0)
-    {
-        const int maxDepth = 8;
-        if (depth > maxDepth)
+        public Task<byte[]?> GetAsync(Guid id)
         {
-            converted = value?.ToString();
-            return converted != null;
+            return Task.FromResult<byte[]?>(null);
         }
 
-        if (value == null)
+        public Task DeleteAsync(Guid id)
         {
-            converted = null;
-            return true;
+            return Task.CompletedTask;
         }
 
-        if (IsKnownImageCarrierType(value.GetType()) || value is byte[])
+        public Task CleanExpiredAsync(TimeSpan expiration)
         {
-            converted = null;
-            return false;
+            return Task.CompletedTask;
         }
-
-        if (value is JsonElement jsonElement)
-        {
-            converted = jsonElement;
-            return true;
-        }
-
-        if (IsSimpleValue(value))
-        {
-            converted = value;
-            return true;
-        }
-
-        if (value is IDictionary<string, object> typedDict)
-        {
-            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (k, v) in typedDict)
-            {
-                if (TryConvertOutputValue(v, out var nested, depth + 1))
-                {
-                    dict[k] = nested;
-                }
-            }
-
-            converted = dict;
-            return true;
-        }
-
-        if (value is IDictionary dictionary)
-        {
-            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (DictionaryEntry entry in dictionary)
-            {
-                var key = entry.Key?.ToString();
-                if (string.IsNullOrWhiteSpace(key))
-                    continue;
-
-                if (TryConvertOutputValue(entry.Value, out var nested, depth + 1))
-                {
-                    dict[key] = nested;
-                }
-            }
-
-            converted = dict;
-            return true;
-        }
-
-        if (value is IEnumerable enumerable && value is not string)
-        {
-            var list = new List<object?>();
-            foreach (var item in enumerable)
-            {
-                if (TryConvertOutputValue(item, out var nested, depth + 1))
-                {
-                    list.Add(nested);
-                }
-            }
-
-            converted = list;
-            return true;
-        }
-
-        try
-        {
-            JsonSerializer.Serialize(value);
-            converted = value;
-            return true;
-        }
-        catch
-        {
-            var text = value.ToString();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                converted = null;
-                return false;
-            }
-
-            converted = text;
-            return true;
-        }
-    }
-
-    private static bool IsSimpleValue(object value)
-    {
-        var type = value.GetType();
-        return type.IsPrimitive ||
-               type.IsEnum ||
-               value is string ||
-               value is decimal ||
-               value is DateTime ||
-               value is DateTimeOffset ||
-               value is Guid ||
-               value is TimeSpan;
-    }
-
-    private static bool IsKnownImageCarrierType(Type type)
-    {
-        var fullName = type.FullName;
-        return string.Equals(fullName, "OpenCvSharp.Mat", StringComparison.Ordinal) ||
-               string.Equals(fullName, "Acme.Product.Infrastructure.Operators.ImageWrapper", StringComparison.Ordinal);
     }
 
     #endregion

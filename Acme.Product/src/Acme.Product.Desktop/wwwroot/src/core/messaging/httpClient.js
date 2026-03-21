@@ -121,12 +121,71 @@ class HttpClient {
         }
     }
 
+    get rootBaseUrl() {
+        return this.baseUrl.replace(/\/api\/?$/i, '');
+    }
+
+    normalizePath(url) {
+        const raw = String(url ?? '').trim();
+        if (!raw) {
+            return '/';
+        }
+
+        if (/^https?:\/\//i.test(raw)) {
+            return raw;
+        }
+
+        if (raw.startsWith('//')) {
+            return `${window.location.protocol}${raw}`;
+        }
+
+        let normalized = raw;
+        if (/^\/api(\/|$)/i.test(normalized)) {
+            normalized = normalized.replace(/^\/api(?=\/|$)/i, '') || '/';
+        }
+
+        if (!normalized.startsWith('/')) {
+            normalized = `/${normalized}`;
+        }
+
+        return normalized;
+    }
+
+    appendQueryString(url, queryString) {
+        if (!queryString) {
+            return url;
+        }
+
+        return `${url}${url.includes('?') ? '&' : '?'}${queryString}`;
+    }
+
+    buildRequestUrl(url, params = null, baseUrl = this.baseUrl) {
+        const normalizedPath = this.normalizePath(url);
+        const queryString = params ? new URLSearchParams(params).toString() : '';
+
+        if (/^https?:\/\//i.test(normalizedPath)) {
+            return this.appendQueryString(normalizedPath, queryString);
+        }
+
+        return this.appendQueryString(`${baseUrl}${normalizedPath}`, queryString);
+    }
+
+    buildRootRequestUrl(url, params = null, baseUrl = this.rootBaseUrl) {
+        const normalizedPath = this.normalizePath(url);
+        const queryString = params ? new URLSearchParams(params).toString() : '';
+
+        if (/^https?:\/\//i.test(normalizedPath)) {
+            return this.appendQueryString(normalizedPath, queryString);
+        }
+
+        return this.appendQueryString(`${baseUrl}${normalizedPath}`, queryString);
+    }
+
     /**
      * 发送 GET 请求
      */
     async get(url, params = null) {
-        const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
-        let fullUrl = this.baseUrl + url + queryString;
+        let fullUrl = this.buildRequestUrl(url, params);
 
         console.log(`[HttpClient] GET ${fullUrl}`);
 
@@ -143,7 +202,7 @@ class HttpClient {
                 const discoveredPort = await this.discoverPort();
                 if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
                     console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
-                    fullUrl = `${buildLocalApiBaseUrl(discoveredPort)}${url}${queryString}`;
+                    fullUrl = this.buildRequestUrl(url, params, buildLocalApiBaseUrl(discoveredPort));
                     const response = await fetch(fullUrl, {
                         method: 'GET',
                         headers: this.defaultHeaders
@@ -156,11 +215,43 @@ class HttpClient {
         }
     }
 
+    async getRoot(url, params = null) {
+        let fullUrl = this.buildRootRequestUrl(url, params);
+
+        console.log(`[HttpClient] GET ${fullUrl}`);
+
+        try {
+            const response = await fetch(fullUrl, {
+                method: 'GET',
+                headers: this.defaultHeaders
+            });
+            this.saveSuccessfulPort(this.buildRequestUrl('/health'));
+            return this.handleResponse(response);
+        } catch (error) {
+            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
+                const discoveredPort = await this.discoverPort();
+                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
+                    const discoveredRootBaseUrl = buildLocalApiBaseUrl(discoveredPort).replace(/\/api\/?$/i, '');
+                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试根路径请求...`);
+                    fullUrl = this.buildRootRequestUrl(url, params, discoveredRootBaseUrl);
+                    const response = await fetch(fullUrl, {
+                        method: 'GET',
+                        headers: this.defaultHeaders
+                    });
+                    this.saveSuccessfulPort(buildLocalApiBaseUrl(discoveredPort));
+                    return this.handleResponse(response);
+                }
+            }
+
+            throw this.handleNetworkError(error, fullUrl);
+        }
+    }
+
     /**
      * 发送 POST 请求
      */
     async post(url, data = null) {
-        let fullUrl = this.baseUrl + url;
+        let fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] POST ${fullUrl}`);
 
         try {
@@ -177,7 +268,7 @@ class HttpClient {
                 const discoveredPort = await this.discoverPort();
                 if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
                     console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
-                    fullUrl = `${buildLocalApiBaseUrl(discoveredPort)}${url}`;
+                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
                     const response = await fetch(fullUrl, {
                         method: 'POST',
                         headers: this.defaultHeaders,
@@ -195,7 +286,7 @@ class HttpClient {
      * 发送 POST 请求并接收 Blob 响应
      */
     async postForBlob(url, data = null) {
-        let fullUrl = this.baseUrl + url;
+        let fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] POST (blob) ${fullUrl}`);
 
         try {
@@ -212,7 +303,7 @@ class HttpClient {
                 const discoveredPort = await this.discoverPort();
                 if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
                     console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
-                    fullUrl = `${buildLocalApiBaseUrl(discoveredPort)}${url}`;
+                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
                     const response = await fetch(fullUrl, {
                         method: 'POST',
                         headers: this.defaultHeaders,
@@ -230,7 +321,7 @@ class HttpClient {
      * 发送 PUT 请求
      */
     async put(url, data = null) {
-        const fullUrl = this.baseUrl + url;
+        const fullUrl = this.buildRequestUrl(url);
         const response = await fetch(fullUrl, {
             method: 'PUT',
             headers: this.defaultHeaders,
@@ -243,7 +334,7 @@ class HttpClient {
      * 发送 DELETE 请求
      */
     async delete(url) {
-        const fullUrl = this.baseUrl + url;
+        const fullUrl = this.buildRequestUrl(url);
         const response = await fetch(fullUrl, {
             method: 'DELETE',
             headers: this.defaultHeaders
@@ -300,8 +391,8 @@ class HttpClient {
      */
     async handleBlobResponse(response) {
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || `HTTP ${response.status}`);
+            const error = await this.extractErrorMessage(response);
+            throw new Error(error);
         }
 
         return {
@@ -315,8 +406,8 @@ class HttpClient {
      */
     async handleResponse(response) {
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || `HTTP ${response.status}`);
+            const error = await this.extractErrorMessage(response);
+            throw new Error(error);
         }
 
         const contentType = response.headers.get('content-type');
@@ -325,6 +416,37 @@ class HttpClient {
         }
 
         return await response.text();
+    }
+
+    async extractErrorMessage(response) {
+        const rawBody = (await response.text()).trim();
+        if (!rawBody) {
+            return `HTTP ${response.status}`;
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            try {
+                const payload = JSON.parse(rawBody);
+                if (typeof payload === 'string' && payload.trim()) {
+                    return payload.trim();
+                }
+
+                if (payload && typeof payload === 'object') {
+                    const candidate = payload.error
+                        || payload.Error
+                        || payload.message
+                        || payload.Message;
+                    if (typeof candidate === 'string' && candidate.trim()) {
+                        return candidate.trim();
+                    }
+                }
+            } catch (error) {
+                console.warn('[HttpClient] Failed to parse JSON error payload:', error);
+            }
+        }
+
+        return rawBody;
     }
 }
 

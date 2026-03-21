@@ -5,6 +5,12 @@
 
 import projectManager from './projectManager.js';
 import { showToast, createModal, closeModal, createButton } from '../../shared/components/uiComponents.js';
+import {
+    getFeatureBadge,
+    getFeatureDescription,
+    getFeatureMeta,
+    isFeatureEnabled
+} from '../../shared/featureRegistry.js';
 
 export class ProjectView {
     constructor(containerId) {
@@ -300,9 +306,6 @@ export class ProjectView {
             
             if (project) {
                 showToast(`工程 "${project.name}" 已打开`, 'success');
-                
-                // 触发自定义事件，通知 app.js 切换到流程视图
-                window.dispatchEvent(new CustomEvent('projectOpened', { detail: project }));
             }
         } catch (error) {
             console.error('[ProjectView] 打开工程失败:', error);
@@ -382,6 +385,9 @@ export class ProjectView {
      * 显示新建工程对话框
      */
     showNewProjectDialog() {
+        const demoFeature = getFeatureMeta('project.demoCreation');
+        const demoCreationEnabled = isFeatureEnabled('project.demoCreation');
+        const demoBadge = getFeatureBadge('project.demoCreation');
         const content = document.createElement('div');
         content.className = 'new-project-form';
         content.innerHTML = `
@@ -392,6 +398,24 @@ export class ProjectView {
             <div class="form-group">
                 <label for="new-project-desc">描述</label>
                 <input type="text" id="new-project-desc" class="cv-input" placeholder="可选描述" />
+            </div>
+            <div class="form-group">
+                <label>创建方式</label>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="radio" name="new-project-mode" value="standard" checked />
+                        标准工程
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="radio" name="new-project-mode" value="demo" ${demoCreationEnabled ? '' : 'disabled'} />
+                        示例工程（完整引导） <span class="type-badge">${demoBadge}</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="radio" name="new-project-mode" value="simple-demo" ${demoCreationEnabled ? '' : 'disabled'} />
+                        示例工程（简化版） <span class="type-badge">${demoBadge}</span>
+                    </label>
+                </div>
+                <div style="margin-top:8px; color:var(--text-muted); font-size:12px;">${getFeatureDescription('project.demoCreation', demoFeature.description)}</div>
             </div>
         `;
         
@@ -408,25 +432,56 @@ export class ProjectView {
             onClick: async () => {
                 const nameInput = document.getElementById('new-project-name');
                 const descInput = document.getElementById('new-project-desc');
+                const modeInput = content.querySelector('input[name="new-project-mode"]:checked');
+                const mode = modeInput?.value || 'standard';
                 const name = nameInput?.value?.trim();
                 const desc = descInput?.value?.trim() || '';
                 
-                if (!name) {
+                if ((mode === 'demo' || mode === 'simple-demo') && !demoCreationEnabled) {
+                    showToast(getFeatureDescription('project.demoCreation', '示例工程入口当前不可用'), 'warning');
+                    return;
+                }
+
+                if (mode === 'standard' && !name) {
                     showToast('请输入工程名称', 'warning');
                     nameInput?.focus();
                     return;
                 }
                 
                 try {
-                    const project = await projectManager.createProject(name, desc);
-                    showToast(`工程 "${name}" 已创建`, 'success');
+                    const project = mode === 'demo'
+                        ? await projectManager.createDemoProject('full')
+                        : (mode === 'simple-demo'
+                            ? await projectManager.createDemoProject('simple')
+                            : await projectManager.createProject(name, desc));
+                    const displayName = project?.name || name || '示例工程';
+                    showToast(`工程 "${displayName}" 已创建`, 'success');
                     closeModal(modalOverlay);
-                    
-                    // 触发工程打开事件，切换到流程视图
-                    window.dispatchEvent(new CustomEvent('projectOpened', { detail: project }));
                 } catch (error) {
                     console.error('[ProjectView] 创建工程失败:', error);
                     showToast('创建失败: ' + error.message, 'error');
+                }
+            }
+        });
+
+        const btnGuide = createButton({
+            text: '引导说明',
+            type: 'secondary',
+            onClick: async () => {
+                if (!demoCreationEnabled) {
+                    showToast(getFeatureDescription('project.demoCreation', '示例工程引导当前不可用'), 'warning');
+                    return;
+                }
+
+                try {
+                    const guide = await projectManager.getDemoGuide();
+                    const guideText = typeof guide === 'string'
+                        ? guide
+                        : JSON.stringify(guide, null, 2);
+                    window.alert(guideText);
+                } catch (error) {
+                    console.error('[ProjectView] 获取引导说明失败:', error);
+                    showToast('获取引导说明失败: ' + error.message, 'error');
                 }
             }
         });
@@ -434,7 +489,7 @@ export class ProjectView {
         modalOverlay = createModal({
             title: '新建工程',
             content,
-            footer: [btnCancel, btnCreate],
+            footer: [btnCancel, btnGuide, btnCreate],
             width: '400px'
         });
         

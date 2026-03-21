@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using OpenCvSharp;
 using System.Linq;
+using System.Text.Json;
 
 namespace Acme.Product.Desktop.Endpoints;
 
@@ -47,37 +48,7 @@ public static class ApiEndpoints
         // 图像相关端点
         MapImageEndpoints(app);
 
-        // 手眼标定端点
-        app.MapPost("/api/calibration/solve", async (List<Infrastructure.Services.CalibrationPoint> points, IHandEyeCalibrationService service) =>
-        {
-            var result = await service.SolveAsync(points);
-            return result.Success ? Results.Ok(result) : Results.BadRequest(new { Error = result.Message });
-        });
-
-        app.MapPost("/api/calibration/save", async (SaveCalibrationRequest request, IHandEyeCalibrationService service) =>
-        {
-            var resultObj = new Infrastructure.Services.HandEyeCalibrationResult
-            {
-                Success = true,
-                OriginX = request.OriginX,
-                OriginY = request.OriginY,
-                ScaleX = request.ScaleX,
-                ScaleY = request.ScaleY
-            };
-            var success = await service.SaveCalibrationAsync(resultObj, request.FileName);
-            return success ? Results.Ok(new { Message = "保存成功" }) : Results.BadRequest(new { Error = "保存失败" });
-        });
-
         return app;
-    }
-
-    public class SaveCalibrationRequest
-    {
-        public double OriginX { get; set; }
-        public double OriginY { get; set; }
-        public double ScaleX { get; set; }
-        public double ScaleY { get; set; }
-        public string FileName { get; set; } = string.Empty;
     }
 
     public class OperatorPreviewRequest
@@ -89,6 +60,16 @@ public static class ApiEndpoints
     public class OperatorParameterRecommendationRequest
     {
         public string ImageBase64 { get; set; } = string.Empty;
+    }
+
+    public class TemplateUpsertRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Industry { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
+        public string? FlowJson { get; set; }
+        public object? FlowData { get; set; }
     }
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
@@ -223,10 +204,12 @@ public static class ApiEndpoints
         Core.Services.IInspectionService service,
         DateTime? startTime,
         DateTime? endTime,
+        string? status,
+        string? defectType,
         int pageIndex = 0,
         int pageSize = 20) =>
         {
-            var results = await service.GetInspectionHistoryAsync(projectId, startTime, endTime, pageIndex, pageSize);
+            var results = await service.GetInspectionHistoryAsync(projectId, startTime, endTime, status, defectType, pageIndex, pageSize);
             return Results.Ok(results);
         });
 
@@ -235,9 +218,11 @@ public static class ApiEndpoints
         Guid projectId,
         Core.Services.IInspectionService service,
         DateTime? startTime,
-        DateTime? endTime) =>
+        DateTime? endTime,
+        string? status,
+        string? defectType) =>
         {
-            var statistics = await service.GetStatisticsAsync(projectId, startTime, endTime);
+            var statistics = await service.GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
             return Results.Ok(statistics);
         });
 
@@ -371,6 +356,67 @@ public static class ApiEndpoints
             return template != null ? Results.Ok(template) : Results.NotFound();
         });
 
+        // 创建流程模板
+        app.MapPost("/api/templates", async (
+            TemplateUpsertRequest request,
+            IFlowTemplateService templateService,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+                return Results.BadRequest(new { Error = "Template name is required." });
+
+            var flowJson = ResolveFlowJson(request);
+            if (string.IsNullOrWhiteSpace(flowJson))
+                return Results.BadRequest(new { Error = "FlowJson or FlowData is required." });
+
+            var template = new FlowTemplate
+            {
+                Id = Guid.Empty,
+                Name = request.Name.Trim(),
+                Description = request.Description?.Trim() ?? string.Empty,
+                Industry = request.Industry?.Trim() ?? string.Empty,
+                Tags = request.Tags?.Where(tag => !string.IsNullOrWhiteSpace(tag))
+                    .Select(tag => tag.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList() ?? new List<string>(),
+                FlowJson = flowJson
+            };
+
+            var created = await templateService.CreateTemplateAsync(template, cancellationToken);
+            return Results.Created($"/api/templates/{created.Id}", created);
+        });
+
+        // 更新流程模板
+        app.MapPut("/api/templates/{id:guid}", async (
+            Guid id,
+            TemplateUpsertRequest request,
+            IFlowTemplateService templateService,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+                return Results.BadRequest(new { Error = "Template name is required." });
+
+            var flowJson = ResolveFlowJson(request);
+            if (string.IsNullOrWhiteSpace(flowJson))
+                return Results.BadRequest(new { Error = "FlowJson or FlowData is required." });
+
+            var template = new FlowTemplate
+            {
+                Id = id,
+                Name = request.Name.Trim(),
+                Description = request.Description?.Trim() ?? string.Empty,
+                Industry = request.Industry?.Trim() ?? string.Empty,
+                Tags = request.Tags?.Where(tag => !string.IsNullOrWhiteSpace(tag))
+                    .Select(tag => tag.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList() ?? new List<string>(),
+                FlowJson = flowJson
+            };
+
+            var updated = await templateService.UpdateTemplateAsync(id, template, cancellationToken);
+            return updated != null ? Results.Ok(updated) : Results.NotFound();
+        });
+
         // 推荐算子参数
         app.MapPost("/api/operators/{type}/recommend-parameters", (
             Core.Enums.OperatorType type,
@@ -455,6 +501,17 @@ public static class ApiEndpoints
             errorMessage = ex.Message;
             return false;
         }
+    }
+
+    private static string? ResolveFlowJson(TemplateUpsertRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.FlowJson))
+            return request.FlowJson;
+
+        if (request.FlowData == null)
+            return null;
+
+        return JsonSerializer.Serialize(request.FlowData);
     }
 
     private static void MapImageEndpoints(IEndpointRouteBuilder app)

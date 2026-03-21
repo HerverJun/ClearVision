@@ -66,6 +66,11 @@ public class InspectionResult : Entity
     /// </summary>
     public string? OutputDataJson { get; private set; }
 
+    /// <summary>
+    /// 显式分析语义数据（JSON 格式存储）
+    /// </summary>
+    public string? AnalysisDataJson { get; private set; }
+
     private InspectionResult()
     {
         Status = InspectionStatus.NotInspected;
@@ -132,11 +137,29 @@ public class InspectionResult : Entity
     }
 
     /// <summary>
+    /// 设置图像缓存引用
+    /// </summary>
+    public void SetImageId(Guid? imageId)
+    {
+        ImageId = imageId;
+        MarkAsModified();
+    }
+
+    /// <summary>
     /// 设置算子额外输出数据（JSON序列化后）
     /// </summary>
     public void SetOutputDataJson(string json)
     {
         OutputDataJson = json;
+        MarkAsModified();
+    }
+
+    /// <summary>
+    /// 设置显式分析语义数据（JSON 序列化后）
+    /// </summary>
+    public void SetAnalysisDataJson(string json)
+    {
+        AnalysisDataJson = json;
         MarkAsModified();
     }
 }

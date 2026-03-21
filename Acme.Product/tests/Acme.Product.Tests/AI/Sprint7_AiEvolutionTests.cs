@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Entities;
+using Acme.Product.Core.Services;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -91,6 +92,47 @@ public class Sprint7_AiEvolutionTests
         generated.Operators[0].Parameters["Method"].Should().Be("Laplacian");
         double.Parse(generated.Operators[0].Parameters["Threshold"], CultureInfo.InvariantCulture)
             .Should().BeGreaterOrEqualTo(0);
+        result.Diagnostics.Should().Contain(item =>
+            item.Code == "default_parameter_applied" &&
+            item.ParameterName == "Method" &&
+            item.Severity == AiValidationSeverity.Warning);
+        result.Diagnostics.Should().Contain(item =>
+            item.Code == "parameter_clamped" &&
+            item.ParameterName == "Threshold" &&
+            item.Severity == AiValidationSeverity.Warning);
+    }
+
+    [Fact(DisplayName = "AiFlowValidator - 非法算子类型应产出结构化错误诊断")]
+    public void AiFlowValidator_Validate_InvalidOperatorType_ShouldEmitStructuredDiagnostic()
+    {
+        // Arrange
+        var factory = new OperatorFactory();
+        var validator = new AiFlowValidator(factory);
+        var generated = new AiGeneratedFlowJson
+        {
+            Operators =
+            [
+                new AiGeneratedOperator
+                {
+                    TempId = "op_1",
+                    OperatorType = "UnknownOperator",
+                    DisplayName = "未知算子"
+                }
+            ],
+            Connections = []
+        };
+
+        // Act
+        var result = validator.Validate(generated);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.PrimaryError.Should().NotBeNull();
+        result.PrimaryError!.Code.Should().Be("unknown_operator_type");
+        result.PrimaryError.Category.Should().Be("operator");
+        result.PrimaryError.OperatorId.Should().Be("op_1");
+        result.PrimaryError.RelatedFields.Should().Contain("operators[0].operatorType");
+        result.PrimaryError.RepairHint.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact(DisplayName = "ConversationalFlowService - 有上下文且出现修改动词时应识别为 MODIFY")]
@@ -199,6 +241,7 @@ public class Sprint7_AiEvolutionTests
             // Assert
             templates.Should().HaveCountGreaterOrEqualTo(8);
             templates.Select(t => t.Name).Should().Contain("传统缺陷检测");
+            templates.Select(t => t.Name).Should().Contain("端子线序检测");
             File.Exists(Path.Combine(tempRoot, "templates", "flow_templates.json")).Should().BeTrue();
         }
         finally
@@ -232,6 +275,114 @@ public class Sprint7_AiEvolutionTests
             // Assert
             loaded.Should().NotBeNull();
             loaded!.Name.Should().Be("自定义测试模板");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 应支持显式创建与更新模板")]
+    public async Task FlowTemplateService_CreateAndUpdateTemplateAsync_ShouldWork()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+            var created = await service.CreateTemplateAsync(new FlowTemplate
+            {
+                Name = "模板A",
+                Description = "初始描述",
+                Industry = "通用制造",
+                Tags = new List<string> { "线序" },
+                FlowJson = "{}"
+            });
+
+            created.Id.Should().NotBe(Guid.Empty);
+
+            var updated = await service.UpdateTemplateAsync(created.Id, new FlowTemplate
+            {
+                Name = "模板A-更新",
+                Description = "更新描述",
+                Industry = "连接器",
+                Tags = new List<string> { "线序", "端子" },
+                FlowJson = """{"operators":[],"connections":[]}"""
+            });
+
+            updated.Should().NotBeNull();
+            updated!.Name.Should().Be("模板A-更新");
+
+            var loaded = await service.GetTemplateAsync(created.Id);
+            loaded.Should().NotBeNull();
+            loaded!.Description.Should().Be("更新描述");
+            loaded.Tags.Should().Contain("端子");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 读取损坏模板文件时应保留损坏副本并恢复默认模板")]
+    public async Task FlowTemplateService_LoadCorruptedFile_ShouldBackupAndRecover()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        var templateDir = Path.Combine(tempRoot, "templates");
+        var templateFile = Path.Combine(templateDir, "flow_templates.json");
+        const string corruptedContent = "{not-valid-json";
+
+        try
+        {
+            Directory.CreateDirectory(templateDir);
+            File.WriteAllText(templateFile, corruptedContent);
+
+            var service = new FlowTemplateService(tempRoot);
+            var templates = await service.GetTemplatesAsync();
+
+            templates.Should().NotBeEmpty();
+            var corruptedCopies = Directory.GetFiles(templateDir, "flow_templates.corrupted.*.json");
+            corruptedCopies.Should().ContainSingle();
+            File.ReadAllText(corruptedCopies[0]).Should().Be(corruptedContent);
+
+            var repairedJson = File.ReadAllText(templateFile);
+            Action parse = () => JsonDocument.Parse(repairedJson);
+            parse.Should().NotThrow();
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 保存模板后不应残留临时文件且主文件保持可解析")]
+    public async Task FlowTemplateService_SaveTemplateAsync_ShouldCleanupTempFilesAndKeepValidJson()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        var templateDir = Path.Combine(tempRoot, "templates");
+        var templateFile = Path.Combine(templateDir, "flow_templates.json");
+
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+            await service.SaveTemplateAsync(new FlowTemplate
+            {
+                Name = "原子写测试",
+                Description = "测试临时文件清理",
+                Industry = "通用制造",
+                Tags = new List<string> { "测试" },
+                FlowJson = """{"operators":[],"connections":[]}"""
+            });
+
+            File.Exists(templateFile).Should().BeTrue();
+            var tempFiles = Directory.GetFiles(templateDir, "*.tmp");
+            tempFiles.Should().BeEmpty();
+
+            var json = File.ReadAllText(templateFile);
+            Action parse = () => JsonDocument.Parse(json);
+            parse.Should().NotThrow();
         }
         finally
         {

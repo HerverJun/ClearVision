@@ -2,6 +2,8 @@
 // AI 生成 DTO 定义
 // 定义 AI 流程生成请求与结果传输结构
 // 作者：蘅芜君
+using Acme.Product.Core.Services;
+
 namespace Acme.Product.Core.DTOs;
 
 /// <summary>
@@ -20,6 +22,15 @@ public record AiFlowGenerationRequest(
 /// </summary>
 public class AiFlowGenerationResult
 {
+    public const string CompletionStatusCompleted = "completed";
+    public const string CompletionStatusCancelled = "cancelled";
+    public const string CompletionStatusTimedOut = "timed_out";
+    public const string CompletionStatusFailed = "failed";
+
+    public const string FailureTypeUserCancelled = "user_cancelled";
+    public const string FailureTypeTimeout = "timeout";
+    public const string FailureTypeSystemError = "system_error";
+
     /// <summary>
     /// 是否生成成功
     /// </summary>
@@ -35,6 +46,16 @@ public class AiFlowGenerationResult
     /// 错误消息（失败时不为 null）
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// 请求完成状态（completed / cancelled / timed_out / failed）
+    /// </summary>
+    public string CompletionStatus { get; set; } = CompletionStatusCompleted;
+
+    /// <summary>
+    /// 失败类型（如 user_cancelled / timeout / system_error）
+    /// </summary>
+    public string? FailureType { get; set; }
 
     /// <summary>
     /// AI 对本次生成的说明（解释为什么选择这些算子）
@@ -70,6 +91,50 @@ public class AiFlowGenerationResult
     /// 沙盒空跑验证的结果（覆盖率等信息）
     /// </summary>
     public object? DryRunResult { get; set; }
+
+    /// <summary>
+    /// 模板优先命中时的推荐模板信息
+    /// </summary>
+    public AiRecommendedTemplateInfo? RecommendedTemplate { get; set; }
+
+    /// <summary>
+    /// 结构化待确认参数（用于前端更精准展示）
+    /// </summary>
+    public List<AiPendingParameterInfo> PendingParameters { get; set; } = new();
+
+    /// <summary>
+    /// 模板落地所缺资源（模型/地址/标定等）
+    /// </summary>
+    public List<AiMissingResourceInfo> MissingResources { get; set; } = new();
+
+    /// <summary>
+    /// 本次失败的结构化摘要（成功时为空）
+    /// </summary>
+    public AiFailureSummary? FailureSummary { get; set; }
+
+    /// <summary>
+    /// 最近一次尝试的结构化诊断（可用于前端闭环提示）
+    /// </summary>
+    public List<AiAttemptDiagnostic> LastAttemptDiagnostics { get; set; } = new();
+}
+
+public class AiFailureSummary
+{
+    public string Category { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string RepairTarget { get; set; } = string.Empty;
+    public int RetryCount { get; set; }
+    public string LastOutputSummary { get; set; } = string.Empty;
+}
+
+public class AiAttemptDiagnostic
+{
+    public int AttemptNumber { get; set; }
+    public string Stage { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string OutputSummary { get; set; } = string.Empty;
+    public List<AiValidationDiagnostic> Issues { get; set; } = new();
 }
 
 /// <summary>
@@ -96,6 +161,43 @@ public class AiGeneratedFlowJson
     /// 需要用户确认的参数（算子临时ID → 参数名列表）
     /// </summary>
     public Dictionary<string, List<string>> ParametersNeedingReview { get; set; } = new();
+
+    /// <summary>
+    /// AI 输出的推荐模板信息（可选）
+    /// </summary>
+    public AiRecommendedTemplateInfo? RecommendedTemplate { get; set; }
+
+    /// <summary>
+    /// AI 输出的待确认参数（可选）
+    /// </summary>
+    public List<AiPendingParameterInfo> PendingParameters { get; set; } = new();
+
+    /// <summary>
+    /// AI 输出的缺失资源（可选）
+    /// </summary>
+    public List<AiMissingResourceInfo> MissingResources { get; set; } = new();
+}
+
+public class AiRecommendedTemplateInfo
+{
+    public string? TemplateId { get; set; }
+    public string TemplateName { get; set; } = string.Empty;
+    public string MatchReason { get; set; } = string.Empty;
+    public string MatchMode { get; set; } = string.Empty;
+    public double Confidence { get; set; }
+}
+
+public class AiPendingParameterInfo
+{
+    public string OperatorId { get; set; } = string.Empty;
+    public List<string> ParameterNames { get; set; } = new();
+}
+
+public class AiMissingResourceInfo
+{
+    public string ResourceType { get; set; } = string.Empty;
+    public string ResourceKey { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
 }
 
 public class AiGeneratedOperator

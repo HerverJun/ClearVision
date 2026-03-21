@@ -44,13 +44,23 @@ class InspectionPanel {
         this.selectedCamera = null;
         this.isContinuous = false;
         this.selectedRunMode = 'camera';
-        this.runtimeConfig = { autoRun: false, stopOnConsecutiveNg: 0 };
+        this.runtimeConfig = {
+            autoRun: false,
+            stopOnConsecutiveNg: 0,
+            missingMaterialTimeoutSeconds: 30,
+            applyProtectionRules: true
+        };
         this.consecutiveNgCount = 0;
         this._autoRunTriggered = false;
+        this._materialTimeoutHandle = null;
+        this._materialTimeoutDeadline = null;
+        this._lastProtectionReason = '';
+        this._lastProtectionMessage = '';
 
         // 初始化 UI 和分析卡片面板
         this.initialize();
         this.analysisCardsPanel = new AnalysisCardsPanel('analysis-cards-container');
+        this.syncAnalysisFlowContext();
         
         // 设置订阅
         this.setupSubscriptions();
@@ -58,7 +68,324 @@ class InspectionPanel {
         
         console.log('[InspectionPanel] 检测控制面板初始化完成');
     }
-    
+
+    isProtectionEnabled() {
+        return this.runtimeConfig?.applyProtectionRules !== false;
+    }
+
+    getMissingMaterialTimeoutMs() {
+        const timeoutSeconds = Number(this.runtimeConfig?.missingMaterialTimeoutSeconds ?? 0);
+        if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+            return 0;
+        }
+
+        return timeoutSeconds * 1000;
+    }
+
+    getContinuousRunStatusText() {
+        if (!this.isProtectionEnabled()) {
+            return '连续运行中...';
+        }
+
+        const timeoutSeconds = Number(this.runtimeConfig?.missingMaterialTimeoutSeconds ?? 0);
+        if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+            return '连续运行中...';
+        }
+
+        return `连续运行中（运行保护已开启，${timeoutSeconds} 秒未等到新结果将自动停止）`;
+    }
+
+    getProtectionSummaryText() {
+        if (!this.isProtectionEnabled()) {
+            return '运行保护已关闭：连续运行不会因缺料超时或连续 NG 自动停止。';
+        }
+
+        const parts = [];
+        const timeoutSeconds = Number(this.runtimeConfig?.missingMaterialTimeoutSeconds ?? 0);
+        const stopThreshold = Number(this.runtimeConfig?.stopOnConsecutiveNg ?? 0);
+
+        if (Number.isFinite(timeoutSeconds) && timeoutSeconds > 0) {
+            parts.push(`${timeoutSeconds} 秒未等到新结果会自动停止连续运行`);
+        }
+
+        if (Number.isFinite(stopThreshold) && stopThreshold > 0) {
+            parts.push(`连续 NG 达到 ${stopThreshold} 次会自动停止`);
+        }
+
+        if (parts.length === 0) {
+            return '运行保护已开启，但当前未配置自动停机阈值。';
+        }
+
+        return `运行保护已开启：${parts.join('；')}。`;
+    }
+
+    getActiveFlowDefinition() {
+        try {
+            const canvasFlow = window.flowCanvas?.serialize?.();
+            const operators = canvasFlow?.operators || canvasFlow?.Operators;
+            if (Array.isArray(operators) && operators.length > 0) {
+                return canvasFlow;
+            }
+        } catch (error) {
+            console.warn('[InspectionPanel] Failed to serialize flow canvas for analysis context:', error);
+        }
+
+        return getCurrentProject()?.flow || null;
+    }
+
+    syncAnalysisFlowContext() {
+        if (!this.analysisCardsPanel) {
+            return;
+        }
+
+        this.analysisCardsPanel.setFlowContext(this.getActiveFlowDefinition());
+    }
+
+    updateProtectionNotice(message = '', tone = 'info') {
+        const summaryEl = this.container?.querySelector('#protection-summary');
+        const statusEl = this.container?.querySelector('#protection-status');
+
+        if (summaryEl) {
+            summaryEl.textContent = this.getProtectionSummaryText();
+        }
+
+        if (statusEl) {
+            const runtimeMessage = message || this._lastProtectionMessage || '待机中。启动连续运行后，这里会持续显示保护监控状态。';
+            statusEl.textContent = runtimeMessage;
+            statusEl.dataset.tone = tone;
+            statusEl.style.color = tone === 'warning'
+                ? '#b45309'
+                : (tone === 'error' ? '#b91c1c' : 'var(--text-secondary)');
+        }
+    }
+
+    armProtectionWatchdog(reason = '等待检测结果') {
+        this.clearProtectionWatchdog();
+
+        if (!this.isProtectionEnabled()) {
+            return;
+        }
+
+        const timeoutMs = this.getMissingMaterialTimeoutMs();
+        if (timeoutMs <= 0) {
+            return;
+        }
+
+        this._lastProtectionReason = reason;
+        this._materialTimeoutDeadline = Date.now() + timeoutMs;
+        const timeoutSeconds = Math.round(timeoutMs / 1000);
+        this._lastProtectionMessage = `${reason}，运行保护监控中；若 ${timeoutSeconds} 秒内没有新结果，将自动停止连续运行。`;
+        this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+        this._materialTimeoutHandle = window.setTimeout(() => {
+            this.handleProtectionTimeout(reason);
+        }, timeoutMs);
+    }
+
+    clearProtectionWatchdog() {
+        if (this._materialTimeoutHandle) {
+            window.clearTimeout(this._materialTimeoutHandle);
+            this._materialTimeoutHandle = null;
+        }
+
+        this._materialTimeoutDeadline = null;
+        this._lastProtectionReason = '';
+    }
+
+    async handleProtectionTimeout(reason) {
+        this._materialTimeoutHandle = null;
+
+        if (!this.isProtectionEnabled()) {
+            return;
+        }
+
+        const timeoutSeconds = Number(this.runtimeConfig?.missingMaterialTimeoutSeconds ?? 0);
+        const message = `${reason}超时（${timeoutSeconds} 秒），已触发运行保护`;
+        const detailMessage = `${message}。系统将其解释为“在约定时间内没有等到新的检测结果”，请优先检查上料、触发链路、相机连接或 PLC 信号，而不是把它当成程序无响应。`;
+        const shouldStopContinuous = this.isContinuous;
+
+        console.warn('[InspectionPanel] 运行保护超时触发:', {
+            reason,
+            timeoutSeconds,
+            runMode: this.selectedRunMode,
+            isContinuous: this.isContinuous
+        });
+
+        this.updateStatus('error', message);
+        this._lastProtectionMessage = detailMessage;
+        this.updateProtectionNotice(detailMessage, 'warning');
+        showToast(`${message}${shouldStopContinuous ? '，连续运行已保护性停止' : ''}`, 'warning');
+
+        if (shouldStopContinuous) {
+            await this.handleStop();
+            this.updateStatus('error', `${message}，请检查上料、触发链路或相机状态`);
+            return;
+        }
+
+        this.setButtonsState(false);
+    }
+
+    async handleRunSingle() {
+        try {
+            this.syncAnalysisFlowContext();
+            this.updateStatus('running', '运行中...');
+            this.setButtonsState(true);
+            this.updateProtectionNotice('单次运行中。若长时间没有返回结果，界面会在这里解释触发了哪条保护规则。', 'info');
+            this.armProtectionWatchdog('等待单次检测结果');
+
+            const project = getCurrentProject();
+            if (project) {
+                inspectionController.setProject(project.id);
+            }
+
+            await inspectionController.executeSingle();
+        } catch (error) {
+            this.clearProtectionWatchdog();
+            console.error('[InspectionPanel] 单次运行失败:', error);
+            this.updateStatus('error', '运行失败');
+            this.setButtonsState(false);
+        }
+    }
+
+    async handleRunContinuous() {
+        try {
+            this.syncAnalysisFlowContext();
+            this.isContinuous = true;
+            this.consecutiveNgCount = 0;
+            this.updateStatus('running', this.getContinuousRunStatusText());
+            this.setButtonsState(true);
+            this.updateProtectionNotice('连续运行已启动，正在等待首个结果。', 'info');
+            this.armProtectionWatchdog('等待连续运行结果');
+
+            const project = getCurrentProject();
+            if (project) {
+                inspectionController.setProject(project.id);
+            }
+
+            const runMode = this.selectedRunMode || 'camera';
+            console.log('[InspectionPanel] 启动连续检测，模式:', runMode);
+
+            if (runMode === 'flow') {
+                await inspectionController.startRealtimeFlowMode();
+            } else {
+                await inspectionController.startRealtime();
+            }
+        } catch (error) {
+            this.clearProtectionWatchdog();
+            console.error('[InspectionPanel] 连续运行失败:', error);
+            this.updateStatus('error', '启动失败');
+            this.setButtonsState(false);
+            this.isContinuous = false;
+        }
+    }
+
+    async handleStop() {
+        try {
+            this.clearProtectionWatchdog();
+            if (this.isContinuous) {
+                await inspectionController.stopRealtime();
+                this.isContinuous = false;
+            }
+            this.consecutiveNgCount = 0;
+            this.updateStatus('idle', '已停止');
+            this.setButtonsState(false);
+            this._lastProtectionMessage = '连续运行已停止。当前未在执行保护监控。';
+            this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+        } catch (error) {
+            console.error('[InspectionPanel] 停止失败:', error);
+        }
+    }
+
+    handleInspectionResult(result) {
+        this.clearProtectionWatchdog();
+
+        const analysisPayload = this.getAnalysisPayload(result);
+        if (this.analysisCardsPanel) {
+            this.syncAnalysisFlowContext();
+            if (analysisPayload) {
+                this.analysisCardsPanel.updateCards(analysisPayload, result.status, result.processingTimeMs);
+            } else {
+                this.analysisCardsPanel.clear();
+            }
+        }
+
+        const status = result.status === 'OK' ? 'ok' : result.status === 'Error' ? 'error' : 'ng';
+        const statusText = result.status === 'OK' ? '通过' : result.status === 'Error' ? '错误' : '不通过';
+        this.updateStatus(status, statusText);
+
+        const stats = getStats();
+        const newStats = {
+            total: stats.total + 1,
+            ok: stats.ok + (result.status === 'OK' ? 1 : 0),
+            ng: stats.ng + (result.status !== 'OK' && result.status !== 'Error' ? 1 : 0)
+        };
+        newStats.yield = newStats.total > 0 ? ((newStats.ok / newStats.total) * 100).toFixed(1) : 0;
+        setStats(newStats);
+
+        if (result.processingTimeMs) {
+            const timing = getTimingStats();
+            const newHistory = [...timing.history, result.processingTimeMs].slice(-10);
+            const avg = newHistory.reduce((a, b) => a + b, 0) / newHistory.length;
+            setTimingStats({
+                avg: Math.round(avg),
+                min: Math.min(...newHistory),
+                max: Math.max(...newHistory),
+                history: newHistory
+            });
+        }
+
+        this.updateCounters();
+        this.setButtonsState(this.isContinuous);
+
+        if (result.status === 'NG') {
+            this.consecutiveNgCount += 1;
+        } else {
+            this.consecutiveNgCount = 0;
+        }
+
+        const stopThreshold = Number(this.runtimeConfig?.stopOnConsecutiveNg ?? 0);
+        if (this.isContinuous && stopThreshold > 0 && this.consecutiveNgCount >= stopThreshold) {
+            const thresholdMessage = `连续 NG 达到阈值 (${stopThreshold})，系统已按运行保护规则自动停止连续运行。请检查工件质量、阈值配置或上游触发条件。`;
+            this._lastProtectionMessage = thresholdMessage;
+            this.updateProtectionNotice(thresholdMessage, 'warning');
+            showToast(`连续 NG 达到阈值 (${stopThreshold})，已自动停止`, 'warning');
+            this.handleStop();
+            return;
+        }
+
+        this.addRecentResult(result);
+
+        if (this.isContinuous) {
+            this.armProtectionWatchdog('等待下一次触发结果');
+        } else {
+            this._lastProtectionMessage = '最近一次检测已完成，当前未在连续运行。';
+            this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+        }
+    }
+
+    async loadRuntimeConfig() {
+        try {
+            const settings = await httpClient.get('/settings');
+            const runtime = settings?.runtime || {};
+            this.runtimeConfig = {
+                autoRun: !!runtime.autoRun,
+                stopOnConsecutiveNg: Math.max(0, Number(runtime.stopOnConsecutiveNg || 0)),
+                missingMaterialTimeoutSeconds: Math.max(0, Number(runtime.missingMaterialTimeoutSeconds || 0)),
+                applyProtectionRules: runtime.applyProtectionRules !== false
+            };
+        } catch (error) {
+            console.warn('[InspectionPanel] 加载运行时配置失败:', error);
+            this.runtimeConfig = {
+                autoRun: false,
+                stopOnConsecutiveNg: 0,
+                missingMaterialTimeoutSeconds: 30,
+                applyProtectionRules: true
+            };
+        }
+
+        this.updateProtectionNotice();
+        this.tryAutoRunIfNeeded();
+    }
+
     /**
      * 初始化面板UI
      */
@@ -100,6 +427,11 @@ class InspectionPanel {
                             </svg>
                             <span>停止</span>
                         </button>
+                    </div>
+                    <div style="margin-top:14px; padding:12px; border-radius:10px; background:#fff7ed; border:1px solid #fed7aa;">
+                        <div style="font-size:12px; font-weight:600; color:#9a3412; margin-bottom:6px;">运行保护说明</div>
+                        <div id="protection-summary" style="font-size:12px; line-height:1.5; color:#7c2d12;"></div>
+                        <div id="protection-status" style="margin-top:8px; font-size:12px; line-height:1.5; color:var(--text-secondary);"></div>
                     </div>
                 </div>
 
@@ -215,20 +547,24 @@ class InspectionPanel {
         });
         
         this.unsubscribeError = inspectionController.onInspectionError((error) => {
+            this.clearProtectionWatchdog();
             this.updateStatus('error', '检测错误');
         });
     }
     
 
     
+    /*
     /**
      * 处理单次运行
      */
-    async handleRunSingle() {
+    async _legacyHandleRunSingleDuplicate2() {
         try {
             this.updateStatus('running', '运行中...');
             this.setButtonsState(true);
             
+            this.armProtectionWatchdog('等待单次检测结果');
+
             const project = getCurrentProject();
             if (project) {
                 inspectionController.setProject(project.id);
@@ -245,12 +581,15 @@ class InspectionPanel {
     /**
      * 处理连续运行
      */
-    async handleRunContinuous() {
+    async _legacyHandleRunContinuousDuplicate2() {
         try {
             this.isContinuous = true;
             this.consecutiveNgCount = 0;
+            this.armProtectionWatchdog('等待连续运行结果');
+            this.updateStatus('running', this.getContinuousRunStatusText());
             this.updateStatus('running', '连续运行中...');
             this.setButtonsState(true);
+            this.armProtectionWatchdog('等待单次检测结果');
             
             const project = getCurrentProject();
             if (project) {
@@ -279,7 +618,7 @@ class InspectionPanel {
     /**
      * 处理停止
      */
-    async handleStop() {
+    async _legacyHandleStopDuplicate2() {
         try {
             if (this.isContinuous) {
                 await inspectionController.stopRealtime();
@@ -297,10 +636,11 @@ class InspectionPanel {
     /**
      * 处理检测结果
      */
-    handleInspectionResult(result) {
+    _legacyHandleInspectionResultDuplicate2(result) {
         // 更新卡片分析
-        if (this.analysisCardsPanel && result.outputData) {
-            this.analysisCardsPanel.updateCards(result.outputData, result.status, result.processingTimeMs);
+        const analysisPayload = this.getAnalysisPayload(result);
+        if (this.analysisCardsPanel && analysisPayload) {
+            this.analysisCardsPanel.updateCards(analysisPayload, result.status, result.processingTimeMs);
         }
 
         // 更新状态
@@ -428,8 +768,9 @@ class InspectionPanel {
             id: Date.now(),
             status: result.status,
             timestamp: new Date().toLocaleTimeString(),
-            imageData: result.outputImage || result.imageData,
-            outputData: result.outputData || {}
+            imageData: result.outputImage || result.outputImageBase64 || result.imageData,
+            outputData: result.outputData || {},
+            analysisData: result.analysisData || null
         };
         
         const updated = [newResult, ...recent].slice(0, 5);
@@ -443,14 +784,14 @@ class InspectionPanel {
      */
     renderRecentResults() {
         // 最近结果移至右侧面板，使用 document.getElementById 全局查找
-        const grid = document.getElementById('recent-results-grid');
+        const grid = document.getElementById('inspection-recent-results-grid');
         if (!grid) return;
         
         const recent = getRecentResults();
         
         grid.innerHTML = recent.map(result => {
             // 提取文本摘要（OCR/条码等输出的文本数据）
-            const textPreview = this.extractTextPreview(result.outputData);
+            const textPreview = this.extractTextPreview(result.analysisData);
             
             return `
             <div class="recent-result-item ${result.status === 'OK' ? 'result-ok' : 'result-ng'}" data-id="${result.id}">
@@ -492,7 +833,10 @@ class InspectionPanel {
         setRecentResults([]);
         this.updateCounters();
         this.renderRecentResults();
-        if (this.analysisCardsPanel) this.analysisCardsPanel.clear();
+        if (this.analysisCardsPanel) {
+            this.syncAnalysisFlowContext();
+            this.analysisCardsPanel.clear();
+        }
 
         this.updateStatus('idle', '就绪');
     }
@@ -500,21 +844,29 @@ class InspectionPanel {
     /**
      * 从输出数据中提取文本摘要
      */
-    extractTextPreview(outputData) {
-        if (!outputData) return null;
-        // 优先展示 Text 字段（OCR/条码识别结果）
-        if (outputData.Text && typeof outputData.Text === 'string') return outputData.Text;
-        if (outputData.text && typeof outputData.text === 'string') return outputData.text;
-        // 其他字符串类型字段
-        for (const [key, value] of Object.entries(outputData)) {
-            if (key === 'Image' || key === 'image') continue;
-            if (typeof value === 'string' && value.length > 0 && value.length < 200) return `${key}: ${value}`;
+    extractTextPreview(analysisData) {
+        if (analysisData && Array.isArray(analysisData.cards)) {
+            for (const card of analysisData.cards) {
+                const fields = Array.isArray(card?.fields) ? card.fields : [];
+                for (const field of fields) {
+                    if ((typeof field?.value === 'string' || typeof field?.value === 'number') && field.value !== '') {
+                        return field.label ? `${field.label}: ${field.value}` : String(field.value);
+                    }
+                }
+            }
         }
-        // 数值类型字段
-        for (const [key, value] of Object.entries(outputData)) {
-            if (typeof value === 'number') return `${key}: ${Number.isInteger(value) ? value : value.toFixed(3)}`;
-        }
+
         return null;
+    }
+
+    getAnalysisPayload(result) {
+        if (!result || typeof result !== 'object') {
+            return null;
+        }
+
+        return result.analysisData
+            || result.AnalysisData
+            || null;
     }
     
     /**
@@ -535,7 +887,7 @@ class InspectionPanel {
         this.tryAutoRunIfNeeded();
     }
 
-    async loadRuntimeConfig() {
+    async _legacyLoadRuntimeConfigDuplicate2() {
         try {
             const settings = await httpClient.get('/settings');
             const runtime = settings?.runtime || {};
@@ -581,6 +933,150 @@ class InspectionPanel {
         });
     }
 
+    async _legacyHandleRunSingleDuplicate() {
+        try {
+            this.updateStatus('running', '运行中...');
+            this.setButtonsState(true);
+            this.armProtectionWatchdog('等待单次检测结果');
+
+            const project = getCurrentProject();
+            if (project) {
+                inspectionController.setProject(project.id);
+            }
+
+            await inspectionController.executeSingle();
+        } catch (error) {
+            this.clearProtectionWatchdog();
+            console.error('[InspectionPanel] 单次运行失败:', error);
+            this.updateStatus('error', '运行失败');
+            this.setButtonsState(false);
+        }
+    }
+
+    async _legacyHandleRunContinuousDuplicate() {
+        try {
+            this.isContinuous = true;
+            this.consecutiveNgCount = 0;
+            this.updateStatus('running', this.getContinuousRunStatusText());
+            this.setButtonsState(true);
+            this.armProtectionWatchdog('等待连续运行结果');
+
+            const project = getCurrentProject();
+            if (project) {
+                inspectionController.setProject(project.id);
+            }
+
+            const runMode = this.selectedRunMode || 'camera';
+            console.log('[InspectionPanel] 启动连续检测，模式:', runMode);
+
+            if (runMode === 'flow') {
+                await inspectionController.startRealtimeFlowMode();
+            } else {
+                await inspectionController.startRealtime();
+            }
+        } catch (error) {
+            this.clearProtectionWatchdog();
+            console.error('[InspectionPanel] 连续运行失败:', error);
+            this.updateStatus('error', '启动失败');
+            this.setButtonsState(false);
+            this.isContinuous = false;
+        }
+    }
+
+    async _legacyHandleStopDuplicate() {
+        try {
+            this.clearProtectionWatchdog();
+            if (this.isContinuous) {
+                await inspectionController.stopRealtime();
+                this.isContinuous = false;
+            }
+            this.consecutiveNgCount = 0;
+            this.updateStatus('idle', '已停止');
+            this.setButtonsState(false);
+        } catch (error) {
+            console.error('[InspectionPanel] 停止失败:', error);
+        }
+    }
+
+    _legacyHandleInspectionResultDuplicate(result) {
+        this.clearProtectionWatchdog();
+
+        const analysisPayload = this.getAnalysisPayload(result);
+        if (this.analysisCardsPanel && analysisPayload) {
+            this.analysisCardsPanel.updateCards(analysisPayload, result.status, result.processingTimeMs);
+        }
+
+        const status = result.status === 'OK' ? 'ok' : result.status === 'Error' ? 'error' : 'ng';
+        const statusText = result.status === 'OK' ? '通过' : result.status === 'Error' ? '错误' : '不通过';
+        this.updateStatus(status, statusText);
+
+        const stats = getStats();
+        const newStats = {
+            total: stats.total + 1,
+            ok: stats.ok + (result.status === 'OK' ? 1 : 0),
+            ng: stats.ng + (result.status !== 'OK' && result.status !== 'Error' ? 1 : 0)
+        };
+        newStats.yield = newStats.total > 0 ? ((newStats.ok / newStats.total) * 100).toFixed(1) : 0;
+        setStats(newStats);
+
+        if (result.processingTimeMs) {
+            const timing = getTimingStats();
+            const newHistory = [...timing.history, result.processingTimeMs].slice(-10);
+            const avg = newHistory.reduce((a, b) => a + b, 0) / newHistory.length;
+            setTimingStats({
+                avg: Math.round(avg),
+                min: Math.min(...newHistory),
+                max: Math.max(...newHistory),
+                history: newHistory
+            });
+        }
+
+        this.updateCounters();
+        this.setButtonsState(false);
+
+        if (result.status === 'NG') {
+            this.consecutiveNgCount += 1;
+        } else {
+            this.consecutiveNgCount = 0;
+        }
+
+        const stopThreshold = Number(this.runtimeConfig?.stopOnConsecutiveNg ?? 0);
+        if (this.isContinuous && stopThreshold > 0 && this.consecutiveNgCount >= stopThreshold) {
+            showToast(`连续 NG 达到阈值 (${stopThreshold})，已自动停止`, 'warning');
+            this.handleStop();
+            return;
+        }
+
+        this.addRecentResult(result);
+
+        if (this.isContinuous) {
+            this.armProtectionWatchdog('等待下一次触发结果');
+        }
+    }
+
+    async _legacyLoadRuntimeConfigDuplicate() {
+        try {
+            const settings = await httpClient.get('/settings');
+            const runtime = settings?.runtime || {};
+            this.runtimeConfig = {
+                autoRun: !!runtime.autoRun,
+                stopOnConsecutiveNg: Math.max(0, Number(runtime.stopOnConsecutiveNg || 0)),
+                missingMaterialTimeoutSeconds: Math.max(0, Number(runtime.missingMaterialTimeoutSeconds || 0)),
+                applyProtectionRules: runtime.applyProtectionRules !== false
+            };
+        } catch (error) {
+            console.warn('[InspectionPanel] 加载运行时配置失败:', error);
+            this.runtimeConfig = {
+                autoRun: false,
+                stopOnConsecutiveNg: 0,
+                missingMaterialTimeoutSeconds: 30,
+                applyProtectionRules: true
+            };
+        }
+
+        this.tryAutoRunIfNeeded();
+    }
+
     /**
      * 销毁组件，清理资源
      */
@@ -597,6 +1093,7 @@ class InspectionPanel {
             this.unsubscribeError();
             this.unsubscribeError = null;
         }
+        this.clearProtectionWatchdog();
         
         // 清理DOM事件（通过innerHTML置空自动处理大部分，但为了保险可以手动移除）
         // 这里主要依赖 innerHTML 清空或 DOM 移除

@@ -1,5 +1,5 @@
 /**
- * 认证服务 - Token管理和权限检查
+ * 认证服务 - Token 管理和权限检查
  */
 
 import {
@@ -10,132 +10,182 @@ import {
     isHostInjectedEnvironment,
     saveApiPort
 } from '../../core/messaging/apiConfig.js';
+import httpClient from '../../core/messaging/httpClient.js';
 import { clearAuthSession, getStoredToken, getStoredUser } from './authStorage.js';
 
-/**
- * 获取存储的Token
- */
+function buildAppUrl(relativePath) {
+    return new URL(relativePath, window.location.href).toString();
+}
+
+function isLoginPage() {
+    return window.location.pathname.includes('/login.html');
+}
+
+function applyCurrentUser(user) {
+    window.currentUser = user || null;
+}
+
+function clearCurrentUser() {
+    applyCurrentUser(null);
+}
+
+const LOGOUT_NOTICE_KEY = 'cv_logout_notice';
+
+function writeLogoutNotice(message) {
+    try {
+        if (!message) {
+            window.sessionStorage?.removeItem(LOGOUT_NOTICE_KEY);
+            return;
+        }
+
+        window.sessionStorage?.setItem(LOGOUT_NOTICE_KEY, message);
+    } catch {
+        // Ignore storage failures and continue logout flow.
+    }
+}
+
+function redirectToLogin() {
+    if (!isLoginPage()) {
+        window.location.href = buildAppUrl('./login.html');
+    }
+}
+
+function resetAuthState() {
+    clearAuthSession();
+    clearCurrentUser();
+}
+
 export function getToken() {
     return getStoredToken();
 }
 
-/**
- * 获取当前用户信息
- */
 export function getCurrentUser() {
     return getStoredUser();
 }
 
-/**
- * 检查是否已登录
- */
 export function isAuthenticated() {
     return !!getToken();
 }
 
-/**
- * 检查当前用户是否有指定角色
- */
 export function hasRole(role) {
     const user = getCurrentUser();
     return user && user.role === role;
 }
 
-/**
- * 检查是否是管理员
- */
 export function isAdmin() {
     return hasRole('Admin');
 }
 
-/**
- * 检查是否是工程师
- */
 export function isEngineer() {
     return hasRole('Engineer') || hasRole('Admin');
 }
 
-/**
- * 检查是否是操作员（或更高权限）
- */
 export function isOperator() {
     const user = getCurrentUser();
     return user && (user.role === 'Operator' || user.role === 'Engineer' || user.role === 'Admin');
 }
 
-/**
- * 登出
- */
-export function logout() {
-    clearAuthSession();
-    window.location.href = '/login.html';
+export async function logout() {
+    try {
+        if (getToken()) {
+            await httpClient.post('/auth/logout');
+        }
+    } catch (error) {
+        console.warn('[Auth] 服务端登出失败，将继续清理本地会话。', error);
+        writeLogoutNotice('服务端登出失败，但本地会话已清理。若其他终端仍在线，请稍后确认会话状态。');
+    } finally {
+        clearAuthSession();
+        window.location.href = buildAppUrl('./login.html');
+    }
 }
 
-/**
- * 获取带认证的请求头
- */
+export function consumeLogoutNotice() {
+    try {
+        const message = window.sessionStorage?.getItem(LOGOUT_NOTICE_KEY) || '';
+        window.sessionStorage?.removeItem(LOGOUT_NOTICE_KEY);
+        return message;
+    } catch {
+        return '';
+    }
+}
+
 export function getAuthHeaders() {
     const token = getToken();
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/**
- * 权限守卫 - 检查特定权限
- */
 export const PermissionGuard = {
-    /**
-     * 是否可以编辑项目（Engineer/Admin）
-     */
     canEdit() {
         return isEngineer();
     },
-    
-    /**
-     * 是否可以管理用户（Admin）
-     */
+
     canManageUsers() {
         return isAdmin();
     },
-    
-    /**
-     * 是否可以查看系统设置
-     */
+
     canViewSettings() {
         return isEngineer();
     },
-    
-    /**
-     * 是否可以运行检测（所有角色）
-     */
+
     canRunInspection() {
         return isOperator();
     }
 };
 
-/**
- * 初始化认证状态检查
- * 应在应用启动时调用
- */
 export function initAuth() {
-    // 检查是否已登录
-    if (!isAuthenticated()) {
-        // 未登录，跳转到登录页
-        if (!window.location.pathname.includes('/login.html')) {
-            window.location.href = '/login.html';
-        }
+    const token = getToken();
+    const user = getCurrentUser();
+
+    if (!token || !user) {
+        resetAuthState();
+        redirectToLogin();
         return false;
     }
-    
-    // 已登录，更新全局用户信息
-    window.currentUser = getCurrentUser();
+
+    applyCurrentUser(user);
     return true;
 }
 
-/**
- * 异步验证 Token 有效性
- * 调用后端 /api/auth/me 端点
- * @returns {Promise<boolean>}
- */
+export async function bootstrapAuthSession({ redirectOnFailure = true } = {}) {
+    const token = getToken();
+    const user = getCurrentUser();
+
+    if (!token || !user) {
+        resetAuthState();
+        if (redirectOnFailure) {
+            redirectToLogin();
+        }
+
+        return {
+            ok: false,
+            reason: 'missing-session',
+            user: null
+        };
+    }
+
+    applyCurrentUser(user);
+
+    const isValid = await validateTokenAsync();
+    if (!isValid) {
+        resetAuthState();
+        if (redirectOnFailure) {
+            redirectToLogin();
+        }
+
+        return {
+            ok: false,
+            reason: 'invalid-session',
+            user: null
+        };
+    }
+
+    return {
+        ok: true,
+        reason: 'authenticated',
+        user
+    };
+}
+
 export async function validateTokenAsync() {
     const token = getToken();
     if (!token) return false;
@@ -144,7 +194,7 @@ export async function validateTokenAsync() {
         if (window.__API_BASE_URL__) {
             const response = await fetch(`${window.__API_BASE_URL__}/auth/me`, {
                 method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` }
             });
             return response.ok;
         }
@@ -165,7 +215,7 @@ export async function validateTokenAsync() {
                 try {
                     const response = await fetch(`${buildLocalApiBaseUrl(port)}/auth/me`, {
                         method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}` }
+                        headers: { Authorization: `Bearer ${token}` }
                     });
 
                     if (response.ok) {
@@ -183,7 +233,7 @@ export async function validateTokenAsync() {
         const { protocol, hostname, port } = window.location;
         const response = await fetch(`${protocol}//${hostname}:${port || DEFAULT_API_PORT}/api/auth/me`, {
             method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` }
         });
         return response.ok;
     } catch (e) {
@@ -192,8 +242,4 @@ export async function validateTokenAsync() {
     }
 }
 
-/**
- * 全局用户信息对象
- * 供其他模块访问当前用户信息
- */
-window.currentUser = getCurrentUser();
+applyCurrentUser(getCurrentUser());
