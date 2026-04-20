@@ -11,29 +11,89 @@ namespace Acme.Product.Infrastructure.Services;
 
 internal static class OperatorFactoryMetadataMerge
 {
-    private static readonly IReadOnlyDictionary<OperatorType, OperatorType> LegacyAliasMap =
-        new Dictionary<OperatorType, OperatorType>
+    private const string StrictMetadataScanSwitchName = "Acme.Product.OperatorFactory.StrictMetadataScan";
+    private const string StrictMetadataScanEnvironmentVariable = "ACME_OPERATOR_FACTORY_STRICT_METADATA_SCAN";
+
+    public static bool IsLegacyAlias(OperatorType type) => OperatorTypeAliasResolver.IsLegacyAlias(type);
+
+    public static OperatorType ResolveExecutionType(OperatorType type)
+    {
+        return OperatorTypeAliasResolver.Resolve(type);
+    }
+
+    public static bool IsStrictMetadataScanEnabled(bool? strictModeOverride = null)
+    {
+        if (strictModeOverride.HasValue)
         {
-            [OperatorType.Preprocessing] = OperatorType.Filtering,
-            [OperatorType.GaussianBlur] = OperatorType.Filtering,
-            [OperatorType.OnnxInference] = OperatorType.DeepLearning,
-            [OperatorType.ModbusRtuCommunication] = OperatorType.ModbusCommunication
-        };
+            return strictModeOverride.Value;
+        }
 
-    public static bool IsLegacyAlias(OperatorType type) => LegacyAliasMap.ContainsKey(type);
+        if (AppContext.TryGetSwitch(StrictMetadataScanSwitchName, out var strictBySwitch))
+        {
+            return strictBySwitch;
+        }
 
-    public static void Apply(Dictionary<OperatorType, OperatorMetadata> metadata)
+        var raw = Environment.GetEnvironmentVariable(StrictMetadataScanEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return true;
+        }
+
+        if (bool.TryParse(raw, out var strictByEnvironment))
+        {
+            return strictByEnvironment;
+        }
+
+        if (string.Equals(raw, "1", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(raw, "0", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static void Apply(
+        Dictionary<OperatorType, OperatorMetadata> metadata,
+        Func<List<OperatorMetadata>>? scanMetadata = null,
+        bool? strictModeOverride = null)
     {
         ArgumentNullException.ThrowIfNull(metadata);
+
+        var strictMode = IsStrictMetadataScanEnabled(strictModeOverride);
+        var scanner = scanMetadata ?? (() => new OperatorMetadataScanner().Scan());
 
         List<OperatorMetadata> scannedMetadata;
         try
         {
-            scannedMetadata = new OperatorMetadataScanner().Scan();
+            scannedMetadata = scanner();
         }
         catch (Exception ex)
         {
-            Trace.TraceWarning($"[OperatorFactory] Attribute metadata scan failed: {ex.Message}");
+            Trace.TraceError($"[OperatorFactory] Attribute metadata scan failed. StrictMode={strictMode}. Error={ex}");
+            if (strictMode)
+            {
+                throw new InvalidOperationException(
+                    "[OperatorFactory] Metadata initialization failed. " +
+                    $"Set {StrictMetadataScanEnvironmentVariable}=false to allow degraded startup.",
+                    ex);
+            }
+
+            return;
+        }
+
+        if (scannedMetadata.Count == 0)
+        {
+            Trace.TraceError($"[OperatorFactory] Attribute metadata scan produced 0 items. StrictMode={strictMode}.");
+            if (strictMode)
+            {
+                throw new InvalidOperationException("[OperatorFactory] Metadata initialization failed because scan returned no metadata.");
+            }
+
             return;
         }
 
@@ -45,6 +105,7 @@ internal static class OperatorFactoryMetadataMerge
 
         // Keep UI-facing names/categories aligned with pre-migration Chinese catalog.
         OperatorMetadataLocalization.Apply(metadata.Values);
+        OperatorMetadataTextLocalization.Apply(metadata.Values);
 
         ApplyLegacyAliases(metadata);
 
@@ -53,8 +114,9 @@ internal static class OperatorFactoryMetadataMerge
 
     private static void ApplyLegacyAliases(Dictionary<OperatorType, OperatorMetadata> metadata)
     {
-        foreach (var (legacyType, mappedType) in LegacyAliasMap)
+        foreach (var legacyType in Enum.GetValues<OperatorType>().Where(OperatorTypeAliasResolver.IsLegacyAlias))
         {
+            var mappedType = OperatorTypeAliasResolver.Resolve(legacyType);
             if (metadata.ContainsKey(legacyType))
             {
                 continue;

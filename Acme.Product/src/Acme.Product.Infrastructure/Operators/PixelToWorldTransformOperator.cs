@@ -1,48 +1,42 @@
-// PixelToWorldTransformOperator.cs
-// 像素↔世界平面映射算子
-// 对标 Halcon: image_points_to_world_plane
-// 作者：AI Assistant
-
+using System.Collections;
+using System.Globalization;
 using System.Text.Json;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Calibration;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
 namespace Acme.Product.Infrastructure.Operators;
 
-/// <summary>
-/// 像素↔世界平面坐标映射算子
-/// 对标 Halcon image_points_to_world_plane
-/// 支持像素到世界坐标的正向映射和世界到像素的反向映射
-/// </summary>
 [OperatorMeta(
     DisplayName = "Pixel To World Transform",
-    Description = "Transforms between pixel coordinates and world plane coordinates using calibration data. Supports both forward (pixel→world) and inverse (world→pixel) transformations.",
+    Description = "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
     Category = "Calibration",
     IconName = "coordinate-transform",
-    Keywords = new[] { "Pixel", "World", "Coordinate", "Transform", "Calibration", "Plane" }
+    Keywords = new[] { "pixel", "world", "coordinate", "transform", "calibration", "ray-plane" }
 )]
 [InputPort("Image", "Input Image (Optional)", PortDataType.Image, IsRequired = false)]
-[InputPort("Points", "Input Points (Pixel or World)", PortDataType.PointList, IsRequired = false)]
-[InputPort("CalibrationData", "Calibration Data JSON", PortDataType.String, IsRequired = false)]
+[InputPort("Points", "Input Points", PortDataType.PointList, IsRequired = false)]
+[InputPort("CalibrationData", "Calibration Bundle V2 JSON", PortDataType.String, IsRequired = false)]
 [OutputPort("Image", "Visualization Image", PortDataType.Image)]
 [OutputPort("TransformedPoints", "Transformed Points", PortDataType.PointList)]
 [OutputPort("TransformResult", "Transform Result Details", PortDataType.Any)]
-[OperatorParam("CalibrationFile", "Calibration File Path", "file", DefaultValue = "")]
 [OperatorParam("TransformMode", "Transform Mode", "enum", DefaultValue = "PixelToWorld", Options = new[] { "PixelToWorld|Pixel to World", "WorldToPixel|World to Pixel" })]
 [OperatorParam("WorldPlaneZ", "World Plane Z (mm)", "double", DefaultValue = 0.0)]
 [OperatorParam("UnitScale", "Unit Scale (mm per unit)", "double", DefaultValue = 1.0, Min = 0.0001, Max = 10000.0)]
 [OperatorParam("InputPointX", "Input Point X (Single Point Mode)", "double", DefaultValue = 0.0)]
 [OperatorParam("InputPointY", "Input Point Y (Single Point Mode)", "double", DefaultValue = 0.0)]
 [OperatorParam("UseDistortion", "Use Distortion Model", "bool", DefaultValue = true)]
-[OperatorParam("OutputCoordinateSystem", "Output Coordinate System", "enum", DefaultValue = "World", Options = new[] { "World|World (mm)", "Image|Image (pixels)", "Normalized|Normalized (0-1)" })]
 [OperatorParam("GenerateReport", "Generate Accuracy Report", "bool", DefaultValue = true)]
 public class PixelToWorldTransformOperator : OperatorBase
 {
+    private const double Epsilon = 1e-12;
+    private static readonly HashSet<int> BrownConradyCoefficientLengths = new() { 4, 5, 8, 12, 14 };
+
     public override OperatorType OperatorType => OperatorType.PixelToWorldTransform;
 
     public PixelToWorldTransformOperator(ILogger<PixelToWorldTransformOperator> logger) : base(logger)
@@ -54,773 +48,1266 @@ public class PixelToWorldTransformOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取参数
         var transformMode = GetStringParam(@operator, "TransformMode", "PixelToWorld");
+        var isPixelToWorld = transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase);
+        var isWorldToPixel = transformMode.Equals("WorldToPixel", StringComparison.OrdinalIgnoreCase);
+        if (!isPixelToWorld && !isWorldToPixel)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("TransformMode must be PixelToWorld or WorldToPixel."));
+        }
+
         var worldPlaneZ = GetDoubleParam(@operator, "WorldPlaneZ", 0.0);
-        var unitScale = GetDoubleParam(@operator, "UnitScale", 1.0);
+        var configuredUnitScale = GetDoubleParam(@operator, "UnitScale", 1.0);
         var useDistortion = GetBoolParam(@operator, "UseDistortion", true);
-        var outputCoordSystem = GetStringParam(@operator, "OutputCoordinateSystem", "World");
         var generateReport = GetBoolParam(@operator, "GenerateReport", true);
 
-        // 解析标定数据
-        if (!TryResolveCalibrationData(@operator, inputs, out var calibrationData))
+        if (!TryResolveCalibrationData(@operator, inputs, out var calibrationJson))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("Calibration data is required."));
+            return Task.FromResult(OperatorExecutionOutput.Failure("CalibrationBundleV2 data is required."));
         }
 
-        if (!TryParseCalibrationData(calibrationData!, out var cameraParams, out var parseError))
+        if (!CalibrationBundleV2Json.TryDeserialize(calibrationJson!, out var bundle, out var parseError))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure($"Invalid calibration data: {parseError}"));
+            return Task.FromResult(OperatorExecutionOutput.Failure($"Invalid CalibrationBundleV2: {parseError}"));
         }
 
-        // 获取输入点
-        var inputPoints = GetInputPoints(@operator, inputs);
-        if (inputPoints.Count == 0)
+        if (!CalibrationBundleV2Json.TryRequireAccepted(bundle, out var acceptedError))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("No input points provided."));
+            return Task.FromResult(OperatorExecutionOutput.Failure(acceptedError));
         }
 
-        // 执行坐标变换
-        List<Point3d> outputPoints;
-        TransformReport report;
-        Mat? visualizationImage = null;
+        var unitScale = ResolveEffectiveUnitScale(
+            bundle.Unit,
+            configuredUnitScale,
+            IsParameterExplicitlyConfigured(@operator, "UnitScale"));
 
-        try
+        if (!TryGetInputPoints(@operator, inputs, out var inputPoints, out var pointError))
         {
-            report = CreateTransformReport(cameraParams.CameraMatrix);
-            outputPoints = transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase)
-                ? inputPoints.Select(point => SimplePixelToWorld(point, cameraParams.CameraMatrix, worldPlaneZ, unitScale)).ToList()
-                : inputPoints.Select(point => SimpleWorldToPixel(point, cameraParams.CameraMatrix, unitScale)).ToList();
+            return Task.FromResult(OperatorExecutionOutput.Failure(pointError));
+        }
 
-            // 生成可视化图像
-            if (TryGetInputImage(inputs, "Image", out var imageWrapper) && imageWrapper != null)
+        if (bundle.Transform2D != null)
+        {
+            return Task.FromResult(ExecutePlanarPath(
+                inputs,
+                bundle,
+                inputPoints,
+                isPixelToWorld,
+                worldPlaneZ,
+                unitScale,
+                generateReport));
+        }
+
+        return Task.FromResult(ExecuteRayPlanePath(
+            inputs,
+            bundle,
+            inputPoints,
+            isPixelToWorld,
+            worldPlaneZ,
+            unitScale,
+            useDistortion,
+            generateReport));
+    }
+
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        var unitScale = GetDoubleParam(@operator, "UnitScale", 1.0);
+        if (unitScale <= 0 || !double.IsFinite(unitScale))
+        {
+            return ValidationResult.Invalid("UnitScale must be a positive finite number.");
+        }
+
+        var worldPlaneZ = GetDoubleParam(@operator, "WorldPlaneZ", 0.0);
+        if (!double.IsFinite(worldPlaneZ))
+        {
+            return ValidationResult.Invalid("WorldPlaneZ must be finite.");
+        }
+
+        return ValidationResult.Valid();
+    }
+
+    private static double ResolveEffectiveUnitScale(string? bundleUnit, double configuredUnitScale, bool unitScaleExplicitlyConfigured)
+    {
+        if (unitScaleExplicitlyConfigured)
+        {
+            return configuredUnitScale;
+        }
+
+        return NormalizeUnitToken(bundleUnit) switch
+        {
+            "m" or "meter" or "meters" => 1000.0,
+            "cm" or "centimeter" or "centimeters" => 10.0,
+            "um" or "micrometer" or "micrometers" => 0.001,
+            _ => configuredUnitScale
+        };
+    }
+
+    private static bool IsParameterExplicitlyConfigured(Operator @operator, string parameterName)
+    {
+        return @operator.Parameters.Any(parameter =>
+            string.Equals(parameter.Name, parameterName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeUnitToken(string? rawUnit)
+    {
+        if (string.IsNullOrWhiteSpace(rawUnit))
+        {
+            return string.Empty;
+        }
+
+        return rawUnit.Trim().ToLowerInvariant();
+    }
+
+    private OperatorExecutionOutput ExecutePlanarPath(
+        Dictionary<string, object>? inputs,
+        CalibrationBundleV2 bundle,
+        IReadOnlyList<Point3d> inputPoints,
+        bool isPixelToWorld,
+        double worldPlaneZ,
+        double unitScale,
+        bool generateReport)
+    {
+        if (!IsSupportedPlanarKind(bundle.CalibrationKind))
+        {
+            return OperatorExecutionOutput.Failure(
+                $"Planar path requires CalibrationKind PlanarTransform2D/RigidTransform2D, got {bundle.CalibrationKind}.");
+        }
+
+        if (!CalibrationPlanarTransformRuntime.TryCreate(
+                bundle,
+                new[] { TransformModelV2.ScaleOffset, TransformModelV2.Similarity, TransformModelV2.Affine, TransformModelV2.Homography },
+                out var runtime,
+                out var runtimeError))
+        {
+            return OperatorExecutionOutput.Failure(runtimeError);
+        }
+
+        var outputPoints = new List<Point3d>(inputPoints.Count);
+        foreach (var point in inputPoints)
+        {
+            if (isPixelToWorld)
             {
-                visualizationImage = CreateVisualization(
-                    imageWrapper.GetMat(), inputPoints, outputPoints, transformMode, report);
+                if (!runtime.TryApplyForward(point.X, point.Y, out var worldXmm, out var worldYmm, out var applyError))
+                {
+                    return OperatorExecutionOutput.Failure($"Planar forward transform failed: {applyError}");
+                }
+
+                outputPoints.Add(new Point3d(worldXmm / unitScale, worldYmm / unitScale, worldPlaneZ / unitScale));
             }
             else
             {
-                visualizationImage = CreateCoordinateVisualization(
-                    inputPoints, outputPoints, transformMode, cameraParams.ImageSize);
+                var worldXmm = point.X * unitScale;
+                var worldYmm = point.Y * unitScale;
+                if (!runtime.TryApplyInverse(worldXmm, worldYmm, out var pixelX, out var pixelY, out var applyError))
+                {
+                    return OperatorExecutionOutput.Failure($"Planar inverse transform failed: {applyError}");
+                }
+
+                outputPoints.Add(new Point3d(pixelX, pixelY, 0));
             }
         }
-        catch (Exception ex)
+
+        var accuracyReport = generateReport
+            ? BuildPlanarAccuracyReport(runtime, inputPoints, outputPoints, isPixelToWorld, unitScale, null)
+            : null;
+
+        return BuildSuccessOutput(
+            inputs,
+            inputPoints,
+            outputPoints,
+            isPixelToWorld ? "PixelToWorld" : "WorldToPixel",
+            "PlanarTransform2D",
+            runtime.Model.ToString(),
+            bundle,
+            worldPlaneZ,
+            unitScale,
+            generateReport,
+            accuracyReport,
+            additionalDiagnostics: null);
+    }
+
+    private OperatorExecutionOutput ExecuteRayPlanePath(
+        Dictionary<string, object>? inputs,
+        CalibrationBundleV2 bundle,
+        IReadOnlyList<Point3d> inputPoints,
+        bool isPixelToWorld,
+        double worldPlaneZ,
+        double unitScale,
+        bool useDistortion,
+        bool generateReport)
+    {
+        if (!TryCreateRayPlaneContext(bundle, out var context, out var contextError))
         {
-            Logger.LogError(ex, "Coordinate transformation failed");
-            return Task.FromResult(OperatorExecutionOutput.Failure($"Transformation failed: {ex.Message}"));
+            return OperatorExecutionOutput.Failure(contextError);
         }
 
-        // 构建输出
-        var outputPositions = outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
+        if (!TryCreateDistortionContext(bundle, useDistortion, out var distortion, out var distortionError))
+        {
+            return OperatorExecutionOutput.Failure(distortionError);
+        }
+
+        var diagnostics = new List<string>();
+        if (distortion.Enabled)
+        {
+            diagnostics.Add($"Distortion model applied in ray-plane PixelToWorld path: {distortion.Model}.");
+        }
+
+        var outputPoints = new List<Point3d>(inputPoints.Count);
+        foreach (var point in inputPoints)
+        {
+            if (isPixelToWorld)
+            {
+                if (!TryPixelToWorldByRayPlane(context, distortion, point.X, point.Y, worldPlaneZ, out var worldPointMm, out var error))
+                {
+                    return OperatorExecutionOutput.Failure($"Ray-plane PixelToWorld failed: {error}");
+                }
+
+                outputPoints.Add(new Point3d(
+                    worldPointMm.X / unitScale,
+                    worldPointMm.Y / unitScale,
+                    worldPointMm.Z / unitScale));
+            }
+            else
+            {
+                var hasExplicitZ = Math.Abs(point.Z) > Epsilon;
+                var worldZmm = hasExplicitZ ? point.Z * unitScale : worldPlaneZ;
+                var worldPointMm = new Point3d(point.X * unitScale, point.Y * unitScale, worldZmm);
+                if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var pixelPoint, out var error))
+                {
+                    return OperatorExecutionOutput.Failure($"Ray-plane WorldToPixel failed: {error}");
+                }
+
+                outputPoints.Add(new Point3d(pixelPoint.X, pixelPoint.Y, 0));
+            }
+        }
+
+        var accuracyReport = generateReport
+            ? BuildRayPlaneAccuracyReport(context, distortion, inputPoints, outputPoints, isPixelToWorld, worldPlaneZ, unitScale, diagnostics)
+            : null;
+
+        return BuildSuccessOutput(
+            inputs,
+            inputPoints,
+            outputPoints,
+            isPixelToWorld ? "PixelToWorld" : "WorldToPixel",
+            "RayPlaneIntersection",
+            "Projection",
+            bundle,
+            worldPlaneZ,
+            unitScale,
+            generateReport,
+            accuracyReport,
+            diagnostics);
+    }
+
+    private OperatorExecutionOutput BuildSuccessOutput(
+        Dictionary<string, object>? inputs,
+        IReadOnlyList<Point3d> inputPoints,
+        IReadOnlyList<Point3d> outputPoints,
+        string transformMode,
+        string path,
+        string model,
+        CalibrationBundleV2 bundle,
+        double worldPlaneZ,
+        double unitScale,
+        bool generateReport,
+        Dictionary<string, object>? accuracyReport,
+        IReadOnlyList<string>? additionalDiagnostics)
+    {
+        var isPixelToWorld = transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase);
+        object transformedPoints = isPixelToWorld
+            ? outputPoints.Select(p => new Point3d(p.X, p.Y, p.Z)).ToList()
+            : outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
+        var transformedPlanarPoints = outputPoints.Select(p => new Position(p.X, p.Y)).ToList();
         var resultData = new Dictionary<string, object>
         {
-            { "TransformedPoints", outputPositions },
-            { "InputPointCount", inputPoints.Count },
-            { "OutputPointCount", outputPoints.Count },
-            { "TransformMode", transformMode },
-            { "WorldPlaneZ", worldPlaneZ },
-            { "UnitScale", unitScale },
-            { "CameraMatrix", cameraParams.CameraMatrix },
-            { "TransformMatrix", cameraParams.TransformMatrix },
-            { "ConditionNumber", report.ConditionNumber },
-            { "TransformQuality", report.Quality },
-            { "MeanReprojectionError", report.MeanReprojectionError },
-            { "MaxReprojectionError", report.MaxReprojectionError }
+            ["TransformedPoints"] = transformedPoints,
+            ["TransformedPlanarPoints"] = transformedPlanarPoints,
+            ["TransformResult"] = new Dictionary<string, object>
+            {
+                ["TransformMode"] = transformMode,
+                ["Path"] = path,
+                ["Model"] = model,
+                ["InputCount"] = inputPoints.Count,
+                ["OutputCount"] = outputPoints.Count,
+                ["OutputPointDimension"] = isPixelToWorld ? 3 : 2,
+                ["WorldPlaneZ"] = worldPlaneZ,
+                ["UnitScale"] = unitScale,
+                ["CalibrationKind"] = bundle.CalibrationKind.ToString(),
+                ["SourceFrame"] = bundle.SourceFrame,
+                ["TargetFrame"] = bundle.TargetFrame
+            }
         };
 
         if (generateReport)
         {
-            resultData["AccuracyReport"] = new Dictionary<string, object>
-            {
-                { "InputPoints", inputPoints.Select(p => new { X = p.X, Y = p.Y, Z = p.Z }).ToList() },
-                { "OutputPoints", outputPoints.Select(p => new { X = p.X, Y = p.Y, Z = p.Z }).ToList() },
-                { "ConditionNumber", report.ConditionNumber },
-                { "TransformQuality", report.Quality.ToString() },
-                { "MeanError", report.MeanReprojectionError },
-                { "MaxError", report.MaxReprojectionError },
-                { "Unit", unitScale == 1.0 ? "mm" : $"mm/{unitScale}" },
-                { "Timestamp", DateTime.UtcNow }
-            };
+            resultData["AccuracyReport"] = accuracyReport ?? CreateFallbackAccuracyReport(inputPoints, outputPoints, additionalDiagnostics);
         }
 
-        var output = visualizationImage ?? new Mat(480, 640, MatType.CV_8UC3, Scalar.Black);
-        
-        // 清理资源
-        cameraParams.Dispose();
-
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(output, resultData)));
-    }
-
-    private TransformReport CreateTransformReport(Mat cameraMatrix)
-    {
-        var conditionNumber = CalculateConditionNumber(cameraMatrix);
-        return new TransformReport
+        Mat visualization;
+        if (TryGetInputImage(inputs, "Image", out var imageWrapper) && imageWrapper != null)
         {
-            ConditionNumber = conditionNumber,
-            Quality = conditionNumber > 1e6
-                ? TransformQuality.Poor
-                : conditionNumber > 1e4
-                    ? TransformQuality.Fair
-                    : TransformQuality.Good,
-            MeanReprojectionError = 0,
-            MaxReprojectionError = 0
-        };
-    }
-
-    private static Point3d SimplePixelToWorld(Point3d pixel, Mat cameraMatrix, double worldPlaneZ, double unitScale)
-    {
-        var fx = cameraMatrix.At<double>(0, 0);
-        var fy = cameraMatrix.At<double>(1, 1);
-        var cx = cameraMatrix.At<double>(0, 2);
-        var cy = cameraMatrix.At<double>(1, 2);
-
-        if (Math.Abs(fx) < 1e-12 || Math.Abs(fy) < 1e-12)
-        {
-            return new Point3d(pixel.X, pixel.Y, worldPlaneZ);
-        }
-
-        return new Point3d(
-            (pixel.X - cx) / fx * unitScale,
-            (pixel.Y - cy) / fy * unitScale,
-            worldPlaneZ);
-    }
-
-    private static Point3d SimpleWorldToPixel(Point3d world, Mat cameraMatrix, double unitScale)
-    {
-        var fx = cameraMatrix.At<double>(0, 0);
-        var fy = cameraMatrix.At<double>(1, 1);
-        var cx = cameraMatrix.At<double>(0, 2);
-        var cy = cameraMatrix.At<double>(1, 2);
-
-        return new Point3d(
-            world.X / Math.Max(unitScale, 1e-12) * fx + cx,
-            world.Y / Math.Max(unitScale, 1e-12) * fy + cy,
-            0);
-    }
-
-    private List<Point3d> GetInputPoints(Operator @operator, Dictionary<string, object>? inputs)
-    {
-        var points = new List<Point3d>();
-
-        // 尝试从输入端口获取点列表
-        if (inputs != null && inputs.TryGetValue("Points", out var pointsObj))
-        {
-            if (pointsObj is IEnumerable<Position> positions)
+            var image = imageWrapper.GetMat();
+            if (image.Empty())
             {
-                points.AddRange(positions.Select(p => new Point3d(p.X, p.Y, 0)));
-            }
-            else if (pointsObj is IEnumerable<Point2f> point2Fs)
-            {
-                points.AddRange(point2Fs.Select(p => new Point3d(p.X, p.Y, 0)));
-            }
-            else if (pointsObj is IEnumerable<Point3f> point3Fs)
-            {
-                points.AddRange(point3Fs.Select(p => new Point3d(p.X, p.Y, p.Z)));
-            }
-            else if (pointsObj is string pointsJson)
-            {
-                try
-                {
-                    var parsed = System.Text.Json.JsonSerializer.Deserialize<List<Point3d>>(pointsJson);
-                    if (parsed != null)
-                    {
-                        points.AddRange(parsed);
-                    }
-                }
-                catch { }
-            }
-        }
-
-        // 单点模式：从参数获取
-        if (points.Count == 0)
-        {
-            var x = GetDoubleParam(@operator, "InputPointX", 0.0);
-            var y = GetDoubleParam(@operator, "InputPointY", 0.0);
-            points.Add(new Point3d(x, y, 0));
-        }
-
-        return points;
-    }
-
-    private List<Point3d> TransformPixelToWorld(
-        List<Point3d> pixelPoints,
-        CameraCalibrationParams camParams,
-        double worldPlaneZ,
-        double unitScale,
-        bool useDistortion,
-        out TransformReport report)
-    {
-        var worldPoints = new List<Point3d>();
-        report = new TransformReport();
-        var reprojectionErrors = new List<double>();
-
-        using var cameraMatrix = camParams.CameraMatrix.Clone();
-        using var distCoeffs = camParams.DistCoeffs != null && !camParams.DistCoeffs.Empty() ? camParams.DistCoeffs.Clone() : new Mat();
-        using var rvec = camParams.RotationVector != null && !camParams.RotationVector.Empty()
-            ? camParams.RotationVector.Clone()
-            : new Mat(3, 1, MatType.CV_64FC1, Scalar.All(0));
-        using var tvec = camParams.TranslationVector != null && !camParams.TranslationVector.Empty()
-            ? camParams.TranslationVector.Clone()
-            : new Mat(3, 1, MatType.CV_64FC1, Scalar.All(0));
-
-        // 构建单应性矩阵 H = K * [r1 r2 t] (假设Z=0平面)
-        // 或者使用 solvePnP 的反向变换
-        using var rotMat = new Mat(3, 3, MatType.CV_64FC1);
-        if (camParams.RotationMatrix != null && !camParams.RotationMatrix.Empty())
-        {
-            camParams.RotationMatrix.CopyTo(rotMat);
-        }
-        else if (!rvec.Empty())
-        {
-            Cv2.Rodrigues(rvec, rotMat);
-        }
-
-        // 计算条件数
-        report.ConditionNumber = CalculateConditionNumber(cameraMatrix);
-        report.Quality = report.ConditionNumber > 1e6 
-            ? TransformQuality.Poor 
-            : report.ConditionNumber > 1e4 
-                ? TransformQuality.Fair 
-                : TransformQuality.Good;
-
-        foreach (var pixel in pixelPoints)
-        {
-            Point3d worldPoint;
-
-            if (camParams.TransformMatrix != null && !camParams.TransformMatrix.Empty())
-            {
-                // 使用预计算的变换矩阵（从标定板得到）
-                worldPoint = TransformUsingMatrix(pixel, camParams.TransformMatrix, unitScale);
-            }
-            else
-            {
-                // 使用相机外参进行射线平面交点计算
-                worldPoint = PixelToWorldRayPlaneIntersection(
-                    pixel, cameraMatrix, rotMat, tvec, worldPlaneZ, useDistortion, distCoeffs);
+                return OperatorExecutionOutput.Failure("Input image is invalid.");
             }
 
-            worldPoints.Add(worldPoint);
-
-            // 计算重投影误差验证
-            if (camParams.TransformMatrix != null && !camParams.TransformMatrix.Empty())
-            {
-                var reprojected = WorldToPixelUsingMatrix(worldPoint, camParams.TransformMatrix, unitScale);
-                var error = Math.Sqrt(
-                    Math.Pow(reprojected.X - pixel.X, 2) + 
-                    Math.Pow(reprojected.Y - pixel.Y, 2));
-                reprojectionErrors.Add(error);
-            }
-        }
-
-        if (reprojectionErrors.Count > 0)
-        {
-            report.MeanReprojectionError = reprojectionErrors.Average();
-            report.MaxReprojectionError = reprojectionErrors.Max();
-        }
-
-        return worldPoints;
-    }
-
-    private List<Point3d> TransformWorldToPixel(
-        List<Point3d> worldPoints,
-        CameraCalibrationParams camParams,
-        double worldPlaneZ,
-        double unitScale,
-        bool useDistortion,
-        out TransformReport report)
-    {
-        var pixelPoints = new List<Point3d>();
-        report = new TransformReport();
-
-        using var cameraMatrix = camParams.CameraMatrix.Clone();
-        using var distCoeffs = camParams.DistCoeffs != null && !camParams.DistCoeffs.Empty() ? camParams.DistCoeffs.Clone() : new Mat();
-        using var rvec = camParams.RotationVector != null && !camParams.RotationVector.Empty()
-            ? camParams.RotationVector.Clone()
-            : new Mat(3, 1, MatType.CV_64FC1, Scalar.All(0));
-        using var tvec = camParams.TranslationVector != null && !camParams.TranslationVector.Empty()
-            ? camParams.TranslationVector.Clone()
-            : new Mat(3, 1, MatType.CV_64FC1, Scalar.All(0));
-
-        // 计算条件数
-        report.ConditionNumber = CalculateConditionNumber(cameraMatrix);
-        report.Quality = report.ConditionNumber > 1e6 
-            ? TransformQuality.Poor 
-            : report.ConditionNumber > 1e4 
-                ? TransformQuality.Fair 
-                : TransformQuality.Good;
-
-        foreach (var world in worldPoints)
-        {
-            Point3d pixelPoint;
-
-            if (camParams.TransformMatrix != null && !camParams.TransformMatrix.Empty())
-            {
-                // 使用预计算的变换矩阵
-                pixelPoint = WorldToPixelUsingMatrix(world, camParams.TransformMatrix, unitScale);
-            }
-            else
-            {
-                // 使用相机外参进行投影
-                pixelPoint = WorldToPixelProjection(
-                    world, cameraMatrix, rvec, tvec, useDistortion, distCoeffs);
-            }
-
-            pixelPoints.Add(pixelPoint);
-        }
-
-        return pixelPoints;
-    }
-
-    private Point3d TransformUsingMatrix(Point3d pixel, Mat transformMatrix, double unitScale)
-    {
-        // 使用单应性矩阵或4x4变换矩阵
-        var x = pixel.X;
-        var y = pixel.Y;
-        var z = pixel.Z;
-
-        if (transformMatrix.Rows == 3 && transformMatrix.Cols == 3)
-        {
-            // 单应性矩阵 (3x3) - 用于Z=0平面
-            var xp = transformMatrix.At<double>(0, 0) * x + 
-                     transformMatrix.At<double>(0, 1) * y + 
-                     transformMatrix.At<double>(0, 2);
-            var yp = transformMatrix.At<double>(1, 0) * x + 
-                     transformMatrix.At<double>(1, 1) * y + 
-                     transformMatrix.At<double>(1, 2);
-            var wp = transformMatrix.At<double>(2, 0) * x + 
-                     transformMatrix.At<double>(2, 1) * y + 
-                     transformMatrix.At<double>(2, 2);
-
-            return new Point3d(xp / wp / unitScale, yp / wp / unitScale, 0);
-        }
-        else if (transformMatrix.Rows == 4 && transformMatrix.Cols == 4)
-        {
-            // 4x4变换矩阵
-            var xp = transformMatrix.At<double>(0, 0) * x + 
-                     transformMatrix.At<double>(0, 1) * y + 
-                     transformMatrix.At<double>(0, 2) * z + 
-                     transformMatrix.At<double>(0, 3);
-            var yp = transformMatrix.At<double>(1, 0) * x + 
-                     transformMatrix.At<double>(1, 1) * y + 
-                     transformMatrix.At<double>(1, 2) * z + 
-                     transformMatrix.At<double>(1, 3);
-            var zp = transformMatrix.At<double>(2, 0) * x + 
-                     transformMatrix.At<double>(2, 1) * y + 
-                     transformMatrix.At<double>(2, 2) * z + 
-                     transformMatrix.At<double>(2, 3);
-            var wp = transformMatrix.At<double>(3, 0) * x + 
-                     transformMatrix.At<double>(3, 1) * y + 
-                     transformMatrix.At<double>(3, 2) * z + 
-                     transformMatrix.At<double>(3, 3);
-
-            return new Point3d(xp / wp / unitScale, yp / wp / unitScale, zp / wp / unitScale);
-        }
-
-        return pixel;
-    }
-
-    private Point3d WorldToPixelUsingMatrix(Point3d world, Mat transformMatrix, double unitScale)
-    {
-        // 应用单位缩放
-        var x = world.X * unitScale;
-        var y = world.Y * unitScale;
-        var z = world.Z * unitScale;
-
-        // 计算逆矩阵
-        using var invMatrix = new Mat();
-        var invertResult = Cv2.Invert(transformMatrix, invMatrix, DecompTypes.LU);
-        if (Math.Abs(invertResult) < 1e-12)
-        {
-            return world;
-        }
-
-        return TransformUsingMatrix(new Point3d(x, y, z), invMatrix, 1.0);
-    }
-
-    private Point3d PixelToWorldRayPlaneIntersection(
-        Point3d pixel,
-        Mat cameraMatrix,
-        Mat rotationMatrix,
-        Mat translationVector,
-        double worldPlaneZ,
-        bool useDistortion,
-        Mat distCoeffs)
-    {
-        // 当前实现使用针孔模型做稳定映射；若存在畸变参数，则在此阶段忽略高阶校正。
-        var cx = cameraMatrix.At<double>(0, 2);
-        var cy = cameraMatrix.At<double>(1, 2);
-        var fx = cameraMatrix.At<double>(0, 0);
-        var fy = cameraMatrix.At<double>(1, 1);
-        var undistortedPixel = new Point2d((pixel.X - cx) / fx, (pixel.Y - cy) / fy);
-
-        // 相机坐标系中的射线方向
-        var rayCamera = new Point3d(undistortedPixel.X, undistortedPixel.Y, 1.0);
-
-        // 转换到世界坐标系
-        // P_world = R^T * (P_camera - t)
-        var t = new Point3d(
-            translationVector.At<double>(0, 0),
-            translationVector.At<double>(1, 0),
-            translationVector.At<double>(2, 0));
-
-        // 射线在世界坐标系中的方向
-        var rayWorld = new Point3d(
-            rotationMatrix.At<double>(0, 0) * rayCamera.X + 
-            rotationMatrix.At<double>(1, 0) * rayCamera.Y + 
-            rotationMatrix.At<double>(2, 0) * rayCamera.Z,
-            rotationMatrix.At<double>(0, 1) * rayCamera.X + 
-            rotationMatrix.At<double>(1, 1) * rayCamera.Y + 
-            rotationMatrix.At<double>(2, 1) * rayCamera.Z,
-            rotationMatrix.At<double>(0, 2) * rayCamera.X + 
-            rotationMatrix.At<double>(1, 2) * rayCamera.Y + 
-            rotationMatrix.At<double>(2, 2) * rayCamera.Z);
-
-        // 相机光心在世界坐标系中的位置
-        var cameraCenter = new Point3d(
-            -(rotationMatrix.At<double>(0, 0) * t.X + rotationMatrix.At<double>(1, 0) * t.Y + rotationMatrix.At<double>(2, 0) * t.Z),
-            -(rotationMatrix.At<double>(0, 1) * t.X + rotationMatrix.At<double>(1, 1) * t.Y + rotationMatrix.At<double>(2, 1) * t.Z),
-            -(rotationMatrix.At<double>(0, 2) * t.X + rotationMatrix.At<double>(1, 2) * t.Y + rotationMatrix.At<double>(2, 2) * t.Z));
-
-        // 射线与Z=worldPlaneZ平面的交点
-        if (Math.Abs(rayWorld.Z) < 1e-10)
-        {
-            return new Point3d(0, 0, worldPlaneZ);
-        }
-
-        var scale = (worldPlaneZ - cameraCenter.Z) / rayWorld.Z;
-        var worldPoint = new Point3d(
-            cameraCenter.X + scale * rayWorld.X,
-            cameraCenter.Y + scale * rayWorld.Y,
-            worldPlaneZ);
-
-        return worldPoint;
-    }
-
-    private Point3d WorldToPixelProjection(
-        Point3d world,
-        Mat cameraMatrix,
-        Mat rvec,
-        Mat tvec,
-        bool useDistortion,
-        Mat distCoeffs)
-    {
-        using var rotationMatrix = new Mat(3, 3, MatType.CV_64FC1);
-        if (!rvec.Empty())
-        {
-            Cv2.Rodrigues(rvec, rotationMatrix);
+            visualization = DrawVisualization(image, inputPoints, outputPoints, transformMode);
         }
         else
         {
-            rotationMatrix.Set(0, 0, 1.0);
-            rotationMatrix.Set(1, 1, 1.0);
-            rotationMatrix.Set(2, 2, 1.0);
+            visualization = DrawVisualization(new Mat(480, 640, MatType.CV_8UC3, Scalar.Black), inputPoints, outputPoints, transformMode);
         }
 
-        var tx = tvec.Empty() ? 0.0 : tvec.At<double>(0, 0);
-        var ty = tvec.Empty() ? 0.0 : tvec.At<double>(1, 0);
-        var tz = tvec.Empty() ? 0.0 : tvec.At<double>(2, 0);
-
-        var xc = rotationMatrix.At<double>(0, 0) * world.X + rotationMatrix.At<double>(0, 1) * world.Y + rotationMatrix.At<double>(0, 2) * world.Z + tx;
-        var yc = rotationMatrix.At<double>(1, 0) * world.X + rotationMatrix.At<double>(1, 1) * world.Y + rotationMatrix.At<double>(1, 2) * world.Z + ty;
-        var zc = rotationMatrix.At<double>(2, 0) * world.X + rotationMatrix.At<double>(2, 1) * world.Y + rotationMatrix.At<double>(2, 2) * world.Z + tz;
-
-        if (Math.Abs(zc) < 1e-12)
-        {
-            return new Point3d(0, 0, 0);
-        }
-
-        var fx = cameraMatrix.At<double>(0, 0);
-        var fy = cameraMatrix.At<double>(1, 1);
-        var cx = cameraMatrix.At<double>(0, 2);
-        var cy = cameraMatrix.At<double>(1, 2);
-
-        return new Point3d(fx * xc / zc + cx, fy * yc / zc + cy, 0);
+        return OperatorExecutionOutput.Success(CreateImageOutput(visualization, resultData));
     }
 
-    private double CalculateConditionNumber(Mat matrix)
+    private static Dictionary<string, object> BuildPlanarAccuracyReport(
+        CalibrationPlanarTransformRuntime runtime,
+        IReadOnlyList<Point3d> inputPoints,
+        IReadOnlyList<Point3d> outputPoints,
+        bool isPixelToWorld,
+        double unitScale,
+        IReadOnlyList<string>? diagnostics)
     {
-        if (matrix.Empty() || matrix.Rows < 3 || matrix.Cols < 3)
+        var roundTripErrors = new List<double>(Math.Min(inputPoints.Count, outputPoints.Count));
+        for (var i = 0; i < inputPoints.Count && i < outputPoints.Count; i++)
         {
-            return double.MaxValue;
+            if (isPixelToWorld)
+            {
+                var worldXmm = outputPoints[i].X * unitScale;
+                var worldYmm = outputPoints[i].Y * unitScale;
+                if (!runtime.TryApplyInverse(worldXmm, worldYmm, out var pixelX, out var pixelY, out _))
+                {
+                    continue;
+                }
+
+                roundTripErrors.Add(MeasurementGeometryHelper.Distance(inputPoints[i].X, inputPoints[i].Y, pixelX, pixelY));
+            }
+            else
+            {
+                if (!runtime.TryApplyInverse(outputPoints[i].X, outputPoints[i].Y, out var worldXmm, out var worldYmm, out _))
+                {
+                    continue;
+                }
+
+                roundTripErrors.Add(MeasurementGeometryHelper.Distance(
+                    inputPoints[i].X,
+                    inputPoints[i].Y,
+                    worldXmm / unitScale,
+                    worldYmm / unitScale));
+            }
         }
 
-        var fx = Math.Abs(matrix.At<double>(0, 0));
-        var fy = Math.Abs(matrix.At<double>(1, 1));
-        var principal = Math.Max(Math.Abs(matrix.At<double>(0, 2)), Math.Abs(matrix.At<double>(1, 2)));
-        var minValue = new[] { fx, fy, Math.Max(principal, 1.0) }.Min();
-        var maxValue = new[] { fx, fy, Math.Max(principal, 1.0) }.Max();
-
-        return minValue < 1e-10 ? double.MaxValue : maxValue / minValue;
+        return BuildAccuracyReportPayload(
+            inputPoints,
+            outputPoints,
+            roundTripErrors,
+            isPixelToWorld ? "px" : "world_unit",
+            diagnostics);
     }
 
-    private Mat CreateVisualization(
-        Mat image,
-        List<Point3d> inputPoints,
-        List<Point3d> outputPoints,
-        string transformMode,
-        TransformReport report)
+    private static Dictionary<string, object> BuildRayPlaneAccuracyReport(
+        RayPlaneContext context,
+        DistortionContext distortion,
+        IReadOnlyList<Point3d> inputPoints,
+        IReadOnlyList<Point3d> outputPoints,
+        bool isPixelToWorld,
+        double worldPlaneZ,
+        double unitScale,
+        IReadOnlyList<string>? diagnostics)
     {
-        var result = image.Clone();
-        var isPixelToWorld = transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase);
-
-        for (int i = 0; i < inputPoints.Count && i < outputPoints.Count; i++)
+        var roundTripErrors = new List<double>(Math.Min(inputPoints.Count, outputPoints.Count));
+        for (var i = 0; i < inputPoints.Count && i < outputPoints.Count; i++)
         {
-            var inputPt = new Point((int)inputPoints[i].X, (int)inputPoints[i].Y);
-            
-            // 绘制输入点
-            Cv2.Circle(result, inputPt, 5, new Scalar(0, 0, 255), -1);
-            Cv2.PutText(result, $"{i}", new Point(inputPt.X + 8, inputPt.Y - 8),
-                HersheyFonts.HersheySimplex, 0.5, new Scalar(0, 0, 255), 1);
+            if (isPixelToWorld)
+            {
+                var worldPointMm = new Point3d(
+                    outputPoints[i].X * unitScale,
+                    outputPoints[i].Y * unitScale,
+                    outputPoints[i].Z * unitScale);
+                if (!TryWorldToPixelByProjection(context, distortion, worldPointMm, out var pixelPoint, out _))
+                {
+                    continue;
+                }
 
-            // 绘制坐标文本
-            var coordText = isPixelToWorld
-                ? $"W:({outputPoints[i].X:F2},{outputPoints[i].Y:F2})"
-                : $"P:({outputPoints[i].X:F1},{outputPoints[i].Y:F1})";
-            Cv2.PutText(result, coordText, new Point(inputPt.X + 8, inputPt.Y + 15),
-                HersheyFonts.HersheySimplex, 0.4, new Scalar(0, 255, 0), 1);
+                roundTripErrors.Add(MeasurementGeometryHelper.Distance(inputPoints[i].X, inputPoints[i].Y, pixelPoint.X, pixelPoint.Y));
+            }
+            else
+            {
+                var planeZmm = Math.Abs(inputPoints[i].Z) > Epsilon
+                    ? inputPoints[i].Z * unitScale
+                    : worldPlaneZ;
+                if (!TryPixelToWorldByRayPlane(context, distortion, outputPoints[i].X, outputPoints[i].Y, planeZmm, out var worldPointMm, out _))
+                {
+                    continue;
+                }
+
+                roundTripErrors.Add(MeasurementGeometryHelper.Distance(
+                    inputPoints[i].X,
+                    inputPoints[i].Y,
+                    worldPointMm.X / unitScale,
+                    worldPointMm.Y / unitScale));
+            }
         }
 
-        // 绘制报告信息
-        Cv2.PutText(result, $"Mode: {transformMode}", new Point(10, 30),
-            HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 0), 2);
-        Cv2.PutText(result, $"Quality: {report.Quality}", new Point(10, 55),
-            HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 0), 2);
-        if (report.MeanReprojectionError > 0)
+        return BuildAccuracyReportPayload(
+            inputPoints,
+            outputPoints,
+            roundTripErrors,
+            isPixelToWorld ? "px" : "world_unit",
+            diagnostics);
+    }
+
+    private static Dictionary<string, object> BuildAccuracyReportPayload(
+        IReadOnlyList<Point3d> inputPoints,
+        IReadOnlyList<Point3d> outputPoints,
+        IReadOnlyList<double> roundTripErrors,
+        string roundTripUnit,
+        IReadOnlyList<string>? diagnostics)
+    {
+        var mean = roundTripErrors.Count > 0 ? roundTripErrors.Average() : 0.0;
+        var max = roundTripErrors.Count > 0 ? roundTripErrors.Max() : 0.0;
+        var rmse = roundTripErrors.Count > 0
+            ? Math.Sqrt(roundTripErrors.Select(static error => error * error).Average())
+            : 0.0;
+
+        return new Dictionary<string, object>
         {
-            Cv2.PutText(result, $"Reproj Error: {report.MeanReprojectionError:F3}px", new Point(10, 80),
-                HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 0), 2);
+            ["InputPoints"] = inputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
+            ["OutputPoints"] = outputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
+            ["RoundTripErrors"] = roundTripErrors.ToList(),
+            ["RoundTripUnit"] = roundTripUnit,
+            ["RoundTripMean"] = mean,
+            ["RoundTripMax"] = max,
+            ["RoundTripP95"] = ComputePercentile(roundTripErrors, 0.95),
+            ["RoundTripRmse"] = rmse,
+            ["Diagnostics"] = diagnostics?.ToList() ?? new List<string>(),
+            ["TimestampUtc"] = DateTime.UtcNow
+        };
+    }
+
+    private static Dictionary<string, object> CreateFallbackAccuracyReport(
+        IReadOnlyList<Point3d> inputPoints,
+        IReadOnlyList<Point3d> outputPoints,
+        IReadOnlyList<string>? diagnostics)
+    {
+        return new Dictionary<string, object>
+        {
+            ["InputPoints"] = inputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
+            ["OutputPoints"] = outputPoints.Select(p => new { p.X, p.Y, p.Z }).ToList(),
+            ["RoundTripErrors"] = new List<double>(),
+            ["RoundTripUnit"] = string.Empty,
+            ["RoundTripMean"] = 0.0,
+            ["RoundTripMax"] = 0.0,
+            ["RoundTripP95"] = 0.0,
+            ["RoundTripRmse"] = 0.0,
+            ["Diagnostics"] = diagnostics?.ToList() ?? new List<string>(),
+            ["TimestampUtc"] = DateTime.UtcNow
+        };
+    }
+
+    private static double ComputePercentile(IReadOnlyList<double> values, double percentile)
+    {
+        if (values.Count == 0)
+        {
+            return 0.0;
         }
 
+        var ordered = values.OrderBy(static value => value).ToArray();
+        if (ordered.Length == 1)
+        {
+            return ordered[0];
+        }
+
+        var position = Math.Clamp(percentile, 0.0, 1.0) * (ordered.Length - 1);
+        var lower = (int)Math.Floor(position);
+        var upper = (int)Math.Ceiling(position);
+        if (lower == upper)
+        {
+            return ordered[lower];
+        }
+
+        var ratio = position - lower;
+        return ordered[lower] * (1.0 - ratio) + ordered[upper] * ratio;
+    }
+
+    private Mat DrawVisualization(
+        Mat source,
+        IReadOnlyList<Point3d> inputPoints,
+        IReadOnlyList<Point3d> outputPoints,
+        string transformMode)
+    {
+        var result = source.Clone();
+        for (var i = 0; i < inputPoints.Count && i < outputPoints.Count; i++)
+        {
+            var x = (int)Math.Round(inputPoints[i].X);
+            var y = (int)Math.Round(inputPoints[i].Y);
+            Cv2.Circle(result, new Point(x, y), 4, new Scalar(0, 0, 255), -1);
+            var label = transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase)
+                ? $"W({outputPoints[i].X:F2},{outputPoints[i].Y:F2})"
+                : $"P({outputPoints[i].X:F1},{outputPoints[i].Y:F1})";
+            Cv2.PutText(
+                result,
+                label,
+                new Point(x + 6, y - 6),
+                HersheyFonts.HersheySimplex,
+                0.4,
+                new Scalar(0, 255, 0),
+                1);
+        }
+
+        Cv2.PutText(
+            result,
+            $"Mode: {transformMode}",
+            new Point(10, 25),
+            HersheyFonts.HersheySimplex,
+            0.6,
+            new Scalar(255, 255, 0),
+            2);
         return result;
     }
 
-    private Mat CreateCoordinateVisualization(
-        List<Point3d> inputPoints,
-        List<Point3d> outputPoints,
-        string transformMode,
-        Size imageSize)
+    private static bool IsSupportedPlanarKind(CalibrationKindV2 kind)
     {
-        // 创建坐标系可视化
-        var size = Math.Max(imageSize.Width, imageSize.Height);
-        if (size < 640) size = 640;
-        
-        var result = new Mat(size, size, MatType.CV_8UC3, new Scalar(30, 30, 30));
-        
-        // 绘制坐标轴
-        var center = new Point(size / 2, size / 2);
-        Cv2.Line(result, new Point(0, center.Y), new Point(size, center.Y), new Scalar(100, 100, 100), 1);
-        Cv2.Line(result, new Point(center.X, 0), new Point(center.X, size), new Scalar(100, 100, 100), 1);
-
-        // 绘制点
-        var isPixelToWorld = transformMode.Equals("PixelToWorld", StringComparison.OrdinalIgnoreCase);
-        var scale = size / 2.0 / (outputPoints.Count > 0 ? outputPoints.Max(p => Math.Max(Math.Abs(p.X), Math.Abs(p.Y))) + 10 : 100);
-
-        for (int i = 0; i < outputPoints.Count; i++)
-        {
-            var pt = outputPoints[i];
-            var drawPt = new Point(
-                (int)(center.X + pt.X * scale),
-                (int)(center.Y - pt.Y * scale)); // Y轴向上
-
-            Cv2.Circle(result, drawPt, 5, new Scalar(0, 255, 0), -1);
-            Cv2.PutText(result, $"{i}:({pt.X:F1},{pt.Y:F1})", new Point(drawPt.X + 8, drawPt.Y),
-                HersheyFonts.HersheySimplex, 0.4, new Scalar(255, 255, 255), 1);
-        }
-
-        Cv2.PutText(result, $"Mode: {transformMode}", new Point(10, 30),
-            HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 0), 2);
-
-        return result;
+        return kind == CalibrationKindV2.PlanarTransform2D || kind == CalibrationKindV2.RigidTransform2D;
     }
 
     private bool TryResolveCalibrationData(Operator @operator, Dictionary<string, object>? inputs, out string? calibrationData)
     {
         calibrationData = null;
-        
-        if (inputs != null && inputs.TryGetValue("CalibrationData", out var data) && data is string strData)
+        if (inputs != null &&
+            inputs.TryGetValue("CalibrationData", out var dataObj) &&
+            dataObj is string inlineData &&
+            !string.IsNullOrWhiteSpace(inlineData))
         {
-            calibrationData = strData;
+            calibrationData = inlineData;
             return true;
         }
 
-        var file = GetStringParam(@operator, "CalibrationFile", "");
-        if (!string.IsNullOrEmpty(file) && File.Exists(file))
+        var inlineParameterData = GetStringParam(@operator, "CalibrationData", string.Empty);
+        if (!string.IsNullOrWhiteSpace(inlineParameterData))
         {
-            calibrationData = File.ReadAllText(file);
+            calibrationData = inlineParameterData;
             return true;
         }
 
         return false;
     }
 
-    private bool TryParseCalibrationData(string json, out CameraCalibrationParams camParams, out string? error)
+    private bool TryGetInputPoints(
+        Operator @operator,
+        Dictionary<string, object>? inputs,
+        out List<Point3d> points,
+        out string error)
     {
-        camParams = new CameraCalibrationParams();
-        error = null;
+        points = new List<Point3d>();
+        error = string.Empty;
 
+        if (inputs != null && inputs.TryGetValue("Points", out var rawPoints) && rawPoints != null)
+        {
+            if (!TryAppendInputPoints(rawPoints, points, out error))
+            {
+                return false;
+            }
+        }
+
+        if (points.Count > 0)
+        {
+            return true;
+        }
+
+        if (inputs != null && inputs.ContainsKey("Points"))
+        {
+            error = "Points input is provided but contains no valid points.";
+            return false;
+        }
+
+        var x = GetDoubleParam(@operator, "InputPointX", 0.0);
+        var y = GetDoubleParam(@operator, "InputPointY", 0.0);
+        points.Add(new Point3d(x, y, 0));
+        return true;
+    }
+
+    private static bool TryAppendInputPoints(
+        object rawPoints,
+        ICollection<Point3d> output,
+        out string error)
+    {
+        error = string.Empty;
+
+        if (rawPoints is IEnumerable<Position> positions)
+        {
+            foreach (var position in positions)
+            {
+                output.Add(new Point3d(position.X, position.Y, 0));
+            }
+
+            return true;
+        }
+
+        if (rawPoints is IEnumerable<Point2f> point2Fs)
+        {
+            foreach (var point in point2Fs)
+            {
+                output.Add(new Point3d(point.X, point.Y, 0));
+            }
+
+            return true;
+        }
+
+        if (rawPoints is IEnumerable<Point3f> point3Fs)
+        {
+            foreach (var point in point3Fs)
+            {
+                output.Add(new Point3d(point.X, point.Y, point.Z));
+            }
+
+            return true;
+        }
+
+        if (rawPoints is IEnumerable<Point3d> point3Ds)
+        {
+            foreach (var point in point3Ds)
+            {
+                output.Add(point);
+            }
+
+            return true;
+        }
+
+        if (rawPoints is string json && !string.IsNullOrWhiteSpace(json))
+        {
+            return TryAppendPointsFromJson(json, output, out error);
+        }
+
+        if (rawPoints is IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+            {
+                if (item is Position pos)
+                {
+                    output.Add(new Point3d(pos.X, pos.Y, 0));
+                }
+                else if (item is Point3d p3d)
+                {
+                    output.Add(p3d);
+                }
+                else if (item is Point2f p2f)
+                {
+                    output.Add(new Point3d(p2f.X, p2f.Y, 0));
+                }
+            }
+
+            return true;
+        }
+
+        error = $"Unsupported Points input type: {rawPoints.GetType().Name}.";
+        return false;
+    }
+
+    private static bool TryAppendPointsFromJson(string json, ICollection<Point3d> output, out string error)
+    {
+        error = string.Empty;
         try
         {
             using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            // 解析相机矩阵
-            if (root.TryGetProperty("CameraMatrix", out var camMatrixElem))
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
             {
-                camParams.CameraMatrix = ParseMatrix(camMatrixElem, 3, 3);
-            }
-            else if (root.TryGetProperty("CameraMatrixLeft", out var camMatrixLeftElem))
-            {
-                // 立体标定数据 - 使用左相机
-                camParams.CameraMatrix = ParseMatrix(camMatrixLeftElem, 3, 3);
+                error = "Points JSON must be an array of point objects.";
+                return false;
             }
 
-            // 解析畸变系数
-            if (root.TryGetProperty("DistCoeffs", out var distCoeffsElem))
+            var index = 0;
+            foreach (var item in doc.RootElement.EnumerateArray())
             {
-                camParams.DistCoeffs = ParseVector(distCoeffsElem);
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    error = $"Points[{index}] must be an object.";
+                    return false;
+                }
+
+                if (!TryReadNumber(item, "X", required: true, out var x, out var xError))
+                {
+                    error = $"Points[{index}].X {xError}";
+                    return false;
+                }
+
+                if (!TryReadNumber(item, "Y", required: true, out var y, out var yError))
+                {
+                    error = $"Points[{index}].Y {yError}";
+                    return false;
+                }
+
+                var z = 0.0;
+                if (!TryReadNumber(item, "Z", required: false, out z, out var zError))
+                {
+                    error = $"Points[{index}].Z {zError}";
+                    return false;
+                }
+
+                output.Add(new Point3d(x, y, z));
+                index++;
             }
 
-            // 解析旋转矩阵（外参）
-            if (root.TryGetProperty("RotationMatrix", out var rotMatElem))
+            if (index == 0)
             {
-                camParams.RotationMatrix = ParseMatrix(rotMatElem, 3, 3);
+                error = "Points JSON must contain at least one point.";
+                return false;
             }
 
-            // 解析平移向量
-            if (root.TryGetProperty("TranslationVector", out var tvecElem))
-            {
-                camParams.TranslationVector = ParseVector(tvecElem);
-            }
-
-            // 解析旋转向量
-            if (root.TryGetProperty("RotationVector", out var rvecElem))
-            {
-                camParams.RotationVector = ParseVector(rvecElem);
-            }
-
-            // 解析图像尺寸
-            if (root.TryGetProperty("ImageWidth", out var widthElem) && 
-                root.TryGetProperty("ImageHeight", out var heightElem))
-            {
-                camParams.ImageSize = new Size(widthElem.GetInt32(), heightElem.GetInt32());
-            }
-
-            // 解析变换矩阵（如果有）
-            if (root.TryGetProperty("TransformMatrix", out var transMatElem))
-            {
-                camParams.TransformMatrix = ParseMatrix(transMatElem, 3, 3);
-            }
-
-            return camParams.CameraMatrix != null && !camParams.CameraMatrix.Empty();
+            return true;
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            error = ex.Message;
+            error = $"Invalid Points JSON: {ex.Message}";
             return false;
         }
     }
 
-    private Mat ParseMatrix(JsonElement element, int rows, int cols)
+    private static bool TryReadNumber(
+        JsonElement obj,
+        string name,
+        bool required,
+        out double value,
+        out string error)
     {
-        var mat = new Mat(rows, cols, MatType.CV_64FC1);
-        
-        if (element.ValueKind == JsonValueKind.Array)
+        value = 0;
+        error = string.Empty;
+        foreach (var property in obj.EnumerateObject())
         {
-            var arr = element.EnumerateArray().ToArray();
-            
-            // 支持嵌套数组格式 [[1,2,3],[4,5,6],[7,8,9]]
-            if (arr.Length == rows && arr[0].ValueKind == JsonValueKind.Array)
+            if (!property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
             {
-                for (int i = 0; i < rows; i++)
-                {
-                    var row = arr[i].EnumerateArray().ToArray();
-                    for (int j = 0; j < Math.Min(cols, row.Length); j++)
-                    {
-                        mat.Set(i, j, row[j].GetDouble());
-                    }
-                }
+                continue;
             }
-            // 支持扁平数组格式 [1,2,3,4,5,6,7,8,9]
-            else if (arr.Length == rows * cols)
+
+            if (property.Value.ValueKind == JsonValueKind.Number)
             {
-                for (int i = 0; i < rows; i++)
+                var parsed = property.Value.GetDouble();
+                if (!double.IsFinite(parsed))
                 {
-                    for (int j = 0; j < cols; j++)
-                    {
-                        mat.Set(i, j, arr[i * cols + j].GetDouble());
-                    }
+                    error = "must be finite.";
+                    return false;
                 }
+
+                value = parsed;
+                return true;
+            }
+
+            if (property.Value.ValueKind == JsonValueKind.String &&
+                double.TryParse(property.Value.GetString(), NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var fromString) &&
+                double.IsFinite(fromString))
+            {
+                value = fromString;
+                return true;
+            }
+
+            error = "must be a valid number.";
+            return false;
+        }
+
+        if (required)
+        {
+            error = "is required.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryCreateRayPlaneContext(
+        CalibrationBundleV2 bundle,
+        out RayPlaneContext context,
+        out string error)
+    {
+        context = default;
+        error = string.Empty;
+
+        if (bundle.Intrinsics == null || !CalibrationBundleV2Json.HasMatrix(bundle.Intrinsics.CameraMatrix, 3, 3))
+        {
+            error = "Ray-plane path requires Intrinsics.CameraMatrix (3x3).";
+            return false;
+        }
+
+        if (bundle.Transform3D == null || !CalibrationBundleV2Json.HasMatrix(bundle.Transform3D.Matrix, 4, 4))
+        {
+            error = "Ray-plane path requires Transform3D.Matrix (4x4).";
+            return false;
+        }
+
+        if (!CalibrationBundleV2Helpers.IsFiniteMatrix(bundle.Intrinsics.CameraMatrix) ||
+            !CalibrationBundleV2Helpers.IsFiniteMatrix(bundle.Transform3D.Matrix))
+        {
+            error = "Calibration matrix data contains NaN or Infinity.";
+            return false;
+        }
+
+        var k = bundle.Intrinsics.CameraMatrix;
+        var fx = k[0][0];
+        var fy = k[1][1];
+        var cx = k[0][2];
+        var cy = k[1][2];
+
+        if (fx <= Epsilon || fy <= Epsilon)
+        {
+            error = "Camera matrix is invalid because fx/fy must be positive.";
+            return false;
+        }
+
+        if (!TryMapRayPlaneFrame(bundle.SourceFrame, out var source))
+        {
+            error = $"Unsupported SourceFrame for ray-plane path: '{bundle.SourceFrame}'.";
+            return false;
+        }
+
+        if (!TryMapRayPlaneFrame(bundle.TargetFrame, out var target))
+        {
+            error = $"Unsupported TargetFrame for ray-plane path: '{bundle.TargetFrame}'.";
+            return false;
+        }
+
+        var rawTransform = bundle.Transform3D.Matrix;
+
+        double[][] cameraToWorld;
+        if (source == RayPlaneFrame.Camera && target == RayPlaneFrame.World)
+        {
+            cameraToWorld = CloneMatrix(rawTransform);
+        }
+        else if (source == RayPlaneFrame.World && target == RayPlaneFrame.Camera)
+        {
+            if (!TryInvert4x4(rawTransform, out cameraToWorld))
+            {
+                error = "Transform3D is singular and cannot be inverted.";
+                return false;
+            }
+        }
+        else
+        {
+            error = $"Unsupported SourceFrame/TargetFrame combination for ray-plane path: '{bundle.SourceFrame}' -> '{bundle.TargetFrame}'.";
+            return false;
+        }
+
+        if (!TryInvert4x4(cameraToWorld, out var worldToCamera))
+        {
+            error = "Camera-to-world matrix is singular.";
+            return false;
+        }
+
+        context = new RayPlaneContext(fx, fy, cx, cy, cameraToWorld, worldToCamera);
+        return true;
+    }
+
+    private static bool TryPixelToWorldByRayPlane(
+        RayPlaneContext context,
+        DistortionContext distortion,
+        double pixelX,
+        double pixelY,
+        double worldPlaneZ,
+        out Point3d worldPoint,
+        out string error)
+    {
+        worldPoint = default;
+        error = string.Empty;
+
+        if (!TryResolveNormalizedCameraPoint(context, distortion, pixelX, pixelY, out var normalized, out error))
+        {
+            return false;
+        }
+
+        var rayCamera = Normalize(new Point3d(normalized.X, normalized.Y, 1.0));
+
+        var rayWorld = TransformDirection(context.CameraToWorld, rayCamera);
+        if (Math.Abs(rayWorld.Z) <= Epsilon)
+        {
+            error = "Ray is parallel to the target world plane.";
+            return false;
+        }
+
+        var cameraCenter = TransformPoint(context.CameraToWorld, new Point3d(0, 0, 0));
+        var scale = (worldPlaneZ - cameraCenter.Z) / rayWorld.Z;
+        if (!double.IsFinite(scale))
+        {
+            error = "Ray-plane intersection scale is not finite.";
+            return false;
+        }
+
+        if (scale <= Epsilon)
+        {
+            error = "Ray-plane intersection is behind the camera or too close to be numerically stable.";
+            return false;
+        }
+
+        worldPoint = new Point3d(
+            cameraCenter.X + scale * rayWorld.X,
+            cameraCenter.Y + scale * rayWorld.Y,
+            worldPlaneZ);
+
+        if (!IsFinite(worldPoint))
+        {
+            error = "Computed world point is not finite.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryCreateDistortionContext(
+        CalibrationBundleV2 bundle,
+        bool useDistortion,
+        out DistortionContext context,
+        out string error)
+    {
+        context = DistortionContext.Disabled;
+        error = string.Empty;
+
+        if (!useDistortion)
+        {
+            return true;
+        }
+
+        var distortion = bundle.Distortion;
+        if (distortion == null || distortion.Model == DistortionModelV2.None || distortion.Coefficients.Length == 0)
+        {
+            return true;
+        }
+
+        if (!CalibrationBundleV2Helpers.IsFiniteVector(distortion.Coefficients))
+        {
+            error = "Distortion coefficients contain NaN or Infinity.";
+            return false;
+        }
+
+        switch (distortion.Model)
+        {
+            case DistortionModelV2.BrownConrady:
+                if (!BrownConradyCoefficientLengths.Contains(distortion.Coefficients.Length))
+                {
+                    error = $"BrownConrady distortion in ray-plane path requires one of coefficient lengths: {string.Join(", ", BrownConradyCoefficientLengths.OrderBy(v => v))}.";
+                    return false;
+                }
+
+                context = new DistortionContext(true, distortion.Model, distortion.Coefficients.ToArray());
+                return true;
+            case DistortionModelV2.KannalaBrandt:
+                if (distortion.Coefficients.Length != 4)
+                {
+                    error = "KannalaBrandt distortion requires exactly 4 coefficients in this operator.";
+                    return false;
+                }
+
+                context = new DistortionContext(true, distortion.Model, distortion.Coefficients.ToArray());
+                return true;
+            default:
+                error = $"Unsupported distortion model in ray-plane path: {distortion.Model}.";
+                return false;
+        }
+    }
+
+    private static bool TryResolveNormalizedCameraPoint(
+        RayPlaneContext context,
+        DistortionContext distortion,
+        double pixelX,
+        double pixelY,
+        out Point2d normalized,
+        out string error)
+    {
+        normalized = default;
+        error = string.Empty;
+
+        if (!distortion.Enabled)
+        {
+            normalized = new Point2d(
+                (pixelX - context.Cx) / context.Fx,
+                (pixelY - context.Cy) / context.Fy);
+            return true;
+        }
+
+        using var cameraMatrix = CreateCameraMatrix(context);
+        using var distCoeffs = CreateDistortionVector(distortion.Coefficients);
+
+        using var srcPoints = new Mat(1, 1, MatType.CV_64FC2);
+        srcPoints.Set(0, 0, new Vec2d(pixelX, pixelY));
+
+        using var undistortedPoints = new Mat();
+        switch (distortion.Model)
+        {
+            case DistortionModelV2.BrownConrady:
+                Cv2.UndistortPoints(srcPoints, undistortedPoints, cameraMatrix, distCoeffs);
+                break;
+            case DistortionModelV2.KannalaBrandt:
+                Cv2.FishEye.UndistortPoints(srcPoints, undistortedPoints, cameraMatrix, distCoeffs, new Mat(), new Mat());
+                break;
+            default:
+                error = $"Unsupported distortion model in ray-plane normalization: {distortion.Model}.";
+                return false;
+        }
+
+        if (undistortedPoints.Empty())
+        {
+            error = "UndistortPoints returned an empty result.";
+            return false;
+        }
+
+        var uv = undistortedPoints.At<Vec2d>(0, 0);
+        if (!double.IsFinite(uv.Item0) || !double.IsFinite(uv.Item1))
+        {
+            error = "UndistortPoints produced non-finite normalized coordinates.";
+            return false;
+        }
+
+        normalized = new Point2d(uv.Item0, uv.Item1);
+        return true;
+    }
+
+    private static bool TryWorldToPixelByProjection(
+        RayPlaneContext context,
+        DistortionContext distortion,
+        Point3d worldPoint,
+        out Point3d pixelPoint,
+        out string error)
+    {
+        pixelPoint = default;
+        error = string.Empty;
+
+        var cameraPoint = TransformPoint(context.WorldToCamera, worldPoint);
+        if (Math.Abs(cameraPoint.Z) <= Epsilon)
+        {
+            error = "Point projects to infinity (camera Z is zero).";
+            return false;
+        }
+
+        var x = cameraPoint.X / cameraPoint.Z;
+        var y = cameraPoint.Y / cameraPoint.Z;
+        double u;
+        double v;
+
+        if (!distortion.Enabled)
+        {
+            u = context.Fx * x + context.Cx;
+            v = context.Fy * y + context.Cy;
+        }
+        else
+        {
+            if (!TryProjectWithDistortion(context, distortion, cameraPoint, out u, out v, out error))
+            {
+                return false;
             }
         }
 
-        return mat;
-    }
+        pixelPoint = new Point3d(u, v, 0);
 
-    private Mat ParseVector(JsonElement element)
-    {
-        if (element.ValueKind != JsonValueKind.Array)
-            return new Mat();
-
-        var values = element.EnumerateArray().Select(e => e.GetDouble()).ToArray();
-        var mat = new Mat(values.Length, 1, MatType.CV_64FC1);
-        for (int i = 0; i < values.Length; i++)
+        if (!IsFinite(pixelPoint))
         {
-            mat.Set(i, 0, values[i]);
-        }
-        return mat;
-    }
-
-    public override ValidationResult ValidateParameters(Operator @operator)
-    {
-        var unitScale = GetDoubleParam(@operator, "UnitScale", 1.0);
-        if (unitScale <= 0)
-        {
-            return ValidationResult.Invalid("UnitScale must be positive.");
+            error = "Projected pixel point is not finite.";
+            return false;
         }
 
-        var worldPlaneZ = GetDoubleParam(@operator, "WorldPlaneZ", 0.0);
-        // Z值范围检查（防止极端值）
-        if (Math.Abs(worldPlaneZ) > 10000)
+        return true;
+    }
+
+    private static bool TryProjectWithDistortion(
+        RayPlaneContext context,
+        DistortionContext distortion,
+        Point3d cameraPoint,
+        out double u,
+        out double v,
+        out string error)
+    {
+        u = 0;
+        v = 0;
+        error = string.Empty;
+
+        using var cameraMatrix = CreateCameraMatrix(context);
+        using var distCoeffs = CreateDistortionVector(distortion.Coefficients);
+        using var objectPoints = new Mat(1, 1, MatType.CV_64FC3);
+        objectPoints.Set(0, 0, new Vec3d(cameraPoint.X, cameraPoint.Y, cameraPoint.Z));
+        using var zeroRvec = new Mat(3, 1, MatType.CV_64FC1, Scalar.All(0));
+        using var zeroTvec = new Mat(3, 1, MatType.CV_64FC1, Scalar.All(0));
+        using var imagePoints = new Mat();
+
+        switch (distortion.Model)
         {
-            Logger.LogWarning("WorldPlaneZ is unusually large: {Z}", worldPlaneZ);
+            case DistortionModelV2.BrownConrady:
+                Cv2.ProjectPoints(objectPoints, zeroRvec, zeroTvec, cameraMatrix, distCoeffs, imagePoints, new Mat(), 0.0);
+                break;
+            case DistortionModelV2.KannalaBrandt:
+                Cv2.FishEye.ProjectPoints(objectPoints, imagePoints, zeroRvec, zeroTvec, cameraMatrix, distCoeffs, 0.0, new Mat());
+                break;
+            default:
+                error = $"Unsupported distortion model in projection path: {distortion.Model}.";
+                return false;
         }
 
-        return ValidationResult.Valid();
-    }
-
-    private enum TransformQuality
-    {
-        Poor,   // 条件数 > 1e6
-        Fair,   // 条件数 > 1e4
-        Good    // 条件数 <= 1e4
-    }
-
-    private class TransformReport
-    {
-        public double ConditionNumber { get; set; }
-        public TransformQuality Quality { get; set; }
-        public double MeanReprojectionError { get; set; }
-        public double MaxReprojectionError { get; set; }
-    }
-
-    private class CameraCalibrationParams : IDisposable
-    {
-        public Mat CameraMatrix { get; set; } = new Mat();
-        public Mat DistCoeffs { get; set; } = new Mat();
-        public Mat RotationMatrix { get; set; } = new Mat();
-        public Mat RotationVector { get; set; } = new Mat();
-        public Mat TranslationVector { get; set; } = new Mat();
-        public Mat TransformMatrix { get; set; } = new Mat();
-        public Size ImageSize { get; set; }
-
-        public void Dispose()
+        if (imagePoints.Empty())
         {
-            CameraMatrix?.Dispose();
-            DistCoeffs?.Dispose();
-            RotationMatrix?.Dispose();
-            RotationVector?.Dispose();
-            TranslationVector?.Dispose();
-            TransformMatrix?.Dispose();
+            error = "Projection returned an empty result.";
+            return false;
         }
+
+        var uv = imagePoints.At<Vec2d>(0, 0);
+        if (!double.IsFinite(uv.Item0) || !double.IsFinite(uv.Item1))
+        {
+            error = "Projection produced non-finite pixel coordinates.";
+            return false;
+        }
+
+        u = uv.Item0;
+        v = uv.Item1;
+        return true;
+    }
+
+    private static Mat CreateCameraMatrix(RayPlaneContext context)
+    {
+        var cameraMatrix = new Mat(3, 3, MatType.CV_64FC1, Scalar.All(0));
+        cameraMatrix.Set(0, 0, context.Fx);
+        cameraMatrix.Set(1, 1, context.Fy);
+        cameraMatrix.Set(0, 2, context.Cx);
+        cameraMatrix.Set(1, 2, context.Cy);
+        cameraMatrix.Set(2, 2, 1.0);
+        return cameraMatrix;
+    }
+
+    private static Mat CreateDistortionVector(IReadOnlyList<double> coefficients)
+    {
+        var distCoeffs = new Mat(coefficients.Count, 1, MatType.CV_64FC1);
+        for (var i = 0; i < coefficients.Count; i++)
+        {
+            distCoeffs.Set(i, 0, coefficients[i]);
+        }
+
+        return distCoeffs;
+    }
+
+    private static Point3d TransformPoint(double[][] matrix, Point3d point)
+    {
+        var x = matrix[0][0] * point.X + matrix[0][1] * point.Y + matrix[0][2] * point.Z + matrix[0][3];
+        var y = matrix[1][0] * point.X + matrix[1][1] * point.Y + matrix[1][2] * point.Z + matrix[1][3];
+        var z = matrix[2][0] * point.X + matrix[2][1] * point.Y + matrix[2][2] * point.Z + matrix[2][3];
+        var w = matrix[3][0] * point.X + matrix[3][1] * point.Y + matrix[3][2] * point.Z + matrix[3][3];
+        if (Math.Abs(w) <= Epsilon)
+        {
+            return new Point3d(double.NaN, double.NaN, double.NaN);
+        }
+
+        return new Point3d(x / w, y / w, z / w);
+    }
+
+    private static Point3d TransformDirection(double[][] matrix, Point3d direction)
+    {
+        var x = matrix[0][0] * direction.X + matrix[0][1] * direction.Y + matrix[0][2] * direction.Z;
+        var y = matrix[1][0] * direction.X + matrix[1][1] * direction.Y + matrix[1][2] * direction.Z;
+        var z = matrix[2][0] * direction.X + matrix[2][1] * direction.Y + matrix[2][2] * direction.Z;
+        return Normalize(new Point3d(x, y, z));
+    }
+
+    private static Point3d Normalize(Point3d vector)
+    {
+        var norm = Math.Sqrt(vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z);
+        if (norm <= Epsilon)
+        {
+            return new Point3d(double.NaN, double.NaN, double.NaN);
+        }
+
+        return new Point3d(vector.X / norm, vector.Y / norm, vector.Z / norm);
+    }
+
+    private static bool TryInvert4x4(double[][] matrix, out double[][] inverse)
+    {
+        inverse = Array.Empty<double[]>();
+        try
+        {
+            using var mat = CalibrationBundleV2Helpers.ToMat(matrix);
+            using var inv = new Mat();
+            var invertResult = Cv2.Invert(mat, inv, DecompTypes.LU);
+            if (Math.Abs(invertResult) <= Epsilon)
+            {
+                return false;
+            }
+
+            inverse = CalibrationBundleV2Helpers.ToJaggedMatrix(inv);
+            return CalibrationBundleV2Json.HasMatrix(inverse, 4, 4) && CalibrationBundleV2Helpers.IsFiniteMatrix(inverse);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsFinite(Point3d point)
+    {
+        return double.IsFinite(point.X) && double.IsFinite(point.Y) && double.IsFinite(point.Z);
+    }
+
+    private static double[][] CloneMatrix(double[][] source)
+    {
+        var clone = new double[source.Length][];
+        for (var i = 0; i < source.Length; i++)
+        {
+            clone[i] = source[i].ToArray();
+        }
+
+        return clone;
+    }
+
+    private static bool TryMapRayPlaneFrame(string? frame, out RayPlaneFrame mapped)
+    {
+        mapped = default;
+        var normalized = NormalizeFrameToken(frame);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return false;
+        }
+
+        switch (normalized)
+        {
+            case "camera":
+            case "cam":
+            case "cameraframe":
+            case "image":
+            case "imageundistorted":
+                mapped = RayPlaneFrame.Camera;
+                return true;
+            case "world":
+            case "worldframe":
+            case "base":
+            case "robotbase":
+                mapped = RayPlaneFrame.World;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static string NormalizeFrameToken(string? frame)
+    {
+        if (string.IsNullOrWhiteSpace(frame))
+        {
+            return string.Empty;
+        }
+
+        return new string(frame.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+    }
+
+    private enum RayPlaneFrame
+    {
+        Camera = 0,
+        World = 1
+    }
+
+    private readonly record struct RayPlaneContext(
+        double Fx,
+        double Fy,
+        double Cx,
+        double Cy,
+        double[][] CameraToWorld,
+        double[][] WorldToCamera);
+
+    private readonly record struct DistortionContext(
+        bool Enabled,
+        DistortionModelV2 Model,
+        double[] Coefficients)
+    {
+        public static DistortionContext Disabled => new(false, DistortionModelV2.None, Array.Empty<double>());
     }
 }

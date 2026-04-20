@@ -1,0 +1,174 @@
+{
+  "GeneratedAtUtc": "2026-04-13T13:43:05.7540661Z",
+  "GateProfile": "acceptance",
+  "WarmupIterations": 5,
+  "MeasuredIterations": 24,
+  "BudgetScale": 1.2,
+  "Entries": [
+    {
+      "Name": "AngleMeasurement",
+      "BudgetMs": 10,
+      "Scale": 1.2,
+      "AllowedMs": 12,
+      "MeanMs": 0.37880833333333336,
+      "P95Ms": 0.7706,
+      "P99Ms": 0.8816,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "CaliperTool",
+      "BudgetMs": 50,
+      "Scale": 1.2,
+      "AllowedMs": 60,
+      "MeanMs": 0.23545416666666666,
+      "P95Ms": 0.3886,
+      "P99Ms": 0.4151,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "CircleMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.2,
+      "AllowedMs": 36,
+      "MeanMs": 5.300691666666666,
+      "P95Ms": 5.8854,
+      "P99Ms": 6.4932,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "ContourMeasurement",
+      "BudgetMs": 40,
+      "Scale": 1.2,
+      "AllowedMs": 48,
+      "MeanMs": 0.5843291666666667,
+      "P95Ms": 0.8345,
+      "P99Ms": 0.8534,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "GapMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.2,
+      "AllowedMs": 36,
+      "MeanMs": 1.1653583333333333,
+      "P95Ms": 1.3636,
+      "P99Ms": 6.4466,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "GeoMeasurement",
+      "BudgetMs": 20,
+      "Scale": 1.2,
+      "AllowedMs": 24,
+      "MeanMs": 0.011158333333333334,
+      "P95Ms": 0.0172,
+      "P99Ms": 0.0668,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "GeometricTolerance",
+      "BudgetMs": 20,
+      "Scale": 1.2,
+      "AllowedMs": 24,
+      "MeanMs": 0.11870416666666665,
+      "P95Ms": 0.1578,
+      "P99Ms": 0.1594,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "HistogramAnalysis",
+      "BudgetMs": 10,
+      "Scale": 1.2,
+      "AllowedMs": 12,
+      "MeanMs": 0.7374916666666667,
+      "P95Ms": 0.854,
+      "P99Ms": 1.0031,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "LineLineDistance",
+      "BudgetMs": 10,
+      "Scale": 1.2,
+      "AllowedMs": 12,
+      "MeanMs": 0.003283333333333333,
+      "P95Ms": 0.0035,
+      "P99Ms": 0.0087,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "LineMeasurement",
+      "BudgetMs": 20,
+      "Scale": 1.2,
+      "AllowedMs": 24,
+      "MeanMs": 5.131966666666666,
+      "P95Ms": 5.4095,
+      "P99Ms": 7.265,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "MeasureDistance",
+      "BudgetMs": 10,
+      "Scale": 1.2,
+      "AllowedMs": 12,
+      "MeanMs": 0.6042624999999999,
+      "P95Ms": 0.7621,
+      "P99Ms": 0.7763,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "PixelStatistics",
+      "BudgetMs": 10,
+      "Scale": 1.2,
+      "AllowedMs": 12,
+      "MeanMs": 0.5624624999999999,
+      "P95Ms": 0.7172,
+      "P99Ms": 0.7835,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "PointLineDistance",
+      "BudgetMs": 10,
+      "Scale": 1.2,
+      "AllowedMs": 12,
+      "MeanMs": 0.0034458333333333333,
+      "P95Ms": 0.004,
+      "P99Ms": 0.0068,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "SharpnessEvaluation",
+      "BudgetMs": 15,
+      "Scale": 1.2,
+      "AllowedMs": 18,
+      "MeanMs": 1.6453041666666663,
+      "P95Ms": 2.2161,
+      "P99Ms": 2.2743,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "WidthMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.2,
+      "AllowedMs": 36,
+      "MeanMs": 1.0203958333333334,
+      "P95Ms": 1.4754,
+      "P99Ms": 1.5032,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    }
+  ]
+}

@@ -7,6 +7,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
+using System.Collections.Concurrent;
 
 using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
@@ -23,10 +24,14 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("FrameCount", "Frame Count", PortDataType.Integer)]
 [OperatorParam("FrameCount", "Frame Count", "int", DefaultValue = 8, Min = 1, Max = 64)]
 [OperatorParam("Mode", "Mode", "enum", DefaultValue = "Mean", Options = new[] { "Mean|Mean", "Median|Median" })]
-public class FrameAveragingOperator : OperatorBase
+public class FrameAveragingOperator : OperatorBase, IDisposable
 {
-    private readonly object _syncRoot = new();
-    private readonly Queue<Mat> _frames = new();
+    private static readonly TimeSpan StateTtl = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
+
+    private readonly ConcurrentDictionary<Guid, FrameWindowState> _states = new();
+    private readonly object _cleanupSync = new();
+    private DateTime _lastCleanupUtc = DateTime.MinValue;
 
     public override OperatorType OperatorType => OperatorType.FrameAveraging;
 
@@ -52,32 +57,33 @@ public class FrameAveragingOperator : OperatorBase
 
         var frameCount = GetIntParam(@operator, "FrameCount", 8, 1, 64);
         var mode = GetStringParam(@operator, "Mode", "Mean");
+        var nowUtc = DateTime.UtcNow;
+        var state = _states.GetOrAdd(@operator.Id, static _ => new FrameWindowState());
 
-        List<Mat> snapshot;
-        lock (_syncRoot)
+        Mat[] snapshot;
+        lock (state.SyncRoot)
         {
-            if (_frames.Count > 0)
+            if (state.Frames.Count > 0)
             {
-                var reference = _frames.Peek();
+                var reference = state.Frames.Peek();
                 if (reference.Rows != src.Rows || reference.Cols != src.Cols || reference.Type() != src.Type())
                 {
-                    while (_frames.Count > 0)
-                    {
-                        var stale = _frames.Dequeue();
-                        stale.Dispose();
-                    }
+                    state.Clear();
                 }
             }
 
-            _frames.Enqueue(src.Clone());
-            while (_frames.Count > frameCount)
+            state.Frames.Enqueue(src.Clone());
+            while (state.Frames.Count > frameCount)
             {
-                var old = _frames.Dequeue();
+                var old = state.Frames.Dequeue();
                 old.Dispose();
             }
 
-            snapshot = _frames.Select(f => f.Clone()).ToList();
+            snapshot = state.Frames.Select(static frame => new Mat(frame)).ToArray();
+            state.LastTouchedUtc = nowUtc;
         }
+
+        TryCleanupStaleStates(nowUtc);
 
         Mat result;
         try
@@ -96,7 +102,7 @@ public class FrameAveragingOperator : OperatorBase
 
         var output = new Dictionary<string, object>
         {
-            { "FrameCount", snapshot.Count }
+            { "FrameCount", snapshot.Length }
         };
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(result, output)));
@@ -118,6 +124,74 @@ public class FrameAveragingOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    public void Dispose()
+    {
+        foreach (var state in _states.Values)
+        {
+            lock (state.SyncRoot)
+            {
+                state.Clear();
+            }
+        }
+
+        _states.Clear();
+    }
+
+    private sealed class FrameWindowState
+    {
+        public object SyncRoot { get; } = new();
+        public Queue<Mat> Frames { get; } = new();
+        public DateTime LastTouchedUtc { get; set; } = DateTime.UtcNow;
+
+        public void Clear()
+        {
+            while (Frames.Count > 0)
+            {
+                var stale = Frames.Dequeue();
+                stale.Dispose();
+            }
+        }
+    }
+
+    private void TryCleanupStaleStates(DateTime nowUtc)
+    {
+        if ((nowUtc - _lastCleanupUtc) < CleanupInterval)
+        {
+            return;
+        }
+
+        lock (_cleanupSync)
+        {
+            if ((nowUtc - _lastCleanupUtc) < CleanupInterval)
+            {
+                return;
+            }
+
+            var staleBefore = nowUtc - StateTtl;
+            foreach (var entry in _states)
+            {
+                var shouldRemove = false;
+                var state = entry.Value;
+                lock (state.SyncRoot)
+                {
+                    shouldRemove = state.LastTouchedUtc < staleBefore;
+                }
+
+                if (!shouldRemove || !_states.TryRemove(entry.Key, out var removedState))
+                {
+                    continue;
+                }
+
+                lock (removedState.SyncRoot)
+                {
+                    removedState.Clear();
+                }
+            }
+
+            _lastCleanupUtc = nowUtc;
+        }
     }
 
     private static Mat ComputeMean(IReadOnlyList<Mat> frames)
@@ -165,41 +239,128 @@ public class FrameAveragingOperator : OperatorBase
 
         var rows = frames[0].Rows;
         var channels = frames[0].Channels();
-
-        using var stacked = BuildTemporalStack(frames);
-        using var sorted = new Mat();
-        Cv2.Sort(stacked, sorted, SortFlags.EveryColumn | SortFlags.Ascending);
-
-        var medianIndex = frames.Count / 2;
-        using var medianRow = sorted.Row(medianIndex);
-        using var medianFlat = medianRow.Clone();
-        using var medianReshaped = medianFlat.Reshape(channels, rows);
-        return medianReshaped.Clone();
-    }
-
-    private static Mat BuildTemporalStack(IReadOnlyList<Mat> frames)
-    {
-        var flattened = new Mat[frames.Count];
+        var depth = frames[0].Depth();
+        var flatWidth = frames[0].Cols * channels;
+        var flattenedViews = new Mat[frames.Count];
 
         try
         {
             for (var i = 0; i < frames.Count; i++)
             {
-                using var reshaped = frames[i].Reshape(1, 1);
-                flattened[i] = reshaped.Clone();
+                flattenedViews[i] = frames[i].Reshape(1, rows);
             }
 
-            var stacked = new Mat();
-            Cv2.VConcat(flattened, stacked);
-            return stacked;
+            return depth switch
+            {
+                MatType.CV_8U => ComputeMedianTyped<byte>(flattenedViews, rows, flatWidth, channels, depth),
+                MatType.CV_16U => ComputeMedianTyped<ushort>(flattenedViews, rows, flatWidth, channels, depth),
+                MatType.CV_32F => ComputeMedianTyped<float>(flattenedViews, rows, flatWidth, channels, depth),
+                MatType.CV_64F => ComputeMedianTyped<double>(flattenedViews, rows, flatWidth, channels, depth),
+                _ => throw new InvalidOperationException($"Unsupported depth for frame median fusion: {depth}")
+            };
         }
         finally
         {
-            foreach (var mat in flattened)
+            foreach (var view in flattenedViews)
             {
-                mat?.Dispose();
+                view?.Dispose();
             }
         }
+    }
+
+    private static Mat ComputeMedianTyped<T>(
+        IReadOnlyList<Mat> flattenedFrames,
+        int rows,
+        int flatWidth,
+        int channels,
+        MatType depth)
+        where T : unmanaged, IComparable<T>
+    {
+        var resultFlat = new Mat(rows, flatWidth, MatType.MakeType(depth, 1));
+        var resultIndexer = resultFlat.GetGenericIndexer<T>();
+        var frameIndexers = flattenedFrames.Select(frame => frame.GetGenericIndexer<T>()).ToArray();
+        var samples = new T[flattenedFrames.Count];
+        var medianIndex = flattenedFrames.Count / 2;
+
+        for (var row = 0; row < rows; row++)
+        {
+            for (var col = 0; col < flatWidth; col++)
+            {
+                for (var frame = 0; frame < flattenedFrames.Count; frame++)
+                {
+                    samples[frame] = frameIndexers[frame][row, col];
+                }
+
+                resultIndexer[row, col] = SelectKthInPlace(samples, medianIndex);
+            }
+        }
+
+        using var reshaped = resultFlat.Reshape(channels, rows);
+        return reshaped.Clone();
+    }
+
+    private static T SelectKthInPlace<T>(T[] values, int k)
+        where T : IComparable<T>
+    {
+        var left = 0;
+        var right = values.Length - 1;
+
+        while (left <= right)
+        {
+            if (left == right)
+            {
+                return values[left];
+            }
+
+            var pivotIndex = left + ((right - left) / 2);
+            pivotIndex = Partition(values, left, right, pivotIndex);
+
+            if (k == pivotIndex)
+            {
+                return values[k];
+            }
+
+            if (k < pivotIndex)
+            {
+                right = pivotIndex - 1;
+            }
+            else
+            {
+                left = pivotIndex + 1;
+            }
+        }
+
+        return values[k];
+    }
+
+    private static int Partition<T>(T[] values, int left, int right, int pivotIndex)
+        where T : IComparable<T>
+    {
+        var pivotValue = values[pivotIndex];
+        Swap(values, pivotIndex, right);
+        var storeIndex = left;
+
+        for (var i = left; i < right; i++)
+        {
+            if (values[i].CompareTo(pivotValue) < 0)
+            {
+                Swap(values, storeIndex, i);
+                storeIndex++;
+            }
+        }
+
+        Swap(values, storeIndex, right);
+        return storeIndex;
+    }
+
+    private static void Swap<T>(T[] values, int i, int j)
+    {
+        if (i == j)
+        {
+            return;
+        }
+
+        (values[i], values[j]) = (values[j], values[i]);
     }
 
     private static void EnsureSameShapeAndType(IReadOnlyList<Mat> frames)

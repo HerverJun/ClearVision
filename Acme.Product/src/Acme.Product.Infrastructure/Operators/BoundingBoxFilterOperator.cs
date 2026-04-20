@@ -72,16 +72,21 @@ public class BoundingBoxFilterOperator : OperatorBase
         var rw = GetIntParam(@operator, "RegionW", 0);
         var rh = GetIntParam(@operator, "RegionH", 0);
         var region = new Rect(rx, ry, Math.Max(0, rw), Math.Max(0, rh));
+        var normalizedMode = mode.Trim().ToLowerInvariant();
+        if (normalizedMode is not ("area" or "class" or "region" or "score"))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("FilterMode must be Area/Class/Region/Score"));
+        }
 
-        var filtered = mode.ToLowerInvariant() switch
+        var filtered = normalizedMode switch
         {
             "area" => detections.Where(d => d.Area >= minArea && d.Area <= maxArea),
             "class" => targetClasses.Count == 0 ? detections : detections.Where(d => targetClasses.Contains(d.Label)),
             "region" => region.Width > 0 && region.Height > 0
-                ? detections.Where(d => region.Contains(new Point((int)d.CenterX, (int)d.CenterY)))
+                ? detections.Where(d => IsCenterInsideRegion(d, region))
                 : Enumerable.Empty<DetectionResultValue>(),
             "score" => detections.Where(d => d.Confidence >= minScore),
-            _ => detections
+            _ => Enumerable.Empty<DetectionResultValue>()
         };
 
         // Apply score threshold as a common post-filter if configured.
@@ -98,19 +103,10 @@ public class BoundingBoxFilterOperator : OperatorBase
             var src = imageWrapper.GetMat();
             if (!src.Empty())
             {
+                var incomingVisualizationDetections = BuildVisualizationDetections(detections, minScore);
+                var keptVisualizationDetections = BuildVisualizationDetections(resultDetections, minScore);
                 var resultImage = src.Clone();
-                foreach (var d in resultDetections)
-                {
-                    var rect = new Rect((int)d.X, (int)d.Y, (int)d.Width, (int)d.Height);
-                    rect = ClampRect(rect, resultImage.Width, resultImage.Height);
-                    if (rect.Width <= 0 || rect.Height <= 0)
-                    {
-                        continue;
-                    }
-
-                    Cv2.Rectangle(resultImage, rect, new Scalar(0, 255, 0), 2);
-                    Cv2.PutText(resultImage, $"{d.Label} {d.Confidence:P0}", new Point(rect.X, Math.Max(12, rect.Y - 4)), HersheyFonts.HersheySimplex, 0.4, new Scalar(0, 255, 0), 1);
-                }
+                DrawDetections(resultImage, incomingVisualizationDetections, new Scalar(255, 120, 0), 1, "IN");
 
                 if (region.Width > 0 && region.Height > 0)
                 {
@@ -118,10 +114,15 @@ public class BoundingBoxFilterOperator : OperatorBase
                     Cv2.Rectangle(resultImage, drawRegion, new Scalar(255, 200, 0), 1);
                 }
 
+                DrawDetections(resultImage, keptVisualizationDetections, new Scalar(0, 255, 0), 2, "KEEP");
+
                 var output = CreateImageOutput(resultImage, new Dictionary<string, object>
                 {
                     { "Detections", outputList },
-                    { "Count", outputList.Count }
+                    { "ReceivedCount", detections.Count },
+                    { "Count", outputList.Count },
+                    { "ReceivedVisualizationCount", incomingVisualizationDetections.Count },
+                    { "VisualizationCount", keptVisualizationDetections.Count }
                 });
 
                 return Task.FromResult(OperatorExecutionOutput.Success(output));
@@ -131,6 +132,7 @@ public class BoundingBoxFilterOperator : OperatorBase
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
             { "Detections", outputList },
+            { "ReceivedCount", detections.Count },
             { "Count", outputList.Count }
         }));
     }
@@ -150,7 +152,31 @@ public class BoundingBoxFilterOperator : OperatorBase
             return ValidationResult.Invalid("MinScore must be within [0, 1]");
         }
 
+        var minArea = GetDoubleParam(@operator, "MinArea", 0, 0);
+        var maxArea = GetDoubleParam(@operator, "MaxArea", 9999999, 0);
+        if (minArea > maxArea)
+        {
+            return ValidationResult.Invalid("MinArea must be less than or equal to MaxArea");
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static bool IsCenterInsideRegion(DetectionResultValue detection, Rect region)
+    {
+        if (region.Width <= 0 || region.Height <= 0)
+        {
+            return false;
+        }
+
+        var left = region.X;
+        var top = region.Y;
+        var right = region.X + region.Width;
+        var bottom = region.Y + region.Height;
+
+        var centerX = detection.CenterX;
+        var centerY = detection.CenterY;
+        return centerX >= left && centerY >= top && centerX < right && centerY < bottom;
     }
 
     private static Rect ClampRect(Rect rect, int width, int height)
@@ -160,6 +186,97 @@ public class BoundingBoxFilterOperator : OperatorBase
         var w = Math.Clamp(rect.Width, 0, width - x);
         var h = Math.Clamp(rect.Height, 0, height - y);
         return new Rect(x, y, w, h);
+    }
+
+    private static void DrawDetections(
+        Mat image,
+        IEnumerable<DetectionResultValue> detections,
+        Scalar color,
+        int thickness,
+        string tag)
+    {
+        foreach (var detection in detections)
+        {
+            var rect = new Rect((int)Math.Round(detection.X), (int)Math.Round(detection.Y), (int)Math.Round(detection.Width), (int)Math.Round(detection.Height));
+            rect = ClampRect(rect, image.Width, image.Height);
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                continue;
+            }
+
+            Cv2.Rectangle(image, rect, color, thickness);
+            var text = $"{tag}:{detection.Label} {detection.Confidence:P0}";
+            Cv2.PutText(image, text, new Point(rect.X, Math.Max(12, rect.Y - 4)), HersheyFonts.HersheySimplex, 0.4, color, 1);
+        }
+    }
+
+    private static List<DetectionResultValue> BuildVisualizationDetections(
+        List<DetectionResultValue> detections,
+        double minScore)
+    {
+        if (detections.Count == 0)
+        {
+            return detections;
+        }
+
+        var scoreFloor = Math.Max((float)minScore, 0.25f);
+        var filtered = detections
+            .Where(detection => detection.Confidence >= scoreFloor)
+            .ToList();
+        if (filtered.Count == 0)
+        {
+            filtered = detections;
+        }
+
+        var kept = new List<DetectionResultValue>();
+        foreach (var group in filtered.GroupBy(detection => detection.Label ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+        {
+            var groupCandidates = group
+                .OrderByDescending(detection => detection.Confidence)
+                .ToList();
+            var removed = new bool[groupCandidates.Count];
+
+            for (var i = 0; i < groupCandidates.Count; i++)
+            {
+                if (removed[i])
+                {
+                    continue;
+                }
+
+                kept.Add(groupCandidates[i]);
+                for (var j = i + 1; j < groupCandidates.Count; j++)
+                {
+                    if (removed[j])
+                    {
+                        continue;
+                    }
+
+                    if (IoU(groupCandidates[i], groupCandidates[j]) > 0.45f)
+                    {
+                        removed[j] = true;
+                    }
+                }
+            }
+        }
+
+        return kept;
+    }
+
+    private static float IoU(DetectionResultValue a, DetectionResultValue b)
+    {
+        var xx1 = Math.Max(a.X, b.X);
+        var yy1 = Math.Max(a.Y, b.Y);
+        var xx2 = Math.Min(a.X + a.Width, b.X + b.Width);
+        var yy2 = Math.Min(a.Y + a.Height, b.Y + b.Height);
+
+        var interW = Math.Max(0, xx2 - xx1);
+        var interH = Math.Max(0, yy2 - yy1);
+        var inter = interW * interH;
+
+        var union = Math.Max(0, a.Width) * Math.Max(0, a.Height)
+            + Math.Max(0, b.Width) * Math.Max(0, b.Height)
+            - inter;
+        return union <= 0 ? 0 : inter / union;
     }
 
     private static bool TryParseDetectionList(object? obj, out List<DetectionResultValue> detections)
@@ -184,15 +301,17 @@ public class BoundingBoxFilterOperator : OperatorBase
 
         if (obj is IEnumerable enumerable)
         {
+            var hasAnyItem = false;
             foreach (var item in enumerable)
             {
+                hasAnyItem = true;
                 if (TryParseDetection(item, out var detection))
                 {
                     detections.Add(detection);
                 }
             }
 
-            return detections.Count > 0;
+            return !hasAnyItem || detections.Count > 0;
         }
 
         return false;

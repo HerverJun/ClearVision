@@ -1,18 +1,18 @@
 # Operator Benchmark Report
 
-Generated (UTC): 2026-03-19T07:32:17.9614395Z
+Generated (UTC): 2026-04-08T11:21:56.1999316Z
 
 | Operator | Resolution | Iterations | Avg (ms) | P95 (ms) | P99 (ms) | Status |
 |---|---:|---:|---:|---:|---:|---|
-| Filtering | 1920x1080 | 8 | 2.12 | 7.00 | 7.00 | OK |
-| Morphology | 1920x1080 | 8 | 3.12 | 4.00 | 4.00 | OK |
-| Thresholding | 1920x1080 | 8 | 6.25 | 19.00 | 19.00 | OK |
-| EdgeDetection | 1920x1080 | 8 | 10.12 | 19.00 | 19.00 | OK |
-| SharpnessEvaluation | 1920x1080 | 8 | 16.50 | 19.00 | 19.00 | OK |
-| BlobAnalysis | 1920x1080 | 8 | 17.50 | 20.00 | 20.00 | OK |
-| Thresholding | 4096x3072 | 5 | 19.20 | 22.00 | 22.00 | OK |
-| Morphology | 4096x3072 | 5 | 28.60 | 69.00 | 69.00 | OK |
-| Filtering | 4096x3072 | 5 | 42.40 | 129.00 | 129.00 | OK |
-| EdgeDetection | 4096x3072 | 5 | 52.20 | 66.00 | 66.00 | OK |
-| BlobAnalysis | 4096x3072 | 5 | 56.00 | 64.00 | 64.00 | OK |
-| SharpnessEvaluation | 4096x3072 | 5 | 69.80 | 75.00 | 75.00 | OK |
+| Filtering | 1920x1080 | 8 | 1.00 | 1.00 | 1.00 | OK |
+| Morphology | 1920x1080 | 8 | 2.25 | 4.00 | 4.00 | OK |
+| Thresholding | 1920x1080 | 8 | 2.75 | 4.00 | 4.00 | OK |
+| Filtering | 4096x3072 | 5 | 6.20 | 8.00 | 8.00 | OK |
+| Thresholding | 4096x3072 | 5 | 8.00 | 9.00 | 9.00 | OK |
+| EdgeDetection | 1920x1080 | 8 | 8.62 | 10.00 | 10.00 | OK |
+| BlobAnalysis | 1920x1080 | 8 | 13.00 | 15.00 | 15.00 | OK |
+| Morphology | 4096x3072 | 5 | 13.20 | 15.00 | 15.00 | OK |
+| SharpnessEvaluation | 1920x1080 | 8 | 16.88 | 25.00 | 25.00 | OK |
+| EdgeDetection | 4096x3072 | 5 | 36.40 | 40.00 | 40.00 | OK |
+| BlobAnalysis | 4096x3072 | 5 | 41.80 | 51.00 | 51.00 | OK |
+| SharpnessEvaluation | 4096x3072 | 5 | 67.20 | 73.00 | 73.00 | OK |

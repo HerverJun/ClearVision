@@ -40,7 +40,8 @@ public class TcpCommunicationOperator : OperatorBase
 
     // 连接池 - 静态缓存
     private static readonly ConcurrentDictionary<string, TcpClient> _connectionPool = new();
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _connectionLocks = new();
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _connectionLocks = new();
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _requestResponseLocks = new();
     private static readonly ConcurrentDictionary<string, NetworkStream> _streamPool = new();
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -85,6 +86,11 @@ public class TcpCommunicationOperator : OperatorBase
             status = false;
         }
 
+        if (!status)
+        {
+            return OperatorExecutionOutput.Failure(response);
+        }
+
         return OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
             { "Response", response },
@@ -102,9 +108,11 @@ public class TcpCommunicationOperator : OperatorBase
         string ipAddress, int port, int timeoutMs, CancellationToken ct)
     {
         var key = $"{ipAddress}:{port}";
-        var lockObj = _connectionLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        var lockEntry = AcquireRefCountedSemaphore(_connectionLocks, key);
+        var lockAcquired = false;
 
-        await lockObj.WaitAsync(ct);
+        await lockEntry.Semaphore.WaitAsync(ct);
+        lockAcquired = true;
         try
         {
             // 检查现有连接是否有效
@@ -118,14 +126,7 @@ public class TcpCommunicationOperator : OperatorBase
                 }
 
                 // 清理旧连接
-                try
-                { existingStream.Dispose(); }
-                catch { }
-                _streamPool.TryRemove(key, out _);
-                try
-                { existingClient.Close(); }
-                catch { }
-                _connectionPool.TryRemove(key, out _);
+                InvalidateConnection(key);
             }
 
             // 建立新连接
@@ -144,13 +145,45 @@ public class TcpCommunicationOperator : OperatorBase
         }
         finally
         {
-            lockObj.Release();
+            if (lockAcquired)
+            {
+                lockEntry.Semaphore.Release();
+            }
+
+            ReleaseRefCountedSemaphore(_connectionLocks, key, lockEntry);
         }
     }
 
     /// <summary>
     /// 检测连接是否存活
     /// </summary>
+    private static void InvalidateConnection(string key)
+    {
+        if (_streamPool.TryRemove(key, out var stream))
+        {
+            try
+            {
+                stream.Dispose();
+            }
+            catch
+            {
+                // Ignore cleanup exceptions.
+            }
+        }
+
+        if (_connectionPool.TryRemove(key, out var client))
+        {
+            try
+            {
+                client.Close();
+            }
+            catch
+            {
+                // Ignore cleanup exceptions.
+            }
+        }
+    }
+
     private bool IsConnectionAlive(TcpClient client)
     {
         try
@@ -165,6 +198,54 @@ public class TcpCommunicationOperator : OperatorBase
         }
     }
 
+    private sealed class RefCountedSemaphore
+    {
+        private int _refCount;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public void AddRef()
+        {
+            Interlocked.Increment(ref _refCount);
+        }
+
+        public int ReleaseRef()
+        {
+            return Interlocked.Decrement(ref _refCount);
+        }
+    }
+
+    private static RefCountedSemaphore AcquireRefCountedSemaphore(
+        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
+        string key)
+    {
+        while (true)
+        {
+            var entry = dictionary.GetOrAdd(key, static _ => new RefCountedSemaphore());
+            entry.AddRef();
+
+            if (dictionary.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
+            {
+                return entry;
+            }
+
+            _ = entry.ReleaseRef();
+        }
+    }
+
+    private static void ReleaseRefCountedSemaphore(
+        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
+        string key,
+        RefCountedSemaphore entry)
+    {
+        if (entry.ReleaseRef() != 0)
+        {
+            return;
+        }
+
+        _ = dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+    }
+
     /// <summary>
     /// 客户端模式执行（带连接池）
     /// </summary>
@@ -176,6 +257,12 @@ public class TcpCommunicationOperator : OperatorBase
         Encoding encoding,
         CancellationToken cancellationToken)
     {
+        var key = $"{ipAddress}:{port}";
+        var requestLockEntry = AcquireRefCountedSemaphore(_requestResponseLocks, key);
+        var requestLockAcquired = false;
+        await requestLockEntry.Semaphore.WaitAsync(cancellationToken);
+        requestLockAcquired = true;
+
         try
         {
             // 从连接池获取连接
@@ -195,6 +282,12 @@ public class TcpCommunicationOperator : OperatorBase
             // 接收响应
             var buffer = new byte[4096];
             var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
+            if (bytesRead == 0)
+            {
+                InvalidateConnection(key);
+                return ("连接已关闭", false);
+            }
+
             var response = encoding.GetString(buffer, 0, bytesRead);
 
             return (response, true);
@@ -209,20 +302,30 @@ public class TcpCommunicationOperator : OperatorBase
         }
         catch (Exception ex)
         {
+            InvalidateConnection(key);
             Logger.LogError(ex, "TCP 通信错误: {IpAddress}:{Port}", ipAddress, port);
             return ($"通信错误: {ex.Message}", false);
+        }
+        finally
+        {
+            if (requestLockAcquired)
+            {
+                requestLockEntry.Semaphore.Release();
+            }
+
+            ReleaseRefCountedSemaphore(_requestResponseLocks, key, requestLockEntry);
         }
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var host = GetStringParam(@operator, "Host", "127.0.0.1");
+        var host = GetStringParam(@operator, "IpAddress", "127.0.0.1");
         var port = GetIntParam(@operator, "Port", 8080);
         var timeout = GetIntParam(@operator, "Timeout", 5000);
         var mode = GetStringParam(@operator, "Mode", "Client");
         var encoding = GetStringParam(@operator, "Encoding", "UTF8");
 
-        if (@operator.Parameters.Any(p => p.Name == "Host") && string.IsNullOrEmpty(host))
+        if (@operator.Parameters.Any(p => p.Name == "IpAddress") && string.IsNullOrEmpty(host))
         {
             return ValidationResult.Invalid("主机地址不能为空");
         }

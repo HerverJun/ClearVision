@@ -2,13 +2,20 @@ import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import inspectionController from '../inspection/inspectionController.js';
 import PreviewPanel from './previewPanel.js';
+import RoiEditorPanel from './roiEditorPanel.js';
+import { resolvePreviewInputImageBase64 } from './previewCoordinator.js';
+import { buildWireSequenceFollowupHint, createWireSequenceParameterPatch } from './wireSequenceAssist.js';
+import { getOperatorRoiConfig } from './roiEditorSupport.mjs';
 
 class PropertyPanel {
-    constructor(containerId) {
+    constructor(containerId, options = {}) {
         this.container = document.getElementById(containerId);
         this.currentOperator = null;
         this.onChangeCallback = null;
         this.previewPanel = null;
+        this.roiEditorPanel = null;
+        this.previewCoordinator = options.previewCoordinator ?? null;
+        this.onOpenPreviewImage = options.onOpenPreviewImage ?? (() => {});
         this.pendingRecommendation = null;
         this.recommendedFieldNames = new Set();
         this.cameraBindingsCache = [];
@@ -62,6 +69,15 @@ class PropertyPanel {
 
             input.value = filePath;
             input.dispatchEvent(new Event('change', { bubbles: true }));
+
+            if (this.currentOperator?.type === 'ImageAcquisition' && parameterName.toLowerCase() === 'filepath') {
+                const sourceTypeInput = this.container.querySelector('#param-SourceType, #param-sourceType, select[name="SourceType"], select[name="sourceType"]');
+                if (sourceTypeInput && sourceTypeInput.value !== 'File') {
+                    sourceTypeInput.value = 'File';
+                    sourceTypeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+
             this.applyChanges();
         });
     }
@@ -86,6 +102,10 @@ class PropertyPanel {
             this.previewPanel.destroy();
             this.previewPanel = null;
         }
+        if (this.roiEditorPanel) {
+            this.roiEditorPanel.destroy();
+            this.roiEditorPanel = null;
+        }
         this.currentOperator = null;
         this.container.innerHTML = '<p class="empty-text">选择一个算子查看属性</p>';
     }
@@ -102,6 +122,7 @@ class PropertyPanel {
         // 兼容 title (画布节点) 和 displayName (算子库)
         const title = this.currentOperator.title || this.currentOperator.displayName || this.currentOperator.type;
         const { type, parameters = [], iconPath, icon } = this.currentOperator;
+        const roiEditorConfig = getOperatorRoiConfig(this.currentOperator);
         const parametersForRender = type === 'ImageAcquisition'
             ? parameters.filter(param => !['exposuretime', 'gain', 'triggermode'].includes(String(param?.name || '').toLowerCase()))
             : parameters;
@@ -173,6 +194,7 @@ class PropertyPanel {
         }
 
         html += `
+                ${roiEditorConfig.supported ? '<div id="roi-editor-container"></div>' : ''}
                 <div id="operator-preview-container"></div>
             </div>
         `;
@@ -181,6 +203,7 @@ class PropertyPanel {
         // 绑定事件
         this.bindEvents();
         this.initSliders();
+        this.initRoiEditorPanel();
         this.initPreviewPanel();
 
         if (this.pendingRecommendation) {
@@ -680,12 +703,37 @@ class PropertyPanel {
 
         this.previewPanel = new PreviewPanel(container, {
             getOperator: () => this.currentOperator,
-            getParameters: () => this.getValues(),
-            getInputImageBase64: () => this.resolveInputImageBase64(),
+            previewCoordinator: this.previewCoordinator,
+            onOpenImage: this.onOpenPreviewImage,
+            onAnalyzePreview: async payload => this.handleWireSequenceAnalyze(payload),
+            onAutoTune: async payload => this.handleWireSequenceAutoTune(payload),
             debounceMs: 500
         });
 
         this.previewPanel.scheduleAutoPreview();
+    }
+
+    initRoiEditorPanel() {
+        const container = this.container.querySelector('#roi-editor-container');
+        if (!container) {
+            if (this.roiEditorPanel) {
+                this.roiEditorPanel.destroy();
+                this.roiEditorPanel = null;
+            }
+            return;
+        }
+
+        if (this.roiEditorPanel) {
+            this.roiEditorPanel.destroy();
+        }
+
+        this.roiEditorPanel = new RoiEditorPanel(container, {
+            getOperator: () => this.currentOperator,
+            getRoiConfig: operator => getOperatorRoiConfig(operator),
+            previewCoordinator: this.previewCoordinator,
+            onRectChanged: (values, phase) => this.handleRoiRectChanged(values, phase),
+            onRequestSyncFromParams: () => this.syncRoiEditorFromParams()
+        });
     }
 
     /**
@@ -698,7 +746,13 @@ class PropertyPanel {
     /**
      * 参数变更后的统一通知
      */
-    _notifyValueChanged() {
+    _notifyValueChanged(options = {}) {
+        const {
+            schedulePreview = true,
+            previewDebounceMs = 500,
+            forcePreview = false,
+            syncRoiEditor = true
+        } = options;
         const values = this.getValues();
         this.updateCurrentOperatorParams(values);
 
@@ -706,11 +760,38 @@ class PropertyPanel {
             this.onChangeCallback(values);
         }
 
-        if (this.previewPanel) {
-            this.previewPanel.scheduleAutoPreview();
+        if (syncRoiEditor) {
+            this.syncRoiEditorFromParams();
+        }
+
+        if (schedulePreview && this.previewPanel) {
+            this.previewPanel.scheduleAutoPreview({
+                debounceMs: previewDebounceMs,
+                force: forcePreview
+            });
         }
 
         return values;
+    }
+
+    handleRoiRectChanged(values, phase) {
+        this._applyValuesToForm(values);
+        this.updateCurrentOperatorParams(values);
+
+        if (this.onChangeCallback) {
+            this.onChangeCallback(values);
+        }
+
+        if (phase === 'commit' && this.previewPanel) {
+            this.previewPanel.scheduleAutoPreview({
+                debounceMs: 250,
+                force: true
+            });
+        }
+    }
+
+    syncRoiEditorFromParams() {
+        this.roiEditorPanel?.refreshFromOperator?.();
     }
 
     async recommendParameters() {
@@ -931,120 +1012,125 @@ class PropertyPanel {
 
     async resolveInputImageBase64() {
         const inspectionResult = window._lastInspectionResult || inspectionController.getLastResult?.();
-        const fromResult = this.extractImageBase64(inspectionResult);
-        if (fromResult) {
-            return fromResult;
-        }
-
-        return null;
+        return resolvePreviewInputImageBase64(inspectionResult);
     }
 
-    extractImageBase64(result) {
-        if (!result || typeof result !== 'object') {
-            return null;
+    async handleWireSequenceAnalyze({ operator, previewState } = {}) {
+        if (!operator?.id) {
+            throw new Error('当前没有可分析的线序节点');
         }
 
-        const candidateKeys = [
-            'outputImage',
-            'OutputImage',
-            'imageBase64',
-            'ImageBase64',
-            'resultImageBase64',
-            'ResultImageBase64',
-            'inputImage',
-            'InputImage'
-        ];
+        const inputImageBase64 = previewState?.inputImageBase64 || await this.resolveInputImageBase64();
+        const result = await inspectionController.previewFlowNodeWithMetrics(operator.id, {
+            inputImageBase64
+        });
 
-        for (const key of candidateKeys) {
-            const value = result[key];
-            if (typeof value === 'string' && this.isImageLikePayload(value)) {
-                return this.normalizeBase64Image(value);
+        if (result?.missingResources?.length > 0) {
+            this.showToast('线序分析发现缺失资源，请先补齐模型与标签。', 'warning');
+        } else {
+            this.showToast(result?.success ? '线序分析已完成' : '线序分析未完成，请查看诊断。', result?.success ? 'success' : 'warning');
+        }
+
+        const hint = buildWireSequenceFollowupHint({
+            scenarioKey: 'wire-sequence-terminal',
+            diagnosticCodes: result?.diagnosticCodes || [],
+            suggestions: result?.suggestions || [],
+            missingResources: result?.missingResources || []
+        });
+        if (hint) {
+            window.aiPanel?.queueParameterOnlyFollowupHint?.({
+                scenarioKey: 'wire-sequence-terminal',
+                diagnosticCodes: result?.diagnosticCodes || [],
+                suggestions: result?.suggestions || [],
+                missingResources: result?.missingResources || []
+            });
+        }
+
+        return result;
+    }
+
+    async handleWireSequenceAutoTune({ operator, previewState } = {}) {
+        if (!operator?.id) {
+            throw new Error('当前没有可调参的线序节点');
+        }
+
+        const inputImageBase64 = previewState?.inputImageBase64 || await this.resolveInputImageBase64();
+        const result = await inspectionController.autoTuneWireSequenceScenario({
+            scenarioKey: 'wire-sequence-terminal',
+            inputImageBase64
+        });
+
+        const patch = createWireSequenceParameterPatch(
+            window.flowCanvas?.serialize?.() || null,
+            operator.id,
+            result?.finalParameters || {}
+        );
+
+        if (patch) {
+            this.applyWireSequenceParameterPatch(patch);
+        }
+
+        window.aiPanel?.queueParameterOnlyFollowupHint?.({
+            scenarioKey: 'wire-sequence-terminal',
+            diagnosticCodes: result?.diagnosticCodes || [],
+            finalParameters: result?.finalParameters || {},
+            suggestions: result?.finalPreview?.suggestions || [],
+            missingResources: result?.missingResources || []
+        });
+
+        if (result?.missingResources?.length > 0) {
+            this.showToast('自动调参已停止：缺少模型或标签资源。', 'warning');
+        } else if (result?.success) {
+            this.showToast('线序自动调参已完成，并已回写 BoxNms 参数。', 'success');
+        } else {
+            this.showToast(result?.errorMessage || '线序自动调参未收敛，请查看诊断。', 'warning');
+        }
+
+        this.previewCoordinator?.requestActivePreview?.({
+            immediate: true,
+            force: true
+        });
+
+        return result?.finalPreview || result;
+    }
+
+    applyWireSequenceParameterPatch(patch) {
+        if (!patch?.operatorId || !patch?.parameters) {
+            return false;
+        }
+
+        const node = window.flowCanvas?.nodes?.get?.(patch.operatorId);
+        if (!node) {
+            return false;
+        }
+
+        const parameters = Array.isArray(node.parameters) ? node.parameters : [];
+        Object.entries(patch.parameters).forEach(([name, value]) => {
+            let parameter = parameters.find(item => String(item?.name || item?.Name || '').toLowerCase() === name.toLowerCase());
+            if (!parameter) {
+                parameter = {
+                    id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                        ? crypto.randomUUID()
+                        : `${patch.operatorId}-${name}`,
+                    name,
+                    displayName: name,
+                    dataType: typeof value === 'number' ? 'double' : 'string',
+                    value,
+                    defaultValue: value
+                };
+                parameters.push(parameter);
+                return;
             }
-        }
 
-        const outputData = result.outputData || result.OutputData;
-        if (outputData && typeof outputData === 'object') {
-            for (const value of Object.values(outputData)) {
-                if (typeof value === 'string' && this.isImageLikePayload(value)) {
-                    return this.normalizeBase64Image(value);
-                }
+            parameter.value = value;
+            if (Object.prototype.hasOwnProperty.call(parameter, 'Value')) {
+                parameter.Value = value;
             }
-        }
+        });
 
-        return null;
-    }
-
-    normalizeBase64Image(imageValue) {
-        if (!imageValue || typeof imageValue !== 'string') {
-            return null;
-        }
-
-        const trimmed = imageValue.trim();
-        const commaIndex = trimmed.indexOf(',');
-        if (trimmed.startsWith('data:image/') && commaIndex > 0) {
-            return trimmed.substring(commaIndex + 1);
-        }
-
-        return trimmed;
-    }
-
-    isImageLikePayload(value) {
-        if (typeof value !== 'string') {
-            return false;
-        }
-
-        const trimmed = value.trim();
-        if (!trimmed) {
-            return false;
-        }
-
-        if (trimmed.startsWith('data:image/')) {
-            return true;
-        }
-
-        if (trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.includes('"Format"')) {
-            return false;
-        }
-
-        return this.hasKnownImageSignature(trimmed);
-    }
-
-    hasKnownImageSignature(base64Text) {
-        const sanitized = String(base64Text || '').replace(/\s+/g, '');
-        if (sanitized.length < 32 || /[^A-Za-z0-9+/=]/.test(sanitized)) {
-            return false;
-        }
-
-        if (typeof atob !== 'function') {
-            return false;
-        }
-
-        const prefixLength = Math.min(64, sanitized.length);
-        let sample = sanitized.slice(0, prefixLength);
-        const paddingLength = sample.length % 4;
-        if (paddingLength !== 0) {
-            sample = sample.padEnd(sample.length + (4 - paddingLength), '=');
-        }
-
-        try {
-            const decoded = atob(sample);
-            if (!decoded || decoded.length < 4) {
-                return false;
-            }
-
-            const bytes = Array.from(decoded.slice(0, 12)).map(char => char.charCodeAt(0));
-            const ascii = decoded.slice(0, 12);
-
-            return (
-                (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) || // PNG
-                (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) || // JPEG
-                (bytes[0] === 0x42 && bytes[1] === 0x4d) || // BMP
-                ascii.startsWith('GIF8') ||
-                ascii.startsWith('RIFF')
-            );
-        } catch {
-            return false;
-        }
+        node.parameters = parameters;
+        window.flowCanvas?.markFlowStructureChanged?.('wire-sequence-autotune');
+        return true;
     }
 
     /**

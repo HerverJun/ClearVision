@@ -40,6 +40,8 @@ public class OperatorService : IOperatorService
         if (OperatorMetadataCache.Count > 0)
             return;
 
+        var factoryMetadata = GetFactoryMetadataDtos();
+
         var metadata = new List<OperatorMetadataDto>
         {
             new()
@@ -280,7 +282,7 @@ public class OperatorService : IOperatorService
                     },
                     new() { Name = "InputSize", DisplayName = "输入尺寸", DataType = "int", DefaultValue = 640, MinValue = 320, MaxValue = 1280, IsRequired = true },
                     new() { Name = "TargetClasses", DisplayName = "目标类别", DataType = "string", DefaultValue = "", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别" },
-                    new() { Name = "LabelFile", DisplayName = "标签文件路径", DataType = "file", DefaultValue = "", Description = "自定义标签文件路径（每行一个标签）" }
+                    new() { Name = "LabelsPath", DisplayName = "标签文件路径", DataType = "file", DefaultValue = "", Description = "自定义标签文件路径（每行一个标签）" }
                 }
             },
             new()
@@ -346,6 +348,74 @@ public class OperatorService : IOperatorService
                 OperatorMetadataCache[type] = meta;
             }
         }
+
+        foreach (var meta in factoryMetadata)
+        {
+            if (Enum.TryParse<OperatorType>(meta.Type, out var type) &&
+                !OperatorMetadataCache.ContainsKey(type))
+            {
+                OperatorMetadataCache[type] = meta;
+            }
+        }
+    }
+
+    private List<OperatorMetadataDto> GetFactoryMetadataDtos()
+    {
+        var metadata = _operatorFactory.GetAllMetadata()?.ToList();
+        if (metadata == null || metadata.Count == 0)
+        {
+            return new List<OperatorMetadataDto>();
+        }
+
+        return metadata.Select(MapFactoryMetadata).ToList();
+    }
+
+    private static OperatorMetadataDto MapFactoryMetadata(OperatorMetadata metadata)
+    {
+        return new OperatorMetadataDto
+        {
+            Id = Guid.NewGuid(),
+            Type = metadata.Type.ToString(),
+            DisplayName = metadata.DisplayName,
+            Category = metadata.Category,
+            Icon = metadata.IconName ?? string.Empty,
+            Description = metadata.Description,
+            Inputs = metadata.InputPorts.Select(MapPortDefinition).ToList(),
+            Outputs = metadata.OutputPorts.Select(MapPortDefinition).ToList(),
+            Parameters = metadata.Parameters.Select(MapParameterDefinition).ToList()
+        };
+    }
+
+    private static PortDefinitionDto MapPortDefinition(PortDefinition definition)
+    {
+        return new PortDefinitionDto
+        {
+            Name = definition.Name,
+            DisplayName = definition.DisplayName,
+            DataType = definition.DataType,
+            IsRequired = definition.IsRequired,
+            Description = definition.Description ?? string.Empty
+        };
+    }
+
+    private static ParameterDefinitionDto MapParameterDefinition(ParameterDefinition definition)
+    {
+        return new ParameterDefinitionDto
+        {
+            Name = definition.Name,
+            DisplayName = definition.DisplayName,
+            Description = definition.Description ?? string.Empty,
+            DataType = definition.DataType,
+            DefaultValue = definition.DefaultValue,
+            MinValue = definition.MinValue,
+            MaxValue = definition.MaxValue,
+            IsRequired = definition.IsRequired,
+            Options = definition.Options?.Select(option => new ParameterOptionDto
+            {
+                Label = option.Label,
+                Value = option.Value
+            }).ToList()
+        };
     }
 
     public Task<IEnumerable<OperatorMetadataDto>> GetLibraryAsync()

@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using System.Reflection;
 using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
 using Acme.PlcComm.Interfaces;
@@ -73,6 +75,83 @@ public class PlcCommunicationOperatorBaseBehaviorTests
         sut.ConvertValueToBytesPublic(client, 12.5f, "FLOAT").Should().Equal(LittleEndianTransform.Instance.GetBytes(12.5f));
     }
 
+    [Fact]
+    public void ResolveConnectionSettings_ShouldReadLegacyGlobalConfigAfterNormalization()
+    {
+        var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+        var originalConfig = File.Exists(configPath) ? File.ReadAllText(configPath, Encoding.UTF8) : null;
+
+        try
+        {
+            const string legacyConfigJson = """
+            {
+              "communication": {
+                "protocol": "MC",
+                "plcIpAddress": "192.168.3.5",
+                "plcPort": 5002
+              }
+            }
+            """;
+
+            File.WriteAllText(configPath, legacyConfigJson, Encoding.UTF8);
+            ResetCachedCommunicationConfig();
+
+            var sut = new TestPlcOperator();
+
+            var (ipAddress, port, protocol, connectionSource) = sut.ResolveConnectionSettingsPublic(
+                null,
+                null,
+                "MC",
+                useGlobalFallback: true);
+
+            ipAddress.Should().Be("192.168.3.5");
+            port.Should().Be(5002);
+            protocol.Should().Be("MC");
+            connectionSource.Should().Be("GlobalFallback");
+        }
+        finally
+        {
+            if (originalConfig == null)
+            {
+                if (File.Exists(configPath))
+                {
+                    File.Delete(configPath);
+                }
+            }
+            else
+            {
+                File.WriteAllText(configPath, originalConfig, Encoding.UTF8);
+            }
+
+            ResetCachedCommunicationConfig();
+        }
+    }
+
+    [Fact]
+    public void ResolveConnectionSettings_WhenFallbackDisabledAndOperatorConfigMissing_ShouldFailClosed()
+    {
+        var sut = new TestPlcOperator();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            sut.ResolveConnectionSettingsPublic(
+                null,
+                null,
+                "MC",
+                useGlobalFallback: false));
+
+        using var doc = JsonDocument.Parse(exception.Message);
+        doc.RootElement.GetProperty("Code").GetString().Should().Be("PLC_CONNECTION_CONFIG_OPERATOR_REQUIRED");
+    }
+
+    private static void ResetCachedCommunicationConfig()
+    {
+        var cachedConfigField = typeof(PlcCommunicationOperatorBase).GetField("_cachedCommunicationConfig", BindingFlags.Static | BindingFlags.NonPublic);
+        var cachedAtField = typeof(PlcCommunicationOperatorBase).GetField("_cachedCommunicationConfigAtUtc", BindingFlags.Static | BindingFlags.NonPublic);
+
+        cachedConfigField?.SetValue(null, new CommunicationConfig());
+        cachedAtField?.SetValue(null, DateTime.MinValue);
+    }
+
     private sealed class TestPlcOperator : PlcCommunicationOperatorBase
     {
         public TestPlcOperator()
@@ -95,6 +174,15 @@ public class PlcCommunicationOperatorBaseBehaviorTests
         public byte[] ConvertValueToBytesPublic(IPlcClient client, object value, string dataType)
         {
             return ConvertValueToBytes(client, value, dataType);
+        }
+
+        public (string ipAddress, int port, string protocol, string connectionSource) ResolveConnectionSettingsPublic(
+            string? ipAddress,
+            int? port,
+            string fallbackProtocol,
+            bool useGlobalFallback = false)
+        {
+            return ResolveConnectionSettings(ipAddress, port, fallbackProtocol, useGlobalFallback);
         }
 
         protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(Operator @operator, Dictionary<string, object>? inputs, CancellationToken cancellationToken)

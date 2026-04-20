@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-21T12:03:10.3395604+08:00",
+  "generatedAt": "2026-04-19T23:24:05.8968586+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -13,6 +13,12 @@
         "VoxelDownsample"
       ]
     },
+    "AI Detection": {
+      "count": 1,
+      "operators": [
+        "DualModalVoting"
+      ]
+    },
     "AI Inspection": {
       "count": 1,
       "operators": [
@@ -20,11 +26,10 @@
       ]
     },
     "AI检测": {
-      "count": 6,
+      "count": 5,
       "operators": [
         "AnomalyDetection",
         "DeepLearning",
-        "DualModalVoting",
         "EdgePairDefect",
         "SemanticSegmentation",
         "SurfaceDefectDetection"
@@ -34,6 +39,25 @@
       "count": 1,
       "operators": [
         "DistanceTransform"
+      ]
+    },
+    "Communication": {
+      "count": 1,
+      "operators": [
+        "MitsubishiMcCommunication"
+      ]
+    },
+    "Detection": {
+      "count": 2,
+      "operators": [
+        "AngleMeasurement",
+        "ContourMeasurement"
+      ]
+    },
+    "Flow Control": {
+      "count": 1,
+      "operators": [
+        "ResultJudgment"
       ]
     },
     "Frequency": {
@@ -153,14 +177,12 @@
       ]
     },
     "检测": {
-      "count": 20,
+      "count": 18,
       "operators": [
-        "AngleMeasurement",
         "ArcCaliper",
         "CaliperTool",
         "CircleMeasurement",
         "ContourExtrema",
-        "ContourMeasurement",
         "GapMeasurement",
         "GeoMeasurement",
         "GeometricFitting",
@@ -178,13 +200,12 @@
       ]
     },
     "流程控制": {
-      "count": 6,
+      "count": 5,
       "operators": [
         "Comparator",
         "ConditionalBranch",
         "Delay",
         "ForEach",
-        "ResultJudgment",
         "TryCatch"
       ]
     },
@@ -220,10 +241,9 @@
       ]
     },
     "通信": {
-      "count": 8,
+      "count": 7,
       "operators": [
         "HttpRequest",
-        "MitsubishiMcCommunication",
         "ModbusCommunication",
         "MqttPublish",
         "OmronFinsCommunication",
@@ -523,13 +543,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/Filtering.md"
     },
@@ -672,21 +692,21 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/EdgeDetection.md"
     },
     {
       "id": "Thresholding",
       "type": 4,
-      "displayName": "二值化",
-      "description": "全局/自适应/Otsu 二值化分割，将图像转为前景/背景二值图，用于缺陷区域分离",
+      "displayName": "Threshold",
+      "description": "Global thresholding with optional Otsu or Triangle auto-thresholding.",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -698,7 +718,7 @@
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "图像",
+          "displayName": "Image",
           "dataType": "Image",
           "isRequired": true
         }
@@ -706,7 +726,7 @@
       "outputPorts": [
         {
           "name": "Image",
-          "displayName": "图像",
+          "displayName": "Image",
           "dataType": "Image",
           "isRequired": null
         }
@@ -714,7 +734,7 @@
       "parameters": [
         {
           "name": "Threshold",
-          "displayName": "阈值",
+          "displayName": "Threshold",
           "dataType": "double",
           "description": null,
           "defaultValue": "127",
@@ -725,7 +745,7 @@
         },
         {
           "name": "MaxValue",
-          "displayName": "最大值",
+          "displayName": "Max Value",
           "dataType": "double",
           "description": null,
           "defaultValue": "255",
@@ -736,7 +756,7 @@
         },
         {
           "name": "Type",
-          "displayName": "类型",
+          "displayName": "Type",
           "dataType": "enum",
           "description": null,
           "defaultValue": "0",
@@ -776,7 +796,7 @@
         },
         {
           "name": "UseOtsu",
-          "displayName": "使用Otsu",
+          "displayName": "Use Otsu",
           "dataType": "bool",
           "description": null,
           "defaultValue": "false",
@@ -787,13 +807,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/Thresholding.md"
     },
@@ -1174,15 +1194,15 @@
       "id": "TemplateMatching",
       "type": 7,
       "displayName": "模板匹配",
-      "description": "基于 OpenCV MatchTemplate 的模板匹配，支持单目标与多目标输出。",
+      "description": "Classic grayscale template matching for fixed-scale, low-rotation scenes. Multi-match outputs are filtered by IoU-based NMS.",
       "category": "匹配定位",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于经典模板匹配，在搜索图像上滑动模板窗口并计算每个位置的相似度响应图，再取全…",
+      "algorithm": "该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NM…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1195,6 +1215,12 @@
           "displayName": "模板图像",
           "dataType": "Image",
           "isRequired": true
+        },
+        {
+          "name": "Mask",
+          "displayName": "搜索掩膜",
+          "dataType": "Image",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -1213,6 +1239,18 @@
         {
           "name": "Score",
           "displayName": "匹配分数",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "NormalizedScore",
+          "displayName": "规范化分数",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "RawResponse",
+          "displayName": "原始响应值",
           "dataType": "Float",
           "isRequired": null
         },
@@ -1273,6 +1311,30 @@
           ]
         },
         {
+          "name": "Domain",
+          "displayName": "匹配域",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Gray",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Gray",
+              "label": "Gray"
+            },
+            {
+              "value": "Edge",
+              "label": "Edge"
+            },
+            {
+              "value": "Gradient",
+              "label": "Gradient"
+            }
+          ]
+        },
+        {
           "name": "Threshold",
           "displayName": "匹配分数阈值",
           "dataType": "double",
@@ -1293,6 +1355,107 @@
           "max": "100",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "UseRoi",
+          "displayName": "使用 ROI",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiX",
+          "displayName": "ROI X",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiY",
+          "displayName": "ROI Y",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiWidth",
+          "displayName": "ROI Width",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiHeight",
+          "displayName": "ROI Height",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OriginMode",
+          "displayName": "Origin Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Center",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Center",
+              "label": "Center"
+            },
+            {
+              "value": "TopLeft",
+              "label": "TopLeft"
+            },
+            {
+              "value": "Custom",
+              "label": "Custom"
+            }
+          ]
+        },
+        {
+          "name": "OriginX",
+          "displayName": "Origin X",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OriginY",
+          "displayName": "Origin Y",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -1310,7 +1473,7 @@
       "id": "Measurement",
       "type": 8,
       "displayName": "测量",
-      "description": "两点/水平/垂直距离测量，支持图像坐标和 Point 输入两种模式，用于尺寸检测",
+      "description": "两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入。",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -1424,13 +1587,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/Measurement.md"
     },
@@ -1531,13 +1694,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/CodeRecognition.md"
     },
@@ -1566,6 +1729,12 @@
         {
           "name": "Image",
           "displayName": "结果图像",
+          "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "OriginalImage",
+          "displayName": "原始图像",
           "dataType": "Image",
           "isRequired": null
         },
@@ -1700,11 +1869,22 @@
           "options": null
         },
         {
-          "name": "LabelFile",
+          "name": "LabelsPath",
           "displayName": "标签文件路径",
           "dataType": "file",
-          "description": "自定义标签文件路径（每行一个标签），为空则使用COCO 80类或自动查找模型目录下的labels.txt",
+          "description": "自定义标签文件路径（每行一个标签），为空则优先使用模型 metadata names 或自动查找模型目录下的 labels.txt；仍不可用时执行失败",
           "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EnableInternalNms",
+          "displayName": "启用内部NMS",
+          "dataType": "bool",
+          "description": "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。",
+          "defaultValue": "true",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -2907,7 +3087,7 @@
       "id": "LineMeasurement",
       "type": 20,
       "displayName": "直线测量",
-      "description": "霍夫直线检测与测量",
+      "description": "Detects line features and reports line direction, span and fitting diagnostics.",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -2962,14 +3142,18 @@
           "displayName": "检测方法",
           "dataType": "enum",
           "description": null,
-          "defaultValue": "HoughLine",
+          "defaultValue": "ProbabilisticHough",
           "min": null,
           "max": null,
           "isRequired": true,
           "options": [
             {
-              "value": "HoughLine",
+              "value": "HoughLines",
               "label": "霍夫直线"
+            },
+            {
+              "value": "ProbabilisticHough",
+              "label": "概率霍夫直线"
             },
             {
               "value": "FitLine",
@@ -3012,22 +3196,22 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/LineMeasurement.md"
     },
     {
       "id": "ContourMeasurement",
       "type": 21,
-      "displayName": "轮廓测量",
-      "description": "轮廓分析与测量",
-      "category": "检测",
+      "displayName": "Contour Measurement",
+      "description": "Measures contour area, perimeter, and centroid with grayscale-weighted area estimation.",
+      "category": "Detection",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -3038,7 +3222,7 @@
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "输入图像",
+          "displayName": "Input Image",
           "dataType": "Image",
           "isRequired": true
         }
@@ -3046,25 +3230,25 @@
       "outputPorts": [
         {
           "name": "Image",
-          "displayName": "结果图像",
+          "displayName": "Result Image",
           "dataType": "Image",
           "isRequired": null
         },
         {
           "name": "Area",
-          "displayName": "面积",
+          "displayName": "Area",
           "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "Perimeter",
-          "displayName": "周长",
+          "displayName": "Perimeter",
           "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "ContourCount",
-          "displayName": "轮廓数量",
+          "displayName": "Contour Count",
           "dataType": "Integer",
           "isRequired": null
         }
@@ -3072,7 +3256,7 @@
       "parameters": [
         {
           "name": "Threshold",
-          "displayName": "二值化阈值",
+          "displayName": "Threshold",
           "dataType": "double",
           "description": null,
           "defaultValue": "127",
@@ -3083,7 +3267,7 @@
         },
         {
           "name": "MinArea",
-          "displayName": "最小面积",
+          "displayName": "Min Area",
           "dataType": "int",
           "description": null,
           "defaultValue": "100",
@@ -3094,7 +3278,7 @@
         },
         {
           "name": "MaxArea",
-          "displayName": "最大面积",
+          "displayName": "Max Area",
           "dataType": "int",
           "description": null,
           "defaultValue": "100000",
@@ -3105,7 +3289,7 @@
         },
         {
           "name": "SortBy",
-          "displayName": "排序依据",
+          "displayName": "Sort By",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Area",
@@ -3115,11 +3299,11 @@
           "options": [
             {
               "value": "Area",
-              "label": "面积"
+              "label": "Area"
             },
             {
               "value": "Perimeter",
-              "label": "周长"
+              "label": "Perimeter"
             }
           ]
         }
@@ -3138,9 +3322,9 @@
     {
       "id": "AngleMeasurement",
       "type": 22,
-      "displayName": "角度测量",
-      "description": "基于三点计算角度",
-      "category": "检测",
+      "displayName": "Angle Measurement",
+      "description": "Measures angle from three points or two lines with subpixel-compatible inputs.",
+      "category": "Detection",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -3151,29 +3335,65 @@
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "输入图像",
+          "displayName": "Input Image",
           "dataType": "Image",
           "isRequired": true
+        },
+        {
+          "name": "Point1",
+          "displayName": "Point 1",
+          "dataType": "Point",
+          "isRequired": false
+        },
+        {
+          "name": "Point2",
+          "displayName": "Point 2",
+          "dataType": "Point",
+          "isRequired": false
+        },
+        {
+          "name": "Point3",
+          "displayName": "Point 3",
+          "dataType": "Point",
+          "isRequired": false
+        },
+        {
+          "name": "Line1",
+          "displayName": "Line 1",
+          "dataType": "LineData",
+          "isRequired": false
+        },
+        {
+          "name": "Line2",
+          "displayName": "Line 2",
+          "dataType": "LineData",
+          "isRequired": false
         }
       ],
       "outputPorts": [
         {
           "name": "Image",
-          "displayName": "结果图像",
+          "displayName": "Result Image",
           "dataType": "Image",
           "isRequired": null
         },
         {
           "name": "Angle",
-          "displayName": "角度",
+          "displayName": "Angle",
           "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Vertex",
+          "displayName": "Vertex",
+          "dataType": "Point",
           "isRequired": null
         }
       ],
       "parameters": [
         {
           "name": "Point1X",
-          "displayName": "点1 X",
+          "displayName": "Point1 X",
           "dataType": "int",
           "description": null,
           "defaultValue": "0",
@@ -3184,7 +3404,7 @@
         },
         {
           "name": "Point1Y",
-          "displayName": "点1 Y",
+          "displayName": "Point1 Y",
           "dataType": "int",
           "description": null,
           "defaultValue": "0",
@@ -3195,7 +3415,7 @@
         },
         {
           "name": "Point2X",
-          "displayName": "点2 X(顶点)",
+          "displayName": "Point2 X",
           "dataType": "int",
           "description": null,
           "defaultValue": "100",
@@ -3206,7 +3426,7 @@
         },
         {
           "name": "Point2Y",
-          "displayName": "点2 Y(顶点)",
+          "displayName": "Point2 Y",
           "dataType": "int",
           "description": null,
           "defaultValue": "100",
@@ -3217,7 +3437,7 @@
         },
         {
           "name": "Point3X",
-          "displayName": "点3 X",
+          "displayName": "Point3 X",
           "dataType": "int",
           "description": null,
           "defaultValue": "200",
@@ -3228,7 +3448,7 @@
         },
         {
           "name": "Point3Y",
-          "displayName": "点3 Y",
+          "displayName": "Point3 Y",
           "dataType": "int",
           "description": null,
           "defaultValue": "0",
@@ -3239,7 +3459,7 @@
         },
         {
           "name": "Unit",
-          "displayName": "角度单位",
+          "displayName": "Angle Unit",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Degree",
@@ -3249,23 +3469,23 @@
           "options": [
             {
               "value": "Degree",
-              "label": "度"
+              "label": "Degree"
             },
             {
               "value": "Radian",
-              "label": "弧度"
+              "label": "Radian"
             }
           ]
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/AngleMeasurement.md"
     },
@@ -3273,7 +3493,7 @@
       "id": "GeometricTolerance",
       "type": 23,
       "displayName": "几何公差",
-      "description": "角度偏差测量（仅角度模型，非完整GD&T公差带）",
+      "description": "Evaluates a constrained 2D GD&T subset using feature/datum and tolerance-zone semantics.",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -3281,13 +3501,37 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
           "displayName": "输入图像",
           "dataType": "Image",
+          "isRequired": false
+        },
+        {
+          "name": "FeaturePrimary",
+          "displayName": "Primary Feature",
+          "dataType": "Any",
           "isRequired": true
+        },
+        {
+          "name": "DatumA",
+          "displayName": "Datum A",
+          "dataType": "Any",
+          "isRequired": true
+        },
+        {
+          "name": "DatumB",
+          "displayName": "Datum B",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "DatumC",
+          "displayName": "Datum C",
+          "dataType": "Any",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -3299,7 +3543,13 @@
         },
         {
           "name": "Tolerance",
-          "displayName": "角度偏差",
+          "displayName": "公差带",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ZoneDeviation",
+          "displayName": "偏离公差带",
           "dataType": "Float",
           "isRequired": null
         },
@@ -3311,7 +3561,7 @@
         },
         {
           "name": "LinearBand",
-          "displayName": "线性跳动带(像素)",
+          "displayName": "线性偏差带(像素)",
           "dataType": "Float",
           "isRequired": null
         },
@@ -3320,12 +3570,18 @@
           "displayName": "测量模型",
           "dataType": "String",
           "isRequired": null
+        },
+        {
+          "name": "Accepted",
+          "displayName": "Accepted",
+          "dataType": "Boolean",
+          "isRequired": null
         }
       ],
       "parameters": [
         {
-          "name": "MeasureType",
-          "displayName": "测量类型",
+          "name": "ToleranceType",
+          "displayName": "Tolerance Type",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Parallelism",
@@ -3340,13 +3596,56 @@
             {
               "value": "Perpendicularity",
               "label": "垂直度"
+            },
+            {
+              "value": "Position",
+              "label": "位置度"
+            },
+            {
+              "value": "Concentricity",
+              "label": "同心度"
             }
           ]
         },
         {
-          "name": "Line1_X1",
-          "displayName": "线1起点X",
-          "dataType": "int",
+          "name": "ZoneSize",
+          "displayName": "Zone Size",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "2",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EvaluationMode",
+          "displayName": "Evaluation Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "CircularZone",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "CircularZone",
+              "label": "Circular Zone"
+            },
+            {
+              "value": "RectangularZone",
+              "label": "Rectangular Zone"
+            },
+            {
+              "value": "Projected2D",
+              "label": "Projected 2D"
+            }
+          ]
+        },
+        {
+          "name": "NominalX",
+          "displayName": "Nominal X",
+          "dataType": "double",
           "description": null,
           "defaultValue": "0",
           "min": null,
@@ -3355,77 +3654,11 @@
           "options": null
         },
         {
-          "name": "Line1_Y1",
-          "displayName": "线1起点Y",
-          "dataType": "int",
+          "name": "NominalY",
+          "displayName": "Nominal Y",
+          "dataType": "double",
           "description": null,
           "defaultValue": "0",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Line1_X2",
-          "displayName": "线1终点X",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "100",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Line1_Y2",
-          "displayName": "线1终点Y",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "100",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Line2_X1",
-          "displayName": "线2起点X",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "0",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Line2_Y1",
-          "displayName": "线2起点Y",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "200",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Line2_X2",
-          "displayName": "线2终点X",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "100",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Line2_Y2",
-          "displayName": "线2终点Y",
-          "dataType": "int",
-          "description": null,
-          "defaultValue": "200",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -3433,13 +3666,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/GeometricTolerance.md"
     },
@@ -3455,7 +3688,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于标定板角点/圆点，估计相机内参矩阵 CameraMatrix 和畸变参数 …",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -3598,7 +3831,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子根据相机标定结果中的内参矩阵 CameraMatrix 和畸变系数 DistC…",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -3621,35 +3854,23 @@
           "isRequired": null
         }
       ],
-      "parameters": [
-        {
-          "name": "CalibrationFile",
-          "displayName": "Calibration File",
-          "dataType": "file",
-          "description": null,
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        }
-      ],
+      "parameters": [],
       "quality": {
-        "totalScore": 95,
+        "totalScore": 91,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/Undistort.md"
     },
     {
       "id": "CoordinateTransform",
       "type": 26,
-      "displayName": "坐标转换",
-      "description": "像素坐标到物理坐标转换",
+      "displayName": "Coordinate Transform",
+      "description": "Converts pixel coordinates to physical coordinates using CalibrationBundleV2 Transform2D.",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -3657,43 +3878,49 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "输入图像",
+          "displayName": "Input Image",
           "dataType": "Image",
           "isRequired": false
         },
         {
           "name": "PixelX",
-          "displayName": "像素X",
+          "displayName": "Pixel X",
           "dataType": "Float",
           "isRequired": false
         },
         {
           "name": "PixelY",
-          "displayName": "像素Y",
+          "displayName": "Pixel Y",
           "dataType": "Float",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationData",
+          "displayName": "Calibration Bundle V2 JSON",
+          "dataType": "String",
           "isRequired": false
         }
       ],
       "outputPorts": [
         {
           "name": "Image",
-          "displayName": "结果图像",
+          "displayName": "Result Image",
           "dataType": "Image",
           "isRequired": null
         },
         {
           "name": "PhysicalX",
-          "displayName": "物理X(mm)",
+          "displayName": "Physical X",
           "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "PhysicalY",
-          "displayName": "物理Y(mm)",
+          "displayName": "Physical Y",
           "dataType": "Float",
           "isRequired": null
         }
@@ -3701,7 +3928,7 @@
       "parameters": [
         {
           "name": "PixelX",
-          "displayName": "像素X坐标",
+          "displayName": "Pixel X",
           "dataType": "double",
           "description": null,
           "defaultValue": "0",
@@ -3712,32 +3939,10 @@
         },
         {
           "name": "PixelY",
-          "displayName": "像素Y坐标",
+          "displayName": "Pixel Y",
           "dataType": "double",
           "description": null,
           "defaultValue": "0",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "PixelSize",
-          "displayName": "像素尺寸(mm/px)",
-          "dataType": "double",
-          "description": null,
-          "defaultValue": "0.01",
-          "min": "0.0001",
-          "max": "100",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "CalibrationFile",
-          "displayName": "标定文件路径",
-          "dataType": "file",
-          "description": null,
-          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -3907,13 +4112,13 @@
         }
       ],
       "quality": {
-        "totalScore": 98,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
@@ -4043,13 +4248,13 @@
         }
       ],
       "quality": {
-        "totalScore": 98,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/TcpCommunication.md"
     },
@@ -4057,7 +4262,7 @@
       "id": "DatabaseWrite",
       "type": 29,
       "displayName": "数据库写入",
-      "description": "检测结果存储到数据库",
+      "description": "将输入数据写入 SQLite / SQL Server / MySQL 表。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -4065,13 +4270,19 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。",
+      "algorithm": "该算子把输入数据持久化到数据库表中，当前正式支持 SQLite、SQLServer、…",
       "inputPorts": [
         {
           "name": "Data",
           "displayName": "数据",
           "dataType": "Any",
           "isRequired": true
+        },
+        {
+          "name": "RecordId",
+          "displayName": "记录ID",
+          "dataType": "String",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -4341,8 +4552,8 @@
     {
       "id": "AdaptiveThreshold",
       "type": 39,
-      "displayName": "自适应阈值",
-      "description": "Mean和Gaussian自适应阈值",
+      "displayName": "Adaptive Threshold",
+      "description": "Local mean or Gaussian adaptive thresholding.",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -4354,7 +4565,7 @@
       "inputPorts": [
         {
           "name": "Image",
-          "displayName": "输入图像",
+          "displayName": "Image",
           "dataType": "Image",
           "isRequired": true
         }
@@ -4362,7 +4573,7 @@
       "outputPorts": [
         {
           "name": "Image",
-          "displayName": "输出图像",
+          "displayName": "Image",
           "dataType": "Image",
           "isRequired": null
         }
@@ -4370,7 +4581,7 @@
       "parameters": [
         {
           "name": "MaxValue",
-          "displayName": "最大值",
+          "displayName": "Max Value",
           "dataType": "double",
           "description": null,
           "defaultValue": "255",
@@ -4381,7 +4592,7 @@
         },
         {
           "name": "AdaptiveMethod",
-          "displayName": "自适应方法",
+          "displayName": "Adaptive Method",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Gaussian",
@@ -4391,17 +4602,17 @@
           "options": [
             {
               "value": "Gaussian",
-              "label": "高斯加权"
+              "label": "Gaussian"
             },
             {
               "value": "Mean",
-              "label": "均值"
+              "label": "Mean"
             }
           ]
         },
         {
           "name": "ThresholdType",
-          "displayName": "阈值类型",
+          "displayName": "Threshold Type",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Binary",
@@ -4411,28 +4622,28 @@
           "options": [
             {
               "value": "Binary",
-              "label": "二值化"
+              "label": "Binary"
             },
             {
               "value": "BinaryInv",
-              "label": "反二值化"
+              "label": "Binary Inv"
             }
           ]
         },
         {
           "name": "BlockSize",
-          "displayName": "块大小",
+          "displayName": "Block Size",
           "dataType": "int",
           "description": null,
           "defaultValue": "11",
           "min": "3",
-          "max": "99",
+          "max": "51",
           "isRequired": true,
           "options": null
         },
         {
           "name": "C",
-          "displayName": "常数C",
+          "displayName": "C",
           "dataType": "double",
           "description": null,
           "defaultValue": "2",
@@ -4457,7 +4668,7 @@
       "id": "HistogramEqualization",
       "type": 40,
       "displayName": "直方图均衡化",
-      "description": "全局均衡化和CLAHE自适应均衡化",
+      "description": "Supports global histogram equalization and CLAHE.",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -4522,6 +4733,17 @@
           "defaultValue": "8",
           "min": "1",
           "max": "64",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ApplyToEachChannel",
+          "displayName": "逐通道处理",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         }
@@ -4635,7 +4857,7 @@
           "displayName": "Contour Selection",
           "dataType": "enum",
           "description": null,
-          "defaultValue": "LargestContour",
+          "defaultValue": "BestResidual",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -4645,12 +4867,8 @@
               "label": "Largest Contour"
             },
             {
-              "value": "AllContours",
-              "label": "All Contours"
-            },
-            {
-              "value": "FirstContour",
-              "label": "First Contour"
+              "value": "BestResidual",
+              "label": "Best Residual"
             }
           ]
         },
@@ -4892,15 +5110,15 @@
       "id": "ShapeMatching",
       "type": 43,
       "displayName": "旋转尺度模板匹配",
-      "description": "Rotation- and scale-robust template matching with pyramid coarse-to-fine search.",
+      "description": "Rotation-scale template matching with pyramid coarse-to-fine search. This is not a generic contour-descriptor matcher.",
       "category": "匹配定位",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "虽然名称叫“形状匹配”，但当前实现本质上仍是基于灰度模板匹配的旋转搜索，而不是基于轮…",
+      "algorithm": "虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子…",
       "inputPorts": [
         {
           "name": "Image",
@@ -5039,6 +5257,52 @@
           "max": "6",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "OriginMode",
+          "displayName": "Origin Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Center",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Center",
+              "label": "Center"
+            },
+            {
+              "value": "TopLeft",
+              "label": "TopLeft"
+            },
+            {
+              "value": "Custom",
+              "label": "Custom"
+            }
+          ]
+        },
+        {
+          "name": "OriginX",
+          "displayName": "Origin X",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OriginY",
+          "displayName": "Origin Y",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -5060,6 +5324,9 @@
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
+        "experimental",
+        "industrial-remediation",
+        "subpixel-edge",
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
@@ -5172,21 +5439,30 @@
       "id": "ColorDetection",
       "type": 45,
       "displayName": "颜色检测",
-      "description": "基于 HSV/Lab 空间的颜色分析与分级",
+      "description": "Supports compatibility color analysis plus HSV inspection and Lab DeltaE inspection.",
       "category": "颜色处理",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "tags": [
+        "color-inspection",
+        "experimental",
+        "industrial-remediation",
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
           "displayName": "输入图像",
           "dataType": "Image",
           "isRequired": true
+        },
+        {
+          "name": "ReferenceColor",
+          "displayName": "Reference Color",
+          "dataType": "Any",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -5212,6 +5488,42 @@
           "name": "ColorSpace",
           "displayName": "颜色空间",
           "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "DeltaE",
+          "displayName": "DeltaE",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Coverage",
+          "displayName": "Coverage",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "WhiteBalanceStatus",
+          "displayName": "White Balance Status",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "MeanColor",
+          "displayName": "Mean Color",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "DominantColors",
+          "displayName": "Dominant Colors",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "Diagnostics",
+          "displayName": "Diagnostics",
+          "dataType": "Any",
           "isRequired": null
         }
       ],
@@ -5248,15 +5560,23 @@
           "options": [
             {
               "value": "Average",
-              "label": "平均色"
+              "label": "Legacy Average"
             },
             {
               "value": "Dominant",
-              "label": "主色提取"
+              "label": "Legacy Dominant"
             },
             {
               "value": "Range",
-              "label": "颜色范围检测"
+              "label": "Legacy Range"
+            },
+            {
+              "value": "HsvInspection",
+              "label": "HSV Inspection"
+            },
+            {
+              "value": "LabDeltaE",
+              "label": "Lab DeltaE"
             }
           ]
         },
@@ -5336,16 +5656,124 @@
           "max": "10",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "DeltaEMethod",
+          "displayName": "DeltaE Method",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "CIEDE2000",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "CIE76",
+              "label": "CIE76"
+            },
+            {
+              "value": "CIEDE2000",
+              "label": "CIEDE2000"
+            }
+          ]
+        },
+        {
+          "name": "RefL",
+          "displayName": "Ref L",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RefA",
+          "displayName": "Ref A",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RefB",
+          "displayName": "Ref B",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiX",
+          "displayName": "ROI X",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiY",
+          "displayName": "ROI Y",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiW",
+          "displayName": "ROI W",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiH",
+          "displayName": "ROI H",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "WhiteBalanceTolerance",
+          "displayName": "White Balance Tolerance",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "12",
+          "min": "0",
+          "max": "255",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 96,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ColorDetection.md"
     },
@@ -5529,13 +5957,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/SerialCommunication.md"
     },
@@ -5594,6 +6022,17 @@
           "defaultValue": "102",
           "min": "1",
           "max": "65535",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "UseGlobalFallback",
+          "displayName": "允许全局回退",
+          "dataType": "bool",
+          "description": "启用后缺失的IP/Port可回退到全局通信配置",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         },
@@ -5849,9 +6288,9 @@
     {
       "id": "MitsubishiMcCommunication",
       "type": 51,
-      "displayName": "三菱MC通信",
-      "description": "三菱MC协议PLC读写通信（FX5U/Q/iQ-R/iQ-F）",
-      "category": "通信",
+      "displayName": "Mitsubishi MC Communication",
+      "description": "Mitsubishi MC protocol PLC read/write communication.",
+      "category": "Communication",
       "version": "1.0.0",
       "tags": [
         "功能域:通信",
@@ -5862,7 +6301,7 @@
       "inputPorts": [
         {
           "name": "Data",
-          "displayName": "数据",
+          "displayName": "Data",
           "dataType": "Any",
           "isRequired": false
         }
@@ -5870,13 +6309,13 @@
       "outputPorts": [
         {
           "name": "Response",
-          "displayName": "响应",
+          "displayName": "Response",
           "dataType": "String",
           "isRequired": null
         },
         {
           "name": "Status",
-          "displayName": "状态",
+          "displayName": "Status",
           "dataType": "Boolean",
           "isRequired": null
         }
@@ -5884,10 +6323,10 @@
       "parameters": [
         {
           "name": "IpAddress",
-          "displayName": "IP地址",
+          "displayName": "IP Address",
           "dataType": "string",
           "description": null,
-          "defaultValue": "192.168.3.1",
+          "defaultValue": "192.168.3.39",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -5895,7 +6334,7 @@
         },
         {
           "name": "Port",
-          "displayName": "端口",
+          "displayName": "Port",
           "dataType": "int",
           "description": null,
           "defaultValue": "5002",
@@ -5905,8 +6344,19 @@
           "options": null
         },
         {
+          "name": "UseGlobalFallback",
+          "displayName": "Use Global Fallback",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
           "name": "Address",
-          "displayName": "PLC地址",
+          "displayName": "PLC Address",
           "dataType": "string",
           "description": null,
           "defaultValue": "D100",
@@ -5917,18 +6367,18 @@
         },
         {
           "name": "Length",
-          "displayName": "读取长度",
+          "displayName": "Read Length",
           "dataType": "int",
           "description": null,
           "defaultValue": "1",
           "min": "1",
-          "max": "960",
+          "max": "999",
           "isRequired": true,
           "options": null
         },
         {
           "name": "DataType",
-          "displayName": "数据类型",
+          "displayName": "Data Type",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Word",
@@ -5938,37 +6388,37 @@
           "options": [
             {
               "value": "Bit",
-              "label": "位 (Bool)"
+              "label": "Bit(Bool)"
             },
             {
               "value": "Word",
-              "label": "字 (Word/UInt16)"
+              "label": "Word(UInt16)"
             },
             {
               "value": "Int16",
-              "label": "短整型 (Int16)"
+              "label": "Int16"
             },
             {
               "value": "DWord",
-              "label": "双字 (DWord/UInt32)"
+              "label": "DWord(UInt32)"
             },
             {
               "value": "Int32",
-              "label": "整型 (Int32)"
+              "label": "Int32"
             },
             {
               "value": "Float",
-              "label": "浮点 (Float)"
+              "label": "Float"
             },
             {
               "value": "Double",
-              "label": "双精度 (Double)"
+              "label": "Double"
             }
           ]
         },
         {
           "name": "Operation",
-          "displayName": "操作",
+          "displayName": "Operation",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Read",
@@ -5978,17 +6428,17 @@
           "options": [
             {
               "value": "Read",
-              "label": "读取"
+              "label": "Read"
             },
             {
               "value": "Write",
-              "label": "写入"
+              "label": "Write"
             }
           ]
         },
         {
           "name": "WriteValue",
-          "displayName": "写入值",
+          "displayName": "Write Value",
           "dataType": "string",
           "description": null,
           "defaultValue": "",
@@ -5999,9 +6449,9 @@
         },
         {
           "name": "PollingMode",
-          "displayName": "轮询模式",
+          "displayName": "Polling Mode",
           "dataType": "enum",
-          "description": "读取时是否启用轮询等待",
+          "description": "Whether to poll while reading.",
           "defaultValue": "None",
           "min": null,
           "max": null,
@@ -6009,19 +6459,19 @@
           "options": [
             {
               "value": "None",
-              "label": "不等待"
+              "label": "None"
             },
             {
               "value": "WaitForValue",
-              "label": "等待指定值"
+              "label": "Wait For Value"
             }
           ]
         },
         {
           "name": "PollingCondition",
-          "displayName": "等待条件",
+          "displayName": "Polling Condition",
           "dataType": "enum",
-          "description": "等待的条件类型",
+          "description": "Condition for polling.",
           "defaultValue": "Equal",
           "min": null,
           "max": null,
@@ -6029,35 +6479,35 @@
           "options": [
             {
               "value": "Equal",
-              "label": "等于"
+              "label": "Equal"
             },
             {
               "value": "NotEqual",
-              "label": "不等于"
+              "label": "Not Equal"
             },
             {
               "value": "GreaterThan",
-              "label": "大于"
+              "label": "Greater Than"
             },
             {
               "value": "LessThan",
-              "label": "小于"
+              "label": "Less Than"
             },
             {
               "value": "GreaterOrEqual",
-              "label": "大于等于"
+              "label": "Greater Or Equal"
             },
             {
               "value": "LessOrEqual",
-              "label": "小于等于"
+              "label": "Less Or Equal"
             }
           ]
         },
         {
           "name": "PollingValue",
-          "displayName": "等待值",
+          "displayName": "Polling Value",
           "dataType": "string",
-          "description": "等待的目标值（如触发信号值）",
+          "description": "Target value for polling.",
           "defaultValue": "1",
           "min": null,
           "max": null,
@@ -6066,9 +6516,9 @@
         },
         {
           "name": "PollingTimeout",
-          "displayName": "等待超时(ms)",
+          "displayName": "Polling Timeout (ms)",
           "dataType": "int",
-          "description": "最长等待时间（毫秒）",
+          "description": "Maximum wait duration in milliseconds.",
           "defaultValue": "30000",
           "min": "100",
           "max": "300000",
@@ -6077,9 +6527,9 @@
         },
         {
           "name": "PollingInterval",
-          "displayName": "轮询间隔(ms)",
+          "displayName": "Polling Interval (ms)",
           "dataType": "int",
-          "description": "每次读取间隔（毫秒）",
+          "description": "Interval between polling reads in milliseconds.",
           "defaultValue": "50",
           "min": "10",
           "max": "5000",
@@ -6153,6 +6603,17 @@
           "defaultValue": "9600",
           "min": "1",
           "max": "65535",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "UseGlobalFallback",
+          "displayName": "允许全局回退",
+          "dataType": "bool",
+          "description": "启用后缺失的IP/Port可回退到全局通信配置",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         },
@@ -6353,9 +6814,9 @@
     {
       "id": "ResultJudgment",
       "type": 60,
-      "displayName": "结果判定",
-      "description": "通用判定逻辑（数量/范围/阈值），输出OK/NG结果",
-      "category": "流程控制",
+      "displayName": "Result Judgment",
+      "description": "Generic business judgment with numeric/string condition checks.",
+      "category": "Flow Control",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -6366,33 +6827,45 @@
       "inputPorts": [
         {
           "name": "Value",
-          "displayName": "输入值",
+          "displayName": "Value",
           "dataType": "Any",
-          "isRequired": true
+          "isRequired": false
         },
         {
           "name": "Confidence",
-          "displayName": "置信度",
+          "displayName": "Confidence",
           "dataType": "Float",
           "isRequired": false
         }
       ],
       "outputPorts": [
         {
+          "name": "JudgmentResult",
+          "displayName": "Judgment Result",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
           "name": "IsOk",
-          "displayName": "是否OK",
+          "displayName": "Is OK",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "ConditionResult",
+          "displayName": "Condition Result",
           "dataType": "Boolean",
           "isRequired": null
         },
         {
           "name": "JudgmentValue",
-          "displayName": "判定值",
+          "displayName": "Judgment Value",
           "dataType": "String",
           "isRequired": null
         },
         {
           "name": "Details",
-          "displayName": "详细信息",
+          "displayName": "Details",
           "dataType": "String",
           "isRequired": null
         }
@@ -6400,9 +6873,9 @@
       "parameters": [
         {
           "name": "FieldName",
-          "displayName": "判定字段",
+          "displayName": "Field Name",
           "dataType": "string",
-          "description": "要从上游输入中读取的字段名，如 DefectCount, Distance",
+          "description": null,
           "defaultValue": "Value",
           "min": null,
           "max": null,
@@ -6411,7 +6884,7 @@
         },
         {
           "name": "Condition",
-          "displayName": "判定条件",
+          "displayName": "Condition",
           "dataType": "enum",
           "description": null,
           "defaultValue": "Equal",
@@ -6421,48 +6894,40 @@
           "options": [
             {
               "value": "Equal",
-              "label": "等于 (Equal)"
+              "label": "Equal"
+            },
+            {
+              "value": "NotEqual",
+              "label": "Not Equal"
             },
             {
               "value": "GreaterThan",
-              "label": "大于 (GreaterThan)"
+              "label": "Greater Than"
             },
             {
               "value": "LessThan",
-              "label": "小于 (LessThan)"
+              "label": "Less Than"
             },
             {
               "value": "GreaterOrEqual",
-              "label": "大于等于 (GreaterOrEqual)"
+              "label": "Greater Or Equal"
             },
             {
               "value": "LessOrEqual",
-              "label": "小于等于 (LessOrEqual)"
+              "label": "Less Or Equal"
             },
             {
               "value": "Range",
-              "label": "范围内 (Range)"
-            },
-            {
-              "value": "Contains",
-              "label": "包含 (Contains)"
-            },
-            {
-              "value": "StartsWith",
-              "label": "开头是 (StartsWith)"
-            },
-            {
-              "value": "EndsWith",
-              "label": "结尾是 (EndsWith)"
+              "label": "Range"
             }
           ]
         },
         {
           "name": "ExpectValue",
-          "displayName": "期望值",
+          "displayName": "Expected Value",
           "dataType": "string",
-          "description": "判定目标值，如 4（螺钉数）、0（缺陷数）、9.5（尺寸下限）",
-          "defaultValue": "4",
+          "description": null,
+          "defaultValue": "1",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -6470,9 +6935,9 @@
         },
         {
           "name": "ExpectValueMin",
-          "displayName": "范围最小值",
+          "displayName": "Expected Min",
           "dataType": "string",
-          "description": "用于Range条件，设置范围下限",
+          "description": null,
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -6481,9 +6946,9 @@
         },
         {
           "name": "ExpectValueMax",
-          "displayName": "范围最大值",
+          "displayName": "Expected Max",
           "dataType": "string",
-          "description": "用于Range条件，设置范围上限",
+          "description": null,
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -6492,9 +6957,9 @@
         },
         {
           "name": "MinConfidence",
-          "displayName": "最小置信度",
+          "displayName": "Min Confidence",
           "dataType": "double",
-          "description": "置信度低于此值时判定为NG（0表示不检查置信度）",
+          "description": null,
           "defaultValue": "0",
           "min": "0",
           "max": "1",
@@ -6502,36 +6967,36 @@
           "options": null
         },
         {
-          "name": "OkOutputValue",
-          "displayName": "OK输出值",
-          "dataType": "string",
-          "description": "判定为OK时输出的值（用于PLC写入）",
-          "defaultValue": "1",
-          "min": null,
-          "max": null,
+          "name": "NumericAbsTolerance",
+          "displayName": "Numeric Absolute Tolerance",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.0001",
+          "min": "0",
+          "max": "1000000",
           "isRequired": true,
           "options": null
         },
         {
-          "name": "NgOutputValue",
-          "displayName": "NG输出值",
-          "dataType": "string",
-          "description": "判定为NG时输出的值（用于PLC写入）",
-          "defaultValue": "0",
-          "min": null,
-          "max": null,
+          "name": "NumericRelTolerance",
+          "displayName": "Numeric Relative Tolerance",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "1E-06",
+          "min": "0",
+          "max": "1",
           "isRequired": true,
           "options": null
         }
       ],
       "quality": {
-        "totalScore": 66,
-        "level": "C",
+        "totalScore": 84,
+        "level": "B",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=35"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=35"
       },
       "docPath": "算子资料/算子名片/ResultJudgment.md"
     },
@@ -6543,6 +7008,9 @@
       "category": "AI Inspection",
       "version": "1.0.0",
       "tags": [
+        "experimental",
+        "industrial-remediation",
+        "sequence-judge",
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
@@ -6554,6 +7022,24 @@
           "displayName": "Detections",
           "dataType": "DetectionList",
           "isRequired": true
+        },
+        {
+          "name": "SlotPoints",
+          "displayName": "Slot Points",
+          "dataType": "PointList",
+          "isRequired": false
+        },
+        {
+          "name": "PerspectiveSrcPoints",
+          "displayName": "Perspective Source Points",
+          "dataType": "PointList",
+          "isRequired": false
+        },
+        {
+          "name": "PerspectiveDstPoints",
+          "displayName": "Perspective Destination Points",
+          "dataType": "PointList",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -6594,6 +7080,42 @@
           "isRequired": null
         },
         {
+          "name": "Assignment",
+          "displayName": "Assignment",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "UnassignedDetections",
+          "displayName": "Unassigned Detections",
+          "dataType": "DetectionList",
+          "isRequired": null
+        },
+        {
+          "name": "SlotDistances",
+          "displayName": "Slot Distances",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "RowCount",
+          "displayName": "Row Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "PerspectiveApplied",
+          "displayName": "Perspective Applied",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "Diagnostics",
+          "displayName": "Diagnostics",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
           "name": "Message",
           "displayName": "Message",
           "dataType": "String",
@@ -6629,6 +7151,10 @@
             {
               "value": "CenterY",
               "label": "Center Y"
+            },
+            {
+              "value": "TopY",
+              "label": "Top Y"
             },
             {
               "value": "Confidence",
@@ -6719,16 +7245,99 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "GroupingMode",
+          "displayName": "Grouping Mode",
+          "dataType": "enum",
+          "description": "SingleRow keeps legacy sorting, RowCluster groups detections into rows, SlotAssignment assigns detections to expected slot points, Auto prefers slots when provided.",
+          "defaultValue": "SingleRow",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "SingleRow",
+              "label": "Single Row"
+            },
+            {
+              "value": "RowCluster",
+              "label": "Row Cluster"
+            },
+            {
+              "value": "SlotAssignment",
+              "label": "Slot Assignment"
+            },
+            {
+              "value": "Auto",
+              "label": "Auto"
+            }
+          ]
+        },
+        {
+          "name": "ExpectedSlots",
+          "displayName": "Expected Slots",
+          "dataType": "string",
+          "description": "JSON array or shorthand x:y;x:y list of expected slot centers.",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RowTolerance",
+          "displayName": "Row Tolerance",
+          "dataType": "double",
+          "description": "Maximum Y delta for row clustering. Use 0 for auto.",
+          "defaultValue": "0",
+          "min": "0",
+          "max": "5000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "SlotTolerance",
+          "displayName": "Slot Tolerance",
+          "dataType": "double",
+          "description": "Maximum assignment distance to an expected slot. Use 0 for auto.",
+          "defaultValue": "0",
+          "min": "0",
+          "max": "5000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "PerspectiveSrcPointsJson",
+          "displayName": "Perspective Source Points JSON",
+          "dataType": "string",
+          "description": "Optional 4-point JSON array for perspective source points.",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "PerspectiveDstPointsJson",
+          "displayName": "Perspective Destination Points JSON",
+          "dataType": "string",
+          "description": "Optional 4-point JSON array for perspective destination points.",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
-        "documentationScore": 60,
+        "totalScore": 100,
+        "level": "A",
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=60"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/DetectionSequenceJudge.md"
     },
@@ -6736,7 +7345,7 @@
       "id": "ClaheEnhancement",
       "type": 71,
       "displayName": "CLAHE增强",
-      "description": "自适应直方图均衡化，用于局部对比度增强",
+      "description": "Adaptive histogram equalization for local contrast enhancement.",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
@@ -6766,7 +7375,7 @@
           "name": "ClipLimit",
           "displayName": "裁剪限制",
           "dataType": "double",
-          "description": "对比度限制阈值，防止过度放大噪声",
+          "description": "Limits local contrast amplification to avoid excessive noise boosting.",
           "defaultValue": "2",
           "min": "0",
           "max": "40",
@@ -6827,7 +7436,7 @@
           "name": "Channel",
           "displayName": "目标通道",
           "dataType": "enum",
-          "description": "指定要增强的通道，Auto 根据颜色空间自动选择",
+          "description": "Auto follows ColorSpace. L/V/Y/All explicitly choose the processing branch.",
           "defaultValue": "Auto",
           "min": null,
           "max": null,
@@ -6857,13 +7466,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/ClaheEnhancement.md"
     },
@@ -7018,13 +7627,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/MorphologicalOperation.md"
     },
@@ -7093,13 +7702,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/LaplacianSharpen.md"
     },
@@ -7382,13 +7991,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/ImageBlend.md"
     },
@@ -7818,13 +8427,13 @@
         }
       ],
       "quality": {
-        "totalScore": 75,
-        "level": "B",
+        "totalScore": 93,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=90"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=90"
       },
       "docPath": "算子资料/算子名片/TryCatch.md"
     },
@@ -7926,7 +8535,7 @@
       "id": "AkazeFeatureMatch",
       "type": 90,
       "displayName": "AKAZE特征匹配",
-      "description": "基于AKAZE特征的鲁棒模板匹配，对光照/旋转/缩放变化具有强鲁棒性",
+      "description": "AKAZE feature matching with verified homography gating for robust template localization.",
       "category": "匹配定位",
       "version": "1.0.0",
       "tags": [
@@ -8036,6 +8645,52 @@
           "max": "2000",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "OriginMode",
+          "displayName": "Origin Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Center",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Center",
+              "label": "Center"
+            },
+            {
+              "value": "TopLeft",
+              "label": "TopLeft"
+            },
+            {
+              "value": "Custom",
+              "label": "Custom"
+            }
+          ]
+        },
+        {
+          "name": "OriginX",
+          "displayName": "Origin X",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OriginY",
+          "displayName": "Origin Y",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -8053,7 +8708,7 @@
       "id": "OrbFeatureMatch",
       "type": 91,
       "displayName": "ORB特征匹配",
-      "description": "基于ORB特征的快速模板匹配，适合实时应用",
+      "description": "ORB feature matching with homography verification for fast template localization.",
       "category": "匹配定位",
       "version": "1.0.0",
       "tags": [
@@ -8185,6 +8840,52 @@
           "max": "100",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "OriginMode",
+          "displayName": "Origin Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Center",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Center",
+              "label": "Center"
+            },
+            {
+              "value": "TopLeft",
+              "label": "TopLeft"
+            },
+            {
+              "value": "Custom",
+              "label": "Custom"
+            }
+          ]
+        },
+        {
+          "name": "OriginX",
+          "displayName": "Origin X",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OriginY",
+          "displayName": "Origin Y",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -8202,7 +8903,7 @@
       "id": "GradientShapeMatch",
       "type": 92,
       "displayName": "梯度形状匹配",
-      "description": "基于梯度方向的形状匹配，支持旋转不变性。",
+      "description": "基于梯度方向特征的形状匹配，支持可选 ROI 搜索。",
       "category": "匹配定位",
       "version": "1.0.0",
       "tags": [
@@ -8282,7 +8983,7 @@
         },
         {
           "name": "AngleRange",
-          "displayName": "角度范围(°)",
+          "displayName": "角度范围(度)",
           "dataType": "int",
           "description": null,
           "defaultValue": "180",
@@ -8323,6 +9024,61 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "UseRoi",
+          "displayName": "使用 ROI",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiX",
+          "displayName": "ROI X",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiY",
+          "displayName": "ROI Y",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiWidth",
+          "displayName": "ROI Width",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiHeight",
+          "displayName": "ROI Height",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -8340,7 +9096,7 @@
       "id": "PyramidShapeMatch",
       "type": 93,
       "displayName": "金字塔形状匹配",
-      "description": "多尺度金字塔形状匹配，速度快，适合大尺寸图像",
+      "description": "基于 LINEMOD 的金字塔模板匹配。",
       "category": "匹配定位",
       "version": "1.0.0",
       "tags": [
@@ -8420,7 +9176,7 @@
         },
         {
           "name": "AngleRange",
-          "displayName": "角度范围(±)",
+          "displayName": "角度范围(度)",
           "dataType": "int",
           "description": null,
           "defaultValue": "180",
@@ -8598,9 +9354,9 @@
     {
       "id": "DualModalVoting",
       "type": 94,
-      "displayName": "双模态投票",
-      "description": "结合深度学习和传统算法结果进行投票决策",
-      "category": "AI检测",
+      "displayName": "Dual Modal Voting",
+      "description": "Combines deep learning and traditional inspection results into a final judgment.",
+      "category": "AI Detection",
       "version": "1.0.0",
       "tags": [
         "功能域:AI",
@@ -8611,13 +9367,13 @@
       "inputPorts": [
         {
           "name": "DLResult",
-          "displayName": "深度学习结果",
+          "displayName": "Deep learning result",
           "dataType": "Any",
           "isRequired": true
         },
         {
           "name": "TraditionalResult",
-          "displayName": "传统算法结果",
+          "displayName": "Traditional result",
           "dataType": "Any",
           "isRequired": true
         }
@@ -8625,19 +9381,19 @@
       "outputPorts": [
         {
           "name": "IsOk",
-          "displayName": "是否OK",
+          "displayName": "Whether the final result is OK",
           "dataType": "Boolean",
           "isRequired": null
         },
         {
           "name": "Confidence",
-          "displayName": "综合置信度",
+          "displayName": "Confidence of the final judgment",
           "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "JudgmentValue",
-          "displayName": "判定值",
+          "displayName": "Final judgment value",
           "dataType": "String",
           "isRequired": null
         }
@@ -8645,7 +9401,7 @@
       "parameters": [
         {
           "name": "VotingStrategy",
-          "displayName": "投票策略",
+          "displayName": "Voting strategy",
           "dataType": "enum",
           "description": null,
           "defaultValue": "WeightedAverage",
@@ -8655,29 +9411,29 @@
           "options": [
             {
               "value": "WeightedAverage",
-              "label": "加权平均"
+              "label": "Weighted average"
             },
             {
               "value": "Unanimous",
-              "label": "一致同意"
+              "label": "Unanimous"
             },
             {
               "value": "Majority",
-              "label": "多数表决"
+              "label": "Majority"
             },
             {
               "value": "PrioritizeDeepLearning",
-              "label": "优先深度学习"
+              "label": "Prioritize deep learning"
             },
             {
               "value": "PrioritizeTraditional",
-              "label": "优先传统算法"
+              "label": "Prioritize traditional"
             }
           ]
         },
         {
           "name": "DLWeight",
-          "displayName": "DL权重",
+          "displayName": "Deep learning weight",
           "dataType": "double",
           "description": null,
           "defaultValue": "0.6",
@@ -8688,7 +9444,7 @@
         },
         {
           "name": "TraditionalWeight",
-          "displayName": "传统算法权重",
+          "displayName": "Traditional weight",
           "dataType": "double",
           "description": null,
           "defaultValue": "0.4",
@@ -8699,7 +9455,7 @@
         },
         {
           "name": "ConfidenceThreshold",
-          "displayName": "置信度阈值",
+          "displayName": "Confidence threshold",
           "dataType": "double",
           "description": null,
           "defaultValue": "0.5",
@@ -8710,7 +9466,7 @@
         },
         {
           "name": "OkOutputValue",
-          "displayName": "OK输出值",
+          "displayName": "OK output value",
           "dataType": "string",
           "description": null,
           "defaultValue": "1",
@@ -8721,7 +9477,7 @@
         },
         {
           "name": "NgOutputValue",
-          "displayName": "NG输出值",
+          "displayName": "NG output value",
           "dataType": "string",
           "description": null,
           "defaultValue": "0",
@@ -8732,13 +9488,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 94,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/DualModalVoting.md"
     },
@@ -8849,7 +9605,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "List",
@@ -8873,7 +9629,7 @@
         },
         {
           "name": "Index",
-          "displayName": "索引",
+          "displayName": "原始索引",
           "dataType": "Integer",
           "isRequired": null
         }
@@ -8925,6 +9681,17 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "LabelFilter",
+          "displayName": "标签过滤",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -8950,7 +9717,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Json",
@@ -8968,7 +9735,7 @@
         },
         {
           "name": "IsSuccess",
-          "displayName": "是否成功",
+          "displayName": "是否命中路径",
           "dataType": "Boolean",
           "isRequired": null
         }
@@ -8980,6 +9747,39 @@
           "dataType": "string",
           "description": null,
           "defaultValue": "$.data",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OutputType",
+          "displayName": "输出类型",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "Any",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "DefaultValue",
+          "displayName": "默认值",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Required",
+          "displayName": "是否必需",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -9111,7 +9911,7 @@
       "id": "LogicGate",
       "type": 111,
       "displayName": "逻辑门",
-      "description": "布尔逻辑运算 (AND, OR, NOT, XOR...)",
+      "description": "布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)",
       "category": "通用",
       "version": "1.0.0",
       "tags": [
@@ -9155,39 +9955,39 @@
           "options": [
             {
               "value": "AND",
-              "label": "AND (与)"
+              "label": "AND"
             },
             {
               "value": "OR",
-              "label": "OR (或)"
+              "label": "OR"
             },
             {
               "value": "NOT",
-              "label": "NOT (非)"
+              "label": "NOT"
             },
             {
               "value": "XOR",
-              "label": "XOR (异或)"
+              "label": "XOR"
             },
             {
               "value": "NAND",
-              "label": "NAND (与非)"
+              "label": "NAND"
             },
             {
               "value": "NOR",
-              "label": "NOR (或非)"
+              "label": "NOR"
             }
           ]
         }
       ],
       "quality": {
-        "totalScore": 73,
+        "totalScore": 76,
         "level": "B",
         "documentationScore": 100,
         "testCoverageScore": 30,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/LogicGate.md"
     },
@@ -9435,13 +10235,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/HttpRequest.md"
     },
@@ -9689,13 +10489,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ImageSave.md"
     },
@@ -9789,13 +10589,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 71,
-        "level": "B",
+        "totalScore": 89,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/ImageDiff.md"
     },
@@ -9944,7 +10744,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子把多路输入聚合成列表，并在可解析为有限数值的输入上计算统计结果。",
       "inputPorts": [
         {
           "name": "Value1",
@@ -9995,6 +10795,12 @@
           "displayName": "均值",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "NumericCount",
+          "displayName": "数值数量",
+          "dataType": "Integer",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -10028,13 +10834,13 @@
         }
       ],
       "quality": {
-        "totalScore": 66,
-        "level": "C",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=35"
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/Aggregator.md"
     },
@@ -10225,13 +11031,13 @@
         }
       ],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
+        "totalScore": 71,
+        "level": "B",
         "documentationScore": 100,
         "testCoverageScore": 30,
         "parameterValidationScore": 80,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=35"
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/Comparator.md"
     },
@@ -10458,10 +11264,6 @@
           "isRequired": true,
           "options": [
             {
-              "value": "single_edge",
-              "label": "single_edge"
-            },
-            {
               "value": "edge_pairs",
               "label": "edge_pairs"
             }
@@ -10524,13 +11326,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/CaliperTool.md"
     },
@@ -10546,7 +11348,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前实现有两种工作模式：",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -10581,6 +11383,12 @@
           "isRequired": null
         },
         {
+          "name": "MeanWidth",
+          "displayName": "Mean Width",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
           "name": "MinWidth",
           "displayName": "Min Width",
           "dataType": "Float",
@@ -10589,6 +11397,24 @@
         {
           "name": "MaxWidth",
           "displayName": "Max Width",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "P95Width",
+          "displayName": "P95 Width",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "StdDev",
+          "displayName": "StdDev",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ValidSampleRate",
+          "displayName": "Valid Sample Rate",
           "dataType": "Float",
           "isRequired": null
         }
@@ -10615,13 +11441,13 @@
           ]
         },
         {
-          "name": "NumSamples",
+          "name": "SampleCount",
           "displayName": "Sample Count",
           "dataType": "int",
           "description": null,
           "defaultValue": "24",
           "min": "10",
-          "max": "100",
+          "max": "256",
           "isRequired": true,
           "options": null
         },
@@ -10655,6 +11481,50 @@
           "max": "180",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "RobustMode",
+          "displayName": "Robust Mode",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OutlierSigmaK",
+          "displayName": "Outlier Sigma K",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "3",
+          "min": "0.5",
+          "max": "10",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinValidSamples",
+          "displayName": "Min Valid Samples",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "256",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MultiScanCount",
+          "displayName": "Multi Scan Count",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "24",
+          "min": "10",
+          "max": "256",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -10672,7 +11542,7 @@
       "id": "PointLineDistance",
       "type": 132,
       "displayName": "点线距离",
-      "description": "Computes perpendicular distance from a point to a line.",
+      "description": "Computes distance from a point to a line or segment.",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -10709,15 +11579,52 @@
           "isRequired": null
         }
       ],
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "DistanceModel",
+          "displayName": "Distance Model",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Segment",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Segment",
+              "label": "Segment"
+            },
+            {
+              "value": "InfiniteLine",
+              "label": "Infinite line"
+            }
+          ]
+        },
+        {
+          "name": "Unit",
+          "displayName": "Unit",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Pixel",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Pixel",
+              "label": "Pixel"
+            }
+          ]
+        }
+      ],
       "quality": {
-        "totalScore": 91,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
+        "parameterValidationScore": 100,
         "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/PointLineDistance.md"
     },
@@ -10725,7 +11632,7 @@
       "id": "LineLineDistance",
       "type": 133,
       "displayName": "线线距离",
-      "description": "Computes distance and angle between two lines.",
+      "description": "Computes distance and angle between two lines or segments.",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -10791,6 +11698,42 @@
           "max": "45",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "DistanceModel",
+          "displayName": "Distance Model",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Segment",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Segment",
+              "label": "Segment"
+            },
+            {
+              "value": "InfiniteLine",
+              "label": "Infinite line"
+            }
+          ]
+        },
+        {
+          "name": "Unit",
+          "displayName": "Unit",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Pixel",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Pixel",
+              "label": "Pixel"
+            }
+          ]
         }
       ],
       "quality": {
@@ -10829,6 +11772,12 @@
           "displayName": "Image",
           "dataType": "Image",
           "isRequired": false
+        },
+        {
+          "name": "SourceImage",
+          "displayName": "Source Image",
+          "dataType": "Image",
+          "isRequired": false
         }
       ],
       "outputPorts": [
@@ -10848,6 +11797,30 @@
           "name": "Count",
           "displayName": "Count",
           "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "InputCount",
+          "displayName": "Input Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "SuppressedCount",
+          "displayName": "Suppressed Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "SuppressedDetections",
+          "displayName": "Suppressed Detections",
+          "dataType": "DetectionList",
+          "isRequired": null
+        },
+        {
+          "name": "Diagnostics",
+          "displayName": "Diagnostics",
+          "dataType": "Any",
           "isRequired": null
         }
       ],
@@ -10882,6 +11855,17 @@
           "defaultValue": "100",
           "min": "1",
           "max": "1000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ShowSuppressed",
+          "displayName": "Show Suppressed",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         }
@@ -11063,13 +12047,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 94,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/BoxFilter.md"
     },
@@ -11144,6 +12128,26 @@
           ]
         },
         {
+          "name": "ThresholdMode",
+          "displayName": "Threshold Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "PerMethodDefault",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "PerMethodDefault",
+              "label": "PerMethodDefault"
+            },
+            {
+              "value": "Manual",
+              "label": "Manual"
+            }
+          ]
+        },
+        {
           "name": "Threshold",
           "displayName": "Threshold",
           "dataType": "double",
@@ -11200,13 +12204,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/SharpnessEvaluation.md"
     },
@@ -11214,9 +12218,9 @@
       "id": "PositionCorrection",
       "type": 143,
       "displayName": "位置修正",
-      "description": "Corrects downstream ROI coordinates using reference/base offsets.",
+      "description": "Pixel-space ROI offset tool. Use calibration operators before treating the result as physical-world compensation.",
       "category": "定位",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "tags": [
         "功能域:定位",
         "成熟度:稳定",
@@ -11279,6 +12283,36 @@
           "displayName": "Angle",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "AppliedOffsetX",
+          "displayName": "Applied Offset X",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AppliedOffsetY",
+          "displayName": "Applied Offset Y",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "TransformMatrix",
+          "displayName": "Transform Matrix",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "RotationCenter",
+          "displayName": "Rotation Center",
+          "dataType": "Point",
+          "isRequired": null
+        },
+        {
+          "name": "CompensationMode",
+          "displayName": "Compensation Mode",
+          "dataType": "String",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -11339,8 +12373,8 @@
     {
       "id": "NPointCalibration",
       "type": 150,
-      "displayName": "N点标定",
-      "description": "Builds affine or perspective calibration from user point pairs.",
+      "displayName": "N Point Calibration",
+      "description": "Builds robust affine or homography calibration from all point pairs.",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -11348,7 +12382,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -11359,15 +12393,9 @@
       ],
       "outputPorts": [
         {
-          "name": "TransformMatrix",
-          "displayName": "Transform Matrix",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "PixelSize",
-          "displayName": "Pixel Size",
-          "dataType": "Float",
+          "name": "CalibrationData",
+          "displayName": "Calibration Data",
+          "dataType": "String",
           "isRequired": null
         },
         {
@@ -11435,8 +12463,8 @@
     {
       "id": "CalibrationLoader",
       "type": 151,
-      "displayName": "标定加载",
-      "description": "Loads calibration data from JSON/XML/YAML file.",
+      "displayName": "Calibration Loader",
+      "description": "Loads CalibrationBundleV2 JSON and exposes typed calibration outputs.",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -11444,38 +12472,32 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": null,
       "inputPorts": [],
       "outputPorts": [
         {
-          "name": "TransformMatrix",
-          "displayName": "Transform Matrix",
+          "name": "CalibrationData",
+          "displayName": "Calibration Data",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "CalibrationBundle",
+          "displayName": "Calibration Bundle",
           "dataType": "Any",
           "isRequired": null
         },
         {
-          "name": "CameraMatrix",
-          "displayName": "Camera Matrix",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "DistCoeffs",
-          "displayName": "Dist Coeffs",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "PixelSize",
-          "displayName": "Pixel Size",
-          "dataType": "Float",
+          "name": "Accepted",
+          "displayName": "Accepted",
+          "dataType": "Boolean",
           "isRequired": null
         }
       ],
       "parameters": [
         {
           "name": "FilePath",
-          "displayName": "File Path",
+          "displayName": "Calibration File Path",
           "dataType": "file",
           "description": null,
           "defaultValue": "",
@@ -11483,30 +12505,6 @@
           "max": null,
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "FileFormat",
-          "displayName": "File Format",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "JSON",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "JSON",
-              "label": "JSON"
-            },
-            {
-              "value": "XML",
-              "label": "XML"
-            },
-            {
-              "value": "YAML",
-              "label": "YAML"
-            }
-          ]
         }
       ],
       "quality": {
@@ -11941,13 +12939,13 @@
         }
       ],
       "quality": {
-        "totalScore": 84,
-        "level": "B",
+        "totalScore": 90,
+        "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=35"
+        "errorHandlingScore": 60,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/TriggerModule.md"
     },
@@ -11955,15 +12953,15 @@
       "id": "PointAlignment",
       "type": 162,
       "displayName": "点位对齐",
-      "description": "Computes offset and distance between current and reference points.",
+      "description": "Pixel-space alignment helper for offsets and repeatability checks. Physical-world interpretation requires calibration.",
       "category": "数据处理",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "tags": [
         "功能域:定位",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "CurrentPoint",
@@ -12032,13 +13030,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/PointAlignment.md"
     },
@@ -12046,15 +13044,15 @@
       "id": "PointCorrection",
       "type": 163,
       "displayName": "点位修正",
-      "description": "Computes translation/rotation correction from detected to reference point.",
+      "description": "Pixel-space rigid correction helper. Do not use it as a physical-world conversion substitute without calibration.",
       "category": "数据处理",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "tags": [
         "功能域:定位",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "DetectedPoint",
@@ -12104,6 +13102,12 @@
           "name": "TransformMatrix",
           "displayName": "Transform Matrix",
           "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "TransformUnit",
+          "displayName": "Transform Unit",
+          "dataType": "String",
           "isRequired": null
         }
       ],
@@ -12158,16 +13162,27 @@
           "max": "1000000",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "MaxAllowedDistance",
+          "displayName": "Max Allowed Distance",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "1000000",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/PointCorrection.md"
     },
@@ -12226,6 +13241,24 @@
         {
           "name": "MaxGap",
           "displayName": "Max Gap",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "P95Gap",
+          "displayName": "P95 Gap",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "StdDev",
+          "displayName": "StdDev",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ValidSampleRate",
+          "displayName": "Valid Sample Rate",
           "dataType": "Float",
           "isRequired": null
         },
@@ -12293,16 +13326,60 @@
           "max": "10000",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "RobustMode",
+          "displayName": "Robust Mode",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "OutlierSigmaK",
+          "displayName": "Outlier Sigma K",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "3",
+          "min": "0.5",
+          "max": "10",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinValidSamples",
+          "displayName": "Min Valid Samples",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "256",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MultiScanCount",
+          "displayName": "Multi Scan Count",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "8",
+          "min": "1",
+          "max": "64",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/GapMeasurement.md"
     },
@@ -12512,16 +13589,36 @@
           "max": "501",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "ColorMode",
+          "displayName": "Color Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "LumaOnly",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "LumaOnly",
+              "label": "LumaOnly"
+            },
+            {
+              "value": "PerChannel",
+              "label": "PerChannel"
+            }
+          ]
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ShadingCorrection.md"
     },
@@ -12764,9 +13861,9 @@
       "id": "ColorMeasurement",
       "type": 174,
       "displayName": "颜色测量",
-      "description": "Measures average Lab/HSV values and computes DeltaE.",
+      "description": "Measures Lab delta-E or HSV statistics over a selected ROI.",
       "category": "颜色处理",
-      "version": "1.0.2",
+      "version": "2.0.0",
       "tags": [
         "功能域:测量",
         "成熟度:稳定",
@@ -12789,45 +13886,45 @@
       ],
       "outputPorts": [
         {
-          "name": "L",
-          "displayName": "L",
-          "dataType": "Float",
+          "name": "LabMean",
+          "displayName": "Lab Mean",
+          "dataType": "Any",
           "isRequired": null
         },
         {
-          "name": "A",
-          "displayName": "A",
-          "dataType": "Float",
-          "isRequired": null
-        },
-        {
-          "name": "B",
-          "displayName": "B",
-          "dataType": "Float",
-          "isRequired": null
-        },
-        {
-          "name": "H",
-          "displayName": "H",
-          "dataType": "Float",
-          "isRequired": null
-        },
-        {
-          "name": "S",
-          "displayName": "S",
-          "dataType": "Float",
-          "isRequired": null
-        },
-        {
-          "name": "V",
-          "displayName": "V",
-          "dataType": "Float",
+          "name": "ReferenceLab",
+          "displayName": "Reference Lab",
+          "dataType": "Any",
           "isRequired": null
         },
         {
           "name": "DeltaE",
           "displayName": "DeltaE",
           "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "HueMean",
+          "displayName": "Hue Mean",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "SaturationMean",
+          "displayName": "Saturation Mean",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ValueMean",
+          "displayName": "Value Mean",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "HueValid",
+          "displayName": "Hue Valid",
+          "dataType": "Boolean",
           "isRequired": null
         },
         {
@@ -12839,22 +13936,22 @@
       ],
       "parameters": [
         {
-          "name": "ColorSpace",
-          "displayName": "Color Space",
+          "name": "MeasurementMode",
+          "displayName": "Measurement Mode",
           "dataType": "enum",
           "description": null,
-          "defaultValue": "Lab",
+          "defaultValue": "LabDeltaE",
           "min": null,
           "max": null,
           "isRequired": true,
           "options": [
             {
-              "value": "Lab",
-              "label": "Lab"
+              "value": "LabDeltaE",
+              "label": "Lab DeltaE"
             },
             {
-              "value": "HSV",
-              "label": "HSV"
+              "value": "HsvStats",
+              "label": "HSV Stats"
             }
           ]
         },
@@ -12957,13 +14054,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ColorMeasurement.md"
     },
@@ -12971,15 +14068,18 @@
       "id": "SurfaceDefectDetection",
       "type": 180,
       "displayName": "表面缺陷检测",
-      "description": "Detects surface defects using gradient, reference diff, or local contrast.",
+      "description": "Detects surface defects using gradient, aligned reference diff, or local contrast.",
       "category": "AI检测",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "tags": [
+        "experimental",
+        "industrial-remediation",
+        "surface-defect",
         "功能域:AI",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -13008,6 +14108,12 @@
           "isRequired": null
         },
         {
+          "name": "ResponseImage",
+          "displayName": "Response Image",
+          "dataType": "Image",
+          "isRequired": null
+        },
+        {
           "name": "DefectCount",
           "displayName": "Defect Count",
           "dataType": "Integer",
@@ -13017,6 +14123,24 @@
           "name": "DefectArea",
           "displayName": "Defect Area",
           "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AlignmentScore",
+          "displayName": "Alignment Score",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "RejectedReason",
+          "displayName": "Rejected Reason",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "Diagnostics",
+          "displayName": "Diagnostics",
+          "dataType": "Any",
           "isRequired": null
         }
       ],
@@ -13088,16 +14212,106 @@
           "max": "301",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "AlignmentMode",
+          "displayName": "Alignment Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "PhaseCorrelation",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "None",
+              "label": "None"
+            },
+            {
+              "value": "PhaseCorrelation",
+              "label": "PhaseCorrelation"
+            }
+          ]
+        },
+        {
+          "name": "NormalizationMode",
+          "displayName": "Normalization Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "LocalMean",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "None",
+              "label": "None"
+            },
+            {
+              "value": "LocalMean",
+              "label": "LocalMean"
+            }
+          ]
+        },
+        {
+          "name": "ThresholdMode",
+          "displayName": "Threshold Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "Auto"
+            },
+            {
+              "value": "Manual",
+              "label": "Manual"
+            },
+            {
+              "value": "Otsu",
+              "label": "Otsu"
+            },
+            {
+              "value": "ReferenceStats",
+              "label": "ReferenceStats"
+            }
+          ]
+        },
+        {
+          "name": "BackgroundKernelSize",
+          "displayName": "Background Kernel Size",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "31",
+          "min": "3",
+          "max": "301",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ReferenceStatsSigma",
+          "displayName": "Reference Stats Sigma",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "2.5",
+          "min": "0.1",
+          "max": "10",
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/SurfaceDefectDetection.md"
     },
@@ -13216,13 +14430,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/EdgePairDefect.md"
     },
@@ -13289,6 +14503,24 @@
           "displayName": "Height",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "NormalizedAngle",
+          "displayName": "Normalized Angle",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "LongSide",
+          "displayName": "Long Side",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ShortSide",
+          "displayName": "Short Side",
+          "dataType": "Float",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -13352,7 +14584,7 @@
       "id": "TranslationRotationCalibration",
       "type": 183,
       "displayName": "平移旋转标定",
-      "description": "Fits image-to-robot transform from calibration point pairs.",
+      "description": "Fits robust 2D rigid or similarity transform from image-to-robot point pairs.",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -13360,7 +14592,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -13371,20 +14603,20 @@
       ],
       "outputPorts": [
         {
-          "name": "TransformMatrix",
-          "displayName": "Transform Matrix",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "RotationCenter",
-          "displayName": "Rotation Center",
-          "dataType": "Point",
+          "name": "CalibrationData",
+          "displayName": "Calibration Data",
+          "dataType": "String",
           "isRequired": null
         },
         {
           "name": "CalibrationError",
           "displayName": "Calibration Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MaxCalibrationError",
+          "displayName": "Max Calibration Error",
           "dataType": "Float",
           "isRequired": null
         }
@@ -13607,17 +14839,44 @@
           "displayName": "Has Intersection",
           "dataType": "Boolean",
           "isRequired": null
+        },
+        {
+          "name": "SegmentsIntersect",
+          "displayName": "Segments Intersect",
+          "dataType": "Boolean",
+          "isRequired": null
         }
       ],
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "IntersectionMode",
+          "displayName": "Intersection Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "InfiniteLine",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "InfiniteLine",
+              "label": "InfiniteLine"
+            },
+            {
+              "value": "SegmentOnly",
+              "label": "SegmentOnly"
+            }
+          ]
+        }
+      ],
       "quality": {
-        "totalScore": 89,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 100,
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/EdgeIntersection.md"
     },
@@ -13768,6 +15027,12 @@
         {
           "name": "Vertices",
           "displayName": "Vertices",
+          "dataType": "PointList",
+          "isRequired": null
+        },
+        {
+          "name": "OrderedVertices",
+          "displayName": "Ordered Vertices",
           "dataType": "PointList",
           "isRequired": null
         },
@@ -13962,16 +15227,36 @@
               "label": "Circle"
             }
           ]
+        },
+        {
+          "name": "DistanceModel",
+          "displayName": "Distance Model",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Segment",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Segment",
+              "label": "Segment"
+            },
+            {
+              "value": "InfiniteLine",
+              "label": "Infinite line"
+            }
+          ]
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/GeoMeasurement.md"
     },
@@ -14262,6 +15547,26 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "ColorMode",
+          "displayName": "Color Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "LumaOnly",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "LumaOnly",
+              "label": "LumaOnly"
+            },
+            {
+              "value": "PerChannel",
+              "label": "PerChannel"
+            }
+          ]
         }
       ],
       "quality": {
@@ -14921,7 +16226,7 @@
       "id": "HistogramAnalysis",
       "type": 213,
       "displayName": "直方图分析",
-      "description": "Computes histogram and distribution statistics for selected channel.",
+      "description": "Computes histogram and intensity-domain distribution statistics for a selected channel.",
       "category": "检测",
       "version": "1.0.0",
       "tags": [
@@ -14960,24 +16265,48 @@
         {
           "name": "Mode",
           "displayName": "Mode",
-          "dataType": "Integer",
+          "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "Median",
           "displayName": "Median",
-          "dataType": "Integer",
+          "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "Peak",
           "displayName": "Peak",
-          "dataType": "Integer",
+          "dataType": "Float",
           "isRequired": null
         },
         {
           "name": "Valley",
           "displayName": "Valley",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ModeBinIndex",
+          "displayName": "Mode Bin Index",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "MedianBinIndex",
+          "displayName": "Median Bin Index",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "PeakBinIndex",
+          "displayName": "Peak Bin Index",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "ValleyBinIndex",
+          "displayName": "Valley Bin Index",
           "dataType": "Integer",
           "isRequired": null
         }
@@ -15222,13 +16551,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 96,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/PixelStatistics.md"
     },
@@ -15806,9 +17135,9 @@
       "id": "PPFMatch",
       "type": 222,
       "displayName": "PPF表面匹配",
-      "description": "Simplified PPF-based 3D surface matching (model -> scene pose).",
+      "description": "Simplified PPF-based 3D coarse surface matching (model -> scene pose). Intended for coarse pose alignment diagnostics.",
       "category": "3D",
-      "version": "1.0.1",
+      "version": "1.0.4",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -15831,9 +17160,69 @@
       ],
       "outputPorts": [
         {
+          "name": "IsMatch",
+          "displayName": "Is Match",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
           "name": "IsMatched",
           "displayName": "Is Matched",
           "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "Score",
+          "displayName": "Score",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MatchCount",
+          "displayName": "Match Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "Method",
+          "displayName": "Method",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "FailureReason",
+          "displayName": "Failure Reason",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "VerificationPassed",
+          "displayName": "Verification Passed",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "AmbiguityDetected",
+          "displayName": "Ambiguity Detected",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "AmbiguityScore",
+          "displayName": "Ambiguity Score",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "StabilityScore",
+          "displayName": "Stability Score",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "NormalConsistency",
+          "displayName": "Normal Consistency",
+          "dataType": "Float",
           "isRequired": null
         },
         {
@@ -16496,6 +17885,9 @@
       "category": "AI检测",
       "version": "1.0.0",
       "tags": [
+        "anomaly-detection",
+        "experimental",
+        "industrial-remediation",
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:基于OpenCV"
@@ -16551,6 +17943,18 @@
           "displayName": "Patch Count",
           "dataType": "Integer",
           "isRequired": null
+        },
+        {
+          "name": "ThresholdUsed",
+          "displayName": "Threshold Used",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Diagnostics",
+          "displayName": "Diagnostics",
+          "dataType": "Any",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -16582,7 +17986,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -16593,7 +17997,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -16604,7 +18008,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -16615,7 +18019,7 @@
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
           "options": null
         },
         {
@@ -16626,7 +18030,40 @@
           "defaultValue": "simple_patchcore",
           "min": null,
           "max": null,
-          "isRequired": true,
+          "isRequired": false,
+          "options": null
+        },
+        {
+          "name": "FeatureExtractorId",
+          "displayName": "Feature Extractor Id",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "lab_gradient_stats",
+          "min": null,
+          "max": null,
+          "isRequired": false,
+          "options": null
+        },
+        {
+          "name": "EmbeddingModelId",
+          "displayName": "Embedding Model Id",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": false,
+          "options": null
+        },
+        {
+          "name": "EmbeddingModelPath",
+          "displayName": "Embedding Model Path",
+          "dataType": "file",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": false,
           "options": null
         },
         {
@@ -16675,20 +18112,20 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/AnomalyDetection.md"
     },
     {
       "id": "HandEyeCalibration",
       "type": 227,
-      "displayName": "手眼标定",
+      "displayName": "Hand-Eye Calibration",
       "description": "Solves eye-in-hand or simplified eye-to-hand calibration from robot poses and calibration-board poses.",
       "category": "标定",
       "version": "1.0.0",
@@ -16714,15 +18151,9 @@
       ],
       "outputPorts": [
         {
-          "name": "HandEyeMatrix",
-          "displayName": "Hand Eye Matrix",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "InverseHandEyeMatrix",
-          "displayName": "Inverse Hand Eye Matrix",
-          "dataType": "Any",
+          "name": "CalibrationData",
+          "displayName": "Calibration Data",
+          "dataType": "String",
           "isRequired": null
         },
         {
@@ -16839,23 +18270,23 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/HandEyeCalibration.md"
     },
     {
       "id": "HandEyeCalibrationValidator",
       "type": 228,
-      "displayName": "手眼标定验证",
-      "description": "Validates a hand-eye calibration matrix and produces quality metrics, HTML report, and pose suggestions.",
+      "displayName": "Hand-Eye Calibration Validator",
+      "description": "Validates a hand-eye CalibrationBundleV2 payload and produces quality metrics, HTML report, and pose suggestions.",
       "category": "标定",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -16876,13 +18307,19 @@
           "isRequired": true
         },
         {
-          "name": "HandEyeMatrix",
-          "displayName": "Hand Eye Matrix",
-          "dataType": "Any",
-          "isRequired": true
+          "name": "CalibrationData",
+          "displayName": "Calibration Data",
+          "dataType": "String",
+          "isRequired": false
         }
       ],
       "outputPorts": [
+        {
+          "name": "CalibrationData",
+          "displayName": "Calibration Data",
+          "dataType": "String",
+          "isRequired": null
+        },
         {
           "name": "MeanError",
           "displayName": "Mean Error",
@@ -16949,13 +18386,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
+        "totalScore": 83,
         "level": "B",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 30,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/HandEyeCalibrationValidator.md"
     },
@@ -16991,18 +18428,6 @@
           "name": "CalibrationData",
           "displayName": "Calibration Data",
           "dataType": "String",
-          "isRequired": null
-        },
-        {
-          "name": "CameraMatrix",
-          "displayName": "Camera Matrix",
-          "dataType": "Any",
-          "isRequired": null
-        },
-        {
-          "name": "DistCoeffs",
-          "displayName": "Distortion Coefficients",
-          "dataType": "Any",
           "isRequired": null
         }
       ],
@@ -17126,13 +18551,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/FisheyeCalibration.md"
     },
@@ -17179,17 +18604,6 @@
       ],
       "parameters": [
         {
-          "name": "CalibrationFile",
-          "displayName": "Calibration File",
-          "dataType": "file",
-          "description": null,
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
           "name": "UseLut",
           "displayName": "Use LUT Acceleration",
           "dataType": "bool",
@@ -17235,13 +18649,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 96,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/FisheyeUndistort.md"
     },
@@ -17452,13 +18866,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/StereoCalibration.md"
     },
@@ -17466,7 +18880,7 @@
       "id": "PixelToWorldTransform",
       "type": 232,
       "displayName": "Pixel To World Transform",
-      "description": "Transforms between pixel coordinates and world plane coordinates using calibration data. Supports both forward (pixel→world) and inverse (world→pixel) transformations.",
+      "description": "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
       "category": "标定",
       "version": "1.0.0",
       "tags": [
@@ -17484,13 +18898,13 @@
         },
         {
           "name": "Points",
-          "displayName": "Input Points (Pixel or World)",
+          "displayName": "Input Points",
           "dataType": "PointList",
           "isRequired": false
         },
         {
           "name": "CalibrationData",
-          "displayName": "Calibration Data JSON",
+          "displayName": "Calibration Bundle V2 JSON",
           "dataType": "String",
           "isRequired": false
         }
@@ -17516,17 +18930,6 @@
         }
       ],
       "parameters": [
-        {
-          "name": "CalibrationFile",
-          "displayName": "Calibration File Path",
-          "dataType": "file",
-          "description": null,
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
         {
           "name": "TransformMode",
           "displayName": "Transform Mode",
@@ -17603,30 +19006,6 @@
           "options": null
         },
         {
-          "name": "OutputCoordinateSystem",
-          "displayName": "Output Coordinate System",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "World",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "World",
-              "label": "World (mm)"
-            },
-            {
-              "value": "Image",
-              "label": "Image (pixels)"
-            },
-            {
-              "value": "Normalized",
-              "label": "Normalized (0-1)"
-            }
-          ]
-        },
-        {
           "name": "GenerateReport",
           "displayName": "Generate Accuracy Report",
           "dataType": "bool",
@@ -17639,13 +19018,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/PixelToWorldTransform.md"
     },
@@ -17653,9 +19032,9 @@
       "id": "PlanarMatching",
       "type": 233,
       "displayName": "Planar Matching",
-      "description": "Detects planar objects using feature matching and homography estimation. Supports perspective deformation.",
+      "description": "Feature-based planar matching with homography verification. Suitable for textured planar targets under perspective change.",
       "category": "匹配定位",
-      "version": "1.0.0",
+      "version": "1.1.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -17681,6 +19060,60 @@
           "name": "Image",
           "displayName": "Result Image",
           "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "IsMatch",
+          "displayName": "Is Match",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "Score",
+          "displayName": "Score",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MatchCount",
+          "displayName": "Match Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "Method",
+          "displayName": "Method",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "FailureReason",
+          "displayName": "Failure Reason",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "CandidateScore",
+          "displayName": "Candidate Score",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "InlierCount",
+          "displayName": "Inlier Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "InlierRatio",
+          "displayName": "Inlier Ratio",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "VerificationPassed",
+          "displayName": "Verification Passed",
+          "dataType": "Boolean",
           "isRequired": null
         },
         {
@@ -17731,10 +19164,6 @@
             {
               "value": "AKAZE",
               "label": "AKAZE"
-            },
-            {
-              "value": "SIFT",
-              "label": "SIFT"
             },
             {
               "value": "BRISK",
@@ -17803,6 +19232,17 @@
           "dataType": "int",
           "description": null,
           "defaultValue": "10",
+          "min": "4",
+          "max": "100",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinInliers",
+          "displayName": "Min Inliers",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "8",
           "min": "4",
           "max": "100",
           "isRequired": true,
@@ -17912,7 +19352,7 @@
           "displayName": "Enable Early Exit",
           "dataType": "bool",
           "description": null,
-          "defaultValue": "true",
+          "defaultValue": "false",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -17934,9 +19374,9 @@
       "id": "LocalDeformableMatching",
       "type": 234,
       "displayName": "Local Deformable Matching",
-      "description": "Local deformable matching with TPS deformation field estimation, multi-candidate search and NMS-based multi-target output.",
+      "description": "Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback.",
       "category": "匹配定位",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
@@ -18020,7 +19460,7 @@
         },
         {
           "name": "TPSGridSize",
-          "displayName": "TPS Grid Size",
+          "displayName": "Control Grid Size",
           "dataType": "int",
           "description": null,
           "defaultValue": "4",
@@ -18031,7 +19471,7 @@
         },
         {
           "name": "TPSLambda",
-          "displayName": "TPS Regularization",
+          "displayName": "MLS Smoothing (Legacy TPSLambda)",
           "dataType": "double",
           "description": null,
           "defaultValue": "0.01",
@@ -18078,7 +19518,7 @@
           "displayName": "Enable Fallback to Rigid",
           "dataType": "bool",
           "description": null,
-          "defaultValue": "true",
+          "defaultValue": "false",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -19489,7 +20929,7 @@
       "id": "FFT1D",
       "type": 251,
       "displayName": "FFT 1D",
-      "description": "Performs 1D Fast Fourier Transform on input signal or image rows/columns.",
+      "description": "Performs FFT on 1D signals and emits a full complex spectrum for image inputs.",
       "category": "Frequency",
       "version": "1.0.0",
       "tags": [
@@ -19507,7 +20947,7 @@
         },
         {
           "name": "Axis",
-          "displayName": "Transform Axis (0=row, 1=col)",
+          "displayName": "Transform Axis (legacy parameter for signal/image profiles)",
           "dataType": "Integer",
           "isRequired": false
         }
@@ -19540,13 +20980,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
+        "totalScore": 71,
+        "level": "B",
+        "documentationScore": 100,
         "testCoverageScore": 30,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/FFT1D.md"
     },
@@ -19554,7 +20994,7 @@
       "id": "FrequencyFilter",
       "type": 252,
       "displayName": "Frequency Filter",
-      "description": "Applies frequency domain filters (low-pass, high-pass, band-pass, band-stop) to spectrum.",
+      "description": "Applies frequency-domain filters to 1D or 2D complex spectra.",
       "category": "Frequency",
       "version": "1.0.0",
       "tags": [
@@ -19617,13 +21057,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
+        "totalScore": 71,
+        "level": "B",
+        "documentationScore": 100,
         "testCoverageScore": 30,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/FrequencyFilter.md"
     },
@@ -19631,7 +21071,7 @@
       "id": "InverseFFT1D",
       "type": 253,
       "displayName": "Inverse FFT 1D",
-      "description": "Performs 1D Inverse Fast Fourier Transform to convert frequency spectrum back to time domain.",
+      "description": "Performs inverse FFT on 1D spectra and reconstructs images from 2D complex spectra.",
       "category": "Frequency",
       "version": "1.0.0",
       "tags": [
@@ -19682,13 +21122,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
+        "totalScore": 71,
+        "level": "B",
+        "documentationScore": 100,
         "testCoverageScore": 30,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/InverseFFT1D.md"
     },
@@ -19696,7 +21136,7 @@
       "id": "PhaseClosure",
       "type": 254,
       "displayName": "Phase Closure",
-      "description": "Computes phase closure by unwrapping wrapped phase from interferometric measurements.",
+      "description": "Unwraps wrapped phase maps while preserving the original phase domain semantics.",
       "category": "检测",
       "version": "1.0.0",
       "tags": [

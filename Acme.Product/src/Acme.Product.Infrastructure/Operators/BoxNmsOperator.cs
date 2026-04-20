@@ -27,12 +27,18 @@ namespace Acme.Product.Infrastructure.Operators;
 )]
 [InputPort("Detections", "Detections", PortDataType.DetectionList, IsRequired = true)]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = false)]
+[InputPort("SourceImage", "Source Image", PortDataType.Image, IsRequired = false)]
 [OutputPort("Detections", "Detections", PortDataType.DetectionList)]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OutputPort("Count", "Count", PortDataType.Integer)]
+[OutputPort("InputCount", "Input Count", PortDataType.Integer)]
+[OutputPort("SuppressedCount", "Suppressed Count", PortDataType.Integer)]
+[OutputPort("SuppressedDetections", "Suppressed Detections", PortDataType.DetectionList)]
+[OutputPort("Diagnostics", "Diagnostics", PortDataType.Any)]
 [OperatorParam("IouThreshold", "IoU Threshold", "double", DefaultValue = 0.45, Min = 0.1, Max = 1.0)]
 [OperatorParam("ScoreThreshold", "Score Threshold", "double", DefaultValue = 0.25, Min = 0.0, Max = 1.0)]
 [OperatorParam("MaxDetections", "Max Detections", "int", DefaultValue = 100, Min = 1, Max = 1000)]
+[OperatorParam("ShowSuppressed", "Show Suppressed", "bool", DefaultValue = true)]
 public class BoxNmsOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.BoxNms;
@@ -54,18 +60,17 @@ public class BoxNmsOperator : OperatorBase
         var iouThreshold = GetDoubleParam(@operator, "IouThreshold", 0.45, 0.1, 1.0);
         var scoreThreshold = GetDoubleParam(@operator, "ScoreThreshold", 0.25, 0.0, 1.0);
         var maxDetections = GetIntParam(@operator, "MaxDetections", 100, 1, 1000);
+        var showSuppressed = GetBoolParam(@operator, "ShowSuppressed", true);
+        var inputCount = detections.Count;
 
-        var candidates = detections
-            .Where(d => d.Confidence >= scoreThreshold)
-            .OrderByDescending(d => d.Confidence)
-            .ToList();
+        var candidates = OrderDetections(detections.Where(d => d.Confidence >= scoreThreshold)).ToList();
 
         var kept = new List<DetectionResultValue>();
-        var suppressed = new HashSet<DetectionResultValue>();
+        var suppressed = new List<DetectionResultValue>();
 
-        foreach (var group in candidates.GroupBy(d => d.Label ?? string.Empty))
+        foreach (var group in candidates.GroupBy(d => d.Label ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
-            var groupCandidates = group.OrderByDescending(d => d.Confidence).ToList();
+            var groupCandidates = OrderDetections(group).ToList();
             var removed = new bool[groupCandidates.Count];
 
             for (var i = 0; i < groupCandidates.Count; i++)
@@ -97,24 +102,52 @@ public class BoxNmsOperator : OperatorBase
 
         if (kept.Count > maxDetections)
         {
-            kept = kept.OrderByDescending(d => d.Confidence).Take(maxDetections).ToList();
+            var orderedKept = OrderDetections(kept).ToList();
+            foreach (var truncatedDetection in orderedKept.Skip(maxDetections))
+            {
+                suppressed.Add(truncatedDetection);
+            }
+
+            kept = orderedKept.Take(maxDetections).ToList();
         }
 
         var outputDetections = new DetectionListValue(kept);
+        var suppressedDetections = new DetectionListValue(OrderDetections(suppressed).ToList());
+        var diagnostics = CreateDiagnostics(
+            inputCount,
+            candidates.Count,
+            outputDetections,
+            suppressedDetections,
+            iouThreshold,
+            scoreThreshold,
+            maxDetections);
 
-        if (TryGetInputImage(inputs, out var imageWrapper) && imageWrapper != null)
+        // Try to use SourceImage first (clean image), fallback to Image (may have previous drawings)
+        var imageToUse = TryGetInputImage(inputs, "SourceImage", out var sourceImageWrapper) && sourceImageWrapper != null
+            ? sourceImageWrapper
+            : (TryGetInputImage(inputs, out var imageWrapper) && imageWrapper != null ? imageWrapper : null);
+        
+        if (imageToUse != null)
         {
-            var src = imageWrapper.GetMat();
+            var src = imageToUse.GetMat();
             if (!src.Empty())
             {
                 var resultImage = src.Clone();
-                DrawDetections(resultImage, suppressed, new Scalar(0, 0, 255), 1, "S");
+                if (showSuppressed)
+                {
+                    DrawDetections(resultImage, suppressedDetections.Detections, new Scalar(0, 0, 255), 1, "S");
+                }
+
                 DrawDetections(resultImage, kept, new Scalar(0, 255, 0), 2, "K");
 
                 var output = CreateImageOutput(resultImage, new Dictionary<string, object>
                 {
                     { "Detections", outputDetections },
-                    { "Count", outputDetections.Count }
+                    { "Count", outputDetections.Count },
+                    { "InputCount", inputCount },
+                    { "SuppressedCount", suppressedDetections.Count },
+                    { "SuppressedDetections", suppressedDetections },
+                    { "Diagnostics", diagnostics }
                 });
                 return Task.FromResult(OperatorExecutionOutput.Success(output));
             }
@@ -123,7 +156,11 @@ public class BoxNmsOperator : OperatorBase
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
             { "Detections", outputDetections },
-            { "Count", outputDetections.Count }
+            { "Count", outputDetections.Count },
+            { "InputCount", inputCount },
+            { "SuppressedCount", suppressedDetections.Count },
+            { "SuppressedDetections", suppressedDetections },
+            { "Diagnostics", diagnostics }
         }));
     }
 
@@ -202,6 +239,16 @@ public class BoxNmsOperator : OperatorBase
         return new Rect(x, y, w, h);
     }
 
+    private static IOrderedEnumerable<DetectionResultValue> OrderDetections(IEnumerable<DetectionResultValue> detections)
+    {
+        return detections
+            .OrderByDescending(d => d.Confidence)
+            .ThenByDescending(d => d.Area)
+            .ThenBy(d => d.X)
+            .ThenBy(d => d.Y)
+            .ThenBy(d => d.Label ?? string.Empty, StringComparer.Ordinal);
+    }
+
     private static bool TryParseDetectionList(object? obj, out List<DetectionResultValue> detections)
     {
         detections = new List<DetectionResultValue>();
@@ -224,15 +271,17 @@ public class BoxNmsOperator : OperatorBase
 
         if (obj is IEnumerable enumerable)
         {
+            var hasAnyItem = false;
             foreach (var item in enumerable)
             {
+                hasAnyItem = true;
                 if (TryParseDetection(item, out var d))
                 {
                     detections.Add(d);
                 }
             }
 
-            return detections.Count > 0;
+            return !hasAnyItem || detections.Count > 0;
         }
 
         return false;
@@ -307,6 +356,29 @@ public class BoxNmsOperator : OperatorBase
 
         value = raw.ToString() ?? string.Empty;
         return true;
+    }
+
+    private static Dictionary<string, object> CreateDiagnostics(
+        int inputCount,
+        int candidateCount,
+        DetectionListValue keptDetections,
+        DetectionListValue suppressedDetections,
+        double iouThreshold,
+        double scoreThreshold,
+        int maxDetections)
+    {
+        return new Dictionary<string, object>
+        {
+            ["InputCount"] = inputCount,
+            ["CandidateCount"] = candidateCount,
+            ["KeptCount"] = keptDetections.Count,
+            ["SuppressedCount"] = suppressedDetections.Count,
+            ["IouThreshold"] = iouThreshold,
+            ["ScoreThreshold"] = scoreThreshold,
+            ["MaxDetections"] = maxDetections,
+            ["KeptDetections"] = keptDetections,
+            ["SuppressedDetections"] = suppressedDetections
+        };
     }
 }
 

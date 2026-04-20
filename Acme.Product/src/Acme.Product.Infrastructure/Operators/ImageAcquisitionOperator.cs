@@ -7,6 +7,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Cameras;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -36,10 +37,20 @@ public class ImageAcquisitionOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.ImageAcquisition;
     private readonly ICameraManager _cameraManager;
+    private readonly ICameraFrameStreamCoordinator _streamCoordinator;
 
-    public ImageAcquisitionOperator(ILogger<ImageAcquisitionOperator> logger, ICameraManager cameraManager) : base(logger)
+    public ImageAcquisitionOperator(ILogger<ImageAcquisitionOperator> logger, ICameraManager cameraManager)
+        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance)
+    {
+    }
+
+    public ImageAcquisitionOperator(
+        ILogger<ImageAcquisitionOperator> logger,
+        ICameraManager cameraManager,
+        ICameraFrameStreamCoordinator streamCoordinator) : base(logger)
     {
         _cameraManager = cameraManager;
+        _streamCoordinator = streamCoordinator;
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -100,6 +111,28 @@ public class ImageAcquisitionOperator : OperatorBase
             }
         }
 
+        var hasExplicitFilePath = !string.IsNullOrEmpty(filePath);
+
+        // 如果显式配置了文件路径，文件模式优先于采集源枚举。
+        if (hasExplicitFilePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                return OperatorExecutionOutput.Failure($"图像文件不存在: {filePath}");
+            }
+
+            var mat = Cv2.ImRead(filePath, ImreadModes.Color);
+            if (mat.Empty())
+            {
+                return OperatorExecutionOutput.Failure("无法加载图像文件，格式可能不受支持");
+            }
+
+            return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
+            {
+                { "Channels", mat.Channels() }
+            }));
+        }
+
         // 如果是相机模式
         if (sourceType?.Equals("Camera", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -113,8 +146,28 @@ public class ImageAcquisitionOperator : OperatorBase
             {
                 // 获取并配置相机
                 var camera = await _cameraManager.GetOrCreateByBindingAsync(cameraId);
-                var bindingConfig = _cameraManager.GetBindings()
-                    .FirstOrDefault(b => b.Id.Equals(cameraId, StringComparison.OrdinalIgnoreCase));
+                var bindingConfig = _cameraManager.FindBinding(cameraId);
+                bindingConfig?.Normalize();
+                var normalizedTriggerMode = CameraTriggerModeExtensions.Normalize(
+                    bindingConfig?.TriggerMode
+                    ?? GetStringParam(@operator, "TriggerMode", GetStringParam(@operator, "triggerMode", "Software")));
+
+                if (normalizedTriggerMode.IsFrameDriven())
+                {
+                    var sharedFrame = await _streamCoordinator.AcquireFrameAsync(bindingConfig?.Id ?? cameraId, cancellationToken);
+                    var sharedMat = Cv2.ImDecode(sharedFrame.ImageData, ImreadModes.Color);
+                    if (sharedMat.Empty())
+                    {
+                        return OperatorExecutionOutput.Failure("鐩告満杩斿洖鐨勫浘鍍忔暟鎹棤鏁?");
+                    }
+
+                    return OperatorExecutionOutput.Success(CreateImageOutput(sharedMat, new Dictionary<string, object>
+                    {
+                        { "Channels", sharedMat.Channels() },
+                        { "Source", normalizedTriggerMode.ToConfigValue().ToLowerInvariant() },
+                        { "CameraId", bindingConfig?.Id ?? cameraId }
+                    }));
+                }
 
                 // 相机参数优先来自“系统设置 -> 相机管理”，保留旧算子参数作为向后兼容 fallback。
                 var exposureTime = bindingConfig?.ExposureTimeUs
@@ -126,18 +179,7 @@ public class ImageAcquisitionOperator : OperatorBase
 
                 if (camera is IIndustrialCamera industrialCamera)
                 {
-                    var triggerMode = bindingConfig?.TriggerMode
-                        ?? GetStringParam(@operator, "TriggerMode", GetStringParam(@operator, "triggerMode", "Software"));
-                    if (triggerMode.Equals("Software", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Current adapter maps false -> software trigger mode in provider SDKs.
-                        await industrialCamera.SetTriggerModeAsync(false);
-                        await industrialCamera.ExecuteSoftwareTriggerAsync();
-                    }
-                    else
-                    {
-                        await industrialCamera.SetTriggerModeAsync(true);
-                    }
+                    await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
                 }
 
                 // 采集图像
@@ -164,28 +206,9 @@ public class ImageAcquisitionOperator : OperatorBase
         }
 
         // 如果是文件模式
-        if (sourceType?.Equals("File", StringComparison.OrdinalIgnoreCase) == true || !string.IsNullOrEmpty(filePath))
+        if (sourceType?.Equals("File", StringComparison.OrdinalIgnoreCase) == true)
         {
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return OperatorExecutionOutput.Failure("未指定文件路径");
-            }
-
-            if (!File.Exists(filePath))
-            {
-                return OperatorExecutionOutput.Failure($"图像文件不存在: {filePath}");
-            }
-
-            var mat = Cv2.ImRead(filePath, ImreadModes.Color);
-            if (mat.Empty())
-            {
-                return OperatorExecutionOutput.Failure("无法加载图像文件，格式可能不受支持");
-            }
-
-            return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
-            {
-                { "Channels", mat.Channels() }
-            }));
+            return OperatorExecutionOutput.Failure("未指定文件路径");
         }
 
         return OperatorExecutionOutput.Failure("未提供图像数据或有效的采集设置");

@@ -42,6 +42,41 @@ public class FrameAveragingOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShouldIsolateBufferedFramesByOperatorId()
+    {
+        var sut = CreateSut();
+        var firstOperator = CreateOperator(new Dictionary<string, object>
+        {
+            { "FrameCount", 3 },
+            { "Mode", "Mean" }
+        });
+        var secondOperator = CreateOperator(new Dictionary<string, object>
+        {
+            { "FrameCount", 3 },
+            { "Mode", "Mean" }
+        });
+
+        using var firstFrame = CreateGrayImage(20);
+        using var foreignFrame = CreateGrayImage(200);
+        using var secondFrame = CreateGrayImage(30);
+
+        var first = await sut.ExecuteAsync(firstOperator, TestHelpers.CreateImageInputs(firstFrame));
+        var foreign = await sut.ExecuteAsync(secondOperator, TestHelpers.CreateImageInputs(foreignFrame));
+        var second = await sut.ExecuteAsync(firstOperator, TestHelpers.CreateImageInputs(secondFrame));
+
+        Assert.True(first.IsSuccess);
+        Assert.True(foreign.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(1, Convert.ToInt32(first.OutputData!["FrameCount"]));
+        Assert.Equal(1, Convert.ToInt32(foreign.OutputData!["FrameCount"]));
+        Assert.Equal(2, Convert.ToInt32(second.OutputData!["FrameCount"]));
+
+        using var output = Assert.IsType<ImageWrapper>(second.OutputData["Image"]);
+        using var resultMat = output.GetMat();
+        Assert.Equal(25, resultMat.At<byte>(0, 0));
+    }
+
+    [Fact]
     public void ValidateParameters_WithInvalidMode_ShouldReturnInvalid()
     {
         var sut = CreateSut();
@@ -106,6 +141,34 @@ public class FrameAveragingOperatorTests
         Assert.Equal(0, pixel.Item0);
         Assert.Equal(0, pixel.Item1);
         Assert.Equal(0, pixel.Item2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MedianMode_EvenFrameCount_ShouldUseUpperMedianOrder()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "FrameCount", 4 },
+            { "Mode", "Median" }
+        });
+
+        using var frame1 = CreateGrayImage(10);
+        using var frame2 = CreateGrayImage(20);
+        using var frame3 = CreateGrayImage(30);
+        using var frame4 = CreateGrayImage(200);
+
+        _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame1));
+        _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame2));
+        _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame3));
+        var fourth = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame4));
+
+        Assert.True(fourth.IsSuccess);
+        Assert.NotNull(fourth.OutputData);
+
+        using var output = Assert.IsType<ImageWrapper>(fourth.OutputData!["Image"]);
+        using var resultMat = output.GetMat();
+        Assert.Equal(30, resultMat.At<byte>(0, 0));
     }
 
     private static FrameAveragingOperator CreateSut()

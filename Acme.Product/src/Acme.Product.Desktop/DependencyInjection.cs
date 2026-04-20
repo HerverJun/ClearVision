@@ -21,6 +21,7 @@ using Microsoft.Extensions.Hosting;
 using Acme.Product.Core.Events;
 using IConfigurationService = Acme.Product.Core.Interfaces.IConfigurationService;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using IImageAcquisitionService = Acme.Product.Application.Services.IImageAcquisitionService;
@@ -32,19 +33,26 @@ namespace Acme.Product.Desktop;
 /// </summary>
 public static class DependencyInjection
 {
+    internal const string DatabasePathConfigKey = "Database:Path";
+
     /// <summary>
     /// 注册服务
     /// </summary>
-    public static IServiceCollection AddVisionServices(this IServiceCollection services)
+    public static IServiceCollection AddVisionServices(this IServiceCollection services, IConfiguration? configuration = null)
     {
         // 配置日志
         var loggerFactory = SerilogConfiguration.ConfigureSerilog();
         services.AddSingleton<ILoggerFactory>(loggerFactory);
+        var databasePath = ResolveVisionDatabasePath(
+            configuration?[DatabasePathConfigKey],
+            AppContext.BaseDirectory,
+            Directory.GetCurrentDirectory(),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
 
         // 数据库 - 使用 Scoped 生命周期（EF Core DbContext 不是线程安全的）
         services.AddDbContext<VisionDbContext>(options =>
         {
-            options.UseSqlite("Data Source=vision.db");
+            options.UseSqlite($"Data Source={databasePath}");
         });
 
         // 仓储 - 使用 Scoped 生命周期（DbContext 是 Scoped，Repository 也必须是 Scoped 或 Transient）
@@ -55,6 +63,10 @@ public static class DependencyInjection
         services.AddSingleton<IImageCacheRepository, ImageCacheRepository>(); // 缓存可以是 Singleton
 
         // 【架构修复 v2】实时检测运行时 - 进程级单例
+        services.AddSingleton<InspectionResultBackgroundService>();
+        services.AddHostedService(sp => sp.GetRequiredService<InspectionResultBackgroundService>());
+        services.AddSingleton<IInspectionResultChannelWriter>(sp => sp.GetRequiredService<InspectionResultBackgroundService>());
+
         services.AddSingleton<IInspectionRuntimeCoordinator, InspectionRuntimeCoordinator>();
         services.AddSingleton<InspectionWorker>();
         services.AddHostedService(sp => sp.GetRequiredService<InspectionWorker>());
@@ -71,6 +83,7 @@ public static class DependencyInjection
 
         // 【Phase 4】LLM 闭环验证 - 预览指标分析和自动调参
         services.AddScoped<IPreviewMetricsAnalyzer, PreviewMetricsAnalyzer>();
+        services.AddScoped<IFlowNodePreviewService, FlowNodePreviewService>();
         services.AddScoped<IAutoTuneService, AutoTuneService>();
 
         // 应用服务
@@ -264,12 +277,13 @@ public static class DependencyInjection
         // 应用服务 - Sprint 4新增
         services.AddScoped<IOperatorService, OperatorService>();
         services.AddScoped<IImageAcquisitionService, ImageAcquisitionService>();
-        services.AddScoped<IHandEyeCalibrationService, HandEyeCalibrationService>();
+        services.AddScoped<IPlanarScaleOffsetCalibrationService, PlanarScaleOffsetCalibrationService>();
         services.AddScoped<DemoProjectService>();
         services.AddScoped<IResultAnalysisService, ResultAnalysisService>();
 
         // 相机
         services.AddSingleton<ICameraManager, CameraManager>();
+        services.AddSingleton<ICameraFrameStreamCoordinator, CameraFrameStreamCoordinator>();
 
         // 注册 MediatR
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly));
@@ -294,5 +308,73 @@ public static class DependencyInjection
         services.AddScoped<UserManagementService>();
 
         return services;
+    }
+
+    internal static string ResolveVisionDatabasePath(
+        string? configuredPath,
+        string baseDirectory,
+        string currentDirectory,
+        string localApplicationDataRoot)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            var overridePath = NormalizeDatabasePath(configuredPath, baseDirectory);
+            EnsureParentDirectory(overridePath);
+            return overridePath;
+        }
+
+        var defaultPath = Path.GetFullPath(Path.Combine(localApplicationDataRoot, "ClearVision", "vision.db"));
+        MigrateLegacyDatabaseIfNeeded(defaultPath, baseDirectory, currentDirectory);
+        EnsureParentDirectory(defaultPath);
+        return defaultPath;
+    }
+
+    internal static string NormalizeDatabasePath(string configuredPath, string baseDirectory)
+    {
+        var trimmedPath = configuredPath.Trim();
+        var combinedPath = Path.IsPathRooted(trimmedPath)
+            ? trimmedPath
+            : Path.Combine(baseDirectory, trimmedPath);
+
+        return Path.GetFullPath(combinedPath);
+    }
+
+    internal static void MigrateLegacyDatabaseIfNeeded(string targetPath, string baseDirectory, string currentDirectory)
+    {
+        if (File.Exists(targetPath))
+        {
+            return;
+        }
+
+        var candidates = new[]
+            {
+                Path.Combine(baseDirectory, "vision.db"),
+                Path.Combine(currentDirectory, "vision.db")
+            }
+            .Select(Path.GetFullPath)
+            .Where(path => !string.Equals(path, targetPath, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(File.Exists)
+            .Select(path => new FileInfo(path))
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .ThenByDescending(file => file.Length)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        EnsureParentDirectory(targetPath);
+        File.Copy(candidates[0].FullName, targetPath);
+    }
+
+    private static void EnsureParentDirectory(string databasePath)
+    {
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
     }
 }

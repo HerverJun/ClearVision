@@ -10,6 +10,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Services;
 using Acme.Product.Desktop.Inspection;
 using Acme.Product.Desktop.Extensions;
@@ -253,12 +254,12 @@ public class WebMessageHandler : IDisposable
                     HandleCancelGenerateFlowCommand(messageJson);
                     break;
 
-                case "handeye:solve":
-                    await HandleHandEyeSolveCommand(messageJson);
+                case "planar2d:solve":
+                    await HandlePlanarScaleOffsetSolveCommand(messageJson);
                     break;
 
-                case "handeye:save":
-                    await HandleHandEyeSaveCommand(messageJson);
+                case "planar2d:save":
+                    await HandlePlanarScaleOffsetSaveCommand(messageJson);
                     break;
 
                 default:
@@ -493,10 +494,12 @@ public class WebMessageHandler : IDisposable
 
     private OperatorDto BuildOperatorDto(OperatorData operatorData)
     {
-        if (!Enum.TryParse<OperatorType>(operatorData.Type, true, out var operatorType))
+        if (!Enum.TryParse<OperatorType>(operatorData.Type, true, out var parsedType))
         {
             throw new InvalidOperationException($"不支持的算子类型: {operatorData.Type}");
         }
+
+        var operatorType = OperatorTypeAliasResolver.Resolve(parsedType);
 
         var @operator = _operatorFactory.CreateOperator(
             operatorType,
@@ -510,8 +513,9 @@ public class WebMessageHandler : IDisposable
         {
             foreach (var (name, value) in operatorData.Parameters)
             {
+                var normalizedName = NormalizeParameterName(operatorType, name);
                 var parameter = @operator.Parameters.FirstOrDefault(p =>
-                    string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(p.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
 
                 if (parameter != null)
                 {
@@ -604,6 +608,17 @@ public class WebMessageHandler : IDisposable
             JsonValueKind.Undefined => null,
             _ => element.ToString()
         };
+    }
+
+    private static string NormalizeParameterName(OperatorType operatorType, string parameterName)
+    {
+        if (operatorType == OperatorType.HistogramEqualization &&
+            string.Equals(parameterName, "TileSize", StringComparison.OrdinalIgnoreCase))
+        {
+            return "TileGridSize";
+        }
+
+        return parameterName;
     }
 
     /// <summary>
@@ -865,6 +880,10 @@ public class WebMessageHandler : IDisposable
             var sessionId = payload.TryGetProperty("sessionId", out var sessionElement)
                 ? sessionElement.GetString()
                 : null;
+            var mode = GenerateFlowModeExtensions.ParseOrAuto(TryGetMessageString(payload, "mode"));
+            var debugPrompt = TryGetBoolean(payload, "debugPrompt") ??
+                              TryGetBoolean(doc.RootElement, "debugPrompt") ??
+                              false;
             var requestId = TryGetMessageString(payload, "requestId")
                 ?? TryGetMessageString(doc.RootElement, "requestId")
                 ?? Guid.NewGuid().ToString("N");
@@ -893,6 +912,8 @@ public class WebMessageHandler : IDisposable
                 sessionId,
                 existingFlowJson,
                 hint,
+                mode,
+                debugPrompt,
                 requestId,
                 attachments,
                 onMessage: (type, payload) =>
@@ -953,19 +974,19 @@ public class WebMessageHandler : IDisposable
     }
 
     /// <summary>
-    /// 处理手眼标定解算请求
+    /// 处理二维平面比例偏移标定解算请求
     /// </summary>
-    private async Task HandleHandEyeSolveCommand(string messageJson)
+    private async Task HandlePlanarScaleOffsetSolveCommand(string messageJson)
     {
         try
         {
             using var doc = JsonDocument.Parse(messageJson);
             var payload = doc.RootElement.GetProperty("payload");
 
-            var points = new List<CalibrationPoint>();
+            var points = new List<PlanarScaleOffsetCalibrationPoint>();
             foreach (var pointElement in payload.EnumerateArray())
             {
-                points.Add(new CalibrationPoint
+                points.Add(new PlanarScaleOffsetCalibrationPoint
                 {
                     PixelX = pointElement.GetProperty("pixelX").GetDouble(),
                     PixelY = pointElement.GetProperty("pixelY").GetDouble(),
@@ -975,51 +996,57 @@ public class WebMessageHandler : IDisposable
             }
 
             using var scope = _scopeFactory.CreateScope();
-            var calibService = scope.ServiceProvider.GetRequiredService<IHandEyeCalibrationService>();
+            var calibService = scope.ServiceProvider.GetRequiredService<IPlanarScaleOffsetCalibrationService>();
             var result = await calibService.SolveAsync(points);
 
             // 发送结果回前端
-            SendProgressMessage("handeye:solve:result", result);
+            SendProgressMessage("planar2d:solve:result", result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "处理手眼标定解算失败");
-            SendProgressMessage("handeye:solve:result", new { success = false, message = ex.Message });
+            _logger.LogError(ex, "处理二维平面比例偏移标定解算失败");
+            SendProgressMessage("planar2d:solve:result", new { success = false, message = ex.Message });
         }
     }
 
     /// <summary>
-    /// 处理手眼标定保存请求
+    /// 处理二维平面比例偏移标定保存请求
     /// </summary>
-    private async Task HandleHandEyeSaveCommand(string messageJson)
+    private async Task HandlePlanarScaleOffsetSaveCommand(string messageJson)
     {
         try
         {
             using var doc = JsonDocument.Parse(messageJson);
             var payload = doc.RootElement.GetProperty("payload");
             var resultElement = payload.GetProperty("result");
-            var fileName = payload.GetProperty("fileName").GetString() ?? "hand_eye_calib.json";
+            var fileName = payload.GetProperty("fileName").GetString() ?? "planar_scale_offset_calib.json";
 
-            var result = new HandEyeCalibrationResult
+            var result = new PlanarScaleOffsetCalibrationResult
             {
                 Success = resultElement.GetProperty("success").GetBoolean(),
+                Accepted = resultElement.TryGetProperty("accepted", out var acceptedElement) && acceptedElement.GetBoolean(),
+                Message = resultElement.TryGetProperty("message", out var messageElement) ? messageElement.GetString() ?? string.Empty : string.Empty,
                 OriginX = resultElement.GetProperty("originX").GetDouble(),
                 OriginY = resultElement.GetProperty("originY").GetDouble(),
                 ScaleX = resultElement.GetProperty("scaleX").GetDouble(),
-                ScaleY = resultElement.GetProperty("scaleY").GetDouble()
+                ScaleY = resultElement.GetProperty("scaleY").GetDouble(),
+                MeanErrorX = resultElement.TryGetProperty("meanErrorX", out var meanErrorXElement) ? meanErrorXElement.GetDouble() : 0.0,
+                MeanErrorY = resultElement.TryGetProperty("meanErrorY", out var meanErrorYElement) ? meanErrorYElement.GetDouble() : 0.0,
+                Rmse = resultElement.TryGetProperty("rmse", out var rmseElement) ? rmseElement.GetDouble() : 0.0,
+                PointCount = resultElement.TryGetProperty("pointCount", out var pointCountElement) ? pointCountElement.GetInt32() : 0
             };
 
             using var scope = _scopeFactory.CreateScope();
-            var calibService = scope.ServiceProvider.GetRequiredService<IHandEyeCalibrationService>();
+            var calibService = scope.ServiceProvider.GetRequiredService<IPlanarScaleOffsetCalibrationService>();
             var isSaved = await calibService.SaveCalibrationAsync(result, fileName);
 
             // 发送结果回前端
-            SendProgressMessage("handeye:save:result", new { success = isSaved });
+            SendProgressMessage("planar2d:save:result", new { success = isSaved });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存手眼标定文件失败");
-            SendProgressMessage("handeye:save:result", new { success = false, message = ex.Message });
+            _logger.LogError(ex, "保存二维平面比例偏移标定文件失败");
+            SendProgressMessage("planar2d:save:result", new { success = false, message = ex.Message });
         }
     }
 
@@ -1166,6 +1193,27 @@ public class WebMessageHandler : IDisposable
             return property.GetString();
 
         return null;
+    }
+
+    private static bool? TryGetBoolean(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            return null;
+
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            var pascalCase = char.ToUpperInvariant(propertyName[0]) + propertyName[1..];
+            if (!element.TryGetProperty(pascalCase, out property))
+                return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(property.GetString(), out var parsed) => parsed,
+            _ => null
+        };
     }
 
     private void PublishRealtimeMessages(IInspectionEvent evt)

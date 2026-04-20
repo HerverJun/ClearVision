@@ -231,7 +231,7 @@ public class BlobDetectionOperator : OperatorBase
             }
 
             using var binary = new Mat();
-            Cv2.Threshold(gray, binary, 0, 255, ThresholdTypes.Binary);
+            ApplyAutomaticThreshold(gray, binary);
 
             if (color.Equals("Black", StringComparison.OrdinalIgnoreCase))
             {
@@ -534,6 +534,20 @@ public class BlobDetectionOperator : OperatorBase
         return -1;
     }
 
+    private static void ApplyAutomaticThreshold(Mat gray, Mat binary)
+    {
+        Cv2.MinMaxLoc(gray, out double minVal, out double maxVal);
+        if (maxVal <= minVal)
+        {
+            // Low-dynamic frames are effectively uniform; keep output stable and avoid full-foreground masks.
+            binary.Create(gray.Rows, gray.Cols, MatType.CV_8UC1);
+            binary.SetTo(Scalar.Black);
+            return;
+        }
+
+        Cv2.Threshold(gray, binary, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
+    }
+
     private static int CountHoles(HierarchyIndex[] hierarchy, int externalIndex)
     {
         if (hierarchy == null || hierarchy.Length == 0 || externalIndex < 0)
@@ -695,10 +709,24 @@ public class BlobDetectionOperator : OperatorBase
             }
 
             // 创建HSV范围掩码
-            var lower = new Scalar(hueLow, satLow, valLow);
-            var upper = new Scalar(hueHigh, satHigh, valHigh);
+            var normalizedHueLow = NormalizeHueBound(hueLow);
+            var normalizedHueHigh = NormalizeHueBound(hueHigh);
             var mask = new Mat();
-            Cv2.InRange(hsv, lower, upper, mask);
+
+            if (normalizedHueLow <= normalizedHueHigh)
+            {
+                var lower = new Scalar(normalizedHueLow, satLow, valLow);
+                var upper = new Scalar(normalizedHueHigh, satHigh, valHigh);
+                Cv2.InRange(hsv, lower, upper, mask);
+            }
+            else
+            {
+                using var lowerWrapMask = new Mat();
+                using var upperWrapMask = new Mat();
+                Cv2.InRange(hsv, new Scalar(0, satLow, valLow), new Scalar(normalizedHueHigh, satHigh, valHigh), lowerWrapMask);
+                Cv2.InRange(hsv, new Scalar(normalizedHueLow, satLow, valLow), new Scalar(179, satHigh, valHigh), upperWrapMask);
+                Cv2.BitwiseOr(lowerWrapMask, upperWrapMask, mask);
+            }
 
             return mask;
         }
@@ -706,5 +734,10 @@ public class BlobDetectionOperator : OperatorBase
         {
             return null;
         }
+    }
+
+    private static int NormalizeHueBound(int hue)
+    {
+        return Math.Clamp(hue, 0, 179);
     }
 }

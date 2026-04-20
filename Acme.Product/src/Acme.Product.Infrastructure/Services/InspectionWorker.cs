@@ -5,7 +5,11 @@
 // 作者：架构修复方案 v2
 
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Acme.Product.Application.Analysis;
+using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
@@ -29,6 +33,9 @@ namespace Acme.Product.Infrastructure.Services;
 /// </summary>
 public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposable
 {
+    private const string TraceabilityFieldName = "Traceability";
+    private static readonly JsonSerializerOptions FlowHashJsonOptions = new() { WriteIndented = false };
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IInspectionRuntimeCoordinator _coordinator;
     private readonly IInspectionEventBus _eventBus;
@@ -168,23 +175,21 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         var cts = CancellationTokenSource.CreateLinkedTokenSource(coordinatorToken);
         var exitCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         
-        // 先创建任务，但不启动
-        var taskEntry = new RunningTaskEntry
-        {
-            ProjectId = projectId,
-            SessionId = sessionId,
-            Cts = cts,
-            StartedAt = DateTime.UtcNow,
-            Task = null!  // 稍后设置
-        };
-
         // 创建任务（使用 Task.Run 但不会立即等待）
         var task = Task.Run(async () =>
         {
             await RunWithTripleExceptionProtectionAsync(projectId, sessionId, flow, cameraId, cts.Token);
         }, cts.Token);
 
-        taskEntry = taskEntry with { Task = task, ExitCompletion = exitCompletion };
+        var taskEntry = new RunningTaskEntry
+        {
+            ProjectId = projectId,
+            SessionId = sessionId,
+            Cts = cts,
+            StartedAt = DateTime.UtcNow,
+            Task = task,
+            ExitCompletion = exitCompletion
+        };
 
         // 注册到运行任务字典
         if (!_runningTasks.TryAdd(projectId, taskEntry))
@@ -215,7 +220,30 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
+        return await WaitForRunExitCoreAsync(projectId, null, timeout, cancellationToken);
+    }
+
+    public async Task<bool> WaitForRunExitAsync(
+        Guid projectId,
+        Guid sessionId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        return await WaitForRunExitCoreAsync(projectId, sessionId, timeout, cancellationToken);
+    }
+
+    private async Task<bool> WaitForRunExitCoreAsync(
+        Guid projectId,
+        Guid? sessionId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
         if (!_runningTasks.TryGetValue(projectId, out var entry))
+        {
+            return true;
+        }
+
+        if (sessionId.HasValue && entry.SessionId != sessionId.Value)
         {
             return true;
         }
@@ -255,10 +283,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         try
         {
             // 更新状态为 Running
-            _coordinator.UpdateSessionStatus(projectId, RuntimeStatus.Running);
+            _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
 
             await RunWithScopeAsync(projectId, sessionId, flow, cameraId, ct);
-            EnsureStoppedState(projectId);
+            EnsureStoppedState(projectId, sessionId);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -270,22 +298,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 OldState = "Running",
                 NewState = "Stopped"
             }, CancellationToken.None);
-            _coordinator.MarkAsStopped(projectId);
+            _coordinator.MarkAsStopped(projectId, sessionId);
         }
-#if false
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            _logger.LogInformation("[InspectionWorker] 浠诲姟姝ｅ父鍙栨秷: {ProjectId}", projectId);
-            await _eventBus.PublishAsync(new InspectionStateChangedEvent
-            {
-                ProjectId = projectId,
-                SessionId = sessionId,
-                OldState = "Running",
-                NewState = "Stopped"
-            }, CancellationToken.None);
-            _coordinator.MarkAsStopped(projectId);
-        }
-#endif
         catch (Exception ex)
         {
             _logger.LogError(ex, "[InspectionWorker] 任务异常: {ProjectId}", projectId);
@@ -293,7 +307,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             // 第二层保护：Coordinator 级
             try
             {
-                _coordinator.MarkAsFaulted(projectId, ex.Message);
+                _coordinator.MarkAsFaulted(projectId, sessionId, ex.Message);
             }
             catch (Exception coordEx)
             {
@@ -327,8 +341,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             // 解析 Scoped 服务
             var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
             var imageAcquisition = scope.ServiceProvider.GetRequiredService<IImageAcquisitionService>();
-            var resultRepository = scope.ServiceProvider.GetRequiredService<IInspectionResultRepository>();
+            var resultChannelWriter = scope.ServiceProvider.GetRequiredService<IInspectionResultChannelWriter>();
             var projectRepository = scope.ServiceProvider.GetRequiredService<IProjectRepository>();
+            var cameraManager = scope.ServiceProvider.GetRequiredService<ICameraManager>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<InspectionWorker>>();
 
             // 创建日志上下文
@@ -355,9 +370,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     sessionId,
                     flow,
                     cameraId,
+                    IsFrameDrivenExecution(flow, cameraId, cameraManager),
                     flowExecution,
                     imageAcquisition,
-                    resultRepository,
+                    resultChannelWriter,
                     ct);
 
                 logger.LogInformation("[InspectionWorker] 检测循环结束");
@@ -402,9 +418,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         Guid sessionId,
         OperatorFlow flow,
         string? cameraId,
+        bool frameDrivenExecution,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
-        IInspectionResultRepository resultRepository,
+        IInspectionResultChannelWriter resultChannelWriter,
         CancellationToken ct)
     {
         const int minIntervalMs = 100;
@@ -417,6 +434,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         {
             var startTime = DateTime.UtcNow;
             cycleCount++;
+            var cycleSucceeded = false;
 
             try
             {
@@ -424,12 +442,18 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
                 // 执行单轮检测
                 var result = await ExecuteCycleAsync(
-                    projectId, flow, cameraId, flowExecution, imageAcquisition, ct);
+                    projectId, sessionId, flow, cameraId, flowExecution, imageAcquisition, ct);
 
-                // 保存结果
-                await resultRepository.AddAsync(result);
+                // 保存结果(异步非阻塞)
+                resultChannelWriter.TryWrite(result);
 
-                // 【架构修复 v2】发布结果事件
+                var outputPayload = EnsureTraceabilityPayload(
+                    AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),
+                    result);
+                var analysisPayload = EnsureTraceabilityPayload(
+                    AnalysisPayloadSerialization.DeserializeJsonDictionary(result.AnalysisDataJson),
+                    result);
+
                 await _eventBus.PublishAsync(new InspectionResultEvent
                 {
                     ProjectId = projectId,
@@ -440,8 +464,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     DefectCount = result.Defects.Count,
                     ProcessingTimeMs = result.ProcessingTimeMs,
                     OutputImageBase64 = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
-                    OutputData = AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),
-                    AnalysisData = AnalysisPayloadSerialization.DeserializeJsonDictionary(result.AnalysisDataJson)
+                    OutputData = outputPayload,
+                    AnalysisData = analysisPayload
                 }, ct);
                 _metrics.RecordDetectionLatency(result.ProcessingTimeMs, result.Status.ToString());
                 _metrics.RecordInspectionCompleted(result.Status.ToString(), result.Defects.Count);
@@ -471,6 +495,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 }
 
                 currentIntervalMs = 500;
+                cycleSucceeded = true;
             }
             catch (OperationCanceledException)
             {
@@ -485,6 +510,11 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
             // 计算间隔
             var elapsedMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            if (frameDrivenExecution && cycleSucceeded)
+            {
+                continue;
+            }
+
             var delayMs = Math.Max(currentIntervalMs - elapsedMs, minIntervalMs);
 
             try
@@ -503,8 +533,56 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     /// <summary>
     /// 执行单轮检测
     /// </summary>
+    private static bool IsFrameDrivenExecution(OperatorFlow flow, string? cameraId, ICameraManager cameraManager)
+    {
+        if (IsFrameDrivenBinding(cameraManager, cameraId))
+        {
+            return true;
+        }
+
+        foreach (var op in flow.Operators.Where(item => item.Type == OperatorType.ImageAcquisition))
+        {
+            var sourceType = op.Parameters
+                .FirstOrDefault(parameter => parameter.Name.Equals("SourceType", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+            var bindingId = op.Parameters
+                .FirstOrDefault(parameter => parameter.Name.Equals("CameraId", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+            if (!string.Equals(sourceType, "Camera", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(sourceType) && !string.IsNullOrWhiteSpace(bindingId))
+                {
+                    // Continue to frame-driven binding check for legacy flows that only persisted CameraId.
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            if (IsFrameDrivenBinding(cameraManager, bindingId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsFrameDrivenBinding(ICameraManager cameraManager, string? cameraId)
+    {
+        var binding = cameraManager.FindBinding(cameraId);
+        if (binding == null)
+        {
+            return false;
+        }
+
+        binding.Normalize();
+        return CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven();
+    }
+
     private async Task<InspectionResult> ExecuteCycleAsync(
         Guid projectId,
+        Guid sessionId,
         OperatorFlow flow,
         string? cameraId,
         IFlowExecutionService flowExecution,
@@ -539,22 +617,34 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
             // 执行流程
             var flowResult = await flowExecution.ExecuteFlowAsync(flow, inputData, cancellationToken: ct);
+            var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
+            flowResult.OutputData = outputData;
 
             stopwatch.Stop();
             _metrics.RecordFlowExecutionLatency(flowResult.ExecutionTimeMs, flowResult.IsSuccess);
 
             // 判定状态
-            InspectionStatus status;
-            if (!flowResult.IsSuccess)
-            {
-                status = InspectionStatus.Error;
-            }
-            else
-            {
-                status = DetermineStatusFromFlowOutput(flowResult.OutputData);
-            }
+            var judgmentEvaluation = flowResult.IsSuccess
+                ? DetermineStatusFromFlowOutput(outputData)
+                : (
+                    Status: InspectionStatus.Error,
+                    JudgmentSource: "FlowExecution",
+                    StatusReason: string.IsNullOrWhiteSpace(flowResult.ErrorMessage)
+                        ? "FlowExecutionFailed"
+                        : $"FlowExecutionFailed:{flowResult.ErrorMessage}",
+                    MissingJudgmentSignal: false);
+            SetJudgmentDiagnostics(outputData, judgmentEvaluation);
 
-            result.SetResult(status, flowResult.ExecutionTimeMs, null, flowResult.ErrorMessage);
+            var status = judgmentEvaluation.Status;
+            var errorMessage = !flowResult.IsSuccess
+                ? (string.IsNullOrWhiteSpace(flowResult.ErrorMessage) ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage)
+                : (status == InspectionStatus.Error ? judgmentEvaluation.StatusReason : flowResult.ErrorMessage);
+
+            result.SetResult(status, flowResult.ExecutionTimeMs, null, errorMessage);
+            result.SetTraceability(
+                ComputeFlowVersionHash(flow),
+                TryResolveCalibrationBundleId(flowResult.OutputData),
+                sessionId);
 
             // 提取输出图像
             if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
@@ -587,8 +677,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             var analysisData = _analysisDataBuilder.Build(flow, flowResult, status);
-            AnalysisPayloadSerialization.TrySetOutputDataJson(result, flowResult.OutputData, _logger);
+            var outputPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
+            AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputPayload, _logger);
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
+            TryAppendTraceabilityToAnalysisPayload(result);
             await CacheResultImageAsync(result);
             return result;
         }
@@ -600,30 +692,306 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
     }
 
-    private InspectionStatus DetermineStatusFromFlowOutput(Dictionary<string, object>? outputData)
+    private void TryAppendTraceabilityToAnalysisPayload(InspectionResult result)
+    {
+        try
+        {
+            var analysisPayload = AnalysisPayloadSerialization.DeserializeJsonDictionary(result.AnalysisDataJson);
+            var enrichedPayload = EnsureTraceabilityPayload(analysisPayload, result);
+            if (enrichedPayload == null)
+            {
+                return;
+            }
+
+            result.SetAnalysisDataJson(JsonSerializer.Serialize(enrichedPayload));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionWorker] Failed to append traceability to analysis payload.");
+        }
+    }
+
+    private static Dictionary<string, object>? EnsureTraceabilityPayload(
+        Dictionary<string, object>? payload,
+        InspectionResult result)
+    {
+        var traceability = BuildTraceabilityPayload(result);
+        if (traceability.Count == 0)
+        {
+            return payload;
+        }
+
+        var merged = payload != null
+            ? new Dictionary<string, object>(payload, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        merged[TraceabilityFieldName] = traceability;
+        return merged;
+    }
+
+    private static Dictionary<string, object> BuildTraceabilityPayload(InspectionResult result)
+    {
+        var payload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(result.FlowVersionHash))
+        {
+            payload["FlowVersionHash"] = result.FlowVersionHash;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.CalibrationBundleId))
+        {
+            payload["CalibrationBundleId"] = result.CalibrationBundleId;
+        }
+
+        if (result.SessionId.HasValue)
+        {
+            payload["SessionId"] = result.SessionId.Value.ToString("D");
+        }
+
+        return payload;
+    }
+
+    private string? ComputeFlowVersionHash(OperatorFlow flow)
+    {
+        try
+        {
+            var serialized = JsonSerializer.Serialize(flow, FlowHashJsonOptions);
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(serialized));
+            return Convert.ToHexString(hashBytes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionWorker] Failed to compute flow version hash.");
+            return null;
+        }
+    }
+
+    private static string? TryResolveCalibrationBundleId(Dictionary<string, object>? outputData)
     {
         if (outputData == null)
-            return InspectionStatus.OK;
-
-        if (outputData.TryGetValue("JudgmentResult", out var judgmentResult)
-            && judgmentResult is string judgment)
         {
+            return null;
+        }
+
+        if (TryResolveBundleIdFromDictionary(outputData, out var directId))
+        {
+            return directId;
+        }
+
+        foreach (var containerKey in new[] { TraceabilityFieldName, "Calibration", "CalibrationBundle", "CalibrationInfo" })
+        {
+            if (!outputData.TryGetValue(containerKey, out var nested) || nested == null)
+            {
+                continue;
+            }
+
+            if (TryResolveBundleIdFromObject(nested, out var nestedId))
+            {
+                return nestedId;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryResolveBundleIdFromDictionary(
+        IReadOnlyDictionary<string, object> data,
+        out string? bundleId)
+    {
+        bundleId = null;
+        if (TryReadStringValue(data, "CalibrationBundleId", out var calibrationBundleId))
+        {
+            bundleId = calibrationBundleId;
+            return true;
+        }
+
+        if (TryReadStringValue(data, "BundleId", out var legacyBundleId))
+        {
+            bundleId = legacyBundleId;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadStringValue(
+        IReadOnlyDictionary<string, object> data,
+        string key,
+        out string? value)
+    {
+        value = null;
+        if (!data.TryGetValue(key, out var raw))
+        {
+            return false;
+        }
+
+        return TryResolveBundleIdFromObject(raw, out value);
+    }
+
+    private static bool TryResolveBundleIdFromObject(object value, out string? bundleId)
+    {
+        bundleId = null;
+        switch (value)
+        {
+            case string text when !string.IsNullOrWhiteSpace(text):
+                bundleId = text.Trim();
+                return true;
+            case Guid guid when guid != Guid.Empty:
+                bundleId = guid.ToString("D");
+                return true;
+            case Dictionary<string, object> dictionary:
+                return TryResolveBundleIdFromDictionary(dictionary, out bundleId);
+            case IReadOnlyDictionary<string, object> dictionary:
+                return TryResolveBundleIdFromDictionary(dictionary, out bundleId);
+            case JsonElement element:
+                return TryResolveBundleIdFromJsonElement(element, out bundleId);
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryResolveBundleIdFromJsonElement(JsonElement element, out string? bundleId)
+    {
+        bundleId = null;
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            if (element.ValueKind == JsonValueKind.String)
+            {
+                var raw = element.GetString();
+                if (!string.IsNullOrWhiteSpace(raw))
+                {
+                    bundleId = raw.Trim();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!property.Name.Equals("CalibrationBundleId", StringComparison.OrdinalIgnoreCase)
+                && !property.Name.Equals("BundleId", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (property.Value.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var raw = property.Value.GetString();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            bundleId = raw.Trim();
+            return true;
+        }
+
+        return false;
+    }
+
+    private static (InspectionStatus Status, string JudgmentSource, string StatusReason, bool MissingJudgmentSignal)
+        DetermineStatusFromFlowOutput(Dictionary<string, object>? outputData)
+    {
+        if (outputData == null || outputData.Count == 0)
+        {
+            return (InspectionStatus.Error, "None", "MissingJudgmentSignal", true);
+        }
+
+        if (outputData.TryGetValue("JudgmentResult", out var judgmentResult))
+        {
+            if (judgmentResult is not string judgment)
+            {
+                return BuildInvalidTypeResult("JudgmentResult", "string", judgmentResult);
+            }
+
             return judgment.Equals("OK", StringComparison.OrdinalIgnoreCase)
-                ? InspectionStatus.OK
-                : InspectionStatus.NG;
+                ? (InspectionStatus.OK, "JudgmentResult", "DerivedFromJudgmentResult", false)
+                : (InspectionStatus.NG, "JudgmentResult", "DerivedFromJudgmentResult", false);
         }
 
-        if (outputData.TryGetValue("IsOk", out var isOk) && isOk is bool isOkBool)
+        if (outputData.TryGetValue("IsOk", out var isOk))
         {
-            return isOkBool ? InspectionStatus.OK : InspectionStatus.NG;
+            if (isOk is not bool isOkBool)
+            {
+                return BuildInvalidTypeResult("IsOk", "bool", isOk);
+            }
+
+            return isOkBool
+                ? (InspectionStatus.OK, "IsOk", "DerivedFromIsOk", false)
+                : (InspectionStatus.NG, "IsOk", "DerivedFromIsOk", false);
         }
 
-        if (outputData.TryGetValue("DefectCount", out var dc) && dc is int defectCount)
+        if (outputData.TryGetValue("Result", out var resultVal))
         {
-            return defectCount > 0 ? InspectionStatus.NG : InspectionStatus.OK;
+            if (resultVal is not bool resultBool)
+            {
+                return BuildInvalidTypeResult("Result", "bool", resultVal);
+            }
+
+            return resultBool
+                ? (InspectionStatus.OK, "Result", "DerivedFromResult", false)
+                : (InspectionStatus.NG, "Result", "DerivedFromResult", false);
         }
 
-        return InspectionStatus.OK;
+        if (outputData.TryGetValue("ConditionResult", out var conditionVal))
+        {
+            if (conditionVal is not bool conditionBool)
+            {
+                return BuildInvalidTypeResult("ConditionResult", "bool", conditionVal);
+            }
+
+            return conditionBool
+                ? (InspectionStatus.OK, "ConditionResult", "DerivedFromConditionResult", false)
+                : (InspectionStatus.NG, "ConditionResult", "DerivedFromConditionResult", false);
+        }
+
+        if (outputData.TryGetValue("DefectCount", out var dc))
+        {
+            if (dc is not int defectCount)
+            {
+                return BuildInvalidTypeResult("DefectCount", "int", dc);
+            }
+
+            return defectCount > 0
+                ? (InspectionStatus.NG, "DefectCount", "DerivedFromDefectCount", false)
+                : (InspectionStatus.OK, "DefectCount", "DerivedFromDefectCount", false);
+        }
+
+        return (InspectionStatus.Error, "None", "MissingJudgmentSignal", true);
+    }
+
+    private static (
+        InspectionStatus Status,
+        string JudgmentSource,
+        string StatusReason,
+        bool MissingJudgmentSignal) BuildInvalidTypeResult(
+        string fieldName,
+        string expectedType,
+        object? actualValue)
+    {
+        return (
+            InspectionStatus.Error,
+            fieldName,
+            $"InvalidJudgmentType:{fieldName}:Expected={expectedType}:Actual={DescribeType(actualValue)}",
+            false);
+    }
+
+    private static void SetJudgmentDiagnostics(
+        Dictionary<string, object> outputData,
+        (InspectionStatus Status, string JudgmentSource, string StatusReason, bool MissingJudgmentSignal) evaluation)
+    {
+        outputData["MissingJudgmentSignal"] = evaluation.MissingJudgmentSignal;
+        outputData["JudgmentSource"] = evaluation.JudgmentSource;
+        outputData["StatusReason"] = evaluation.StatusReason;
+    }
+
+    private static string DescribeType(object? value)
+    {
+        return value?.GetType().Name ?? "null";
     }
 
     private async Task CacheResultImageAsync(InspectionResult result)
@@ -755,7 +1123,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     private async Task CleanupTaskAsync(Guid projectId, RunningTaskEntry entry)
     {
         var removed = _runningTasks.TryRemove(projectId, out _);
-        EnsureStoppedState(projectId);
+        EnsureStoppedState(projectId, entry.SessionId);
         
         try
         {
@@ -776,7 +1144,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         entry.ExitCompletion.TrySetResult(true);
     }
 
-    private void EnsureStoppedState(Guid projectId)
+    private void EnsureStoppedState(Guid projectId, Guid sessionId)
     {
         var state = _coordinator.GetState(projectId);
         if (state == null)
@@ -784,9 +1152,14 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             return;
         }
 
+        if (state.SessionId != sessionId)
+        {
+            return;
+        }
+
         if (state.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping)
         {
-            _coordinator.MarkAsStopped(projectId);
+            _coordinator.MarkAsStopped(projectId, sessionId);
         }
     }
 

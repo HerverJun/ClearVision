@@ -1,8 +1,5 @@
-﻿// PointLineDistanceOperator.cs
-// 点线距离算子
-// 计算点到线段或直线的距离与投影
-// 作者：蘅芜君
 using System.Collections;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
@@ -10,23 +7,21 @@ using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
-/// <summary>
-/// Computes perpendicular distance from a point to a line segment's infinite line.
-/// </summary>
 [OperatorMeta(
     DisplayName = "点线距离",
-    Description = "Computes perpendicular distance from a point to a line.",
+    Description = "Computes distance from a point to a line or segment.",
     Category = "检测",
     IconName = "distance",
-    Keywords = new[] { "point", "line", "distance", "perpendicular" }
+    Keywords = new[] { "point", "line", "distance", "perpendicular", "segment" }
 )]
 [InputPort("Point", "Point", PortDataType.Point, IsRequired = true)]
 [InputPort("Line", "Line", PortDataType.LineData, IsRequired = true)]
 [OutputPort("Distance", "Distance", PortDataType.Float)]
 [OutputPort("FootPoint", "Foot Point", PortDataType.Point)]
+[OperatorParam("DistanceModel", "Distance Model", "enum", DefaultValue = "Segment", Options = new[] { "Segment|Segment", "InfiniteLine|Infinite line" })]
+[OperatorParam("Unit", "Unit", "enum", DefaultValue = "Pixel", Options = new[] { "Pixel|Pixel" })]
 public class PointLineDistanceOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.PointLineDistance;
@@ -55,28 +50,54 @@ public class PointLineDistanceOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Input 'Line' is missing or invalid"));
         }
 
-        var dx = line.EndX - line.StartX;
-        var dy = line.EndY - line.StartY;
-        var norm2 = dx * dx + dy * dy;
-        if (norm2 < 1e-9)
+        if (!MeasurementGeometryHelper.IsFinite(line) || !double.IsFinite(point.X) || !double.IsFinite(point.Y))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("Line is degenerate (zero length)"));
+            return Task.FromResult(OperatorExecutionOutput.Failure("[DegenerateGeometry] Point/Line coordinates must be finite numbers"));
         }
 
-        var t = ((point.X - line.StartX) * dx + (point.Y - line.StartY) * dy) / norm2;
-        var footX = line.StartX + t * dx;
-        var footY = line.StartY + t * dy;
+        if (line.Length < 1e-9)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("[DegenerateGeometry] Line is zero length"));
+        }
 
-        var distX = point.X - footX;
-        var distY = point.Y - footY;
-        var distance = Math.Sqrt(distX * distX + distY * distY);
+        var distanceModel = GetStringParam(@operator, "DistanceModel", "Segment");
+        if (!TryParseDistanceModel(distanceModel, out var parsedModel))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("DistanceModel must be Segment or InfiniteLine"));
+        }
+
+        if (!GetStringParam(@operator, "Unit", "Pixel").Equals("Pixel", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("Unit must be Pixel"));
+        }
+
+        var footPoint = parsedModel == DistanceModel.Segment
+            ? MeasurementGeometryHelper.ProjectPointToSegment(point.X, point.Y, line)
+            : MeasurementGeometryHelper.ProjectPointToInfiniteLine(point.X, point.Y, line);
+        var distance = parsedModel == DistanceModel.Segment
+            ? MeasurementGeometryHelper.DistancePointToSegment(point.X, point.Y, line)
+            : MeasurementGeometryHelper.DistancePointToInfiniteLine(point.X, point.Y, line);
+        var pointSigmaPx = MeasurementGeometryHelper.EstimatePointSigma(point);
+        var lineSigmaPx = MeasurementGeometryHelper.EstimateLineSigma(line);
+        var uncertaintyPx = MeasurementGeometryHelper.PropagatePointLineDistanceUncertainty(
+            point,
+            pointSigmaPx,
+            line,
+            lineSigmaPx,
+            parsedModel == DistanceModel.Segment);
 
         var output = new Dictionary<string, object>
         {
             { "Distance", distance },
-            { "FootPoint", new Position(footX, footY) },
-            { "FootPointX", footX },
-            { "FootPointY", footY }
+            { "FootPoint", footPoint },
+            { "FootPointX", footPoint.X },
+            { "FootPointY", footPoint.Y },
+            { "DistanceModel", parsedModel.ToString() },
+            { "Unit", "Pixel" },
+            { "StatusCode", "OK" },
+            { "StatusMessage", "Success" },
+            { "Confidence", ComputeConfidence(uncertaintyPx) },
+            { "UncertaintyPx", uncertaintyPx }
         };
 
         return Task.FromResult(OperatorExecutionOutput.Success(output));
@@ -84,19 +105,48 @@ public class PointLineDistanceOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        if (!TryParseDistanceModel(GetStringParam(@operator, "DistanceModel", "Segment"), out _))
+        {
+            return ValidationResult.Invalid("DistanceModel must be Segment or InfiniteLine");
+        }
+
+        if (!GetStringParam(@operator, "Unit", "Pixel").Equals("Pixel", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("Unit must be Pixel");
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static bool TryParseDistanceModel(string model, out DistanceModel parsed)
+    {
+        parsed = DistanceModel.Segment;
+        if (string.Equals(model, "Segment", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(model, "InfiniteLine", StringComparison.OrdinalIgnoreCase))
+        {
+            parsed = DistanceModel.InfiniteLine;
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryParsePoint(object? obj, out Position point)
     {
         point = new Position(0, 0);
         if (obj == null)
+        {
             return false;
+        }
 
         switch (obj)
         {
-            case Position p:
-                point = p;
+            case Position position:
+                point = position;
                 return true;
             case Point cvPoint:
                 point = new Position(cvPoint.X, cvPoint.Y);
@@ -120,8 +170,8 @@ public class PointLineDistanceOperator : OperatorBase
         if (obj is IDictionary legacyDict)
         {
             var normalized = legacyDict.Cast<DictionaryEntry>()
-                .Where(e => e.Key != null)
-                .ToDictionary(e => e.Key!.ToString() ?? string.Empty, e => e.Value ?? 0.0, StringComparer.OrdinalIgnoreCase);
+                .Where(entry => entry.Key != null)
+                .ToDictionary(entry => entry.Key!.ToString() ?? string.Empty, entry => entry.Value ?? 0.0, StringComparer.OrdinalIgnoreCase);
             if (TryGetDouble(normalized, "X", out var parsedX) && TryGetDouble(normalized, "Y", out var parsedY))
             {
                 point = new Position(parsedX, parsedY);
@@ -150,7 +200,9 @@ public class PointLineDistanceOperator : OperatorBase
     {
         line = new LineData();
         if (obj == null)
+        {
             return false;
+        }
 
         if (obj is LineData lineData)
         {
@@ -182,8 +234,8 @@ public class PointLineDistanceOperator : OperatorBase
         if (obj is IDictionary legacyDict)
         {
             var normalized = legacyDict.Cast<DictionaryEntry>()
-                .Where(e => e.Key != null)
-                .ToDictionary(e => e.Key!.ToString() ?? string.Empty, e => e.Value ?? 0.0, StringComparer.OrdinalIgnoreCase);
+                .Where(entry => entry.Key != null)
+                .ToDictionary(entry => entry.Key!.ToString() ?? string.Empty, entry => entry.Value ?? 0.0, StringComparer.OrdinalIgnoreCase);
             return TryParseLine(normalized, out line);
         }
 
@@ -218,6 +270,20 @@ public class PointLineDistanceOperator : OperatorBase
 
         return double.TryParse(raw.ToString(), out value);
     }
+
+    private static double ComputeConfidence(double uncertaintyPx)
+    {
+        if (!double.IsFinite(uncertaintyPx) || uncertaintyPx < 0)
+        {
+            return 0.0;
+        }
+
+        return 1.0 / (1.0 + uncertaintyPx);
+    }
+
+    private enum DistanceModel
+    {
+        Segment = 0,
+        InfiniteLine = 1
+    }
 }
-
-

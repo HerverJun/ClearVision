@@ -17,6 +17,7 @@ using OpenCvSharp;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Hosting;
 
 namespace Acme.Product.Infrastructure.AI;
 
@@ -30,6 +31,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IOperatorFactory _operatorFactory;
     private readonly IFlowTemplateService _templateService;
     private readonly DryRunService _dryRunService;
+    private readonly IHostEnvironment _hostEnvironment;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -60,6 +62,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IOperatorFactory operatorFactory,
         IFlowTemplateService templateService,
         DryRunService dryRunService,
+        IHostEnvironment hostEnvironment,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
     {
         _aiOrchestrator = aiOrchestrator;
@@ -70,6 +73,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _operatorFactory = operatorFactory;
         _templateService = templateService;
         _dryRunService = dryRunService;
+        _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
@@ -90,17 +94,37 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         var systemPrompt = _promptBuilder.BuildSystemPrompt(request.Description);
-        var userMessage = BuildUserMessage(
-            request,
-            conversationContext.ExistingFlowJson,
-            conversationContext.Intent,
-            conversationContext.PromptContext,
-            templatePriority);
+        var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(conversationContext.Mode)
+            ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
+            : string.Empty;
+        var attachmentContext = BuildAttachmentContext(request.Attachments);
+        var userMessage = AiPromptComposer.BuildUserPrompt(new AiPromptRequest(
+            Task: request.Description,
+            Mode: conversationContext.Mode,
+            AdditionalContext: request.AdditionalContext,
+            TemplatePriority: BuildTemplatePriorityPromptSection(templatePriority),
+            AttachmentContext: attachmentContext,
+            SessionSummary: conversationContext.SessionSummary,
+            ReferenceFlowSummary: referenceFlowSummary));
 
         // 读取当前激活模型快照
         var activeModel = _aiOrchestrator.ResolveGenerationModel();
         var options = activeModel.ToGenerationOptions();
         var capabilities = _aiOrchestrator.ResolveCapabilities(activeModel);
+        GenerateFlowAttachmentReport promptTraceAttachmentReport = new();
+        var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
+            ? new AiPromptTrace
+            {
+                Mode = conversationContext.Mode.ToWireValue(),
+                Provider = options.Provider,
+                Model = options.Model,
+                BaseUrl = options.BaseUrl,
+                Capabilities = capabilities.Clone(),
+                SystemPrompt = systemPrompt,
+                UserPrompt = userMessage,
+                UsedReferenceFlowSummary = referenceFlowSummary
+            }
+            : null;
 
         var maxAttachmentCount = capabilities.MaxImageCount > 0
             ? Math.Min(DefaultMaxMultimodalAttachmentCount, capabilities.MaxImageCount)
@@ -110,6 +134,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             capabilities.MaxImageBytes > 0 ? capabilities.MaxImageBytes : AiApiClient.MaxImageBytes);
 
         var attachmentSelection = AnalyzeMultimodalAttachments(request.Attachments, maxAttachmentCount, maxImageBytes);
+        promptTraceAttachmentReport = attachmentSelection.Report;
         if (request.Attachments is { Count: > 0 })
         {
             onAttachmentReport?.Invoke(attachmentSelection.Report);
@@ -122,9 +147,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 "Model {Model} capability says vision input is unsupported. Falling back to text-only mode.",
                 options.Model);
             activeSendablePaths = Array.Empty<string>();
-            onAttachmentReport?.Invoke(BuildFallbackAttachmentReport(attachmentSelection.Report, "model_not_support_image"));
+            promptTraceAttachmentReport = BuildFallbackAttachmentReport(attachmentSelection.Report, "model_not_support_image");
+            onAttachmentReport?.Invoke(promptTraceAttachmentReport);
             onProgress?.Invoke("当前模型不支持图片输入，已自动切换为文本模式（附件仅用于元信息）。");
         }
+        if (promptTrace != null)
+            promptTrace.AttachmentReport = promptTraceAttachmentReport;
         var currentUserMessage = BuildUserChatMessage(userMessage, activeSendablePaths);
 
         AiGeneratedFlowJson? generatedFlow = null;
@@ -211,7 +239,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 if (lastValidation.IsValid)
                 {
                     // 校验通过，转换为 DTO 并返回
-                    var flowDto = ConvertToFlowDto(generatedFlow, request.Description);
+                    var (flowDto, actualOperatorIdMap) = ConvertToFlowDto(generatedFlow, request.Description);
                     _layoutService.ApplyLayout(flowDto);
 
                     onProgress?.Invoke("正在进行 Dry-Run 沙箱安全校验与分支覆盖率统计...");
@@ -240,15 +268,16 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         _logger.LogWarning(ex, "DryRun 预演阶段异常，跳过覆盖率采集");
                     }
 
+                    var recommendedTemplate = ResolveRecommendedTemplate(generatedFlow, templatePriority);
+                    var pendingParameters = BuildPendingParameters(generatedFlow, actualOperatorIdMap);
+                    var missingResources = BuildMissingResources(generatedFlow, templatePriority);
+                    generatedFlow.PendingParameters = pendingParameters;
+
                     _conversationalFlowService.RecordAssistantResponse(
                         conversationContext.SessionId,
                         generatedFlow.Explanation,
                         JsonSerializer.Serialize(generatedFlow, _jsonOptions),
                         JsonSerializer.Serialize(flowDto, _jsonOptions));
-
-                    var recommendedTemplate = ResolveRecommendedTemplate(generatedFlow, templatePriority);
-                    var pendingParameters = BuildPendingParameters(generatedFlow);
-                    var missingResources = BuildMissingResources(generatedFlow, templatePriority);
 
                     return new AiFlowGenerationResult
                     {
@@ -264,7 +293,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         DryRunResult = dryRunReport,
                         RecommendedTemplate = recommendedTemplate,
                         PendingParameters = pendingParameters,
-                        MissingResources = missingResources
+                        MissingResources = missingResources,
+                        PromptTrace = promptTrace
                     };
                 }
 
@@ -320,7 +350,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         lastRawResponse,
                         fallbackCode: wasUserCancelled ? "user_cancelled" : "generation_timeout",
                         fallbackCategory: "execution"),
-                    LastAttemptDiagnostics = lastAttemptDiagnostics
+                    LastAttemptDiagnostics = lastAttemptDiagnostics,
+                    PromptTrace = promptTrace
                 };
             }
             catch (Exception ex)
@@ -336,7 +367,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
                     activeSendablePaths = Array.Empty<string>();
                     currentUserMessage = BuildUserChatMessage(userMessage, activeSendablePaths);
-                    onAttachmentReport?.Invoke(BuildFallbackAttachmentReport(attachmentSelection.Report, "model_not_support_image"));
+                    promptTraceAttachmentReport = BuildFallbackAttachmentReport(attachmentSelection.Report, "model_not_support_image");
+                    onAttachmentReport?.Invoke(promptTraceAttachmentReport);
+                    if (promptTrace != null)
+                        promptTrace.AttachmentReport = promptTraceAttachmentReport;
                     onProgress?.Invoke("图片附件暂不被当前模型/接口支持，已自动改为文本模式重试...");
                     retryCount++;
                     attempt--;
@@ -373,7 +407,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         lastRawResponse,
                         fallbackCode: "service_call_failed",
                         fallbackCategory: "execution"),
-                    LastAttemptDiagnostics = lastAttemptDiagnostics
+                    LastAttemptDiagnostics = lastAttemptDiagnostics,
+                    PromptTrace = promptTrace
                 };
             }
         }
@@ -394,93 +429,55 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 lastRawResponse,
                 fallbackCode: "validation_failed",
                 fallbackCategory: "validation"),
-            LastAttemptDiagnostics = lastAttemptDiagnostics
+            LastAttemptDiagnostics = lastAttemptDiagnostics,
+            PromptTrace = promptTrace
         };
     }
 
-    private string BuildUserMessage(
-        AiFlowGenerationRequest request,
-        string? existingFlow,
-        ConversationIntent intent,
-        string promptContext,
-        TemplatePriorityContext templatePriority)
+    private static bool ShouldIncludeReferenceFlowSummary(GenerateFlowMode mode)
     {
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Please generate a workflow from the following request:");
-        sb.AppendLine();
-        sb.AppendLine(request.Description);
+        return mode is GenerateFlowMode.Modify or GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters;
+    }
 
-        if (!string.IsNullOrWhiteSpace(request.AdditionalContext))
-        {
-            sb.AppendLine();
-            sb.AppendLine($"Additional context: {request.AdditionalContext}");
-        }
+    private bool ShouldIncludePromptTrace(bool debugPrompt)
+    {
+        return debugPrompt || _hostEnvironment.IsDevelopment() || System.Diagnostics.Debugger.IsAttached;
+    }
 
-        if (templatePriority.IsTemplateFirst)
+    private static string BuildTemplatePriorityPromptSection(TemplatePriorityContext templatePriority)
+    {
+        if (!templatePriority.IsTemplateFirst)
+            return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("templateFirst=true");
+        sb.AppendLine($"matchMode={templatePriority.MatchMode}");
+        sb.AppendLine($"matchReason={templatePriority.MatchReason}");
+        if (templatePriority.Confidence > 0)
+            sb.AppendLine($"confidence={templatePriority.Confidence:F2}");
+
+        if (templatePriority.Template != null)
         {
-            sb.AppendLine();
-            sb.AppendLine("Template-first mode is enabled for this request.");
-            sb.AppendLine($"Template match reason: {templatePriority.MatchReason}");
-            if (templatePriority.Template != null)
+            sb.AppendLine($"templateId={templatePriority.Template.Id}");
+            sb.AppendLine($"templateName={templatePriority.Template.Name}");
+            sb.AppendLine($"templateIndustry={templatePriority.Template.Industry}");
+
+            if (!string.IsNullOrWhiteSpace(templatePriority.Template.FlowJson))
             {
-                sb.AppendLine($"Preferred template id: {templatePriority.Template.Id}");
-                sb.AppendLine($"Preferred template name: {templatePriority.Template.Name}");
-                sb.AppendLine($"Preferred template industry: {templatePriority.Template.Industry}");
-                if (!string.IsNullOrWhiteSpace(templatePriority.Template.FlowJson))
-                {
-                    sb.AppendLine("Preferred template skeleton JSON:");
-                    sb.AppendLine("```json");
-                    sb.AppendLine(TrimTemplateFlowJson(templatePriority.Template.FlowJson));
-                    sb.AppendLine("```");
-                    sb.AppendLine("Reuse this skeleton as the starting point unless the user explicitly asks to replace it.");
-                }
-            }
-            else
-            {
-                sb.AppendLine("No exact template file is currently available, but keep the workflow in wire-sequence pattern.");
-            }
-            sb.AppendLine("Please preserve template skeleton first, then only adjust missing operators or parameters.");
-            sb.AppendLine("In JSON output, include recommendedTemplate, pendingParameters, and missingResources fields.");
-        }
-
-        var attachmentContext = BuildAttachmentContext(request.Attachments);
-        if (!string.IsNullOrWhiteSpace(attachmentContext))
-        {
-            sb.AppendLine();
-            sb.AppendLine("Attachment context:");
-            sb.AppendLine(attachmentContext);
-            sb.AppendLine("If attachments include template and target images, provide concrete template-matching parameter ranges.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(promptContext))
-        {
-            sb.AppendLine();
-            sb.AppendLine("会话上下文：");
-            sb.AppendLine(promptContext);
-        }
-
-        if (!string.IsNullOrWhiteSpace(existingFlow))
-        {
-            sb.AppendLine();
-            sb.AppendLine("以下是用户当前的工作流 JSON，请在此基础上处理：");
-            sb.AppendLine("```json");
-            sb.AppendLine(existingFlow);
-            sb.AppendLine("```");
-
-            if (intent == ConversationIntent.Modify)
-            {
-                sb.AppendLine("Requirement: apply incremental changes only to explicitly requested parts and keep other nodes/connections unchanged.");
-            }
-            else if (intent == ConversationIntent.Explain)
-            {
-                sb.AppendLine("Requirement: keep operators and connections unchanged and focus on improving the explanation field.");
+                sb.AppendLine("templateSkeletonJson:");
+                sb.AppendLine("```json");
+                sb.AppendLine(TrimTemplateFlowJson(templatePriority.Template.FlowJson));
+                sb.AppendLine("```");
+                sb.AppendLine("Reuse the template skeleton as the starting point unless the request explicitly asks to replace it.");
             }
         }
+        else
+        {
+            sb.AppendLine("No exact reusable template asset is available. Keep the workflow in the wire-sequence pattern.");
+        }
 
-        sb.AppendLine();
-        sb.AppendLine("Output must be valid JSON only with no extra text.");
-
-        return sb.ToString();
+        sb.AppendLine("Include recommendedTemplate, pendingParameters, and missingResources in the JSON output.");
+        return sb.ToString().Trim();
     }
 
     private static ChatMessage BuildUserChatMessage(string userMessage, IReadOnlyList<string> sendablePaths)
@@ -872,40 +869,53 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         };
     }
 
-    private static List<AiPendingParameterInfo> BuildPendingParameters(AiGeneratedFlowJson generatedFlow)
+    private static List<AiPendingParameterInfo> BuildPendingParameters(
+        AiGeneratedFlowJson generatedFlow,
+        IReadOnlyDictionary<string, string>? actualOperatorIdMap = null)
     {
-        var merged = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var merged = new Dictionary<string, (HashSet<string> Names, string ActualOperatorId)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var item in generatedFlow.PendingParameters ?? new List<AiPendingParameterInfo>())
         {
             if (string.IsNullOrWhiteSpace(item.OperatorId))
                 continue;
 
-            if (!merged.TryGetValue(item.OperatorId, out var names))
+            if (!merged.TryGetValue(item.OperatorId, out var entry))
             {
-                names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                merged[item.OperatorId] = names;
+                entry = (
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                    ResolveActualOperatorId(item.OperatorId, item.ActualOperatorId, actualOperatorIdMap));
+                merged[item.OperatorId] = entry;
+            }
+            else if (string.IsNullOrWhiteSpace(entry.ActualOperatorId))
+            {
+                merged[item.OperatorId] = (
+                    entry.Names,
+                    ResolveActualOperatorId(item.OperatorId, item.ActualOperatorId, actualOperatorIdMap));
+                entry = merged[item.OperatorId];
             }
 
             foreach (var name in item.ParameterNames ?? new List<string>())
             {
                 if (!string.IsNullOrWhiteSpace(name))
-                    names.Add(name);
+                    entry.Names.Add(name);
             }
         }
 
         foreach (var pair in generatedFlow.ParametersNeedingReview ?? new Dictionary<string, List<string>>())
         {
-            if (!merged.TryGetValue(pair.Key, out var names))
+            if (!merged.TryGetValue(pair.Key, out var entry))
             {
-                names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                merged[pair.Key] = names;
+                entry = (
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                    ResolveActualOperatorId(pair.Key, null, actualOperatorIdMap));
+                merged[pair.Key] = entry;
             }
 
             foreach (var name in pair.Value)
             {
                 if (!string.IsNullOrWhiteSpace(name))
-                    names.Add(name);
+                    entry.Names.Add(name);
             }
         }
 
@@ -914,9 +924,28 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             .Select(item => new AiPendingParameterInfo
             {
                 OperatorId = item.Key,
-                ParameterNames = item.Value.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList()
+                ActualOperatorId = item.Value.ActualOperatorId,
+                ParameterNames = item.Value.Names.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList()
             })
             .ToList();
+    }
+
+    private static string ResolveActualOperatorId(
+        string pendingOperatorId,
+        string? existingActualOperatorId,
+        IReadOnlyDictionary<string, string>? actualOperatorIdMap)
+    {
+        if (!string.IsNullOrWhiteSpace(existingActualOperatorId))
+            return existingActualOperatorId;
+
+        if (actualOperatorIdMap != null &&
+            actualOperatorIdMap.TryGetValue(pendingOperatorId, out var actualOperatorId) &&
+            !string.IsNullOrWhiteSpace(actualOperatorId))
+        {
+            return actualOperatorId;
+        }
+
+        return string.Empty;
     }
 
     private static List<AiMissingResourceInfo> BuildMissingResources(
@@ -959,11 +988,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 {
                     AddResource("Model", "DeepLearning.ModelPath", "缺少可用模型文件路径");
                 }
-
-                if (IsMissingParameter(parameters, "LabelsPath"))
-                {
-                    AddResource("Label", "DeepLearning.LabelsPath", "缺少标签文件路径");
-                }
             }
 
             if (op.OperatorType.Contains("Communication", StringComparison.OrdinalIgnoreCase))
@@ -988,20 +1012,28 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return resources.Values.ToList();
     }
 
-    private static bool IsMissingParameter(IReadOnlyDictionary<string, string> parameters, string key)
+    private static bool IsMissingParameter(IReadOnlyDictionary<string, string> parameters, params string[] keys)
     {
-        if (!parameters.TryGetValue(key, out var value))
-            return true;
+        foreach (var key in keys)
+        {
+            if (!parameters.TryGetValue(key, out var value))
+                continue;
 
-        if (string.IsNullOrWhiteSpace(value))
-            return true;
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
 
-        var normalized = value.Trim();
-        return normalized.Equals("todo", StringComparison.OrdinalIgnoreCase)
-               || normalized.Equals("tbd", StringComparison.OrdinalIgnoreCase)
-               || normalized.Contains("placeholder", StringComparison.OrdinalIgnoreCase)
-               || normalized.Contains("your_", StringComparison.OrdinalIgnoreCase)
-               || normalized.Contains("to_be_filled", StringComparison.OrdinalIgnoreCase);
+            var normalized = value.Trim();
+            if (!normalized.Equals("todo", StringComparison.OrdinalIgnoreCase)
+                && !normalized.Equals("tbd", StringComparison.OrdinalIgnoreCase)
+                && !normalized.Contains("placeholder", StringComparison.OrdinalIgnoreCase)
+                && !normalized.Contains("your_", StringComparison.OrdinalIgnoreCase)
+                && !normalized.Contains("to_be_filled", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private sealed record TemplatePriorityContext(
@@ -1305,7 +1337,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
     }
 
-    private OperatorFlowDto ConvertToFlowDto(AiGeneratedFlowJson generated, string userDescription)
+    private (OperatorFlowDto Flow, Dictionary<string, string> ActualOperatorIdMap) ConvertToFlowDto(
+        AiGeneratedFlowJson generated,
+        string userDescription)
     {
         // tempId 鈫?(IdGuid, Metadata) 鐨勬槧灏?
         var opInfoMapping = new Dictionary<string, (Guid Id, OperatorMetadata Meta)>();
@@ -1406,13 +1440,18 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             };
         }).ToList() ?? new List<OperatorConnectionDto>();
 
-        return new OperatorFlowDto
-        {
-            Id = Guid.NewGuid(),
-            Name = $"AI生成 - {userDescription}",
-            Operators = operators,
-            Connections = connections
-        };
+        return (
+            new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = $"AI生成 - {userDescription}",
+                Operators = operators,
+                Connections = connections
+            },
+            opInfoMapping.ToDictionary(
+                item => item.Key,
+                item => item.Value.Id.ToString(),
+                StringComparer.OrdinalIgnoreCase));
     }
 
     private OperatorFlow ConvertDtoToEntity(OperatorFlowDto dto)

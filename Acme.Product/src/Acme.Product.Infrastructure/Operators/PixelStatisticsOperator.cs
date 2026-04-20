@@ -56,43 +56,68 @@ public class PixelStatisticsOperator : OperatorBase
         }
 
         var channel = GetStringParam(@operator, "Channel", "Gray");
-        var roi = ResolveRoi(@operator, src.Width, src.Height);
+        var roi = MeasurementRoiHelper.ResolveRoi(@operator, src.Width, src.Height);
         if (roi.Width <= 0 || roi.Height <= 0)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("ROI is invalid"));
         }
 
         using var roiMat = new Mat(src, roi);
-        using var analysis = ExtractChannel(roiMat, channel);
-        using var mask = ResolveMask(inputs, analysis.Size());
-
-        Cv2.MeanStdDev(analysis, out var mean, out var stddev, mask);
-        Cv2.MinMaxLoc(analysis, out var minValue, out var maxValue, out _, out _, mask);
-
-        using var nzSource = new Mat();
-        if (mask.Empty())
+        using var mask = ResolveMask(inputs, roi, src.Size(), out var maskError);
+        if (maskError != null)
         {
-            analysis.CopyTo(nzSource);
-        }
-        else
-        {
-            Cv2.BitwiseAnd(analysis, analysis, nzSource, mask);
+            return Task.FromResult(OperatorExecutionOutput.Failure(maskError));
         }
 
-        var nonZeroCount = Cv2.CountNonZero(nzSource);
-        var median = ComputeMedian(analysis, mask);
-
-        var output = new Dictionary<string, object>
+        var analysisChannels = ResolveAnalysisChannels(roiMat, channel);
+        try
         {
-            { "Mean", mean.Val0 },
-            { "StdDev", stddev.Val0 },
-            { "Min", minValue },
-            { "Max", maxValue },
-            { "Median", median },
-            { "NonZeroCount", nonZeroCount }
-        };
+            var perChannelStats = new Dictionary<string, StatisticsSummary>(StringComparer.OrdinalIgnoreCase);
+            var aggregateValues = analysisChannels.Count > 1 ? new List<double>() : null;
 
-        return Task.FromResult(OperatorExecutionOutput.Success(output));
+            foreach (var analysisChannel in analysisChannels)
+            {
+                var values = ExtractValues(analysisChannel.Data, mask);
+                var stats = ComputeStatistics(values);
+                perChannelStats[analysisChannel.Name] = stats;
+
+                if (aggregateValues != null)
+                {
+                    aggregateValues.AddRange(values);
+                }
+            }
+
+            var aggregateStats = aggregateValues == null
+                ? perChannelStats[analysisChannels[0].Name]
+                : ComputeStatistics(aggregateValues);
+
+            var output = CreateStatisticsDictionary(aggregateStats);
+            output["SelectedChannel"] = channel;
+            output["ChannelsAnalyzed"] = analysisChannels.Select(item => item.Name).ToArray();
+            output["AggregationMode"] = aggregateValues == null ? "SingleChannel" : "FlattenedChannels";
+
+            if (analysisChannels.Count > 1)
+            {
+                output["ChannelStats"] = perChannelStats.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (object)CreateStatisticsDictionary(kvp.Value),
+                    StringComparer.OrdinalIgnoreCase);
+            }
+
+            output["StatusCode"] = "OK";
+            output["StatusMessage"] = "Success";
+            output["Confidence"] = MeasurementStatisticsHelper.ComputeConfidenceFromUncertainty(aggregateStats.StdError);
+            output["UncertaintyPx"] = aggregateStats.StdError;
+
+            return Task.FromResult(OperatorExecutionOutput.Success(output));
+        }
+        finally
+        {
+            foreach (var analysisChannel in analysisChannels)
+            {
+                analysisChannel.Dispose();
+            }
+        }
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -107,59 +132,62 @@ public class PixelStatisticsOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private static Mat ExtractChannel(Mat src, string channel)
+    private static List<AnalysisChannel> ResolveAnalysisChannels(Mat src, string channel)
     {
         if (channel.Equals("All", StringComparison.OrdinalIgnoreCase))
         {
             if (src.Channels() == 1)
             {
-                return src.Clone();
+                return new List<AnalysisChannel> { new("Gray", src.Clone()) };
             }
 
-            var gray = new Mat();
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-            return gray;
+            var channels = src.Split();
+            var channelNames = new[] { "B", "G", "R", "A" };
+            var results = new List<AnalysisChannel>(channels.Length);
+            for (var i = 0; i < channels.Length; i++)
+            {
+                var name = i < channelNames.Length ? channelNames[i] : $"C{i}";
+                results.Add(new AnalysisChannel(name, channels[i]));
+            }
+
+            return results;
         }
 
         if (channel.Equals("Gray", StringComparison.OrdinalIgnoreCase))
         {
-            if (src.Channels() == 1)
-            {
-                return src.Clone();
-            }
-
-            var gray = new Mat();
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-            return gray;
+            return new List<AnalysisChannel> { new("Gray", ExtractGray(src)) };
         }
 
         if (src.Channels() == 1)
         {
-            return src.Clone();
+            return new List<AnalysisChannel> { new("Gray", src.Clone()) };
         }
 
-        var channels = src.Split();
+        var splitChannels = src.Split();
         try
         {
-            return channel.ToUpperInvariant() switch
+            var selected = channel.ToUpperInvariant() switch
             {
-                "R" => channels[2].Clone(),
-                "G" => channels[1].Clone(),
-                "B" => channels[0].Clone(),
-                _ => channels[0].Clone()
+                "R" => splitChannels[2].Clone(),
+                "G" => splitChannels[1].Clone(),
+                "B" => splitChannels[0].Clone(),
+                _ => splitChannels[0].Clone()
             };
+
+            return new List<AnalysisChannel> { new(channel.ToUpperInvariant(), selected) };
         }
         finally
         {
-            foreach (var c in channels)
+            foreach (var c in splitChannels)
             {
                 c.Dispose();
             }
         }
     }
 
-    private static Mat ResolveMask(Dictionary<string, object>? inputs, Size size)
+    private static Mat ResolveMask(Dictionary<string, object>? inputs, Rect roi, Size sourceSize, out string? error)
     {
+        error = null;
         if (inputs == null ||
             !ImageWrapper.TryGetFromInputs(inputs, "Mask", out var maskWrapper) ||
             maskWrapper == null)
@@ -183,79 +211,156 @@ public class PixelStatisticsOperator : OperatorBase
             Cv2.CvtColor(maskSrc, grayMask, ColorConversionCodes.BGR2GRAY);
         }
 
-        if (grayMask.Size() != size)
+        Mat roiMask;
+        if (grayMask.Size() == sourceSize)
         {
-            var resized = new Mat();
-            Cv2.Resize(grayMask, resized, size);
+            if (roi.Right > grayMask.Width || roi.Bottom > grayMask.Height)
+            {
+                grayMask.Dispose();
+                error = "Mask ROI exceeds mask image bounds";
+                return new Mat();
+            }
+
+            roiMask = new Mat(grayMask, roi).Clone();
             grayMask.Dispose();
-            grayMask = resized;
+            grayMask = roiMask;
+        }
+        else if (grayMask.Size() != roi.Size)
+        {
+            grayMask.Dispose();
+            error = "Mask must match the full image size or the resolved ROI size";
+            return new Mat();
         }
 
         Cv2.Threshold(grayMask, grayMask, 1, 255, ThresholdTypes.Binary);
         return grayMask;
     }
 
-    private static int ComputeMedian(Mat analysis, Mat mask)
+    private static Mat ExtractGray(Mat src)
     {
-        using var hist = new Mat();
-        using var noMask = new Mat();
-        Cv2.CalcHist(
-            new[] { analysis },
-            new[] { 0 },
-            mask.Empty() ? noMask : mask,
-            hist,
-            1,
-            new[] { 256 },
-            new[] { new Rangef(0, 256) });
-
-        var values = new float[256];
-        var total = 0.0;
-        for (var i = 0; i < 256; i++)
+        if (src.Channels() == 1)
         {
-            values[i] = hist.At<float>(i);
-            total += values[i];
+            return src.Clone();
         }
 
-        if (total <= 0)
-        {
-            return 0;
-        }
+        var gray = new Mat();
+        Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+        return gray;
+    }
 
-        var acc = 0.0;
-        for (var i = 0; i < 256; i++)
+    private static List<double> ExtractValues(Mat analysis, Mat mask)
+    {
+        var values = new List<double>();
+        for (var y = 0; y < analysis.Rows; y++)
         {
-            acc += values[i];
-            if (acc >= total / 2.0)
+            for (var x = 0; x < analysis.Cols; x++)
             {
-                return i;
+                if (!mask.Empty() && mask.At<byte>(y, x) == 0)
+                {
+                    continue;
+                }
+
+                values.Add(ReadScalarValue(analysis, x, y));
             }
         }
 
-        return 255;
+        return values;
     }
 
-    private static Rect ResolveRoi(Operator @operator, int width, int height)
+    private static double ReadScalarValue(Mat mat, int x, int y)
     {
-        var x = ReadParam(@operator, "RoiX", 0);
-        var y = ReadParam(@operator, "RoiY", 0);
-        var w = ReadParam(@operator, "RoiW", width - x);
-        var h = ReadParam(@operator, "RoiH", height - y);
-
-        x = Math.Clamp(x, 0, Math.Max(0, width - 1));
-        y = Math.Clamp(y, 0, Math.Max(0, height - 1));
-        w = Math.Clamp(w, 1, width - x);
-        h = Math.Clamp(h, 1, height - y);
-        return new Rect(x, y, w, h);
-    }
-
-    private static int ReadParam(Operator @operator, string name, int def)
-    {
-        var raw = @operator.Parameters.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Value;
-        if (raw == null)
+        return mat.Depth() switch
         {
-            return def;
+            MatType.CV_8U => mat.At<byte>(y, x),
+            MatType.CV_8S => mat.At<sbyte>(y, x),
+            MatType.CV_16U => mat.At<ushort>(y, x),
+            MatType.CV_16S => mat.At<short>(y, x),
+            MatType.CV_32S => mat.At<int>(y, x),
+            MatType.CV_32F => mat.At<float>(y, x),
+            MatType.CV_64F => mat.At<double>(y, x),
+            _ => throw new NotSupportedException($"Unsupported image depth for pixel statistics: {mat.Depth()}.")
+        };
+    }
+
+    private static StatisticsSummary ComputeStatistics(List<double> values)
+    {
+        if (values.Count == 0)
+        {
+            return new StatisticsSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0);
         }
 
-        return int.TryParse(raw.ToString(), out var value) ? value : def;
+        var min = double.PositiveInfinity;
+        var max = double.NegativeInfinity;
+        var sum = 0.0;
+        var sumSquares = 0.0;
+        var nonZeroCount = 0;
+
+        foreach (var value in values)
+        {
+            min = Math.Min(min, value);
+            max = Math.Max(max, value);
+            sum += value;
+            sumSquares += value * value;
+            if (value != 0.0)
+            {
+                nonZeroCount++;
+            }
+        }
+
+        var mean = sum / values.Count;
+        var variance = Math.Max(0.0, (sumSquares / values.Count) - (mean * mean));
+        var stdDev = Math.Sqrt(variance);
+        var median = MeasurementStatisticsHelper.ComputeMedian(values);
+        var medianAbsoluteDeviation = MeasurementStatisticsHelper.ComputeMedianAbsoluteDeviation(values, median);
+        var stdError = MeasurementStatisticsHelper.ComputeStandardError(stdDev, values.Count);
+
+        return new StatisticsSummary(
+            mean,
+            stdDev,
+            min,
+            max,
+            median,
+            max - min,
+            medianAbsoluteDeviation,
+            stdError,
+            nonZeroCount,
+            values.Count);
     }
+
+    private static Dictionary<string, object> CreateStatisticsDictionary(StatisticsSummary stats)
+    {
+        return new Dictionary<string, object>
+        {
+            { "Mean", stats.Mean },
+            { "StdDev", stats.StdDev },
+            { "Min", stats.Min },
+            { "Max", stats.Max },
+            { "Median", stats.Median },
+            { "Range", stats.Range },
+            { "MedianAbsoluteDeviation", stats.MedianAbsoluteDeviation },
+            { "StdError", stats.StdError },
+            { "NonZeroCount", stats.NonZeroCount },
+            { "SampleCount", stats.SampleCount }
+        };
+    }
+
+    private sealed record AnalysisChannel(string Name, Mat Data) : IDisposable
+    {
+        public void Dispose()
+        {
+            Data.Dispose();
+        }
+    }
+
+    private sealed record StatisticsSummary(
+        double Mean,
+        double StdDev,
+        double Min,
+        double Max,
+        double Median,
+        double Range,
+        double MedianAbsoluteDeviation,
+        double StdError,
+        int NonZeroCount,
+        int SampleCount);
 }

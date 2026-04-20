@@ -5,6 +5,7 @@
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
+using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -68,7 +69,14 @@ public class FindContoursOperator : OperatorBase
 
         // 转换为灰度图
         using var gray = new Mat();
-        Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+        if (src.Channels() == 1)
+        {
+            src.CopyTo(gray);
+        }
+        else
+        {
+            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+        }
 
         // 二值化
         using var binary = new Mat();
@@ -99,12 +107,17 @@ public class FindContoursOperator : OperatorBase
         Cv2.FindContours(binary, out Point[][] contours, out HierarchyIndex[] hierarchy, retrievalMode, contourApprox);
 
         // 筛选轮廓
-        var filteredContours = contours
-            .Where(c =>
+        var filteredContourEntries = contours
+            .Select((contour, index) => new
             {
-                var area = Cv2.ContourArea(c);
-                return area >= minArea && area <= maxArea;
+                Index = index,
+                Contour = contour,
+                Area = Cv2.ContourArea(contour)
             })
+            .Where(entry => entry.Area >= minArea && entry.Area <= maxArea)
+            .ToArray();
+        var filteredContours = filteredContourEntries
+            .Select(entry => entry.Contour)
             .ToArray();
 
         // 绘制轮廓
@@ -130,7 +143,14 @@ public class FindContoursOperator : OperatorBase
 
         // P0: 使用ImageWrapper实现零拷贝输出
         // 构建轮廓信息
-        var contourInfos = filteredContours.Select((c, index) =>
+        var originalToFiltered = filteredContourEntries
+            .Select((entry, filteredIndex) => new { entry.Index, FilteredIndex = filteredIndex })
+            .ToDictionary(item => item.Index, item => item.FilteredIndex);
+        var filteredHierarchy = filteredContourEntries
+            .Select(entry => RemapHierarchy(hierarchy[entry.Index], originalToFiltered))
+            .ToArray();
+
+        var contourSummaries = filteredContours.Select((c, index) =>
         {
             var area = Cv2.ContourArea(c);
             var perimeter = Cv2.ArcLength(c, true);
@@ -149,11 +169,28 @@ public class FindContoursOperator : OperatorBase
             };
         }).ToList();
 
+        var contourPayload = filteredContours
+            .Select(contour => contour.Select(point => new Position(point.X, point.Y)).ToList())
+            .ToList();
+
+        var hierarchyPayload = filteredHierarchy
+            .Select((item, index) => new Dictionary<string, object>
+            {
+                { "Id", index },
+                { "Next", item.Next },
+                { "Previous", item.Previous },
+                { "Child", item.Child },
+                { "Parent", item.Parent }
+            })
+            .ToList();
+
         // P0: 使用ImageWrapper实现零拷贝输出
         var additionalData = new Dictionary<string, object>
         {
             { "ContourCount", filteredContours.Length },
-            { "Contours", contourInfos }
+            { "Contours", contourPayload },
+            { "ContourSummaries", contourSummaries },
+            { "Hierarchy", hierarchyPayload }
         };
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImg, additionalData)));
     }
@@ -188,5 +225,28 @@ public class FindContoursOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static HierarchyIndex RemapHierarchy(
+        HierarchyIndex original,
+        IReadOnlyDictionary<int, int> originalToFiltered)
+    {
+        return new HierarchyIndex(
+            RemapHierarchyIndex(original.Next, originalToFiltered),
+            RemapHierarchyIndex(original.Previous, originalToFiltered),
+            RemapHierarchyIndex(original.Child, originalToFiltered),
+            RemapHierarchyIndex(original.Parent, originalToFiltered));
+    }
+
+    private static int RemapHierarchyIndex(int originalIndex, IReadOnlyDictionary<int, int> originalToFiltered)
+    {
+        if (originalIndex < 0)
+        {
+            return -1;
+        }
+
+        return originalToFiltered.TryGetValue(originalIndex, out var filteredIndex)
+            ? filteredIndex
+            : -1;
     }
 }

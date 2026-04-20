@@ -1,5 +1,7 @@
 ﻿import httpClient from '../../core/messaging/httpClient.js';
 import { showToast, createModal, closeModal } from '../../shared/components/uiComponents.js';
+import { applyTheme, getAppliedTheme, normalizeTheme } from '../../core/theme/theme.js';
+import inspectionController from '../inspection/inspectionController.js';
 import {
     applyFeatureToButton,
     getFeatureButtonLabel,
@@ -27,13 +29,34 @@ class SettingsView {
         this.activeAiModelId = null;
         this.editingAiModelId = null;
         this._pendingFormEdits = {}; // 暂存表单中的未保存修改
+        this.aiReasoningSupportPreview = null;
+        this._aiReasoningSupportRequestId = 0;
+        this._aiReasoningSupportDebounce = null;
         this.diskUsage = null;
         this.plcMappings = [];
         this.plcConnectionStatus = 'unknown';
-        this.plcMappingsLoaded = false;
+        this.plcValidationErrors = [];
+        this.plcSettingsLoaded = false;
+        this.savedCommunicationConfig = null;
         this.activeTab = null;
 
         console.log('[SettingsView] Initialized for container:', containerId, '| isAdmin:', this.isAdmin);
+    }
+
+    normalizeCameraTriggerMode(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'continuous') return 'Continuous';
+        if (normalized === 'external' || normalized === 'hardware' || normalized === 'externalsignal') return 'External';
+        return 'Software';
+    }
+
+    normalizeCameraTargetFrameRate(value) {
+        const parsed = Number.parseInt(String(value ?? ''), 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            return 10;
+        }
+
+        return Math.min(120, Math.max(1, parsed));
     }
 
     /**
@@ -54,10 +77,13 @@ class SettingsView {
         // 获取配置信息
         try {
             console.log('[SettingsView] Fetching main config...');
-            this.config = await httpClient.get('/settings');
+            this.config = this.normalizeAppConfig(await httpClient.get('/settings'));
             this.cameraBindings = this.config.cameras || [];
-            this.plcMappings = this.config?.communication?.mappings || [];
-            this.plcMappingsLoaded = false;
+            this.syncActiveCameraSelection();
+            this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
+            this.syncPlcMappingsFromActiveProfile();
+            this.plcSettingsLoaded = false;
+            this.plcValidationErrors = [];
             
             if (this.isAdmin) {
                 console.log('[SettingsView] Fetching users list...');
@@ -66,9 +92,12 @@ class SettingsView {
         } catch (error) {
             console.error('[SettingsView] Failed to load data:', error);
             showToast('加载系统配置失败: ' + error.message, 'error');
-            this.config = this.getDefaultConfig();
-            this.plcMappings = this.config?.communication?.mappings || [];
-            this.plcMappingsLoaded = false;
+            this.config = this.normalizeAppConfig(this.getDefaultConfig());
+            this.syncActiveCameraSelection();
+            this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
+            this.syncPlcMappingsFromActiveProfile();
+            this.plcSettingsLoaded = false;
+            this.plcValidationErrors = [];
         }
         
         await this.loadAiModels();
@@ -86,6 +115,126 @@ class SettingsView {
         this.activateTab('general');
         
         console.log('[SettingsView] === refresh() END ===');
+    }
+
+    cloneCommunicationConfig(config) {
+        return JSON.parse(JSON.stringify(config || this.getDefaultConfig().communication));
+    }
+
+    normalizePlcProtocol(protocol) {
+        const candidate = `${protocol || ''}`.trim().toUpperCase();
+        if (candidate === 'MC' || candidate === 'MITSUBISHIMC') return 'MC';
+        if (candidate === 'FINS' || candidate === 'OMRONFINS') return 'FINS';
+        return 'S7';
+    }
+
+    getPlcProfileKey(protocol = null) {
+        const normalized = this.normalizePlcProtocol(protocol || this.config?.communication?.activeProtocol);
+        if (normalized === 'MC') return 'mc';
+        if (normalized === 'FINS') return 'fins';
+        return 's7';
+    }
+
+    normalizePlcMappings(mappings) {
+        if (!Array.isArray(mappings)) return [];
+        return mappings
+            .map(item => ({
+                name: item?.name || '',
+                address: item?.address || '',
+                dataType: item?.dataType || 'Bool',
+                description: item?.description || '',
+                canWrite: !!item?.canWrite
+            }))
+            .filter(item => item.name || item.address || item.description);
+    }
+
+    normalizePlcProfile(profile, defaults, includeS7Fields = false) {
+        const normalized = {
+            ipAddress: `${profile?.ipAddress || ''}`.trim(),
+            port: Number.isFinite(Number.parseInt(`${profile?.port ?? ''}`, 10))
+                ? Number.parseInt(`${profile?.port ?? ''}`, 10)
+                : defaults.port,
+            mappings: this.normalizePlcMappings(profile?.mappings ?? defaults.mappings)
+        };
+
+        if (includeS7Fields) {
+            normalized.cpuType = `${profile?.cpuType || defaults.cpuType || 'S7-1200'}`.trim() || 'S7-1200';
+            normalized.rack = Number.isFinite(Number.parseInt(`${profile?.rack ?? ''}`, 10))
+                ? Number.parseInt(`${profile?.rack ?? ''}`, 10)
+                : defaults.rack;
+            normalized.slot = Number.isFinite(Number.parseInt(`${profile?.slot ?? ''}`, 10))
+                ? Number.parseInt(`${profile?.slot ?? ''}`, 10)
+                : defaults.slot;
+        }
+
+        return normalized;
+    }
+
+    normalizeCommunicationConfig(communication) {
+        const defaults = this.getDefaultConfig().communication;
+        const normalized = {
+            activeProtocol: this.normalizePlcProtocol(communication?.activeProtocol || communication?.protocol || defaults.activeProtocol),
+            heartbeatIntervalMs: Number.isFinite(Number.parseInt(`${communication?.heartbeatIntervalMs ?? ''}`, 10))
+                && Number.parseInt(`${communication?.heartbeatIntervalMs ?? ''}`, 10) > 0
+                ? Number.parseInt(`${communication?.heartbeatIntervalMs ?? ''}`, 10)
+                : defaults.heartbeatIntervalMs,
+            s7: this.normalizePlcProfile(communication?.s7 || {}, defaults.s7, true),
+            mc: this.normalizePlcProfile(communication?.mc || {}, defaults.mc),
+            fins: this.normalizePlcProfile(communication?.fins || {}, defaults.fins)
+        };
+
+        const hasProtocolProfiles = !!communication?.s7 || !!communication?.mc || !!communication?.fins;
+        const legacyIp = `${communication?.plcIpAddress || communication?.ipAddress || ''}`.trim();
+        const legacyPort = Number.parseInt(`${communication?.plcPort ?? communication?.port ?? ''}`, 10);
+        const legacyMappings = this.normalizePlcMappings(communication?.mappings);
+        if (!hasProtocolProfiles && (legacyIp || Number.isFinite(legacyPort) || legacyMappings.length > 0)) {
+            const profileKey = this.getPlcProfileKey(normalized.activeProtocol);
+            normalized[profileKey] = {
+                ...normalized[profileKey],
+                ipAddress: legacyIp || normalized[profileKey].ipAddress,
+                port: Number.isFinite(legacyPort) ? legacyPort : normalized[profileKey].port,
+                mappings: legacyMappings.length > 0 ? legacyMappings : normalized[profileKey].mappings
+            };
+        }
+
+        return normalized;
+    }
+
+    normalizeAppConfig(config) {
+        const defaults = this.getDefaultConfig();
+        return {
+            ...defaults,
+            ...config,
+            general: {
+                ...defaults.general,
+                ...(config?.general || {}),
+                theme: normalizeTheme(config?.general?.theme, defaults.general.theme)
+            },
+            communication: this.normalizeCommunicationConfig(config?.communication),
+            storage: { ...defaults.storage, ...(config?.storage || {}) },
+            runtime: { ...defaults.runtime, ...(config?.runtime || {}) },
+            security: { ...defaults.security, ...(config?.security || {}) },
+            cameras: (Array.isArray(config?.cameras) ? config.cameras : (defaults.cameras || [])).map(binding => ({
+                ...binding,
+                triggerMode: this.normalizeCameraTriggerMode(binding?.triggerMode ?? binding?.TriggerMode),
+                targetFrameRateFps: this.normalizeCameraTargetFrameRate(binding?.targetFrameRateFps ?? binding?.TargetFrameRateFps)
+            })),
+            activeCameraId: config?.activeCameraId || defaults.activeCameraId || ''
+        };
+    }
+
+    getActivePlcProtocol() {
+        return this.normalizePlcProtocol(this.config?.communication?.activeProtocol);
+    }
+
+    getActivePlcProfile() {
+        const communication = this.normalizeCommunicationConfig(this.config?.communication);
+        return communication[this.getPlcProfileKey(communication.activeProtocol)];
+    }
+
+    syncPlcMappingsFromActiveProfile() {
+        const profile = this.getActivePlcProfile();
+        this.plcMappings = this.normalizePlcMappings(profile?.mappings);
     }
     
     async loadAiModels({ preserveEditingId = false } = {}) {
@@ -110,6 +259,8 @@ class SettingsView {
             this.editingAiModelId = this.activeAiModelId;
         }
         this._pendingFormEdits = {};
+        this.aiReasoningSupportPreview = null;
+        this._aiReasoningSupportRequestId += 1;
     }
 
     /**
@@ -207,7 +358,7 @@ class SettingsView {
         } else if (tabName === 'cameras') {
             this.loadCameraBindings();
         } else if (tabName === 'communication') {
-            this.loadPlcMappings();
+            this.loadPlcSettings();
         }
     }
 
@@ -282,7 +433,12 @@ class SettingsView {
             }
 
             if (button.id === 'btn-save-plc') {
-                await this.savePlcMappings();
+                await this.savePlcSettings();
+                return;
+            }
+
+            if (button.id === 'btn-reset-plc') {
+                await this.loadPlcSettings({ force: true });
                 return;
             }
 
@@ -313,37 +469,112 @@ class SettingsView {
         communicationTab.addEventListener('change', (e) => {
             const target = e.target;
             if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+            if (target.id === 'cfg-protocol') {
+                const previousProtocol = this.getActivePlcProtocol();
+                this.syncActivePlcProfileDraft(previousProtocol);
+                this.config.communication.activeProtocol = this.normalizePlcProtocol(target.value);
+                this.syncPlcMappingsFromActiveProfile();
+                this.plcValidationErrors = [];
+                this.plcConnectionStatus = 'unknown';
+                this.refreshCommunicationPanel();
+                return;
+            }
             updateField(target);
         });
     }
 
-    async loadPlcMappings({ force = false } = {}) {
-        if (!force && this.plcMappingsLoaded) {
-            this.renderPlcMappingsTable();
+    refreshCommunicationPanel() {
+        const communicationPanel = this.container?.querySelector('[data-section="communication"]');
+        if (!communicationPanel) return;
+
+        this.syncPlcMappingsFromActiveProfile();
+        communicationPanel.innerHTML = this.renderCommunicationTab();
+        this.renderPlcMappingsTable();
+        this.updatePlcConnectionBadge(this.plcConnectionStatus);
+    }
+
+    syncActivePlcProfileDraft(protocol = this.getActivePlcProtocol()) {
+        if (!this.config?.communication) {
+            this.config = this.normalizeAppConfig(this.getDefaultConfig());
+        }
+
+        const communication = this.normalizeCommunicationConfig(this.config.communication);
+        const profileKey = this.getPlcProfileKey(protocol);
+        const defaults = this.getDefaultConfig().communication[profileKey];
+        const currentProfile = communication[profileKey] || defaults;
+        const nextProfile = {
+            ...currentProfile,
+            ipAddress: this.container?.querySelector('#cfg-plcIpAddress')?.value?.trim() ?? currentProfile.ipAddress ?? '',
+            port: Number.parseInt(this.container?.querySelector('#cfg-plcPort')?.value || `${currentProfile.port || defaults.port}`, 10),
+            mappings: this.collectPlcMappingsFromTable()
+        };
+
+        if (protocol === 'S7') {
+            nextProfile.cpuType = this.container?.querySelector('#cfg-s7-cpuType')?.value || currentProfile.cpuType || defaults.cpuType;
+            nextProfile.rack = Number.parseInt(this.container?.querySelector('#cfg-s7-rack')?.value || `${currentProfile.rack ?? defaults.rack}`, 10);
+            nextProfile.slot = Number.parseInt(this.container?.querySelector('#cfg-s7-slot')?.value || `${currentProfile.slot ?? defaults.slot}`, 10);
+        }
+
+        communication.activeProtocol = this.normalizePlcProtocol(protocol);
+        communication[profileKey] = this.normalizePlcProfile(nextProfile, defaults, protocol === 'S7');
+        this.config.communication = communication;
+        this.syncPlcMappingsFromActiveProfile();
+    }
+
+    buildPlcSettingsPayload({ persistAllProfiles = false } = {}) {
+        this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
+        const workingCommunication = this.cloneCommunicationConfig(this.config.communication);
+        if (persistAllProfiles) {
+            return workingCommunication;
+        }
+
+        const savedCommunication = this.cloneCommunicationConfig(this.savedCommunicationConfig || this.getDefaultConfig().communication);
+        const activeProtocol = this.getActivePlcProtocol();
+        const profileKey = this.getPlcProfileKey(activeProtocol);
+        savedCommunication.activeProtocol = activeProtocol;
+        savedCommunication.heartbeatIntervalMs = workingCommunication.heartbeatIntervalMs;
+        savedCommunication[profileKey] = this.cloneCommunicationConfig(workingCommunication[profileKey]);
+        return savedCommunication;
+    }
+
+    async loadPlcSettings({ force = false } = {}) {
+        if (!force && this.plcSettingsLoaded) {
+            this.refreshCommunicationPanel();
             return;
         }
 
         try {
-            const mappings = await httpClient.get('/plc/mappings');
-            this.plcMappings = Array.isArray(mappings)
-                ? mappings.map(item => ({
-                    name: item?.name || '',
-                    address: item?.address || '',
-                    dataType: item?.dataType || 'Bool',
-                    description: item?.description || '',
-                    canWrite: !!item?.canWrite
-                }))
-                : [];
-
-            this.plcMappingsLoaded = true;
-            if (this.config?.communication) {
-                this.config.communication.mappings = [...this.plcMappings];
-            }
-            this.renderPlcMappingsTable();
+            const result = await httpClient.get('/plc/settings');
+            const settings = this.normalizeCommunicationConfig(result?.settings || result);
+            this.savedCommunicationConfig = this.cloneCommunicationConfig(settings);
+            this.config.communication = this.cloneCommunicationConfig(settings);
+            this.plcValidationErrors = [];
+            this.plcSettingsLoaded = true;
+            this.syncPlcMappingsFromActiveProfile();
+            this.refreshCommunicationPanel();
         } catch (error) {
-            console.error('[SettingsView] Failed to load PLC mappings:', error);
-            showToast('加载PLC映射失败: ' + error.message, 'error');
+            console.error('[SettingsView] Failed to load PLC settings:', error);
+            showToast('加载PLC配置失败: ' + error.message, 'error');
         }
+    }
+
+    getCurrentProtocolValidationErrors() {
+        const protocol = this.getActivePlcProtocol();
+        return (this.plcValidationErrors || []).filter(error => this.normalizePlcProtocol(error?.protocol) === protocol);
+    }
+
+    getPlcFieldErrors(section, field, index = null) {
+        return this.getCurrentProtocolValidationErrors().filter(error => {
+            if (`${error?.section || ''}` !== section) return false;
+            if (`${error?.field || ''}` !== field) return false;
+            if (index === null) return error?.index === undefined || error?.index === null;
+            return Number.parseInt(`${error?.index ?? ''}`, 10) === index;
+        });
+    }
+
+    renderPlcErrorText(errors) {
+        if (!Array.isArray(errors) || errors.length === 0) return '';
+        return `<div class="plc-field-error">${errors.map(error => this.escapeHtml(error?.message || '')).join('<br>')}</div>`;
     }
 
     renderPlcMappingsTable() {
@@ -361,25 +592,35 @@ class SettingsView {
             return;
         }
 
-        const dataTypeOptions = ['Bool', 'Int16', 'Int32', 'Float', 'Double', 'String', 'Word', 'DWord'];
+        const dataTypeOptions = ['Bool', 'Byte', 'Int16', 'Int32', 'Float', 'Double', 'String', 'Word', 'DWord'];
         const rowsHtml = this.plcMappings.map((mapping, index) => {
             const name = this.escapeHtml(mapping?.name || '');
             const address = this.escapeHtml(mapping?.address || '');
             const description = this.escapeHtml(mapping?.description || '');
             const dataType = (mapping?.dataType || 'Bool').trim();
             const canWrite = !!mapping?.canWrite;
+            const nameErrors = this.getPlcFieldErrors('mapping', 'name', index);
+            const addressErrors = this.getPlcFieldErrors('mapping', 'address', index);
+            const dataTypeErrors = this.getPlcFieldErrors('mapping', 'dataType', index);
             const optionsHtml = dataTypeOptions.map(type =>
                 `<option value="${type}" ${dataType === type ? 'selected' : ''}>${type}</option>`
             ).join('');
 
             return `
                 <tr class="plc-mapping-row" data-index="${index}">
-                    <td><input type="text" class="cv-input" data-field="name" value="${name}" placeholder="变量名"></td>
-                    <td><input type="text" class="cv-input" data-field="address" value="${address}" placeholder="如 D100 / DB1.DBX0.0"></td>
                     <td>
-                        <select class="cv-input" data-field="dataType">
+                        <input type="text" class="cv-input ${nameErrors.length ? 'plc-invalid-input' : ''}" data-field="name" value="${name}" placeholder="变量名">
+                        ${this.renderPlcErrorText(nameErrors)}
+                    </td>
+                    <td>
+                        <input type="text" class="cv-input ${addressErrors.length ? 'plc-invalid-input' : ''}" data-field="address" value="${address}" placeholder="${this.getActivePlcProtocol() === 'S7' ? '如 DB1.DBX0.0' : this.getActivePlcProtocol() === 'MC' ? '如 D100' : '如 DM100'}">
+                        ${this.renderPlcErrorText(addressErrors)}
+                    </td>
+                    <td>
+                        <select class="cv-input ${dataTypeErrors.length ? 'plc-invalid-input' : ''}" data-field="dataType">
                             ${optionsHtml}
                         </select>
+                        ${this.renderPlcErrorText(dataTypeErrors)}
                     </td>
                     <td>
                         <select class="cv-input" data-field="canWrite">
@@ -438,13 +679,7 @@ class SettingsView {
     collectPlcMappingsFromTable() {
         const rows = this.container?.querySelectorAll('#plc-mapping-tbody tr.plc-mapping-row') || [];
         if (rows.length === 0) {
-            return (this.plcMappings || []).map(item => ({
-                name: item?.name || '',
-                address: item?.address || '',
-                dataType: item?.dataType || 'Bool',
-                description: item?.description || '',
-                canWrite: !!item?.canWrite
-            }));
+            return this.normalizePlcMappings(this.plcMappings);
         }
 
         return Array.from(rows).map(row => {
@@ -457,43 +692,67 @@ class SettingsView {
         }).filter(item => item.name || item.address || item.description);
     }
 
-    async savePlcMappings({ silent = false } = {}) {
-        const mappings = this.collectPlcMappingsFromTable();
+    async savePlcSettings({ silent = false, persistAllProfiles = false } = {}) {
+        const payload = this.buildPlcSettingsPayload({ persistAllProfiles });
         try {
-            await httpClient.put('/plc/mappings', mappings);
-            this.plcMappings = mappings;
-            this.plcMappingsLoaded = true;
+            const result = await httpClient.put('/plc/settings', payload);
+            const success = !!result?.success;
+            const normalizedSettings = this.normalizeCommunicationConfig(result?.settings || payload);
 
-            if (this.config?.communication) {
-                this.config.communication.mappings = [...mappings];
+            this.plcValidationErrors = Array.isArray(result?.errors) ? result.errors : [];
+            this.config.communication = this.cloneCommunicationConfig(normalizedSettings);
+            this.syncPlcMappingsFromActiveProfile();
+            this.refreshCommunicationPanel();
+
+            if (!success) {
+                if (!silent) {
+                    showToast(result?.message || 'PLC 配置校验失败', 'error');
+                }
+                return { success: false, settings: normalizedSettings };
             }
 
-            this.renderPlcMappingsTable();
+            this.savedCommunicationConfig = this.cloneCommunicationConfig(normalizedSettings);
+            this.config.communication = this.cloneCommunicationConfig(normalizedSettings);
+            this.plcValidationErrors = [];
+            this.plcSettingsLoaded = true;
+            this.syncPlcMappingsFromActiveProfile();
+            this.refreshCommunicationPanel();
+
             if (!silent) {
-                showToast('PLC映射已保存', 'success');
+                showToast(result?.message || 'PLC 配置已保存', 'success');
             }
-            return true;
+
+            return { success: true, settings: normalizedSettings };
         } catch (error) {
-            console.error('[SettingsView] Failed to save PLC mappings:', error);
+            console.error('[SettingsView] Failed to save PLC settings:', error);
             if (!silent) {
-                showToast('保存PLC映射失败: ' + error.message, 'error');
+                showToast('保存PLC配置失败: ' + error.message, 'error');
             }
-            return false;
+            return { success: false, settings: null };
         }
     }
 
     async testPlcConnection() {
-        const protocol = this.container?.querySelector('#cfg-protocol')?.value || 'S7';
-        const ipAddress = this.container?.querySelector('#cfg-plcIpAddress')?.value?.trim() || '';
-        const port = Number.parseInt(this.container?.querySelector('#cfg-plcPort')?.value || '0', 10);
-        const testButton = this.container?.querySelector('#btn-plc-test');
+        this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
 
-        if (!ipAddress) {
+        const protocol = this.getActivePlcProtocol();
+        const profile = this.getActivePlcProfile();
+        const testButton = this.container?.querySelector('#btn-plc-test');
+        const payload = {
+            protocol,
+            ipAddress: profile?.ipAddress || '',
+            port: Number.parseInt(`${profile?.port ?? 0}`, 10) || 0,
+            cpuType: protocol === 'S7' ? (profile?.cpuType || 'S7-1200') : null,
+            rack: protocol === 'S7' ? Number.parseInt(`${profile?.rack ?? 0}`, 10) : null,
+            slot: protocol === 'S7' ? Number.parseInt(`${profile?.slot ?? 1}`, 10) : null
+        };
+
+        if (!payload.ipAddress) {
             showToast('请先填写 PLC IP 地址', 'warning');
             return;
         }
 
-        if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+        if (!Number.isFinite(payload.port) || payload.port <= 0 || payload.port > 65535) {
             showToast('端口必须是 1-65535 之间的整数', 'warning');
             return;
         }
@@ -503,7 +762,7 @@ class SettingsView {
         }
 
         try {
-            const result = await httpClient.post('/plc/test-connection', { protocol, ipAddress, port });
+            const result = await httpClient.post('/plc/test-connection', payload);
             const isSuccess = !!result?.success;
             const message = result?.message || (isSuccess ? '连接成功' : '连接失败');
             this.updatePlcConnectionBadge(isSuccess ? 'connected' : 'failed', message);
@@ -518,18 +777,27 @@ class SettingsView {
         }
     }
 
+    getPlcConnectionBadgeMeta(status) {
+        if (status === 'connected') {
+            return { className: 'status-connected', text: '连接正常' };
+        }
+
+        if (status === 'failed') {
+            return { className: 'status-disconnected', text: '连接失败' };
+        }
+
+        return { className: 'status-disconnected', text: '未测试' };
+    }
+
     updatePlcConnectionBadge(status, message = '') {
         this.plcConnectionStatus = status;
         const badge = this.container?.querySelector('#plc-connection-badge');
         if (!badge) return;
 
+        const meta = this.getPlcConnectionBadgeMeta(status);
         badge.classList.remove('status-connected', 'status-disconnected', 'status-error');
-        badge.classList.add(status === 'connected' ? 'status-connected' : 'status-disconnected');
-
-        const text = status === 'connected'
-            ? '连接正常'
-            : (status === 'failed' ? '连接失败' : '未测试');
-        badge.innerHTML = `<span class="status-dot"></span> ${text}`;
+        badge.classList.add(meta.className);
+        badge.innerHTML = `<span class="status-dot"></span> ${meta.text}`;
         badge.title = message || '';
     }
 
@@ -540,6 +808,155 @@ class SettingsView {
             .replace(/>/g, '&gt;')
             .replace(/\"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    normalizeAiReasoning(reasoning) {
+        const mode = `${reasoning?.mode || 'auto'}`.toLowerCase();
+        const effort = `${reasoning?.effort || 'medium'}`.toLowerCase();
+        return {
+            mode: ['auto', 'off', 'on'].includes(mode) ? mode : 'auto',
+            effort: ['low', 'medium', 'high'].includes(effort) ? effort : 'medium'
+        };
+    }
+
+    getDefaultAiReasoningSupport() {
+        return {
+            familyId: 'unknown',
+            familyName: 'Unknown',
+            allowedModes: ['auto'],
+            allowedEfforts: ['medium'],
+            supportsExplicitMode: false,
+            supportsEffort: false,
+            isModelLockedOn: false,
+            helpText: '当前模型族未识别，建议保持 Auto，以免覆盖厂商默认行为。'
+        };
+    }
+
+    normalizeAiReasoningSupport(support) {
+        const fallback = this.getDefaultAiReasoningSupport();
+        const allowedModes = Array.isArray(support?.allowedModes) ? support.allowedModes : fallback.allowedModes;
+        const allowedEfforts = Array.isArray(support?.allowedEfforts) ? support.allowedEfforts : fallback.allowedEfforts;
+        const normalizedModes = allowedModes
+            .map(mode => `${mode || ''}`.toLowerCase())
+            .filter(mode => ['auto', 'off', 'on'].includes(mode));
+        const normalizedEfforts = allowedEfforts
+            .map(effort => `${effort || ''}`.toLowerCase())
+            .filter(effort => ['low', 'medium', 'high'].includes(effort));
+        const finalModes = normalizedModes.length > 0 ? [...new Set(normalizedModes)] : fallback.allowedModes;
+        const finalEfforts = normalizedEfforts.length > 0 ? [...new Set(normalizedEfforts)] : fallback.allowedEfforts;
+
+        return {
+            familyId: support?.familyId || fallback.familyId,
+            familyName: support?.familyName || fallback.familyName,
+            allowedModes: finalModes,
+            allowedEfforts: finalEfforts,
+            supportsExplicitMode: finalModes.some(mode => mode === 'on' || mode === 'off'),
+            supportsEffort: finalEfforts.length > 1 || finalEfforts[0] !== 'medium',
+            isModelLockedOn: finalModes.includes('on') && !finalModes.includes('off'),
+            helpText: support?.helpText || fallback.helpText
+        };
+    }
+
+    getAiReasoningNote(support) {
+        const modeText = support.allowedModes.map(mode => mode === 'auto' ? 'Auto' : mode === 'off' ? 'Off' : 'On').join(' / ');
+        const effortText = support.allowedEfforts.map(effort => effort === 'low' ? 'Low' : effort === 'high' ? 'High' : 'Medium').join(' / ');
+
+        if (support.allowedModes.length === 1 && support.allowedModes[0] === 'auto') {
+            return '当前模型族仅支持 Auto。';
+        }
+
+        if (support.allowedEfforts.length === 1) {
+            return `可选模式：${modeText}；强度固定为 ${effortText}。`;
+        }
+
+        return `可选模式：${modeText}；可选强度：${effortText}。`;
+    }
+
+    scheduleAiReasoningSupportPreview() {
+        if (this._aiReasoningSupportDebounce) {
+            clearTimeout(this._aiReasoningSupportDebounce);
+        }
+
+        this._aiReasoningSupportDebounce = setTimeout(() => {
+            this._aiReasoningSupportDebounce = null;
+            this.refreshAiReasoningSupportPreview();
+        }, 120);
+    }
+
+    async refreshAiReasoningSupportPreview() {
+        const aiTab = this.container?.querySelector('[data-section="ai"]');
+        const model = this.aiModels.find(x => x.id === this.editingAiModelId);
+        if (!aiTab || !model) {
+            this.aiReasoningSupportPreview = null;
+            this.syncAiReasoningUiState();
+            return;
+        }
+
+        const requestId = ++this._aiReasoningSupportRequestId;
+        try {
+            const support = await httpClient.post('/ai/reasoning-support', {
+                provider: aiTab.querySelector('#cfg-ai-provider')?.value || model.provider || '',
+                model: aiTab.querySelector('#cfg-ai-model')?.value || model.model || '',
+                baseUrl: aiTab.querySelector('#cfg-ai-baseurl')?.value || model.baseUrl || '',
+                protocol: null
+            });
+
+            if (requestId !== this._aiReasoningSupportRequestId) return;
+            this.aiReasoningSupportPreview = this.normalizeAiReasoningSupport(support);
+        } catch (error) {
+            if (requestId !== this._aiReasoningSupportRequestId) return;
+            console.warn('[SettingsView] Failed to refresh AI reasoning support preview:', error);
+            this.aiReasoningSupportPreview = null;
+        }
+
+        this.syncAiReasoningUiState();
+    }
+
+    getCurrentAiReasoningSupport() {
+        const model = this.aiModels.find(x => x.id === this.editingAiModelId);
+        if (this.aiReasoningSupportPreview) {
+            return this.normalizeAiReasoningSupport(this.aiReasoningSupportPreview);
+        }
+
+        return this.normalizeAiReasoningSupport(model?.reasoningSupport);
+    }
+
+    syncAiReasoningUiState() {
+        const aiTab = this.container?.querySelector('[data-section="ai"]');
+        if (!aiTab) return;
+
+        const modeEl = aiTab.querySelector('#cfg-ai-reasoning-mode');
+        const effortEl = aiTab.querySelector('#cfg-ai-reasoning-effort');
+        const familyEl = aiTab.querySelector('#ai-reasoning-family');
+        const helpEl = aiTab.querySelector('#ai-reasoning-help');
+        const noteEl = aiTab.querySelector('#ai-reasoning-note');
+        if (!modeEl || !effortEl || !familyEl || !helpEl || !noteEl) return;
+
+        const support = this.getCurrentAiReasoningSupport();
+        const allowedModes = support.allowedModes || ['auto'];
+        const allowedEfforts = support.allowedEfforts || ['medium'];
+        const modeOptions = Array.from(modeEl.options || []);
+        const effortOptions = Array.from(effortEl.options || []);
+
+        modeOptions.forEach(option => {
+            option.disabled = !allowedModes.includes(option.value);
+        });
+        effortOptions.forEach(option => {
+            option.disabled = !allowedEfforts.includes(option.value);
+        });
+
+        if (!allowedModes.includes(modeEl.value)) {
+            modeEl.value = allowedModes[0] || 'auto';
+        }
+        if (!allowedEfforts.includes(effortEl.value)) {
+            effortEl.value = allowedEfforts[0] || 'medium';
+        }
+
+        modeEl.disabled = allowedModes.length <= 1;
+        effortEl.disabled = modeEl.value === 'off' || allowedEfforts.length <= 1;
+        familyEl.textContent = `${support.familyName} (${support.familyId})`;
+        helpEl.textContent = support.helpText || '';
+        noteEl.textContent = this.getAiReasoningNote(support);
     }
 
     bindAiSettingsEvents() {
@@ -577,6 +994,8 @@ class SettingsView {
             } else if (btn.dataset.action === 'edit') {
                 // 切换编辑前先保存当前编辑（如果有未保存的修改）
                 this.editingAiModelId = btn.dataset.id;
+                this.aiReasoningSupportPreview = null;
+                this._aiReasoningSupportRequestId += 1;
                 this._pendingFormEdits = {};
                 this.refreshAiTableAndForm();
             } else if (btn.dataset.action === 'delete') {
@@ -648,23 +1067,48 @@ class SettingsView {
             }
         });
         
-        // 监听表单输入变化（暂存到 _pendingFormEdits，不再实时写 localStorage）
-        ['name', 'provider', 'model', 'baseurl', 'apikey', 'timeout'].forEach(f => {
-            aiTab.addEventListener('input', (e) => {
-                const el = e.target;
-                if(el && el.id === `cfg-ai-${f}`) {
-                    const fieldMap = { 'name':'name', 'provider':'provider', 'model':'model', 'baseurl':'baseUrl', 'apikey':'apiKey', 'timeout':'timeoutMs' };
-                    this._pendingFormEdits[fieldMap[f]] = el.value;
-                    // 名称变化时实时刷新表格行
-                    if (f === 'name') {
-                        const m = this.aiModels.find(x => x.id === this.editingAiModelId);
-                        if (m) { m.name = el.value; this.refreshAiTableOnly(); }
-                    }
+        const handleAiFieldChange = (e) => {
+            const el = e.target;
+            if (!el || !el.id) return;
+
+            const fieldMap = {
+                'cfg-ai-name': 'name',
+                'cfg-ai-provider': 'provider',
+                'cfg-ai-model': 'model',
+                'cfg-ai-baseurl': 'baseUrl',
+                'cfg-ai-apikey': 'apiKey',
+                'cfg-ai-timeout': 'timeoutMs',
+                'cfg-ai-reasoning-mode': 'reasoning.mode',
+                'cfg-ai-reasoning-effort': 'reasoning.effort'
+            };
+            const field = fieldMap[el.id];
+            if (!field) return;
+
+            this._pendingFormEdits[field] = el.value;
+            if (el.id === 'cfg-ai-name') {
+                const m = this.aiModels.find(x => x.id === this.editingAiModelId);
+                if (m) {
+                    m.name = el.value;
+                    this.refreshAiTableOnly();
                 }
-            });
-        });
+            }
+
+            if (['cfg-ai-provider', 'cfg-ai-model', 'cfg-ai-baseurl'].includes(el.id)) {
+                this.scheduleAiReasoningSupportPreview();
+            }
+
+            if (['cfg-ai-reasoning-mode', 'cfg-ai-reasoning-effort'].includes(el.id)) {
+                this.syncAiReasoningUiState();
+            }
+        };
+
+        aiTab.addEventListener('input', handleAiFieldChange);
+        aiTab.addEventListener('change', handleAiFieldChange);
         
-        setTimeout(() => this.refreshAiTableAndForm(), 0);
+        setTimeout(() => {
+            this.refreshAiTableAndForm();
+            this.syncAiReasoningUiState();
+        }, 0);
     }
 
     getActiveTabName() {
@@ -699,12 +1143,19 @@ class SettingsView {
         const currentTimeout = parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10);
         const normalizedTimeout = Number.isFinite(currentTimeout) ? currentTimeout : 120000;
         const pendingApiKey = aiTab.querySelector('#cfg-ai-apikey')?.value || '';
+        const currentReasoning = this.normalizeAiReasoning(model.reasoning);
+        const draftReasoning = this.normalizeAiReasoning({
+            mode: aiTab.querySelector('#cfg-ai-reasoning-mode')?.value || currentReasoning.mode,
+            effort: aiTab.querySelector('#cfg-ai-reasoning-effort')?.value || currentReasoning.effort
+        });
 
         return (aiTab.querySelector('#cfg-ai-name')?.value || '') !== (model.name || '')
             || (aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible') !== (model.provider || 'OpenAI Compatible')
             || (aiTab.querySelector('#cfg-ai-model')?.value || '') !== (model.model || '')
             || (aiTab.querySelector('#cfg-ai-baseurl')?.value || '') !== (model.baseUrl || '')
             || normalizedTimeout !== (model.timeoutMs ?? 120000)
+            || draftReasoning.mode !== currentReasoning.mode
+            || draftReasoning.effort !== currentReasoning.effort
             || pendingApiKey.trim().length > 0;
     }
 
@@ -721,11 +1172,16 @@ class SettingsView {
             model: aiTab.querySelector('#cfg-ai-model')?.value || '',
             baseUrl: aiTab.querySelector('#cfg-ai-baseurl')?.value || '',
             apiKey: aiTab.querySelector('#cfg-ai-apikey')?.value || '', // 空 → 后端保留原值
-            timeoutMs: parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10)
+            timeoutMs: parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10),
+            reasoning: {
+                mode: aiTab.querySelector('#cfg-ai-reasoning-mode')?.value || 'auto',
+                effort: aiTab.querySelector('#cfg-ai-reasoning-effort')?.value || 'medium'
+            }
         };
 
         await httpClient.put(`/ai/models/${modelId}`, payload);
         await this.loadAiModels({ preserveEditingId: true });
+        this.aiReasoningSupportPreview = null;
         this._pendingFormEdits = {};
         this.refreshAiTableOnly();
     }
@@ -776,6 +1232,8 @@ class SettingsView {
 
         // apiKey 不再从后端获取真实值，用 placeholder 提示
         const apiKeyPlaceholder = m.hasApiKey ? '●●●●●●（已配置，留空则不修改）' : '请输入 API Key';
+        const reasoning = this.normalizeAiReasoning(m.reasoning);
+        const support = this.normalizeAiReasoningSupport(this.aiReasoningSupportPreview || m.reasoningSupport);
         
         formContainer.innerHTML = `
             <div style="display:flex; gap:16px; margin-bottom:16px;">
@@ -803,25 +1261,53 @@ class SettingsView {
                      <input type="text" class="cv-input" id="cfg-ai-baseurl" value="${m.baseUrl || ''}" placeholder="如 https://api.deepseek.com/v1" style="border-radius:0 6px 6px 0;">
                  </div>
              </div>
-             <div style="display:flex; gap:16px;">
-                 <div class="settings-fieldset" style="flex:2;">
-                     <label>API Key</label>
+              <div style="display:flex; gap:16px;">
+                  <div class="settings-fieldset" style="flex:2;">
+                      <label>API Key</label>
                      <div class="input-with-suffix" style="position:relative;">
                          <input type="password" class="cv-input" id="cfg-ai-apikey" value="" placeholder="${apiKeyPlaceholder}" style="padding-right:36px; font-family:monospace;">
                          <button class="icon-action-btn" id="btn-toggle-apikey" style="position:absolute; right:10px; top:50%; transform:translateY(-50%);">👁</button>
                      </div>
                  </div>
-                 <div class="settings-fieldset" style="flex:1;">
-                     <label>请求超时 (ms)</label>
-                     <input type="number" class="cv-input" id="cfg-ai-timeout" value="${m.timeoutMs || 120000}">
-                 </div>
+                  <div class="settings-fieldset" style="flex:1;">
+                      <label>请求超时 (ms)</label>
+                      <input type="number" class="cv-input" id="cfg-ai-timeout" value="${m.timeoutMs || 120000}">
+                  </div>
+              </div>
+              <details class="settings-fieldset" style="margin-top:16px; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; background:#fafcff;" open>
+                  <summary style="cursor:pointer; font-weight:700; color:#1e293b;">推理 / Thinking</summary>
+                  <div style="display:flex; gap:16px; margin-top:14px;">
+                      <div class="settings-fieldset" style="flex:1;">
+                          <label>推理模式</label>
+                          <select class="cv-input" id="cfg-ai-reasoning-mode">
+                              <option value="auto" ${reasoning.mode === 'auto' ? 'selected' : ''}>Auto</option>
+                              <option value="off" ${reasoning.mode === 'off' ? 'selected' : ''}>Off</option>
+                              <option value="on" ${reasoning.mode === 'on' ? 'selected' : ''}>On</option>
+                          </select>
+                      </div>
+                      <div class="settings-fieldset" style="flex:1;">
+                          <label>思考强度</label>
+                          <select class="cv-input" id="cfg-ai-reasoning-effort">
+                              <option value="low" ${reasoning.effort === 'low' ? 'selected' : ''}>Low</option>
+                              <option value="medium" ${reasoning.effort === 'medium' ? 'selected' : ''}>Medium</option>
+                              <option value="high" ${reasoning.effort === 'high' ? 'selected' : ''}>High</option>
+                          </select>
+                      </div>
+                  </div>
+                  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+                       <span style="font-size:12px; font-weight:700; color:#475569;">识别模型族</span>
+                       <span id="ai-reasoning-family" style="font-size:12px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3;">${this.escapeHtml(`${support.familyName} (${support.familyId})`)}</span>
+                       <span id="ai-reasoning-note" style="font-size:12px; color:#64748b;">${this.escapeHtml(this.getAiReasoningNote(support))}</span>
+                   </div>
+                   <div id="ai-reasoning-help" style="margin-top:8px; font-size:12px; line-height:1.6; color:#475569;">${this.escapeHtml(support.helpText || '')}</div>
+               </details>
+              <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+                  <button class="cv-btn settings-btn-light" id="btn-ai-test">🔗 测试连接</button>
+                  <button class="cv-btn settings-btn-danger" id="btn-ai-save">💾 保存并应用该模型集</button>
              </div>
-             <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
-                 <button class="cv-btn settings-btn-light" id="btn-ai-test">🔗 测试连接</button>
-                 <button class="cv-btn settings-btn-danger" id="btn-ai-save">💾 保存并应用该模型集</button>
-             </div>
-             <div id="ai-test-result" style="margin-top:10px; text-align:right; font-size:13px; font-weight:500;"></div>
-        `;
+              <div id="ai-test-result" style="margin-top:10px; text-align:right; font-size:13px; font-weight:500;"></div>
+         `;
+        this.syncAiReasoningUiState();
     }
     
     bindCameraManagementEvents() {
@@ -846,18 +1332,18 @@ class SettingsView {
                 try {
                     const binding = this.getSelectedCameraBinding();
                     if (!binding) {
-                        showToast('请先在相机列表中明确选中一台相机，再启动手眼标定向导', 'warning');
+                        showToast('请先在相机列表中明确选中一台相机，再启动二维平面标定向导', 'warning');
                         return;
                     }
 
-                    const module = await import('../../core/calibration/handEyeCalibWizard.js');
-                    const wizard = new module.HandEyeCalibWizard(null, {
+                    const module = await import('../../core/calibration/planarScaleOffsetCalibWizard.js');
+                    const wizard = new module.PlanarScaleOffsetCalibWizard(null, {
                         captureFrame: (cameraBindingId) => this.captureCameraPreview(cameraBindingId),
                         getCameraBindingId: () => binding.id
                     });
                     wizard.show();
                 } catch (e) {
-                    showToast('无法加载手眼标定向导: ' + e.message, 'error');
+                    showToast('无法加载二维平面标定向导: ' + e.message, 'error');
                 }
             });
         }
@@ -913,6 +1399,9 @@ class SettingsView {
                 this.updateCameraParameterPanel(null);
             }
         });
+
+        const triggerModeSelect = section.querySelector('#cam-param-trigger-mode');
+        triggerModeSelect?.addEventListener('change', () => this.syncCameraFrameRateInputState());
     }
 
     async loadCameraBindings() {
@@ -927,6 +1416,7 @@ class SettingsView {
                 const exposureRaw = binding.exposureTimeUs ?? binding.ExposureTimeUs;
                 const gainRaw = binding.gainDb ?? binding.GainDb;
                 const triggerRaw = binding.triggerMode ?? binding.TriggerMode;
+                const targetFrameRateRaw = binding.targetFrameRateFps ?? binding.TargetFrameRateFps;
                 const connectionStatus = binding.connectionStatus ?? binding.ConnectionStatus ?? binding.status ?? binding.Status ?? null;
                 const serialNumber = binding.serialNumber ?? binding.SerialNumber ?? binding.deviceId ?? binding.DeviceId ?? '';
                 const ipAddress = binding.ipAddress ?? binding.IpAddress ?? '';
@@ -937,7 +1427,8 @@ class SettingsView {
                     ipAddress: typeof ipAddress === 'string' ? ipAddress.trim() : '',
                     exposureTimeUs: Number.isFinite(Number(exposureRaw)) ? Number(exposureRaw) : 5000,
                     gainDb: Number.isFinite(Number(gainRaw)) ? Number(gainRaw) : 1.0,
-                    triggerMode: typeof triggerRaw === 'string' && triggerRaw.trim() ? triggerRaw.trim() : 'Software',
+                    triggerMode: this.normalizeCameraTriggerMode(triggerRaw),
+                    targetFrameRateFps: this.normalizeCameraTargetFrameRate(targetFrameRateRaw),
                     connectionStatus: typeof connectionStatus === 'string' && connectionStatus.trim() ? connectionStatus.trim() : null
                 };
             });
@@ -946,6 +1437,7 @@ class SettingsView {
                 this.selectedCameraBindingId = null;
             }
             this.refreshCameraTable();
+            this.syncActiveCameraSelection();
         } catch (error) {
             console.error('Failed to load camera bindings:', error);
             if (tbody) {
@@ -1077,7 +1569,8 @@ class SettingsView {
                     isEnabled: true,
                     exposureTimeUs: 5000,
                     gainDb: 1.0,
-                    triggerMode: 'Software'
+                    triggerMode: 'Software',
+                    targetFrameRateFps: 10
                 };
 
                 this.cameraBindings.push(newBinding);
@@ -1179,10 +1672,14 @@ class SettingsView {
 
         const id = tr.getAttribute('data-id');
         this.selectedCameraBindingId = id;
+        if (this.config) {
+            this.config.activeCameraId = id;
+        }
         const cam = this.cameraBindings.find(b => b.id === id);
         tr.style.backgroundColor = 'var(--panel-bg)';
 
         this.updateCameraParameterPanel(cam || null);
+        this.syncActiveCameraSelection();
     }
 
     updateCameraParameterPanel(cam) {
@@ -1194,6 +1691,7 @@ class SettingsView {
         const exposureInput = this.container.querySelector('#cam-param-exposure');
         const gainInput = this.container.querySelector('#cam-param-gain');
         const triggerModeSelect = this.container.querySelector('#cam-param-trigger-mode');
+        const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
 
         if (exposureInput) {
             exposureInput.value = cam ? String(cam.exposureTimeUs ?? 5000) : '';
@@ -1204,10 +1702,13 @@ class SettingsView {
             gainInput.disabled = !cam;
         }
         if (triggerModeSelect) {
-            const triggerMode = cam?.triggerMode || 'Software';
-            triggerModeSelect.value = ['Software', 'Hardware', 'Continuous'].includes(triggerMode) ? triggerMode : 'Software';
+            triggerModeSelect.value = this.normalizeCameraTriggerMode(cam?.triggerMode);
             triggerModeSelect.disabled = !cam;
         }
+        if (frameRateInput) {
+            frameRateInput.value = cam ? String(this.normalizeCameraTargetFrameRate(cam.targetFrameRateFps)) : '';
+        }
+        this.syncCameraFrameRateInputState(cam?.triggerMode, !cam);
 
         const saveBtn = this.container.querySelector('#btn-save-camera-params');
         if (saveBtn) {
@@ -1223,14 +1724,34 @@ class SettingsView {
         const calibBtn = this.container.querySelector('#btn-hand-eye-calib');
         if (calibBtn) {
             calibBtn.disabled = !cam;
-            calibBtn.title = cam ? `对 ${cam.displayName || cam.serialNumber || cam.id} 启动手眼标定` : '请先在列表中选择一台相机';
+            calibBtn.title = cam ? `对 ${cam.displayName || cam.serialNumber || cam.id} 启动二维平面标定` : '请先在列表中选择一台相机';
         }
 
         const selectionHint = this.container.querySelector('#camera-selection-hint');
         if (selectionHint) {
             selectionHint.textContent = cam
-                ? `当前已选中：${cam.displayName || cam.serialNumber || cam.id}。你现在可以直接预览该相机，并在此基础上启动手眼标定。`
-                : '请先在上方绑定列表中选择一台相机，再进行预览、手眼标定或参数保存。';
+                ? `当前已选中：${cam.displayName || cam.serialNumber || cam.id}。你现在可以直接预览该相机，并在此基础上启动二维平面标定。`
+                : '请先在上方绑定列表中选择一台相机，再进行预览、二维平面标定或参数保存。';
+        }
+    }
+
+    syncCameraFrameRateInputState(triggerMode = null, forceDisabled = false) {
+        const frameRateInput = this.container?.querySelector('#cam-param-target-frame-rate');
+        const hintEl = this.container?.querySelector('#cam-param-target-frame-rate-hint');
+        if (!frameRateInput) return;
+
+        const effectiveTriggerMode = this.normalizeCameraTriggerMode(
+            triggerMode ?? this.container?.querySelector('#cam-param-trigger-mode')?.value
+        );
+        const disabled = forceDisabled || effectiveTriggerMode !== 'Continuous';
+        frameRateInput.disabled = disabled;
+        frameRateInput.readOnly = disabled;
+        frameRateInput.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+
+        if (hintEl) {
+            hintEl.textContent = disabled
+                ? '仅 Continuous 模式下可编辑；当前值会保留。'
+                : 'Continuous 模式下按该目标 fps 在应用侧节流。';
         }
     }
 
@@ -1242,9 +1763,66 @@ class SettingsView {
         return this.cameraBindings.find(binding => binding.id === this.selectedCameraBindingId) || null;
     }
 
+    async startContinuousPreviewSession(cameraBindingId) {
+        return await httpClient.post('/cameras/continuous-preview/start', {
+            cameraBindingId
+        });
+    }
+
+    async stopContinuousPreviewSession(sessionId) {
+        if (!sessionId) return;
+        try {
+            await httpClient.post('/cameras/continuous-preview/stop', { sessionId });
+        } catch (error) {
+            console.warn('[SettingsView] Failed to stop continuous preview session:', error);
+        }
+    }
+
+    async fetchContinuousPreviewFrame(sessionId) {
+        const { blob, headers } = await httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}`);
+        if (!blob || blob.size === 0) {
+            throw new Error('连续预览未返回图像数据');
+        }
+
+        const imageUrl = URL.createObjectURL(blob);
+        const widthHeader = headers.get('X-Image-Width');
+        const heightHeader = headers.get('X-Image-Height');
+        const sequenceHeader = headers.get('X-Frame-Sequence');
+        const parsedWidth = widthHeader ? Number(widthHeader) : null;
+        const parsedHeight = heightHeader ? Number(heightHeader) : null;
+        const parsedSequence = sequenceHeader ? Number(sequenceHeader) : null;
+
+        return {
+            imageUrl,
+            width: Number.isFinite(parsedWidth) ? parsedWidth : null,
+            height: Number.isFinite(parsedHeight) ? parsedHeight : null,
+            sequence: Number.isFinite(parsedSequence) ? parsedSequence : null
+        };
+    }
+
+    async captureSharedFrame(cameraBindingId) {
+        const session = await this.startContinuousPreviewSession(cameraBindingId);
+        try {
+            const preview = await this.fetchContinuousPreviewFrame(session.sessionId || session.SessionId);
+            return {
+                ...preview,
+                triggerMode: this.normalizeCameraTriggerMode(session.triggerMode || session.TriggerMode),
+                cameraBindingId
+            };
+        } finally {
+            await this.stopContinuousPreviewSession(session.sessionId || session.SessionId);
+        }
+    }
+
     async captureCameraPreview(cameraBindingId = this.selectedCameraBindingId) {
         if (!cameraBindingId) {
             throw new Error('请先在相机管理中选择一台相机');
+        }
+
+        const binding = this.cameraBindings.find(item => item.id === cameraBindingId) || this.getSelectedCameraBinding();
+        const triggerMode = this.normalizeCameraTriggerMode(binding?.triggerMode);
+        if (triggerMode === 'Continuous') {
+            return await this.captureSharedFrame(cameraBindingId);
         }
 
         const { blob, headers } = await httpClient.postForBlob('/cameras/soft-trigger-capture', {
@@ -1270,10 +1848,127 @@ class SettingsView {
         };
     }
 
+    async showContinuousCameraPreview(binding) {
+        let currentPreviewUrl = null;
+        let sessionId = null;
+        let previewActive = false;
+        let previewLoopToken = 0;
+
+        const content = document.createElement('div');
+        content.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                    <div style="font-size:13px; color:var(--text-muted);">
+                        当前相机: <strong style="color:var(--text-primary);">${binding.displayName || binding.serialNumber || binding.id}</strong>
+                    </div>
+                    <button class="cv-btn cv-btn-secondary" id="btn-toggle-camera-preview" type="button">停止预览</button>
+                </div>
+                <div style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                    <img id="camera-preview-image" alt="相机预览" style="max-width:100%; max-height:420px; display:none; object-fit:contain;">
+                    <div id="camera-preview-placeholder" style="color:#94a3b8; font-size:14px; text-align:center; padding:24px;">正在启动连续预览...</div>
+                </div>
+                <div id="camera-preview-meta" style="font-size:13px; color:var(--text-muted); min-height:20px;"></div>
+            </div>
+        `;
+
+        const cleanupPreviewUrl = () => {
+            if (currentPreviewUrl) {
+                URL.revokeObjectURL(currentPreviewUrl);
+                currentPreviewUrl = null;
+            }
+        };
+
+        const stopPreview = async () => {
+            previewActive = false;
+            previewLoopToken += 1;
+            await this.stopContinuousPreviewSession(sessionId);
+            sessionId = null;
+        };
+
+        const modal = createModal({
+            title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
+            content,
+            width: '960px',
+            onClose: async () => {
+                await stopPreview();
+                cleanupPreviewUrl();
+            }
+        });
+        modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
+
+        const toggleBtn = content.querySelector('#btn-toggle-camera-preview');
+        const imageEl = content.querySelector('#camera-preview-image');
+        const placeholderEl = content.querySelector('#camera-preview-placeholder');
+        const metaEl = content.querySelector('#camera-preview-meta');
+
+        const renderFrame = preview => {
+            cleanupPreviewUrl();
+            currentPreviewUrl = preview.imageUrl;
+            imageEl.src = preview.imageUrl;
+            imageEl.style.display = 'block';
+            placeholderEl.style.display = 'none';
+            metaEl.textContent = `触发模式: Continuous · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
+        };
+
+        const startPreview = async () => {
+            if (previewActive) return;
+            previewActive = true;
+            const loopToken = ++previewLoopToken;
+            toggleBtn.textContent = '停止预览';
+            placeholderEl.style.display = 'block';
+            placeholderEl.textContent = '正在启动连续预览...';
+            imageEl.style.display = 'none';
+
+            try {
+                const session = await this.startContinuousPreviewSession(binding.id);
+                sessionId = session.sessionId || session.SessionId;
+
+                while (previewActive && sessionId && loopToken === previewLoopToken) {
+                    const preview = await this.fetchContinuousPreviewFrame(sessionId);
+                    if (!previewActive || loopToken !== previewLoopToken) {
+                        URL.revokeObjectURL(preview.imageUrl);
+                        break;
+                    }
+
+                    renderFrame(preview);
+                }
+            } catch (error) {
+                await this.stopContinuousPreviewSession(sessionId);
+                sessionId = null;
+                placeholderEl.style.display = 'block';
+                placeholderEl.textContent = `连续预览加载失败: ${error.message}`;
+                metaEl.textContent = '';
+                imageEl.style.display = 'none';
+                previewActive = false;
+                toggleBtn.textContent = '继续预览';
+            }
+        };
+
+        toggleBtn.addEventListener('click', async () => {
+            if (previewActive) {
+                await stopPreview();
+                toggleBtn.textContent = '继续预览';
+                placeholderEl.style.display = 'block';
+                placeholderEl.textContent = '连续预览已停止';
+                imageEl.style.display = currentPreviewUrl ? 'block' : 'none';
+                return;
+            }
+
+            await startPreview();
+        });
+
+        await startPreview();
+    }
+
     async showSelectedCameraPreview() {
         const binding = this.getSelectedCameraBinding();
         if (!binding) {
             showToast('请先在相机管理中选择一台相机，再打开相机预览', 'warning');
+            return;
+        }
+
+        if (this.normalizeCameraTriggerMode(binding.triggerMode) === 'Continuous') {
+            await this.showContinuousCameraPreview(binding);
             return;
         }
 
@@ -1357,14 +2052,16 @@ class SettingsView {
         const exposureInput = this.container.querySelector('#cam-param-exposure');
         const gainInput = this.container.querySelector('#cam-param-gain');
         const triggerModeSelect = this.container.querySelector('#cam-param-trigger-mode');
-        if (!exposureInput || !gainInput || !triggerModeSelect) {
+        const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
+        if (!exposureInput || !gainInput || !triggerModeSelect || !frameRateInput) {
             showToast('参数面板控件缺失，请刷新后重试', 'error');
             return;
         }
 
         const exposureTimeUs = Number.parseFloat(exposureInput.value);
         const gainDb = Number.parseFloat(gainInput.value);
-        const triggerMode = triggerModeSelect.value || 'Software';
+        const triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
+        const targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
 
         if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
             showToast('曝光时间需在 10 - 1000000 µs 范围内', 'warning');
@@ -1378,6 +2075,7 @@ class SettingsView {
         binding.exposureTimeUs = exposureTimeUs;
         binding.gainDb = gainDb;
         binding.triggerMode = triggerMode;
+        binding.targetFrameRateFps = targetFrameRateFps;
 
         const saved = await this.saveCameraBindings();
         if (!saved) {
@@ -1397,7 +2095,28 @@ class SettingsView {
     getDefaultConfig() {
         return {
             general: { softwareTitle: 'ClearVision', theme: 'dark', autoStart: false },
-            communication: { plcIpAddress: '192.168.1.100', plcPort: 502, protocol: 'ModbusTcp', heartbeatIntervalMs: 1000, mappings: [] },
+            communication: {
+                activeProtocol: 'S7',
+                heartbeatIntervalMs: 1000,
+                s7: {
+                    ipAddress: '192.168.0.1',
+                    port: 102,
+                    cpuType: 'S7-1200',
+                    rack: 0,
+                    slot: 1,
+                    mappings: []
+                },
+                mc: {
+                    ipAddress: '192.168.3.1',
+                    port: 5002,
+                    mappings: []
+                },
+                fins: {
+                    ipAddress: '192.168.250.1',
+                    port: 9600,
+                    mappings: []
+                }
+            },
             storage: { imageSavePath: 'D:\\VisionData\\Images', savePolicy: 'NgOnly', retentionDays: 30, minFreeSpaceGb: 5 },
             runtime: {
                 autoRun: false,
@@ -1409,14 +2128,16 @@ class SettingsView {
                 passwordMinLength: 6,
                 sessionTimeoutMinutes: 30,
                 loginFailureLockoutCount: 5
-            }
+            },
+            cameras: [],
+            activeCameraId: ''
         };
     }
 
     renderGeneralTab() {
         const general = this.config?.general || this.getDefaultConfig().general;
         const security = this.config?.security || this.getDefaultConfig().security;
-        const runtimeTheme = localStorage.getItem('cv_theme') || general.theme || 'light';
+        const runtimeTheme = normalizeTheme(general.theme, getAppliedTheme());
         const settingsResetFeature = getFeatureMeta('settings.reset');
         return `
             <div class="settings-section-title">
@@ -1497,14 +2218,41 @@ class SettingsView {
     }
 
     renderCommunicationTab() {
-        const comm = this.config?.communication || this.getDefaultConfig().communication;
+        const comm = this.normalizeCommunicationConfig(this.config?.communication);
+        const activeProtocol = this.normalizePlcProtocol(comm.activeProtocol);
+        const profileKey = this.getPlcProfileKey(activeProtocol);
+        const profile = comm[profileKey];
+        const badgeMeta = this.getPlcConnectionBadgeMeta(this.plcConnectionStatus);
+        const connectionErrors = {
+            ipAddress: this.getPlcFieldErrors('connection', 'ipAddress'),
+            port: this.getPlcFieldErrors('connection', 'port'),
+            cpuType: this.getPlcFieldErrors('connection', 'cpuType'),
+            rack: this.getPlcFieldErrors('connection', 'rack'),
+            slot: this.getPlcFieldErrors('connection', 'slot')
+        };
+        const activeErrors = this.getCurrentProtocolValidationErrors();
+        const protocolLabel = activeProtocol === 'MC'
+            ? '三菱 MC'
+            : activeProtocol === 'FINS'
+                ? '欧姆龙 FINS'
+                : '西门子 S7';
+        const addressPlaceholder = activeProtocol === 'MC'
+            ? '如 D100 / X10 / M200'
+            : activeProtocol === 'FINS'
+                ? '如 DM100 / CIO10.3'
+                : '如 DB1.DBX0.0 / MW100';
+        const protocolHint = activeProtocol === 'MC'
+            ? '使用 Mitsubishi MC 协议与 FX/Q/iQ 系列 PLC 通讯。'
+            : activeProtocol === 'FINS'
+                ? '使用 Omron FINS/TCP 与 CP/CJ/NJ/NX 系列 PLC 通讯。'
+                : '使用 Siemens S7 协议与 S7-1200/1500 等 PLC 通讯。';
+
         return `
             <div class="settings-section-title">
                 <h2>PLC 通讯配置</h2>
-                <p>配置与外部控制器的数据交换协议和地址映射。</p>
+                <p>聚焦已落地的厂牌协议栈，配置连接参数与地址映射。</p>
             </div>
 
-            <!-- Block 1: 通讯连接设置 -->
             <div class="settings-modern-card">
                 <div class="settings-card-header has-badge">
                     <div class="settings-header-left">
@@ -1512,34 +2260,41 @@ class SettingsView {
                         <span>通讯连接设置</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <div class="settings-status-badge status-disconnected" id="plc-connection-badge">
-                            <span class="status-dot"></span> 未测试
-                        </div>
-                        <div class="settings-status-badge status-disconnected" style="color:#b45309; border-color:#f59e0b; background:#fffbeb;">
-                            开发中
+                        <div class="settings-status-badge ${badgeMeta.className}" id="plc-connection-badge">
+                            <span class="status-dot"></span> ${badgeMeta.text}
                         </div>
                     </div>
                 </div>
                 
-                <div class="settings-card-body horizontal-flex">
+                <div class="settings-card-body">
+                    <div class="settings-field-hint" style="margin-bottom: 16px;">${protocolHint}</div>
+                    ${activeErrors.length > 0 ? `
+                        <div class="plc-validation-summary">
+                            <strong>${protocolLabel} 配置存在 ${activeErrors.length} 个问题</strong>
+                            <span>请修正当前协议的连接参数或地址映射后再保存。</span>
+                        </div>
+                    ` : ''}
+                    <div class="horizontal-flex">
                     <div class="settings-fieldset" style="flex:1.5;">
                         <label>通讯协议</label>
                         <select class="cv-input" id="cfg-protocol">
-                            <option value="ModbusTcp" ${comm.protocol === 'ModbusTcp' ? 'selected' : ''}>Modbus TCP</option>
-                            <option value="S7" ${comm.protocol === 'S7' ? 'selected' : ''}>Siemens S7</option>
-                            <option value="CIP" ${comm.protocol === 'CIP' ? 'selected' : ''}>EtherNet/IP (CIP)</option>
+                            <option value="S7" ${activeProtocol === 'S7' ? 'selected' : ''}>Siemens S7</option>
+                            <option value="MC" ${activeProtocol === 'MC' ? 'selected' : ''}>Mitsubishi MC</option>
+                            <option value="FINS" ${activeProtocol === 'FINS' ? 'selected' : ''}>Omron FINS</option>
                         </select>
                     </div>
                     <div class="settings-fieldset" style="flex:2;">
                         <label>PLC IP地址</label>
                         <div class="input-with-icon">
                             <svg class="input-icon" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
-                            <input type="text" class="cv-input" id="cfg-plcIpAddress" value="${comm.plcIpAddress || ''}">
+                            <input type="text" class="cv-input ${connectionErrors.ipAddress.length ? 'plc-invalid-input' : ''}" id="cfg-plcIpAddress" value="${this.escapeHtml(profile?.ipAddress || '')}" placeholder="192.168.0.10">
                         </div>
+                        ${this.renderPlcErrorText(connectionErrors.ipAddress)}
                     </div>
                     <div class="settings-fieldset" style="flex:1;">
                         <label>端口号</label>
-                        <input type="number" class="cv-input" id="cfg-plcPort" value="${comm.plcPort || 502}">
+                        <input type="number" class="cv-input ${connectionErrors.port.length ? 'plc-invalid-input' : ''}" id="cfg-plcPort" value="${profile?.port || ''}">
+                        ${this.renderPlcErrorText(connectionErrors.port)}
                     </div>
                     <div class="settings-fieldset-action">
                         <button class="cv-btn settings-btn-dark" id="btn-plc-test">
@@ -1547,23 +2302,51 @@ class SettingsView {
                             连接测试
                         </button>
                     </div>
+                    </div>
+                    ${activeProtocol === 'S7' ? `
+                        <div class="horizontal-flex" style="margin-top: 16px;">
+                            <div class="settings-fieldset" style="flex:1.2;">
+                                <label>CPU 类型</label>
+                                <select class="cv-input ${connectionErrors.cpuType.length ? 'plc-invalid-input' : ''}" id="cfg-s7-cpuType">
+                                    <option value="S7-1200" ${profile?.cpuType === 'S7-1200' ? 'selected' : ''}>S7-1200</option>
+                                    <option value="S7-1500" ${profile?.cpuType === 'S7-1500' ? 'selected' : ''}>S7-1500</option>
+                                    <option value="S7-300" ${profile?.cpuType === 'S7-300' ? 'selected' : ''}>S7-300</option>
+                                    <option value="S7-400" ${profile?.cpuType === 'S7-400' ? 'selected' : ''}>S7-400</option>
+                                    <option value="S7-200" ${profile?.cpuType === 'S7-200' ? 'selected' : ''}>S7-200</option>
+                                    <option value="S7-200 Smart" ${profile?.cpuType === 'S7-200 Smart' ? 'selected' : ''}>S7-200 Smart</option>
+                                </select>
+                                ${this.renderPlcErrorText(connectionErrors.cpuType)}
+                            </div>
+                            <div class="settings-fieldset" style="flex:0.8;">
+                                <label>Rack</label>
+                                <input type="number" class="cv-input ${connectionErrors.rack.length ? 'plc-invalid-input' : ''}" id="cfg-s7-rack" value="${Number.isFinite(profile?.rack) ? profile.rack : 0}">
+                                ${this.renderPlcErrorText(connectionErrors.rack)}
+                            </div>
+                            <div class="settings-fieldset" style="flex:0.8;">
+                                <label>Slot</label>
+                                <input type="number" class="cv-input ${connectionErrors.slot.length ? 'plc-invalid-input' : ''}" id="cfg-s7-slot" value="${Number.isFinite(profile?.slot) ? profile.slot : 1}">
+                                ${this.renderPlcErrorText(connectionErrors.slot)}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
 
-            <!-- Block 2: 地址映射表 -->
             <div class="settings-modern-card" style="margin-top: 24px;">
                 <div class="settings-card-header">
                     <div class="settings-header-left">
                         <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-                        <span>地址映射表 (Address Mapping)</span>
+                        <span>${protocolLabel} 地址映射表</span>
                     </div>
                     <div class="settings-header-actions">
-                        <button class="icon-action-btn" disabled title="功能开发中"><svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg></button>
-                        <button class="icon-action-btn" disabled title="功能开发中"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
                         <button class="cv-btn settings-btn-light" style="padding: 4px 12px; margin-left: 8px;" id="btn-add-plc-mapping">
                             <span style="font-size: 16px; margin-right: 4px;">+</span> 添加变量
                         </button>
                     </div>
+                </div>
+
+                <div class="settings-card-body" style="padding-bottom: 0;">
+                    <span class="settings-field-hint">地址格式示例：${addressPlaceholder}</span>
                 </div>
                 
                 <div class="settings-card-table-wrapper">
@@ -1578,73 +2361,16 @@ class SettingsView {
                                 <th>操作</th>
                             </tr>
                         </thead>
-                        <tbody id="plc-mapping-tbody">
-                            <tr>
-                                <td class="font-bold">Trigger_Start</td>
-                                <td class="font-mono">D1000</td>
-                                <td><span class="type-badge badge-bool">BOOL</span></td>
-                                <td><span class="rw-badge rw-read">R</span></td>
-                                <td class="text-muted italic">检测启动信号</td>
-                                <td>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold">Product_ID</td>
-                                <td class="font-mono">D1002</td>
-                                <td><span class="type-badge badge-int">INT16</span></td>
-                                <td><span class="rw-badge rw-read">R</span></td>
-                                <td class="text-muted italic">当前产品编号</td>
-                                <td>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold">Result_OK</td>
-                                <td class="font-mono">D2000</td>
-                                <td><span class="type-badge badge-bool">BOOL</span></td>
-                                <td><span class="rw-badge rw-write">W</span></td>
-                                <td class="text-muted italic">OK结果输出</td>
-                                <td>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold">Result_NG</td>
-                                <td class="font-mono">D2001</td>
-                                <td><span class="type-badge badge-bool">BOOL</span></td>
-                                <td><span class="rw-badge rw-write">W</span></td>
-                                <td class="text-muted italic">NG结果输出</td>
-                                <td>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold">Coordinate_X</td>
-                                <td class="font-mono">D2010</td>
-                                <td><span class="type-badge badge-float">FLOAT</span></td>
-                                <td><span class="rw-badge rw-write">W</span></td>
-                                <td class="text-muted italic">定位X坐标</td>
-                                <td>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-                                    <button class="action-icon-btn"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-                                </td>
-                            </tr>
-                        </tbody>
+                        <tbody id="plc-mapping-tbody"></tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- 底部浮动操作区 -->
             <div class="settings-floating-footer">
-                <button class="cv-btn settings-btn-light" style="width: 100px;" disabled title="功能开发中">取消</button>
+                <button class="cv-btn settings-btn-light" style="width: 100px;" id="btn-reset-plc">取消</button>
                 <button class="cv-btn settings-btn-danger" style="width: 140px;" id="btn-save-plc">
                     <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; margin-right: 6px; fill: currentColor;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg> 
-                    同步配置
+                    保存当前协议
                 </button>
             </div>
         `;
@@ -1834,7 +2560,7 @@ class SettingsView {
                         相机预览
                     </button>
                     <button class="cv-btn settings-btn-light" id="btn-hand-eye-calib" disabled title="请先在列表中选择一台相机">
-                        手眼标定向导
+                        二维平面标定向导
                     </button>
                 </div>
             </div>
@@ -1869,7 +2595,7 @@ class SettingsView {
                 </div>
                 <div class="settings-card-body">
                     <div id="camera-selection-hint" class="settings-field-hint" style="display:block; margin-bottom:16px;">
-                        请先在上方绑定列表中选择一台相机，再进行预览、手眼标定或参数保存。
+                        请先在上方绑定列表中选择一台相机，再进行预览、二维平面标定或参数保存。
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:24px; margin-bottom: 24px;">
                         <div class="settings-fieldset">
@@ -1891,9 +2617,9 @@ class SettingsView {
                         <div class="settings-fieldset">
                             <label>触发模式 (Trigger Mode)</label>
                             <select class="cv-input" id="cam-param-trigger-mode">
-                                <option value="Software">Software Trigger</option>
-                                <option value="Hardware">Hardware Trigger</option>
-                                <option value="Continuous">Continuous</option>
+                                <option value="Software">软件触发</option>
+                                <option value="External">外部触发</option>
+                                <option value="Continuous">连续采集</option>
                             </select>
                             <span class="settings-field-hint">仅作用于当前所选相机</span>
                         </div>
@@ -1902,10 +2628,10 @@ class SettingsView {
                         <div class="settings-fieldset">
                             <label>采集帧率 (Frame Rate)</label>
                             <div class="input-with-suffix" style="position:relative;">
-                                <input type="number" class="cv-input" value="" style="padding-right:36px;" disabled readonly aria-disabled="true">
+                                <input type="number" class="cv-input" id="cam-param-target-frame-rate" value="" min="1" max="120" style="padding-right:36px;" disabled readonly aria-disabled="true">
                                 <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">fps</span>
                             </div>
-                            <span class="settings-field-hint">该字段暂未接入保存链路，当前仅展示占位。</span>
+                            <span class="settings-field-hint" id="cam-param-target-frame-rate-hint">仅 Continuous 模式下可编辑；当前值会保留。</span>
                         </div>
                         <div class="settings-fieldset">
                             <label>图像宽度 (Width)</label>
@@ -2322,7 +3048,15 @@ class SettingsView {
     }
 
     collectCameraBindings() {
-        return this.cameraBindings.map(binding => ({ ...binding }));
+        return this.cameraBindings.map(binding => ({
+            ...binding,
+            triggerMode: this.normalizeCameraTriggerMode(binding.triggerMode),
+            targetFrameRateFps: this.normalizeCameraTargetFrameRate(binding.targetFrameRateFps)
+        }));
+    }
+
+    syncActiveCameraSelection() {
+        inspectionController.setCamera(this.resolveActiveCameraId() || null);
     }
 
     resolveActiveCameraId() {
@@ -2335,17 +3069,20 @@ class SettingsView {
 
     async saveCameraBindings({ silent = false } = {}) {
         const activeCameraId = this.resolveActiveCameraId();
+        const bindingsPayload = this.collectCameraBindings();
 
         try {
             await httpClient.put('/cameras/bindings', {
-                bindings: this.cameraBindings,
+                bindings: bindingsPayload,
                 activeCameraId: activeCameraId
             });
 
             if (this.config) {
-                this.config.cameras = [...this.cameraBindings];
+                this.config.cameras = [...bindingsPayload];
                 this.config.activeCameraId = activeCameraId;
             }
+
+            this.syncActiveCameraSelection();
 
             return true;
         } catch (error) {
@@ -2406,6 +3143,10 @@ class SettingsView {
             const message = result?.message
                 || result?.Message
                 || `${getFeatureButtonLabel('settings.reset', '恢复默认设置')}已执行`;
+            applyTheme(
+                normalizeTheme(result?.config?.general?.theme, this.getDefaultConfig().general.theme),
+                { persist: true }
+            );
             showToast(message, 'success');
             await this.refresh();
         } catch (error) {
@@ -2420,10 +3161,8 @@ class SettingsView {
         console.log('[SettingsView] Saving config...');
 
         const themeSelect = this.container?.querySelector('#cfg-theme');
-        const selectedTheme = themeSelect?.value;
-        const currentTheme = this.config?.general?.theme
-            || document.documentElement.dataset.theme
-            || 'light';
+        const selectedTheme = normalizeTheme(themeSelect?.value, null);
+        const currentTheme = normalizeTheme(this.config?.general?.theme, getAppliedTheme());
         const effectiveTheme = selectedTheme || currentTheme;
         const defaultConfig = this.getDefaultConfig();
         const parsedHeartbeatIntervalMs = Number.parseInt(`${this.config?.communication?.heartbeatIntervalMs ?? ''}`, 10);
@@ -2455,7 +3194,6 @@ class SettingsView {
             ? parsedLoginFailureLockoutCount
             : (this.config?.security?.loginFailureLockoutCount ?? defaultConfig.security.loginFailureLockoutCount);
         const activeCameraId = this.resolveActiveCameraId();
-        const plcMappings = this.collectPlcMappingsFromTable();
 
         // 保证“保存所有更改”也会带上当前选中相机的参数修改。
         if (this.selectedCameraBindingId) {
@@ -2463,7 +3201,8 @@ class SettingsView {
             const exposureInput = this.container?.querySelector('#cam-param-exposure');
             const gainInput = this.container?.querySelector('#cam-param-gain');
             const triggerModeSelect = this.container?.querySelector('#cam-param-trigger-mode');
-            if (selectedBinding && exposureInput && gainInput && triggerModeSelect) {
+            const frameRateInput = this.container?.querySelector('#cam-param-target-frame-rate');
+            if (selectedBinding && exposureInput && gainInput && triggerModeSelect && frameRateInput) {
                 const exposureTimeUs = Number.parseFloat(exposureInput.value);
                 const gainDb = Number.parseFloat(gainInput.value);
                 if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
@@ -2476,11 +3215,17 @@ class SettingsView {
                 }
                 selectedBinding.exposureTimeUs = exposureTimeUs;
                 selectedBinding.gainDb = gainDb;
-                selectedBinding.triggerMode = triggerModeSelect.value || 'Software';
+                selectedBinding.triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
+                selectedBinding.targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
             }
         }
         
-        // 收集表单数据
+        const plcSaveResult = await this.savePlcSettings({ silent: true, persistAllProfiles: true });
+        if (!plcSaveResult?.success) {
+            showToast('PLC 配置校验未通过，请先修正当前协议配置。', 'error');
+            return;
+        }
+
         const config = {
             general: {
                 softwareTitle: this.container?.querySelector('#cfg-softwareTitle')?.value || '',
@@ -2488,11 +3233,8 @@ class SettingsView {
                 autoStart: this.container?.querySelector('#cfg-autoStart')?.checked || false
             },
             communication: {
-                plcIpAddress: this.container?.querySelector('#cfg-plcIpAddress')?.value || '',
-                plcPort: parseInt(this.container?.querySelector('#cfg-plcPort')?.value || '502', 10),
-                protocol: this.container?.querySelector('#cfg-protocol')?.value || 'ModbusTcp',
-                heartbeatIntervalMs,
-                mappings: plcMappings
+                ...this.normalizeCommunicationConfig(plcSaveResult.settings || this.config?.communication),
+                heartbeatIntervalMs
             },
             storage: {
                 imageSavePath: this.container?.querySelector('#cfg-imageSavePath')?.value || '',
@@ -2518,7 +3260,8 @@ class SettingsView {
         try {
             // 首先保存全局配置 (AppConfig)
             await httpClient.put('/settings', config);
-            this.config = config;
+            this.config = this.normalizeAppConfig(config);
+            this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
 
             // 保存相机绑定
             const bindingsSaved = await this.saveCameraBindings({ silent: true });
@@ -2526,8 +3269,8 @@ class SettingsView {
                 throw new Error('Camera bindings save failed');
             }
 
-            this.plcMappings = [...plcMappings];
-            this.plcMappingsLoaded = true;
+            this.syncPlcMappingsFromActiveProfile();
+            this.plcSettingsLoaded = true;
 
             // 仅在 AI 页显式保存时同步当前模型，避免全局保存触发隐式副作用。
             const activeTabName = this.getActiveTabName();
@@ -2544,11 +3287,7 @@ class SettingsView {
             }
             await this.loadDiskUsage();
             
-            // 仅在用户显式设置主题时才应用，避免“保存所有更改”意外切换深色模式。
-            if (themeSelect && selectedTheme) {
-                document.documentElement.dataset.theme = selectedTheme;
-                localStorage.setItem('cv_theme', selectedTheme);
-            }
+            applyTheme(effectiveTheme, { persist: true });
         } catch (error) {
             console.error('[SettingsView] Failed to save config:', error);
             showToast('保存设置通讯错误: ' + error.message, 'error');

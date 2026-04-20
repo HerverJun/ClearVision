@@ -1,10 +1,29 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="dark">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>ClearVision - 工业视觉检测软件</title>
         <link rel="icon" href="data:," />
+        <script>
+            (function () {
+                const storageKey = 'cv_theme';
+                const validThemes = new Set(['light', 'dark']);
+                let theme = 'dark';
+
+                try {
+                    const storedTheme = window.localStorage.getItem(storageKey);
+                    if (validThemes.has(storedTheme)) {
+                        theme = storedTheme;
+                    }
+                } catch {
+                    // Ignore storage failures and keep the default theme.
+                }
+
+                document.documentElement.dataset.theme = theme;
+                document.documentElement.style.colorScheme = theme;
+            })();
+        </script>
         <!-- 【科学方案二】动态CSS版本号：通过JavaScript动态加载，使用后端注入的版本号 -->
         <script>
             // 动态加载CSS，自动附加版本号
@@ -28,7 +47,7 @@
                     "src/shared/styles/analysisCards.css",
                     "src/shared/styles/inspection.css",
                     "src/shared/styles/results.css",
-                    "css/handEyeCalibWizard.css",
+                    "css/planarScaleOffsetCalibWizard.css",
                 ];
 
                 cssFiles.forEach(function (file) {
@@ -655,7 +674,16 @@
                 </section>
 
                 <!-- 右侧面板 -->
-                <aside class="sidebar right">
+                <div
+                    class="sidebar-resizer hidden"
+                    data-sidebar-resizer="property"
+                    role="separator"
+                    aria-label="Property sidebar width"
+                    aria-orientation="vertical"
+                    aria-disabled="true"
+                    tabindex="-1"
+                ></div>
+                <aside class="sidebar right" data-sidebar="property">
                     <div class="panel">
                         <h3 class="panel-title">属性</h3>
                         <div class="property-panel" id="property-panel">
@@ -770,7 +798,7 @@
         ></script>
         <script
             type="module"
-            src="src/core/calibration/handEyeCalibWizard.js"
+            src="src/core/calibration/planarScaleOffsetCalibWizard.js"
         ></script>
 
         <!-- 加载共享组件 -->

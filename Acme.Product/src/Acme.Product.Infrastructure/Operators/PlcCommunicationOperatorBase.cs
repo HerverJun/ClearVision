@@ -9,6 +9,7 @@ using Acme.Product.Core.ValueObjects;
 using Acme.PlcComm;
 using Acme.PlcComm.Interfaces;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace Acme.Product.Infrastructure.Operators;
@@ -21,6 +22,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     // ─── 静态连接池 ───────────────────────────────────────────
     private static readonly Dictionary<string, IPlcClient> _connectionPool = new();
     private static readonly SemaphoreSlim _poolLock = new(1, 1);
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _connectionKeyLocks = new(StringComparer.Ordinal);
 
     // ─── 心跳巡检 ─────────────────────────────────────────────
     private static Task? _heartbeatTask;
@@ -222,45 +224,137 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     /// <summary>
     /// 获取或创建PLC连接
     /// </summary>
+    private sealed class RefCountedSemaphore
+    {
+        private int _refCount;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public void AddRef()
+        {
+            Interlocked.Increment(ref _refCount);
+        }
+
+        public int ReleaseRef()
+        {
+            return Interlocked.Decrement(ref _refCount);
+        }
+    }
+
+    private static RefCountedSemaphore AcquireRefCountedSemaphore(
+        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
+        string key)
+    {
+        while (true)
+        {
+            var entry = dictionary.GetOrAdd(key, static _ => new RefCountedSemaphore());
+            entry.AddRef();
+
+            if (dictionary.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
+            {
+                return entry;
+            }
+
+            _ = entry.ReleaseRef();
+        }
+    }
+
+    private static void ReleaseRefCountedSemaphore(
+        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
+        string key,
+        RefCountedSemaphore entry)
+    {
+        if (entry.ReleaseRef() != 0)
+        {
+            return;
+        }
+
+        _ = dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+    }
+
     protected async Task<(IPlcClient client, bool isNewConnection)> GetOrCreateConnectionAsync(
         string connectionKey,
         Func<IPlcClient> factory)
     {
-        await _poolLock.WaitAsync();
+        var keyLockEntry = AcquireRefCountedSemaphore(_connectionKeyLocks, connectionKey);
+        var keyLockAcquired = false;
+        await keyLockEntry.Semaphore.WaitAsync();
+        keyLockAcquired = true;
         try
         {
-            if (_connectionPool.TryGetValue(connectionKey, out var existingClient) && existingClient.IsConnected)
+            await _poolLock.WaitAsync();
+            try
             {
-                Logger.LogDebug("[{OperatorType}] 复用现有连接: {Key}", OperatorType, connectionKey);
-                return (existingClient, false);
+                if (_connectionPool.TryGetValue(connectionKey, out var existingClient) && existingClient.IsConnected)
+                {
+                    Logger.LogDebug("[{OperatorType}] 复用现有连接: {Key}", OperatorType, connectionKey);
+                    return (existingClient, false);
+                }
+            }
+            finally
+            {
+                _poolLock.Release();
             }
 
             // 创建新连接
             Logger.LogInformation("[{OperatorType}] 创建新连接: {Key}", OperatorType, connectionKey);
             var newClient = factory();
-            var connected = await newClient.ConnectAsync();
+            bool connected;
+            try
+            {
+                connected = await newClient.ConnectAsync();
+            }
+            catch
+            {
+                newClient.Dispose();
+                throw;
+            }
 
             if (!connected)
             {
+                newClient.Dispose();
                 throw new InvalidOperationException($"无法连接到PLC: {connectionKey}");
             }
 
-            // 如果存在旧连接，先释放
-            if (_connectionPool.TryGetValue(connectionKey, out var oldClient))
+            IPlcClient? oldClient = null;
+            await _poolLock.WaitAsync();
+            try
             {
-                oldClient.Dispose();
+                // 并发场景下若其他线程已恢复可用连接，则直接复用并回收新客户端
+                if (_connectionPool.TryGetValue(connectionKey, out var latestClient) && latestClient.IsConnected)
+                {
+                    newClient.Dispose();
+                    Logger.LogDebug("[{OperatorType}] 复用连接（并发延迟）: {Key}", OperatorType, connectionKey);
+                    return (latestClient, false);
+                }
+
+                if (_connectionPool.TryGetValue(connectionKey, out oldClient))
+                {
+                    _connectionPool.Remove(connectionKey);
+                }
+
+                _connectionPool[connectionKey] = newClient;
+
+                // 新连接上线，初始化心跳状态
+                _lastKnownState[connectionKey] = true;
+            }
+            finally
+            {
+                _poolLock.Release();
             }
 
-            _connectionPool[connectionKey] = newClient;
-
-            // 新连接上线，初始化心跳状态
-            _lastKnownState[connectionKey] = true;
+            oldClient?.Dispose();
 
             return (newClient, true);
         }
         finally
         {
-            _poolLock.Release();
+            if (keyLockAcquired)
+            {
+                keyLockEntry.Semaphore.Release();
+            }
+
+            ReleaseRefCountedSemaphore(_connectionKeyLocks, connectionKey, keyLockEntry);
         }
     }
 
@@ -269,45 +363,122 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     /// <summary>
     /// 根据数据类型获取长度
     /// </summary>
-    protected (string ipAddress, int port, string protocol) ResolveConnectionSettings(
+    protected (string ipAddress, int port, string protocol, string connectionSource) ResolveConnectionSettings(
         string? ipAddress,
         int? port,
-        string fallbackProtocol = "")
+        string fallbackProtocol = "",
+        bool useGlobalFallback = false)
     {
         var global = GetGlobalCommunicationConfig();
+        var normalizedProtocol = CommunicationConfig.NormalizeProtocolKey(fallbackProtocol, global.ActiveProtocol) ?? string.Empty;
+        var globalProfile = global.GetProfile(normalizedProtocol);
         var normalizedIp = (ipAddress ?? string.Empty).Trim();
         var requestedPort = port ?? 0;
+        var hasOperatorIp = !string.IsNullOrWhiteSpace(normalizedIp);
+        var hasOperatorPort = requestedPort > 0;
+        var globalIp = (globalProfile.IpAddress ?? string.Empty).Trim();
+        var hasGlobalIp = !string.IsNullOrWhiteSpace(globalIp);
+        var hasGlobalPort = globalProfile.Port > 0 && globalProfile.Port <= 65535;
 
-        var resolvedIp = string.IsNullOrWhiteSpace(normalizedIp)
-            ? (global.PlcIpAddress ?? string.Empty).Trim()
-            : normalizedIp;
-        var resolvedPort = requestedPort > 0 ? requestedPort : global.PlcPort;
-        var resolvedProtocol = !string.IsNullOrWhiteSpace(global.Protocol)
-            ? global.Protocol
-            : fallbackProtocol;
+        if (hasOperatorPort && (requestedPort < 1 || requestedPort > 65535))
+        {
+            throw new InvalidOperationException(BuildConnectionConfigErrorMessage(
+                code: "PLC_CONNECTION_CONFIG_INVALID_PORT",
+                message: "Operator Port must be within 1..65535.",
+                protocol: normalizedProtocol,
+                useGlobalFallback: useGlobalFallback,
+                hasOperatorIp: hasOperatorIp,
+                hasOperatorPort: hasOperatorPort,
+                hasGlobalIp: hasGlobalIp,
+                hasGlobalPort: hasGlobalPort));
+        }
+
+        if (!useGlobalFallback)
+        {
+            if (!hasOperatorIp || !hasOperatorPort)
+            {
+                throw new InvalidOperationException(BuildConnectionConfigErrorMessage(
+                    code: "PLC_CONNECTION_CONFIG_OPERATOR_REQUIRED",
+                    message: "Operator IpAddress and Port are required when UseGlobalFallback is false.",
+                    protocol: normalizedProtocol,
+                    useGlobalFallback: false,
+                    hasOperatorIp: hasOperatorIp,
+                    hasOperatorPort: hasOperatorPort,
+                    hasGlobalIp: hasGlobalIp,
+                    hasGlobalPort: hasGlobalPort));
+            }
+
+            return (normalizedIp, requestedPort, normalizedProtocol, "OperatorParameters");
+        }
+
+        var resolvedIp = hasOperatorIp ? normalizedIp : globalIp;
+        var resolvedPort = hasOperatorPort ? requestedPort : globalProfile.Port;
+        var usedGlobalFallback = !hasOperatorIp || !hasOperatorPort;
 
         if (string.IsNullOrWhiteSpace(resolvedIp))
         {
-            throw new InvalidOperationException("PLC IP is not configured in operator parameters or global settings.");
+            throw new InvalidOperationException(BuildConnectionConfigErrorMessage(
+                code: "PLC_CONNECTION_CONFIG_MISSING_IP",
+                message: "PLC IP is not configured in operator parameters and global settings.",
+                protocol: normalizedProtocol,
+                useGlobalFallback: true,
+                hasOperatorIp: hasOperatorIp,
+                hasOperatorPort: hasOperatorPort,
+                hasGlobalIp: hasGlobalIp,
+                hasGlobalPort: hasGlobalPort));
         }
 
         if (resolvedPort <= 0 || resolvedPort > 65535)
         {
-            throw new InvalidOperationException("PLC port is invalid in operator parameters and global settings.");
+            throw new InvalidOperationException(BuildConnectionConfigErrorMessage(
+                code: "PLC_CONNECTION_CONFIG_MISSING_PORT",
+                message: "PLC Port is not configured in operator parameters and global settings.",
+                protocol: normalizedProtocol,
+                useGlobalFallback: true,
+                hasOperatorIp: hasOperatorIp,
+                hasOperatorPort: hasOperatorPort,
+                hasGlobalIp: hasGlobalIp,
+                hasGlobalPort: hasGlobalPort));
         }
 
-        if (string.IsNullOrWhiteSpace(normalizedIp) || requestedPort <= 0)
+        if (usedGlobalFallback)
         {
             Logger.LogInformation(
                 "[{OperatorType}] Connection fallback applied. Operator IP='{OperatorIp}', Port='{OperatorPort}', Global IP='{GlobalIp}', Port={GlobalPort}.",
                 OperatorType,
                 ipAddress,
                 port,
-                global.PlcIpAddress,
-                global.PlcPort);
+                globalProfile.IpAddress,
+                globalProfile.Port);
         }
 
-        return (resolvedIp, resolvedPort, resolvedProtocol ?? string.Empty);
+        return (resolvedIp, resolvedPort, normalizedProtocol, usedGlobalFallback ? "GlobalFallback" : "OperatorParameters");
+    }
+
+    private static string BuildConnectionConfigErrorMessage(
+        string code,
+        string message,
+        string protocol,
+        bool useGlobalFallback,
+        bool hasOperatorIp,
+        bool hasOperatorPort,
+        bool hasGlobalIp,
+        bool hasGlobalPort)
+    {
+        return JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["Code"] = code,
+            ["Message"] = message,
+            ["Protocol"] = protocol,
+            ["UseGlobalFallback"] = useGlobalFallback,
+            ["Details"] = new Dictionary<string, object>
+            {
+                ["HasOperatorIp"] = hasOperatorIp,
+                ["HasOperatorPort"] = hasOperatorPort,
+                ["HasGlobalIp"] = hasGlobalIp,
+                ["HasGlobalPort"] = hasGlobalPort
+            }
+        });
     }
 
     private static int GetHeartbeatIntervalMs()
@@ -323,6 +494,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             var nowUtc = DateTime.UtcNow;
             if (nowUtc - _cachedCommunicationConfigAtUtc < ConfigRefreshInterval)
             {
+                _cachedCommunicationConfig.Normalize();
                 return _cachedCommunicationConfig;
             }
 
@@ -333,9 +505,11 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
                 {
                     var json = File.ReadAllText(configPath);
                     var config = JsonSerializer.Deserialize<AppConfig>(json, _configJsonOptions);
+                    config?.Normalize();
                     if (config?.Communication != null)
                     {
                         _cachedCommunicationConfig = config.Communication;
+                        _cachedCommunicationConfig.Normalize();
                     }
                 }
             }
@@ -345,6 +519,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             }
 
             _cachedCommunicationConfigAtUtc = nowUtc;
+            _cachedCommunicationConfig.Normalize();
             return _cachedCommunicationConfig;
         }
     }
@@ -416,6 +591,17 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             ["Status"] = true,
             ["Timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
         });
+    }
+
+    protected static void AttachConnectionAuditInfo(OperatorExecutionOutput output, string connectionSource)
+    {
+        if (!output.IsSuccess)
+        {
+            return;
+        }
+
+        output.OutputData ??= new Dictionary<string, object>();
+        output.OutputData["ConnectionSource"] = connectionSource;
     }
 
     /// <summary>

@@ -1,8 +1,20 @@
 {
   "name": "Terminal Wire Sequence Template",
-  "description": "DeepLearning + DetectionSequenceJudge baseline.",
+  "description": "Full-image DeepLearning + ROI box filtering + BoxNms + DetectionSequenceJudge baseline.",
   "scenarioKey": "wire-sequence-terminal",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.4.0",
+  "expectedSequence": [
+    "Wire_Black",
+    "Wire_Blue"
+  ],
+  "expectedDetectionCount": 2,
+  "requiredResources": [
+    "DeepLearning.ModelPath"
+  ],
+  "tunableParameters": [
+    "BoxNms.ScoreThreshold",
+    "BoxNms.IouThreshold"
+  ],
   "operators": [
     {
       "id": "op_1",
@@ -11,34 +23,62 @@
     },
     {
       "id": "op_2",
-      "type": "ImageResize",
-      "name": "Resize640"
+      "type": "DeepLearning",
+      "name": "WireRootDetection",
+      "params": {
+        "ModelPath": "",
+        "LabelsPath": "",
+        "Confidence": "0.05",
+        "InputSize": "640",
+        "TargetClasses": "Wire_Black,Wire_Blue",
+        "EnableInternalNms": "false",
+        "DetectionMode": "Object"
+      }
     },
     {
       "id": "op_3",
-      "type": "DeepLearning",
-      "name": "WireDetection",
+      "type": "BoxFilter",
+      "name": "RoiDetectionFilter",
       "params": {
-        "ModelPath": "models/wire-seq-yolo-v1.1.onnx",
-        "Confidence": "0.5",
-        "TargetClasses": "Wire_Brown,Wire_Black,Wire_Blue"
+        "FilterMode": "Region",
+        "RegionX": "0",
+        "RegionY": "0",
+        "RegionW": "999999",
+        "RegionH": "999999",
+        "MinScore": "0.0"
       }
     },
     {
       "id": "op_4",
-      "type": "DetectionSequenceJudge",
-      "name": "SequenceJudge",
+      "type": "BoxNms",
+      "name": "DetectionNms",
       "params": {
-        "ExpectedLabels": "Wire_Brown,Wire_Black,Wire_Blue",
-        "SortBy": "CenterX",
-        "Direction": "Ascending",
-        "ExpectedCount": "3"
+        "IouThreshold": "0.45",
+        "ScoreThreshold": "0.25",
+        "MaxDetections": "10",
+        "ShowSuppressed": "false"
       }
     },
     {
       "id": "op_5",
+      "type": "DetectionSequenceJudge",
+      "name": "SequenceJudge",
+      "params": {
+        "ExpectedLabels": "Wire_Black,Wire_Blue",
+        "SortBy": "CenterY",
+        "Direction": "TopToBottom",
+        "ExpectedCount": "2",
+        "MinConfidence": "0.0"
+      }
+    },
+    {
+      "id": "op_6",
       "type": "ResultOutput",
-      "name": "Output"
+      "name": "Output",
+      "params": {
+        "Format": "JSON",
+        "SaveToFile": "true"
+      }
     }
   ],
   "connections": [
@@ -50,6 +90,12 @@
     },
     {
       "source": "op_2",
+      "sourcePort": "Objects",
+      "target": "op_3",
+      "targetPort": "Detections"
+    },
+    {
+      "source": "op_1",
       "sourcePort": "Image",
       "target": "op_3",
       "targetPort": "Image"
@@ -61,10 +107,59 @@
       "targetPort": "Detections"
     },
     {
+      "source": "op_1",
+      "sourcePort": "Image",
+      "target": "op_4",
+      "targetPort": "Image"
+    },
+    {
       "source": "op_4",
-      "sourcePort": "Message",
+      "sourcePort": "Detections",
       "target": "op_5",
+      "targetPort": "Detections"
+    },
+    {
+      "source": "op_4",
+      "sourcePort": "Image",
+      "target": "op_6",
+      "targetPort": "Image"
+    },
+    {
+      "source": "op_4",
+      "sourcePort": "Diagnostics",
+      "target": "op_6",
+      "targetPort": "Data"
+    },
+    {
+      "source": "op_5",
+      "sourcePort": "Diagnostics",
+      "target": "op_6",
       "targetPort": "Result"
+    },
+    {
+      "source": "op_5",
+      "sourcePort": "Message",
+      "target": "op_6",
+      "targetPort": "Text"
     }
-  ]
+  ],
+  "parametersNeedingReview": {
+    "op_2": [
+      "ModelPath"
+    ],
+    "op_3": [
+      "RegionX",
+      "RegionY",
+      "RegionW",
+      "RegionH"
+    ],
+    "op_4": [
+      "ScoreThreshold",
+      "IouThreshold"
+    ],
+    "op_5": [
+      "ExpectedLabels",
+      "ExpectedCount"
+    ]
+  }
 }

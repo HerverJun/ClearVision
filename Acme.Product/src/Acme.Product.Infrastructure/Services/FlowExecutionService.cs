@@ -4,6 +4,7 @@
 
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -26,6 +27,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan DebugCleanupInterval = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
+    private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
     private readonly ConcurrentDictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
     private readonly Dictionary<OperatorType, IOperatorExecutor> _executors;
     private readonly ILogger<FlowExecutionService> _logger;
@@ -39,6 +41,86 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private readonly ConcurrentDictionary<Guid, DateTime> _debugSessionLastAccess = new();
     private readonly Timer _debugCacheCleanupTimer;
     private bool _disposed;
+
+    private sealed class FlowInputPreparationIndex
+    {
+        private readonly Dictionary<Guid, Operator> _operatorsById;
+        private readonly Dictionary<Guid, List<OperatorConnection>> _incomingConnectionsByTargetId;
+        private readonly Dictionary<(Guid OperatorId, Guid PortId), Port> _outputPortsByOperatorPortId;
+        private readonly Dictionary<(Guid OperatorId, Guid PortId), Port> _inputPortsByOperatorPortId;
+
+        public int IncomingConnectionLookupCount { get; private set; }
+        public int SourceOperatorLookupCount { get; private set; }
+        public int SourcePortLookupCount { get; private set; }
+        public int TargetPortLookupCount { get; private set; }
+
+        public FlowInputPreparationIndex(OperatorFlow flow)
+        {
+            _operatorsById = flow.Operators.ToDictionary(item => item.Id);
+            _incomingConnectionsByTargetId = new Dictionary<Guid, List<OperatorConnection>>();
+            _outputPortsByOperatorPortId = new Dictionary<(Guid OperatorId, Guid PortId), Port>();
+            _inputPortsByOperatorPortId = new Dictionary<(Guid OperatorId, Guid PortId), Port>();
+
+            foreach (var op in flow.Operators)
+            {
+                foreach (var outputPort in op.OutputPorts)
+                {
+                    _outputPortsByOperatorPortId[(op.Id, outputPort.Id)] = outputPort;
+                }
+
+                foreach (var inputPort in op.InputPorts)
+                {
+                    _inputPortsByOperatorPortId[(op.Id, inputPort.Id)] = inputPort;
+                }
+            }
+
+            foreach (var connection in flow.Connections)
+            {
+                if (!_incomingConnectionsByTargetId.TryGetValue(connection.TargetOperatorId, out var list))
+                {
+                    list = new List<OperatorConnection>();
+                    _incomingConnectionsByTargetId[connection.TargetOperatorId] = list;
+                }
+
+                // Keep original flow connection order to preserve merge/override semantics.
+                list.Add(connection);
+            }
+        }
+
+        public IReadOnlyList<OperatorConnection> GetIncomingConnections(Guid targetOperatorId)
+        {
+            IncomingConnectionLookupCount++;
+            return _incomingConnectionsByTargetId.TryGetValue(targetOperatorId, out var list)
+                ? list
+                : [];
+        }
+
+        public Operator? GetSourceOperator(Guid sourceOperatorId)
+        {
+            SourceOperatorLookupCount++;
+            _operatorsById.TryGetValue(sourceOperatorId, out var sourceOperator);
+            return sourceOperator;
+        }
+
+        public Port? GetSourcePort(Guid sourceOperatorId, Guid sourcePortId)
+        {
+            SourcePortLookupCount++;
+            _outputPortsByOperatorPortId.TryGetValue((sourceOperatorId, sourcePortId), out var sourcePort);
+            return sourcePort;
+        }
+
+        public Port? GetTargetPort(Guid targetOperatorId, Guid targetPortId)
+        {
+            TargetPortLookupCount++;
+            _inputPortsByOperatorPortId.TryGetValue((targetOperatorId, targetPortId), out var targetPort);
+            return targetPort;
+        }
+    }
+
+    private static FlowInputPreparationIndex BuildFlowInputPreparationIndex(OperatorFlow flow)
+    {
+        return new FlowInputPreparationIndex(flow);
+    }
 
     public FlowExecutionService(
         IEnumerable<IOperatorExecutor> executors,
@@ -61,6 +143,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _variableContext.IncrementCycleCount();
         _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
 
+        // Each ExecuteFlowAsync call owns its own FlowExecutionResult instance.
         var result = new FlowExecutionResult();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -75,6 +158,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             // 获取执行顺序（拓扑排序）
             var executionOrder = flow.GetExecutionOrder().ToList();
+            var inputPreparationIndex = BuildFlowInputPreparationIndex(flow);
 
             // 初始化执行状态
             var status = new FlowExecutionStatus
@@ -98,12 +182,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (enableParallel && executionOrder.Count > 1)
             {
                 // 并行执行模式
-                await ExecuteFlowParallelAsync(flow, executionOrder, operatorOutputs, result, status, cts.Token, fanOutDegrees);
+                await ExecuteFlowParallelAsync(flow, executionOrder, operatorOutputs, result, status, cts.Token, inputPreparationIndex, fanOutDegrees);
             }
             else
             {
                 // 顺序执行模式
-                await ExecuteFlowSequentialAsync(flow, executionOrder, operatorOutputs, result, status, cts.Token, fanOutDegrees);
+                await ExecuteFlowSequentialAsync(flow, executionOrder, operatorOutputs, result, status, cts.Token, inputPreparationIndex, fanOutDegrees);
             }
 
             stopwatch.Stop();
@@ -179,6 +263,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         FlowExecutionResult result,
         FlowExecutionStatus status,
         CancellationToken cancellationToken,
+        FlowInputPreparationIndex inputPreparationIndex,
         Dictionary<string, int>? fanOutDegrees = null)
     {
         int completedCount = 0;
@@ -190,7 +275,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 break;
             }
 
-            if (!_executors.TryGetValue(op.Type, out var executor))
+            if (!TryResolveExecutor(op.Type, out var executor))
             {
                 result.OperatorResults.Add(new OperatorExecutionResult
                 {
@@ -207,7 +292,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
             // 准备输入数据
-            var inputs = PrepareOperatorInputs(flow, op, operatorOutputs);
+            var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
 
             // 执行算子
             var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, cancellationToken);
@@ -243,6 +328,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         FlowExecutionResult result,
         FlowExecutionStatus status,
         CancellationToken cancellationToken,
+        FlowInputPreparationIndex inputPreparationIndex,
         Dictionary<string, int>? fanOutDegrees = null)
     {
         // 构建执行层级（哪些算子可以并行执行）
@@ -259,53 +345,21 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             status.CurrentOperatorId = layer.First().Id;
             status.ProgressPercentage = (double)completedOperators.Count / executionOrder.Count * 100;
 
+            using var layerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            OperatorExecutionResult? primaryLayerFailure = null;
+
             // 并行执行当前层的所有算子
-            var layerTasks = layer.Select(async op =>
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return new OperatorExecutionResult
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = "Flow was canceled.",
-                        OperatorId = op.Id,
-                        OperatorName = op.Name
-                    };
-                }
+            var layerTasks = layer.Select(op => ExecuteParallelLayerOperatorAsync(
+                flow,
+                op,
+                operatorOutputs,
+                inputPreparationIndex,
+                fanOutDegrees,
+                cancellationToken,
+                layerCts,
+                failedResult => Interlocked.CompareExchange(ref primaryLayerFailure, failedResult, null) is null)).ToList();
 
-                if (!_executors.TryGetValue(op.Type, out var executor))
-                {
-                    return new OperatorExecutionResult
-                    {
-                        OperatorId = op.Id,
-                        OperatorName = op.Name,
-                        IsSuccess = false,
-                        ErrorMessage = $"未找到类型为 {op.Type} 的算子执行器"
-                    };
-                }
-
-                // 准备输入数据
-                var inputs = PrepareOperatorInputs(flow, op, operatorOutputs);
-
-                // 执行算子
-                var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, cancellationToken);
-
-                if (opResult.IsSuccess)
-                {
-                    var outputs = opResult.OutputData ?? new Dictionary<string, object>();
-                    operatorOutputs[op.Id] = outputs;
-
-                    // Sprint 1 Task 1.1: 应用扇出引用计数
-                    if (fanOutDegrees != null)
-                    {
-                        ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
-                    }
-                }
-
-                return opResult;
-            }).ToList();
-
-            // 等待当前层所有算子执行完成
+            // Wait for the layer to drain before mutating the method-local result accumulator.
             var layerResults = await Task.WhenAll(layerTasks);
             result.OperatorResults.AddRange(layerResults);
 
@@ -313,7 +367,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (layerResults.Any(r => !r.IsSuccess))
             {
                 failed = true;
-                var failedOp = layerResults.First(r => !r.IsSuccess);
+                var failedOp = primaryLayerFailure
+                    ?? layerResults
+                    .FirstOrDefault(r => !r.IsSuccess && !IsCanceledOperatorResult(r))
+                    ?? layerResults.First(r => !r.IsSuccess);
                 result.IsSuccess = false;
                 result.ErrorMessage = cancellationToken.IsCancellationRequested
                     ? "Flow was canceled."
@@ -325,6 +382,70 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 completedOperators.Add(op.Id);
             }
         }
+    }
+
+    private async Task<OperatorExecutionResult> ExecuteParallelLayerOperatorAsync(
+        OperatorFlow flow,
+        Operator op,
+        ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
+        FlowInputPreparationIndex inputPreparationIndex,
+        Dictionary<string, int>? fanOutDegrees,
+        CancellationToken cancellationToken,
+        CancellationTokenSource layerCts,
+        Func<OperatorExecutionResult, bool> signalLayerFailure)
+    {
+        if (layerCts.Token.IsCancellationRequested)
+        {
+            return CreateCanceledOperatorResult(op);
+        }
+
+        if (!TryResolveExecutor(op.Type, out var executor))
+        {
+            var missingExecutorResult = new OperatorExecutionResult
+            {
+                OperatorId = op.Id,
+                OperatorName = op.Name,
+                IsSuccess = false,
+                ErrorMessage = $"未找到类型为 {op.Type} 的算子执行器"
+            };
+
+            if (!cancellationToken.IsCancellationRequested && signalLayerFailure(missingExecutorResult))
+            {
+                await CancelLayerAsync(layerCts);
+            }
+
+            return missingExecutorResult;
+        }
+
+        var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+        var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, layerCts.Token);
+
+        if (opResult.IsSuccess)
+        {
+            var outputs = opResult.OutputData ?? new Dictionary<string, object>();
+            operatorOutputs[op.Id] = outputs;
+
+            if (fanOutDegrees != null)
+            {
+                ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
+            }
+
+            return opResult;
+        }
+
+        if (!cancellationToken.IsCancellationRequested && signalLayerFailure(opResult))
+        {
+            await CancelLayerAsync(layerCts);
+        }
+
+        if (!cancellationToken.IsCancellationRequested &&
+            layerCts.IsCancellationRequested &&
+            string.IsNullOrWhiteSpace(opResult.ErrorMessage))
+        {
+            return CreateCanceledOperatorResult(op, opResult.ExecutionTimeMs);
+        }
+
+        return opResult;
     }
 
     /// <summary>
@@ -452,6 +573,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 ErrorMessage = $"Operator '{op.Name}' timed out ({DefaultOperatorTimeoutMs / 1000}s)"
             };
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            opStopwatch.Stop();
+            op.MarkExecutionFailed("Operator execution was canceled.");
+            _logger.LogWarning("算子执行被取消: {OperatorName} ({OperatorId})", op.Name, op.Id);
+
+            return CreateCanceledOperatorResult(op, opStopwatch.ElapsedMilliseconds);
+        }
         catch (Exception ex)
         {
             opStopwatch.Stop();
@@ -471,7 +600,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
     public async Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null)
     {
-        if (!_executors.TryGetValue(@operator.Type, out var executor))
+        if (!TryResolveExecutor(@operator.Type, out var executor))
         {
             return new OperatorExecutionResult
             {
@@ -545,7 +674,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         // 验证每个算子的参数
         foreach (var op in flow.Operators)
         {
-            if (_executors.TryGetValue(op.Type, out var executor))
+            if (TryResolveExecutor(op.Type, out var executor))
             {
                 var validation = executor.ValidateParameters(op);
                 if (!validation.IsValid)
@@ -565,6 +694,23 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     public FlowExecutionStatus? GetExecutionStatus(Guid flowId)
     {
         return _executionStatuses.TryGetValue(flowId, out var status) ? status : null;
+    }
+
+    private bool TryResolveExecutor(OperatorType operatorType, out IOperatorExecutor executor)
+    {
+        if (_executors.TryGetValue(operatorType, out executor!))
+        {
+            return true;
+        }
+
+        var resolvedType = OperatorTypeAliasResolver.Resolve(operatorType);
+        if (resolvedType != operatorType && _executors.TryGetValue(resolvedType, out executor!))
+        {
+            return true;
+        }
+
+        executor = null!;
+        return false;
     }
 
     public Task CancelExecutionAsync(Guid flowId)
@@ -592,8 +738,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// <summary>
     /// 规范化流程输出，避免将 OpenCvSharp.Mat 等非 JSON 安全对象直接暴露到上层。
+    /// 图像类型会被快照化为 byte[]，因此上层不能假设结果仍然是 live Mat。
     /// </summary>
     private Dictionary<string, object> ConvertImageWrappersToBytes(Dictionary<string, object>? outputData)
     {
@@ -769,9 +915,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
     #endregion
 
-    private Dictionary<string, object> PrepareOperatorInputs(OperatorFlow flow, Operator op, IDictionary<Guid, Dictionary<string, object>> operatorOutputs)
+    private Dictionary<string, object> PrepareOperatorInputs(
+        OperatorFlow flow,
+        Operator op,
+        IDictionary<Guid, Dictionary<string, object>> operatorOutputs,
+        FlowInputPreparationIndex? inputPreparationIndex = null)
     {
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        inputPreparationIndex ??= BuildFlowInputPreparationIndex(flow);
 
         // 1. 【基础注入】首先将算子自身的参数合并到输入中作为默认值。
         // 这确保了如果没有外部连线，算子依然能拿到 UI 属性面板设置的参数（例如 filePath）。
@@ -784,12 +935,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
 
         // 查找连接到该算子的所有连线
-        var incomingConnections = flow.Connections
-            .Where(c => c.TargetOperatorId == op.Id)
-            .ToList();
+        var incomingConnections = inputPreparationIndex.GetIncomingConnections(op.Id);
 
         // 如果没有输入连接，尝试从初始输入数据获取 (Guid.Empty)
-        if (!incomingConnections.Any())
+        if (incomingConnections.Count == 0)
         {
             if (operatorOutputs.TryGetValue(Guid.Empty, out var initialInputs))
             {
@@ -810,17 +959,17 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 if (operatorOutputs.TryGetValue(connection.SourceOperatorId, out var sourceOutputs))
                 {
                     // 【条件分支路由修复】检查源算子是否为条件分支算子
-                    var sourceOperator = flow.Operators.FirstOrDefault(o => o.Id == connection.SourceOperatorId);
+                    var sourceOperator = inputPreparationIndex.GetSourceOperator(connection.SourceOperatorId);
 
                     if (sourceOperator?.Type == OperatorType.ConditionalBranch)
                     {
                         // 对于条件分支算子，只传递与连接端口名称匹配的数据
                         // 获取源端口名称（True / False）
-                        var sourcePort = sourceOperator.OutputPorts.FirstOrDefault(p => p.Id == connection.SourcePortId);
+                        var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
                         if (sourcePort != null)
                         {
                             var portName = sourcePort.Name;
-                            var targetPort = op.InputPorts.FirstOrDefault(p => p.Id == connection.TargetPortId);
+                            var targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
                             // 检查输出数据中是否有对应端口的数据且不为null
                             if (sourceOutputs.TryGetValue(portName, out var portData) && portData != null)
                             {
@@ -852,8 +1001,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                         // 注意：SourceOperator 可能不在当前上下文（虽然不太可能），但我们要防御性编程
                         if (sourceOperator != null)
                         {
-                            var sourcePort = sourceOperator.OutputPorts.FirstOrDefault(p => p.Id == connection.SourcePortId);
-                            var targetPort = op.InputPorts.FirstOrDefault(p => p.Id == connection.TargetPortId);
+                            var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
+                            var targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
 
                             // 【Bug 4 修复】基于端口名称的精确映射
                             if (sourcePort != null && targetPort != null)
@@ -1010,6 +1159,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             // 获取执行顺序（拓扑排序）
             var executionOrder = flow.GetExecutionOrder().ToList();
+            var inputPreparationIndex = BuildFlowInputPreparationIndex(flow);
             var fanOutDegrees = AnalyzeFanOutDegrees(flow);
 
             // 初始化执行状态
@@ -1058,7 +1208,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     }
                 }
 
-                if (!_executors.TryGetValue(op.Type, out var executor))
+                if (!TryResolveExecutor(op.Type, out var executor))
                 {
                     var debugResult = new OperatorDebugResult
                     {
@@ -1079,10 +1229,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
                 // 准备输入数据
-                var inputs = PrepareOperatorInputs(flow, op, operatorOutputs);
+                var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
                 var normalizedInputSnapshot = ConvertImageWrappersToBytes(inputs);
                 var cacheKey = (options.DebugSessionId, op.Id);
-                var cacheFingerprint = CreateDebugCacheFingerprint(op, normalizedInputSnapshot);
+                string? cacheFingerprint = null;
+                if (options.EnableIntermediateCache)
+                {
+                    cacheFingerprint = CreateDebugCacheFingerprint(op, normalizedInputSnapshot);
+                }
 
                 if (options.EnableIntermediateCache &&
                     _debugCache.TryGetValue(cacheKey, out var cachedOutputs) &&
@@ -1163,10 +1317,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 // 调试模式：缓存中间结果
                 if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)
                 {
-                    var normalizedOutputCopy = CloneNormalizedDictionary(normalizedOutputData);
-                    _debugCache[cacheKey] = normalizedOutputCopy;
-                    _debugCacheFingerprints[cacheKey] = cacheFingerprint;
-                    result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputCopy);
+                    _debugCache[cacheKey] = normalizedOutputData;
+                    _debugCacheFingerprints[cacheKey] = cacheFingerprint!;
+                    result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputData);
                     TouchDebugSession(options.DebugSessionId);
                 }
 
@@ -1302,49 +1455,158 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
     private static string CreateDebugCacheFingerprint(Operator op, Dictionary<string, object> inputs)
     {
-        var fingerprintPayload = new
-        {
-            operatorId = op.Id,
-            operatorType = op.Type.ToString(),
-            parameters = op.Parameters
-                .OrderBy(parameter => parameter.Name, StringComparer.Ordinal)
-                .ToDictionary(
-                    parameter => parameter.Name,
-                    parameter => NormalizeFingerprintValue(parameter.GetValue()),
-                    StringComparer.Ordinal),
-            inputs = inputs
-                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .ToDictionary(
-                    pair => pair.Key,
-                    pair => NormalizeFingerprintValue(pair.Value),
-                    StringComparer.Ordinal)
-        };
+        using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
-        var json = JsonSerializer.Serialize(fingerprintPayload);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
-        return Convert.ToHexString(hash);
+        AppendFingerprintString(hasher, op.Id.ToString("D"));
+        AppendFingerprintString(hasher, op.Type.ToString());
+
+        foreach (var parameter in op.Parameters.OrderBy(parameter => parameter.Name, StringComparer.Ordinal))
+        {
+            AppendFingerprintString(hasher, parameter.Name);
+            AppendFingerprintValue(hasher, parameter.GetValue());
+        }
+
+        foreach (var (key, value) in inputs.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            AppendFingerprintString(hasher, key);
+            AppendFingerprintValue(hasher, value);
+        }
+
+        return Convert.ToHexString(hasher.GetHashAndReset());
     }
 
-    private static object? NormalizeFingerprintValue(object? value)
+    private static void AppendFingerprintValue(IncrementalHash hasher, object? value)
     {
         if (!TryNormalizeOutputValue(value, out var normalized))
         {
-            return null;
+            AppendFingerprintString(hasher, "<unsupported>");
+            return;
         }
 
-        return normalized switch
+        switch (normalized)
         {
-            byte[] bytes => new
-            {
-                byteCount = bytes.Length,
-                sha256 = Convert.ToHexString(SHA256.HashData(bytes))
-            },
-            IDictionary<string, object?> dictionary => dictionary
-                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .ToDictionary(pair => pair.Key, pair => NormalizeFingerprintValue(pair.Value), StringComparer.Ordinal),
-            IEnumerable enumerable when normalized is not string => enumerable.Cast<object?>().Select(NormalizeFingerprintValue).ToList(),
-            _ => normalized
-        };
+            case null:
+                AppendFingerprintString(hasher, "<null>");
+                return;
+            case byte[] bytes:
+                hasher.AppendData(BitConverter.GetBytes(bytes.Length));
+                hasher.AppendData(bytes);
+                return;
+            case IDictionary<string, object?> dictionary:
+                AppendFingerprintString(hasher, "<dict>");
+                foreach (var (key, nestedValue) in dictionary.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                {
+                    AppendFingerprintString(hasher, key);
+                    AppendFingerprintValue(hasher, nestedValue);
+                }
+                AppendFingerprintString(hasher, "</dict>");
+                return;
+            case IEnumerable enumerable when normalized is not string:
+                AppendFingerprintString(hasher, "<list>");
+                foreach (var item in enumerable)
+                {
+                    AppendFingerprintValue(hasher, item);
+                }
+                AppendFingerprintString(hasher, "</list>");
+                return;
+            default:
+                AppendTypedFingerprintValue(hasher, normalized);
+                return;
+        }
+    }
+
+    private static void AppendTypedFingerprintValue(IncrementalHash hasher, object value)
+    {
+        switch (value)
+        {
+            case string text:
+                AppendFingerprintString(hasher, "<string>");
+                AppendFingerprintString(hasher, text);
+                return;
+            case bool boolValue:
+                AppendFingerprintString(hasher, "<bool>");
+                AppendFingerprintString(hasher, boolValue ? "1" : "0");
+                return;
+            case char charValue:
+                AppendFingerprintString(hasher, "<char>");
+                AppendFingerprintString(hasher, charValue.ToString());
+                return;
+            case sbyte sbyteValue:
+                AppendFingerprintString(hasher, "<sbyte>");
+                AppendFingerprintString(hasher, sbyteValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case byte byteValue:
+                AppendFingerprintString(hasher, "<byte>");
+                AppendFingerprintString(hasher, byteValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case short shortValue:
+                AppendFingerprintString(hasher, "<short>");
+                AppendFingerprintString(hasher, shortValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case ushort ushortValue:
+                AppendFingerprintString(hasher, "<ushort>");
+                AppendFingerprintString(hasher, ushortValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case int intValue:
+                AppendFingerprintString(hasher, "<int>");
+                AppendFingerprintString(hasher, intValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case uint uintValue:
+                AppendFingerprintString(hasher, "<uint>");
+                AppendFingerprintString(hasher, uintValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case long longValue:
+                AppendFingerprintString(hasher, "<long>");
+                AppendFingerprintString(hasher, longValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case ulong ulongValue:
+                AppendFingerprintString(hasher, "<ulong>");
+                AppendFingerprintString(hasher, ulongValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case float floatValue:
+                AppendFingerprintString(hasher, "<float>");
+                AppendFingerprintString(hasher, floatValue.ToString("R", CultureInfo.InvariantCulture));
+                return;
+            case double doubleValue:
+                AppendFingerprintString(hasher, "<double>");
+                AppendFingerprintString(hasher, doubleValue.ToString("R", CultureInfo.InvariantCulture));
+                return;
+            case decimal decimalValue:
+                AppendFingerprintString(hasher, "<decimal>");
+                AppendFingerprintString(hasher, decimalValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            case DateTime dateTimeValue:
+                AppendFingerprintString(hasher, "<datetime>");
+                AppendFingerprintString(hasher, dateTimeValue.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+                return;
+            case DateTimeOffset dateTimeOffsetValue:
+                AppendFingerprintString(hasher, "<datetimeoffset>");
+                AppendFingerprintString(hasher, dateTimeOffsetValue.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+                return;
+            case TimeSpan timeSpanValue:
+                AppendFingerprintString(hasher, "<timespan>");
+                AppendFingerprintString(hasher, timeSpanValue.ToString("c", CultureInfo.InvariantCulture));
+                return;
+            case Guid guidValue:
+                AppendFingerprintString(hasher, "<guid>");
+                AppendFingerprintString(hasher, guidValue.ToString("D"));
+                return;
+            case IFormattable formattable:
+                AppendFingerprintString(hasher, $"<{value.GetType().FullName}>");
+                AppendFingerprintString(hasher, formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty);
+                return;
+            default:
+                AppendFingerprintString(hasher, $"<{value.GetType().FullName}>");
+                AppendFingerprintString(hasher, value.ToString() ?? string.Empty);
+                return;
+        }
+    }
+
+    private static void AppendFingerprintString(IncrementalHash hasher, string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        hasher.AppendData(BitConverter.GetBytes(bytes.Length));
+        hasher.AppendData(bytes);
     }
 
     private void TouchDebugSession(Guid debugSessionId)
@@ -1396,8 +1658,39 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             return;
         }
 
+        // This service does not have a finalizer. Per-execution CancellationTokenSources are disposed
+        // in the finally blocks of ExecuteFlowAsync / ExecuteFlowDebugAsync; Dispose only tears down
+        // the service-level cleanup timer.
         _debugCacheCleanupTimer.Dispose();
         _disposed = true;
+    }
+
+    private static OperatorExecutionResult CreateCanceledOperatorResult(Operator op, long executionTimeMs = 0)
+    {
+        return new OperatorExecutionResult
+        {
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            IsSuccess = false,
+            ExecutionTimeMs = executionTimeMs,
+            ErrorMessage = OperatorCanceledErrorMessage
+        };
+    }
+
+    private static bool IsCanceledOperatorResult(OperatorExecutionResult result)
+    {
+        return string.Equals(result.ErrorMessage, OperatorCanceledErrorMessage, StringComparison.Ordinal);
+    }
+
+    private static async Task CancelLayerAsync(CancellationTokenSource layerCts)
+    {
+        try
+        {
+            await layerCts.CancelAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     #endregion

@@ -16,7 +16,8 @@ namespace Acme.Product.Infrastructure.Operators;
     DisplayName = "Subpixel Edge Detection",
     Description = "Extracts subpixel edges using Steger or interpolation-based methods.",
     Category = "Feature Extraction",
-    IconName = "edge-subpixel"
+    IconName = "edge-subpixel",
+    Tags = new[] { "experimental", "industrial-remediation", "subpixel-edge" }
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]
@@ -66,6 +67,7 @@ public class SubpixelEdgeDetectionOperator : OperatorBase
             {
                 using var detector = new StegerSubpixelEdgeDetector
                 {
+                    Sigma = sigma,
                     EdgeThreshold = edgeThreshold,
                     MaxOffset = 0.5
                 };
@@ -109,7 +111,17 @@ public class SubpixelEdgeDetectionOperator : OperatorBase
                 { "Edges", subpixelEdges },
                 { "EdgeCount", edgePoints.Count },
                 { "ContourCount", contourCount },
-                { "Method", method }
+                { "Method", method },
+                { "SigmaUsed", sigma },
+                { "AlgorithmClass", method.Equals("Steger", StringComparison.OrdinalIgnoreCase) ? "HessianRidgeSubpixel" : "InterpolationRefinement" },
+                { "IndustrialGradeModel", method.Equals("Steger", StringComparison.OrdinalIgnoreCase) },
+                { "Diagnostics", method.Equals("Steger", StringComparison.OrdinalIgnoreCase)
+                    ? Array.Empty<string>()
+                    : new[]
+                    {
+                        "GradientInterp/GaussianFit are interpolation refinements on top of binary edge candidates.",
+                        "They are suitable for lightweight subpixel localization but are not a full industrial metrology edge model."
+                    } }
             };
 
             return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData));

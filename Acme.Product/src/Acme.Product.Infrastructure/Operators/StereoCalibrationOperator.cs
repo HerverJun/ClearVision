@@ -3,12 +3,11 @@
 // 对标 Halcon: binocular_calibration / gen_binocular_rectification_map
 // 作者：AI Assistant
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
+using Acme.Product.Infrastructure.Calibration;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -46,6 +45,11 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("Alpha", "Alpha (0=Crop, 1=Preserve)", "double", DefaultValue = 0.0, Min = -1.0, Max = 1.0)]
 public class StereoCalibrationOperator : OperatorBase
 {
+    private const double StereoMeanErrorAcceptanceThreshold = 0.35;
+    private const double CameraMeanErrorAcceptanceThreshold = 0.35;
+    private const double PerViewErrorAcceptanceThreshold = 0.60;
+    private const double EpipolarErrorAcceptanceThreshold = 0.75;
+
     public override OperatorType OperatorType => OperatorType.StereoCalibration;
 
     public StereoCalibrationOperator(ILogger<StereoCalibrationOperator> logger) : base(logger)
@@ -148,29 +152,36 @@ public class StereoCalibrationOperator : OperatorBase
                 new TermCriteria(CriteriaTypes.Eps | CriteriaTypes.MaxIter, 30, 0.1));
         }
 
-        var objectPoints = CreateObjectPoints(patternSize, squareSize);
         var imageSize = leftGray.Size();
 
         // 单个图像对无法进行完整双目标定，只能验证角点检测
         var resultImage = CreateStereoVisualization(leftMat, rightMat, leftCorners, rightCorners, patternSize);
 
-        var payload = new StereoCalibrationPayload
+        var bundle = new CalibrationBundleV2
         {
-            PatternType = patternType,
-            BoardWidth = patternSize.Width,
-            BoardHeight = patternSize.Height,
-            SquareSize = squareSize,
-            ImageWidth = imageSize.Width,
-            ImageHeight = imageSize.Height,
-            ImageCount = 1,
-            Found = true,
-            Message = "Single pair mode: corner detection successful. Use FolderCalibration for full stereo calibration.",
-            LeftCorners = leftCorners.Select(c => new Point2Payload(c.X, c.Y)).ToList(),
-            RightCorners = rightCorners.Select(c => new Point2Payload(c.X, c.Y)).ToList(),
-            Timestamp = DateTime.UtcNow
+            CalibrationKind = CalibrationKindV2.StereoRig,
+            TransformModel = TransformModelV2.Preview,
+            SourceFrame = "left_camera",
+            TargetFrame = "right_camera",
+            Unit = "mm",
+            ImageSize = new CalibrationImageSizeV2
+            {
+                Width = imageSize.Width,
+                Height = imageSize.Height
+            },
+            Quality = CalibrationBundleV2Helpers.CreatePreviewQuality(
+                new[]
+                {
+                    "SinglePair mode is preview-only.",
+                    $"PatternType={patternType}",
+                    $"CornersLeft={leftCorners.Length}",
+                    $"CornersRight={rightCorners.Length}"
+                },
+                sampleCount: 1),
+            ProducerOperator = nameof(StereoCalibrationOperator)
         };
 
-        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        var json = CalibrationBundleV2Json.Serialize(bundle);
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, new Dictionary<string, object>
         {
@@ -178,7 +189,8 @@ public class StereoCalibrationOperator : OperatorBase
             { "Found", true },
             { "LeftCornerCount", leftCorners.Length },
             { "RightCornerCount", rightCorners.Length },
-            { "Message", payload.Message }
+            { "Accepted", false },
+            { "Message", "Single pair mode: preview only. Use FolderCalibration for accepted stereo bundle." }
         })));
     }
 
@@ -204,38 +216,52 @@ public class StereoCalibrationOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("RightImageFolder does not exist."));
         }
 
-        var leftFiles = GetImageFiles(leftFolder).OrderBy(f => f).ToArray();
-        var rightFiles = GetImageFiles(rightFolder).OrderBy(f => f).ToArray();
+        var leftFiles = GetImageFiles(leftFolder)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var rightFiles = GetImageFiles(rightFolder)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         if (leftFiles.Length == 0 || rightFiles.Length == 0)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("No calibration images found in folders."));
         }
 
-        if (leftFiles.Length != rightFiles.Length)
+        if (!TryCreateStereoFilePairs(leftFiles, rightFiles, out var filePairs, out var pairingError))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure($"Left and right folders must have same number of images. Left: {leftFiles.Length}, Right: {rightFiles.Length}"));
+            return Task.FromResult(OperatorExecutionOutput.Failure(pairingError));
         }
 
         var objectPointsList = new List<Point3f[]>();
         var leftImagePointsList = new List<Point2f[]>();
         var rightImagePointsList = new List<Point2f[]>();
-        var failedPairs = new List<int>();
+        var validPairKeys = new List<string>();
+        var failedPairKeys = new List<string>();
+        var successfulPairs = new List<StereoImagePair>();
         Size imageSize = default;
 
-        for (int i = 0; i < leftFiles.Length; i++)
+        for (int i = 0; i < filePairs.Length; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var pair = filePairs[i];
 
             try
             {
-                using var leftImg = Cv2.ImRead(leftFiles[i], ImreadModes.Grayscale);
-                using var rightImg = Cv2.ImRead(rightFiles[i], ImreadModes.Grayscale);
+                using var leftImg = Cv2.ImRead(pair.LeftFile, ImreadModes.Grayscale);
+                using var rightImg = Cv2.ImRead(pair.RightFile, ImreadModes.Grayscale);
 
                 if (leftImg.Empty() || rightImg.Empty())
                 {
-                    failedPairs.Add(i);
-                    Logger.LogWarning("Failed to load image pair {Index}: {Left}, {Right}", i, leftFiles[i], rightFiles[i]);
+                    failedPairKeys.Add(pair.StableKey);
+                    Logger.LogWarning("Failed to load image pair {Index}: {Left}, {Right}", i, pair.LeftFile, pair.RightFile);
+                    continue;
+                }
+
+                if (leftImg.Size() != rightImg.Size())
+                {
+                    failedPairKeys.Add(pair.StableKey);
+                    Logger.LogWarning("Image sizes do not match for stereo pair {Key}: {LeftSize} vs {RightSize}", pair.StableKey, leftImg.Size(), rightImg.Size());
                     continue;
                 }
 
@@ -243,18 +269,24 @@ public class StereoCalibrationOperator : OperatorBase
                 {
                     imageSize = leftImg.Size();
                 }
+                else if (leftImg.Size() != imageSize)
+                {
+                    failedPairKeys.Add(pair.StableKey);
+                    Logger.LogWarning("Image size for stereo pair {Key} differs from calibration set size {Expected}: {Actual}", pair.StableKey, imageSize, leftImg.Size());
+                    continue;
+                }
 
                 if (!TryFindCalibrationCorners(leftImg, patternType, patternSize, out var leftCorners) || leftCorners.Length == 0)
                 {
-                    failedPairs.Add(i);
-                    Logger.LogWarning("Pattern not found in left image: {File}", leftFiles[i]);
+                    failedPairKeys.Add(pair.StableKey);
+                    Logger.LogWarning("Pattern not found in left image: {File}", pair.LeftFile);
                     continue;
                 }
 
                 if (!TryFindCalibrationCorners(rightImg, patternType, patternSize, out var rightCorners) || rightCorners.Length == 0)
                 {
-                    failedPairs.Add(i);
-                    Logger.LogWarning("Pattern not found in right image: {File}", rightFiles[i]);
+                    failedPairKeys.Add(pair.StableKey);
+                    Logger.LogWarning("Pattern not found in right image: {File}", pair.RightFile);
                     continue;
                 }
 
@@ -270,20 +302,22 @@ public class StereoCalibrationOperator : OperatorBase
                 objectPointsList.Add(CreateObjectPoints(patternSize, squareSize));
                 leftImagePointsList.Add(leftCorners);
                 rightImagePointsList.Add(rightCorners);
+                validPairKeys.Add(pair.StableKey);
+                successfulPairs.Add(pair);
 
-                Logger.LogDebug("Successfully processed pair {Index}/{Total}", i + 1, leftFiles.Length);
+                Logger.LogDebug("Successfully processed pair {Index}/{Total} ({Key})", i + 1, filePairs.Length, pair.StableKey);
             }
             catch (Exception ex)
             {
-                failedPairs.Add(i);
-                Logger.LogWarning(ex, "Failed to process image pair {Index}", i);
+                failedPairKeys.Add(pair.StableKey);
+                Logger.LogWarning(ex, "Failed to process image pair {Index} ({Key})", i, pair.StableKey);
             }
         }
 
         if (objectPointsList.Count < minValidPairs)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure(
-                $"Need at least {minValidPairs} valid image pairs, got {objectPointsList.Count}. Failed pairs: {failedPairs.Count}"));
+                $"Need at least {minValidPairs} valid image pairs, got {objectPointsList.Count}. Failed pairs: {failedPairKeys.Count}. Keys: {JoinKeys(failedPairKeys)}"));
         }
 
         // 执行双目标定
@@ -298,14 +332,35 @@ public class StereoCalibrationOperator : OperatorBase
         // 执行立体校正
         var rectificationResult = PerformStereoRectification(
             calibrationResult, imageSize, zeroDisparity, alpha);
+        if (!rectificationResult.Success)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("Stereo rectification failed."));
+        }
 
         // 保存结果
-        var payload = CreateCalibrationPayload(
-            patternType, patternSize, squareSize, imageSize,
-            objectPointsList.Count, leftFiles.Length, failedPairs,
-            calibrationResult, rectificationResult);
+        var quality = EvaluateStereoCalibrationQuality(
+            patternType,
+            patternSize,
+            squareSize,
+            objectPointsList.Count,
+            filePairs.Length,
+            minValidPairs,
+            calibrationResult.ReprojectionErrorStereo,
+            calibrationResult.ReprojectionErrorLeft,
+            calibrationResult.ReprojectionErrorRight,
+            calibrationResult.EpipolarError,
+            calibrationResult.LeftPerViewErrors,
+            calibrationResult.RightPerViewErrors,
+            validPairKeys,
+            failedPairKeys);
 
-        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        var bundle = CreateCalibrationBundleV2(
+            imageSize,
+            calibrationResult,
+            rectificationResult,
+            quality);
+
+        var json = CalibrationBundleV2Json.Serialize(bundle);
         try
         {
             File.WriteAllText(outputPath, json);
@@ -317,12 +372,13 @@ public class StereoCalibrationOperator : OperatorBase
 
         // 创建可视化结果
         var resultImage = CreateCalibrationResultVisualization(
-            leftFiles.First(), rightFiles.First(), calibrationResult, rectificationResult);
+            successfulPairs[0].LeftFile, successfulPairs[0].RightFile, calibrationResult, rectificationResult);
 
         // 输出校正映射
         var outputData = new Dictionary<string, object>
         {
             { "CalibrationData", json },
+            { "Accepted", quality.Accepted },
             { "CameraMatrixLeft", calibrationResult.CameraMatrixLeft },
             { "DistCoeffsLeft", calibrationResult.DistCoeffsLeft },
             { "CameraMatrixRight", calibrationResult.CameraMatrixRight },
@@ -340,12 +396,17 @@ public class StereoCalibrationOperator : OperatorBase
             { "ReprojectionErrorLeft", calibrationResult.ReprojectionErrorLeft },
             { "ReprojectionErrorRight", calibrationResult.ReprojectionErrorRight },
             { "ReprojectionErrorStereo", calibrationResult.ReprojectionErrorStereo },
+            { "MaxPerViewErrorLeft", calibrationResult.MaxPerViewErrorLeft },
+            { "MaxPerViewErrorRight", calibrationResult.MaxPerViewErrorRight },
+            { "MaxPerViewError", quality.MaxError },
             { "EpipolarError", calibrationResult.EpipolarError },
             { "ValidPairs", objectPointsList.Count },
-            { "TotalPairs", leftFiles.Length },
-            { "FailedPairs", failedPairs.Count },
+            { "TotalPairs", filePairs.Length },
+            { "FailedPairs", failedPairKeys.Count },
             { "OutputPath", outputPath },
-            { "Message", $"Stereo calibration completed. Valid pairs: {objectPointsList.Count}/{leftFiles.Length}, Stereo RMS: {calibrationResult.ReprojectionErrorStereo:F4}" }
+            { "Message", quality.Accepted
+                ? $"Stereo calibration accepted. Valid pairs: {objectPointsList.Count}/{filePairs.Length}, Stereo RMS: {calibrationResult.ReprojectionErrorStereo:F4}"
+                : $"Stereo calibration completed but did not pass quality acceptance. Valid pairs: {objectPointsList.Count}/{filePairs.Length}, Stereo RMS: {calibrationResult.ReprojectionErrorStereo:F4}, Max per-view: {quality.MaxError:F4}" }
         };
 
         // 清理资源（输出字典中保留的Mat除外）
@@ -378,14 +439,32 @@ public class StereoCalibrationOperator : OperatorBase
                 rightImagePointInputs[i] = InputArray.Create(rightImagePoints[i]);
             }
 
-            result.CameraMatrixLeft = new Mat(3, 3, MatType.CV_64FC1);
-            result.DistCoeffsLeft = new Mat();
-            result.CameraMatrixRight = new Mat(3, 3, MatType.CV_64FC1);
-            result.DistCoeffsRight = new Mat();
+            var leftCalibration = CalibrateSingleCamera(objectPoints, leftImagePoints, imageSize);
+            if (!leftCalibration.Success)
+            {
+                throw new InvalidOperationException($"Left camera calibration failed: {leftCalibration.ErrorMessage}");
+            }
+
+            var rightCalibration = CalibrateSingleCamera(objectPoints, rightImagePoints, imageSize);
+            if (!rightCalibration.Success)
+            {
+                throw new InvalidOperationException($"Right camera calibration failed: {rightCalibration.ErrorMessage}");
+            }
+
+            result.CameraMatrixLeft = leftCalibration.CameraMatrix;
+            result.DistCoeffsLeft = leftCalibration.DistCoeffs;
+            result.CameraMatrixRight = rightCalibration.CameraMatrix;
+            result.DistCoeffsRight = rightCalibration.DistCoeffs;
             result.RotationMatrix = new Mat(3, 3, MatType.CV_64FC1);
             result.TranslationVector = new Mat(3, 1, MatType.CV_64FC1);
             result.EssentialMatrix = new Mat(3, 3, MatType.CV_64FC1);
             result.FundamentalMatrix = new Mat(3, 3, MatType.CV_64FC1);
+            result.ReprojectionErrorLeft = leftCalibration.MeanError;
+            result.ReprojectionErrorRight = rightCalibration.MeanError;
+            result.MaxPerViewErrorLeft = leftCalibration.MaxError;
+            result.MaxPerViewErrorRight = rightCalibration.MaxError;
+            result.LeftPerViewErrors = leftCalibration.PerViewErrors;
+            result.RightPerViewErrors = rightCalibration.PerViewErrors;
 
             // 执行双目标定
             var stereoRms = Cv2.StereoCalibrate(
@@ -401,17 +480,24 @@ public class StereoCalibrationOperator : OperatorBase
                 result.TranslationVector,
                 result.EssentialMatrix,
                 result.FundamentalMatrix,
-                CalibrationFlags.None,
+                CalibrationFlags.FixIntrinsic,
                 new TermCriteria(CriteriaTypes.Eps | CriteriaTypes.MaxIter, 100, 1e-5));
 
             result.ReprojectionErrorStereo = stereoRms;
             result.Success = true;
 
             // 计算单独的重投影误差
-            result.ReprojectionErrorLeft = CalculateReprojectionError(
+            var leftStats = CalculateReprojectionStats(
                 objectPoints, leftImagePoints, result.CameraMatrixLeft, result.DistCoeffsLeft);
-            result.ReprojectionErrorRight = CalculateReprojectionError(
+            var rightStats = CalculateReprojectionStats(
                 objectPoints, rightImagePoints, result.CameraMatrixRight, result.DistCoeffsRight);
+
+            result.ReprojectionErrorLeft = leftStats.MeanError;
+            result.ReprojectionErrorRight = rightStats.MeanError;
+            result.MaxPerViewErrorLeft = leftStats.MaxError;
+            result.MaxPerViewErrorRight = rightStats.MaxError;
+            result.LeftPerViewErrors = leftStats.PerViewErrors;
+            result.RightPerViewErrors = rightStats.PerViewErrors;
 
             // 计算极线误差
             result.EpipolarError = CalculateEpipolarError(
@@ -422,6 +508,75 @@ public class StereoCalibrationOperator : OperatorBase
             result.Success = false;
             result.ErrorMessage = ex.Message;
             Logger.LogError(ex, "Stereo calibration failed");
+        }
+
+        return result;
+    }
+
+    private SingleCameraCalibrationResult CalibrateSingleCamera(
+        IReadOnlyList<Point3f[]> objectPoints,
+        IReadOnlyList<Point2f[]> imagePoints,
+        Size imageSize)
+    {
+        var result = new SingleCameraCalibrationResult
+        {
+            CameraMatrix = new Mat(),
+            DistCoeffs = new Mat()
+        };
+
+        var objectPointMats = new List<Mat>(objectPoints.Count);
+        var imagePointMats = new List<Mat>(imagePoints.Count);
+        Mat[]? rvecs = null;
+        Mat[]? tvecs = null;
+        try
+        {
+            foreach (var points in objectPoints)
+            {
+                objectPointMats.Add(Mat.FromArray(points));
+            }
+
+            foreach (var points in imagePoints)
+            {
+                imagePointMats.Add(Mat.FromArray(points));
+            }
+
+            result.CameraMatrix = new Mat();
+            result.DistCoeffs = new Mat();
+
+            Cv2.CalibrateCamera(
+                objectPointMats,
+                imagePointMats,
+                imageSize,
+                result.CameraMatrix,
+                result.DistCoeffs,
+                out rvecs,
+                out tvecs,
+                CalibrationFlags.None,
+                new TermCriteria(CriteriaTypes.Eps | CriteriaTypes.MaxIter, 80, 1e-7));
+
+            var viewErrors = ComputePerViewErrors(
+                objectPointMats,
+                imagePointMats,
+                rvecs,
+                tvecs,
+                result.CameraMatrix,
+                result.DistCoeffs);
+            result.PerViewErrors = viewErrors;
+            result.MeanError = viewErrors.Length == 0 ? 0.0 : viewErrors.Average();
+            result.MaxError = viewErrors.Length == 0 ? 0.0 : viewErrors.Max();
+            result.Success = true;
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            DisposeMatList(objectPointMats);
+            DisposeMatList(imagePointMats);
+            DisposeMatArray(rvecs);
+            DisposeMatArray(tvecs);
         }
 
         return result;
@@ -444,6 +599,7 @@ public class StereoCalibrationOperator : OperatorBase
             result.DisparityToDepth = new Mat(4, 4, MatType.CV_64FC1);
 
             // 执行立体校正
+            var rectificationFlags = zeroDisparity ? StereoRectificationFlags.ZeroDisparity : (StereoRectificationFlags)0;
             Cv2.StereoRectify(
                 calibration.CameraMatrixLeft,
                 calibration.DistCoeffsLeft,
@@ -457,7 +613,7 @@ public class StereoCalibrationOperator : OperatorBase
                 result.LeftProjection,
                 result.RightProjection,
                 result.DisparityToDepth,
-                StereoRectificationFlags.ZeroDisparity,
+                rectificationFlags,
                 alpha,
                 imageSize,
                 out var leftValidRoi,
@@ -503,7 +659,7 @@ public class StereoCalibrationOperator : OperatorBase
         return result;
     }
 
-    private double CalculateReprojectionError(
+    private ReprojectionErrorStats CalculateReprojectionStats(
         List<Point3f[]> objectPoints,
         List<Point2f[]> imagePoints,
         Mat cameraMatrix,
@@ -513,20 +669,28 @@ public class StereoCalibrationOperator : OperatorBase
         {
             var totalError = 0.0;
             var totalPoints = 0;
+            var perViewErrors = new List<double>(objectPoints.Count);
 
-            for (int i = 0; i < objectPoints.Count; i++)
+            for (var i = 0; i < objectPoints.Count; i++)
             {
                 using var rvec = new Mat();
                 using var tvec = new Mat();
-
-                Cv2.SolvePnP(
-                    InputArray.Create(objectPoints[i]),
-                    InputArray.Create(imagePoints[i]),
-                    cameraMatrix,
-                    distCoeffs,
-                    rvec,
-                    tvec,
-                    flags: SolvePnPFlags.Iterative);
+                try
+                {
+                    Cv2.SolvePnP(
+                        InputArray.Create(objectPoints[i]),
+                        InputArray.Create(imagePoints[i]),
+                        cameraMatrix,
+                        distCoeffs,
+                        rvec,
+                        tvec,
+                        flags: SolvePnPFlags.Iterative);
+                }
+                catch
+                {
+                    perViewErrors.Add(double.PositiveInfinity);
+                    continue;
+                }
 
                 using var projectedPoints = new Mat();
                 Cv2.ProjectPoints(
@@ -539,23 +703,82 @@ public class StereoCalibrationOperator : OperatorBase
 
                 var projected = ReadPoint2fVector(projectedPoints);
                 var original = imagePoints[i];
+                if (projected.Length != original.Length || projected.Length == 0)
+                {
+                    perViewErrors.Add(double.PositiveInfinity);
+                    continue;
+                }
 
-                for (int j = 0; j < projected.Length; j++)
+                var viewError = 0.0;
+                for (var j = 0; j < projected.Length; j++)
                 {
                     var error = Math.Sqrt(
                         Math.Pow(projected[j].X - original[j].X, 2) +
                         Math.Pow(projected[j].Y - original[j].Y, 2));
                     totalError += error;
+                    viewError += error;
                     totalPoints++;
                 }
+
+                perViewErrors.Add(viewError / projected.Length);
             }
 
-            return totalPoints > 0 ? totalError / totalPoints : 0.0;
+            var finiteErrors = perViewErrors.Where(double.IsFinite).ToArray();
+            var meanError = totalPoints > 0 ? totalError / totalPoints : double.PositiveInfinity;
+            var maxError = finiteErrors.Length > 0 ? finiteErrors.Max() : double.PositiveInfinity;
+            return new ReprojectionErrorStats(meanError, maxError, perViewErrors);
         }
         catch
         {
-            return -1.0;
+            return new ReprojectionErrorStats(-1.0, double.PositiveInfinity, Array.Empty<double>());
         }
+    }
+
+    private static double[] ComputePerViewErrors(
+        IReadOnlyList<Mat> objectPoints,
+        IReadOnlyList<Mat> imagePoints,
+        IReadOnlyList<Mat>? rvecs,
+        IReadOnlyList<Mat>? tvecs,
+        Mat cameraMatrix,
+        Mat distCoeffs)
+    {
+        if (rvecs == null || tvecs == null || rvecs.Count != objectPoints.Count || tvecs.Count != objectPoints.Count)
+        {
+            return Enumerable.Repeat(double.PositiveInfinity, objectPoints.Count).ToArray();
+        }
+
+        var errors = new double[objectPoints.Count];
+        for (var i = 0; i < objectPoints.Count; i++)
+        {
+            using var projectedPoints = new Mat();
+            Cv2.ProjectPoints(
+                objectPoints[i],
+                rvecs[i],
+                tvecs[i],
+                cameraMatrix,
+                distCoeffs,
+                projectedPoints);
+
+            var projected = ReadPoint2fVector(projectedPoints);
+            var original = ReadPoint2fVector(imagePoints[i]);
+            if (projected.Length != original.Length || projected.Length == 0)
+            {
+                errors[i] = double.PositiveInfinity;
+                continue;
+            }
+
+            double sumSq = 0;
+            for (var p = 0; p < projected.Length; p++)
+            {
+                var dx = projected[p].X - original[p].X;
+                var dy = projected[p].Y - original[p].Y;
+                sumSq += dx * dx + dy * dy;
+            }
+
+            errors[i] = Math.Sqrt(sumSq / projected.Length);
+        }
+
+        return errors;
     }
 
     private double CalculateEpipolarError(List<Point2f[]> leftPoints, List<Point2f[]> rightPoints, Mat fundamentalMatrix)
@@ -694,39 +917,54 @@ public class StereoCalibrationOperator : OperatorBase
         }
     }
 
-    private StereoCalibrationPayload CreateCalibrationPayload(
-        string patternType, Size patternSize, double squareSize, Size imageSize,
-        int validPairs, int totalPairs, List<int> failedPairs,
-        StereoCalibrationResult calib, StereoRectificationResult rect)
+    private CalibrationBundleV2 CreateCalibrationBundleV2(
+        Size imageSize,
+        StereoCalibrationResult calib, StereoRectificationResult rect,
+        CalibrationQualityV2 quality)
     {
-        return new StereoCalibrationPayload
+        var leftDistCoeffs = FlattenMat(calib.DistCoeffsLeft);
+        var rightDistCoeffs = FlattenMat(calib.DistCoeffsRight);
+
+        return new CalibrationBundleV2
         {
-            PatternType = patternType,
-            BoardWidth = patternSize.Width,
-            BoardHeight = patternSize.Height,
-            SquareSize = squareSize,
-            ImageWidth = imageSize.Width,
-            ImageHeight = imageSize.Height,
-            ImageCount = validPairs,
-            TotalPairs = totalPairs,
-            FailedPairIndices = failedPairs,
-            Found = true,
-            Timestamp = DateTime.UtcNow,
-            CameraMatrixLeft = ToJaggedMatrix(calib.CameraMatrixLeft),
-            DistCoeffsLeft = FlattenMat(calib.DistCoeffsLeft),
-            CameraMatrixRight = ToJaggedMatrix(calib.CameraMatrixRight),
-            DistCoeffsRight = FlattenMat(calib.DistCoeffsRight),
-            RotationMatrix = ToJaggedMatrix(calib.RotationMatrix),
-            TranslationVector = FlattenMat(calib.TranslationVector),
-            EssentialMatrix = ToJaggedMatrix(calib.EssentialMatrix),
-            FundamentalMatrix = ToJaggedMatrix(calib.FundamentalMatrix),
-            ReprojectionErrorLeft = calib.ReprojectionErrorLeft,
-            ReprojectionErrorRight = calib.ReprojectionErrorRight,
-            ReprojectionErrorStereo = calib.ReprojectionErrorStereo,
-            EpipolarError = calib.EpipolarError,
-            LeftValidRoi = new[] { rect.LeftValidRoi.X, rect.LeftValidRoi.Y, rect.LeftValidRoi.Width, rect.LeftValidRoi.Height },
-            RightValidRoi = new[] { rect.RightValidRoi.X, rect.RightValidRoi.Y, rect.RightValidRoi.Width, rect.RightValidRoi.Height },
-            Message = $"Stereo calibration successful. Valid pairs: {validPairs}/{totalPairs}"
+            CalibrationKind = CalibrationKindV2.StereoRig,
+            TransformModel = TransformModelV2.StereoRig,
+            SourceFrame = "left_camera",
+            TargetFrame = "right_camera",
+            Unit = "mm",
+            ImageSize = new CalibrationImageSizeV2
+            {
+                Width = imageSize.Width,
+                Height = imageSize.Height
+            },
+            Stereo = new StereoCalibrationDataV2
+            {
+                LeftIntrinsics = new CalibrationIntrinsicsV2
+                {
+                    CameraMatrix = ToJaggedMatrix(calib.CameraMatrixLeft)
+                },
+                RightIntrinsics = new CalibrationIntrinsicsV2
+                {
+                    CameraMatrix = ToJaggedMatrix(calib.CameraMatrixRight)
+                },
+                LeftDistortion = new CalibrationDistortionV2
+                {
+                    Model = DistortionModelV2.BrownConrady,
+                    Coefficients = leftDistCoeffs
+                },
+                RightDistortion = new CalibrationDistortionV2
+                {
+                    Model = DistortionModelV2.BrownConrady,
+                    Coefficients = rightDistCoeffs
+                },
+                Rotation = ToJaggedMatrix(calib.RotationMatrix),
+                Translation = FlattenMat(calib.TranslationVector),
+                Essential = ToJaggedMatrix(calib.EssentialMatrix),
+                Fundamental = ToJaggedMatrix(calib.FundamentalMatrix),
+                Q = ToJaggedMatrix(rect.DisparityToDepth)
+            },
+            Quality = quality,
+            ProducerOperator = nameof(StereoCalibrationOperator)
         };
     }
 
@@ -750,6 +988,210 @@ public class StereoCalibrationOperator : OperatorBase
             .Concat(Directory.GetFiles(folder, "*.jpeg"))
             .Concat(Directory.GetFiles(folder, "*.bmp"))
             .ToArray();
+    }
+
+    private static bool TryCreateStereoFilePairs(
+        IReadOnlyList<string> leftFiles,
+        IReadOnlyList<string> rightFiles,
+        out StereoImagePair[] pairs,
+        out string error)
+    {
+        pairs = Array.Empty<StereoImagePair>();
+        error = string.Empty;
+
+        if (!TryIndexStereoFiles(leftFiles, "Left", out var leftIndex, out error) ||
+            !TryIndexStereoFiles(rightFiles, "Right", out var rightIndex, out error))
+        {
+            return false;
+        }
+
+        var missingOnRight = leftIndex.Keys.Except(rightIndex.Keys, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var missingOnLeft = rightIndex.Keys.Except(leftIndex.Keys, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missingOnRight.Length > 0 || missingOnLeft.Length > 0)
+        {
+            error = $"Stereo pair mismatch detected. Missing on right: {JoinKeys(missingOnRight)}. Missing on left: {JoinKeys(missingOnLeft)}.";
+            return false;
+        }
+
+        pairs = leftIndex.Keys
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .Select(key => new StereoImagePair(key, leftIndex[key], rightIndex[key]))
+            .ToArray();
+
+        return true;
+    }
+
+    private static bool TryIndexStereoFiles(
+        IReadOnlyList<string> files,
+        string side,
+        out Dictionary<string, string> index,
+        out string error)
+    {
+        index = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        error = string.Empty;
+
+        foreach (var file in files)
+        {
+            var stableKey = CreateStablePairKey(Path.GetFileNameWithoutExtension(file));
+            if (index.TryGetValue(stableKey, out var existing))
+            {
+                error = $"{side} folder contains duplicate stereo key '{stableKey}' from '{Path.GetFileName(existing)}' and '{Path.GetFileName(file)}'.";
+                return false;
+            }
+
+            index[stableKey] = file;
+        }
+
+        return true;
+    }
+
+    private static string CreateStablePairKey(string? baseName)
+    {
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            return string.Empty;
+        }
+
+        var tokens = baseName
+            .Split(new[] { '_', '-', '.', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(token => !IsStereoSideToken(token))
+            .Select(token => token.ToLowerInvariant())
+            .ToArray();
+
+        return tokens.Length == 0
+            ? baseName.Trim().ToLowerInvariant()
+            : string.Join("_", tokens);
+    }
+
+    private static bool IsStereoSideToken(string token)
+    {
+        return token.Equals("left", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("right", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("l", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("r", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("cam0", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("cam1", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("camera0", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("camera1", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void DisposeMatList(IEnumerable<Mat> mats)
+    {
+        foreach (var mat in mats)
+        {
+            mat.Dispose();
+        }
+    }
+
+    private static void DisposeMatArray(IReadOnlyList<Mat>? mats)
+    {
+        if (mats == null)
+        {
+            return;
+        }
+
+        foreach (var mat in mats)
+        {
+            mat.Dispose();
+        }
+    }
+
+    private static string JoinKeys(IReadOnlyList<string> keys)
+    {
+        return keys.Count == 0 ? "none" : string.Join(", ", keys.Take(10));
+    }
+
+    private static CalibrationQualityV2 EvaluateStereoCalibrationQuality(
+        string patternType,
+        Size patternSize,
+        double squareSize,
+        int validPairs,
+        int totalPairs,
+        int minValidPairs,
+        double stereoMeanError,
+        double leftMeanError,
+        double rightMeanError,
+        double epipolarError,
+        IReadOnlyList<double> leftPerViewErrors,
+        IReadOnlyList<double> rightPerViewErrors,
+        IReadOnlyList<string> pairKeys,
+        IReadOnlyList<string>? failedPairKeys)
+    {
+        var diagnostics = new List<string>
+        {
+            $"PatternType={patternType}",
+            $"Board={patternSize.Width}x{patternSize.Height}",
+            $"SquareSize={squareSize.ToString("G17", System.Globalization.CultureInfo.InvariantCulture)}",
+            $"ValidPairs={validPairs}",
+            $"TotalPairs={totalPairs}",
+            $"FailedPairs={failedPairKeys?.Count ?? 0}",
+            $"StereoRms={stereoMeanError:F4}",
+            $"LeftMeanError={leftMeanError:F4}",
+            $"RightMeanError={rightMeanError:F4}",
+            $"EpipolarError={epipolarError:F4}"
+        };
+
+        if (failedPairKeys is { Count: > 0 })
+        {
+            diagnostics.Add($"Rejected samples: {JoinKeys(failedPairKeys)}");
+        }
+
+        var maxPerViewErrorLeft = leftPerViewErrors.Count > 0 ? leftPerViewErrors.Max() : 0.0;
+        var maxPerViewErrorRight = rightPerViewErrors.Count > 0 ? rightPerViewErrors.Max() : 0.0;
+        var maxPerViewError = Math.Max(maxPerViewErrorLeft, maxPerViewErrorRight);
+        diagnostics.Add($"MaxPerViewError={maxPerViewError:F4}");
+
+        var perViewOutliers = pairKeys
+            .Select((key, index) => new
+            {
+                Key = key,
+                Error = Math.Max(
+                    index < leftPerViewErrors.Count ? leftPerViewErrors[index] : double.PositiveInfinity,
+                    index < rightPerViewErrors.Count ? rightPerViewErrors[index] : double.PositiveInfinity)
+            })
+            .Where(item => !double.IsFinite(item.Error) || item.Error > PerViewErrorAcceptanceThreshold)
+            .OrderByDescending(item => item.Error)
+            .Take(10)
+            .Select(item => $"{item.Key}={item.Error:F4}px")
+            .ToArray();
+
+        if (perViewOutliers.Length > 0)
+        {
+            diagnostics.Add($"Per-view outliers: {string.Join(", ", perViewOutliers)}");
+        }
+
+        var metricsAreFinite =
+            double.IsFinite(stereoMeanError) &&
+            double.IsFinite(leftMeanError) &&
+            double.IsFinite(rightMeanError) &&
+            double.IsFinite(maxPerViewError) &&
+            double.IsFinite(epipolarError);
+
+        var accepted =
+            validPairs >= minValidPairs &&
+            metricsAreFinite &&
+            stereoMeanError <= StereoMeanErrorAcceptanceThreshold &&
+            Math.Max(leftMeanError, rightMeanError) <= CameraMeanErrorAcceptanceThreshold &&
+            maxPerViewError <= PerViewErrorAcceptanceThreshold &&
+            epipolarError <= EpipolarErrorAcceptanceThreshold;
+
+        diagnostics.Add(accepted
+            ? "Quality gate passed."
+            : $"Quality gate failed. Thresholds: stereoMean<={StereoMeanErrorAcceptanceThreshold:F2}, cameraMean<={CameraMeanErrorAcceptanceThreshold:F2}, perView<={PerViewErrorAcceptanceThreshold:F2}, epipolar<={EpipolarErrorAcceptanceThreshold:F2}, minPairs>={minValidPairs}.");
+
+        return new CalibrationQualityV2
+        {
+            Accepted = accepted,
+            MeanError = stereoMeanError,
+            MaxError = maxPerViewError,
+            InlierCount = validPairs,
+            TotalSampleCount = totalPairs,
+            Diagnostics = diagnostics
+        };
     }
 
     private static bool TryFindCalibrationCorners(Mat gray, string patternType, Size patternSize, out Point2f[] corners)
@@ -876,6 +1318,10 @@ public class StereoCalibrationOperator : OperatorBase
         public double ReprojectionErrorLeft { get; set; }
         public double ReprojectionErrorRight { get; set; }
         public double ReprojectionErrorStereo { get; set; }
+        public double MaxPerViewErrorLeft { get; set; }
+        public double MaxPerViewErrorRight { get; set; }
+        public IReadOnlyList<double> LeftPerViewErrors { get; set; } = Array.Empty<double>();
+        public IReadOnlyList<double> RightPerViewErrors { get; set; } = Array.Empty<double>();
         public double EpipolarError { get; set; }
     }
 
@@ -927,7 +1373,20 @@ public class StereoCalibrationOperator : OperatorBase
         public string Message { get; set; } = string.Empty;
     }
 
+    private class SingleCameraCalibrationResult
+    {
+        public required Mat CameraMatrix { get; set; }
+        public required Mat DistCoeffs { get; set; }
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+        public double MeanError { get; set; }
+        public double MaxError { get; set; }
+        public IReadOnlyList<double> PerViewErrors { get; set; } = Array.Empty<double>();
+    }
+
     private readonly record struct Point2Payload(double X, double Y);
+    private readonly record struct StereoImagePair(string StableKey, string LeftFile, string RightFile);
+    private readonly record struct ReprojectionErrorStats(double MeanError, double MaxError, IReadOnlyList<double> PerViewErrors);
 
     private static Point2f[] ReadPoint2fVector(Mat mat)
     {

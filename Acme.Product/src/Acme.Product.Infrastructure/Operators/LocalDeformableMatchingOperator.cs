@@ -1,7 +1,7 @@
-// LocalDeformableMatchingOperator.cs
-// 局部可变形匹配算子 (实验级 MVP)
-// 对标 Halcon: find_local_deformable_model
-// 作者：AI Assistant
+﻿// LocalDeformableMatchingOperator.cs
+// 灞€閮ㄥ彲鍙樺舰鍖归厤绠楀瓙 (瀹為獙绾?MVP)
+// 瀵规爣 Halcon: find_local_deformable_model
+// 浣滆€咃細AI Assistant
 
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
@@ -10,20 +10,22 @@ using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
+using System.Security.Cryptography;
 
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 局部可变形匹配算子 - 支持局部形变和遮挡的模板匹配
-/// 对标 Halcon find_local_deformable_model
-/// Phase 4.2: 扩展为多目标候选、NMS 去重和批量变形评估
+/// 灞€閮ㄥ彲鍙樺舰鍖归厤绠楀瓙 - 鏀寔灞€閮ㄥ舰鍙樺拰閬尅鐨勬ā鏉垮尮閰?
+/// 瀵规爣 Halcon find_local_deformable_model
+/// Phase 4.2: 鎵╁睍涓哄鐩爣鍊欓€夈€丯MS 鍘婚噸鍜屾壒閲忓彉褰㈣瘎浼?
 /// </summary>
 [OperatorMeta(
     DisplayName = "Local Deformable Matching",
-    Description = "Local deformable matching with TPS deformation field estimation, multi-candidate search and NMS-based multi-target output.",
+    Description = "Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback.",
     Category = "Matching",
     IconName = "deformable-match",
-    Keywords = new[] { "Deformable", "Local", "Matching", "TPS", "Occlusion", "MultiTarget", "NMS" }
+    Keywords = new[] { "Deformable", "Local", "Matching", "MLS", "Occlusion", "MultiTarget", "NMS" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "Search Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Template", "Template Image", PortDataType.Image, IsRequired = false)]
@@ -35,12 +37,12 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("OcclusionMask", "Occlusion Mask", PortDataType.Image)]
 [OperatorParam("TemplatePath", "Template Image Path", "file", DefaultValue = "")]
 [OperatorParam("PyramidLevels", "Pyramid Levels", "int", DefaultValue = 3, Min = 1, Max = 6)]
-[OperatorParam("TPSGridSize", "TPS Grid Size", "int", DefaultValue = 4, Min = 2, Max = 8)]
-[OperatorParam("TPSLambda", "TPS Regularization", "double", DefaultValue = 0.01, Min = 0.001, Max = 1.0)]
+[OperatorParam("TPSGridSize", "Control Grid Size", "int", DefaultValue = 4, Min = 2, Max = 8)]
+[OperatorParam("TPSLambda", "MLS Smoothing (Legacy TPSLambda)", "double", DefaultValue = 0.01, Min = 0.001, Max = 1.0)]
 [OperatorParam("MaxDeformation", "Max Deformation (px)", "double", DefaultValue = 20.0, Min = 5.0, Max = 100.0)]
 [OperatorParam("OcclusionThreshold", "Occlusion Threshold", "double", DefaultValue = 0.3, Min = 0.1, Max = 0.9)]
 [OperatorParam("MinMatchScore", "Min Match Score", "double", DefaultValue = 0.6, Min = 0.0, Max = 1.0)]
-[OperatorParam("EnableFallback", "Enable Fallback to Rigid", "bool", DefaultValue = true)]
+[OperatorParam("EnableFallback", "Enable Fallback to Rigid", "bool", DefaultValue = false)]
 [OperatorParam("MaxIterations", "Max Refinement Iterations", "int", DefaultValue = 5, Min = 1, Max = 20)]
 [OperatorParam("ConvergenceThreshold", "Convergence Threshold", "double", DefaultValue = 0.5, Min = 0.1, Max = 5.0)]
 [OperatorParam("MaxMatches", "Maximum Matches", "int", DefaultValue = 5, Min = 1, Max = 20)]
@@ -50,10 +52,13 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("ParallelCandidates", "Parallel Candidate Evaluation", "bool", DefaultValue = true)]
 public class LocalDeformableMatchingOperator : OperatorBase
 {
+    private const int TemplateCacheCapacity = 10;
+    private const double OcclusionDifferenceThreshold = 32.0;
     public override OperatorType OperatorType => OperatorType.LocalDeformableMatching;
 
-    // 模板缓存
-    private static readonly Dictionary<string, TemplateData> TemplateCache = new();
+    // 妯℃澘缂撳瓨
+    private static readonly Dictionary<string, TemplateData> TemplateCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly LinkedList<string> TemplateCacheOrder = new();
     private static readonly object CacheLock = new();
 
     public LocalDeformableMatchingOperator(ILogger<LocalDeformableMatchingOperator> logger) : base(logger)
@@ -67,14 +72,14 @@ public class LocalDeformableMatchingOperator : OperatorBase
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        // 参数
+        // 鍙傛暟
         var pyramidLevels = GetIntParam(@operator, "PyramidLevels", 3, 1, 6);
         var tpsGridSize = GetIntParam(@operator, "TPSGridSize", 4, 2, 8);
         var tpsLambda = GetDoubleParam(@operator, "TPSLambda", 0.01, 0.001, 1.0);
         var maxDeformation = GetDoubleParam(@operator, "MaxDeformation", 20.0, 5.0, 100.0);
         var occlusionThreshold = GetDoubleParam(@operator, "OcclusionThreshold", 0.3, 0.1, 0.9);
         var minMatchScore = GetDoubleParam(@operator, "MinMatchScore", 0.6, 0.0, 1.0);
-        var enableFallback = GetBoolParam(@operator, "EnableFallback", true);
+        var enableFallback = GetBoolParam(@operator, "EnableFallback", false);
         var maxIterations = GetIntParam(@operator, "MaxIterations", 5, 1, 20);
         var convergenceThreshold = GetDoubleParam(@operator, "ConvergenceThreshold", 0.5, 0.1, 5.0);
         var maxMatches = GetIntParam(@operator, "MaxMatches", 5, 1, 20);
@@ -83,7 +88,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
         var nmsThreshold = GetDoubleParam(@operator, "NmsThreshold", 0.35, 0.0, 1.0);
         var parallelCandidates = GetBoolParam(@operator, "ParallelCandidates", true);
 
-        // 获取图像
+        // 鑾峰彇鍥惧儚
         if (!TryGetInputImage(inputs, "Image", out var imageWrapper) || imageWrapper == null)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is required."));
@@ -95,7 +100,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid."));
         }
 
-        // 获取模板
+        // 鑾峰彇妯℃澘
         TemplateData? template = null;
         if (TryGetInputImage(inputs, "Template", out var templateWrapper) && templateWrapper != null)
         {
@@ -119,17 +124,19 @@ public class LocalDeformableMatchingOperator : OperatorBase
             return Task.FromResult(CreateFailureOutput(searchImage, "Template not available", 0));
         }
 
+        List<DeformableMatchResult>? candidateResults = null;
         try
         {
-            var candidates = GenerateCandidateWindows(searchImage, template.BaseImage, maxMatches, candidateThreshold, maxDeformation);
-            var candidateResults = EvaluateCandidates(
+            var candidateBudget = Math.Max(maxMatches * 4, 16);
+            var candidates = GenerateCandidateWindows(searchImage, template.BaseImage, candidateBudget, candidateThreshold, maxDeformation);
+            candidateResults = EvaluateCandidates(
                 searchImage, template, candidates, parallelCandidates,
                 pyramidLevels, tpsGridSize, tpsLambda, maxDeformation,
                 occlusionThreshold, minMatchScore, enableFallback,
                 maxIterations, convergenceThreshold, cancellationToken);
 
             var acceptedMatches = candidateResults
-                .Where(result => result.IsSuccess && result.Score >= minMatchScore)
+                .Where(result => result.IsSuccess && result.VerificationPassed && result.Score >= minMatchScore)
                 .OrderByDescending(result => result.Score)
                 .ToList();
 
@@ -147,28 +154,6 @@ public class LocalDeformableMatchingOperator : OperatorBase
             if (acceptedMatches.Count > 0)
             {
                 return Task.FromResult(CreateSuccessOutput(searchImage, acceptedMatches, template, stopwatch.ElapsedMilliseconds));
-            }
-
-            if (enableFallback)
-            {
-                var seedFallbackMatches = candidates
-                    .Where(candidate => candidate.Score >= candidateThreshold)
-                    .Select(candidate => CreateSeedFallbackMatch(candidate, template))
-                    .ToList();
-
-                if (seedFallbackMatches.Count > 0)
-                {
-                    if (enableNms)
-                    {
-                        seedFallbackMatches = ApplyNms(seedFallbackMatches, nmsThreshold, maxMatches);
-                    }
-                    else
-                    {
-                        seedFallbackMatches = seedFallbackMatches.Take(maxMatches).ToList();
-                    }
-
-                    return Task.FromResult(CreateSuccessOutput(searchImage, seedFallbackMatches, template, stopwatch.ElapsedMilliseconds));
-                }
             }
 
             var bestFallback = candidateResults
@@ -192,6 +177,18 @@ public class LocalDeformableMatchingOperator : OperatorBase
             Logger.LogError(ex, "Deformable matching failed");
             return Task.FromResult(CreateFailureOutput(searchImage, $"Exception: {ex.Message}", 0));
         }
+        finally
+        {
+            if (candidateResults != null)
+            {
+                foreach (var result in candidateResults)
+                {
+                    result.Dispose();
+                }
+            }
+
+            template.Dispose();
+        }
     }
 
     private DeformableMatchResult PerformCoarseToFineMatching(
@@ -200,140 +197,192 @@ public class LocalDeformableMatchingOperator : OperatorBase
         double minMatchScore, int maxIterations, double convergenceThreshold,
         CancellationToken cancellationToken)
     {
-        var result = new DeformableMatchResult();
+        var result = new DeformableMatchResult
+        {
+            ControlGridSize = tpsGridSize,
+            MlsLambda = tpsLambda,
+            OcclusionThreshold = occlusionThreshold
+        };
         var currentLevel = pyramidLevels - 1;
 
-        // 构建搜索图像金字塔
+        // 鏋勫缓鎼滅储鍥惧儚閲戝瓧濉?
         var searchPyramid = BuildImagePyramid(searchImage, pyramidLevels);
 
-        // 从粗到细迭代
+        // 浠庣矖鍒扮粏杩唬
         Mat? currentHomography = null;
         Point2f[]? controlPoints = null;
         Point2f[]? deformedPoints = null;
-
-        for (int level = currentLevel; level >= 0; level--)
+        var bestVerifiedMatchCount = 0;
+        var bestVerifiedInlierRatio = 0.0;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var levelTemplate = template.Pyramid[level];
-            var levelSearch = searchPyramid[level];
-
-            // 缩放控制点到当前层级
-            var scale = Math.Pow(2, level);
-            if (controlPoints == null)
+            for (var level = currentLevel; level >= 0; level--)
             {
-                // 初始化均匀网格控制点
-                controlPoints = InitializeControlPoints(
-                    levelTemplate.Width, levelTemplate.Height, tpsGridSize);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            // 特征匹配
-            var (matches, templateKpts, searchKpts) = MatchFeaturesAtLevel(
-                levelTemplate.Image, levelSearch, levelTemplate.KeyPoints, levelTemplate.Descriptors);
+                var levelTemplate = template.Pyramid[level];
+                var levelSearch = searchPyramid[level];
 
-            if (matches.Count < 10)
-            {
-                result.FailureReason = $"Insufficient matches at level {level}: {matches.Count}";
-                result.RigidFallbackResult = TryRigidFallback(
-                    levelSearch, levelTemplate, matches, templateKpts, searchKpts);
-                return result;
-            }
-
-            // 估计初始刚性变换（鲁棒估计）
-            if (currentHomography == null)
-            {
-                currentHomography = EstimateRigidTransform(
-                    matches, templateKpts, searchKpts, maxDeformation / scale);
-                if (currentHomography == null)
+                // 缂╂斁鎺у埗鐐瑰埌褰撳墠灞傜骇
+                var scale = Math.Pow(2, level);
+                if (controlPoints == null)
                 {
-                    result.FailureReason = "Failed to estimate initial rigid transform";
+                    // 鍒濆鍖栧潎鍖€缃戞牸鎺у埗鐐?
+                    controlPoints = InitializeControlPoints(
+                        levelTemplate.Width, levelTemplate.Height, tpsGridSize);
+                }
+
+                // 鐗瑰緛鍖归厤
+                var (matches, templateKpts, searchKpts) = MatchFeaturesAtLevel(
+                    levelTemplate.Image, levelSearch, levelTemplate.KeyPoints, levelTemplate.Descriptors);
+
+                if (matches.Count < 10)
+                {
+                    if (level > 0 && currentHomography == null)
+                    {
+                        continue;
+                    }
+
+                    result.FailureReason = $"Insufficient matches at level {level}: {matches.Count}";
+                    result.RigidFallbackResult = TryRigidFallback(
+                        levelSearch, levelTemplate, matches, templateKpts, searchKpts);
                     return result;
                 }
-            }
 
-            // TPS形变细化
-            var iteration = 0;
-            var converged = false;
-            var prevError = double.MaxValue;
-
-            while (iteration < maxIterations && !converged)
-            {
-                // 计算当前变换下的特征点对应
-                var correspondences = ComputeCorrespondences(
-                    matches, templateKpts, searchKpts, controlPoints, currentHomography);
-
-                // 估计形变场
-                deformedPoints = EstimateTPSDeformation(
-                    controlPoints, correspondences, tpsLambda, maxDeformation / scale);
-
-                // 应用形变并计算误差
-                var (warpedImage, warpedMask) = ApplyTPSWarp(
-                    levelTemplate.Image, controlPoints, deformedPoints, levelSearch.Size());
-
-                // 计算匹配分数和遮挡
-                var (score, occlusionMask, meanError) = ComputeMatchScoreAndOcclusion(
-                    warpedImage, warpedMask, levelSearch, occlusionThreshold);
-
-                // 检查收敛
-                if (Math.Abs(prevError - meanError) < convergenceThreshold)
+                // 浼拌鍒濆鍒氭€у彉鎹紙椴佹浼拌锛?
+                if (currentHomography == null)
                 {
-                    converged = true;
-                }
-                prevError = meanError;
+                    currentHomography = EstimateRigidTransform(
+                        matches, templateKpts, searchKpts, new Size(levelTemplate.Width, levelTemplate.Height), levelSearch.Size(), maxDeformation / scale);
+                    if (currentHomography == null)
+                    {
+                        if (level > 0)
+                        {
+                            continue;
+                        }
 
-                // 更新控制点用于下一轮
-                for (int i = 0; i < controlPoints.Length; i++)
-                {
-                    controlPoints[i] = new Point2f(
-                        controlPoints[i].X + (float)(deformedPoints[i].X - controlPoints[i].X) * 0.5f,
-                        controlPoints[i].Y + (float)(deformedPoints[i].Y - controlPoints[i].Y) * 0.5f);
+                        result.FailureReason = "Failed to estimate initial rigid transform";
+                        return result;
+                    }
                 }
 
-                iteration++;
+                // TPS褰㈠彉缁嗗寲
+                var levelBaselineDeformedPoints = deformedPoints?.ToArray()
+                    ?? Cv2.PerspectiveTransform(controlPoints, currentHomography);
+                var iterationDeformedPoints = levelBaselineDeformedPoints.ToArray();
+                var iteration = 0;
+                var converged = false;
+                var prevError = double.MaxValue;
+                var bestIterationScore = double.NegativeInfinity;
+                var bestIterationError = double.PositiveInfinity;
+                Point2f[]? bestIterationDeformedPoints = iterationDeformedPoints.ToArray();
 
-                warpedImage.Dispose();
-                warpedMask.Dispose();
+                while (iteration < maxIterations && !converged)
+                {
+                    // 璁＄畻褰撳墠鍙樻崲涓嬬殑鐗瑰緛鐐瑰搴?
+                    var correspondences = ComputeCorrespondences(
+                        matches, templateKpts, searchKpts, controlPoints, iterationDeformedPoints, currentHomography);
+
+                    // 浼拌褰㈠彉鍦?
+                    var refinedDeformedPoints = EstimateTPSDeformation(
+                        iterationDeformedPoints, correspondences, tpsLambda, maxDeformation / scale);
+
+                    // 搴旂敤褰㈠彉骞惰绠楄宸?
+                    var (warpedImage, warpedMask) = ApplyTPSWarp(
+                        levelTemplate.Image, controlPoints, refinedDeformedPoints, levelSearch.Size());
+
+                    // 璁＄畻鍖归厤鍒嗘暟鍜岄伄鎸?
+                    var (score, occlusionMask, meanError, _) = ComputeMatchScoreAndOcclusion(
+                        warpedImage, warpedMask, levelSearch, occlusionThreshold);
+
+                    if (score > bestIterationScore || (Math.Abs(score - bestIterationScore) < 1e-6 && meanError < bestIterationError))
+                    {
+                        bestIterationScore = score;
+                        bestIterationError = meanError;
+                        bestIterationDeformedPoints = refinedDeformedPoints.ToArray();
+                    }
+
+                    if (iteration > 0 && Math.Abs(prevError - meanError) < convergenceThreshold)
+                    {
+                        converged = true;
+                    }
+
+                    iterationDeformedPoints = refinedDeformedPoints;
+                    prevError = meanError;
+                    iteration++;
+
+                    warpedImage.Dispose();
+                    warpedMask.Dispose();
+                    occlusionMask.Dispose();
+                }
+
+                if (bestIterationDeformedPoints != null)
+                {
+                    deformedPoints = bestIterationDeformedPoints;
+                }
+
+                bestVerifiedMatchCount = Math.Max(bestVerifiedMatchCount, matches.Count);
+                bestVerifiedInlierRatio = Math.Max(bestVerifiedInlierRatio, matches.Count / (double)Math.Max(1, levelTemplate.KeyPoints.Length));
+
+                // 涓婇噰鏍峰埌涓嬩竴灞?
+                if (level > 0)
+                {
+                    controlPoints = UpsampleControlPoints(controlPoints, 2.0);
+                    if (deformedPoints != null)
+                    {
+                        deformedPoints = UpsampleControlPoints(deformedPoints, 2.0);
+                    }
+                }
             }
 
-            // 上采样到下一层
-            if (level > 0)
+            // 鏈€缁堥獙璇?
+            if (currentHomography != null && controlPoints != null && deformedPoints != null)
             {
-                controlPoints = UpsampleControlPoints(controlPoints, 2.0);
+                var (finalScore, finalOcclusionMask, finalOcclusionRate, finalDeformation) = ValidateFinalMatch(
+                    searchImage,
+                    template.BaseImage,
+                    controlPoints,
+                    deformedPoints,
+                    currentHomography,
+                    occlusionThreshold);
+
+                result.OcclusionThreshold = occlusionThreshold;
+                result.OcclusionRate = finalOcclusionRate;
+                result.IsSuccess = finalScore >= minMatchScore && finalOcclusionRate <= occlusionThreshold;
+                result.VerificationPassed = result.IsSuccess;
+                result.Score = finalScore;
+                result.VerificationScore = result.IsSuccess ? finalScore : 0.0;
+                result.InlierCount = bestVerifiedMatchCount;
+                result.InlierRatio = Math.Clamp(bestVerifiedInlierRatio, 0.0, 1.0);
+                result.DeformationMagnitude = finalDeformation;
+                result.ControlPoints = controlPoints;
+                result.DeformedPoints = deformedPoints;
+                result.Homography = currentHomography;
+                currentHomography = null;
+                result.OcclusionMask = finalOcclusionMask;
+
+                if (!result.IsSuccess)
+                {
+                    result.FailureReason = finalOcclusionRate > occlusionThreshold
+                        ? $"Occlusion rate {finalOcclusionRate:F3} exceeded threshold {occlusionThreshold:F3}"
+                        : $"Final score {finalScore:F3} below threshold {minMatchScore}";
+                }
             }
-        }
-
-        // 最终验证
-        if (currentHomography != null && controlPoints != null && deformedPoints != null)
-        {
-            var (finalScore, finalOcclusionMask, finalDeformation) = ValidateFinalMatch(
-                searchImage, template.BaseImage, controlPoints, deformedPoints, currentHomography);
-
-            result.IsSuccess = finalScore >= minMatchScore;
-            result.Score = finalScore;
-            result.OcclusionRate = ComputeOcclusionRate(finalOcclusionMask);
-            result.DeformationMagnitude = finalDeformation;
-            result.ControlPoints = controlPoints;
-            result.DeformedPoints = deformedPoints;
-            result.Homography = currentHomography;
-            result.OcclusionMask = finalOcclusionMask;
-
-            if (!result.IsSuccess)
+            else
             {
-                result.FailureReason = $"Final score {finalScore:F3} below threshold {minMatchScore}";
+                result.FailureReason = "Failed to compute deformation field";
+            }
+
+            return result;
+        }
+        finally
+        {
+            currentHomography?.Dispose();
+            foreach (var level in searchPyramid)
+            {
+                level.Dispose();
             }
         }
-        else
-        {
-            result.FailureReason = "Failed to compute deformation field";
-        }
-
-        // 清理
-        foreach (var level in searchPyramid)
-        {
-            level.Dispose();
-        }
-
-        return result;
     }
 
     private List<CandidateWindow> GenerateCandidateWindows(Mat searchImage, Mat templateImage, int maxMatches, double candidateThreshold, double maxDeformation)
@@ -498,14 +547,19 @@ public class LocalDeformableMatchingOperator : OperatorBase
     private static void PromoteFallback(DeformableMatchResult result, Rect roi)
     {
         var fallback = result.RigidFallbackResult;
-        if (fallback == null)
+        if (fallback == null || !fallback.VerificationPassed)
         {
             return;
         }
 
         result.IsSuccess = true;
         result.IsFallback = true;
+        result.VerificationPassed = true;
         result.Score = fallback.Score;
+        result.VerificationScore = fallback.VerificationScore;
+        result.InlierCount = fallback.InlierCount;
+        result.InlierRatio = fallback.InlierRatio;
+        result.OcclusionRate = 0.0;
         result.Corners = fallback.Corners
             .Select(point => new Point2f(point.X + roi.X, point.Y + roi.Y))
             .ToArray();
@@ -563,7 +617,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
         }
 
         var union = a.Width * a.Height + b.Width * b.Height - intersection;
-        return union <= 0 ? 0 : intersection / union;
+        return union <= 0 ? 0 : intersection / (double)union;
     }
 
     private static DeformableMatchResult CreateSeedFallbackMatch(CandidateWindow candidate, TemplateData template)
@@ -599,42 +653,54 @@ public class LocalDeformableMatchingOperator : OperatorBase
         };
 
         var currentImage = templateImage.Clone();
-        for (int i = 0; i < levels; i++)
+        try
         {
-            using var gray = currentImage.Channels() == 1
-                ? currentImage.Clone()
-                : new Mat();
-            if (currentImage.Channels() > 1)
+            for (var i = 0; i < levels; i++)
             {
-                Cv2.CvtColor(currentImage, gray, ColorConversionCodes.BGR2GRAY);
-            }
+                using var gray = currentImage.Channels() == 1
+                    ? currentImage.Clone()
+                    : new Mat();
+                if (currentImage.Channels() > 1)
+                {
+                    Cv2.CvtColor(currentImage, gray, ColorConversionCodes.BGR2GRAY);
+                }
 
-            // 提取特征
-            using var orb = ORB.Create(1000, 1.2f, 8);
-            KeyPoint[] keypoints;
-            Mat descriptors = new Mat();
-            orb.DetectAndCompute(gray, null, out keypoints, descriptors);
+                // 鎻愬彇鐗瑰緛
+                using var orb = ORB.Create(1000, 1.2f, 8);
+                KeyPoint[] keypoints;
+                var descriptors = new Mat();
+                orb.DetectAndCompute(gray, null, out keypoints, descriptors);
 
-            data.Pyramid.Add(new PyramidLevel
-            {
-                Image = currentImage.Clone(),
-                KeyPoints = keypoints,
-                Descriptors = descriptors,
-                Width = currentImage.Width,
-                Height = currentImage.Height,
-                Scale = Math.Pow(2, i)
-            });
+                data.Pyramid.Add(new PyramidLevel
+                {
+                    Image = currentImage.Clone(),
+                    KeyPoints = keypoints,
+                    Descriptors = descriptors,
+                    Width = currentImage.Width,
+                    Height = currentImage.Height,
+                    Scale = Math.Pow(2, i)
+                });
 
-            // 下采样
-            if (i < levels - 1)
-            {
-                using var nextImage = new Mat();
-                Cv2.PyrDown(currentImage, nextImage);
-                currentImage = nextImage.Clone();
+                // 涓嬮噰鏍?
+                if (i < levels - 1)
+                {
+                    using var nextImage = new Mat();
+                    Cv2.PyrDown(currentImage, nextImage);
+                    currentImage.Dispose();
+                    currentImage = nextImage.Clone();
+                }
             }
         }
+        catch
+        {
+            data.Dispose();
+            throw;
+        }
+        finally
+        {
+            currentImage.Dispose();
+        }
 
-        currentImage.Dispose();
         return data;
     }
 
@@ -666,7 +732,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             {
                 var px = (float)(x * stepX);
                 var py = (float)(y * stepY);
-                // 边界处理
+                // 杈圭晫澶勭悊
                 if (x == gridSize - 1) px = width;
                 if (y == gridSize - 1) py = height;
                 points.Add(new Point2f(px, py));
@@ -679,7 +745,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
     private (List<DMatch> matches, KeyPoint[] templateKpts, KeyPoint[] searchKpts) MatchFeaturesAtLevel(
         Mat templateImage, Mat searchImage, KeyPoint[] templateKpts, Mat templateDesc)
     {
-        // 提取搜索图像特征
+        // 鎻愬彇鎼滅储鍥惧儚鐗瑰緛
         using var graySearch = searchImage.Channels() == 1
             ? searchImage.Clone()
             : new Mat();
@@ -699,7 +765,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             return (new List<DMatch>(), templateKpts, searchKpts);
         }
 
-        // KNN匹配
+        // KNN鍖归厤
         using var matcher = new BFMatcher(NormTypes.Hamming, crossCheck: false);
         var knnMatches = matcher.KnnMatch(templateDesc, searchDesc, k: 2);
 
@@ -726,177 +792,141 @@ public class LocalDeformableMatchingOperator : OperatorBase
     }
 
     private Mat? EstimateRigidTransform(List<DMatch> matches, KeyPoint[] templateKpts,
-        KeyPoint[] searchKpts, double maxDeformation)
+        KeyPoint[] searchKpts, Size templateSize, Size searchImageSize, double maxDeformation)
     {
-        if (matches.Count < 4) return null;
+        if (matches.Count < 4)
+        {
+            return null;
+        }
 
         var srcPoints = matches.Select(m => templateKpts[m.QueryIdx].Pt).ToArray();
         var dstPoints = matches.Select(m => searchKpts[m.TrainIdx].Pt).ToArray();
+        var verified = HomographyVerificationHelper.TryEstimateAndVerify(
+            srcPoints,
+            dstPoints,
+            templateSize,
+            searchImageSize,
+            Math.Max(2.0, Math.Min(6.0, maxDeformation)),
+            minMatchCount: 4,
+            minInliers: 4,
+            minInlierRatio: 0.10,
+            out var homography,
+            out _,
+            out _);
 
-        using var homography = Cv2.FindHomography(
-            InputArray.Create(srcPoints),
-            InputArray.Create(dstPoints),
-            HomographyMethods.Ransac,
-            maxDeformation);
-
-        return homography.Empty() ? null : homography.Clone();
+        return verified && homography != null && !homography.Empty() ? homography : null;
     }
 
     private (Point2f[] templatePts, Point2f[] searchPts) ComputeCorrespondences(
         List<DMatch> matches, KeyPoint[] templateKpts, KeyPoint[] searchKpts,
-        Point2f[] controlPoints, Mat homography)
+        Point2f[] controlPoints, Point2f[] currentDeformedPoints, Mat homography)
     {
-        // 根据单应性变换模板特征点
         var templatePts = matches.Select(m => templateKpts[m.QueryIdx].Pt).ToArray();
-        var warpedTemplatePts = Cv2.PerspectiveTransform(templatePts, homography);
-
         var searchPts = matches.Select(m => searchKpts[m.TrainIdx].Pt).ToArray();
 
-        return (warpedTemplatePts, searchPts);
+        if (currentDeformedPoints.Length == controlPoints.Length &&
+            LocalDeformableMovingLeastSquaresHelper.TryCreate(
+                controlPoints,
+                currentDeformedPoints,
+                1e-3,
+                out var currentModel,
+                out _))
+        {
+            var projectedTemplatePts = currentModel!.MapForward(templatePts);
+            return (projectedTemplatePts, searchPts);
+        }
+
+        return AddDeformationAnchors(templatePts, searchPts, controlPoints, homography);
     }
 
     private Point2f[] EstimateTPSDeformation(Point2f[] controlPoints,
         (Point2f[] templatePts, Point2f[] searchPts) correspondences,
-        double lambda, double maxDeformation)
+        double lambda, double maxDeformation, Point2f[]? clampReferencePoints = null)
     {
-        // 简化版TPS：使用加权平均近似
-        var deformed = new Point2f[controlPoints.Length];
-
-        for (int i = 0; i < controlPoints.Length; i++)
+        if (!LocalDeformableMovingLeastSquaresHelper.TryCreate(
+                correspondences.templatePts,
+                correspondences.searchPts,
+                Math.Max(1e-4, lambda),
+                out var model,
+                out _))
         {
-            var cp = controlPoints[i];
-            var totalWeight = 0.0;
-            var dx = 0.0;
-            var dy = 0.0;
-
-            for (int j = 0; j < correspondences.templatePts.Length; j++)
-            {
-                var tp = correspondences.templatePts[j];
-                var sp = correspondences.searchPts[j];
-
-                // 基于距离的高斯权重
-                var dist = Math.Sqrt(Math.Pow(tp.X - cp.X, 2) + Math.Pow(tp.Y - cp.Y, 2));
-                var weight = Math.Exp(-dist * dist / (2 * maxDeformation * maxDeformation));
-
-                dx += (sp.X - tp.X) * weight;
-                dy += (sp.Y - tp.Y) * weight;
-                totalWeight += weight;
-            }
-
-            if (totalWeight > 0)
-            {
-                dx /= totalWeight;
-                dy /= totalWeight;
-            }
-
-            // 添加正则化
-            dx *= (1 - lambda);
-            dy *= (1 - lambda);
-
-            deformed[i] = new Point2f(cp.X + (float)dx, cp.Y + (float)dy);
+            return controlPoints.ToArray();
         }
 
-        return deformed;
+        var referencePoints = clampReferencePoints != null && clampReferencePoints.Length == controlPoints.Length
+            ? clampReferencePoints
+            : controlPoints;
+
+        return model!.MapForward(controlPoints)
+            .Select((point, index) =>
+            {
+                var dx = point.X - referencePoints[index].X;
+                var dy = point.Y - referencePoints[index].Y;
+                var magnitude = Math.Sqrt((dx * dx) + (dy * dy));
+                if (magnitude <= maxDeformation || magnitude <= 1e-6)
+                {
+                    return point;
+                }
+
+                var scale = maxDeformation / magnitude;
+                return new Point2f(
+                    referencePoints[index].X + (float)(dx * scale),
+                    referencePoints[index].Y + (float)(dy * scale));
+            })
+            .ToArray();
     }
 
     private (Mat warpedImage, Mat mask) ApplyTPSWarp(Mat templateImage, Point2f[] controlPoints,
         Point2f[] deformedPoints, Size outputSize)
     {
-        // 使用控制点构建网格并应用形变
-        var mapX = new Mat(outputSize, MatType.CV_32FC1);
-        var mapY = new Mat(outputSize, MatType.CV_32FC1);
-        var mask = new Mat(outputSize, MatType.CV_8UC1, Scalar.All(255));
-
-        // 为每个像素计算对应的源坐标（简化版最近邻）
-        for (int y = 0; y < outputSize.Height; y++)
+        if (!LocalDeformableMovingLeastSquaresHelper.TryCreate(
+                controlPoints,
+                deformedPoints,
+                1e-3,
+                out var model,
+                out _))
         {
-            for (int x = 0; x < outputSize.Width; x++)
-            {
-                // 找到最近的控制点并插值
-                var (srcX, srcY, valid) = TPSInterpolate(x, y, controlPoints, deformedPoints, templateImage.Size());
-                mapX.Set(y, x, srcX);
-                mapY.Set(y, x, srcY);
-                if (!valid)
-                {
-                    mask.Set(y, x, (byte)0);
-                }
-            }
+            return (new Mat(), new Mat(outputSize, MatType.CV_8UC1, Scalar.All(0)));
         }
 
-        var warped = new Mat();
-        Cv2.Remap(templateImage, warped, mapX, mapY, InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
-
-        mapX.Dispose();
-        mapY.Dispose();
-
-        return (warped, mask);
+        return model!.Warp(templateImage, outputSize);
     }
 
-    private (float x, float y, bool valid) TPSInterpolate(int dstX, int dstY, Point2f[] controlPoints,
-        Point2f[] deformedPoints, Size srcSize)
-    {
-        // 找到最近的4个控制点并加权
-        var dst = new Point2f(dstX, dstY);
-        var distances = controlPoints.Select((cp, i) => new
-        {
-            Index = i,
-            Dist = Math.Sqrt(Math.Pow(cp.X - dst.X, 2) + Math.Pow(cp.Y - dst.Y, 2))
-        }).OrderBy(d => d.Dist).Take(4).ToList();
-
-        if (distances.Count < 4) return (0, 0, false);
-
-        var totalWeight = distances.Sum(d => 1.0 / (d.Dist + 1));
-        var srcX = 0.0f;
-        var srcY = 0.0f;
-
-        foreach (var d in distances)
-        {
-            var weight = (float)(1.0 / (d.Dist + 1) / totalWeight);
-            var dp = deformedPoints[d.Index];
-            var cp = controlPoints[d.Index];
-            // 反推源坐标
-            srcX += (dstX - dp.X + cp.X) * weight;
-            srcY += (dstY - dp.Y + cp.Y) * weight;
-        }
-
-        var valid = srcX >= 0 && srcX < srcSize.Width && srcY >= 0 && srcY < srcSize.Height;
-        return (srcX, srcY, valid);
-    }
-
-    private (double score, Mat occlusionMask, double meanError) ComputeMatchScoreAndOcclusion(
+    private (double score, Mat occlusionMask, double meanError, double occlusionRate) ComputeMatchScoreAndOcclusion(
         Mat warpedImage, Mat warpedMask, Mat searchImage, double occlusionThreshold)
     {
-        using var grayWarped = warpedImage.Channels() == 1
-            ? warpedImage.Clone()
-            : new Mat();
-        if (warpedImage.Channels() > 1)
-            Cv2.CvtColor(warpedImage, grayWarped, ColorConversionCodes.BGR2GRAY);
-
-        using var graySearch = searchImage.Channels() == 1
-            ? searchImage.Clone()
-            : new Mat();
-        if (searchImage.Channels() > 1)
-            Cv2.CvtColor(searchImage, graySearch, ColorConversionCodes.BGR2GRAY);
-
-        // 计算差异
+        using var grayWarped = warpedImage.Channels() == 1 ? warpedImage.Clone() : warpedImage.CvtColor(ColorConversionCodes.BGR2GRAY);
+        using var graySearch = searchImage.Channels() == 1 ? searchImage.Clone() : searchImage.CvtColor(ColorConversionCodes.BGR2GRAY);
         using var diff = new Mat();
         Cv2.Absdiff(grayWarped, graySearch, diff);
 
-        // 遮挡掩码：差异大于阈值的区域
-        var occlusionMask = new Mat();
-        Cv2.Threshold(diff, occlusionMask, occlusionThreshold * 255, 255, ThresholdTypes.Binary);
+        using var rawOcclusion = new Mat();
+        Cv2.Threshold(diff, rawOcclusion, OcclusionDifferenceThreshold, 255, ThresholdTypes.Binary);
+        var occlusionMask = new Mat(warpedMask.Size(), MatType.CV_8UC1, Scalar.All(0));
+        Cv2.BitwiseAnd(rawOcclusion, warpedMask, occlusionMask);
 
-        // 计算分数（归一化互相关）
-        using var maskedWarped = new Mat();
-        grayWarped.CopyTo(maskedWarped, warpedMask);
+        using var invertedOcclusion = new Mat();
+        Cv2.BitwiseNot(occlusionMask, invertedOcclusion);
+        using var visibleMask = new Mat();
+        Cv2.BitwiseAnd(invertedOcclusion, warpedMask, visibleMask);
 
-        using var result = new Mat();
-        Cv2.MatchTemplate(graySearch, maskedWarped, result, TemplateMatchModes.CCoeffNormed);
+        var visiblePixels = Cv2.CountNonZero(visibleMask);
+        if (visiblePixels == 0)
+        {
+            return (0, occlusionMask, double.PositiveInfinity, 1.0);
+        }
 
-        var score = result.At<float>(0, 0);
-        var meanError = diff.Mean().Val0;
-
-        return (score, occlusionMask, meanError);
+        var occlusionRate = ComputeOcclusionRate(occlusionMask, warpedMask);
+        var normalizedCorrelation = (ComputeMaskedCorrelation(grayWarped, graySearch, visibleMask) + 1.0) * 0.5;
+        var meanError = diff.Mean(visibleMask).Val0;
+        var visibleRatio = visiblePixels / (double)Math.Max(1, Cv2.CountNonZero(warpedMask));
+        var errorScore = 1.0 - Math.Clamp(meanError / 255.0, 0.0, 1.0);
+        var baseScore = Math.Clamp((normalizedCorrelation * 0.7) + (visibleRatio * 0.2) + (errorScore * 0.1), 0.0, 1.0);
+        var occlusionPenalty = occlusionRate <= occlusionThreshold
+            ? 1.0
+            : Math.Max(0.0, 1.0 - ((occlusionRate - occlusionThreshold) / Math.Max(1e-6, 1.0 - occlusionThreshold)));
+        var score = Math.Clamp(baseScore * occlusionPenalty, 0.0, 1.0);
+        return (score, occlusionMask, meanError, occlusionRate);
     }
 
     private Point2f[] UpsampleControlPoints(Point2f[] points, double factor)
@@ -904,35 +934,103 @@ public class LocalDeformableMatchingOperator : OperatorBase
         return points.Select(p => new Point2f(p.X * (float)factor, p.Y * (float)factor)).ToArray();
     }
 
-    private (double score, Mat mask, double deformation) ValidateFinalMatch(Mat searchImage, Mat templateImage,
-        Point2f[] controlPoints, Point2f[] deformedPoints, Mat homography)
+    private (double score, Mat mask, double occlusionRate, double deformation) ValidateFinalMatch(Mat searchImage, Mat templateImage,
+        Point2f[] controlPoints, Point2f[] deformedPoints, Mat homography, double occlusionThreshold)
     {
-        // 应用最终形变
         var (warped, mask) = ApplyTPSWarp(templateImage, controlPoints, deformedPoints, searchImage.Size());
+        var (score, occlusionMask, _, occlusionRate) = ComputeMatchScoreAndOcclusion(warped, mask, searchImage, occlusionThreshold);
 
-        var (score, occlusionMask, _) = ComputeMatchScoreAndOcclusion(warped, mask, searchImage, 0.3);
-
-        // 计算平均形变量
         var deformation = 0.0;
-        for (int i = 0; i < controlPoints.Length; i++)
+        for (var index = 0; index < controlPoints.Length; index++)
         {
-            deformation += Math.Sqrt(
-                Math.Pow(deformedPoints[i].X - controlPoints[i].X, 2) +
-                Math.Pow(deformedPoints[i].Y - controlPoints[i].Y, 2));
+            var dx = deformedPoints[index].X - controlPoints[index].X;
+            var dy = deformedPoints[index].Y - controlPoints[index].Y;
+            deformation += Math.Sqrt((dx * dx) + (dy * dy));
         }
-        deformation /= controlPoints.Length;
 
+        deformation /= Math.Max(1, controlPoints.Length);
         warped.Dispose();
         mask.Dispose();
-
-        return (score, occlusionMask, deformation);
+        return (score, occlusionMask, occlusionRate, deformation);
     }
 
-    private double ComputeOcclusionRate(Mat occlusionMask)
+    private double ComputeOcclusionRate(Mat occlusionMask, Mat supportMask)
     {
-        var total = occlusionMask.Total();
-        var occluded = Cv2.CountNonZero(occlusionMask);
-        return (double)occluded / total;
+        var total = Math.Max(1.0, Cv2.CountNonZero(supportMask));
+        return Cv2.CountNonZero(occlusionMask) / total;
+    }
+
+    private static (Point2f[] templatePts, Point2f[] searchPts) AddDeformationAnchors(
+        Point2f[] templatePts,
+        Point2f[] searchPts,
+        Point2f[] controlPoints,
+        Mat homography)
+    {
+        var mergedTemplate = templatePts.ToList();
+        var mergedSearch = searchPts.ToList();
+        var projectedControls = Cv2.PerspectiveTransform(controlPoints, homography);
+        for (var index = 0; index < controlPoints.Length; index++)
+        {
+            var controlPoint = controlPoints[index];
+            if (mergedTemplate.Any(existing => Math.Abs(existing.X - controlPoint.X) < 1e-3 && Math.Abs(existing.Y - controlPoint.Y) < 1e-3))
+            {
+                continue;
+            }
+
+            mergedTemplate.Add(controlPoint);
+            mergedSearch.Add(projectedControls[index]);
+        }
+
+        return (mergedTemplate.ToArray(), mergedSearch.ToArray());
+    }
+    private static double ComputeMaskedCorrelation(Mat warpedGray, Mat searchGray, Mat visibleMask)
+    {
+        var sumWarped = 0.0;
+        var sumSearch = 0.0;
+        var count = 0;
+        for (var y = 0; y < visibleMask.Rows; y++)
+        {
+            for (var x = 0; x < visibleMask.Cols; x++)
+            {
+                if (visibleMask.Get<byte>(y, x) == 0)
+                {
+                    continue;
+                }
+
+                sumWarped += warpedGray.Get<byte>(y, x);
+                sumSearch += searchGray.Get<byte>(y, x);
+                count++;
+            }
+        }
+
+        if (count == 0)
+        {
+            return 0;
+        }
+
+        var meanWarped = sumWarped / count;
+        var meanSearch = sumSearch / count;
+        var numerator = 0.0;
+        var denomWarped = 0.0;
+        var denomSearch = 0.0;
+        for (var y = 0; y < visibleMask.Rows; y++)
+        {
+            for (var x = 0; x < visibleMask.Cols; x++)
+            {
+                if (visibleMask.Get<byte>(y, x) == 0)
+                {
+                    continue;
+                }
+
+                var centeredWarped = warpedGray.Get<byte>(y, x) - meanWarped;
+                var centeredSearch = searchGray.Get<byte>(y, x) - meanSearch;
+                numerator += centeredWarped * centeredSearch;
+                denomWarped += centeredWarped * centeredWarped;
+                denomSearch += centeredSearch * centeredSearch;
+            }
+        }
+
+        return denomWarped <= 1e-6 || denomSearch <= 1e-6 ? 0 : Math.Clamp(numerator / Math.Sqrt(denomWarped * denomSearch), -1.0, 1.0);
     }
 
     private RigidFallbackResult? TryRigidFallback(Mat searchImage, PyramidLevel templateLevel,
@@ -943,15 +1041,21 @@ public class LocalDeformableMatchingOperator : OperatorBase
         var srcPoints = matches.Select(m => templateKpts[m.QueryIdx].Pt).ToArray();
         var dstPoints = matches.Select(m => searchKpts[m.TrainIdx].Pt).ToArray();
 
-        using var homography = Cv2.FindHomography(
-            InputArray.Create(srcPoints),
-            InputArray.Create(dstPoints),
-            HomographyMethods.Ransac,
-            3.0);
+        var verified = HomographyVerificationHelper.TryEstimateAndVerify(
+            srcPoints,
+            dstPoints,
+            new Size(templateLevel.Width, templateLevel.Height),
+            searchImage.Size(),
+            3.0,
+            minMatchCount: 4,
+            minInliers: 4,
+            minInlierRatio: 0.10,
+            out var homography,
+            out var transformedCorners,
+            out var metrics);
 
-        if (homography.Empty()) return null;
-
-        // 计算分数
+        // 璁＄畻鍒嗘暟
+        #if false
         var corners = new[]
         {
             new Point2f(0, 0),
@@ -961,23 +1065,30 @@ public class LocalDeformableMatchingOperator : OperatorBase
         };
 
         var transformedCorners = Cv2.PerspectiveTransform(corners, homography);
+        #endif
 
         return new RigidFallbackResult
         {
-            Homography = homography.Clone(),
+            VerificationPassed = verified,
+            FailureReason = metrics.FailureReason,
+            InlierRatio = metrics.InlierRatio,
+            VerificationScore = HomographyVerificationHelper.ComputeVerificationScore(metrics, 3.0),
+            Homography = homography ?? new Mat(),
             Corners = transformedCorners,
-            InlierCount = matches.Count,
-            Score = 0.5 // 降级匹配的默认分数
+            InlierCount = metrics.InlierCount,
+            Score = HomographyVerificationHelper.ComputeVerificationScore(metrics, 3.0)
         };
     }
 
     private TemplateData? GetOrLoadTemplate(string path, int pyramidLevels)
     {
+        var cacheKey = BuildTemplateCacheKey(path, pyramidLevels);
         lock (CacheLock)
         {
-            if (TemplateCache.TryGetValue(path, out var cached))
+            if (TemplateCache.TryGetValue(cacheKey, out var cached))
             {
-                return cached;
+                TouchTemplateCacheEntry(cacheKey, cached);
+                return cached.Clone();
             }
         }
 
@@ -990,15 +1101,33 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
         lock (CacheLock)
         {
-            while (TemplateCache.Count >= 10)
+            if (TemplateCache.TryGetValue(cacheKey, out var existing))
             {
-                var oldest = TemplateCache.Keys.First();
-                TemplateCache.Remove(oldest);
+                template.Dispose();
+                TouchTemplateCacheEntry(cacheKey, existing);
+                return existing.Clone();
             }
-            TemplateCache[path] = template;
+
+            while (TemplateCache.Count >= TemplateCacheCapacity)
+            {
+                var oldest = TemplateCacheOrder.First?.Value;
+                if (oldest == null)
+                {
+                    break;
+                }
+
+                if (TemplateCache.Remove(oldest, out var evicted))
+                {
+                    TemplateCacheOrder.RemoveFirst();
+                    evicted.Dispose();
+                }
+            }
+
+            template.OrderNode = TemplateCacheOrder.AddLast(cacheKey);
+            TemplateCache[cacheKey] = template;
         }
 
-        return template;
+        return template.Clone();
     }
 
     private OperatorExecutionOutput CreateSuccessOutput(Mat image, IReadOnlyList<DeformableMatchResult> matches,
@@ -1007,7 +1136,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
         var bestMatch = matches[0];
         var resultImage = image.Clone();
 
-        // 绘制形变网格
+        // 缁樺埗褰㈠彉缃戞牸
         if (bestMatch.ControlPoints != null && bestMatch.DeformedPoints != null)
         {
             DrawDeformationGrid(resultImage, bestMatch.ControlPoints, bestMatch.DeformedPoints, new Scalar(0, 255, 0));
@@ -1031,7 +1160,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             }
         }
 
-        // 绘制信息
+        // 缁樺埗淇℃伅
         Cv2.PutText(resultImage, $"Matches: {matches.Count}", new Point(10, 30),
             HersheyFonts.HersheySimplex, 0.7, new Scalar(0, 255, 0), 2);
         Cv2.PutText(resultImage, $"Best Score: {bestMatch.Score:F3}", new Point(10, 60),
@@ -1048,16 +1177,23 @@ public class LocalDeformableMatchingOperator : OperatorBase
         {
             { "IsMatch", true },
             { "Score", bestMatch.Score },
+            { "FailureReason", string.Empty },
+            { "VerificationPassed", bestMatch.VerificationPassed || bestMatch.IsFallback },
             { "OcclusionRate", bestMatch.OcclusionRate },
+            { "OcclusionThreshold", bestMatch.OcclusionThreshold },
             { "DeformationMagnitude", bestMatch.DeformationMagnitude },
-            { "ControlPoints", bestMatch.ControlPoints?.Select(p => new Position(p.X, p.Y)).ToList() },
+            { "InlierCount", bestMatch.InlierCount },
+            { "InlierRatio", bestMatch.InlierRatio },
+            { "ControlPoints", bestMatch.ControlPoints?.Select(p => new Position(p.X, p.Y)).ToList() ?? new List<Position>() },
             { "ProcessingTimeMs", processingTime },
-            { "Method", bestMatch.IsFallback ? "Rigid_Fallback" : "TPS_Deformable" },
+            { "Method", bestMatch.IsFallback ? "Rigid_Fallback" : "MLS_Deformable" },
+            { "DeformationModel", bestMatch.IsFallback ? "RigidHomography" : "MovingLeastSquaresSimilarity" },
+            { "LegacyParameterCompatibility", CreateLegacyParameterCompatibilityPayload(bestMatch) },
             { "MatchCount", matches.Count },
             { "Matches", serializedMatches },
             { "MatchResult", bestPayload },
             { "DeformationField", CreateDeformationFieldPayload(bestMatch) },
-            { "Message", matches.Count > 1 ? "Multi-target deformable matching successful" : "Deformable match successful" }
+            { "Message", matches.Count > 1 ? "Multi-target MLS deformable matching successful" : "MLS deformable match successful" }
         };
 
         if (bestMatch.OcclusionMask != null && !bestMatch.OcclusionMask.Empty())
@@ -1076,7 +1212,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
         if (fallback != null)
         {
-            // 绘制刚性变换结果
+            // 缁樺埗鍒氭€у彉鎹㈢粨鏋?
             for (int i = 0; i < 4; i++)
             {
                 var pt1 = new Point((int)fallback.Corners[i].X, (int)fallback.Corners[i].Y);
@@ -1095,7 +1231,15 @@ public class LocalDeformableMatchingOperator : OperatorBase
             { "IsMatch", true },
             { "Score", result.Score },
             { "Method", "Rigid_Fallback" },
+            { "DeformationModel", "RigidHomography" },
+            { "FailureReason", string.Empty },
+            { "VerificationPassed", true },
             { "MatchCount", 1 },
+            { "InlierCount", fallback?.InlierCount ?? 0 },
+            { "InlierRatio", fallback?.InlierRatio ?? 0.0 },
+            { "OcclusionRate", result.OcclusionRate },
+            { "OcclusionThreshold", result.OcclusionThreshold },
+            { "LegacyParameterCompatibility", CreateLegacyParameterCompatibilityPayload(result) },
             { "Matches", new List<Dictionary<string, object>> { BuildMatchPayload(result) } },
             { "MatchResult", BuildMatchPayload(result) },
             { "ProcessingTimeMs", processingTime },
@@ -1113,8 +1257,15 @@ public class LocalDeformableMatchingOperator : OperatorBase
         return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, new Dictionary<string, object>
         {
             { "IsMatch", false },
+            { "Method", result.IsFallback ? "Rigid_Fallback" : "MLS_Deformable" },
             { "FailureReason", result.FailureReason },
+            { "VerificationPassed", false },
             { "MatchCount", 0 },
+            { "InlierCount", result.InlierCount },
+            { "InlierRatio", result.InlierRatio },
+            { "Score", result.Score },
+            { "OcclusionRate", result.OcclusionRate },
+            { "OcclusionThreshold", result.OcclusionThreshold },
             { "Matches", Array.Empty<object>() },
             { "ProcessingTimeMs", processingTime },
             { "Message", result.FailureReason }
@@ -1130,8 +1281,12 @@ public class LocalDeformableMatchingOperator : OperatorBase
         return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, new Dictionary<string, object>
         {
             { "IsMatch", false },
+            { "Method", "MLS_Deformable" },
             { "FailureReason", reason },
+            { "VerificationPassed", false },
             { "MatchCount", 0 },
+            { "InlierCount", 0 },
+            { "InlierRatio", 0.0 },
             { "Matches", Array.Empty<object>() },
             { "ProcessingTimeMs", processingTime },
             { "Message", reason }
@@ -1143,13 +1298,31 @@ public class LocalDeformableMatchingOperator : OperatorBase
         var boundingBox = match.BoundingBox;
         return new Dictionary<string, object>
         {
+            { "Method", match.IsFallback ? "Rigid_Fallback" : "MLS_Deformable" },
+            { "DeformationModel", match.IsFallback ? "RigidHomography" : "MovingLeastSquaresSimilarity" },
             { "Score", match.Score },
             { "OcclusionRate", match.OcclusionRate },
+            { "OcclusionThreshold", match.OcclusionThreshold },
             { "DeformationMagnitude", match.DeformationMagnitude },
             { "CandidateScore", match.CandidateScore },
+            { "VerificationScore", match.VerificationScore },
+            { "VerificationPassed", match.VerificationPassed || match.IsFallback },
+            { "InlierCount", match.InlierCount },
+            { "InlierRatio", match.InlierRatio },
             { "IsFallback", match.IsFallback },
+            { "FailureReason", match.FailureReason },
+            { "LegacyParameterCompatibility", CreateLegacyParameterCompatibilityPayload(match) },
             { "BoundingBox", new { boundingBox.X, boundingBox.Y, boundingBox.Width, boundingBox.Height } },
             { "Corners", match.Corners?.Select(point => new Position(point.X, point.Y)).ToList() ?? new List<Position>() }
+        };
+    }
+
+    private static Dictionary<string, object> CreateLegacyParameterCompatibilityPayload(DeformableMatchResult match)
+    {
+        return new Dictionary<string, object>
+        {
+            { "TPSLambda", $"Applied as the MLS smoothing/regularization weight ({match.MlsLambda:F4})." },
+            { "TPSGridSize", $"Applied as the MLS control grid dimension ({match.ControlGridSize})." }
         };
     }
 
@@ -1164,7 +1337,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
     private void DrawDeformationGrid(Mat image, Point2f[] controlPoints, Point2f[] deformedPoints, Scalar color)
     {
-        // 绘制控制点连线
+        // 缁樺埗鎺у埗鐐硅繛绾?
         var gridSize = (int)Math.Sqrt(controlPoints.Length);
         for (int y = 0; y < gridSize; y++)
         {
@@ -1185,6 +1358,29 @@ public class LocalDeformableMatchingOperator : OperatorBase
                 }
             }
         }
+    }
+
+    private static string BuildTemplateCacheKey(string path, int pyramidLevels)
+    {
+        var fingerprint = ComputeFileFingerprint(path);
+        return $"{path}|{fingerprint}|{pyramidLevels}";
+    }
+
+    private static string ComputeFileFingerprint(string path)
+    {
+        using var stream = File.OpenRead(path);
+        var hash = SHA256.HashData(stream);
+        return Convert.ToHexString(hash);
+    }
+
+    private static void TouchTemplateCacheEntry(string cacheKey, TemplateData entry)
+    {
+        if (entry.OrderNode != null)
+        {
+            TemplateCacheOrder.Remove(entry.OrderNode);
+        }
+
+        entry.OrderNode = TemplateCacheOrder.AddLast(cacheKey);
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -1222,15 +1418,36 @@ public class LocalDeformableMatchingOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private class TemplateData
+    private sealed class TemplateData : IDisposable
     {
         public Mat BaseImage { get; set; } = new Mat();
         public int Width { get; set; }
         public int Height { get; set; }
         public List<PyramidLevel> Pyramid { get; set; } = new();
+        public LinkedListNode<string>? OrderNode { get; set; }
+
+        public TemplateData Clone()
+        {
+            return new TemplateData
+            {
+                BaseImage = BaseImage.Clone(),
+                Width = Width,
+                Height = Height,
+                Pyramid = Pyramid.Select(level => level.Clone()).ToList()
+            };
+        }
+
+        public void Dispose()
+        {
+            BaseImage.Dispose();
+            foreach (var level in Pyramid)
+            {
+                level.Dispose();
+            }
+        }
     }
 
-    private class PyramidLevel
+    private sealed class PyramidLevel : IDisposable
     {
         public Mat Image { get; set; } = new Mat();
         public Mat Descriptors { get; set; } = new Mat();
@@ -1238,16 +1455,42 @@ public class LocalDeformableMatchingOperator : OperatorBase
         public int Width { get; set; }
         public int Height { get; set; }
         public double Scale { get; set; }
+
+        public PyramidLevel Clone()
+        {
+            return new PyramidLevel
+            {
+                Image = Image.Clone(),
+                Descriptors = Descriptors.Clone(),
+                KeyPoints = KeyPoints.ToArray(),
+                Width = Width,
+                Height = Height,
+                Scale = Scale
+            };
+        }
+
+        public void Dispose()
+        {
+            Image.Dispose();
+            Descriptors.Dispose();
+        }
     }
 
-    private class DeformableMatchResult
+    private sealed class DeformableMatchResult : IDisposable
     {
         public bool IsSuccess { get; set; }
         public bool IsFallback { get; set; }
+        public bool VerificationPassed { get; set; }
         public string FailureReason { get; set; } = string.Empty;
         public double Score { get; set; }
         public double CandidateScore { get; set; }
+        public double VerificationScore { get; set; }
+        public int InlierCount { get; set; }
+        public double InlierRatio { get; set; }
+        public int ControlGridSize { get; set; }
+        public double MlsLambda { get; set; }
         public double OcclusionRate { get; set; }
+        public double OcclusionThreshold { get; set; }
         public double DeformationMagnitude { get; set; }
         public Rect BoundingBox { get; set; }
         public Point2f[]? Corners { get; set; }
@@ -1256,15 +1499,33 @@ public class LocalDeformableMatchingOperator : OperatorBase
         public Mat? Homography { get; set; }
         public Mat? OcclusionMask { get; set; }
         public RigidFallbackResult? RigidFallbackResult { get; set; }
+
+        public void Dispose()
+        {
+            Homography?.Dispose();
+            OcclusionMask?.Dispose();
+            RigidFallbackResult?.Dispose();
+        }
     }
 
-    private class RigidFallbackResult
+    private sealed class RigidFallbackResult : IDisposable
     {
         public Mat Homography { get; set; } = new Mat();
         public Point2f[] Corners { get; set; } = Array.Empty<Point2f>();
+        public bool VerificationPassed { get; set; }
+        public string FailureReason { get; set; } = string.Empty;
         public int InlierCount { get; set; }
+        public double InlierRatio { get; set; }
+        public double VerificationScore { get; set; }
         public double Score { get; set; }
+
+        public void Dispose()
+        {
+            Homography.Dispose();
+        }
     }
 
     private readonly record struct CandidateWindow(Rect Roi, Rect Proposal, double Score);
 }
+
+

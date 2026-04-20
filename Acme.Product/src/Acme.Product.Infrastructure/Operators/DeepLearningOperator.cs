@@ -2,8 +2,10 @@
 // 深度学习算子 - 使用 ONNX 模型进行 AI 缺陷检测
 // 作者：蘅芜君
 
-using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using Acme.Product.Infrastructure.AI.Runtime;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
@@ -62,6 +64,7 @@ public enum YoloVersion
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
+[OutputPort("OriginalImage", "原始图像", PortDataType.Image)]
 [OutputPort("DetectionList", "检测列表", PortDataType.DetectionList)]
 [OutputPort("Defects", "缺陷列表", PortDataType.DetectionList)]
 [OutputPort("DefectCount", "缺陷数量", PortDataType.Integer)]
@@ -74,7 +77,8 @@ public enum YoloVersion
 [OperatorParam("UseGpu", "使用GPU", "bool", DefaultValue = true)]
 [OperatorParam("GpuDeviceId", "GPU设备ID", "int", DefaultValue = 0, Min = 0, Max = 15)]
 [OperatorParam("TargetClasses", "目标类别", "string", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别", DefaultValue = "")]
-[OperatorParam("LabelFile", "标签文件路径", "file", Description = "自定义标签文件路径（每行一个标签），为空则使用COCO 80类或自动查找模型目录下的labels.txt", DefaultValue = "")]
+[OperatorParam("LabelsPath", "标签文件路径", "file", Description = "自定义标签文件路径（每行一个标签），为空则优先使用模型 metadata names 或自动查找模型目录下的 labels.txt；仍不可用时执行失败", DefaultValue = "")]
+[OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。", DefaultValue = true)]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
 public class DeepLearningOperator : OperatorBase
 {
@@ -85,7 +89,7 @@ public class DeepLearningOperator : OperatorBase
     /// <summary>
     /// 模型缓存 - 避免重复加载
     /// </summary>
-    private static readonly ConcurrentDictionary<string, InferenceSession> _modelCache = new();
+    private static readonly ConcurrentDictionary<string, CachedModelSession> _modelCache = new();
 
     /// <summary>
     /// 线程锁 - 用于并发加载模型
@@ -119,22 +123,115 @@ public class DeepLearningOperator : OperatorBase
     /// <summary>
     /// COCO 80类标签名映射
     /// </summary>
-    private static readonly string[] CocoClassNames = new[]
+    private sealed class LabelSourceInfo
     {
-        "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
-        "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
-        "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-        "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle",
-        "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
-        "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed",
-        "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven",
-        "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
-    };
+        public required string[] Labels { get; init; }
+        public required string Source { get; init; }
+        public string Path { get; init; } = string.Empty;
+        public bool IsFileBacked { get; init; }
+    }
+
+    private sealed class CachedModelSession
+    {
+        private int _leaseCount;
+        private int _disposeRequested;
+        private int _disposed;
+
+        public CachedModelSession(InferenceSession session)
+        {
+            Session = session;
+        }
+
+        public InferenceSession Session { get; }
+
+        public bool TryAcquire([NotNullWhen(true)] out ModelSessionLease? lease)
+        {
+            lease = null;
+
+            if (Volatile.Read(ref _disposeRequested) != 0)
+            {
+                return false;
+            }
+
+            Interlocked.Increment(ref _leaseCount);
+
+            if (Volatile.Read(ref _disposeRequested) != 0)
+            {
+                Release();
+                return false;
+            }
+
+            lease = new ModelSessionLease(this);
+            return true;
+        }
+
+        public void MarkForDisposal()
+        {
+            Interlocked.Exchange(ref _disposeRequested, 1);
+            TryDispose();
+        }
+
+        private void Release()
+        {
+            var remainingLeases = Interlocked.Decrement(ref _leaseCount);
+            if (remainingLeases < 0)
+            {
+                throw new InvalidOperationException("Model session lease count dropped below zero.");
+            }
+
+            if (remainingLeases == 0)
+            {
+                TryDispose();
+            }
+        }
+
+        private void TryDispose()
+        {
+            if (Volatile.Read(ref _disposeRequested) == 0 || Volatile.Read(ref _leaseCount) != 0)
+            {
+                return;
+            }
+
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                Session.Dispose();
+            }
+        }
+
+        public sealed class ModelSessionLease : IDisposable
+        {
+            private CachedModelSession? _owner;
+
+            public ModelSessionLease(CachedModelSession owner)
+            {
+                _owner = owner;
+            }
+
+            public InferenceSession Session => _owner?.Session ?? throw new ObjectDisposedException(nameof(ModelSessionLease));
+
+            public void Dispose()
+            {
+                Interlocked.Exchange(ref _owner, null)?.Release();
+            }
+        }
+    }
+
+    private sealed class LabelContract
+    {
+        public required string[] ResolvedLabels { get; init; }
+        public required string[] MetadataLabels { get; init; }
+        public required string[] ExternalLabels { get; init; }
+        public required string ResolvedLabelSource { get; init; }
+        public string ResolvedLabelPath { get; init; } = string.Empty;
+        public string ValidationStatus { get; init; } = "Unknown";
+        public string? ValidationMessage { get; init; }
+        public bool IsValid => string.IsNullOrWhiteSpace(ValidationMessage);
+    }
 
     /// <summary>
     /// 执行算子核心逻辑
     /// </summary>
-    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+    protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
@@ -142,7 +239,7 @@ public class DeepLearningOperator : OperatorBase
         // 1. 获取输入图像
         if (!TryGetInputImage(inputs, out var imageWrapper) || imageWrapper == null)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("未提供输入图像"));
+            return OperatorExecutionOutput.Failure("未提供输入图像");
         }
 
         // 2. 获取参数
@@ -152,33 +249,30 @@ public class DeepLearningOperator : OperatorBase
         var yoloVersionStr = GetStringParam(@operator, "ModelVersion", "Auto");
         var yoloVersion = ParseYoloVersion(yoloVersionStr);
         var targetClassesStr = GetStringParam(@operator, "TargetClasses", string.Empty);
-        var labelFile = GetStringParam(@operator, "LabelFile", "");
+        var labelsPath = ResolveLabelsPath(@operator);
+        var enableInternalNms = GetBoolParam(@operator, "EnableInternalNms", true);
 
         // 2.1 加载自定义标签
-        var labels = LoadLabels(labelFile, modelPath);
-        var targetClasses = ParseTargetClasses(targetClassesStr, labels);
-        Logger.LogInformation("[DeepLearning] 当前使用标签数量: {Count}, 目标参数: {TargetStr}", labels.Length, targetClassesStr);
-        if (labels.Length > 0 && !ReferenceEquals(labels, CocoClassNames))
-        {
-            Logger.LogInformation("[DeepLearning] 使用自定义标签");
-        }
+        var labels = Array.Empty<string>();
+        var unresolvedTargetClasses = new List<string>();
+        HashSet<int>? targetClasses = null;
 
         // 3. 验证模型路径
         if (string.IsNullOrWhiteSpace(modelPath))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("未指定模型路径"));
+            return OperatorExecutionOutput.Failure("未指定模型路径");
         }
 
         if (!File.Exists(modelPath))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure($"模型文件不存在: {modelPath}"));
+            return OperatorExecutionOutput.Failure($"模型文件不存在: {modelPath}");
         }
 
         // 4. 解码图像
         var src = imageWrapper.GetMat();
         if (src.Empty())
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
+            return OperatorExecutionOutput.Failure("无法解码输入图像");
         }
 
         var originalWidth = src.Width;
@@ -187,88 +281,153 @@ public class DeepLearningOperator : OperatorBase
         // 5. 加载模型（支持GPU加速 - P3-O3.1）
         var useGpu = GetBoolParam(@operator, "UseGpu", true);
         var gpuDeviceId = GetIntParam(@operator, "GpuDeviceId", 0, 0, 15);
-        var session = LoadModel(modelPath, useGpu, gpuDeviceId);
-        if (session == null)
+        using var modelSessionLease = await AcquireModelSessionWithVerifiedExecutionProviderAsync(modelPath, useGpu, gpuDeviceId, cancellationToken).ConfigureAwait(false);
+        if (modelSessionLease == null)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("模型加载失败"));
+            return OperatorExecutionOutput.Failure("模型加载失败");
         }
 
+        var session = modelSessionLease.Session;
+
         // 6. 预处理图像
+        var labelContract = ResolveLabelContract(session, labelsPath, modelPath, targetClassesStr);
+        if (!labelContract.IsValid)
+        {
+            return OperatorExecutionOutput.Failure(labelContract.ValidationMessage!);
+        }
+
+        labels = labelContract.ResolvedLabels;
+        unresolvedTargetClasses = FindUnresolvedTargetClasses(targetClassesStr, labels);
+        if (unresolvedTargetClasses.Count > 0)
+        {
+            const string labelSource = "the active labels";
+            return OperatorExecutionOutput.Failure(
+                $"Failed to resolve TargetClasses [{string.Join(", ", unresolvedTargetClasses)}] against {labelSource}. Set LabelsPath or place labels.txt next to the model."));
+        }
+
+        targetClasses = ParseTargetClasses(targetClassesStr, labels);
+        Logger.LogInformation(
+            "[DeepLearning] Using {Count} labels. TargetClasses={TargetStr}, LabelSource={LabelSource}, ValidationStatus={ValidationStatus}",
+            labels.Length,
+            targetClassesStr,
+            labelContract.ResolvedLabelSource,
+            labelContract.ValidationStatus);
+        Logger.LogInformation(
+            "[DeepLearning] Label contract resolved. LabelContractSource={LabelContractSource}, LabelContractStatus={LabelContractStatus}",
+            labelContract.ResolvedLabelSource,
+            labelContract.ValidationStatus);
+
         var inputTensor = PreprocessImage(src, inputSize);
         Logger.LogDebug("[DeepLearning] 输入张量形状: [1, 3, {InputSize}, {InputSize}]", inputSize, inputSize);
 
         // 7. 执行推理
-        var outputTensor = RunInference(session, inputTensor);
-        Logger.LogDebug("[DeepLearning] 输出张量形状: [{Dimensions}]", string.Join(", ", outputTensor.Dimensions.ToArray()));
+        var inferenceOutput = RunInference(session, inputTensor, labels.Length);
+        var outputTensor = inferenceOutput.Tensor;
+        Logger.LogInformation(
+            "[DeepLearning] Output tensor selected. OutputTensorName={OutputTensorName}, OutputTensorShape={OutputTensorShape}, SelectionRule={SelectionRule}",
+            inferenceOutput.OutputName,
+            string.Join(", ", inferenceOutput.OutputShape),
+            inferenceOutput.SelectionRule);
 
         // 8. 自动检测 YOLO 版本
         Logger.LogDebug("[DeepLearning] 参数ModelVersion: '{YoloVersionStr}', 解析为: {YoloVersion}", yoloVersionStr, yoloVersion);
 
         if (yoloVersion == YoloVersion.Auto)
         {
-            yoloVersion = DetectYoloVersion(outputTensor);
+            yoloVersion = DetectYoloVersion(outputTensor, labels.Length);
         }
         Logger.LogInformation("[DeepLearning] 最终使用YOLO版本: {YoloVersion}, 置信度阈值: {Confidence}", yoloVersion, confidenceThreshold);
 
         // 9. 后处理
-        var detections = PostprocessResults(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses);
+        var detections = PostprocessResults(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses, enableInternalNms);
         Logger.LogInformation("[DeepLearning] 检测到目标数量: {DetectionCount}", detections.Count);
-
-        // 10. 绘制结果
-        var outputImage = DrawResults(src, detections, labels);
-
-        // 11. 构建输出 - Sprint 1 Task 1.2: 使用 DetectionList 类型
-        var detectionList = new DetectionList(
-            detections.Select((d, index) => new Core.ValueObjects.DetectionResult
-            {
-                Label = GetClassName(d.ClassId, labels),
-                Confidence = d.Confidence,
-                X = d.X,
-                Y = d.Y,
-                Width = d.Width,
-                Height = d.Height
-            })
-        );
 
         var detectionMode = GetStringParam(@operator, "DetectionMode", "Defect");
         var isObjectMode = detectionMode.Equals("Object", StringComparison.OrdinalIgnoreCase);
 
+        // 10. 绘制结果
+        var visualizationDetections = BuildVisualizationDetections(detections, confidenceThreshold, enableInternalNms);
+        var outputImage = DrawResults(src, visualizationDetections, labels, detectionMode);
+
+        // 11. 构建输出 - Sprint 1 Task 1.2: 使用 DetectionList 类型
+        var outputDetections = new List<Core.ValueObjects.DetectionResult>(detections.Count);
+        foreach (var detection in detections)
+        {
+            outputDetections.Add(new Core.ValueObjects.DetectionResult
+            {
+                Label = GetClassName(detection.ClassId, labels),
+                Confidence = detection.Confidence,
+                X = detection.X,
+                Y = detection.Y,
+                Width = detection.Width,
+                Height = detection.Height
+            });
+        }
+
+        var detectionList = new DetectionList(outputDetections);
+
+        // 输出原始图像（不带任何绘制），供下游节点重新绘制
+        var originalImage = src.Clone();
+        
         var additionalData = new Dictionary<string, object>
         {
             { "DetectionMode", detectionMode },
+            { "InternalNmsEnabled", enableInternalNms },
+            { "RawCandidateCount", detections.Count },
+            { "VisualizationDetectionCount", visualizationDetections.Count },
             { "DetectionList", detectionList },
             { "Objects", isObjectMode ? detectionList : new DetectionList() },
             { "ObjectCount", isObjectMode ? detections.Count : 0 },
             { "Defects", isObjectMode ? new DetectionList() : detectionList },
-            { "DefectCount", isObjectMode ? 0 : detections.Count }
+            { "DefectCount", isObjectMode ? 0 : detections.Count },
+            { "OriginalImage", new ImageWrapper(originalImage) },
+            { "LabelSource", labelContract.ResolvedLabelSource },
+            { "ResolvedLabels", labelContract.ResolvedLabels },
+            { "ModelMetadataLabels", labelContract.MetadataLabels },
+            { "LabelsPath", labelContract.ResolvedLabelPath },
+            { "LabelValidationStatus", labelContract.ValidationStatus }
         };
 
         Logger.LogInformation("[DeepLearning] 执行完毕. 检测总数: {Count}, 过滤后输出: {DefectCount}", detections.Count, detections.Count);
 
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(outputImage, additionalData)));
+        return OperatorExecutionOutput.Success(CreateImageOutput(outputImage, additionalData));
     }
 
-    /// <summary>
-    /// 加载模型（带缓存，支持GPU加速 - P3-O3.1）
-    /// </summary>
-    private InferenceSession? LoadModel(string modelPath, bool useGpu = true, int gpuDeviceId = 0)
+    private async Task<CachedModelSession.ModelSessionLease?> AcquireModelSessionWithVerifiedExecutionProviderAsync(
+        string modelPath,
+        bool useGpu = true,
+        int gpuDeviceId = 0,
+        CancellationToken cancellationToken = default)
     {
         var cacheKey = $"{modelPath}_gpu_{useGpu}_{gpuDeviceId}";
-        if (_modelCache.TryGetValue(cacheKey, out var cachedSession))
+        if (_modelCache.TryGetValue(cacheKey, out var cachedSessionEntry))
         {
-            TouchModelCacheKey(cacheKey);
-            return cachedSession;
+            if (cachedSessionEntry.TryAcquire(out var cachedLease))
+            {
+                TouchModelCacheKey(cacheKey);
+                return cachedLease;
+            }
+
+            _modelCache.TryRemove(new KeyValuePair<string, CachedModelSession>(cacheKey, cachedSessionEntry));
         }
 
         var lockObj = _modelLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
 
-        lockObj.Wait();
+        var lockAcquired = false;
         try
         {
-            if (_modelCache.TryGetValue(cacheKey, out cachedSession))
+            await lockObj.WaitAsync(cancellationToken).ConfigureAwait(false);
+            lockAcquired = true;
+
+            if (_modelCache.TryGetValue(cacheKey, out cachedSessionEntry))
             {
-                TouchModelCacheKey(cacheKey);
-                return cachedSession;
+                if (cachedSessionEntry.TryAcquire(out var cachedLease))
+                {
+                    TouchModelCacheKey(cacheKey);
+                    return cachedLease;
+                }
+
+                _modelCache.TryRemove(new KeyValuePair<string, CachedModelSession>(cacheKey, cachedSessionEntry));
             }
 
             var sessionOptions = new SessionOptions
@@ -278,50 +437,140 @@ public class DeepLearningOperator : OperatorBase
                 GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
             };
 
+            var activeExecutionProvider = "CPU";
+
             if (useGpu && GpuAvailabilityChecker.IsCudaAvailable)
             {
-                try
+                if (TryAppendTensorRtExecutionProvider(sessionOptions, gpuDeviceId, out var tensorRtFailureReason))
+                {
+                    activeExecutionProvider = "TensorRT";
+                    Logger.LogInformation("[DeepLearning] TensorRT execution provider enabled, device ID: {DeviceId}", gpuDeviceId);
+                }
+                else
                 {
                     if (GpuAvailabilityChecker.IsTensorRtAvailable)
                     {
-                        Logger.LogInformation("[DeepLearning] TensorRT加速已启用，设备ID: {DeviceId}", gpuDeviceId);
+                        Logger.LogWarning(
+                            "[DeepLearning] TensorRT detected but not enabled. Falling back to CUDA. Reason: {Reason}",
+                            tensorRtFailureReason);
                     }
-                    else
+
+                    try
                     {
                         sessionOptions.AppendExecutionProvider_CUDA(gpuDeviceId);
-                        Logger.LogInformation("[DeepLearning] CUDA GPU加速已启用，设备ID: {DeviceId}", gpuDeviceId);
+                        activeExecutionProvider = "CUDA";
+                        Logger.LogInformation("[DeepLearning] CUDA execution provider enabled, device ID: {DeviceId}", gpuDeviceId);
                     }
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "[DeepLearning] GPU加速启用失败，回退到CPU模式");
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "[DeepLearning] GPU execution provider enable failed, falling back to CPU");
+                    }
                 }
             }
             else
             {
-                Logger.LogInformation("[DeepLearning] 使用CPU模式运行");
+                Logger.LogInformation("[DeepLearning] Using CPU execution provider");
             }
 
             var session = new InferenceSession(modelPath, sessionOptions);
+            var cacheEntry = new CachedModelSession(session);
 
             lock (_modelCacheEvictionLock)
             {
                 EvictModelsIfNeeded();
-                _modelCache[cacheKey] = session;
+                _modelCache[cacheKey] = cacheEntry;
                 TouchModelCacheKey(cacheKey);
             }
 
-            Logger.LogDebug("[DeepLearning] 模型加载成功，GPU加速: {GpuEnabled}", useGpu && GpuAvailabilityChecker.IsCudaAvailable);
-            return session;
+            Logger.LogDebug("[DeepLearning] Model loaded successfully with execution provider: {ExecutionProvider}", activeExecutionProvider);
+            if (!cacheEntry.TryAcquire(out var createdLease))
+            {
+                throw new InvalidOperationException("Newly created model session could not be acquired.");
+            }
+
+            return createdLease;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[DeepLearning] 模型加载失败");
+            Logger.LogError(ex, "[DeepLearning] Failed to load model with verified execution provider");
             return null;
         }
         finally
         {
-            lockObj.Release();
+            if (lockAcquired)
+            {
+                lockObj.Release();
+            }
+        }
+    }
+
+    private bool TryAppendTensorRtExecutionProvider(SessionOptions sessionOptions, int gpuDeviceId, out string failureReason)
+    {
+        failureReason = string.Empty;
+
+        if (!GpuAvailabilityChecker.IsTensorRtAvailable)
+        {
+            failureReason = "TensorRT was not detected on this machine.";
+            return false;
+        }
+
+        try
+        {
+            var tensorRtMethod = typeof(SessionOptions)
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .FirstOrDefault(method =>
+                    string.Equals(method.Name, "AppendExecutionProvider_TensorRT", StringComparison.Ordinal) &&
+                    method.GetParameters().Length == 1);
+
+            if (tensorRtMethod is null)
+            {
+                failureReason = "The current OnnxRuntime package does not expose TensorRT provider APIs.";
+                return false;
+            }
+
+            var optionsParameterType = tensorRtMethod.GetParameters()[0].ParameterType;
+            var providerOptions = Activator.CreateInstance(optionsParameterType);
+            if (providerOptions is null)
+            {
+                failureReason = $"Unable to create TensorRT provider options of type '{optionsParameterType.FullName}'.";
+                return false;
+            }
+
+            SetTensorRtDeviceId(providerOptions, gpuDeviceId);
+            tensorRtMethod.Invoke(sessionOptions, new[] { providerOptions });
+            return true;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            failureReason = ex.InnerException.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            failureReason = ex.Message;
+            return false;
+        }
+    }
+
+    private static void SetTensorRtDeviceId(object providerOptions, int gpuDeviceId)
+    {
+        var optionsType = providerOptions.GetType();
+        var candidateProperties = new[] { "DeviceId", "GpuDeviceId" };
+
+        foreach (var propertyName in candidateProperties)
+        {
+            var property = optionsType.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+            if (property is null || !property.CanWrite || property.PropertyType != typeof(int))
+            {
+                continue;
+            }
+
+            property.SetValue(providerOptions, gpuDeviceId);
+            return;
         }
     }
 
@@ -341,7 +590,7 @@ public class DeepLearningOperator : OperatorBase
             {
                 if (_modelCache.TryRemove(key, out var session))
                 {
-                    session.Dispose();
+                    session.MarkForDisposal();
                 }
 
                 _modelLocks.TryRemove(key, out _);
@@ -368,7 +617,7 @@ public class DeepLearningOperator : OperatorBase
 
             if (_modelCache.TryRemove(oldestKey, out var oldSession))
             {
-                oldSession.Dispose();
+                oldSession.MarkForDisposal();
                 Logger.LogInformation("[DeepLearning] 驱逐模型缓存: {Key}", oldestKey);
             }
 
@@ -390,14 +639,16 @@ public class DeepLearningOperator : OperatorBase
     /// </summary>
     private DenseTensor<float> PreprocessImage(Mat src, int inputSize)
     {
+        using var normalizedSrc = NormalizeToBgr8(src);
+
         // 1. 计算缩放比例（保持宽高比）
-        var scale = Math.Min((float)inputSize / src.Width, (float)inputSize / src.Height);
-        var newWidth = (int)(src.Width * scale);
-        var newHeight = (int)(src.Height * scale);
+        var scale = Math.Min((float)inputSize / normalizedSrc.Width, (float)inputSize / normalizedSrc.Height);
+        var newWidth = (int)(normalizedSrc.Width * scale);
+        var newHeight = (int)(normalizedSrc.Height * scale);
 
         // 2. Resize
         using var resized = new Mat();
-        Cv2.Resize(src, resized, new Size(newWidth, newHeight), 0, 0, InterpolationFlags.Linear);
+        Cv2.Resize(normalizedSrc, resized, new Size(newWidth, newHeight), 0, 0, InterpolationFlags.Linear);
 
         // 3. 创建填充画布（640x640）
         using var padded = new Mat(inputSize, inputSize, MatType.CV_8UC3, new Scalar(114, 114, 114));
@@ -416,60 +667,314 @@ public class DeepLearningOperator : OperatorBase
         // 5. 提取数据并转换为 CHW 格式（P3-O3.2: 使用ArrayPool）
         // YOLO 模型期望 RGB 顺序，OpenCV 使用 BGR 顺序
         var tensorSize = 1 * 3 * inputSize * inputSize;
-        var tensorData = ArrayPool<float>.Shared.Rent(tensorSize);
+        var tensorData = new float[tensorSize];
+        var matData = floatMat.GetGenericIndexer<Vec3f>();
+        var channelSize = inputSize * inputSize;
 
+        for (int h = 0; h < inputSize; h++)
+        {
+            for (int w = 0; w < inputSize; w++)
+            {
+                var pixel = matData[h, w];
+                var pixelIndex = h * inputSize + w;
+                // CHW 格式: [batch, channel, height, width]
+                // OpenCV BGR -> 模型 RGB: Item2=R, Item1=G, Item0=B
+                tensorData[pixelIndex] = pixel.Item2;
+                tensorData[channelSize + pixelIndex] = pixel.Item1;
+                tensorData[(channelSize * 2) + pixelIndex] = pixel.Item0;
+            }
+        }
+
+        return new DenseTensor<float>(tensorData, new[] { 1, 3, inputSize, inputSize });
+    }
+
+    private static Mat NormalizeToBgr8(Mat src)
+    {
+        if (src.Empty())
+        {
+            throw new ArgumentException("Source image must not be empty.", nameof(src));
+        }
+
+        using var normalizedDepth = new Mat();
+        ConvertToByteDepth(src, normalizedDepth);
+
+        if (normalizedDepth.Channels() == 3)
+        {
+            return normalizedDepth.Clone();
+        }
+
+        var converted = new Mat();
+        switch (normalizedDepth.Channels())
+        {
+            case 1:
+                Cv2.CvtColor(normalizedDepth, converted, ColorConversionCodes.GRAY2BGR);
+                return converted;
+            case 4:
+                Cv2.CvtColor(normalizedDepth, converted, ColorConversionCodes.BGRA2BGR);
+                return converted;
+            default:
+                throw new NotSupportedException($"Unsupported channel count for deep learning preprocessing: {normalizedDepth.Channels()}.");
+        }
+    }
+
+    private static void ConvertToByteDepth(Mat src, Mat dst)
+    {
+        var targetType = MatType.MakeType(MatType.CV_8U, src.Channels());
+        switch (src.Depth())
+        {
+            case MatType.CV_8U:
+                src.CopyTo(dst);
+                return;
+            case MatType.CV_16U:
+                src.ConvertTo(dst, targetType, 1.0 / 256.0);
+                return;
+            case MatType.CV_32F:
+            case MatType.CV_64F:
+                var (floatMin, floatMax) = GetGlobalMinMax(src);
+                if (floatMin >= 0d && floatMax <= 1d)
+                {
+                    src.ConvertTo(dst, targetType, 255.0);
+                    return;
+                }
+
+                if (floatMin >= 0d && floatMax <= 255d)
+                {
+                    src.ConvertTo(dst, targetType);
+                    return;
+                }
+
+                if (floatMin >= 0d && floatMax <= 65535d)
+                {
+                    src.ConvertTo(dst, targetType, 1.0 / 256.0);
+                    return;
+                }
+
+                throw new InvalidOperationException("DeepLearning preprocessing only supports float images in [0,1], [0,255], or [0,65535].");
+            default:
+                throw new NotSupportedException($"Unsupported image depth for deep learning preprocessing: {src.Depth()}.");
+        }
+    }
+
+    private static (double Min, double Max) GetGlobalMinMax(Mat src)
+    {
+        if (src.Channels() == 1)
+        {
+            double minValue;
+            double maxValue;
+            Cv2.MinMaxLoc(src, out minValue, out maxValue);
+            return (minValue, maxValue);
+        }
+
+        Cv2.Split(src, out var channels);
         try
         {
-            var matData = floatMat.GetGenericIndexer<Vec3f>();
-            var channelSize = inputSize * inputSize;
-
-            for (int h = 0; h < inputSize; h++)
+            var minValue = double.PositiveInfinity;
+            var maxValue = double.NegativeInfinity;
+            foreach (var channel in channels)
             {
-                for (int w = 0; w < inputSize; w++)
-                {
-                    var pixel = matData[h, w];
-                    var pixelIndex = h * inputSize + w;
-                    // CHW 格式: [batch, channel, height, width]
-                    // OpenCV BGR -> 模型 RGB: Item2=R, Item1=G, Item0=B
-                    tensorData[0 * channelSize + pixelIndex] = pixel.Item2; // R 通道
-                    tensorData[1 * channelSize + pixelIndex] = pixel.Item1; // G 通道
-                    tensorData[2 * channelSize + pixelIndex] = pixel.Item0; // B 通道
-                }
+                double channelMin;
+                double channelMax;
+                Cv2.MinMaxLoc(channel, out channelMin, out channelMax);
+                minValue = Math.Min(minValue, channelMin);
+                maxValue = Math.Max(maxValue, channelMax);
             }
 
-            // 创建DenseTensor（复制数据）
-            return new DenseTensor<float>(tensorData[..tensorSize].ToArray(), new[] { 1, 3, inputSize, inputSize });
+            return (minValue, maxValue);
         }
         finally
         {
-            // 归还数组到池（清理数据确保安全）
-            ArrayPool<float>.Shared.Return(tensorData, clearArray: true);
+            foreach (var channel in channels)
+            {
+                channel.Dispose();
+            }
         }
     }
+
+    private readonly record struct InferenceTensorSelection(
+        DenseTensor<float> Tensor,
+        string OutputName,
+        int[] OutputShape,
+        string SelectionRule);
 
     /// <summary>
     /// 执行推理
     /// </summary>
-    private DenseTensor<float> RunInference(InferenceSession session, DenseTensor<float> inputTensor)
+    private InferenceTensorSelection RunInference(InferenceSession session, DenseTensor<float> inputTensor, int knownLabelCount)
     {
-        // 获取输入名称
         var inputName = session.InputMetadata.Keys.First();
-
-        // 创建输入
         var inputs = new List<NamedOnnxValue>
         {
             NamedOnnxValue.CreateFromTensor(inputName, inputTensor)
         };
 
-        // 执行推理
         using var results = session.Run(inputs);
+        var outputNames = new List<string>();
+        var outputShapes = new List<int[]>();
+        var outputTensors = new List<Tensor<float>>();
 
-        // 获取输出
-        var outputName = session.OutputMetadata.Keys.First();
-        var outputValue = results.First(r => r.Name == outputName);
-        var outputTensor = outputValue.AsTensor<float>();
+        foreach (var output in results)
+        {
+            try
+            {
+                var tensor = output.AsTensor<float>();
+                outputNames.Add(output.Name);
+                outputShapes.Add(tensor.Dimensions.ToArray());
+                outputTensors.Add(tensor);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "[DeepLearning] Ignoring non-float output tensor: {OutputName}", output.Name);
+            }
+        }
 
-        return outputTensor as DenseTensor<float> ?? new DenseTensor<float>(outputTensor.ToArray(), outputTensor.Dimensions.ToArray());
+        if (outputTensors.Count == 0)
+        {
+            throw new InvalidOperationException("No float output tensor was produced by the model.");
+        }
+
+        var selection = SelectDetectionOutputIndex(outputNames, outputShapes, knownLabelCount);
+        var selectedShape = outputShapes[selection.SelectedIndex];
+        var selectedTensor = outputTensors[selection.SelectedIndex];
+        var selectedDenseTensor = new DenseTensor<float>(selectedTensor.ToArray(), selectedShape);
+
+        return new InferenceTensorSelection(
+            selectedDenseTensor,
+            outputNames[selection.SelectedIndex],
+            selectedShape,
+            selection.SelectionRule);
+    }
+
+    private static (int SelectedIndex, string SelectionRule) SelectDetectionOutputIndex(
+        IReadOnlyList<string> outputNames,
+        IReadOnlyList<int[]> outputShapes,
+        int knownLabelCount)
+    {
+        if (outputNames.Count == 0 || outputShapes.Count == 0 || outputNames.Count != outputShapes.Count)
+        {
+            throw new ArgumentException("Output tensor names and shapes must be non-empty and aligned.");
+        }
+
+        if (knownLabelCount > 0)
+        {
+            var bestIndex = -1;
+            var bestAnchor = -1;
+            var bestRule = string.Empty;
+
+            for (var i = 0; i < outputShapes.Count; i++)
+            {
+                if (!TryMatchKnownLabelShape(outputShapes[i], knownLabelCount, out var anchorDim, out var rule))
+                {
+                    continue;
+                }
+
+                if (anchorDim > bestAnchor)
+                {
+                    bestAnchor = anchorDim;
+                    bestIndex = i;
+                    bestRule = rule;
+                }
+            }
+
+            if (bestIndex >= 0)
+            {
+                return (bestIndex, bestRule);
+            }
+
+            throw new InvalidOperationException(
+                $"No output tensor matched the configured label count ({knownLabelCount}).");
+        }
+
+        var heuristicIndex = -1;
+        var heuristicScore = int.MinValue;
+        for (var i = 0; i < outputShapes.Count; i++)
+        {
+            if (!TryGetRank3DetectionScore(outputShapes[i], out var score))
+            {
+                continue;
+            }
+
+            if (score > heuristicScore)
+            {
+                heuristicScore = score;
+                heuristicIndex = i;
+            }
+        }
+
+        if (heuristicIndex >= 0)
+        {
+            return (heuristicIndex, "Rank3Heuristic");
+        }
+
+        throw new InvalidOperationException("Could not identify a rank-3 detection output tensor.");
+    }
+
+    private static bool TryMatchKnownLabelShape(int[] shape, int knownLabelCount, out int anchorDim, out string rule)
+    {
+        anchorDim = 0;
+        rule = string.Empty;
+
+        if (shape.Length != 3)
+        {
+            return false;
+        }
+
+        if (TryMatchFeatureDimension(shape[1], shape[2], knownLabelCount, out rule))
+        {
+            anchorDim = shape[2];
+            return true;
+        }
+
+        if (TryMatchFeatureDimension(shape[2], shape[1], knownLabelCount, out rule))
+        {
+            anchorDim = shape[1];
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryMatchFeatureDimension(int featureDim, int anchorDim, int knownLabelCount, out string rule)
+    {
+        rule = string.Empty;
+        if (anchorDim <= featureDim)
+        {
+            return false;
+        }
+
+        if (featureDim == knownLabelCount + 4)
+        {
+            rule = "KnownLabelFeature+4";
+            return true;
+        }
+
+        if (featureDim == knownLabelCount + 5)
+        {
+            rule = "KnownLabelFeature+5";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetRank3DetectionScore(int[] shape, out int score)
+    {
+        score = int.MinValue;
+        if (shape.Length != 3)
+        {
+            return false;
+        }
+
+        var dimA = shape[1];
+        var dimB = shape[2];
+        var anchorDim = Math.Max(dimA, dimB);
+        var featureDim = Math.Min(dimA, dimB);
+        if (anchorDim < 16 || featureDim < 4 || featureDim > 512)
+        {
+            return false;
+        }
+
+        score = (anchorDim * 1024) - featureDim;
+        return true;
     }
 
     /// <summary>
@@ -503,23 +1008,33 @@ public class DeepLearningOperator : OperatorBase
         int originalHeight,
         int inputSize,
         YoloVersion yoloVersion,
-        HashSet<int>? targetClasses)
+        HashSet<int>? targetClasses,
+        bool enableInternalNms)
     {
         // 根据 YOLO 版本选择处理方式
         var detections = yoloVersion switch
         {
-            YoloVersion.YOLOv5 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize),
-            YoloVersion.YOLOv6 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize),
-            YoloVersion.YOLOv8 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize),
-            YoloVersion.YOLOv11 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize),
-            _ => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize)
+            YoloVersion.YOLOv5 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
+            YoloVersion.YOLOv6 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
+            YoloVersion.YOLOv8 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
+            YoloVersion.YOLOv11 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
+            _ => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms)
         };
 
         // 如果指定了目标类别，进行过滤
         if (targetClasses != null && targetClasses.Count > 0)
         {
             var beforeFilter = detections.Count;
-            detections = detections.Where(d => targetClasses.Contains(d.ClassId)).ToList();
+            var filteredDetections = new List<DetectionResult>(detections.Count);
+            foreach (var detection in detections)
+            {
+                if (targetClasses.Contains(detection.ClassId))
+                {
+                    filteredDetections.Add(detection);
+                }
+            }
+
+            detections = filteredDetections;
             Logger.LogDebug("[DeepLearning] 类别过滤: {BeforeFilter} -> {AfterFilter} (目标类别: {TargetClasses})",
                 beforeFilter, detections.Count, string.Join(",", targetClasses));
         }
@@ -536,7 +1051,8 @@ public class DeepLearningOperator : OperatorBase
         float confidenceThreshold,
         int originalWidth,
         int originalHeight,
-        int inputSize)
+        int inputSize,
+        bool enableInternalNms)
     {
         var detections = new List<DetectionResult>();
         var shape = outputTensor.Dimensions.ToArray();
@@ -650,6 +1166,12 @@ public class DeepLearningOperator : OperatorBase
 
         Logger.LogDebug("[DeepLearning] V8/V11后处理: 最大置信度={GlobalMaxConf:F4}, 阈值={ConfidenceThreshold}, 阈值前检测数={DetectionCount}",
             globalMaxConf, confidenceThreshold, detections.Count);
+        if (!enableInternalNms)
+        {
+            Logger.LogDebug("[DeepLearning] 已禁用内部NMS，输出候选框数: {CandidateCount}", detections.Count);
+            return detections;
+        }
+
         var nmsResult = ApplyNMS(detections, 0.45f);
         Logger.LogDebug("[DeepLearning] NMS后检测数: {NmsCount}", nmsResult.Count);
         return nmsResult;
@@ -663,15 +1185,17 @@ public class DeepLearningOperator : OperatorBase
         float confidenceThreshold,
         int originalWidth,
         int originalHeight,
-        int inputSize)
+        int inputSize,
+        bool enableInternalNms)
     {
         var detections = new List<DetectionResult>();
         var shape = outputTensor.Dimensions.ToArray();
 
         if (shape.Length != 3)
             return detections;
-        int numAnchors = shape[1];
-        int numFeatures = shape[2];
+        var isTransposed = shape[1] < shape[2];
+        int numAnchors = isTransposed ? shape[2] : shape[1];
+        int numFeatures = isTransposed ? shape[1] : shape[2];
         int numClasses = numFeatures - 5;
         float globalMaxConf = 0f;
         var scale = Math.Min((float)inputSize / originalWidth, (float)inputSize / originalHeight);
@@ -680,21 +1204,25 @@ public class DeepLearningOperator : OperatorBase
 
         for (int i = 0; i < numAnchors; i++)
         {
-            float objConf = outputTensor[0, i, 4];
+            float objConf = isTransposed
+                ? outputTensor[0, 4, i]
+                : outputTensor[0, i, 4];
             if (objConf < confidenceThreshold)
                 continue;
 
-            float x = outputTensor[0, i, 0];
-            float y = outputTensor[0, i, 1];
-            float w = outputTensor[0, i, 2];
-            float h = outputTensor[0, i, 3];
+            float x = isTransposed ? outputTensor[0, 0, i] : outputTensor[0, i, 0];
+            float y = isTransposed ? outputTensor[0, 1, i] : outputTensor[0, i, 1];
+            float w = isTransposed ? outputTensor[0, 2, i] : outputTensor[0, i, 2];
+            float h = isTransposed ? outputTensor[0, 3, i] : outputTensor[0, i, 3];
 
             float maxClassProb = 0;
             int maxClassId = 0;
 
             for (int c = 0; c < numClasses; c++)
             {
-                float prob = outputTensor[0, i, 5 + c];
+                float prob = isTransposed
+                    ? outputTensor[0, 5 + c, i]
+                    : outputTensor[0, i, 5 + c];
                 if (prob > maxClassProb)
                 { maxClassProb = prob; maxClassId = c; }
             }
@@ -720,6 +1248,12 @@ public class DeepLearningOperator : OperatorBase
 
         Logger.LogDebug("[DeepLearning] V5/V6后处理: 最大置信度={GlobalMaxConf:F4}, 阈值前检测数={DetectionCount}",
             globalMaxConf, detections.Count);
+        if (!enableInternalNms)
+        {
+            Logger.LogDebug("[DeepLearning] 已禁用内部NMS，输出候选框数: {CandidateCount}", detections.Count);
+            return detections;
+        }
+
         var nmsResult = ApplyNMS(detections, 0.45f);
         Logger.LogDebug("[DeepLearning] NMS后检测数: {NmsCount}", nmsResult.Count);
         return nmsResult;
@@ -728,7 +1262,7 @@ public class DeepLearningOperator : OperatorBase
     /// <summary>
     /// 自动检测 YOLO 版本
     /// </summary>
-    private YoloVersion DetectYoloVersion(DenseTensor<float> outputTensor)
+    private YoloVersion DetectYoloVersion(DenseTensor<float> outputTensor, int knownLabelCount = 0)
     {
         var shape = outputTensor.Dimensions.ToArray();
 
@@ -744,6 +1278,44 @@ public class DeepLearningOperator : OperatorBase
         // dim1=8400, dim2=84 -> Transposed V8/V11
         // dim1=84, dim2=8400 -> Standard V8/V11
         // dim1=25200, dim2=85 -> Transposed V5/V6 (standard output)
+
+        if (knownLabelCount > 0)
+        {
+            if (dim1 > dim2)
+            {
+                if (dim2 == knownLabelCount + 5)
+                {
+                    Logger.LogDebug("[DeepLearning] 自动检测: YOLOv5/v6自定义类别格式 (anchors={Dim1}, features={Dim2}, labels={KnownLabelCount})", dim1, dim2, knownLabelCount);
+                    return YoloVersion.YOLOv5;
+                }
+
+                if (dim2 == knownLabelCount + 4)
+                {
+                    Logger.LogDebug("[DeepLearning] 自动检测: YOLOv8/v11自定义类别格式 (anchors={Dim1}, features={Dim2}, labels={KnownLabelCount})", dim1, dim2, knownLabelCount);
+                    return YoloVersion.YOLOv8;
+                }
+            }
+            else
+            {
+                if (dim1 == knownLabelCount + 5)
+                {
+                    Logger.LogDebug("[DeepLearning] 自动检测: YOLOv5/v6转置格式 (features={Dim1}, anchors={Dim2}, labels={KnownLabelCount})", dim1, dim2, knownLabelCount);
+                    return YoloVersion.YOLOv5;
+                }
+
+                if (dim1 == knownLabelCount + 4)
+                {
+                    Logger.LogDebug("[DeepLearning] 自动检测: YOLOv8/v11标准格式 (features={Dim1}, anchors={Dim2}, labels={KnownLabelCount})", dim1, dim2, knownLabelCount);
+                    return YoloVersion.YOLOv8;
+                }
+            }
+        }
+
+        if (dim1 == 85 && dim2 > dim1)
+        {
+            Logger.LogDebug("[DeepLearning] 自动检测: YOLOv5/v6转置格式 (features={Dim1}, anchors={Dim2})", dim1, dim2);
+            return YoloVersion.YOLOv5;
+        }
 
         if (dim1 > dim2)
         {
@@ -787,40 +1359,177 @@ public class DeepLearningOperator : OperatorBase
     /// </summary>
     private List<DetectionResult> ApplyNMS(List<DetectionResult> detections, float iouThreshold)
     {
+        var (keep, _) = ApplyNmsWithStats(detections, iouThreshold);
+        return keep;
+    }
+
+    private (List<DetectionResult> Kept, long IoUComparisons) ApplyNmsWithStats(
+        List<DetectionResult> detections,
+        float iouThreshold)
+    {
         if (detections.Count == 0)
-            return detections;
-
-        // 按置信度排序
-        var sorted = detections.OrderByDescending(d => d.Confidence).ToList();
-        var keep = new List<DetectionResult>();
-        var removed = new HashSet<int>();
-
-        for (int i = 0; i < sorted.Count; i++)
         {
-            if (removed.Contains(i))
-                continue;
+            return (detections, 0);
+        }
 
-            keep.Add(sorted[i]);
-
-            for (int j = i + 1; j < sorted.Count; j++)
+        var keep = new List<DetectionResult>(detections.Count);
+        var iouComparisons = 0L;
+        var indicesByClass = new Dictionary<int, List<int>>();
+        var nmsBoxes = new NmsBox[detections.Count];
+        for (var i = 0; i < detections.Count; i++)
+        {
+            nmsBoxes[i] = ToNmsBox(detections[i]);
+            var classId = detections[i].ClassId;
+            if (!indicesByClass.TryGetValue(classId, out var indices))
             {
-                if (removed.Contains(j))
-                    continue;
+                indices = new List<int>();
+                indicesByClass[classId] = indices;
+            }
 
-                // 只比较相同类别的框
-                if (sorted[i].ClassId != sorted[j].ClassId)
-                    continue;
+            indices.Add(i);
+        }
 
-                // 计算 IoU
-                float iou = CalculateIoU(sorted[i], sorted[j]);
-                if (iou > iouThreshold)
+        var cellSize = GetNmsCellSize(detections);
+        foreach (var indices in indicesByClass.Values)
+        {
+            indices.Sort((left, right) => detections[right].Confidence.CompareTo(detections[left].Confidence));
+            var keptBySpatialCell = new Dictionary<long, List<int>>();
+            var candidateNeighbors = new HashSet<int>();
+
+            for (var i = 0; i < indices.Count; i++)
+            {
+                var candidateIndex = indices[i];
+                var candidateBox = nmsBoxes[candidateIndex];
+                if (!candidateBox.IsValid)
                 {
-                    removed.Add(j);
+                    continue;
+                }
+
+                candidateNeighbors.Clear();
+                var minCellX = QuantizeToCell(candidateBox.X1, cellSize);
+                var maxCellX = QuantizeToCell(candidateBox.X2, cellSize);
+                var minCellY = QuantizeToCell(candidateBox.Y1, cellSize);
+                var maxCellY = QuantizeToCell(candidateBox.Y2, cellSize);
+
+                for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+                {
+                    for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+                    {
+                        var key = BuildSpatialKey(cellX, cellY);
+                        if (!keptBySpatialCell.TryGetValue(key, out var neighborIndexes))
+                        {
+                            continue;
+                        }
+
+                        for (var idx = 0; idx < neighborIndexes.Count; idx++)
+                        {
+                            candidateNeighbors.Add(neighborIndexes[idx]);
+                        }
+                    }
+                }
+
+                var suppressed = false;
+                foreach (var keptIndex in candidateNeighbors)
+                {
+                    iouComparisons++;
+                    if (CalculateIoU(candidateBox, nmsBoxes[keptIndex]) > iouThreshold)
+                    {
+                        suppressed = true;
+                        break;
+                    }
+                }
+
+                if (suppressed)
+                {
+                    continue;
+                }
+
+                keep.Add(detections[candidateIndex]);
+                for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+                {
+                    for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+                    {
+                        var key = BuildSpatialKey(cellX, cellY);
+                        if (!keptBySpatialCell.TryGetValue(key, out var cellEntries))
+                        {
+                            cellEntries = new List<int>();
+                            keptBySpatialCell[key] = cellEntries;
+                        }
+
+                        cellEntries.Add(candidateIndex);
+                    }
                 }
             }
         }
 
-        return keep;
+        return (keep, iouComparisons);
+    }
+
+    private readonly struct NmsBox
+    {
+        public NmsBox(float x1, float y1, float x2, float y2, float area)
+        {
+            X1 = x1;
+            Y1 = y1;
+            X2 = x2;
+            Y2 = y2;
+            Area = area;
+        }
+
+        public float X1 { get; }
+        public float Y1 { get; }
+        public float X2 { get; }
+        public float Y2 { get; }
+        public float Area { get; }
+        public bool IsValid => Area > 0f;
+    }
+
+    private static NmsBox ToNmsBox(DetectionResult detection)
+    {
+        var x1 = detection.X;
+        var y1 = detection.Y;
+        var x2 = x1 + Math.Max(0f, detection.Width);
+        var y2 = y1 + Math.Max(0f, detection.Height);
+        var width = Math.Max(0f, x2 - x1);
+        var height = Math.Max(0f, y2 - y1);
+        return new NmsBox(x1, y1, x2, y2, width * height);
+    }
+
+    private static int GetNmsCellSize(IReadOnlyList<DetectionResult> detections)
+    {
+        var totalArea = 0f;
+        var validCount = 0;
+        for (var i = 0; i < detections.Count; i++)
+        {
+            var width = Math.Max(0f, detections[i].Width);
+            var height = Math.Max(0f, detections[i].Height);
+            var area = width * height;
+            if (area <= 0f)
+            {
+                continue;
+            }
+
+            totalArea += area;
+            validCount++;
+        }
+
+        if (validCount == 0)
+        {
+            return 32;
+        }
+
+        var meanSideLength = MathF.Sqrt(totalArea / validCount);
+        return Math.Clamp((int)MathF.Round(meanSideLength), 16, 256);
+    }
+
+    private static int QuantizeToCell(float coordinate, int cellSize)
+    {
+        return (int)MathF.Floor(coordinate / cellSize);
+    }
+
+    private static long BuildSpatialKey(int cellX, int cellY)
+    {
+        return ((long)cellX << 32) | (uint)cellY;
     }
 
     /// <summary>
@@ -828,20 +1537,21 @@ public class DeepLearningOperator : OperatorBase
     /// </summary>
     private float CalculateIoU(DetectionResult a, DetectionResult b)
     {
-        float x1 = Math.Max(a.X, b.X);
-        float y1 = Math.Max(a.Y, b.Y);
-        float x2 = Math.Min(a.X + a.Width, b.X + b.Width);
-        float y2 = Math.Min(a.Y + a.Height, b.Y + b.Height);
+        return CalculateIoU(ToNmsBox(a), ToNmsBox(b));
+    }
 
-        if (x2 < x1 || y2 < y1)
-            return 0;
+    private static float CalculateIoU(in NmsBox a, in NmsBox b)
+    {
+        var intersectionWidth = MathF.Min(a.X2, b.X2) - MathF.Max(a.X1, b.X1);
+        var intersectionHeight = MathF.Min(a.Y2, b.Y2) - MathF.Max(a.Y1, b.Y1);
+        if (intersectionWidth <= 0f || intersectionHeight <= 0f)
+        {
+            return 0f;
+        }
 
-        float intersection = (x2 - x1) * (y2 - y1);
-        float areaA = a.Width * a.Height;
-        float areaB = b.Width * b.Height;
-        float union = areaA + areaB - intersection;
-
-        return union > 0 ? intersection / union : 0;
+        var intersection = intersectionWidth * intersectionHeight;
+        var union = a.Area + b.Area - intersection;
+        return union > 0f ? intersection / union : 0f;
     }
 
     /// <summary>
@@ -880,40 +1590,245 @@ public class DeepLearningOperator : OperatorBase
     /// <summary>
     /// 加载标签 - 支持自定义标签文件或自动查找
     /// </summary>
-    private string[] LoadLabels(string labelFile, string modelPath)
+    /// <summary>
+    /// Validates that named target classes exist in the active label set.
+    /// </summary>
+    private List<string> FindUnresolvedTargetClasses(string targetClassesStr, IReadOnlyList<string>? labels)
     {
-        string[] labels = Array.Empty<string>();
-
-        // 1. 尝试加载用户指定的标签文件
-        if (!string.IsNullOrEmpty(labelFile) && File.Exists(labelFile))
+        if (string.IsNullOrWhiteSpace(targetClassesStr))
         {
-            labels = File.ReadAllLines(labelFile)
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .ToArray();
-            Logger.LogInformation("[DeepLearning] 加载自定义标签文件: {File}, 共 {Count} 个标签", labelFile, labels.Length);
-            return labels;
+            return new List<string>();
         }
 
-        // 2. 自动查找模型目录下的 labels.txt
-        if (!string.IsNullOrEmpty(modelPath))
+        var unresolved = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var part in targetClassesStr.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = part.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || int.TryParse(trimmed, out _))
+            {
+                continue;
+            }
+
+            if (FindClassIndex(labels, trimmed) >= 0 || !seen.Add(trimmed))
+            {
+                continue;
+            }
+
+            unresolved.Add(trimmed);
+        }
+
+        return unresolved;
+    }
+
+    private string? TryResolveBundledLabelsPath(string targetClassesStr)
+    {
+        return DeepLearningLabelResolver.TryResolveBundledLabelsPath(targetClassesStr);
+    }
+
+    private LabelContract ResolveLabelContract(
+        InferenceSession session,
+        string configuredLabelsPath,
+        string modelPath,
+        string targetClassesStr)
+    {
+        var metadataLabels = DeepLearningLabelResolver.GetMetadataLabels(session);
+        var externalLabels = LoadExternalLabels(configuredLabelsPath, modelPath, targetClassesStr);
+        return BuildLabelContract(modelPath, metadataLabels, externalLabels);
+    }
+
+    private LabelContract BuildLabelContract(
+        string modelPath,
+        string[] metadataLabels,
+        LabelSourceInfo externalLabels)
+    {
+        if (metadataLabels.Length > 0)
+        {
+            Logger.LogInformation("[DeepLearning] Loaded {Count} labels from ONNX metadata.", metadataLabels.Length);
+
+            if (externalLabels.IsFileBacked && !LabelSequencesEqual(metadataLabels, externalLabels.Labels))
+            {
+                return new LabelContract
+                {
+                    ResolvedLabels = metadataLabels,
+                    MetadataLabels = metadataLabels,
+                    ExternalLabels = externalLabels.Labels,
+                    ResolvedLabelSource = "ModelMetadata",
+                    ResolvedLabelPath = externalLabels.Path,
+                    ValidationStatus = "Mismatch",
+                    ValidationMessage = BuildLabelContractMismatchMessage(modelPath, externalLabels, metadataLabels)
+                };
+            }
+
+            return new LabelContract
+            {
+                ResolvedLabels = metadataLabels,
+                MetadataLabels = metadataLabels,
+                ExternalLabels = externalLabels.IsFileBacked ? externalLabels.Labels : Array.Empty<string>(),
+                ResolvedLabelSource = "ModelMetadata",
+                ResolvedLabelPath = externalLabels.Path,
+                ValidationStatus = externalLabels.IsFileBacked
+                    ? "MetadataValidatedWithExternalLabels"
+                    : "MetadataOnly"
+            };
+        }
+
+        if (externalLabels.Labels.Length == 0)
+        {
+            return new LabelContract
+            {
+                ResolvedLabels = Array.Empty<string>(),
+                MetadataLabels = Array.Empty<string>(),
+                ExternalLabels = Array.Empty<string>(),
+                ResolvedLabelSource = externalLabels.Source,
+                ResolvedLabelPath = externalLabels.Path,
+                ValidationStatus = "MissingLabelContract",
+                ValidationMessage = BuildMissingLabelContractMessage(modelPath)
+            };
+        }
+
+        return new LabelContract
+        {
+            ResolvedLabels = externalLabels.Labels,
+            MetadataLabels = Array.Empty<string>(),
+            ExternalLabels = externalLabels.Labels,
+            ResolvedLabelSource = externalLabels.Source,
+            ResolvedLabelPath = externalLabels.Path,
+            ValidationStatus = "ExternalLabelsOnly"
+        };
+    }
+
+    private LabelSourceInfo LoadExternalLabels(string labelFile, string modelPath, string targetClassesStr)
+    {
+        if (!string.IsNullOrWhiteSpace(labelFile) && File.Exists(labelFile))
+        {
+            var labels = DeepLearningLabelResolver.ReadLabelsFromFile(labelFile);
+            Logger.LogInformation("[DeepLearning] Loaded labels from explicit LabelsPath: {File}", labelFile);
+            return new LabelSourceInfo
+            {
+                Labels = labels,
+                Source = "ExplicitFile",
+                Path = labelFile,
+                IsFileBacked = true
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(modelPath))
         {
             var modelDir = Path.GetDirectoryName(modelPath);
-            if (!string.IsNullOrEmpty(modelDir))
+            if (!string.IsNullOrWhiteSpace(modelDir))
             {
                 var autoLabelFile = Path.Combine(modelDir, "labels.txt");
                 if (File.Exists(autoLabelFile))
                 {
-                    labels = File.ReadAllLines(autoLabelFile)
-                        .Where(l => !string.IsNullOrWhiteSpace(l))
-                        .ToArray();
-                    Logger.LogInformation("[DeepLearning] 自动发现标签文件: {File}, 共 {Count} 个标签", autoLabelFile, labels.Length);
-                    return labels;
+                    var labels = DeepLearningLabelResolver.ReadLabelsFromFile(autoLabelFile);
+                    Logger.LogInformation("[DeepLearning] Loaded labels from model directory: {File}", autoLabelFile);
+                    return new LabelSourceInfo
+                    {
+                        Labels = labels,
+                        Source = "ModelDirectoryFile",
+                        Path = autoLabelFile,
+                        IsFileBacked = true
+                    };
                 }
             }
         }
 
-        // 3. 回退到 COCO 80 类默认标签
-        return CocoClassNames;
+        var bundledLabelFile = TryResolveBundledLabelsPath(targetClassesStr);
+        if (!string.IsNullOrEmpty(bundledLabelFile))
+        {
+            var labels = DeepLearningLabelResolver.ReadLabelsFromFile(bundledLabelFile);
+            Logger.LogInformation("[DeepLearning] Loaded bundled labels: {File}", bundledLabelFile);
+            return new LabelSourceInfo
+            {
+                Labels = labels,
+                Source = "BundledFile",
+                Path = bundledLabelFile,
+                IsFileBacked = true
+            };
+        }
+
+        return new LabelSourceInfo
+        {
+            Labels = Array.Empty<string>(),
+            Source = "Unavailable",
+            Path = string.Empty,
+            IsFileBacked = false
+        };
+    }
+
+    private static bool LabelSequencesEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (!string.Equals(left[i], right[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string BuildLabelContractMismatchMessage(
+        string modelPath,
+        LabelSourceInfo externalLabels,
+        IReadOnlyList<string> metadataLabels)
+    {
+        var externalLabelPath = string.IsNullOrWhiteSpace(externalLabels.Path)
+            ? "<not provided>"
+            : externalLabels.Path;
+
+        return string.Join(
+            Environment.NewLine,
+            "Label contract mismatch: ONNX metadata names do not match the external labels file.",
+            $"ModelPath: {modelPath}",
+            $"LabelsPath: {externalLabelPath}",
+            $"ModelMetadataLabels: {FormatLabelSequence(metadataLabels)}",
+            $"ExternalLabels: {FormatLabelSequence(externalLabels.Labels)}",
+            "Update labels.txt to match the model export order, or remove the mismatched external labels file.");
+    }
+
+    private static string BuildMissingLabelContractMessage(string modelPath)
+    {
+        return string.Join(
+            Environment.NewLine,
+            "Label contract missing: the model does not expose ONNX metadata names and no valid labels file was found.",
+            $"ModelPath: {modelPath}",
+            "Provide LabelsPath, place labels.txt next to the model, or export the ONNX model with metadata names.");
+    }
+
+    private static string FormatLabelSequence(IReadOnlyList<string> labels)
+    {
+        return labels.Count == 0
+            ? "<empty>"
+            : string.Join(", ", labels);
+    }
+
+    private static string ResolveLabelsPath(Operator @operator)
+    {
+        var labelsPath = @operator.Parameters
+            .FirstOrDefault(parameter => parameter.Name.Equals("LabelsPath", StringComparison.OrdinalIgnoreCase))
+            ?.Value
+            ?.ToString();
+
+        if (!string.IsNullOrWhiteSpace(labelsPath))
+        {
+            return labelsPath;
+        }
+
+        // Backward compatibility for older flows that still persisted LabelFile.
+        return @operator.Parameters
+            .FirstOrDefault(parameter => parameter.Name.Equals("LabelFile", StringComparison.OrdinalIgnoreCase))
+            ?.Value
+            ?.ToString()
+            ?? string.Empty;
     }
 
     // 存储当前使用的标签数组
@@ -924,15 +1839,55 @@ public class DeepLearningOperator : OperatorBase
     {
         if (labels != null && classId >= 0 && classId < labels.Count)
             return labels[classId];
-        if (classId >= 0 && classId < CocoClassNames.Length)
-            return CocoClassNames[classId];
         return $"class_{classId}";
     }
 
     /// <summary>
     /// 绘制检测结果 - 返回Mat实现零拷贝 (P0优先级)
     /// </summary>
-    private Mat DrawResults(Mat src, List<DetectionResult> detections, IReadOnlyList<string>? labels)
+    private List<DetectionResult> BuildVisualizationDetections(
+        List<DetectionResult> detections,
+        float confidenceThreshold,
+        bool enableInternalNms)
+    {
+        if (detections.Count == 0)
+        {
+            return detections;
+        }
+
+        if (enableInternalNms)
+        {
+            return detections;
+        }
+
+        // For preview readability we apply a visual-only NMS pass when the node is
+        // configured to emit raw candidates to downstream BoxNms.
+        var scoreFloor = Math.Max(confidenceThreshold, 0.25f);
+        var filtered = new List<DetectionResult>(detections.Count);
+        foreach (var detection in detections)
+        {
+            if (detection.Confidence >= scoreFloor)
+            {
+                filtered.Add(detection);
+            }
+        }
+        if (filtered.Count == 0)
+        {
+            filtered = detections;
+        }
+
+        return ApplyNMS(filtered, 0.45f);
+    }
+
+    private static string BuildStatisticsLabel(int count, string detectionMode)
+    {
+        var isObjectMode = detectionMode.Equals("Object", StringComparison.OrdinalIgnoreCase);
+        return isObjectMode
+            ? $"Objects: {count}"
+            : $"Defects: {count}";
+    }
+
+    private Mat DrawResults(Mat src, List<DetectionResult> detections, IReadOnlyList<string>? labels, string detectionMode)
     {
         var result = src.Clone();
 
@@ -975,7 +1930,7 @@ public class DeepLearningOperator : OperatorBase
         }
 
         // 添加统计信息
-        var stats = $"共检测 {detections.Count} 处缺陷";
+        var stats = BuildStatisticsLabel(detections.Count, detectionMode);
         Cv2.PutText(
             result,
             stats,
@@ -1003,8 +1958,7 @@ public class DeepLearningOperator : OperatorBase
             }
         }
 
-        return Array.FindIndex(CocoClassNames, name =>
-            string.Equals(name, className, StringComparison.OrdinalIgnoreCase));
+        return -1;
     }
 
 

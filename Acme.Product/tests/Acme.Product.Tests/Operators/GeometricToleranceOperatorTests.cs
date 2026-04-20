@@ -1,9 +1,6 @@
-// GeometricToleranceOperatorTests.cs
-// GeometricToleranceOperatorTests测试
-// 作者：蘅芜君
-
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
+using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -27,56 +24,236 @@ public class GeometricToleranceOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithNullInputs_ShouldReturnFailure()
+    public async Task ExecuteAsync_Parallelism_ShouldReturnDatumZoneDecision()
     {
-        var op = new Operator("测试", OperatorType.GeometricTolerance, 0, 0);
-        var result = await _operator.ExecuteAsync(op, null);
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Parallelism", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 1.0, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new LineData(10, 30, 180, 30),
+            ["DatumA"] = new LineData(20, 80, 170, 80)
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["MeasurementModel"].Should().Be("DatumZone2D");
+        result.OutputData["Accepted"].Should().Be(true);
+        Convert.ToDouble(result.OutputData["ZoneDeviation"]).Should().BeApproximately(0.0, 1e-6);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Position_ShouldUseDatumFrameAndNominalTarget()
+    {
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Position", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 2.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EvaluationMode", "CircularZone", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalX", 10.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalY", 5.0, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new Position(10, 5),
+            ["DatumA"] = new LineData(0, 0, 20, 0),
+            ["DatumB"] = new LineData(0, 0, 0, 20)
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Accepted"].Should().Be(true);
+        Convert.ToDouble(result.OutputData["ZoneDeviation"]).Should().BeApproximately(0.0, 1e-6);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Position_WithNonOrthogonalDatums_ShouldUseOrthogonalizedFrame()
+    {
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Position", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 2.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EvaluationMode", "CircularZone", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalX", 10.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalY", 5.0, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new Position(10, 5),
+            ["DatumA"] = new LineData(0, 0, 20, 0),
+            ["DatumB"] = new LineData(0, 0, 20, 20)
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Accepted"].Should().Be(true);
+        Convert.ToDouble(result.OutputData["ZoneDeviation"]).Should().BeApproximately(0.0, 1e-6);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Parallelism_WithSubpixelDeviation_ShouldReturnAnalyticZoneDeviation()
+    {
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Parallelism", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 0.10, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new Dictionary<string, object>
+            {
+                ["StartX"] = 10.25,
+                ["StartY"] = 30.10,
+                ["EndX"] = 180.25,
+                ["EndY"] = 30.18,
+                ["UncertaintyPx"] = 0.05
+            },
+            ["DatumA"] = new Dictionary<string, object>
+            {
+                ["StartX"] = 20.0,
+                ["StartY"] = 80.0,
+                ["EndX"] = 170.0,
+                ["EndY"] = 80.0,
+                ["UncertaintyPx"] = 0.05
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Accepted"].Should().Be(true);
+        Convert.ToDouble(result.OutputData["ZoneDeviation"]).Should().BeApproximately(0.08, 1e-6);
+        Convert.ToDouble(result.OutputData["ToleranceMargin"]).Should().BeApproximately(0.02, 1e-6);
+        Convert.ToDouble(result.OutputData["UncertaintyPx"]).Should().BeGreaterThan(0.0).And.BeLessThan(0.2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Position_WithSubpixelDatumFrame_ShouldReturnAnalyticDeviation()
+    {
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Position", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 0.02, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EvaluationMode", "CircularZone", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalX", 10.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("NominalY", 5.0, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new Dictionary<string, object>
+            {
+                ["X"] = 10.003,
+                ["Y"] = 5.004,
+                ["UncertaintyPx"] = 0.05
+            },
+            ["DatumA"] = new Dictionary<string, object>
+            {
+                ["StartX"] = 0.0,
+                ["StartY"] = 0.0,
+                ["EndX"] = 20.0,
+                ["EndY"] = 0.0,
+                ["UncertaintyPx"] = 0.05
+            },
+            ["DatumB"] = new Dictionary<string, object>
+            {
+                ["StartX"] = 0.0,
+                ["StartY"] = 0.0,
+                ["EndX"] = 0.0,
+                ["EndY"] = 20.0,
+                ["UncertaintyPx"] = 0.05
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Accepted"].Should().Be(true);
+        Convert.ToDouble(result.OutputData["ZoneDeviation"]).Should().BeApproximately(0.005, 1e-6);
+        Convert.ToDouble(result.OutputData["ToleranceMargin"]).Should().BeApproximately(0.005, 1e-6);
+        Convert.ToDouble(result.OutputData["UncertaintyPx"]).Should().BeGreaterThan(0.0);
+        Convert.ToDouble(result.OutputData["Confidence"]).Should().BeGreaterThan(0.5);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Position_Projected2D_ShouldUseAdditiveProjectedDeviation_NotCircularRadius()
+    {
+        var circularOp = new Operator("gtol-circ", OperatorType.GeometricTolerance, 0, 0);
+        circularOp.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Position", "string"));
+        circularOp.AddParameter(TestHelpers.CreateParameter("ZoneSize", 2.0, "double"));
+        circularOp.AddParameter(TestHelpers.CreateParameter("EvaluationMode", "CircularZone", "string"));
+        circularOp.AddParameter(TestHelpers.CreateParameter("NominalX", 10.0, "double"));
+        circularOp.AddParameter(TestHelpers.CreateParameter("NominalY", 5.0, "double"));
+
+        var projectedOp = new Operator("gtol-proj", OperatorType.GeometricTolerance, 0, 0);
+        projectedOp.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Position", "string"));
+        projectedOp.AddParameter(TestHelpers.CreateParameter("ZoneSize", 2.0, "double"));
+        projectedOp.AddParameter(TestHelpers.CreateParameter("EvaluationMode", "Projected2D", "string"));
+        projectedOp.AddParameter(TestHelpers.CreateParameter("NominalX", 10.0, "double"));
+        projectedOp.AddParameter(TestHelpers.CreateParameter("NominalY", 5.0, "double"));
+
+        var inputs = new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new Position(10.6, 5.6),
+            ["DatumA"] = new LineData(0, 0, 20, 0),
+            ["DatumB"] = new LineData(0, 0, 0, 20)
+        };
+
+        var circularResult = await _operator.ExecuteAsync(circularOp, inputs);
+        var projectedResult = await _operator.ExecuteAsync(projectedOp, inputs);
+
+        circularResult.IsSuccess.Should().BeTrue(circularResult.ErrorMessage);
+        projectedResult.IsSuccess.Should().BeTrue(projectedResult.ErrorMessage);
+
+        Convert.ToDouble(circularResult.OutputData!["ZoneDeviation"]).Should().BeApproximately(Math.Sqrt(0.72), 1e-6);
+        Convert.ToDouble(projectedResult.OutputData!["ZoneDeviation"]).Should().BeApproximately(1.2, 1e-6);
+        circularResult.OutputData!["Accepted"].Should().Be(true);
+        projectedResult.OutputData!["Accepted"].Should().Be(false);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Parallelism_WithInvalidUncertaintyPx_ShouldIgnoreInvalidExternalValues()
+    {
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Parallelism", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 0.10, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new Dictionary<string, object>
+            {
+                ["StartX"] = 10.25,
+                ["StartY"] = 30.10,
+                ["EndX"] = 180.25,
+                ["EndY"] = 30.18,
+                ["UncertaintyPx"] = 0.0
+            },
+            ["DatumA"] = new Dictionary<string, object>
+            {
+                ["StartX"] = 20.0,
+                ["StartY"] = 80.0,
+                ["EndX"] = 170.0,
+                ["EndY"] = 80.0,
+                ["UncertaintyPx"] = -0.1
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToDouble(result.OutputData!["UncertaintyPx"]).Should().BeGreaterThan(0.0);
+        Convert.ToDouble(result.OutputData["Confidence"]).Should().BeLessThan(1.0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Parallelism_WithDegenerateLine_ShouldFail()
+    {
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Parallelism", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ZoneSize", 1.0, "double"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new LineData(10, 10, 10, 10),
+            ["DatumA"] = new LineData(20, 80, 170, 80)
+        });
+
         result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("degenerate");
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithValidImage_ShouldReturnSuccess()
+    public void ValidateParameters_WithInvalidToleranceType_ShouldReturnInvalid()
     {
-        var op = new Operator("测试", OperatorType.GeometricTolerance, 0, 0);
-        using var image = TestHelpers.CreateTestImage();
-        var inputs = TestHelpers.CreateImageInputs(image);
-        var result = await _operator.ExecuteAsync(op, inputs);
-        result.IsSuccess.Should().BeTrue();
-        result.OutputData.Should().ContainKey("Image");
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithParallelLines_ShouldReportAngleOnlyModel()
-    {
-        var op = new Operator("测试", OperatorType.GeometricTolerance, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("MeasureType", "Parallelism", "enum"));
-        op.AddParameter(TestHelpers.CreateParameter("Line1_X1", 10, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line1_Y1", 30, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line1_X2", 180, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line1_Y2", 30, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line2_X1", 20, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line2_Y1", 80, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line2_X2", 170, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Line2_Y2", 80, "int"));
-
-        using var image = TestHelpers.CreateTestImage();
-        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
-
-        result.IsSuccess.Should().BeTrue();
-        result.OutputData.Should().ContainKey("MeasurementModel");
-        result.OutputData!["MeasurementModel"].Should().Be("AngleOnly");
-        result.OutputData.Should().ContainKey("AngularDeviationDeg");
-        result.OutputData.Should().ContainKey("LinearBand");
-
-        Convert.ToDouble(result.OutputData["Tolerance"]).Should().BeApproximately(0.0, 1e-6);
-        Convert.ToDouble(result.OutputData["AngularDeviationDeg"]).Should().BeApproximately(0.0, 1e-6);
-        Convert.ToDouble(result.OutputData["LinearBand"]).Should().BeApproximately(0.0, 1e-6);
-    }
-
-    [Fact]
-    public void ValidateParameters_Default_ShouldBeValid()
-    {
-        var op = new Operator("测试", OperatorType.GeometricTolerance, 0, 0);
-        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+        var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ToleranceType", "Runout", "string"));
+        _operator.ValidateParameters(op).IsValid.Should().BeFalse();
     }
 }

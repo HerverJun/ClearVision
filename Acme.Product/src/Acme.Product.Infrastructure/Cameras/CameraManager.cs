@@ -108,20 +108,46 @@ public class CameraManager : ICameraManager, IDisposable
         return camera;
     }
 
+    /// <summary>
+    /// This is intentionally a synchronous shim. The disconnect path only disposes in-memory camera
+    /// wrappers/providers and does not perform async I/O, so callers should not infer UI-thread deadlock risk.
+    /// </summary>
     public Task DisconnectAllAsync()
     {
+        DisconnectAllCore();
+        return Task.CompletedTask;
+    }
+
+    private void DisconnectAllCore()
+    {
         foreach (var camera in _cameras.Values)
+        {
             camera.Dispose();
+        }
+
+        foreach (var (cameraId, provider) in _providers)
+        {
+            if (!_cameras.ContainsKey(cameraId))
+            {
+                provider.Dispose();
+            }
+        }
+
         _cameras.Clear();
         _providers.Clear();
-        return Task.CompletedTask;
     }
 
     // --- 相机绑定管理功能 ---
 
     public void LoadBindings(List<CameraBindingConfig> bindings, string activeCameraId)
     {
-        _bindings = bindings ?? new List<CameraBindingConfig>();
+        _bindings = (bindings ?? new List<CameraBindingConfig>())
+            .Select(binding =>
+            {
+                binding.Normalize();
+                return binding;
+            })
+            .ToList();
         _activeCameraId = activeCameraId ?? "";
         _logger.LogDebug("[CameraManager] 已加载 {Count} 个相机绑定", _bindings.Count);
     }
@@ -130,7 +156,13 @@ public class CameraManager : ICameraManager, IDisposable
 
     public void UpdateBindings(List<CameraBindingConfig> bindings, string activeCameraId)
     {
-        _bindings = bindings ?? new List<CameraBindingConfig>();
+        _bindings = (bindings ?? new List<CameraBindingConfig>())
+            .Select(binding =>
+            {
+                binding.Normalize();
+                return binding;
+            })
+            .ToList();
         _activeCameraId = activeCameraId ?? "";
         _logger.LogDebug("[CameraManager] 已更新绑定，活动相机: {ActiveCameraId}", _activeCameraId);
     }
@@ -139,7 +171,7 @@ public class CameraManager : ICameraManager, IDisposable
     {
         if (!_disposed)
         {
-            DisconnectAllAsync().Wait();
+            DisconnectAllCore();
             _disposed = true;
         }
         GC.SuppressFinalize(this);
@@ -187,7 +219,7 @@ public class CameraProviderAdapter : IIndustrialCamera
             _provider.StartGrabbing();
 
         // 2) 设置软件触发模式（TriggerMode=On, TriggerSource=Software）
-        _provider.SetTriggerMode(true);
+        _provider.SetTriggerMode(CameraTriggerMode.Software);
 
         // 3) 发送软触发命令
         _provider.ExecuteSoftwareTrigger();
@@ -280,7 +312,7 @@ public class CameraProviderAdapter : IIndustrialCamera
 
     public Task SetExposureTimeAsync(double exposureTime) { _provider.SetExposure(exposureTime); return Task.CompletedTask; }
     public Task SetGainAsync(double gain) { _provider.SetGain(gain); return Task.CompletedTask; }
-    public Task SetTriggerModeAsync(bool isHardwareTrigger) { _provider.SetTriggerMode(!isHardwareTrigger); return Task.CompletedTask; }
+    public Task SetTriggerModeAsync(CameraTriggerMode mode) { _provider.SetTriggerMode(mode); return Task.CompletedTask; }
     public Task ExecuteSoftwareTriggerAsync() { _provider.ExecuteSoftwareTrigger(); return Task.CompletedTask; }
 
     public CameraParameters GetParameters() => new CameraParameters();

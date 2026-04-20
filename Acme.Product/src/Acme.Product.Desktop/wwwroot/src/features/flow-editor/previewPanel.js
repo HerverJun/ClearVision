@@ -1,28 +1,46 @@
-import httpClient from '../../core/messaging/httpClient.js';
-import inspectionController from '../inspection/inspectionController.js';
-import { getCurrentProject } from '../project/projectManager.js';
+import { renderDiagnosticsCardsHtml } from '../inspection/analysisCardsPanel.js';
+import {
+    formatPreviewOutputValue,
+    isPreviewImageLikePayload
+} from './previewOutputFormatter.mjs';
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 export class PreviewPanel {
     constructor(container, options = {}) {
         this.container = container;
         this.getOperator = options.getOperator ?? (() => null);
-        this.getParameters = options.getParameters ?? (() => ({}));
-        this.getInputImageBase64 = options.getInputImageBase64 ?? (() => null);
+        this.previewCoordinator = options.previewCoordinator ?? null;
+        this.onOpenImage = options.onOpenImage ?? (() => {});
+        this.onAnalyzePreview = options.onAnalyzePreview ?? null;
+        this.onAutoTune = options.onAutoTune ?? null;
         this.debounceMs = options.debounceMs ?? 500;
 
         this.autoPreviewEnabled = true;
         this.collapsed = false;
-        this._debounceTimer = null;
+        this.analysisResult = null;
+        this.isAnalyzing = false;
+        this.isAutoTuning = false;
+        this.state = this.previewCoordinator?.getState?.() ?? null;
+        this.unsubscribePreview = this.previewCoordinator?.subscribe?.(state => {
+            this.state = state;
+            this.applyPreviewState();
+        }) || null;
 
         this.render();
+        this.applyPreviewState();
     }
 
     destroy() {
-        if (this._debounceTimer) {
-            clearTimeout(this._debounceTimer);
-            this._debounceTimer = null;
-        }
-
+        this.unsubscribePreview?.();
+        this.unsubscribePreview = null;
         this._setImage('before', null);
         this._setImage('after', null);
     }
@@ -33,27 +51,32 @@ export class PreviewPanel {
         }
 
         const operator = this.getOperator();
-        const isImageAcquisition = operator?.type === 'ImageAcquisition';
+        const showWireSequenceActions = operator?.type === 'DetectionSequenceJudge';
+        const analyzeLabel = this.isAnalyzing ? '分析中...' : '预览并分析';
+        const autoTuneLabel = this.isAutoTuning ? '调参中...' : '一键自动调参';
 
         this.container.innerHTML = `
             <section class="operator-preview-panel ${this.collapsed ? 'collapsed' : ''}">
                 <header class="operator-preview-header">
                     <button type="button" class="operator-preview-toggle" id="btn-preview-toggle">
-                        ${this.collapsed ? '▸' : '▾'} 预览
+                        ${this.collapsed ? '▶' : '▼'} 预览
                     </button>
                     <div class="operator-preview-actions">
                         <label class="operator-preview-auto">
                             <input type="checkbox" id="preview-auto-toggle" ${this.autoPreviewEnabled ? 'checked' : ''}/>
                             自动预览
                         </label>
+                        ${showWireSequenceActions ? `
+                            <button type="button" class="btn btn-secondary btn-preview-analyze" id="btn-preview-analyze" ${this.isAnalyzing || this.isAutoTuning ? 'disabled' : ''}>
+                                ${analyzeLabel}
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-preview-autotune" id="btn-preview-autotune" ${this.isAnalyzing || this.isAutoTuning ? 'disabled' : ''}>
+                                ${autoTuneLabel}
+                            </button>
+                        ` : ''}
                         <button type="button" class="btn btn-secondary btn-preview-refresh" id="btn-preview-refresh">
                             刷新预览
                         </button>
-                        ${isImageAcquisition
-                            ? `<button type="button" class="btn btn-primary btn-preview-soft-trigger" id="btn-preview-soft-trigger">
-                                软触发拍照
-                            </button>`
-                            : ''}
                     </div>
                 </header>
 
@@ -61,12 +84,12 @@ export class PreviewPanel {
                     <div class="operator-preview-images">
                         <div class="operator-preview-image-card">
                             <div class="title">输入</div>
-                            <img id="preview-before-image" alt="输入图像预览" />
+                            <img id="preview-before-image" alt="输入图像预览" data-role="preview-before-image" />
                             <div class="placeholder" id="preview-before-placeholder">暂无输入图像</div>
                         </div>
                         <div class="operator-preview-image-card">
                             <div class="title">输出</div>
-                            <img id="preview-after-image" alt="输出图像预览" />
+                            <img id="preview-after-image" alt="输出图像预览" data-role="preview-after-image" />
                             <div class="placeholder" id="preview-after-placeholder">尚未执行预览</div>
                         </div>
                     </div>
@@ -74,6 +97,7 @@ export class PreviewPanel {
                     <div class="operator-preview-meta">
                         <div class="operator-preview-status" id="preview-status-text">等待预览</div>
                         <div class="operator-preview-outputs" id="preview-output-list">暂无输出摘要</div>
+                        <div class="operator-preview-diagnostics" id="preview-diagnostics-panel"></div>
                     </div>
                 </div>
             </section>
@@ -83,158 +107,91 @@ export class PreviewPanel {
         toggleBtn?.addEventListener('click', () => {
             this.collapsed = !this.collapsed;
             this.render();
+            this.applyPreviewState();
         });
 
         const autoToggle = this.container.querySelector('#preview-auto-toggle');
-        autoToggle?.addEventListener('change', (event) => {
-            this.autoPreviewEnabled = event.target.checked;
+        autoToggle?.addEventListener('change', event => {
+            this.autoPreviewEnabled = Boolean(event.target.checked);
         });
 
         const refreshBtn = this.container.querySelector('#btn-preview-refresh');
-        refreshBtn?.addEventListener('click', async () => {
-            await this.refresh();
+        refreshBtn?.addEventListener('click', () => {
+            this.refresh();
         });
 
-        const softTriggerBtn = this.container.querySelector('#btn-preview-soft-trigger');
-        softTriggerBtn?.addEventListener('click', async () => {
-            await this.captureBySoftTrigger();
+        const analyzeBtn = this.container.querySelector('#btn-preview-analyze');
+        analyzeBtn?.addEventListener('click', () => {
+            this._handleAnalyzePreview();
+        });
+
+        const autoTuneBtn = this.container.querySelector('#btn-preview-autotune');
+        autoTuneBtn?.addEventListener('click', () => {
+            this._handleAutoTune();
+        });
+
+        this.container.querySelectorAll('[data-role="preview-before-image"], [data-role="preview-after-image"]').forEach(image => {
+            image.addEventListener('click', event => {
+                const source = event.currentTarget.getAttribute('src');
+                if (source) {
+                    this.onOpenImage(source);
+                }
+            });
         });
     }
 
-    scheduleAutoPreview() {
+    scheduleAutoPreview(options = {}) {
         if (!this.autoPreviewEnabled || this.collapsed) {
             return;
         }
 
-        if (this._debounceTimer) {
-            clearTimeout(this._debounceTimer);
-        }
-
-        this._debounceTimer = setTimeout(() => {
-            this.refresh();
-        }, this.debounceMs);
+        const debounceMs = options.debounceMs ?? this.debounceMs;
+        const force = Boolean(options.force);
+        this.previewCoordinator?.requestActivePreview?.({
+            immediate: false,
+            force,
+            debounceMs
+        });
     }
 
-    async refresh() {
-        const operator = this.getOperator();
-        if (!operator?.type) {
-            this._setStatus('未选中算子');
-            return;
-        }
+    refresh() {
+        this.analysisResult = null;
+        this.previewCoordinator?.requestActivePreview?.({
+            immediate: true,
+            force: true
+        });
+    }
 
-        const inputImageBase64 = await Promise.resolve(this.getInputImageBase64());
-        if (!inputImageBase64) {
-            if (operator.type === 'ImageAcquisition') {
-                this._setStatus('图像采集算子请点击“软触发拍照”获取预览');
-            } else {
-                this._setStatus('缺少输入图像，请先执行一次检测');
-            }
+    applyPreviewState() {
+        const operator = this.getOperator();
+        if (!operator || !this.state || this.state.activeNodeId !== operator.id) {
+            this._setStatus(operator ? '等待预览' : '未选中算子');
             this._setImage('before', null);
             this._setImage('after', null);
-            return;
-        }
-
-        const parameters = this.getParameters() || {};
-        this._setStatus('预览执行中...');
-        this._setImage('before', inputImageBase64);
-
-        try {
-            const nodePreviewContext = this._getNodePreviewContext(operator);
-            if (nodePreviewContext) {
-                try {
-                    const response = await inspectionController.previewNode(nodePreviewContext.nodeId, {
-                        inputImageBase64,
-                        parameters
-                    });
-                    this._applyPreviewResponse(response, {
-                        successKeys: ['success', 'Success'],
-                        imageKeys: ['outputImageBase64', 'OutputImageBase64'],
-                        outputKeys: ['outputData', 'OutputData'],
-                        elapsedKeys: ['executionTimeMs', 'ExecutionTimeMs'],
-                        errorKeys: ['errorMessage', 'ErrorMessage']
-                    });
-                    return;
-                } catch (error) {
-                    console.warn('[PreviewPanel] Node preview failed, falling back to operator preview.', error);
-                    this._setStatus(`节点预览失败，正在回退算子预览: ${error.message}`);
-                }
-            }
-
-            const response = await httpClient.post(`/operators/${encodeURIComponent(operator.type)}/preview`, {
-                imageBase64: inputImageBase64,
-                parameters
-            });
-
-            this._applyPreviewResponse(response, {
-                successKeys: ['isSuccess', 'IsSuccess'],
-                imageKeys: ['imageBase64', 'resultImageBase64', 'ImageBase64'],
-                outputKeys: ['outputs', 'Outputs'],
-                elapsedKeys: ['executionTimeMs', 'ExecutionTimeMs'],
-                errorKeys: ['errorMessage', 'ErrorMessage']
-            });
-        } catch (error) {
-            this._setStatus(`预览错误: ${error.message}`);
-            this._setImage('after', null);
             this._renderOutputs(null);
-        }
-    }
-
-    async captureBySoftTrigger() {
-        const operator = this.getOperator();
-        if (!operator?.type || operator.type !== 'ImageAcquisition') {
-            this._setStatus('当前算子不支持软触发拍照');
             return;
         }
 
-        const parameters = this.getParameters() || {};
-        const sourceType = String(parameters.sourceType || parameters.SourceType || 'camera').toLowerCase();
-        if (sourceType !== 'camera') {
-            this._setStatus('当前采集源不是相机，请将采集源切换为相机');
+        const analysisResult = this.analysisResult?.targetNodeId === operator.id
+            ? this.analysisResult
+            : null;
+
+        if (analysisResult) {
+            const statusText = analysisResult.success
+                ? (this.isAutoTuning ? '线序自动调参已完成' : '线序分析已完成')
+                : (analysisResult.errorMessage || '线序分析未完成');
+            this._setStatus(statusText);
+            this._setImage('before', analysisResult.inputImageSrc || this.state.presenter.inputImageSrc);
+            this._setImage('after', analysisResult.previewImageSrc || this.state.presenter.outputImageSrc);
+            this._renderOutputs(analysisResult.outputs || this.state.outputData);
             return;
         }
 
-        const cameraBindingId = parameters.cameraId || parameters.CameraId;
-        if (!cameraBindingId) {
-            this._setStatus('请先在图像采集算子中选择相机');
-            return;
-        }
-
-        this._setStatus('软触发拍照中...');
-        this._setImage('before', null);
-
-        try {
-            const { blob, headers } = await httpClient.postForBlob('/cameras/soft-trigger-capture', {
-                cameraBindingId
-            });
-
-            if (!blob || blob.size === 0) {
-                this._setStatus('软触发成功，但未返回图像');
-                this._setImage('after', null);
-                this._renderOutputs(null);
-                return;
-            }
-
-            const imageUrl = URL.createObjectURL(blob);
-            this._setImage('after', imageUrl);
-
-            const widthHeader = headers.get('X-Image-Width');
-            const heightHeader = headers.get('X-Image-Height');
-            const parsedWidth = widthHeader ? Number(widthHeader) : null;
-            const parsedHeight = heightHeader ? Number(heightHeader) : null;
-
-            this._renderOutputs({
-                Source: 'camera',
-                CameraId: headers.get('X-Camera-Id') || cameraBindingId,
-                Width: Number.isFinite(parsedWidth) ? parsedWidth : (widthHeader || 'N/A'),
-                Height: Number.isFinite(parsedHeight) ? parsedHeight : (heightHeader || 'N/A'),
-                TriggerMode: headers.get('X-Trigger-Mode') || 'Software'
-            });
-            this._setStatus('软触发拍照完成');
-        } catch (error) {
-            this._setStatus(`软触发失败: ${error.message}`);
-            this._setImage('after', null);
-            this._renderOutputs(null);
-        }
+        const presenter = this.state.presenter;
+        this._setStatus(presenter.statusText);
+        this._setImage('before', presenter.inputImageSrc);
+        this._setImage('after', presenter.outputImageSrc);
+        this._renderOutputs(this.state.outputData);
     }
 
     _setStatus(text) {
@@ -244,51 +201,7 @@ export class PreviewPanel {
         }
     }
 
-    _getNodePreviewContext(operator) {
-        const project = getCurrentProject();
-        const nodeId = operator?.id || operator?.Id || null;
-        if (!project?.id || !nodeId) {
-            return null;
-        }
-
-        return {
-            projectId: project.id,
-            nodeId
-        };
-    }
-
-    _readFirstDefined(source, keys) {
-        for (const key of keys) {
-            if (source?.[key] !== undefined && source?.[key] !== null) {
-                return source[key];
-            }
-        }
-
-        return undefined;
-    }
-
-    _applyPreviewResponse(response, config) {
-        const isSuccess = Boolean(this._readFirstDefined(response, config.successKeys));
-        if (!isSuccess) {
-            const errorMessage = this._readFirstDefined(response, config.errorKeys) || '预览执行失败';
-            this._setStatus(`预览失败: ${errorMessage}`);
-            this._setImage('after', null);
-            this._renderOutputs(null);
-            return;
-        }
-
-        const resultImage = this._readFirstDefined(response, config.imageKeys);
-        const outputs = this._readFirstDefined(response, config.outputKeys);
-        const elapsedMs = this._readFirstDefined(response, config.elapsedKeys);
-
-        this._setImage('after', resultImage || null);
-        this._renderOutputs(outputs);
-        this._setStatus(typeof elapsedMs === 'number'
-            ? `预览完成 (${elapsedMs} ms)`
-            : '预览完成');
-    }
-
-    _setImage(type, imageBase64OrDataUrl) {
+    _setImage(type, imageSource) {
         const isBefore = type === 'before';
         const image = this.container?.querySelector(isBefore ? '#preview-before-image' : '#preview-after-image');
         const placeholder = this.container?.querySelector(
@@ -299,64 +212,139 @@ export class PreviewPanel {
             return;
         }
 
-        const oldSource = image.getAttribute('src');
-
-        if (!imageBase64OrDataUrl) {
-            if (oldSource && oldSource.startsWith('blob:')) {
-                URL.revokeObjectURL(oldSource);
-            }
+        if (!imageSource) {
             image.removeAttribute('src');
             image.style.display = 'none';
             placeholder.style.display = 'flex';
             return;
         }
 
-        const imageSourceText = String(imageBase64OrDataUrl);
-        const source = imageSourceText.startsWith('data:') || imageSourceText.startsWith('blob:')
-            ? imageSourceText
-            : `data:image/png;base64,${imageSourceText}`;
-
-        if (oldSource && oldSource.startsWith('blob:') && oldSource !== source) {
-            URL.revokeObjectURL(oldSource);
-        }
-
-        image.src = source;
+        image.src = imageSource;
         image.style.display = 'block';
         placeholder.style.display = 'none';
     }
 
     _renderOutputs(outputs) {
         const outputContainer = this.container?.querySelector('#preview-output-list');
+        const diagnosticsContainer = this.container?.querySelector('#preview-diagnostics-panel');
         if (!outputContainer) {
             return;
         }
 
         if (!outputs || typeof outputs !== 'object' || Object.keys(outputs).length === 0) {
             outputContainer.textContent = '暂无输出摘要';
+            if (diagnosticsContainer) {
+                diagnosticsContainer.innerHTML = '';
+            }
             return;
         }
 
-        const items = Object.entries(outputs).slice(0, 8).map(([key, value]) => {
-            let displayValue;
-            if (typeof value === 'number') {
-                displayValue = Number.isInteger(value) ? value : value.toFixed(3);
-            } else if (typeof value === 'string') {
-                displayValue = value.length > 48 ? `${value.substring(0, 48)}...` : value;
-            } else if (typeof value === 'boolean') {
-                displayValue = value ? 'true' : 'false';
-            } else {
-                displayValue = JSON.stringify(value);
-            }
+        const items = Object.entries(outputs)
+            .filter(([key, value]) => ![
+                'image',
+                'originalimage',
+                'diagnostics',
+                'data',
+                'output',
+                'filepath',
+                'text',
+                'detectionlist',
+                'objects',
+                'defects',
+                'rawcandidatecount',
+                'visualizationdetectioncount',
+                'internalnmsenabled'
+            ].includes(String(key).toLowerCase()) && !(typeof value === 'string' && isPreviewImageLikePayload(value)))
+            .slice(0, 8)
+            .map(([key, value]) => {
+            const formattedValue = formatPreviewOutputValue(key, value, {
+                stringMaxLength: 48
+            });
+            const titleAttribute = formattedValue.title
+                ? ` title="${escapeHtml(formattedValue.title)}"`
+                : '';
 
             return `
-                <div class="operator-preview-output-item">
-                    <span class="key">${key}</span>
-                    <span class="value">${displayValue}</span>
+                <div class="operator-preview-output-item" data-output-kind="${formattedValue.kind}">
+                    <span class="key">${escapeHtml(key)}</span>
+                    <span class="value"${titleAttribute}>${escapeHtml(formattedValue.text)}</span>
                 </div>
             `;
         });
 
-        outputContainer.innerHTML = items.join('');
+        outputContainer.innerHTML = items.length > 0 ? items.join('') : '暂无输出摘要';
+
+        if (diagnosticsContainer) {
+            diagnosticsContainer.innerHTML = renderDiagnosticsCardsHtml(outputs, 'OK', {
+                compact: true,
+                containerClass: 'analysis-cards-container ac-diagnostics-inline ac-diagnostics-preview'
+            });
+        }
+    }
+
+    async _handleAnalyzePreview() {
+        if (typeof this.onAnalyzePreview !== 'function' || this.isAnalyzing || this.isAutoTuning) {
+            return;
+        }
+
+        try {
+            this.isAnalyzing = true;
+            this.render();
+            this.applyPreviewState();
+            const result = await this.onAnalyzePreview({
+                operator: this.getOperator(),
+                previewState: this.state
+            });
+            this.analysisResult = this._normalizeAnalysisResult(result);
+        } catch (error) {
+            console.error('[PreviewPanel] 线序分析失败:', error);
+        } finally {
+            this.isAnalyzing = false;
+            this.render();
+            this.applyPreviewState();
+        }
+    }
+
+    async _handleAutoTune() {
+        if (typeof this.onAutoTune !== 'function' || this.isAnalyzing || this.isAutoTuning) {
+            return;
+        }
+
+        try {
+            this.isAutoTuning = true;
+            this.render();
+            this.applyPreviewState();
+            const result = await this.onAutoTune({
+                operator: this.getOperator(),
+                previewState: this.state
+            });
+            this.analysisResult = this._normalizeAnalysisResult(result);
+        } catch (error) {
+            console.error('[PreviewPanel] 线序自动调参失败:', error);
+        } finally {
+            this.isAutoTuning = false;
+            this.render();
+            this.applyPreviewState();
+        }
+    }
+
+    _normalizeAnalysisResult(result) {
+        if (!result || typeof result !== 'object') {
+            return null;
+        }
+
+        const previewImageBase64 = result.previewImageBase64 || result.PreviewImageBase64 || null;
+        const inputImageBase64 = result.inputImageBase64 || result.InputImageBase64 || null;
+        const outputs = result.outputs || result.Outputs || null;
+
+        return {
+            targetNodeId: result.targetNodeId || result.TargetNodeId || null,
+            success: Boolean(result.success ?? result.Success),
+            errorMessage: result.errorMessage || result.ErrorMessage || null,
+            inputImageSrc: inputImageBase64 ? `data:image/png;base64,${inputImageBase64}` : null,
+            previewImageSrc: previewImageBase64 ? `data:image/png;base64,${previewImageBase64}` : null,
+            outputs
+        };
     }
 }
 

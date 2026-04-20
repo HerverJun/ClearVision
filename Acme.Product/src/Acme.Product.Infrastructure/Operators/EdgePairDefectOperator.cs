@@ -60,22 +60,54 @@ public class EdgePairDefectOperator : OperatorBase
         var sampleCount = GetIntParam(@operator, "NumSamples", 100, 5, 5000);
         var edgeMethod = GetStringParam(@operator, "EdgeMethod", "Canny");
 
-        if (!TryResolveLines(src, inputs, edgeMethod, out var line1, out var line2))
+        if (!TryResolveLines(src, inputs, edgeMethod, expectedWidth, tolerance, out var line1, out var line2))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("Failed to resolve Line1/Line2 for edge-pair inspection"));
         }
 
+        using var edgeMap = BuildEdgeMap(src, edgeMethod);
+        var direction = new Point2d(line1.EndX - line1.StartX, line1.EndY - line1.StartY);
+        var directionLength = Math.Sqrt((direction.X * direction.X) + (direction.Y * direction.Y));
+        if (directionLength <= 1e-9)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("Resolved Line1 is degenerate."));
+        }
+
+        var tangent = new Point2d(direction.X / directionLength, direction.Y / directionLength);
+        var normal = new Point2d(-tangent.Y, tangent.X);
+        var lineMidpointDelta = new Point2d(line2.MidX - line1.MidX, line2.MidY - line1.MidY);
+        if ((lineMidpointDelta.X * normal.X) + (lineMidpointDelta.Y * normal.Y) < 0)
+        {
+            normal = new Point2d(-normal.X, -normal.Y);
+        }
+
+        var localSearchRadius = Math.Max(4, (int)Math.Ceiling(Math.Max(tolerance * 2.0, expectedWidth * 0.25)));
         var deviations = new List<double>(sampleCount);
         var defectPoints = new List<Point>();
+        var defectSegmentCount = 0;
+        var inDefectSegment = false;
         var maxDeviation = 0.0;
 
         for (var i = 0; i < sampleCount; i++)
         {
             var t = sampleCount <= 1 ? 0.0 : (double)i / (sampleCount - 1);
-            var x = line1.StartX + (line1.EndX - line1.StartX) * t;
-            var y = line1.StartY + (line1.EndY - line1.StartY) * t;
+            var predictedFirst = new Point2d(
+                line1.StartX + (line1.EndX - line1.StartX) * t,
+                line1.StartY + (line1.EndY - line1.StartY) * t);
+            var predictedSecond = new Point2d(
+                line2.StartX + (line2.EndX - line2.StartX) * t,
+                line2.StartY + (line2.EndY - line2.StartY) * t);
 
-            var width = DistancePointToLine(x, y, line2);
+            var firstPoint = TryFindLocalEdgePoint(edgeMap, predictedFirst, normal, localSearchRadius, out var localFirst)
+                ? localFirst
+                : predictedFirst;
+            var secondPoint = TryFindLocalEdgePoint(edgeMap, predictedSecond, normal, localSearchRadius, out var localSecond)
+                ? localSecond
+                : predictedSecond;
+
+            var width = Math.Sqrt(
+                ((secondPoint.X - firstPoint.X) * (secondPoint.X - firstPoint.X)) +
+                ((secondPoint.Y - firstPoint.Y) * (secondPoint.Y - firstPoint.Y)));
             var deviation = width - expectedWidth;
             deviations.Add(deviation);
 
@@ -87,7 +119,18 @@ public class EdgePairDefectOperator : OperatorBase
 
             if (abs > tolerance)
             {
-                defectPoints.Add(new Point((int)Math.Round(x), (int)Math.Round(y)));
+                defectPoints.Add(new Point(
+                    (int)Math.Round((firstPoint.X + secondPoint.X) * 0.5),
+                    (int)Math.Round((firstPoint.Y + secondPoint.Y) * 0.5)));
+                if (!inDefectSegment)
+                {
+                    defectSegmentCount++;
+                    inDefectSegment = true;
+                }
+            }
+            else
+            {
+                inDefectSegment = false;
             }
         }
 
@@ -102,7 +145,7 @@ public class EdgePairDefectOperator : OperatorBase
 
         Cv2.PutText(
             result,
-            $"Defects:{defectPoints.Count} MaxDev:{maxDeviation:F2}",
+            $"Defects:{defectSegmentCount} MaxDev:{maxDeviation:F2}",
             new Point(8, 24),
             HersheyFonts.HersheySimplex,
             0.6,
@@ -111,7 +154,7 @@ public class EdgePairDefectOperator : OperatorBase
 
         var output = new Dictionary<string, object>
         {
-            { "DefectCount", defectPoints.Count },
+            { "DefectCount", defectSegmentCount },
             { "MaxDeviation", maxDeviation },
             { "Deviations", deviations }
         };
@@ -143,7 +186,14 @@ public class EdgePairDefectOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private static bool TryResolveLines(Mat src, Dictionary<string, object>? inputs, string edgeMethod, out LineData line1, out LineData line2)
+    private static bool TryResolveLines(
+        Mat src,
+        Dictionary<string, object>? inputs,
+        string edgeMethod,
+        double expectedWidth,
+        double tolerance,
+        out LineData line1,
+        out LineData line2)
     {
         line1 = new LineData();
         line2 = new LineData();
@@ -157,42 +207,21 @@ public class EdgePairDefectOperator : OperatorBase
             return true;
         }
 
-        return TryDetectLinesFromImage(src, edgeMethod, out line1, out line2);
+        return TryDetectLinesFromImage(src, edgeMethod, expectedWidth, tolerance, out line1, out line2);
     }
 
-    private static bool TryDetectLinesFromImage(Mat src, string edgeMethod, out LineData line1, out LineData line2)
+    private static bool TryDetectLinesFromImage(
+        Mat src,
+        string edgeMethod,
+        double expectedWidth,
+        double tolerance,
+        out LineData line1,
+        out LineData line2)
     {
         line1 = new LineData();
         line2 = new LineData();
 
-        using var gray = new Mat();
-        if (src.Channels() == 1)
-        {
-            src.CopyTo(gray);
-        }
-        else
-        {
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-        }
-
-        using var edge = new Mat();
-        if (edgeMethod.Equals("Sobel", StringComparison.OrdinalIgnoreCase))
-        {
-            using var gradX = new Mat();
-            using var gradY = new Mat();
-            using var absX = new Mat();
-            using var absY = new Mat();
-            Cv2.Sobel(gray, gradX, MatType.CV_16S, 1, 0);
-            Cv2.Sobel(gray, gradY, MatType.CV_16S, 0, 1);
-            Cv2.ConvertScaleAbs(gradX, absX);
-            Cv2.ConvertScaleAbs(gradY, absY);
-            Cv2.AddWeighted(absX, 0.5, absY, 0.5, 0, edge);
-            Cv2.Threshold(edge, edge, 60, 255, ThresholdTypes.Binary);
-        }
-        else
-        {
-            Cv2.Canny(gray, edge, 60, 160);
-        }
+        using var edge = BuildEdgeMap(src, edgeMethod);
 
         var lines = Cv2.HoughLinesP(edge, 1, Math.PI / 180, 80, 60, 10);
         if (lines == null || lines.Length < 2)
@@ -227,7 +256,10 @@ public class EdgePairDefectOperator : OperatorBase
                     continue;
                 }
 
-                var score = a.Length + b.Length + separation;
+                var widthDelta = Math.Abs(separation - expectedWidth);
+                var widthPenalty = widthDelta * (10.0 / (tolerance + 1.0));
+                var withinToleranceBonus = widthDelta <= tolerance ? 60.0 : 0.0;
+                var score = a.Length + b.Length - widthPenalty + withinToleranceBonus;
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -244,6 +276,103 @@ public class EdgePairDefectOperator : OperatorBase
         line1 = bestPair.Value.Item1;
         line2 = bestPair.Value.Item2;
         return true;
+    }
+
+    private static Mat BuildEdgeMap(Mat src, string edgeMethod)
+    {
+        using var gray = new Mat();
+        if (src.Channels() == 1)
+        {
+            src.CopyTo(gray);
+        }
+        else
+        {
+            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+        }
+
+        var edge = new Mat();
+        if (edgeMethod.Equals("Sobel", StringComparison.OrdinalIgnoreCase))
+        {
+            using var gradX = new Mat();
+            using var gradY = new Mat();
+            using var absX = new Mat();
+            using var absY = new Mat();
+            Cv2.Sobel(gray, gradX, MatType.CV_16S, 1, 0);
+            Cv2.Sobel(gray, gradY, MatType.CV_16S, 0, 1);
+            Cv2.ConvertScaleAbs(gradX, absX);
+            Cv2.ConvertScaleAbs(gradY, absY);
+            Cv2.AddWeighted(absX, 0.5, absY, 0.5, 0, edge);
+            Cv2.Threshold(edge, edge, 60, 255, ThresholdTypes.Binary);
+        }
+        else
+        {
+            Cv2.Canny(gray, edge, 60, 160);
+        }
+
+        return edge;
+    }
+
+    private static bool TryFindLocalEdgePoint(
+        Mat edgeMap,
+        Point2d predictedPoint,
+        Point2d normal,
+        int searchRadius,
+        out Point2d edgePoint)
+    {
+        edgePoint = default;
+
+        for (var delta = 0; delta <= searchRadius; delta++)
+        {
+            foreach (var signedDelta in EnumerateSignedOffsets(delta))
+            {
+                var sampleX = predictedPoint.X + (normal.X * signedDelta);
+                var sampleY = predictedPoint.Y + (normal.Y * signedDelta);
+                var roundedX = (int)Math.Round(sampleX);
+                var roundedY = (int)Math.Round(sampleY);
+
+                var hitCount = 0;
+                var sumX = 0.0;
+                var sumY = 0.0;
+                for (var offsetY = -1; offsetY <= 1; offsetY++)
+                {
+                    var candidateY = roundedY + offsetY;
+                    if (candidateY < 0 || candidateY >= edgeMap.Rows)
+                    {
+                        continue;
+                    }
+
+                    for (var offsetX = -1; offsetX <= 1; offsetX++)
+                    {
+                        var candidateX = roundedX + offsetX;
+                        if (candidateX < 0 || candidateX >= edgeMap.Cols || edgeMap.At<byte>(candidateY, candidateX) == 0)
+                        {
+                            continue;
+                        }
+
+                        hitCount++;
+                        sumX += candidateX;
+                        sumY += candidateY;
+                    }
+                }
+
+                if (hitCount > 0)
+                {
+                    edgePoint = new Point2d(sumX / hitCount, sumY / hitCount);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<int> EnumerateSignedOffsets(int delta)
+    {
+        yield return delta;
+        if (delta != 0)
+        {
+            yield return -delta;
+        }
     }
 
     private static double DistancePointToLine(double px, double py, LineData line)
