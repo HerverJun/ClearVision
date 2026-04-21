@@ -80,8 +80,17 @@ public enum YoloVersion
 [OperatorParam("LabelsPath", "标签文件路径", "file", Description = "自定义标签文件路径（每行一个标签），为空则优先使用模型 metadata names 或自动查找模型目录下的 labels.txt；仍不可用时执行失败", DefaultValue = "")]
 [OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。", DefaultValue = true)]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
+[OutputPort("ResolvedModelPath", "Resolved Model Path", PortDataType.String)]
+[OutputPort("ResolvedModelId", "Resolved Model Id", PortDataType.String)]
+[OutputPort("ResolvedModelCatalogPath", "Resolved Model Catalog Path", PortDataType.String)]
+[OutputPort("ModelSource", "Model Source", PortDataType.String)]
+[OutputPort("ModelProvenance", "Model Provenance", PortDataType.Any)]
+[OperatorParam("ModelId", "Model Id", "string", DefaultValue = "")]
+[OperatorParam("ModelCatalogPath", "Model Catalog Path", "file", DefaultValue = "")]
 public class DeepLearningOperator : OperatorBase
 {
+    private static readonly string[] SupportedCatalogTypes = ["detection", "object_detection", "deep_learning", "yolo"];
+
     public override OperatorType OperatorType => OperatorType.DeepLearning;
 
     public DeepLearningOperator(ILogger<DeepLearningOperator> logger) : base(logger) { }
@@ -243,7 +252,8 @@ public class DeepLearningOperator : OperatorBase
         }
 
         // 2. 获取参数
-        var modelPath = GetStringParam(@operator, "ModelPath", string.Empty);
+        var explicitModelPath = GetStringParam(@operator, "ModelPath", string.Empty);
+        var modelId = GetStringParam(@operator, "ModelId", string.Empty);
         var confidenceThreshold = GetFloatParam(@operator, "Confidence", 0.5f, 0.0f, 1.0f);
         var inputSize = GetIntParam(@operator, "InputSize", DefaultInputSize);
         var yoloVersionStr = GetStringParam(@operator, "ModelVersion", "Auto");
@@ -258,10 +268,22 @@ public class DeepLearningOperator : OperatorBase
         HashSet<int>? targetClasses = null;
 
         // 3. 验证模型路径
-        if (string.IsNullOrWhiteSpace(modelPath))
+        if (string.IsNullOrWhiteSpace(explicitModelPath) && string.IsNullOrWhiteSpace(modelId))
         {
-            return OperatorExecutionOutput.Failure("未指定模型路径");
+            return OperatorExecutionOutput.Failure("未指定模型路径或模型标识");
         }
+
+        ResolvedModelTarget modelTarget;
+        try
+        {
+            modelTarget = ResolveModelTarget(@operator);
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure(ex.Message);
+        }
+
+        var modelPath = modelTarget.ResolvedPath;
 
         if (!File.Exists(modelPath))
         {
@@ -385,7 +407,12 @@ public class DeepLearningOperator : OperatorBase
             { "ResolvedLabels", labelContract.ResolvedLabels },
             { "ModelMetadataLabels", labelContract.MetadataLabels },
             { "LabelsPath", labelContract.ResolvedLabelPath },
-            { "LabelValidationStatus", labelContract.ValidationStatus }
+            { "LabelValidationStatus", labelContract.ValidationStatus },
+            { "ResolvedModelPath", modelTarget.ResolvedPath },
+            { "ResolvedModelId", modelTarget.ModelId },
+            { "ResolvedModelCatalogPath", modelTarget.CatalogPath },
+            { "ModelSource", modelTarget.Source },
+            { "ModelProvenance", modelTarget.ToProvenancePayload() }
         };
 
         Logger.LogInformation("[DeepLearning] 执行完毕. 检测总数: {Count}, 过滤后输出: {DefectCount}", detections.Count, detections.Count);
@@ -983,11 +1010,21 @@ public class DeepLearningOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var modelPath = GetStringParam(@operator, "ModelPath", string.Empty);
+        var modelId = GetStringParam(@operator, "ModelId", string.Empty);
         var confidence = GetFloatParam(@operator, "Confidence", 0.5f);
 
-        if (string.IsNullOrWhiteSpace(modelPath))
+        if (string.IsNullOrWhiteSpace(modelPath) && string.IsNullOrWhiteSpace(modelId))
         {
             return ValidationResult.Invalid("必须指定模型路径");
+        }
+
+        try
+        {
+            _ = ResolveModelTarget(@operator);
+        }
+        catch (Exception ex)
+        {
+            return ValidationResult.Invalid(ex.Message);
         }
 
         if (confidence < 0 || confidence > 1)
@@ -996,6 +1033,19 @@ public class DeepLearningOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    private ResolvedModelTarget ResolveModelTarget(Operator @operator)
+    {
+        var modelPath = GetStringParam(@operator, "ModelPath", string.Empty);
+        var modelId = GetStringParam(@operator, "ModelId", string.Empty);
+        var modelCatalogPath = GetStringParam(@operator, "ModelCatalogPath", string.Empty);
+
+        return ModelCatalog.ResolveExplicitOrCatalog(
+            modelPath,
+            modelId,
+            modelCatalogPath,
+            SupportedCatalogTypes);
     }
 
     /// <summary>

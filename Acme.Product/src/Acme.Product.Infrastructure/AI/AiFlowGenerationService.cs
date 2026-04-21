@@ -1033,9 +1033,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
             if (op.OperatorType.Equals("DeepLearning", StringComparison.OrdinalIgnoreCase))
             {
-                if (IsMissingParameter(parameters, "ModelPath"))
+                if (IsMissingParameter(parameters, "ModelPath", "ModelId"))
                 {
-                    AddResource("Model", "DeepLearning.ModelPath", "缺少可用模型文件路径");
+                    AddResource("Model", "DeepLearning.ModelPath", "缺少可用模型文件路径或模型标识");
                 }
             }
 

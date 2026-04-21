@@ -28,6 +28,11 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("ClassMasks", "Class Masks", PortDataType.Any)]
 [OutputPort("ClassCount", "Class Count", PortDataType.Integer)]
 [OutputPort("PresentClasses", "Present Classes", PortDataType.Any)]
+[OutputPort("ResolvedModelPath", "Resolved Model Path", PortDataType.String)]
+[OutputPort("ResolvedModelId", "Resolved Model Id", PortDataType.String)]
+[OutputPort("ResolvedModelCatalogPath", "Resolved Model Catalog Path", PortDataType.String)]
+[OutputPort("ModelSource", "Model Source", PortDataType.String)]
+[OutputPort("ModelProvenance", "Model Provenance", PortDataType.Any)]
 [OperatorParam("ModelId", "Model Id", "string", DefaultValue = "")]
 [OperatorParam("ModelCatalogPath", "Model Catalog Path", "file", DefaultValue = "")]
 [OperatorParam("ModelPath", "Model Path", "file", DefaultValue = "")]
@@ -68,17 +73,18 @@ public sealed class SemanticSegmentationOperator : OperatorBase
             return OperatorExecutionOutput.Failure("Input image is invalid.");
         }
 
-        string modelPath;
-        ModelCatalogEntry? modelCatalogEntry;
+        ResolvedModelTarget modelTarget;
         try
         {
-            modelPath = ResolveModelPath(@operator, out modelCatalogEntry);
+            modelTarget = ResolveModelTarget(@operator);
         }
         catch (Exception ex)
         {
             return OperatorExecutionOutput.Failure(ex.Message);
         }
 
+        var modelPath = modelTarget.ResolvedPath;
+        var modelCatalogEntry = modelTarget.Entry;
         if (!File.Exists(modelPath))
         {
             return OperatorExecutionOutput.Failure($"Model file not found: {modelPath}");
@@ -145,7 +151,12 @@ public sealed class SemanticSegmentationOperator : OperatorBase
                 pair => (object)new ImageWrapper(pair.Value),
                 StringComparer.OrdinalIgnoreCase),
             ["ClassCount"] = executionResult.PresentClasses.Length,
-            ["PresentClasses"] = executionResult.PresentClasses
+            ["PresentClasses"] = executionResult.PresentClasses,
+            ["ResolvedModelPath"] = modelTarget.ResolvedPath,
+            ["ResolvedModelId"] = modelTarget.ModelId,
+            ["ResolvedModelCatalogPath"] = modelTarget.CatalogPath,
+            ["ModelSource"] = modelTarget.Source,
+            ["ModelProvenance"] = modelTarget.ToProvenancePayload()
         };
 
         return OperatorExecutionOutput.Success(output);
@@ -153,17 +164,18 @@ public sealed class SemanticSegmentationOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        string modelPath;
-        ModelCatalogEntry? modelCatalogEntry;
+        ResolvedModelTarget modelTarget;
         try
         {
-            modelPath = ResolveModelPath(@operator, out modelCatalogEntry);
+            modelTarget = ResolveModelTarget(@operator);
         }
         catch (Exception ex)
         {
             return ValidationResult.Invalid(ex.Message);
         }
 
+        var modelPath = modelTarget.ResolvedPath;
+        var modelCatalogEntry = modelTarget.Entry;
         if (!File.Exists(modelPath))
         {
             return ValidationResult.Invalid($"Model file not found: {modelPath}");
@@ -203,22 +215,21 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private string ResolveModelPath(Operator @operator, out ModelCatalogEntry? modelCatalogEntry)
+    private ResolvedModelTarget ResolveModelTarget(Operator @operator)
     {
         var modelPath = GetStringParam(@operator, "ModelPath", string.Empty);
         var modelId = GetStringParam(@operator, "ModelId", string.Empty);
         var modelCatalogPath = GetStringParam(@operator, "ModelCatalogPath", string.Empty);
 
-        var resolved = ModelCatalog.ResolveExplicitOrCatalogPath(
+        var resolved = ModelCatalog.ResolveExplicitOrCatalog(
             modelPath,
             modelId,
             modelCatalogPath,
-            SupportedCatalogTypes,
-            out modelCatalogEntry);
+            SupportedCatalogTypes);
 
-        if (string.IsNullOrWhiteSpace(resolved))
+        if (string.IsNullOrWhiteSpace(resolved.ResolvedPath))
         {
-            throw new InvalidOperationException("ModelPath is required.");
+            throw new InvalidOperationException("ModelPath or ModelId is required.");
         }
 
         return resolved;

@@ -59,6 +59,26 @@ public class DeepLearningOperatorTests
     }
 
     [Fact]
+    public void ValidateParameters_WithModelIdAndCatalog_ShouldReturnValid()
+    {
+        var catalogPath = CreateTempModelCatalog("demo_detection", "detection", "models/demo-detection.onnx");
+        try
+        {
+            var op = CreateTestOperator(string.Empty, 0.5f);
+            op.AddParameter(new Parameter(Guid.NewGuid(), "ModelId", "Model Id", string.Empty, "string", "demo_detection"));
+            op.AddParameter(new Parameter(Guid.NewGuid(), "ModelCatalogPath", "Model Catalog Path", string.Empty, "file", catalogPath));
+
+            var result = _operator.ValidateParameters(op);
+
+            result.IsValid.Should().BeTrue();
+        }
+        finally
+        {
+            File.Delete(catalogPath);
+        }
+    }
+
+    [Fact]
     public void ParseTargetClasses_WithCustomLabels_ShouldPreferLoadedLabels()
     {
         var method = typeof(DeepLearningOperator).GetMethod(
@@ -765,6 +785,29 @@ public class DeepLearningOperatorTests
         {
             { "Image", imageData }
         };
+    }
+
+    private static string CreateTempModelCatalog(string modelId, string type, string artifactPath)
+    {
+        var catalogPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+        var json =
+            $$"""
+            {
+              "models": [
+                {
+                  "id": "{{modelId}}",
+                  "name": "Demo Detection",
+                  "type": "{{type}}",
+                  "path": "{{artifactPath}}",
+                  "version": "1.0.0",
+                  "execution_provider": "cpu"
+                }
+              ]
+            }
+            """;
+
+        File.WriteAllText(catalogPath, json);
+        return catalogPath;
     }
 
     private static byte[] CreateTestImage()

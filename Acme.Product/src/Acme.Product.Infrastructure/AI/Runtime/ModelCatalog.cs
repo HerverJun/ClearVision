@@ -51,6 +51,63 @@ public sealed class ResolvedModelCatalogEntry
     public required string ArtifactPath { get; init; }
 }
 
+public sealed class ResolvedModelTarget
+{
+    public required string ResolvedPath { get; init; }
+
+    public required string Source { get; init; }
+
+    public string ExplicitPath { get; init; } = string.Empty;
+
+    public string ModelId { get; init; } = string.Empty;
+
+    public string CatalogPath { get; init; } = string.Empty;
+
+    public ModelCatalogEntry? Entry { get; init; }
+
+    public Dictionary<string, object> ToProvenancePayload()
+    {
+        var payload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ResolutionSource"] = Source,
+            ["ResolvedPath"] = ResolvedPath,
+            ["ExplicitPath"] = ExplicitPath,
+            ["ModelId"] = ModelId,
+            ["CatalogPath"] = CatalogPath
+        };
+
+        if (Entry == null)
+        {
+            return payload;
+        }
+
+        payload["ModelName"] = Entry.Name;
+        payload["ModelType"] = Entry.Type;
+        payload["ModelVersion"] = Entry.Version;
+        payload["CatalogArtifactPath"] = Entry.ArtifactPath;
+        payload["CatalogSource"] = Entry.Source ?? string.Empty;
+        payload["ExecutionProvider"] = Entry.ExecutionProvider;
+        payload["InputSize"] = Entry.InputSize;
+        payload["NumClasses"] = Entry.NumClasses;
+        payload["ClassNames"] = Entry.ClassNames;
+        payload["CatalogEntry"] = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Id"] = Entry.Id,
+            ["Name"] = Entry.Name,
+            ["Type"] = Entry.Type,
+            ["Version"] = Entry.Version,
+            ["ArtifactPath"] = Entry.ArtifactPath,
+            ["Source"] = Entry.Source ?? string.Empty,
+            ["ExecutionProvider"] = Entry.ExecutionProvider,
+            ["InputSize"] = Entry.InputSize,
+            ["NumClasses"] = Entry.NumClasses,
+            ["ClassNames"] = Entry.ClassNames
+        };
+
+        return payload;
+    }
+}
+
 public static class ModelCatalog
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -167,11 +224,28 @@ public static class ModelCatalog
         IReadOnlyCollection<string>? expectedTypes,
         out ModelCatalogEntry? entry)
     {
-        entry = null;
+        var resolved = ResolveExplicitOrCatalog(explicitPath, modelId, catalogPath, expectedTypes);
+        entry = resolved.Entry;
+        return resolved.ResolvedPath;
+    }
 
+    public static ResolvedModelTarget ResolveExplicitOrCatalog(
+        string? explicitPath,
+        string? modelId,
+        string? catalogPath,
+        IReadOnlyCollection<string>? expectedTypes)
+    {
         if (!string.IsNullOrWhiteSpace(explicitPath))
         {
-            return Path.GetFullPath(explicitPath);
+            return new ResolvedModelTarget
+            {
+                ResolvedPath = Path.GetFullPath(explicitPath),
+                Source = "ExplicitPath",
+                ExplicitPath = explicitPath,
+                ModelId = string.Empty,
+                CatalogPath = string.Empty,
+                Entry = null
+            };
         }
 
         if (!TryResolve(modelId, catalogPath, expectedTypes, out var resolved, out var error) || resolved == null)
@@ -179,8 +253,15 @@ public static class ModelCatalog
             throw new InvalidOperationException(error ?? "Unable to resolve model path.");
         }
 
-        entry = resolved.Entry;
-        return resolved.ArtifactPath;
+        return new ResolvedModelTarget
+        {
+            ResolvedPath = resolved.ArtifactPath,
+            Source = "ModelCatalog",
+            ExplicitPath = string.Empty,
+            ModelId = resolved.Entry.Id,
+            CatalogPath = resolved.CatalogPath,
+            Entry = resolved.Entry
+        };
     }
 
     private static IEnumerable<string> EnumerateCandidateRoots()

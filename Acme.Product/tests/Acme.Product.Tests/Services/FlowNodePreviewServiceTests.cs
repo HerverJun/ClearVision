@@ -162,6 +162,66 @@ public class FlowNodePreviewServiceTests
     }
 
     [Fact]
+    public async Task PreviewWithMetricsAsync_ShouldResolveDeepLearningModelFromCatalog()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
+        var modelPath = Path.GetTempFileName();
+        var catalogPath = CreateTempModelCatalog("demo_detection", "detection", modelPath);
+        target.AddParameter(new Parameter(Guid.NewGuid(), "ModelId", "ModelId", string.Empty, "string", "demo_detection"));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "ModelCatalogPath", "ModelCatalogPath", string.Empty, "string", catalogPath));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "LabelsPath", "LabelsPath", string.Empty, "string", string.Empty));
+        target.AddParameter(new Parameter(Guid.NewGuid(), "TargetClasses", "TargetClasses", string.Empty, "string", "Wire_Black,Wire_Blue"));
+
+        var flow = new OperatorFlow("catalog-preview-flow");
+        flow.AddOperator(target);
+
+        flowExecution.ExecuteFlowDebugAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowDebugExecutionResult
+            {
+                IsSuccess = true,
+                DebugSessionId = Guid.NewGuid(),
+                IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                {
+                    [target.Id] = new()
+                    {
+                        ["Image"] = CreatePreviewImageBytes()
+                    }
+                }
+            }));
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>());
+
+        try
+        {
+            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+
+            result.Success.Should().BeTrue();
+            result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.ModelPath");
+            result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.LabelsPath");
+        }
+        finally
+        {
+            if (File.Exists(modelPath))
+            {
+                File.Delete(modelPath);
+            }
+
+            if (File.Exists(catalogPath))
+            {
+                File.Delete(catalogPath);
+            }
+        }
+    }
+
+    [Fact]
     public async Task PreviewWithMetricsAsync_ShouldExcludeOriginalImageFromOutputs()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -211,5 +271,29 @@ public class FlowNodePreviewServiceTests
         using var image = new Mat(4, 4, MatType.CV_8UC1, Scalar.All(255));
         Cv2.ImEncode(".png", image, out var encoded);
         return encoded;
+    }
+
+    private static string CreateTempModelCatalog(string modelId, string type, string artifactPath)
+    {
+        var catalogPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+        var escapedArtifactPath = artifactPath.Replace("\\", "\\\\");
+        var json =
+            $$"""
+            {
+              "models": [
+                {
+                  "id": "{{modelId}}",
+                  "name": "Demo Detection",
+                  "type": "{{type}}",
+                  "path": "{{escapedArtifactPath}}",
+                  "version": "1.0.0",
+                  "execution_provider": "cpu"
+                }
+              ]
+            }
+            """;
+
+        File.WriteAllText(catalogPath, json);
+        return catalogPath;
     }
 }
