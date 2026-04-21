@@ -20,17 +20,22 @@ internal readonly record struct IndustrialCaliperEdgePair(
 
 internal static class IndustrialCaliperKernel
 {
+    private const double GaussianKernelSigmaSupport = 3.0;
+    private const double MinimumGaussianSigma = 1e-6;
+
     public static double[] SampleBandProfile(Mat gray, Point2d start, Point2d end, double averagingThickness, int sampleCount)
     {
         var profile = new double[Math.Max(sampleCount, 2)];
-        var length = Math.Sqrt(Math.Pow(end.X - start.X, 2) + Math.Pow(end.Y - start.Y, 2));
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+        var length = Math.Sqrt((dx * dx) + (dy * dy));
         if (length <= 1e-9)
         {
             return profile;
         }
 
-        var dirX = (end.X - start.X) / length;
-        var dirY = (end.Y - start.Y) / length;
+        var dirX = dx / length;
+        var dirY = dy / length;
         var normalX = -dirY;
         var normalY = dirX;
 
@@ -76,9 +81,8 @@ internal static class IndustrialCaliperKernel
             return minimumThreshold;
         }
 
-        var median = ComputePercentile(magnitudes, 0.5);
-        var deviations = magnitudes.Select(value => Math.Abs(value - median)).ToArray();
-        var mad = ComputePercentile(deviations, 0.5) * 1.4826;
+        var median = MeasurementStatisticsHelper.ComputeMedian(magnitudes);
+        var mad = MeasurementStatisticsHelper.ComputeScaledMedianAbsoluteDeviation(magnitudes, median);
         if (mad <= 1e-6)
         {
             return Math.Max(minimumThreshold, median * 0.75);
@@ -273,23 +277,26 @@ internal static class IndustrialCaliperKernel
             return Array.Empty<double>();
         }
 
-        var radius = Math.Clamp((int)Math.Ceiling(sigma * 3.0), 1, 8);
+        if (!double.IsFinite(sigma) || sigma <= MinimumGaussianSigma || profile.Count == 1)
+        {
+            return profile.ToArray();
+        }
+
+        var radius = Math.Max(1, (int)Math.Ceiling(sigma * GaussianKernelSigmaSupport));
         var kernel = BuildGaussianKernel(radius, sigma);
         var smoothed = new double[profile.Count];
 
         for (var i = 0; i < profile.Count; i++)
         {
             double sum = 0.0;
-            double weightSum = 0.0;
             for (var k = -radius; k <= radius; k++)
             {
-                var idx = Math.Clamp(i + k, 0, profile.Count - 1);
+                var idx = ReflectIndex(i + k, profile.Count);
                 var weight = kernel[k + radius];
                 sum += profile[idx] * weight;
-                weightSum += weight;
             }
 
-            smoothed[i] = weightSum > 0 ? sum / weightSum : profile[i];
+            smoothed[i] = sum;
         }
 
         return smoothed;
@@ -350,29 +357,22 @@ internal static class IndustrialCaliperKernel
         return kernel;
     }
 
-    private static double ComputePercentile(IReadOnlyList<double> values, double percentile)
+    private static int ReflectIndex(int index, int length)
     {
-        if (values.Count == 0)
+        if (length <= 1)
         {
-            return 0.0;
+            return 0;
         }
 
-        var ordered = values.OrderBy(static value => value).ToArray();
-        if (ordered.Length == 1)
+        var period = (length * 2) - 2;
+        var reflected = index % period;
+        if (reflected < 0)
         {
-            return ordered[0];
+            reflected += period;
         }
 
-        var position = Math.Clamp(percentile, 0.0, 1.0) * (ordered.Length - 1);
-        var lower = (int)Math.Floor(position);
-        var upper = (int)Math.Ceiling(position);
-        if (lower == upper)
-        {
-            return ordered[lower];
-        }
-
-        var ratio = position - lower;
-        return ordered[lower] * (1.0 - ratio) + ordered[upper] * ratio;
+        // Reflect-101 avoids reusing the endpoint value repeatedly, which reduces edge bias near ROI boundaries.
+        return reflected < length ? reflected : period - reflected;
     }
 
     private static double SampleGrayBilinear(Mat gray, double x, double y)

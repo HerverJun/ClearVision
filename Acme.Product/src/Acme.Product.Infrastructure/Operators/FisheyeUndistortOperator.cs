@@ -112,18 +112,33 @@ public class FisheyeUndistortOperator : OperatorBase
                 map2.Dispose();
             }
 
-            var output = new Dictionary<string, object>
+            var diagnostics = runtime.Bundle.Quality.Diagnostics?.Count > 0
+                ? string.Join("; ", runtime.Bundle.Quality.Diagnostics)
+                : "No diagnostics";
+            var runtimeMonitoring = IntrinsicsCalibrationRuntimeFactory.BuildRuntimeMonitoringOutput(runtime);
+            var gateStatus = runtime.RuntimeQualityAssessment.Status;
+
+            if (!string.Equals(gateStatus, "pass", StringComparison.Ordinal))
             {
-                ["Applied"] = true,
-                ["Accepted"] = runtime.Bundle.Quality.Accepted,
-                ["CalibrationKind"] = runtime.Bundle.CalibrationKind.ToString(),
-                ["DistortionModel"] = runtime.Bundle.Distortion?.Model.ToString() ?? DistortionModelV2.None.ToString(),
-                ["UseLutAcceleration"] = useLut,
-                ["OriginalSize"] = new { Width = src.Width, Height = src.Height },
-                ["OutputSize"] = new { Width = outputSize.Width, Height = outputSize.Height },
-                ["Balance"] = balance,
-                ["Message"] = "Fisheye undistortion applied using CalibrationBundleV2."
-            };
+                Logger.LogWarning(
+                    "Fisheye undistort runtime quality gate status={Status}. Mean={MeanError:F4}px, Max={MaxError:F4}px. {Summary}",
+                    gateStatus,
+                    runtime.RuntimeQualityAssessment.BaselineMeanError,
+                    runtime.RuntimeQualityAssessment.BaselineMaxError,
+                    runtime.RuntimeQualityAssessment.Summary);
+            }
+
+            var output = runtimeMonitoring;
+            output["Applied"] = true;
+            output["Accepted"] = runtime.Bundle.Quality.Accepted;
+            output["CalibrationKind"] = runtime.Bundle.CalibrationKind.ToString();
+            output["DistortionModel"] = runtime.Bundle.Distortion?.Model.ToString() ?? DistortionModelV2.None.ToString();
+            output["UseLutAcceleration"] = useLut;
+            output["OriginalSize"] = new { Width = src.Width, Height = src.Height };
+            output["OutputSize"] = new { Width = outputSize.Width, Height = outputSize.Height };
+            output["Balance"] = balance;
+            output["Diagnostics"] = diagnostics;
+            output["Message"] = "Fisheye undistortion applied using CalibrationBundleV2.";
 
             return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst, output)));
         }

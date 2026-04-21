@@ -1,7 +1,3 @@
-// ContourExtremaOperator.cs
-// 轮廓极值点算子 - 查找轮廓在特定方向上的极值点
-// 对标 Halcon: extremity, get_contour_xld
-
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -35,53 +31,66 @@ public class ContourExtremaOperator : OperatorBase
 
     protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(Operator @operator, Dictionary<string, object>? inputs, CancellationToken cancellationToken)
     {
-        if (!TryGetContour(inputs, out var contour) || contour == null || contour.Count < 2)
-            return Task.FromResult(OperatorExecutionOutput.Failure("Valid contour required (at least 2 points)."));
+        if (!TryGetContour(inputs, out var contour) || contour == null || contour.Count == 0)
+            return Task.FromResult(OperatorExecutionOutput.Failure("Contour must contain at least one point."));
 
-        string direction = GetString(inputs, "Direction", "horizontal").ToLower();
+        string direction = GetString(inputs, "Direction", "horizontal").ToLowerInvariant();
 
-        OpenCvSharp.Point2f? refPoint = null;
+        Point2f? refPoint = null;
         if (inputs?.TryGetValue("ReferencePoint", out var rp) == true)
         {
-            if (rp is OpenCvSharp.Point2f p2f) refPoint = p2f;
-            else if (rp is OpenCvSharp.Point p) refPoint = new OpenCvSharp.Point2f(p.X, p.Y);
+            if (rp is Point2f p2f)
+            {
+                refPoint = p2f;
+            }
+            else if (rp is Point p)
+            {
+                refPoint = new Point2f(p.X, p.Y);
+            }
         }
 
+        if (direction == "distance" && !refPoint.HasValue)
+            return Task.FromResult(OperatorExecutionOutput.Failure("ReferencePoint is required when Direction is 'distance'."));
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        // 计算极值点
         var results = ComputeExtrema(contour, direction, refPoint);
-
         stopwatch.Stop();
 
-        // 创建可视化图像
         int padding = 50;
-        var bbox = Cv2.BoundingRect(contour.ToArray());
+        var bbox = Cv2.BoundingRect(contour.Select(ToPoint).ToArray());
         int w = Math.Max(400, bbox.Width + padding * 2);
         int h = Math.Max(300, bbox.Height + padding * 2);
 
-        var vis = new Mat(h, w, MatType.CV_8UC3, OpenCvSharp.Scalar.Black);
-        var shiftedContour = contour.Select(p => new OpenCvSharp.Point(p.X - bbox.X + padding, p.Y - bbox.Y + padding)).ToArray();
+        var vis = new Mat(h, w, MatType.CV_8UC3, Scalar.Black);
+        var shiftedContour = contour
+            .Select(p => new Point((int)Math.Round(p.X - bbox.X + padding), (int)Math.Round(p.Y - bbox.Y + padding)))
+            .ToArray();
 
-        // 绘制轮廓
-        Cv2.Polylines(vis, new[] { shiftedContour }, false, new OpenCvSharp.Scalar(255, 255, 255), 2);
+        if (shiftedContour.Length > 1)
+        {
+            Cv2.Polylines(vis, new[] { shiftedContour }, false, Scalar.White, 2);
+        }
+        else
+        {
+            Cv2.Circle(vis, shiftedContour[0], 3, Scalar.White, -1);
+        }
 
-        // 绘制极值点
         var minPt = results.MinPoint;
         var maxPt = results.MaxPoint;
-        var shiftedMin = new OpenCvSharp.Point((int)(minPt.X - bbox.X + padding), (int)(minPt.Y - bbox.Y + padding));
-        var shiftedMax = new OpenCvSharp.Point((int)(maxPt.X - bbox.X + padding), (int)(maxPt.Y - bbox.Y + padding));
+        var shiftedMin = new Point((int)Math.Round(minPt.X - bbox.X + padding), (int)Math.Round(minPt.Y - bbox.Y + padding));
+        var shiftedMax = new Point((int)Math.Round(maxPt.X - bbox.X + padding), (int)Math.Round(maxPt.Y - bbox.Y + padding));
 
-        Cv2.Circle(vis, shiftedMin, 6, new OpenCvSharp.Scalar(0, 0, 255), -1);
-        Cv2.Circle(vis, shiftedMax, 6, new OpenCvSharp.Scalar(0, 255, 0), -1);
-        Cv2.PutText(vis, "MIN", new OpenCvSharp.Point(shiftedMin.X + 8, shiftedMin.Y), HersheyFonts.HersheySimplex, 0.5, new OpenCvSharp.Scalar(0, 0, 255), 1);
-        Cv2.PutText(vis, "MAX", new OpenCvSharp.Point(shiftedMax.X + 8, shiftedMax.Y), HersheyFonts.HersheySimplex, 0.5, new OpenCvSharp.Scalar(0, 255, 0), 1);
+        Cv2.Circle(vis, shiftedMin, 6, new Scalar(0, 0, 255), -1);
+        Cv2.Circle(vis, shiftedMax, 6, new Scalar(0, 255, 0), -1);
+        Cv2.PutText(vis, "MIN", new Point(shiftedMin.X + 8, shiftedMin.Y), HersheyFonts.HersheySimplex, 0.5, new Scalar(0, 0, 255), 1);
+        Cv2.PutText(vis, "MAX", new Point(shiftedMax.X + 8, shiftedMax.Y), HersheyFonts.HersheySimplex, 0.5, new Scalar(0, 255, 0), 1);
 
-        // 如果有参考点，绘制连接线
         if (refPoint.HasValue)
         {
-            var shiftedRef = new Point((int)(refPoint.Value.X - bbox.X + padding), (int)(refPoint.Value.Y - bbox.Y + padding));
-            Cv2.Circle(vis, shiftedRef, 5, new OpenCvSharp.Scalar(255, 0, 255), -1);
+            var shiftedRef = new Point(
+                (int)Math.Round(refPoint.Value.X - bbox.X + padding),
+                (int)Math.Round(refPoint.Value.Y - bbox.Y + padding));
+            Cv2.Circle(vis, shiftedRef, 5, new Scalar(255, 0, 255), -1);
             Cv2.Line(vis, shiftedRef, shiftedMin, new Scalar(0, 0, 255), 1, LineTypes.Link8);
             Cv2.Line(vis, shiftedRef, shiftedMax, new Scalar(0, 255, 0), 1, LineTypes.Link8);
         }
@@ -97,65 +106,83 @@ public class ContourExtremaOperator : OperatorBase
         })));
     }
 
-    private ExtremaResult ComputeExtrema(List<OpenCvSharp.Point2f> contour, string direction, OpenCvSharp.Point2f? refPoint)
+    private static ExtremaResult ComputeExtrema(List<Point2f> contour, string direction, Point2f? refPoint)
     {
-        var values = new List<(OpenCvSharp.Point2f Point, double Value)>();
+        var values = contour
+            .Select(pt => (Point: pt, Value: GetExtremaValue(pt, direction, refPoint)))
+            .ToList();
 
-        foreach (var pt in contour)
-        {
-            double value = direction switch
-            {
-                "horizontal" or "x" => pt.X,
-                "vertical" or "y" => pt.Y,
-                "distance" when refPoint.HasValue => Distance(pt, refPoint.Value),
-                _ => pt.X
-            };
-            values.Add((pt, value));
-        }
+        var minPoint = OrderExtrema(values, direction, descending: false).First();
+        var maxPoint = OrderExtrema(values, direction, descending: true).First();
 
-        if (direction == "distance" && refPoint.HasValue)
+        return new ExtremaResult
         {
-            // 找到距离参考点最远和最近的点
-            var ordered = values.OrderBy(v => v.Value).ToList();
-            return new ExtremaResult
-            {
-                MinPoint = ordered.First().Point,
-                MaxPoint = ordered.Last().Point,
-                MinValue = ordered.First().Value,
-                MaxValue = ordered.Last().Value,
-                AllExtrema = new List<OpenCvSharp.Point2f> { ordered.First().Point, ordered.Last().Point }
-            };
-        }
-        else
-        {
-            // 找到最小和最大的点
-            var minPt = values.OrderBy(v => v.Value).First();
-            var maxPt = values.OrderByDescending(v => v.Value).First();
-
-            return new ExtremaResult
-            {
-                MinPoint = minPt.Point,
-                MaxPoint = maxPt.Point,
-                MinValue = minPt.Value,
-                MaxValue = maxPt.Value,
-                AllExtrema = new List<OpenCvSharp.Point2f> { minPt.Point, maxPt.Point }
-            };
-        }
+            MinPoint = minPoint.Point,
+            MaxPoint = maxPoint.Point,
+            MinValue = minPoint.Value,
+            MaxValue = maxPoint.Value,
+            AllExtrema = AreSamePoint(minPoint.Point, maxPoint.Point)
+                ? new List<Point2f> { minPoint.Point }
+                : new List<Point2f> { minPoint.Point, maxPoint.Point }
+        };
     }
 
-    private double Distance(OpenCvSharp.Point2f a, OpenCvSharp.Point2f b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+    private static double GetExtremaValue(Point2f pt, string direction, Point2f? refPoint)
+    {
+        return direction switch
+        {
+            "horizontal" or "x" => pt.X,
+            "vertical" or "y" => pt.Y,
+            "distance" when refPoint.HasValue => Distance(pt, refPoint.Value),
+            _ => pt.X
+        };
+    }
 
-    private bool TryGetContour(Dictionary<string, object>? inputs, out List<OpenCvSharp.Point2f>? contour)
+    private static IOrderedEnumerable<(Point2f Point, double Value)> OrderExtrema(
+        IEnumerable<(Point2f Point, double Value)> values,
+        string direction,
+        bool descending)
+    {
+        return direction switch
+        {
+            "vertical" or "y" => descending
+                ? values.OrderByDescending(v => v.Value).ThenByDescending(v => v.Point.X).ThenByDescending(v => v.Point.Y)
+                : values.OrderBy(v => v.Value).ThenBy(v => v.Point.X).ThenBy(v => v.Point.Y),
+            "distance" => descending
+                ? values.OrderByDescending(v => v.Value).ThenByDescending(v => v.Point.X).ThenByDescending(v => v.Point.Y)
+                : values.OrderBy(v => v.Value).ThenBy(v => v.Point.X).ThenBy(v => v.Point.Y),
+            _ => descending
+                ? values.OrderByDescending(v => v.Value).ThenByDescending(v => v.Point.Y).ThenByDescending(v => v.Point.X)
+                : values.OrderBy(v => v.Value).ThenBy(v => v.Point.Y).ThenBy(v => v.Point.X)
+        };
+    }
+
+    private static bool AreSamePoint(Point2f a, Point2f b)
+    {
+        return Math.Abs(a.X - b.X) < 1e-6f && Math.Abs(a.Y - b.Y) < 1e-6f;
+    }
+
+    private static double Distance(Point2f a, Point2f b)
+    {
+        return Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+    }
+
+    private bool TryGetContour(Dictionary<string, object>? inputs, out List<Point2f>? contour)
     {
         contour = null;
         if (inputs?.TryGetValue("Contour", out var val) != true || val == null)
             return false;
 
-        if (val is IEnumerable<OpenCvSharp.Point2f> pts2f) { contour = pts2f.ToList(); return true; }
-        if (val is IEnumerable<OpenCvSharp.Point> pts) { contour = pts.Select(p => new OpenCvSharp.Point2f(p.X, p.Y)).ToList(); return true; }
-        if (val is OpenCvSharp.Point[] arr) { contour = arr.Select(p => new OpenCvSharp.Point2f(p.X, p.Y)).ToList(); return true; }
-        if (val is OpenCvSharp.Point2f[] arr2f) { contour = arr2f.ToList(); return true; }
+        if (val is IEnumerable<Point2f> pts2f) { contour = pts2f.ToList(); return true; }
+        if (val is IEnumerable<Point> pts) { contour = pts.Select(p => new Point2f(p.X, p.Y)).ToList(); return true; }
+        if (val is Point[] arr) { contour = arr.Select(p => new Point2f(p.X, p.Y)).ToList(); return true; }
+        if (val is Point2f[] arr2f) { contour = arr2f.ToList(); return true; }
         return false;
+    }
+
+    private static Point ToPoint(Point2f point)
+    {
+        return new Point((int)Math.Round(point.X), (int)Math.Round(point.Y));
     }
 
     private string GetString(Dictionary<string, object>? inputs, string key, string defaultVal) =>
@@ -166,9 +193,9 @@ public class ContourExtremaOperator : OperatorBase
 
 public class ExtremaResult
 {
-    public OpenCvSharp.Point2f MinPoint { get; set; }
-    public OpenCvSharp.Point2f MaxPoint { get; set; }
+    public Point2f MinPoint { get; set; }
+    public Point2f MaxPoint { get; set; }
     public double MinValue { get; set; }
     public double MaxValue { get; set; }
-    public List<OpenCvSharp.Point2f> AllExtrema { get; set; } = new();
+    public List<Point2f> AllExtrema { get; set; } = new();
 }
