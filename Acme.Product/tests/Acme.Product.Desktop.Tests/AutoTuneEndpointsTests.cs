@@ -2,10 +2,12 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Encodings.Web;
+using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using Acme.Product.Desktop.Endpoints;
+using Acme.Product.Desktop.Middleware;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
@@ -22,6 +24,37 @@ namespace Acme.Product.Desktop.Tests;
 
 public class AutoTuneEndpointsTests
 {
+    [Fact]
+    public async Task StrategiesEndpoint_ShouldWorkWithDesktopAuthMiddleware()
+    {
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        var authService = Substitute.For<IAuthService>();
+
+        authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<Acme.Product.Application.Services.UserSession?>(new Acme.Product.Application.Services.UserSession
+        {
+            UserId = Guid.NewGuid().ToString(),
+            Username = "tester",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+
+        await using var host = await AutoTuneEndpointTestHost.CreateWithDesktopAuthAsync(
+            previewService,
+            autoTuneService,
+            authService);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/autotune/strategies");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "desktop-token");
+
+        using var response = await host.Client.SendAsync(request);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.ValueKind.Should().Be(JsonValueKind.Array);
+        document.RootElement.GetArrayLength().Should().BeGreaterThan(0);
+    }
+
     [Fact]
     public async Task FlowNodePreview_ShouldReturnMetricsDiagnosticCodesAndSuggestions()
     {
@@ -359,6 +392,31 @@ public class AutoTuneEndpointsTests
             var app = builder.Build();
             app.UseAuthentication();
             app.UseAuthorization();
+            app.MapAutoTuneEndpoints();
+            await app.StartAsync();
+
+            return new AutoTuneEndpointTestHost(app, app.GetTestClient());
+        }
+
+        public static async Task<AutoTuneEndpointTestHost> CreateWithDesktopAuthAsync(
+            IFlowNodePreviewService previewService,
+            IAutoTuneService autoTuneService,
+            IAuthService authService)
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = Environments.Development
+            });
+
+            builder.WebHost.UseTestServer();
+            builder.Services.AddLogging();
+            builder.Services.AddSingleton(previewService);
+            builder.Services.AddSingleton(autoTuneService);
+            builder.Services.AddSingleton(Substitute.For<IPreviewMetricsAnalyzer>());
+            builder.Services.AddSingleton(authService);
+
+            var app = builder.Build();
+            app.UseMiddleware<AuthMiddleware>();
             app.MapAutoTuneEndpoints();
             await app.StartAsync();
 

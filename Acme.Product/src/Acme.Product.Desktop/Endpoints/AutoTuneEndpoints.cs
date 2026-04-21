@@ -26,8 +26,7 @@ public static class AutoTuneEndpoints
     public static IEndpointRouteBuilder MapAutoTuneEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/autotune")
-            .WithTags("AutoTune")
-            .RequireAuthorization();
+            .WithTags("AutoTune");
 
         // POST /api/autotune/operator - 单个算子自动调参
         group.MapPost("/operator", async (
