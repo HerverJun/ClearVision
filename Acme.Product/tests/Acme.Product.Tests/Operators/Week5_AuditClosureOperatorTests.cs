@@ -79,6 +79,43 @@ public class DelayOperatorTests
         result.OutputData!["Output"].Should().Be("payload");
         Convert.ToInt32(result.OutputData["ElapsedMs"]).Should().BeGreaterThanOrEqualTo(15);
     }
+
+    [Fact]
+    public void ValidateParameters_WithNegativeMilliseconds_ShouldBeInvalid()
+    {
+        var op = new Operator("delay", OperatorType.Delay, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Milliseconds", -1, "int"));
+
+        var validation = _operator.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().Contain("greater than or equal to 0");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithTooLargeDelay_ShouldFailPredictably()
+    {
+        var op = new Operator("delay", OperatorType.Delay, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Milliseconds", 60001, "int"));
+
+        var result = await _operator.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("60000");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCanceledToken_ShouldThrowOperationCanceledException()
+    {
+        var op = new Operator("delay", OperatorType.Delay, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Milliseconds", 25, "int"));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Func<Task> act = () => _operator.ExecuteAsync(op, cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }
 
 public class VariableReadOperatorTests
@@ -181,6 +218,72 @@ public class CycleCounterOperatorTests
         result.OutputData!["CycleCount"].Should().Be(1L);
         result.OutputData["IsLimitReached"].Should().Be(false);
     }
+
+    [Fact]
+    public void ValidateParameters_WithUnsupportedAction_ShouldBeInvalid()
+    {
+        var sut = new CycleCounterOperator(Substitute.For<ILogger<CycleCounterOperator>>(), new VariableContext());
+        var op = new Operator("cycle", OperatorType.CycleCounter, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Action", "Skip", "string"));
+
+        var validation = sut.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().Contain("Unsupported action");
+    }
+
+    [Fact]
+    public void ValidateParameters_WithNegativeMaxCycles_ShouldBeInvalid()
+    {
+        var sut = new CycleCounterOperator(Substitute.For<ILogger<CycleCounterOperator>>(), new VariableContext());
+        var op = new Operator("cycle", OperatorType.CycleCounter, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Action", "Read", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxCycles", -1, "int"));
+
+        var validation = sut.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().Contain("MaxCycles");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenLimitAlreadyReached_ShouldNotIncrementBeyondMaxCycles()
+    {
+        var context = new VariableContext();
+        context.IncrementCycleCount();
+        context.IncrementCycleCount();
+
+        var sut = new CycleCounterOperator(Substitute.For<ILogger<CycleCounterOperator>>(), context);
+        var op = new Operator("cycle", OperatorType.CycleCounter, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Action", "Increment", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxCycles", 2, "int"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["CycleCount"].Should().Be(2L);
+        result.OutputData["IsLimitReached"].Should().Be(true);
+        result.OutputData["RemainingCycles"].Should().Be(0L);
+        Convert.ToDouble(result.OutputData["Progress"]).Should().Be(100d);
+        context.CycleCount.Should().Be(2L);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenCycleCountWouldOverflow_ShouldFailWithoutIncrementing()
+    {
+        var context = Substitute.For<IVariableContext>();
+        context.CycleCount.Returns(long.MaxValue);
+        var sut = new CycleCounterOperator(Substitute.For<ILogger<CycleCounterOperator>>(), context);
+
+        var op = new Operator("cycle", OperatorType.CycleCounter, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Action", "Increment", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Int64.MaxValue");
+        context.DidNotReceive().IncrementCycleCount();
+    }
 }
 
 public class StringFormatOperatorTests
@@ -222,5 +325,22 @@ public class CommentOperatorTests
         result.IsSuccess.Should().BeTrue();
         result.OutputData!["Output"].Should().Be("payload");
         result.OutputData["Message"].Should().Be("lab checkpoint");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithReferencePayload_ShouldOnlyPassThroughAndExposeMessage()
+    {
+        var payload = new Dictionary<string, object> { ["Name"] = "station-a" };
+        var op = new Operator("comment", OperatorType.Comment, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Text", "checkpoint", "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Input"] = payload
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["Output"].Should().BeSameAs(payload);
+        result.OutputData["Message"].Should().Be("checkpoint");
     }
 }
