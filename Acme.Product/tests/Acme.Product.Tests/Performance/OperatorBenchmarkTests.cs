@@ -6,6 +6,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.ImageProcessing;
 using Acme.Product.Infrastructure.Operators;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Tests.TestData;
@@ -216,6 +217,43 @@ public class OperatorBenchmarkTests
 
         var reportPath = WriteMeasurementReport(entries);
         _output.WriteLine($"Measurement benchmark report written: {reportPath}");
+    }
+
+    [Fact]
+    public void Benchmark_StegerSubpixelEdgeDetector_ShouldFlagSparse4KBudgetPressure()
+    {
+        const int width = 4096;
+        const int height = 3072;
+
+        using var image = CreateSparseVerticalStepEdgeImage(width, height);
+        using var detector = new StegerSubpixelEdgeDetector
+        {
+            Sigma = 1.0,
+            EdgeThreshold = 6.0,
+            MaxOffset = 1.0
+        };
+
+        var stopwatch = Stopwatch.StartNew();
+        var points = detector.DetectEdges(image, cannyLow: 20, cannyHigh: 60);
+        stopwatch.Stop();
+
+        var diagnostics = detector.LastDiagnostics;
+        _output.WriteLine(
+            $"Steger 4K sparse-edge diagnostics: elapsed={stopwatch.ElapsedMilliseconds}ms, " +
+            $"points={points.Count}, candidates={diagnostics.CandidateEdgePixels}, " +
+            $"density={diagnostics.CandidateEdgeDensity:P4}, derivativeMB={diagnostics.ApproxDerivativeBufferMegabytes:F1}, " +
+            $"roiHint={diagnostics.ShouldConsiderRoiCropping}");
+
+        Assert.NotEmpty(points);
+        Assert.True(diagnostics.UsedFullImageDerivatives, "Sparse 4K benchmark should exercise the current full-image derivative path.");
+        Assert.Equal(width, diagnostics.ImageWidth);
+        Assert.Equal(height, diagnostics.ImageHeight);
+        Assert.Equal((long)width * height, diagnostics.DerivativeRegionPixels);
+        Assert.Equal((long)width * height * 5 * sizeof(double), diagnostics.ApproxDerivativeBufferBytes);
+        Assert.True(diagnostics.CandidateEdgeDensity < 0.01, $"Expected sparse Canny support, but density was {diagnostics.CandidateEdgeDensity:P4}.");
+        Assert.True(
+            diagnostics.ShouldConsiderRoiCropping,
+            $"Sparse 4K detections should surface the ROI-cropping headroom hint. DerivativeMB={diagnostics.ApproxDerivativeBufferMegabytes:F1}, density={diagnostics.CandidateEdgeDensity:P4}.");
     }
 
     private async Task<List<long>> RunBenchmarkAsync(
@@ -746,6 +784,14 @@ public class OperatorBenchmarkTests
     {
         var image = new Mat(height, width, MatType.CV_8UC1, Scalar.Black);
         Cv2.Rectangle(image, new Rect(190, 110, 100, 290), Scalar.White, -1);
+        return image;
+    }
+
+    private static Mat CreateSparseVerticalStepEdgeImage(int width, int height)
+    {
+        var image = new Mat(height, width, MatType.CV_8UC1, new Scalar(32));
+        var edgeX = width / 2;
+        Cv2.Rectangle(image, new Rect(edgeX, 0, width - edgeX, height), new Scalar(224), -1);
         return image;
     }
 
