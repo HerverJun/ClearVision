@@ -72,7 +72,12 @@ public class RegionComplementOperator : OperatorBase
             var runsInRow = new List<RunLength>();
             while (runIndex < sortedRuns.Count && sortedRuns[runIndex].Y == y)
             {
-                runsInRow.Add(sortedRuns[runIndex]);
+                var clippedRun = ClipRunToBounds(sortedRuns[runIndex], width);
+                if (clippedRun.HasValue)
+                {
+                    runsInRow.Add(clippedRun.Value);
+                }
+
                 runIndex++;
             }
 
@@ -119,6 +124,23 @@ public class RegionComplementOperator : OperatorBase
         })));
     }
 
+    private static RunLength? ClipRunToBounds(RunLength run, int width)
+    {
+        if (width <= 0)
+        {
+            return null;
+        }
+
+        var startX = Math.Max(0, run.StartX);
+        var endX = Math.Min(width - 1, run.EndX);
+        if (startX > endX)
+        {
+            return null;
+        }
+
+        return new RunLength(run.Y, startX, endX);
+    }
+
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
@@ -142,9 +164,12 @@ public class RegionComplementOperator : OperatorBase
         }
 
         // 补集用绿色轮廓
-        var pts = complement.GetContourPoints();
-        if (pts.Count > 0)
-            Cv2.Polylines(mat, new[] { pts.ToArray() }, true, new OpenCvSharp.Scalar(0, 255, 0), 1);
+        if (!complement.IsEmpty)
+        {
+            var pts = complement.GetContourPoints();
+            if (pts.Count > 0)
+                Cv2.Polylines(mat, new[] { pts.ToArray() }, true, new OpenCvSharp.Scalar(0, 255, 0), 1);
+        }
 
         Cv2.PutText(mat, $"Complement: {complement.Area}", new OpenCvSharp.Point(10, 20), HersheyFonts.HersheySimplex, 0.5, new OpenCvSharp.Scalar(0, 255, 0), 1);
         return mat;

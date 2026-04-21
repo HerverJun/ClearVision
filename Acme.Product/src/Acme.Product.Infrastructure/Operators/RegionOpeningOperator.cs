@@ -9,7 +9,6 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
 
 namespace Acme.Product.Infrastructure.Operators;
@@ -31,15 +30,10 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("KernelHeight", "Kernel Height", "int", DefaultValue = 3, Min = 1, Max = 99)]
 public class RegionOpeningOperator : OperatorBase
 {
-    private readonly RegionErosionOperator _erosionOperator;
-    private readonly RegionDilationOperator _dilationOperator;
-
     public override OperatorType OperatorType => OperatorType.RegionOpening;
 
     public RegionOpeningOperator(ILogger<RegionOpeningOperator> logger) : base(logger)
     {
-        _erosionOperator = new RegionErosionOperator(NullLogger<RegionErosionOperator>.Instance);
-        _dilationOperator = new RegionDilationOperator(NullLogger<RegionDilationOperator>.Instance);
     }
 
     protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -264,7 +258,8 @@ public class RegionOpeningOperator : OperatorBase
         return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
         {
             { "Region", new Region() },
-            { "Area", 0 }
+            { "Area", 0 },
+            { "Message", "Input region is empty" }
         }));
     }
 
@@ -272,8 +267,12 @@ public class RegionOpeningOperator : OperatorBase
     {
         var kernelWidth = GetIntParam(@operator, "KernelWidth", 3);
         var kernelHeight = GetIntParam(@operator, "KernelHeight", 3);
+        var kernelShape = GetStringParam(@operator, "KernelShape", "Rectangle");
         if (kernelWidth < 1 || kernelWidth > 99) return ValidationResult.Invalid("KernelWidth must be 1-99.");
         if (kernelHeight < 1 || kernelHeight > 99) return ValidationResult.Invalid("KernelHeight must be 1-99.");
+        var validShapes = new[] { "Rectangle", "Ellipse", "Cross" };
+        if (!validShapes.Contains(kernelShape, StringComparer.OrdinalIgnoreCase))
+            return ValidationResult.Invalid($"KernelShape must be one of: {string.Join(", ", validShapes)}");
         return ValidationResult.Valid();
     }
 }

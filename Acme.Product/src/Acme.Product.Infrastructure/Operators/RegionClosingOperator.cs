@@ -64,6 +64,8 @@ public class RegionClosingOperator : OperatorBase
             { "Region", closed },
             { "OriginalArea", region.Area },
             { "Area", closed.Area },
+            { "AreaChange", closed.Area - region.Area },
+            { "Kernel", new { Shape = kernelShape, Width = kernelWidth, Height = kernelHeight } },
             { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
         })));
     }
@@ -169,15 +171,24 @@ public class RegionClosingOperator : OperatorBase
     {
         var m = new Mat(300, 400, MatType.CV_8UC3, Scalar.Black);
         Cv2.PutText(m, "Empty Region", new Point(10, 30), HersheyFonts.HersheySimplex, 0.7, new Scalar(0, 0, 255), 2);
-        return OperatorExecutionOutput.Success(CreateImageOutput(m, new Dictionary<string, object> { { "Region", new Region() }, { "Area", 0 } }));
+        return OperatorExecutionOutput.Success(CreateImageOutput(m, new Dictionary<string, object>
+        {
+            { "Region", new Region() },
+            { "Area", 0 },
+            { "Message", "Input region is empty" }
+        }));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var kw = GetIntParam(@operator, "KernelWidth", 3);
         var kh = GetIntParam(@operator, "KernelHeight", 3);
+        var kernelShape = GetStringParam(@operator, "KernelShape", "Rectangle");
         if (kw < 1 || kw > 99) return ValidationResult.Invalid("KernelWidth 1-99.");
         if (kh < 1 || kh > 99) return ValidationResult.Invalid("KernelHeight 1-99.");
+        var validShapes = new[] { "Rectangle", "Ellipse", "Cross" };
+        if (!validShapes.Contains(kernelShape, StringComparer.OrdinalIgnoreCase))
+            return ValidationResult.Invalid($"KernelShape must be one of: {string.Join(", ", validShapes)}");
         return ValidationResult.Valid();
     }
 }

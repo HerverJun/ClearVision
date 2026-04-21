@@ -17,11 +17,11 @@ namespace Acme.Product.Infrastructure.Operators;
 /// </summary>
 [OperatorMeta(
     DisplayName = "Morphology (Legacy)",
-    Description = "Legacy morphology node. Use Morphological Operation for new workflows.",
+    Description = "Legacy image morphology node. Use Morphological Operation for image workflows and Region* morphology operators for region workflows.",
     Category = "Preprocessing",
     IconName = "morphology",
-    Keywords = new[] { "Morphology", "Erode", "Dilate", "Open", "Close", "Legacy" },
-    Tags = new[] { "Legacy", "Deprecated", "Compatibility" }
+    Keywords = new[] { "Morphology", "Erode", "Dilate", "Open", "Close", "Legacy", "ImageOnly" },
+    Tags = new[] { "Legacy", "Deprecated", "Compatibility", "ImageOnly" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]

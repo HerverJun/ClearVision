@@ -175,6 +175,198 @@ public class Phase42RegionProcessingOperatorTests
         complement.Area.Should().Be(60 * 50 - regionA.Area);
     }
 
+    [Fact]
+    public async Task RegionComplement_WithEmptyRegion_ShouldReturnWholeImage()
+    {
+        var sut = new RegionComplementOperator(Substitute.For<ILogger<RegionComplementOperator>>());
+        var result = await sut.ExecuteAsync(
+            new Operator("RegionComplement", OperatorType.RegionComplement, 0, 0),
+            new Dictionary<string, object>
+            {
+                ["Region"] = new Region(),
+                ["ImageWidth"] = 12,
+                ["ImageHeight"] = 8
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        var complement = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        complement.Area.Should().Be(96);
+        complement.ContainsPoint(0, 0).Should().BeTrue();
+        complement.ContainsPoint(11, 7).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RegionComplement_WithFullImageRegion_ShouldReturnEmptyRegion()
+    {
+        var sut = new RegionComplementOperator(Substitute.For<ILogger<RegionComplementOperator>>());
+        var fullRegion = CreateRectangleRegion(0, 0, 12, 8, imageWidth: 12, imageHeight: 8);
+
+        var result = await sut.ExecuteAsync(
+            new Operator("RegionComplement", OperatorType.RegionComplement, 0, 0),
+            new Dictionary<string, object>
+            {
+                ["Region"] = fullRegion,
+                ["ImageWidth"] = 12,
+                ["ImageHeight"] = 8
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        var complement = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        complement.IsEmpty.Should().BeTrue();
+        complement.Area.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RegionComplement_ShouldClipInputRunsToExplicitImageBounds()
+    {
+        var sut = new RegionComplementOperator(Substitute.For<ILogger<RegionComplementOperator>>());
+        var region = new Region(new[]
+        {
+            new RunLength(0, -3, 2),
+            new RunLength(1, 8, 15),
+            new RunLength(2, 12, 14)
+        });
+
+        var result = await sut.ExecuteAsync(
+            new Operator("RegionComplement", OperatorType.RegionComplement, 0, 0),
+            new Dictionary<string, object>
+            {
+                ["Region"] = region,
+                ["ImageWidth"] = 10,
+                ["ImageHeight"] = 4
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        var complement = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        complement.Area.Should().Be(35);
+        complement.RunLengths.Should().OnlyContain(run => run.StartX >= 0 && run.EndX < 10 && run.Y >= 0 && run.Y < 4);
+        complement.ContainsPoint(9, 1).Should().BeFalse();
+        complement.ContainsPoint(5, 3).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RegionMorphologyOperators_WithEmptyRegion_ShouldReturnEmptyOutputs()
+    {
+        var emptyRegion = new Region();
+        var erosion = new RegionErosionOperator(Substitute.For<ILogger<RegionErosionOperator>>());
+        var dilation = new RegionDilationOperator(Substitute.For<ILogger<RegionDilationOperator>>());
+        var opening = new RegionOpeningOperator(Substitute.For<ILogger<RegionOpeningOperator>>());
+        var closing = new RegionClosingOperator(Substitute.For<ILogger<RegionClosingOperator>>());
+        var skeleton = new RegionSkeletonOperator(Substitute.For<ILogger<RegionSkeletonOperator>>());
+
+        var erosionResult = await erosion.ExecuteAsync(new Operator("RegionErosion", OperatorType.RegionErosion, 0, 0), new Dictionary<string, object> { ["Region"] = emptyRegion });
+        var dilationResult = await dilation.ExecuteAsync(new Operator("RegionDilation", OperatorType.RegionDilation, 0, 0), new Dictionary<string, object> { ["Region"] = emptyRegion });
+        var openingResult = await opening.ExecuteAsync(new Operator("RegionOpening", OperatorType.RegionOpening, 0, 0), new Dictionary<string, object> { ["Region"] = emptyRegion });
+        var closingResult = await closing.ExecuteAsync(new Operator("RegionClosing", OperatorType.RegionClosing, 0, 0), new Dictionary<string, object> { ["Region"] = emptyRegion });
+        var skeletonResult = await skeleton.ExecuteAsync(new Operator("RegionSkeleton", OperatorType.RegionSkeleton, 0, 0), new Dictionary<string, object> { ["Region"] = emptyRegion });
+
+        erosionResult.IsSuccess.Should().BeTrue();
+        dilationResult.IsSuccess.Should().BeTrue();
+        openingResult.IsSuccess.Should().BeTrue();
+        closingResult.IsSuccess.Should().BeTrue();
+        skeletonResult.IsSuccess.Should().BeTrue();
+
+        ((Region)erosionResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        ((Region)dilationResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        ((Region)openingResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        ((Region)closingResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        ((Region)skeletonResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+
+        erosionResult.OutputData!["Area"].Should().Be(0);
+        dilationResult.OutputData!["Area"].Should().Be(0);
+        openingResult.OutputData!["Area"].Should().Be(0);
+        closingResult.OutputData!["Area"].Should().Be(0);
+        skeletonResult.OutputData!["SkeletonLength"].Should().Be(0);
+        skeletonResult.OutputData!["Connectivity"].Should().Be(8);
+    }
+
+    [Fact]
+    public async Task RegionErosion_WithKernelLargerThanRegion_ShouldReturnEmptyRegion()
+    {
+        var sut = new RegionErosionOperator(Substitute.For<ILogger<RegionErosionOperator>>());
+        var region = CreateRectangleRegion(12, 12, 3, 3);
+        var op = new Operator("RegionErosion", OperatorType.RegionErosion, 0, 0);
+        op.Parameters.Add(TestHelpers.CreateParameter("KernelWidth", 9, "int"));
+        op.Parameters.Add(TestHelpers.CreateParameter("KernelHeight", 9, "int"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Region"] = region });
+
+        result.IsSuccess.Should().BeTrue();
+        var eroded = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        eroded.IsEmpty.Should().BeTrue();
+        eroded.Area.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RegionOpening_WithKernelLargerThanRegion_ShouldReturnEmptyRegion()
+    {
+        var sut = new RegionOpeningOperator(Substitute.For<ILogger<RegionOpeningOperator>>());
+        var region = CreateRectangleRegion(12, 12, 5, 5);
+        var op = new Operator("RegionOpening", OperatorType.RegionOpening, 0, 0);
+        op.Parameters.Add(TestHelpers.CreateParameter("KernelWidth", 11, "int"));
+        op.Parameters.Add(TestHelpers.CreateParameter("KernelHeight", 11, "int"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Region"] = region });
+
+        result.IsSuccess.Should().BeTrue();
+        var opened = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        opened.IsEmpty.Should().BeTrue();
+        opened.Area.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RegionClosing_WithLargeKernel_ShouldBridgeSmallGap()
+    {
+        var sut = new RegionClosingOperator(Substitute.For<ILogger<RegionClosingOperator>>());
+        var region = CreateSplitRectanglesRegion();
+        var op = new Operator("RegionClosing", OperatorType.RegionClosing, 0, 0);
+        op.Parameters.Add(TestHelpers.CreateParameter("KernelWidth", 5, "int"));
+        op.Parameters.Add(TestHelpers.CreateParameter("KernelHeight", 5, "int"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Region"] = region });
+
+        result.IsSuccess.Should().BeTrue();
+        var closed = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        closed.Area.Should().BeGreaterThan(region.Area);
+        closed.ContainsPoint(15, 16).Should().BeTrue();
+        CountConnectedComponents(closed, ConnectivityType.EightConnected).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RegionSkeleton_WithThinLine_ShouldPreserveEndpointsAtTightBounds()
+    {
+        var sut = new RegionSkeletonOperator(Substitute.For<ILogger<RegionSkeletonOperator>>());
+        var region = CreateThinHorizontalLineRegion();
+        var op = new Operator("RegionSkeleton", OperatorType.RegionSkeleton, 0, 0);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Region"] = region });
+
+        result.IsSuccess.Should().BeTrue();
+        var skeleton = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        skeleton.RunLengths.Should().Equal(region.RunLengths);
+        result.OutputData!["SkeletonLength"].Should().Be(region.Area);
+        result.OutputData!["EndPoints"].Should().Be(2);
+        result.OutputData!["BranchPoints"].Should().Be(0);
+        result.OutputData!["Connectivity"].Should().Be(8);
+        result.OutputData!["Algorithm"].Should().Be("Zhang-Suen");
+    }
+
+    [Fact]
+    public async Task RegionSkeleton_ShouldRemainEightConnectedForCrossShape()
+    {
+        var sut = new RegionSkeletonOperator(Substitute.For<ILogger<RegionSkeletonOperator>>());
+        var region = CreateThickCrossRegion();
+        var op = new Operator("RegionSkeleton", OperatorType.RegionSkeleton, 0, 0);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Region"] = region });
+
+        result.IsSuccess.Should().BeTrue();
+        var skeleton = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        CountConnectedComponents(skeleton, ConnectivityType.EightConnected).Should().Be(1);
+        result.OutputData!["Connectivity"].Should().Be(8);
+        result.OutputData!["BranchPoints"].Should().BeOfType<int>().Which.Should().BeGreaterThan(0);
+    }
+
     private static Region CreateRectangleRegion(int x, int y, int width, int height, int imageWidth = 80, int imageHeight = 80)
     {
         using var mat = new Mat(imageHeight, imageWidth, MatType.CV_8UC1, Scalar.Black);
@@ -213,5 +405,75 @@ public class Phase42RegionProcessingOperatorTests
         Cv2.Rectangle(mat, new Rect(58, 32, 12, 58), Scalar.White, -1);
         Cv2.Rectangle(mat, new Rect(38, 52, 52, 12), Scalar.White, -1);
         return Region.FromMat(mat);
+    }
+
+    private static Region CreateSplitRectanglesRegion()
+    {
+        using var mat = new Mat(40, 40, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(mat, new Rect(8, 12, 6, 10), Scalar.White, -1);
+        Cv2.Rectangle(mat, new Rect(16, 12, 6, 10), Scalar.White, -1);
+        return Region.FromMat(mat);
+    }
+
+    private static Region CreateThinHorizontalLineRegion()
+    {
+        using var mat = new Mat(40, 40, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(mat, new Rect(10, 20, 21, 1), Scalar.White, -1);
+        return Region.FromMat(mat);
+    }
+
+    private static int CountConnectedComponents(Region region, ConnectivityType connectivity)
+    {
+        if (region.IsEmpty)
+        {
+            return 0;
+        }
+
+        var remaining = new HashSet<(int X, int Y)>(EnumeratePoints(region));
+        var neighborOffsets = connectivity == ConnectivityType.FourConnected
+            ? new (int dx, int dy)[] { (0, -1), (-1, 0), (1, 0), (0, 1) }
+            : new (int dx, int dy)[]
+            {
+                (-1, -1), (0, -1), (1, -1),
+                (-1, 0),            (1, 0),
+                (-1, 1),  (0, 1),  (1, 1)
+            };
+
+        var components = 0;
+        var queue = new Queue<(int X, int Y)>();
+
+        while (remaining.Count > 0)
+        {
+            var seed = remaining.First();
+            remaining.Remove(seed);
+            queue.Enqueue(seed);
+            components++;
+
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                foreach (var (dx, dy) in neighborOffsets)
+                {
+                    var neighbor = (current.X + dx, current.Y + dy);
+                    if (remaining.Remove(neighbor))
+                    {
+                        queue.Enqueue(neighbor);
+                    }
+                }
+            }
+        }
+
+        return components;
+    }
+
+    private static IEnumerable<(int X, int Y)> EnumeratePoints(Region region)
+    {
+        foreach (var run in region.RunLengths)
+        {
+            for (int x = run.StartX; x <= run.EndX; x++)
+            {
+                yield return (x, run.Y);
+            }
+        }
     }
 }
