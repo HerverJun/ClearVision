@@ -88,7 +88,7 @@
     display: block;
     width: 4px;
     height: 14px;
-    background: var(--primary-color, #dc2626);
+    background: var(--primary-color, #e74c3c);
     border-radius: 2px;
 }
 
@@ -135,17 +135,17 @@
 .btn-run-single:active { transform: translateY(0); }
 
 .btn-run-continuous {
-    background-color: var(--primary-color, #dc2626);
+    background-color: var(--primary-color, #e74c3c);
     color: white;
-    border-color: var(--primary-color, #dc2626);
+    border-color: var(--primary-color, #e74c3c);
 }
 .btn-run-continuous:hover { 
-    background-color: #ef4444; /* hover lighter red */
+    background-color: #e74c3c; /* hover lighter red */
     box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
     transform: translateY(-1px); 
 }
 .btn-run-continuous.running {
-    background-color: #b91c1c; /* active darker red */
+    background-color: #c0392b; /* active darker red */
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
 }
 
@@ -155,7 +155,7 @@
 }
 .btn-stop:hover:not(:disabled) { 
     background-color: #fee2e2; 
-    color: #dc2626;
+    color: #e74c3c;
     border-color: #fecaca;
     transform: translateY(-1px); 
 }
@@ -321,7 +321,7 @@
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ef4444, #dc2626); /* 红色基调进度条 */
+    background: linear-gradient(90deg, #e74c3c, #e74c3c); /* 红色基调进度条 */
     width: 0%;
     transition: width 0.1s linear;
     position: relative;
@@ -373,13 +373,13 @@
 }
 
 .camera-dropdown:hover {
-    border-color: var(--primary-color, #dc2626);
+    border-color: var(--primary-color, #e74c3c);
     background-color: var(--hover-color, #f8fafc);
 }
 
 .camera-dropdown:focus {
     outline: none;
-    border-color: var(--primary-color, #dc2626);
+    border-color: var(--primary-color, #e74c3c);
     box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 
@@ -399,7 +399,7 @@
 
 .btn-refresh-cameras:hover {
     background-color: var(--hover-color, #f8fafc);
-    color: var(--primary-color, #dc2626);
+    color: var(--primary-color, #e74c3c);
     border-color: rgba(226, 232, 240, 1);
 }
 
@@ -435,7 +435,7 @@
 
 .recent-result-item:hover {
     background-color: var(--hover-color, #f8fafc);
-    border-color: var(--primary-color, #dc2626);
+    border-color: var(--primary-color, #e74c3c);
     transform: translateX(2px);
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
@@ -461,7 +461,7 @@
     text-align: center;
 }
 .result-ok .result-badge { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
-.result-ng .result-badge { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+.result-ng .result-badge { background: rgba(239, 68, 68, 0.15); color: #e74c3c; border: 1px solid rgba(239, 68, 68, 0.2); }
 .result-error .result-badge { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.2); }
 
 .result-time {
@@ -570,7 +570,7 @@
 }
 
 [data-theme="light"] .inspection-protection-status[data-tone="error"] {
-    color: #b91c1c;
+    color: #c0392b;
 }
 
 /* Panels — Clean Card Style */
@@ -638,7 +638,7 @@
 }
 
 [data-theme="light"] .status-led.status-ng {
-    background: #ef4444;
+    background: #e74c3c;
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
 }
 
@@ -669,11 +669,11 @@
 }
 
 [data-theme="light"] .btn-stop {
-    background: #ef4444;
+    background: #e74c3c;
     color: white;
 }
 [data-theme="light"] .btn-stop:hover {
-    background: #dc2626;
+    background: #e74c3c;
 }
 
 [data-theme="light"] .btn-stop:disabled {
@@ -716,7 +716,7 @@
 [data-theme="light"] .counter-label { color: #64748b; font-weight: 500; }
 [data-theme="light"] .counter-total .counter-value { color: #334155; }
 [data-theme="light"] .counter-ok .counter-value { color: #10b981; }
-[data-theme="light"] .counter-ng .counter-value { color: #ef4444; }
+[data-theme="light"] .counter-ng .counter-value { color: #e74c3c; }
 [data-theme="light"] .counter-error .counter-value { color: #f97316; }
 
 /* Timing stats — Clean Box */

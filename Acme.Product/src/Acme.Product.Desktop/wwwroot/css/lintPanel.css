@@ -142,7 +142,7 @@
 
 .lint-panel__banner--pass {
     background: linear-gradient(135deg, rgba(46, 204, 113, 0.2), rgba(39, 174, 96, 0.1));
-    color: #2ecc71;
+    color: #34c759;
     border-bottom: 1px solid rgba(46, 204, 113, 0.2);
 }
 

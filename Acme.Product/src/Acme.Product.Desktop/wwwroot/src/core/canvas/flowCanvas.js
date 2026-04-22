@@ -463,11 +463,11 @@ class FlowCanvas {
         );
 
         if (node.status === 'running') {
-            borderColor = '#3498db';
+            borderColor = '#5ac8fa';
             borderWidth = 3;
             glowColor = 'rgba(52, 152, 219, 0.6)';
         } else if (node.status === 'success') {
-            borderColor = '#2ecc71';
+            borderColor = '#34c759';
             glowColor = 'rgba(46, 204, 113, 0.5)';
         } else if (node.status === 'error') {
             borderColor = '#e74c3c';
@@ -1086,7 +1086,7 @@ class FlowCanvas {
         
         // 根据连接状态设置样式
         if (connection.status === 'active') {
-            this.ctx.strokeStyle = '#2ecc71';
+            this.ctx.strokeStyle = '#34c759';
             this.ctx.shadowColor = 'rgba(46, 204, 113, 0.5)';
             this.ctx.shadowBlur = 10;
         } else if (connection.status === 'error') {
@@ -1094,7 +1094,7 @@ class FlowCanvas {
             this.ctx.shadowColor = 'rgba(231, 76, 60, 0.5)';
             this.ctx.shadowBlur = 10;
         } else {
-            this.ctx.strokeStyle = '#3498db';
+            this.ctx.strokeStyle = '#5ac8fa';
             this.ctx.shadowColor = 'transparent';
             this.ctx.shadowBlur = 0;
         }
@@ -1967,7 +1967,7 @@ class FlowCanvas {
                 align-items: center;
                 gap: 8px;
                 font-size: 13px;
-                color: ${item.danger ? '#e74c3c' : '#fdfbf7'};
+                color: ${item.danger ? '#e74c3c' : '#eceef2'};
                 transition: all 0.2s;
             `;
             menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;

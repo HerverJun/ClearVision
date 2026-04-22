@@ -809,7 +809,7 @@ class ResultPanel {
             const offset = circumference * (1 - yieldRate);
             fillCircle.style.strokeDasharray = circumference;
             fillCircle.style.strokeDashoffset = offset;
-            fillCircle.style.stroke = yieldRate > 0.9 ? '#2ecc71' : yieldRate > 0.7 ? '#f1c40f' : '#e74c3c';
+            fillCircle.style.stroke = yieldRate > 0.9 ? '#34c759' : yieldRate > 0.7 ? '#f5a623' : '#e74c3c';
             fillCircle.style.transition = 'stroke-dashoffset 0.5s ease';
         }
     }

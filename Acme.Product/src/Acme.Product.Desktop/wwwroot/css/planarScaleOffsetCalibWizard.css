@@ -80,7 +80,7 @@ html[data-theme="dark"] .calib-wizard-header {
 }
 
 .calib-wizard-close:hover {
-    color: var(--primary-color, #dc2626); /* Cinnabar Red */
+    color: var(--primary-color, #e74c3c); /* Cinnabar Red */
 }
 
 /* Stepper */
@@ -125,7 +125,7 @@ html[data-theme="dark"] .calib-step:not(:last-child)::after {
 }
 
 .calib-step.completed:not(:last-child)::after {
-    background: var(--primary-color, #dc2626);
+    background: var(--primary-color, #e74c3c);
 }
 
 .calib-step-circle {
@@ -150,14 +150,14 @@ html[data-theme="dark"] .calib-step-circle {
 }
 
 .calib-step.active .calib-step-circle {
-    border-color: var(--primary-color, #dc2626);
-    color: var(--primary-color, #dc2626);
+    border-color: var(--primary-color, #e74c3c);
+    color: var(--primary-color, #e74c3c);
     box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
 }
 
 .calib-step.completed .calib-step-circle {
-    background: var(--primary-color, #dc2626);
-    border-color: var(--primary-color, #dc2626);
+    background: var(--primary-color, #e74c3c);
+    border-color: var(--primary-color, #e74c3c);
     color: white;
 }
 
@@ -294,7 +294,7 @@ html[data-theme="dark"] .calib-input-row input {
 }
 
 .calib-btn-add {
-    background: var(--primary-color, #dc2626);
+    background: var(--primary-color, #e74c3c);
     color: white;
     border: none;
     padding: 8px;
@@ -306,7 +306,7 @@ html[data-theme="dark"] .calib-input-row input {
 }
 
 .calib-btn-add:hover {
-    background: #b91c1c;
+    background: #c0392b;
 }
 
 .calib-btn-add:disabled {
@@ -377,7 +377,7 @@ html[data-theme="dark"] .calib-table td {
 .calib-solve-btn {
     padding: 12px 32px;
     font-size: 16px;
-    background: var(--primary-color, #dc2626);
+    background: var(--primary-color, #e74c3c);
     color: white;
     border: none;
     border-radius: 8px;
@@ -390,7 +390,7 @@ html[data-theme="dark"] .calib-table td {
 }
 
 .calib-solve-btn:hover {
-    background: #b91c1c;
+    background: #c0392b;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
 }
@@ -563,13 +563,13 @@ html[data-theme="dark"] .calib-btn-prev:hover {
 }
 
 .calib-btn-next {
-    background: var(--primary-color, #dc2626);
-    border: 1px solid var(--primary-color, #dc2626);
+    background: var(--primary-color, #e74c3c);
+    border: 1px solid var(--primary-color, #e74c3c);
     color: white;
 }
 
 .calib-btn-next:hover {
-    background: #b91c1c;
+    background: #c0392b;
 }
 
 .calib-btn-next:disabled {

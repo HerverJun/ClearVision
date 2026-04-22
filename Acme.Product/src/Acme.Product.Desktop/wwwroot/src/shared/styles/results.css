@@ -772,7 +772,7 @@
 [data-theme="light"] .defect-bar-value { color: #0f172a; }
 [data-theme="light"] .kpi-value.total { color: #0f172a; }
 [data-theme="light"] .kpi-value.ok { color: #059669; }
-[data-theme="light"] .kpi-value.ng { color: #dc2626; }
+[data-theme="light"] .kpi-value.ng { color: #e74c3c; }
 [data-theme="light"] .trend-chart-title,
 [data-theme="light"] .yield-chart-title,
 [data-theme="light"] .defect-distribution-title { color: #475569; }
