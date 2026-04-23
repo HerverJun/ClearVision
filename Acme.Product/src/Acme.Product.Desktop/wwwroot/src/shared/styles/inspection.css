@@ -1,5 +1,6 @@
 /* ==========================================================================
-   ClearVision 检测视图专用样式 (Modern Industrial Edition)
+   ClearVision 检测视图专用样式 (Phase 3 - Industrial Dashboard Unified)
+   与结果面板统一风格：浅绿底 + glass-card + 深红主色
    ========================================================================== */
 
 /* ==========================================================================
@@ -11,28 +12,37 @@
     display: flex;
     gap: 20px;
     padding: 20px;
-    background-color: var(--workspace-bg, #f1f5f9);
+    background-color: var(--workspace-bg);
     overflow: hidden;
     position: relative;
-    z-index: 20; /* Ensure it lies above the workspace (z-index: 5) */
+    z-index: 20;
 }
 
 .inspection-view-container.hidden {
     display: none !important;
 }
 
-/* 通用面板样式 - 工业玻璃质感 */
+/* 三栏通用 glass-card 面板 */
 .inspection-control-panel,
-.inspection-side-panel {
-    background-color: var(--bg-color, #ffffff);
-    border: 1px solid var(--border-color, rgba(226, 232, 240, 0.8));
-    box-shadow: 
-        0 4px 6px -1px rgba(0, 0, 0, 0.05),
-        0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    border-radius: 16px;
+.inspection-side-panel,
+.inspection-image-area {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #e1bebc;
+    border-radius: 12px;
+    box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.03);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.inspection-control-panel:hover,
+.inspection-side-panel:hover,
+.inspection-image-area:hover {
+    border-color: #d4a7a4;
+    box-shadow: 4px 8px 20px rgba(0, 0, 0, 0.05);
 }
 
 .inspection-control-panel { width: 260px; flex-shrink: 0; }
@@ -41,14 +51,26 @@
 /* 中间图像区域 */
 .inspection-image-area {
     flex: 1;
-    display: flex;
-    flex-direction: column;
     position: relative;
-    background-color: var(--bg-color, #ffffff);
-    border: 1px solid var(--border-color, rgba(226, 232, 240, 0.8));
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    border-radius: 16px;
-    overflow: hidden;
+}
+
+/* 右侧洞察面板内部 .panel 覆盖 — 保持 glass-card 风格一致 */
+.inspection-side-panel .panel {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+.inspection-side-panel .panel::before {
+    display: none;
+}
+
+.inspection-side-panel .panel:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 /* ==========================================================================
@@ -57,13 +79,14 @@
 
 .inspection-panel {
     flex: 1;
-    overflow-y: overlay;
-    padding: 12px;
+    overflow-y: auto;
+    padding: 16px;
 }
 
 .inspection-section {
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(225, 190, 188, 0.4);
 }
 
 .inspection-section:last-child {
@@ -73,11 +96,12 @@
 }
 
 .section-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-color);
-    letter-spacing: 0.5px;
-    margin-bottom: 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -88,18 +112,18 @@
     display: block;
     width: 4px;
     height: 14px;
-    background: var(--primary-color, #e74c3c);
+    background: #af262c;
     border-radius: 2px;
 }
 
 /* ==========================================================================
-   控制按钮 (Industrial Matte Finish)
+   控制按钮 — 深红主色系统一
    ========================================================================== */
 
 .control-buttons {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
 }
 
 .btn-stop { grid-column: span 2; }
@@ -108,59 +132,76 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    height: 44px;
-    font-size: 13px;
+    gap: 6px;
+    height: 40px;
+    font-size: 12px;
     font-weight: 600;
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
-    color: var(--text-color);
-    background-color: var(--bg-color);
-    border: 1px solid var(--border-color, rgba(226, 232, 240, 0.8));
-    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+    border: none;
+    outline: none;
 }
 
+.btn-inspection .icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* 单次运行 — 白底深红边 */
 .btn-run-single {
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    background: #ffffff;
+    color: #af262c;
+    border: 1px solid #e1bebc;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
-.btn-run-single:hover { 
-    background-color: var(--hover-color);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    transform: translateY(-1px); 
+
+.btn-run-single:hover {
+    background: rgba(175, 38, 44, 0.06);
+    border-color: #af262c;
+    box-shadow: 0 4px 8px rgba(175, 38, 44, 0.1);
+    transform: translateY(-1px);
 }
+
 .btn-run-single:active { transform: translateY(0); }
 
+/* 连续运行 — 深红底白字 */
 .btn-run-continuous {
-    background-color: var(--primary-color, #e74c3c);
-    color: white;
-    border-color: var(--primary-color, #e74c3c);
-}
-.btn-run-continuous:hover { 
-    background-color: #e74c3c; /* hover lighter red */
-    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
-    transform: translateY(-1px); 
-}
-.btn-run-continuous.running {
-    background-color: #c0392b; /* active darker red */
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    background: linear-gradient(135deg, #af262c 0%, #901f24 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(175, 38, 44, 0.2);
 }
 
+.btn-run-continuous:hover {
+    background: linear-gradient(135deg, #c0392b 0%, #af262c 100%);
+    box-shadow: 0 4px 12px rgba(175, 38, 44, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-run-continuous.running {
+    background: linear-gradient(135deg, #901f24 0%, #7a1a1e 100%);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* 停止 — 白底深红边，hover 变深红底 */
 .btn-stop {
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    background: #ffffff;
+    color: #af262c;
+    border: 1px solid #e1bebc;
 }
-.btn-stop:hover:not(:disabled) { 
-    background-color: #fee2e2; 
-    color: #e74c3c;
-    border-color: #fecaca;
-    transform: translateY(-1px); 
+
+.btn-stop:hover:not(:disabled) {
+    background: linear-gradient(135deg, #af262c 0%, #901f24 100%);
+    color: #ffffff;
+    border-color: #af262c;
+    box-shadow: 0 4px 12px rgba(175, 38, 44, 0.25);
+    transform: translateY(-1px);
 }
+
 .btn-stop:disabled {
-    background-color: var(--bg-subtle);
+    background: var(--bg-subtle);
     color: var(--text-muted);
     border-color: var(--border-color);
     cursor: not-allowed;
@@ -168,83 +209,79 @@
 }
 
 /* ==========================================================================
-   状态仪表盘 (High Precision Look)
+   运行保护说明 — 现代 Alert 样式
    ========================================================================== */
 
-.status-indicator {
-    background-color: var(--bg-color);
-    border: 1px solid var(--border-color, rgba(226, 232, 240, 0.8));
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-}
-
-.status-led {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: var(--bg-subtle);
-    border: 2px solid var(--bg-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1), inset 0 2px 4px rgba(0,0,0,0.05);
+.inspection-protection-notice {
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #fed7aa;
+    background: rgba(255, 247, 237, 0.85);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
     position: relative;
-    transition: all 0.3s ease;
+    overflow: hidden;
 }
 
-.status-led.status-idle { background: #cbd5e1; box-shadow: 0 0 0 1px #94a3b8; }
-.status-led.status-running { 
-    background: #eab308; 
-    box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), 0 0 0 1px #eab308;
-    animation: pulse-ring 2s infinite;
-}
-.status-led.status-ok { 
-    background: #10b981; 
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4), 0 0 0 1px #10b981;
-}
-.status-led.status-ng { 
-    background: #e11d48; 
-    box-shadow: 0 0 15px rgba(225, 29, 72, 0.4), 0 0 0 1px #e11d48;
-    animation: flash-red 0.5s infinite alternate;
+.inspection-protection-notice::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #f59e0b;
+    border-radius: 2px 0 0 2px;
 }
 
-.status-text {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--text-color);
+.inspection-protection-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #9a3412;
+    margin-bottom: 6px;
 }
+
+.inspection-protection-summary {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #7c2d12;
+}
+
+.inspection-protection-status {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.inspection-protection-status[data-tone="warning"] { color: #b45309; }
+.inspection-protection-status[data-tone="error"] { color: #c0392b; }
 
 /* ==========================================================================
-   实时计数器 (Data Visualization)
+   实时计数器 — KPI 风格大数值卡片
    ========================================================================== */
 
 .counters-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 8px;
 }
 
 .counter-item {
-    background-color: var(--bg-color);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 8px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    padding: 10px 8px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(225, 190, 188, 0.5);
+    border-radius: 10px;
+    padding: 10px 4px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    transition: transform 0.2s ease;
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .counter-item:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     transform: translateY(-2px);
+    border-color: #e1bebc;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
 }
 
 .counter-value {
@@ -252,67 +289,270 @@
     font-variant-numeric: tabular-nums;
     font-size: 24px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
 }
 
 .counter-label {
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     margin-top: 4px;
     font-weight: 600;
+    letter-spacing: 0.05em;
 }
 
-.counter-ok .counter-value { color: #10b981; }
-.counter-ng .counter-value { color: #e11d48; }
+.counter-ok .counter-value { color: #00685b; }
+.counter-ng .counter-value { color: #ba1a1a; }
 .counter-error .counter-value { color: #f97316; }
-.counter-yield .counter-value { color: #f59e0b; }
+.counter-yield .counter-value { color: #af262c; }
 .counter-total .counter-value { color: var(--text-color); }
 
 /* ==========================================================================
-   耗时统计 & 进度条
+   耗时统计 — 紧凑 glass-card
    ========================================================================== */
 
 .timing-stats {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    background-color: var(--bg-color);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(225, 190, 188, 0.5);
+    border-radius: 10px;
     padding: 12px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    font-size: 12px;
+    transition: all 180ms;
 }
 
 .timing-stats:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    transform: translateY(-2px);
+    border-color: #e1bebc;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .timing-item {
     display: flex;
     justify-content: space-between;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     padding: 4px 0;
-    border-bottom: 1px dashed rgba(226, 232, 240, 0.8);
+    border-bottom: 1px dashed rgba(225, 190, 188, 0.5);
 }
+
 .timing-item:last-child { border-bottom: none; }
 
 .timing-value { color: var(--text-color); font-weight: 600; }
 
+/* ==========================================================================
+   状态仪表盘
+   ========================================================================== */
+
+.status-indicator {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(225, 190, 188, 0.5);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.status-led {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--bg-subtle);
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.status-led.status-idle { background: #cbd5e1; box-shadow: 0 0 0 1px #94a3b8; }
+.status-led.status-running {
+    background: #eab308;
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.4), 0 0 0 1px #eab308;
+    animation: pulse-ring 2s infinite;
+}
+.status-led.status-ok {
+    background: #10b981;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4), 0 0 0 1px #10b981;
+}
+.status-led.status-ng {
+    background: #e74c3c;
+    box-shadow: 0 0 12px rgba(231, 76, 60, 0.4), 0 0 0 1px #e74c3c;
+    animation: flash-red 0.5s infinite alternate;
+}
+
+.status-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-color);
+}
+
+/* ==========================================================================
+   相机选择器
+   ========================================================================== */
+
+.camera-selector { display: flex; gap: 8px; }
+
+.camera-dropdown {
+    flex: 1;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: #ffffff;
+    border: 1px solid #e1bebc;
+    border-radius: 6px;
+    color: var(--text-color);
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: all 180ms;
+}
+
+.camera-dropdown:hover {
+    border-color: #af262c;
+    background-color: rgba(175, 38, 44, 0.04);
+}
+
+.camera-dropdown:focus {
+    outline: none;
+    border-color: #af262c;
+    box-shadow: 0 0 0 3px rgba(175, 38, 44, 0.12);
+}
+
+.btn-refresh-cameras {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff;
+    border: 1px solid #e1bebc;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 180ms;
+}
+
+.btn-refresh-cameras:hover {
+    background-color: rgba(175, 38, 44, 0.06);
+    color: #af262c;
+    border-color: #af262c;
+}
+
+/* ==========================================================================
+   最近结果 — 卡片网格化
+   ========================================================================== */
+
+.inspection-recent-results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.inspection-recent-results-grid::-webkit-scrollbar { width: 4px; }
+.inspection-recent-results-grid::-webkit-scrollbar-thumb { background: #e1bebc; border-radius: 2px; }
+
+.recent-result-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(225, 190, 188, 0.4);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 顶部状态色条 */
+.recent-result-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.recent-result-item.result-ok::before { background: #00685b; }
+.recent-result-item.result-ng::before { background: #ba1a1a; }
+.recent-result-item.result-error::before { background: #f97316; }
+
+.recent-result-item:hover {
+    border-color: #af262c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(175, 38, 44, 0.1);
+}
+
+.result-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    background: rgba(225, 190, 188, 0.2);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(225, 190, 188, 0.3);
+}
+
+.result-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.result-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    display: inline-block;
+    text-align: center;
+    align-self: flex-start;
+}
+
+.result-ok .result-badge { background: rgba(0, 104, 91, 0.1); color: #00685b; border: 1px solid rgba(0, 104, 91, 0.15); }
+.result-ng .result-badge { background: rgba(186, 26, 26, 0.1); color: #ba1a1a; border: 1px solid rgba(186, 26, 26, 0.15); }
+.result-error .result-badge { background: rgba(249, 115, 22, 0.1); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.15); }
+
+.result-time {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.result-text-preview {
+    font-size: 10px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* ==========================================================================
+   进度条
+   ========================================================================== */
+
 .progress-container {
-    background: var(--workspace-bg, #f1f5f9);
+    background: rgba(225, 190, 188, 0.2);
     border-radius: 6px;
     padding: 4px;
-    border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .progress-bar {
     height: 8px;
-    background: var(--bg-color, #ffffff);
+    background: #ffffff;
     border-radius: 4px;
     overflow: hidden;
     position: relative;
@@ -321,14 +561,13 @@
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #e74c3c, #e74c3c); /* 红色基调进度条 */
+    background: linear-gradient(90deg, #af262c, #c0392b);
     width: 0%;
     transition: width 0.1s linear;
     position: relative;
     overflow: hidden;
 }
 
-/* 进度条斜纹动画 */
 .progress-fill::after {
     content: '';
     position: absolute;
@@ -343,168 +582,19 @@
     justify-content: space-between;
     margin-top: 8px;
     font-size: 11px;
-    color: var(--text-secondary);
+    color: var(--text-muted);
 }
 
 /* ==========================================================================
-   相机选择器 (Custom Dropdown)
+   空状态
    ========================================================================== */
 
-.camera-selector {
-    display: flex;
-    gap: 8px;
-}
-
-.camera-dropdown {
-    flex: 1;
-    appearance: none;
-    -webkit-appearance: none;
-    background-color: var(--bg-color, #ffffff);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 6px;
-    color: var(--text-color);
-    padding: 8px 12px;
-    font-size: 13px;
-    cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    transition: all 0.2s ease;
-}
-
-.camera-dropdown:hover {
-    border-color: var(--primary-color, #e74c3c);
-    background-color: var(--hover-color, #f8fafc);
-}
-
-.camera-dropdown:focus {
-    outline: none;
-    border-color: var(--primary-color, #e74c3c);
-    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
-}
-
-.btn-refresh-cameras {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--bg-color, #ffffff);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-refresh-cameras:hover {
-    background-color: var(--hover-color, #f8fafc);
-    color: var(--primary-color, #e74c3c);
-    border-color: rgba(226, 232, 240, 1);
-}
-
-/* ==========================================================================
-   最近结果 (Visual Grid)
-   ========================================================================== */
-
-.inspection-recent-results-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 300px;
-    overflow-y: auto;
-    padding-right: 4px;
-}
-
-.inspection-recent-results-grid::-webkit-scrollbar { width: 4px; }
-.inspection-recent-results-grid::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-
-.recent-result-item {
-    display: grid;
-    grid-template-columns: 48px 1fr auto;
-    align-items: center;
-    gap: 12px;
-    padding: 8px;
-    background-color: var(--bg-color, #ffffff);
-    border: 1px solid rgba(226, 232, 240, 0.4);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-}
-
-.recent-result-item:hover {
-    background-color: var(--hover-color, #f8fafc);
-    border-color: var(--primary-color, #e74c3c);
-    transform: translateX(2px);
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-}
-
-.result-thumb {
-    width: 48px;
-    height: 48px;
-    background-color: var(--workspace-bg, #f1f5f9);
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid rgba(226, 232, 240, 0.8);
-}
-
-.result-thumb img { width: 100%; height: 100%; object-fit: cover; }
-
-.result-badge {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    display: inline-block;
+.empty-text {
+    color: var(--text-muted);
+    font-size: 12px;
     text-align: center;
-}
-.result-ok .result-badge { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
-.result-ng .result-badge { background: rgba(239, 68, 68, 0.15); color: #e74c3c; border: 1px solid rgba(239, 68, 68, 0.2); }
-.result-error .result-badge { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.2); }
-
-.result-time {
-    font-size: 11px;
-    color: #64748b;
-    font-family: 'JetBrains Mono', monospace;
-}
-
-.inspection-protection-notice {
-    margin-top: 14px;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(245, 158, 11, 0.26);
-    background: rgba(66, 46, 18, 0.72);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.inspection-protection-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #fcd34d;
-    margin-bottom: 6px;
-}
-
-.inspection-protection-summary {
-    font-size: 12px;
-    line-height: 1.5;
-    color: #fde68a;
-}
-
-.inspection-protection-status {
-    margin-top: 8px;
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text-secondary);
-}
-
-.inspection-protection-status[data-tone="warning"] {
-    color: #fbbf24;
-}
-
-.inspection-protection-status[data-tone="error"] {
-    color: #f87171;
+    padding: 20px;
+    font-style: italic;
 }
 
 /* ==========================================================================
@@ -528,7 +618,7 @@
 }
 
 /* ==========================================================================
-   响应式 & 亮色模式支持
+   响应式
    ========================================================================== */
 
 @media (max-width: 1280px) {
@@ -544,300 +634,120 @@
 }
 
 /* ==========================================================================
-   ☀️ Light Theme — Elegant & Bright (Modern Clean)
+   ☀️ Light Theme 适配
    ========================================================================== */
 
 [data-theme="light"] .inspection-view-container {
-    background: #f1f5f9; /* Clean slate background matching main workspace */
+    background: var(--workspace-bg);
+}
+
+[data-theme="light"] .inspection-control-panel,
+[data-theme="light"] .inspection-side-panel,
+[data-theme="light"] .inspection-image-area {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: #e1bebc;
 }
 
 [data-theme="light"] .inspection-protection-notice {
-    background: #fff7ed;
+    background: rgba(255, 247, 237, 0.9);
     border-color: #fed7aa;
-    box-shadow: none;
 }
 
-[data-theme="light"] .inspection-protection-title {
-    color: #9a3412;
-}
-
-[data-theme="light"] .inspection-protection-summary {
-    color: #7c2d12;
-}
-
-[data-theme="light"] .inspection-protection-status[data-tone="warning"] {
-    color: #b45309;
-}
-
-[data-theme="light"] .inspection-protection-status[data-tone="error"] {
-    color: #c0392b;
-}
-
-/* Panels — Clean Card Style */
-[data-theme="light"] .inspection-control-panel,
-[data-theme="light"] .inspection-side-panel {
-    background: #ffffff;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: 1px solid #e2e8f0; 
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    border-radius: 12px;
-}
-
-/* Section titles — Minimalist */
-[data-theme="light"] .section-title {
-    color: #475569;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    font-size: 13px;
-}
-
-[data-theme="light"] .section-title::before {
-    background: var(--cinnabar); /* Brand color */
-    width: 4px;
-    height: 14px;
-    border-radius: 2px;
-    box-shadow: none;
-}
-
-/* Inspection section dividers */
-[data-theme="light"] .inspection-section {
-    border-bottom-color: #e2e8f0;
-}
-
-/* Status indicator — Soft Pill Style */
-[data-theme="light"] .status-indicator {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    box-shadow: none;
-    border-radius: 8px;
-}
-
-[data-theme="light"] .status-text {
-    color: #334155;
-    font-weight: 600;
-}
-
-[data-theme="light"] .status-led {
-    border: none;
-    box-shadow: none;
-}
-
-[data-theme="light"] .status-led.status-idle {
-    background: #cbd5e1;
-}
-
-[data-theme="light"] .status-led.status-running {
-    background: #eab308;
-    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.2);
-}
-
-[data-theme="light"] .status-led.status-ok {
-    background: #10b981;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-}
-
-[data-theme="light"] .status-led.status-ng {
-    background: #e74c3c;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
-}
-
-/* Buttons — Solid & Clean */
-[data-theme="light"] .btn-inspection {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-[data-theme="light"] .btn-inspection::after {
-    display: none; /* Remove gloss */
-}
-
-[data-theme="light"] .btn-run-single {
-    background: #10b981;
-    color: white;
-}
-[data-theme="light"] .btn-run-single:hover {
-    background: #059669;
-}
-
-[data-theme="light"] .btn-run-continuous {
-    background: #3b82f6;
-    color: white;
-}
-[data-theme="light"] .btn-run-continuous:hover {
-    background: #2563eb;
-}
-
-[data-theme="light"] .btn-stop {
-    background: #e74c3c;
-    color: white;
-}
-[data-theme="light"] .btn-stop:hover {
-    background: #e74c3c;
-}
-
-[data-theme="light"] .btn-stop:disabled {
-    background: #f1f5f9;
-    color: #cbd5e1;
-    box-shadow: none;
-}
-
-/* Progress bar — Vivid */
-[data-theme="light"] .progress-container {
-    background: #f1f5f9;
-    border: none;
-}
-
-[data-theme="light"] .progress-bar {
-    background: #e2e8f0;
-}
-
-[data-theme="light"] .progress-fill {
-    background: linear-gradient(90deg, #3b82f6, #06b6d4); /* Blue to Cyan */
-}
-
-[data-theme="light"] .progress-info {
-    color: #64748b;
-}
-
-/* Counter cards — Floating White Cards */
 [data-theme="light"] .counter-item {
     background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    border-color: rgba(225, 190, 188, 0.5);
 }
 
-[data-theme="light"] .counter-item:hover {
-    border-color: #cbd5e1;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.04);
-}
-
-[data-theme="light"] .counter-label { color: #64748b; font-weight: 500; }
-[data-theme="light"] .counter-total .counter-value { color: #334155; }
-[data-theme="light"] .counter-ok .counter-value { color: #10b981; }
-[data-theme="light"] .counter-ng .counter-value { color: #e74c3c; }
-[data-theme="light"] .counter-error .counter-value { color: #f97316; }
-
-/* Timing stats — Clean Box */
 [data-theme="light"] .timing-stats {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-color: rgba(225, 190, 188, 0.5);
 }
 
-[data-theme="light"] .timing-item {
-    color: #64748b;
-    border-bottom-color: #e2e8f0;
+[data-theme="light"] .recent-result-item {
+    background: #ffffff;
+    border-color: rgba(225, 190, 188, 0.4);
 }
 
-[data-theme="light"] .timing-value { color: #334155; font-weight: 600; }
-
-/* Camera dropdown — White Input */
 [data-theme="light"] .camera-dropdown {
     background-color: #ffffff;
-    color: #334155;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-}
-
-[data-theme="light"] .camera-dropdown:hover {
-    border-color: #3b82f6;
+    color: var(--text-color);
+    border-color: #e1bebc;
 }
 
 [data-theme="light"] .btn-refresh-cameras {
-    color: #64748b;
-    border: 1px solid #e2e8f0;
-    background: #ffffff;
+    background-color: #ffffff;
+    border-color: #e1bebc;
 }
 
-[data-theme="light"] .btn-refresh-cameras:hover {
-    border-color: #3b82f6;
-    color: #3b82f6;
-    background: #eff6ff;
+/* ==========================================================================
+   🌙 Dark Theme 适配
+   ========================================================================== */
+
+[data-theme="dark"] .inspection-control-panel,
+[data-theme="dark"] .inspection-side-panel,
+[data-theme="dark"] .inspection-image-area {
+    background: rgba(30, 22, 22, 0.7);
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
 }
 
-/* Recent results — Clean List */
-[data-theme="light"] .recent-result-item {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+[data-theme="dark"] .counter-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
-[data-theme="light"] .recent-result-item:hover {
-    border-color: #3b82f6;
-    transform: translateX(4px);
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+[data-theme="dark"] .timing-stats {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
-[data-theme="light"] .result-time {
-    color: #94a3b8;
+[data-theme="dark"] .recent-result-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
 }
 
-[data-theme="light"] .result-thumb {
-    background: #f8fafc;
-    border-color: #e2e8f0;
+[data-theme="dark"] .recent-result-item:hover {
+    border-color: rgba(231, 76, 60, 0.4);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.1);
 }
 
-/* Image area — Clean Container */
-[data-theme="light"] .inspection-image-area {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important;
-    border-radius: 12px;
+[data-theme="dark"] .btn-run-single {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f87171;
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Right Panel — Result Summary */
-[data-theme="light"] .inspection-recent-results-grid {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+[data-theme="dark"] .btn-run-continuous {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
 }
 
-[data-theme="light"] .result-detail-item {
-    border-bottom-color: #f1f5f9;
+[data-theme="dark"] .btn-stop {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f87171;
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="light"] .detail-label {
-    color: #64748b;
+[data-theme="dark"] .btn-stop:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: #ffffff;
 }
 
-[data-theme="light"] .detail-value {
-    color: #334155;
-    font-weight: 600;
+[data-theme="dark"] .camera-dropdown {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
 }
 
-[data-theme="light"] .defects-list {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+[data-theme="dark"] .btn-refresh-cameras {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
 }
 
-[data-theme="light"] .defects-list h4 {
-    color: #475569;
-    border-bottom: 1px solid #f1f5f9;
-    background: #f8fafc;
+[data-theme="dark"] .inspection-protection-notice {
+    background: rgba(66, 46, 18, 0.6);
+    border-color: rgba(245, 158, 11, 0.3);
 }
 
-[data-theme="light"] .defects-list li {
-    color: #334155;
-    border-bottom-color: #f1f5f9;
-}
-
-[data-theme="light"] .defect-type { color: #1e293b; font-weight: 500; }
-
-[data-theme="light"] .empty-text {
-    color: #94a3b8;
-}
-
-/* Right Panel Title Fix for Light Mode */
-[data-theme="light"] .inspection-side-panel .panel-title {
-    border-bottom-color: #f1f5f9 !important;
-    color: #64748b !important;
-}
-
-[data-theme="light"] .inspection-side-panel .panel-title::before {
-    background: #3b82f6;
-    box-shadow: none;
-}
-
+[data-theme="dark"] .inspection-protection-title { color: #fcd34d; }
+[data-theme="dark"] .inspection-protection-summary { color: #fde68a; }

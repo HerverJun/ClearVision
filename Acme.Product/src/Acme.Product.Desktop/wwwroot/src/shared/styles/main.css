@@ -318,7 +318,7 @@ body.property-sidebar-resizing .sidebar-resizer::before {
     width: 100%;
     height: 100%;
     cursor: grab;
-    background: #f8f9fa;
+    background: var(--workspace-bg);
 }
 
 #flow-canvas:active {
