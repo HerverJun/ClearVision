@@ -64,24 +64,26 @@ public class RegionComplementOperator : OperatorBase
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var compRuns = new List<RunLength>();
-        var sortedRuns = region.RunLengths.OrderBy(r => r.Y).ThenBy(r => r.StartX).ToList();
-        int runIndex = 0;
+        var runsByRow = region.RunLengths
+            .Where(run => run.Y >= 0 && run.Y < height)
+            .Select(run => ClipRunToBounds(run, width))
+            .Where(run => run.HasValue)
+            .Select(run => run!.Value)
+            .GroupBy(run => run.Y)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(run => run.StartX)
+                    .ToList());
+        var clippedInputArea = runsByRow.Values
+            .SelectMany(rowRuns => rowRuns)
+            .Sum(run => run.Length);
 
         for (int y = 0; y < height; y++)
         {
-            var runsInRow = new List<RunLength>();
-            while (runIndex < sortedRuns.Count && sortedRuns[runIndex].Y == y)
-            {
-                var clippedRun = ClipRunToBounds(sortedRuns[runIndex], width);
-                if (clippedRun.HasValue)
-                {
-                    runsInRow.Add(clippedRun.Value);
-                }
+            runsByRow.TryGetValue(y, out var runsInRow);
 
-                runIndex++;
-            }
-
-            if (runsInRow.Count == 0)
+            if (runsInRow is not { Count: > 0 })
             {
                 // 整行都是背景
                 if (width > 0)
@@ -118,8 +120,9 @@ public class RegionComplementOperator : OperatorBase
             { "Region", complement },
             { "Area", complement.Area },
             { "InputArea", region.Area },
+            { "ClippedInputArea", clippedInputArea },
             { "TotalArea", width * height },
-            { "FillRatio", (double)region.Area / (width * height) },
+            { "FillRatio", (double)clippedInputArea / (width * height) },
             { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
         })));
     }

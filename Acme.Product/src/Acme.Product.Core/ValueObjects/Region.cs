@@ -248,6 +248,11 @@ public class Region : ValueObject
     /// </summary>
     public List<OpenCvSharp.Point> GetContourPoints()
     {
+        if (IsEmpty)
+        {
+            return new List<OpenCvSharp.Point>();
+        }
+
         // 使用 Mat 提取轮廓（简化实现）
         using var mat = ToMat();
         using var fullMat = new OpenCvSharp.Mat(BoundingBox.Height + 2, BoundingBox.Width + 2, 

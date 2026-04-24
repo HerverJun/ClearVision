@@ -115,3 +115,6 @@ test_zxing.cs
 /.tmp/userprofile/
 401.py
 .codex-tools/
+
+# Generated quality flywheel cases; regenerate from quality/synthetic/generators/
+/quality/synthetic/cases/

@@ -176,6 +176,62 @@ public class Phase42RegionProcessingOperatorTests
     }
 
     [Fact]
+    public async Task RegionBooleanOperators_WithEmptyInputs_ShouldReturnStableEmptyOutputs()
+    {
+        var empty = new Region();
+        var unionSut = new RegionUnionOperator(Substitute.For<ILogger<RegionUnionOperator>>());
+        var intersectionSut = new RegionIntersectionOperator(Substitute.For<ILogger<RegionIntersectionOperator>>());
+        var diffSut = new RegionDifferenceOperator(Substitute.For<ILogger<RegionDifferenceOperator>>());
+
+        var unionResult = await unionSut.ExecuteAsync(new Operator("RegionUnion", OperatorType.RegionUnion, 0, 0), new Dictionary<string, object>
+        {
+            ["Region1"] = empty,
+            ["Region2"] = empty
+        });
+        var intersectionResult = await intersectionSut.ExecuteAsync(new Operator("RegionIntersection", OperatorType.RegionIntersection, 0, 0), new Dictionary<string, object>
+        {
+            ["Region1"] = empty,
+            ["Region2"] = empty
+        });
+        var differenceResult = await diffSut.ExecuteAsync(new Operator("RegionDifference", OperatorType.RegionDifference, 0, 0), new Dictionary<string, object>
+        {
+            ["Region1"] = empty,
+            ["Region2"] = empty
+        });
+
+        unionResult.IsSuccess.Should().BeTrue();
+        intersectionResult.IsSuccess.Should().BeTrue();
+        differenceResult.IsSuccess.Should().BeTrue();
+
+        ((Region)unionResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        ((Region)intersectionResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        ((Region)differenceResult.OutputData!["Region"]).IsEmpty.Should().BeTrue();
+        unionResult.OutputData!["Area"].Should().Be(0);
+        intersectionResult.OutputData!["Area"].Should().Be(0);
+        differenceResult.OutputData!["Area"].Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RegionUnion_WithDuplicateInputs_ShouldBeIdempotent()
+    {
+        var sut = new RegionUnionOperator(Substitute.For<ILogger<RegionUnionOperator>>());
+        var region = CreateRegionWithHole();
+
+        var result = await sut.ExecuteAsync(
+            new Operator("RegionUnion", OperatorType.RegionUnion, 0, 0),
+            new Dictionary<string, object>
+            {
+                ["Region1"] = region,
+                ["Region2"] = region
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        var union = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        union.Area.Should().Be(region.Area);
+        union.RunLengths.Should().Equal(region.RunLengths);
+    }
+
+    [Fact]
     public async Task RegionComplement_WithEmptyRegion_ShouldReturnWholeImage()
     {
         var sut = new RegionComplementOperator(Substitute.For<ILogger<RegionComplementOperator>>());
@@ -242,6 +298,47 @@ public class Phase42RegionProcessingOperatorTests
         complement.RunLengths.Should().OnlyContain(run => run.StartX >= 0 && run.EndX < 10 && run.Y >= 0 && run.Y < 4);
         complement.ContainsPoint(9, 1).Should().BeFalse();
         complement.ContainsPoint(5, 3).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RegionComplement_ShouldIgnoreRowsOutsideExplicitImageBounds()
+    {
+        var sut = new RegionComplementOperator(Substitute.For<ILogger<RegionComplementOperator>>());
+        var region = new Region(new[]
+        {
+            new RunLength(-1, 0, 5),
+            new RunLength(1, 2, 3),
+            new RunLength(4, 0, 5)
+        });
+
+        var result = await sut.ExecuteAsync(
+            new Operator("RegionComplement", OperatorType.RegionComplement, 0, 0),
+            new Dictionary<string, object>
+            {
+                ["Region"] = region,
+                ["ImageWidth"] = 6,
+                ["ImageHeight"] = 3
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        var complement = result.OutputData!["Region"].Should().BeOfType<Region>().Subject;
+        complement.Area.Should().Be(16);
+        complement.ContainsPoint(2, 1).Should().BeFalse();
+        complement.ContainsPoint(4, 1).Should().BeTrue();
+        complement.ContainsPoint(0, 0).Should().BeTrue();
+        complement.RunLengths.Should().OnlyContain(run => run.Y >= 0 && run.Y < 3);
+        result.OutputData!["ClippedInputArea"].Should().Be(2);
+        ((double)result.OutputData!["FillRatio"]).Should().BeApproximately(2.0 / 18.0, 1e-9);
+    }
+
+    [Fact]
+    public void RegionGetContourPoints_WithEmptyRegion_ShouldReturnEmptyCollection()
+    {
+        var empty = new Region();
+
+        var points = empty.GetContourPoints();
+
+        points.Should().BeEmpty();
     }
 
     [Fact]
