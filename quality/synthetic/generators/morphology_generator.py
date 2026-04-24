@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 from collections import deque
 from pathlib import Path
@@ -172,9 +173,8 @@ def kernel_offsets(shape: str, width: int, height: int) -> list[Point]:
             if shape == "Cross":
                 include = kx == anchor_x or ky == anchor_y
             elif shape == "Ellipse":
-                rx = max(1.0, width / 2.0)
-                ry = max(1.0, height / 2.0)
-                include = ((kx - anchor_x) / rx) ** 2 + ((ky - anchor_y) / ry) ** 2 <= 1.0
+                row_start, row_end = opencv_ellipse_row_bounds(ky, width, height)
+                include = row_start <= kx < row_end
             else:
                 include = True
 
@@ -182,6 +182,26 @@ def kernel_offsets(shape: str, width: int, height: int) -> list[Point]:
                 offsets.append((kx - anchor_x, ky - anchor_y))
 
     return offsets or [(0, 0)]
+
+
+def opencv_ellipse_row_bounds(row: int, width: int, height: int) -> tuple[int, int]:
+    """Match OpenCV's MORPH_ELLIPSE rasterization for odd/even kernels."""
+    radius_y = height // 2
+    center_x = width // 2
+    if radius_y == 0:
+        return 0, width
+
+    dy = row - radius_y
+    if abs(dy) > radius_y:
+        return width, width
+
+    radius_x = center_x
+    dx = cv_round(radius_x * math.sqrt(max(0.0, (radius_y * radius_y - dy * dy) / (radius_y * radius_y))))
+    return max(center_x - dx, 0), min(center_x + dx + 1, width)
+
+
+def cv_round(value: float) -> int:
+    return int(math.floor(value + 0.5))
 
 
 def erode(points: set[Point], offsets: list[Point]) -> set[Point]:

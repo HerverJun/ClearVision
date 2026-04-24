@@ -185,6 +185,10 @@ RegionUnion 等名片中的 TODO 字段全部补齐
 [x] 新增 RegionUnion baseline、RegionMorphology C 级恢复报告、failure triage
 [x] 回填 9 张 Region/Morphology P0 名片的实现策略、API 调用链、性能特征、适用场景、已知限制
 [x] 清理 generated golden case 文件爆炸：quality/synthetic/cases/ 已加入 .gitignore，只保留生成器和报告
+[x] 新增 .NET golden runner：quality/tools/RegionMorphologyGoldenRunner
+[x] 产出 RegionMorphology_baseline.json / RegionMorphology_before_after_report.md
+[x] runner 采集 RuntimeMs / MemoryAllocationBytes
+[x] 修正 morphology generator 的 Ellipse kernel 离散化，与 OpenCV MORPH_ELLIPSE 对齐
 ```
 
 #### 验证结果
@@ -206,6 +210,17 @@ expected.json count   900
 metrics smoke:
 RegionUnion sample     Passed=true
 RegionSkeleton sample  Passed=true
+
+.NET golden runner:
+cases   900
+passed  900
+failed  0
+
+baseline:
+quality/evals/reports/RegionMorphology_baseline.json
+
+runner report:
+quality/evals/reports/RegionMorphology_before_after_report.md
 ```
 
 #### 当前边界
@@ -213,36 +228,44 @@ RegionSkeleton sample  Passed=true
 ```text
 已闭环：
 - P0 Region/Morphology 的代码级空输入和显式边界崩溃风险
-- 9 张名片中的 TODO 骨架
 - 可复现 synthetic golden case 生成入口
 - Area / component / bbox / mask IoU 的离线指标脚本
+- generated JSON golden cases 已接入真实 .NET 自动执行 runner
+- RuntimeMs / MemoryAllocationBytes 已进入 runner baseline
+- operator_quality_matrix.md 已生成，9 个 Region/Morphology 算子均有真实 runner golden evidence
 
 未闭环：
-- generated JSON golden cases 尚未接入 .NET 自动执行 runner
-- RuntimeMs / MemoryAllocation 尚未由 runner 统一采集
 - QScore / Level 尚未重新计算并回写 catalog
-- 13 个 C 级算子中的非 Region/Morphology 项尚未处理
+- operator_quality_matrix 显示 Region/Morphology 当前生成名片仍有 CardTodoCount=5/张，需要回填到名片/source 后再清零
+- 13 个 C 级算子中仍有 4 个未接入 golden evidence：Comment / ContourExtrema / PhaseClosure / ArcCaliper
+- runtime / memory 还缺重复运行趋势，不足以作为长期性能基线
 ```
 
 #### 下一步行动
 
 ```text
 P0-Next-1:
-建立 quality/tools/run_region_morphology_golden.py 或 .NET 等价 runner，
-把 generated input.json / expected.json 真正跑过算子实现，输出 baseline.json。
+已完成。当前使用 .NET runner：
+quality/tools/RegionMorphologyGoldenRunner
 
 P0-Next-2:
-为 runner 增加 RuntimeMs / MemoryAllocation 采集，
-把 morphology_metrics.py 的离线指标与真实执行结果合并。
+已完成。baseline 已包含 RuntimeMs / MemoryAllocationBytes。
 
 P0-Next-3:
-生成 operator_quality_matrix.md，
-自动抽取 CardTodoCount / HasGoldenTest / Priority / NextAction，
-把 Region/Morphology P0 状态从“文档完成”推进到“矩阵可追踪”。
+已完成。当前使用：
+quality/tools/generate_operator_quality_matrix.py
+quality/evals/reports/operator_quality_matrix.md
+
+矩阵快照：
+- Total operators 155
+- Level counts A=115, B=27, C=13
+- Golden test status Yes=9, No=146
+- C-level without golden evidence=4
 
 P0-Next-4:
-定位剩余 C 级算子，优先处理 ArcCaliper 与 Frequency 低分项，
-避免第一阶段只完成 Region/Morphology 局部闭环。
+优先处理矩阵暴露出的两个缺口：
+1. Region/Morphology：把 CardTodoCount=5/张回填到名片/source，再复核 QScore/Level 是否可升 B+。
+2. 剩余 C 级：ArcCaliper 进入下一批 golden tests；ContourExtrema / PhaseClosure 建 baseline；Comment 走参数和异常契约测试。
 ```
 
 ---
@@ -1065,6 +1088,7 @@ P3:
 
 ```text
 quality/tools/generate_operator_quality_matrix.py
+quality/evals/reports/operator_quality_matrix.md
 ```
 
 ### 7.4 输出示例
@@ -1072,11 +1096,12 @@ quality/tools/generate_operator_quality_matrix.py
 ```text
 | Operator | Q | Level | Card TODO | Known Limitations | Golden Test | Priority | Next Action |
 |---|---:|---|---:|---:|---|---|---|
-| RegionUnion | 61 | C | 5 | 1 | No | P0 | 补区域布尔 golden tests + 补名片 |
+| RegionUnion | 61 | C | 5 | 1 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
+| ArcCaliper | 64 | C | 5 | 1 | No | P0 | Add arc ROI boundary, polarity, and sub-pixel golden tests |
 | GradientShapeMatch | 83 | B | 0 | 5 | No | P1 | 修缓存/Position/多候选测试 |
-| TemplateMatching | 96 | A | 0 | 3 | Partial | P2 | 补 ScoreContract + HPatches |
+| TemplateMatching | 96 | A | 0 | 3 | No | P2 | 补 ScoreContract + HPatches |
 | AnomalyDetection | 100 | A/Experimental | 0 | 3 | No | P2 | MVTec AD baseline |
-| DeepLearning | 100 | A | 0 | 4 | Partial | P2 | YOLO 输出契约 + NMS 参数化 |
+| DeepLearning | 100 | A | 0 | 5 | No | P2 | YOLO 输出契约 + NMS 参数化 |
 ```
 
 ---
@@ -1106,17 +1131,20 @@ TODO：
 [x] 建立 region_generator.py
 [x] 建立 morphology_metrics.py
 [x] 建立 C 级恢复报告
-[x] 修补 RegionUnion 等名片 TODO
-[ ] 所有 C 级 Region/Morphology 算子至少有 20 个边界测试
+[ ] 回填 RegionUnion 等 Region/Morphology 名片/source TODO（矩阵仍显示 CardTodoCount=5/张）
+[x] 把 synthetic case 接入真实算子执行 runner
+[x] 由 runner 产出 baseline.json / before_after_report.md
+[x] 补 RuntimeMs / MemoryAllocation 采集
+[x] 所有 C 级 Region/Morphology 算子至少有 20 个边界测试（当前 9 个算子各 100 个 runner case）
 ```
 
 第 1 周剩余动作：
 
 ```text
-[ ] 把 synthetic case 接入真实算子执行 runner
-[ ] 由 runner 产出 baseline.json / before_after_report.md
-[ ] 补 RuntimeMs / MemoryAllocation 采集
-[ ] 按 runner 结果决定是否把 Region/Morphology 标记为 B+
+[x] 生成 operator_quality_matrix.md
+[x] 定位剩余 C 级算子：Comment / ContourExtrema / PhaseClosure / ArcCaliper
+[ ] 回填 Region/Morphology 名片/source TODO 后，按 runner 结果决定是否标记为 B+
+[ ] 启动下一批 golden tests：优先 ArcCaliper，其次 ContourExtrema / PhaseClosure；Comment 走契约测试
 ```
 
 验收：
@@ -1349,9 +1377,9 @@ Calibration → synthetic geometry
 ### 30 天目标
 
 ```text
-[ ] operator_quality_matrix 自动生成
-[ ] 13 个 C 级算子完成 golden tests（Region/Morphology 生成器已完成，runner 待接入）
-[x] Region/Morphology 名片 TODO 清零
+[x] operator_quality_matrix 自动生成
+[ ] 13 个 C 级算子完成 golden tests（9/13 已有 runner evidence；剩余 Comment / ContourExtrema / PhaseClosure / ArcCaliper）
+[ ] Region/Morphology 名片 TODO 清零（矩阵仍显示 CardTodoCount=5/张，需回填生成源）
 [ ] CaliperTool / TemplateMatching / GradientShapeMatch 完成 baseline + triage
 [ ] AnomalyDetection 完成 MVTec AD 子集 baseline
 [ ] DeepLearning 完成 YOLO 输出契约测试
