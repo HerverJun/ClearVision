@@ -1,0 +1,1397 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-24T15:14:34.6234679+00:00",
+    "CasesRoot": "embedded synthetic C-level cases",
+    "CaseCount": 66,
+    "Passed": 66,
+    "Failed": 0,
+    "MemoryAllocationBytesAvgSum": 323964
+  },
+  "Operators": [
+    {
+      "Operator": "Comment",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.176,
+      "RuntimeMsMax": 21.034,
+      "MemoryAllocationBytesAvg": 35571
+    },
+    {
+      "Operator": "ContourExtrema",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.244,
+      "RuntimeMsMax": 1.171,
+      "MemoryAllocationBytesAvg": 8815
+    },
+    {
+      "Operator": "PhaseClosure",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.429,
+      "RuntimeMsMax": 4.59,
+      "MemoryAllocationBytesAvg": 279578
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "ContourExtrema_quad_horizontal_0000",
+      "Operator": "ContourExtrema",
+      "Scenario": "quad_horizontal",
+      "Passed": true,
+      "RuntimeMs": 0.198,
+      "MemoryAllocationBytes": 9344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,12",
+        "ExpectedMaxPoint": "50,18",
+        "ActualMinPoint": "10,12",
+        "ActualMaxPoint": "50,18",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_quad_vertical_0001",
+      "Operator": "ContourExtrema",
+      "Scenario": "quad_vertical",
+      "Passed": true,
+      "RuntimeMs": 0.273,
+      "MemoryAllocationBytes": 10112,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "vertical",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,12",
+        "ExpectedMaxPoint": "40,60",
+        "ActualMinPoint": "10,12",
+        "ActualMaxPoint": "40,60",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_quad_distance_0002",
+      "Operator": "ContourExtrema",
+      "Scenario": "quad_distance",
+      "Passed": true,
+      "RuntimeMs": 0.312,
+      "MemoryAllocationBytes": 10112,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,12",
+        "ExpectedMaxPoint": "40,60",
+        "ActualMinPoint": "10,12",
+        "ActualMaxPoint": "40,60",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_negative_horizontal_0003",
+      "Operator": "ContourExtrema",
+      "Scenario": "negative_horizontal",
+      "Passed": true,
+      "RuntimeMs": 0.137,
+      "MemoryAllocationBytes": 9344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "-8,4",
+        "ExpectedMaxPoint": "20,16",
+        "ActualMinPoint": "-8,4",
+        "ActualMaxPoint": "20,16",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_negative_vertical_0004",
+      "Operator": "ContourExtrema",
+      "Scenario": "negative_vertical",
+      "Passed": true,
+      "RuntimeMs": 0.122,
+      "MemoryAllocationBytes": 9344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "vertical",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "12,-3",
+        "ExpectedMaxPoint": "-2,22",
+        "ActualMinPoint": "12,-3",
+        "ActualMaxPoint": "-2,22",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_negative_distance_0005",
+      "Operator": "ContourExtrema",
+      "Scenario": "negative_distance",
+      "Passed": true,
+      "RuntimeMs": 0.119,
+      "MemoryAllocationBytes": 9344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "12,-3",
+        "ExpectedMaxPoint": "20,16",
+        "ActualMinPoint": "12,-3",
+        "ActualMaxPoint": "20,16",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_collinear_horizontal_0006",
+      "Operator": "ContourExtrema",
+      "Scenario": "collinear_horizontal",
+      "Passed": true,
+      "RuntimeMs": 0.115,
+      "MemoryAllocationBytes": 9240,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,10",
+        "ExpectedMaxPoint": "40,10",
+        "ActualMinPoint": "10,10",
+        "ActualMaxPoint": "40,10",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_collinear_vertical_0007",
+      "Operator": "ContourExtrema",
+      "Scenario": "collinear_vertical",
+      "Passed": true,
+      "RuntimeMs": 1.026,
+      "MemoryAllocationBytes": 9240,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "vertical",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,10",
+        "ExpectedMaxPoint": "40,10",
+        "ActualMinPoint": "10,10",
+        "ActualMaxPoint": "40,10",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_collinear_distance_0008",
+      "Operator": "ContourExtrema",
+      "Scenario": "collinear_distance",
+      "Passed": true,
+      "RuntimeMs": 0.135,
+      "MemoryAllocationBytes": 9240,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,10",
+        "ExpectedMaxPoint": "40,10",
+        "ActualMinPoint": "10,10",
+        "ActualMaxPoint": "40,10",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_duplicate_extreme_horizontal_0009",
+      "Operator": "ContourExtrema",
+      "Scenario": "duplicate_extreme_horizontal",
+      "Passed": true,
+      "RuntimeMs": 0.13,
+      "MemoryAllocationBytes": 9448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "4,2",
+        "ExpectedMaxPoint": "12,9",
+        "ActualMinPoint": "4,2",
+        "ActualMaxPoint": "12,9",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_duplicate_extreme_vertical_0010",
+      "Operator": "ContourExtrema",
+      "Scenario": "duplicate_extreme_vertical",
+      "Passed": true,
+      "RuntimeMs": 0.128,
+      "MemoryAllocationBytes": 9448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "vertical",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "4,2",
+        "ExpectedMaxPoint": "12,9",
+        "ActualMinPoint": "4,2",
+        "ActualMaxPoint": "12,9",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_duplicate_extreme_distance_0011",
+      "Operator": "ContourExtrema",
+      "Scenario": "duplicate_extreme_distance",
+      "Passed": true,
+      "RuntimeMs": 0.137,
+      "MemoryAllocationBytes": 9448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "4,6",
+        "ExpectedMaxPoint": "12,9",
+        "ActualMinPoint": "4,6",
+        "ActualMaxPoint": "12,9",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_slanted_horizontal_0012",
+      "Operator": "ContourExtrema",
+      "Scenario": "slanted_horizontal",
+      "Passed": true,
+      "RuntimeMs": 0.12,
+      "MemoryAllocationBytes": 9448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "3,40",
+        "ExpectedMaxPoint": "42,34",
+        "ActualMinPoint": "3,40",
+        "ActualMaxPoint": "42,34",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_slanted_vertical_0013",
+      "Operator": "ContourExtrema",
+      "Scenario": "slanted_vertical",
+      "Passed": true,
+      "RuntimeMs": 0.114,
+      "MemoryAllocationBytes": 9448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "vertical",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "31,18",
+        "ExpectedMaxPoint": "25,52",
+        "ActualMinPoint": "31,18",
+        "ActualMaxPoint": "25,52",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_slanted_distance_0014",
+      "Operator": "ContourExtrema",
+      "Scenario": "slanted_distance",
+      "Passed": true,
+      "RuntimeMs": 0.116,
+      "MemoryAllocationBytes": 9448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "15,22",
+        "ExpectedMaxPoint": "25,52",
+        "ActualMinPoint": "15,22",
+        "ActualMaxPoint": "25,52",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_single_point_horizontal_0015",
+      "Operator": "ContourExtrema",
+      "Scenario": "single_point_horizontal",
+      "Passed": true,
+      "RuntimeMs": 0.239,
+      "MemoryAllocationBytes": 8640,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "12,34",
+        "ExpectedMaxPoint": "12,34",
+        "ActualMinPoint": "12,34",
+        "ActualMaxPoint": "12,34",
+        "ActualExtremaCount": 1,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_single_point_vertical_0016",
+      "Operator": "ContourExtrema",
+      "Scenario": "single_point_vertical",
+      "Passed": true,
+      "RuntimeMs": 0.118,
+      "MemoryAllocationBytes": 8640,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "vertical",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "12,34",
+        "ExpectedMaxPoint": "12,34",
+        "ActualMinPoint": "12,34",
+        "ActualMaxPoint": "12,34",
+        "ActualExtremaCount": 1,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_single_point_distance_0017",
+      "Operator": "ContourExtrema",
+      "Scenario": "single_point_distance",
+      "Passed": true,
+      "RuntimeMs": 0.11,
+      "MemoryAllocationBytes": 8640,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "12,34",
+        "ExpectedMaxPoint": "12,34",
+        "ActualMinPoint": "12,34",
+        "ActualMaxPoint": "12,34",
+        "ActualExtremaCount": 1,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_point_array_horizontal_0018",
+      "Operator": "ContourExtrema",
+      "Scenario": "point_array_horizontal",
+      "Passed": true,
+      "RuntimeMs": 1.171,
+      "MemoryAllocationBytes": 9688,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "horizontal",
+        "PayloadKind": "PointArray",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "10,12",
+        "ExpectedMaxPoint": "50,18",
+        "ActualMinPoint": "10,12",
+        "ActualMaxPoint": "50,18",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_unknown_direction_fallback_0019",
+      "Operator": "ContourExtrema",
+      "Scenario": "unknown_direction_fallback",
+      "Passed": true,
+      "RuntimeMs": 0.221,
+      "MemoryAllocationBytes": 9496,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Direction": "diagonal",
+        "PayloadKind": "ListPoint2f",
+        "ErrorMessage": null,
+        "ExpectedMinPoint": "-8,4",
+        "ExpectedMaxPoint": "20,16",
+        "ActualMinPoint": "-8,4",
+        "ActualMaxPoint": "20,16",
+        "ActualExtremaCount": 2,
+        "MinValueError": 0,
+        "MaxValueError": 0
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_empty_contour_0020",
+      "Operator": "ContourExtrema",
+      "Scenario": "empty_contour",
+      "Passed": true,
+      "RuntimeMs": 0.283,
+      "MemoryAllocationBytes": 4224,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": false,
+        "ActualSuccess": false,
+        "Direction": "horizontal",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": "Contour must contain at least one point."
+      }
+    },
+    {
+      "CaseId": "ContourExtrema_distance_missing_ref_0021",
+      "Operator": "ContourExtrema",
+      "Scenario": "distance_missing_reference",
+      "Passed": true,
+      "RuntimeMs": 0.053,
+      "MemoryAllocationBytes": 2600,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": false,
+        "ActualSuccess": false,
+        "Direction": "distance",
+        "PayloadKind": "Point2fArray",
+        "ErrorMessage": "ReferencePoint is required when Direction is \u0027distance\u0027."
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_32_0000",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_32",
+      "Passed": true,
+      "RuntimeMs": 0.858,
+      "MemoryAllocationBytes": 106144,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.809847,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_48_0001",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_48",
+      "Passed": true,
+      "RuntimeMs": 1.303,
+      "MemoryAllocationBytes": 193768,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.878136,
+        "Mae": 1E-06
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_wide_0002",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_wide",
+      "Passed": true,
+      "RuntimeMs": 2.327,
+      "MemoryAllocationBytes": 235296,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.841536,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_tall_0003",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_tall",
+      "Passed": true,
+      "RuntimeMs": 1.394,
+      "MemoryAllocationBytes": 230776,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.823789,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_gentle_0004",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_gentle",
+      "Passed": true,
+      "RuntimeMs": 1.629,
+      "MemoryAllocationBytes": 310168,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.949933,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_x_only_0005",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_x_only",
+      "Passed": true,
+      "RuntimeMs": 1.02,
+      "MemoryAllocationBytes": 171520,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.794604,
+        "Mae": 1E-06
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_y_only_0006",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_y_only",
+      "Passed": true,
+      "RuntimeMs": 1.127,
+      "MemoryAllocationBytes": 180424,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.794604,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_ramp_offset_0007",
+      "Operator": "PhaseClosure",
+      "Scenario": "ramp_offset",
+      "Passed": true,
+      "RuntimeMs": 1.113,
+      "MemoryAllocationBytes": 163096,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.876919,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_quality_centered_0008",
+      "Operator": "PhaseClosure",
+      "Scenario": "quality_centered",
+      "Passed": true,
+      "RuntimeMs": 4.59,
+      "MemoryAllocationBytes": 611480,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "quality",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.903419,
+        "Mae": 1E-06
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_quality_rect_0009",
+      "Operator": "PhaseClosure",
+      "Scenario": "quality_rect",
+      "Passed": true,
+      "RuntimeMs": 2.377,
+      "MemoryAllocationBytes": 549736,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "quality",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.891591,
+        "Mae": 2E-06
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_quality_gentle_0010",
+      "Operator": "PhaseClosure",
+      "Scenario": "quality_gentle",
+      "Passed": true,
+      "RuntimeMs": 1.44,
+      "MemoryAllocationBytes": 349064,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "quality",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.936689,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_quality_x_only_0011",
+      "Operator": "PhaseClosure",
+      "Scenario": "quality_x_only",
+      "Passed": true,
+      "RuntimeMs": 1.367,
+      "MemoryAllocationBytes": 331800,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "quality",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.821942,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_floodfill_centered_0012",
+      "Operator": "PhaseClosure",
+      "Scenario": "floodfill_centered",
+      "Passed": true,
+      "RuntimeMs": 2.117,
+      "MemoryAllocationBytes": 415688,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "floodfill",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.904884,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_floodfill_offset_0013",
+      "Operator": "PhaseClosure",
+      "Scenario": "floodfill_offset",
+      "Passed": true,
+      "RuntimeMs": 1.338,
+      "MemoryAllocationBytes": 415472,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "floodfill",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.890819,
+        "Mae": 1E-06
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_floodfill_discontinuity_0014",
+      "Operator": "PhaseClosure",
+      "Scenario": "floodfill_discontinuity",
+      "Passed": true,
+      "RuntimeMs": 1.625,
+      "MemoryAllocationBytes": 613448,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "floodfill",
+        "Scene": "Discontinuity",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 47,
+        "Quality": 0.29313,
+        "Mae": null
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_itoh_discontinuity_0015",
+      "Operator": "PhaseClosure",
+      "Scenario": "itoh_discontinuity",
+      "Passed": true,
+      "RuntimeMs": 1.182,
+      "MemoryAllocationBytes": 229744,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Discontinuity",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 47,
+        "Quality": 0.29313,
+        "Mae": null
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_uniform_zero_0016",
+      "Operator": "PhaseClosure",
+      "Scenario": "uniform_zero",
+      "Passed": true,
+      "RuntimeMs": 0.647,
+      "MemoryAllocationBytes": 106144,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Uniform",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 1,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_uniform_positive_0017",
+      "Operator": "PhaseClosure",
+      "Scenario": "uniform_positive",
+      "Passed": true,
+      "RuntimeMs": 1.759,
+      "MemoryAllocationBytes": 424528,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "quality",
+        "Scene": "Uniform",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 1,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_uniform_negative_0018",
+      "Operator": "PhaseClosure",
+      "Scenario": "uniform_negative",
+      "Passed": true,
+      "RuntimeMs": 1.104,
+      "MemoryAllocationBytes": 344688,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "floodfill",
+        "Scene": "Uniform",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 1,
+        "Mae": 0
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_wavelength_scaled_0019",
+      "Operator": "PhaseClosure",
+      "Scenario": "wavelength_scaled",
+      "Passed": true,
+      "RuntimeMs": 0.923,
+      "MemoryAllocationBytes": 106232,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "Method": "itoh",
+        "Scene": "Ramp",
+        "ErrorMessage": null,
+        "NonFinitePixels": 0,
+        "DiscontinuityCount": 0,
+        "Quality": 0.912073,
+        "Mae": 1.2E-05
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_bad_quality_size_0020",
+      "Operator": "PhaseClosure",
+      "Scenario": "bad_quality_size",
+      "Passed": true,
+      "RuntimeMs": 0.188,
+      "MemoryAllocationBytes": 59160,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": false,
+        "ActualSuccess": false,
+        "Method": "quality",
+        "Scene": "Ramp",
+        "ErrorMessage": "QualityMap must match PhaseImage dimensions."
+      }
+    },
+    {
+      "CaseId": "PhaseClosure_missing_image_0021",
+      "Operator": "PhaseClosure",
+      "Scenario": "missing_image",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 2336,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": false,
+        "ActualSuccess": false,
+        "Method": "itoh",
+        "Scene": "MissingImage",
+        "ErrorMessage": "PhaseImage required."
+      }
+    },
+    {
+      "CaseId": "Comment_missing_input_default_text_0000",
+      "Operator": "Comment",
+      "Scenario": "missing_input_default_text",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 3360,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 0,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 0,
+        "ActualMessageLength": 0,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_string_payload_0001",
+      "Operator": "Comment",
+      "Scenario": "string_payload",
+      "Passed": true,
+      "RuntimeMs": 21.034,
+      "MemoryAllocationBytes": 126656,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 10,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 10,
+        "ActualMessageLength": 10,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_int_payload_0002",
+      "Operator": "Comment",
+      "Scenario": "int_payload",
+      "Passed": true,
+      "RuntimeMs": 0.061,
+      "MemoryAllocationBytes": 5344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 5,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 5,
+        "ActualMessageLength": 5,
+        "OutputType": "Int32",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_double_payload_0003",
+      "Operator": "Comment",
+      "Scenario": "double_payload",
+      "Passed": true,
+      "RuntimeMs": 0.03,
+      "MemoryAllocationBytes": 5456,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 5,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 5,
+        "ActualMessageLength": 5,
+        "OutputType": "Double",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_bool_payload_0004",
+      "Operator": "Comment",
+      "Scenario": "bool_payload",
+      "Passed": true,
+      "RuntimeMs": 0.023,
+      "MemoryAllocationBytes": 5456,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 4,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 4,
+        "ActualMessageLength": 4,
+        "OutputType": "Boolean",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_dictionary_payload_0005",
+      "Operator": "Comment",
+      "Scenario": "dictionary_payload",
+      "Passed": true,
+      "RuntimeMs": 0.038,
+      "MemoryAllocationBytes": 5680,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 4,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 4,
+        "ActualMessageLength": 4,
+        "OutputType": "Dictionary\u00602",
+        "ReferencePreserved": true
+      }
+    },
+    {
+      "CaseId": "Comment_list_payload_0006",
+      "Operator": "Comment",
+      "Scenario": "list_payload",
+      "Passed": true,
+      "RuntimeMs": 0.04,
+      "MemoryAllocationBytes": 5528,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 4,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 4,
+        "ActualMessageLength": 4,
+        "OutputType": "List\u00601",
+        "ReferencePreserved": true
+      }
+    },
+    {
+      "CaseId": "Comment_byte_array_payload_0007",
+      "Operator": "Comment",
+      "Scenario": "byte_array_payload",
+      "Passed": true,
+      "RuntimeMs": 0.098,
+      "MemoryAllocationBytes": 5552,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 5,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 5,
+        "ActualMessageLength": 5,
+        "OutputType": "Byte[]",
+        "ReferencePreserved": true
+      }
+    },
+    {
+      "CaseId": "Comment_empty_text_0008",
+      "Operator": "Comment",
+      "Scenario": "empty_text",
+      "Passed": true,
+      "RuntimeMs": 0.027,
+      "MemoryAllocationBytes": 5072,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 0,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 0,
+        "ActualMessageLength": 0,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_long_valid_text_0009",
+      "Operator": "Comment",
+      "Scenario": "long_valid_text",
+      "Passed": true,
+      "RuntimeMs": 0.353,
+      "MemoryAllocationBytes": 95256,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 4096,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 4096,
+        "ActualMessageLength": 4096,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_numeric_text_param_0010",
+      "Operator": "Comment",
+      "Scenario": "numeric_text_param",
+      "Passed": true,
+      "RuntimeMs": 2.168,
+      "MemoryAllocationBytes": 210816,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 3,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 3,
+        "ActualMessageLength": 3,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_bool_text_param_0011",
+      "Operator": "Comment",
+      "Scenario": "bool_text_param",
+      "Passed": true,
+      "RuntimeMs": 0.743,
+      "MemoryAllocationBytes": 19896,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 5,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 5,
+        "ActualMessageLength": 5,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_image_payload_small_0012",
+      "Operator": "Comment",
+      "Scenario": "image_payload_small",
+      "Passed": true,
+      "RuntimeMs": 0.144,
+      "MemoryAllocationBytes": 6376,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 5,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 5,
+        "ActualMessageLength": 5,
+        "OutputType": "ImageWrapper",
+        "ReferencePreserved": true
+      }
+    },
+    {
+      "CaseId": "Comment_image_payload_gray_0013",
+      "Operator": "Comment",
+      "Scenario": "image_payload_gray",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 6488,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 10,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 10,
+        "ActualMessageLength": 10,
+        "OutputType": "ImageWrapper",
+        "ReferencePreserved": true
+      }
+    },
+    {
+      "CaseId": "Comment_large_scalar_payload_0014",
+      "Operator": "Comment",
+      "Scenario": "large_scalar_payload",
+      "Passed": true,
+      "RuntimeMs": 0.03,
+      "MemoryAllocationBytes": 5768,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 5,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 5,
+        "ActualMessageLength": 5,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_zero_payload_0015",
+      "Operator": "Comment",
+      "Scenario": "zero_payload",
+      "Passed": true,
+      "RuntimeMs": 0.026,
+      "MemoryAllocationBytes": 5256,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 4,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 4,
+        "ActualMessageLength": 4,
+        "OutputType": "Int32",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_negative_payload_0016",
+      "Operator": "Comment",
+      "Scenario": "negative_payload",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 5344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 8,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 8,
+        "ActualMessageLength": 8,
+        "OutputType": "Int32",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_decimal_payload_0017",
+      "Operator": "Comment",
+      "Scenario": "decimal_payload",
+      "Passed": true,
+      "RuntimeMs": 0.056,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 7,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 7,
+        "ActualMessageLength": 7,
+        "OutputType": "Decimal",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_object_payload_0018",
+      "Operator": "Comment",
+      "Scenario": "object_payload",
+      "Passed": true,
+      "RuntimeMs": 0.066,
+      "MemoryAllocationBytes": 5512,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 6,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 6,
+        "ActualMessageLength": 6,
+        "OutputType": "PayloadBox",
+        "ReferencePreserved": true
+      }
+    },
+    {
+      "CaseId": "Comment_max_minus_one_text_0019",
+      "Operator": "Comment",
+      "Scenario": "max_minus_one_text",
+      "Passed": true,
+      "RuntimeMs": 0.204,
+      "MemoryAllocationBytes": 95240,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": true,
+        "ActualSuccess": true,
+        "ValidationIsValid": true,
+        "TextLength": 4095,
+        "ErrorMessage": null,
+        "ExpectedMessageLength": 4095,
+        "ActualMessageLength": 4095,
+        "OutputType": "String",
+        "ReferencePreserved": null
+      }
+    },
+    {
+      "CaseId": "Comment_too_long_text_0020",
+      "Operator": "Comment",
+      "Scenario": "too_long_text",
+      "Passed": true,
+      "RuntimeMs": 0.458,
+      "MemoryAllocationBytes": 69256,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": false,
+        "ActualSuccess": false,
+        "ValidationIsValid": false,
+        "TextLength": 4097,
+        "ErrorMessage": "Text must be 4096 characters or fewer."
+      }
+    },
+    {
+      "CaseId": "Comment_much_too_long_text_0021",
+      "Operator": "Comment",
+      "Scenario": "much_too_long_text",
+      "Passed": true,
+      "RuntimeMs": 0.162,
+      "MemoryAllocationBytes": 83720,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedSuccess": false,
+        "ActualSuccess": false,
+        "ValidationIsValid": false,
+        "TextLength": 5000,
+        "ErrorMessage": "Text must be 4096 characters or fewer."
+      }
+    }
+  ]
+}

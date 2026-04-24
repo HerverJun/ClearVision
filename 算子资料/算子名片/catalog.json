@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-24T20:31:31.4396535+08:00",
+  "generatedAt": "2026-04-24T23:35:17.0337549+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -821,12 +821,13 @@
       "id": "Morphology",
       "type": 5,
       "displayName": "Morphology (Legacy)",
-      "description": "Legacy morphology node. Use Morphological Operation for new workflows.",
+      "description": "Legacy image morphology node. Use Morphological Operation for image workflows and Region* morphology operators for region workflows.",
       "category": "预处理",
       "version": "1.0.0",
       "tags": [
         "Compatibility",
         "Deprecated",
+        "ImageOnly",
         "Legacy",
         "功能域:检测",
         "成熟度:稳定",
@@ -1767,6 +1768,36 @@
           "displayName": "目标数量",
           "dataType": "Integer",
           "isRequired": null
+        },
+        {
+          "name": "ResolvedModelPath",
+          "displayName": "Resolved Model Path",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ResolvedModelId",
+          "displayName": "Resolved Model Id",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ResolvedModelCatalogPath",
+          "displayName": "Resolved Model Catalog Path",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ModelSource",
+          "displayName": "Model Source",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ModelProvenance",
+          "displayName": "Model Provenance",
+          "dataType": "Any",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -1909,6 +1940,28 @@
               "label": "目标检测"
             }
           ]
+        },
+        {
+          "name": "ModelId",
+          "displayName": "Model Id",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ModelCatalogPath",
+          "displayName": "Model Catalog Path",
+          "dataType": "file",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "quality": {
@@ -2029,7 +2082,7 @@
           "displayName": "保存到文件",
           "dataType": "bool",
           "description": null,
-          "defaultValue": "true",
+          "defaultValue": "false",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -5320,7 +5373,7 @@
       "id": "SubpixelEdgeDetection",
       "type": 44,
       "displayName": "Subpixel Edge Detection",
-      "description": "Extracts subpixel edges using Steger or interpolation-based methods.",
+      "description": "Extracts subpixel edges using Steger or lightweight gradient/interpolation refinements.",
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
@@ -10850,13 +10903,13 @@
       "displayName": "注释",
       "description": "在工作流中添加说明文本，不影响数据流，仅用于标注设计意图",
       "category": "辅助",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:流程",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "Workflow annotation passthrough",
       "inputPorts": [
         {
           "name": "Input",
@@ -10893,13 +10946,13 @@
         }
       ],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
+        "totalScore": 90,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=35"
+        "testCoverageScore": 100,
+        "parameterValidationScore": 100,
+        "errorHandlingScore": 60,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/Comment.md"
     },
@@ -16652,13 +16705,13 @@
       "displayName": "ROI跟踪",
       "description": "Transforms a base ROI using match pose (CenterX/CenterY/Angle/Scale) and outputs SearchRegion.",
       "category": "辅助",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Pose-driven ROI rectangle transform",
       "inputPorts": [
         {
           "name": "BaseRoi",
@@ -16695,13 +16748,13 @@
         }
       ],
       "quality": {
-        "totalScore": 86,
+        "totalScore": 96,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=85"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/RoiTransform.md"
     },
@@ -16711,13 +16764,13 @@
       "displayName": "体素下采样",
       "description": "Voxel grid downsampling for point clouds (centroid per voxel).",
       "category": "3D",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Voxel grid centroid downsampling",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -16754,13 +16807,13 @@
         }
       ],
       "quality": {
-        "totalScore": 85,
+        "totalScore": 95,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/VoxelDownsample.md"
     },
@@ -16942,6 +16995,17 @@
           "defaultValue": "100",
           "min": "1",
           "max": "10000000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RandomSeed",
+          "displayName": "Random Seed (0=DeterministicFromInput)",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "2147483647",
           "isRequired": true,
           "options": null
         }
@@ -17385,13 +17449,13 @@
       "displayName": "Laws Texture Filter",
       "description": "Apply 5x5 Laws texture filtering and compute local energy.",
       "category": "Texture",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Laws 5x5 texture energy filtering",
       "inputPorts": [
         {
           "name": "Image",
@@ -17491,13 +17555,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/LawsTextureFilter.md"
     },
@@ -17507,13 +17571,13 @@
       "displayName": "GLCM Texture Features",
       "description": "Compute Gray-Level Co-occurrence Matrix (GLCM) texture features.",
       "category": "Texture",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Quantized gray-level co-occurrence matrix",
       "inputPorts": [
         {
           "name": "Image",
@@ -17662,13 +17726,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/GlcmTexture.md"
     },
@@ -17721,6 +17785,36 @@
         {
           "name": "PresentClasses",
           "displayName": "Present Classes",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "ResolvedModelPath",
+          "displayName": "Resolved Model Path",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ResolvedModelId",
+          "displayName": "Resolved Model Id",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ResolvedModelCatalogPath",
+          "displayName": "Resolved Model Catalog Path",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ModelSource",
+          "displayName": "Model Source",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
+          "name": "ModelProvenance",
+          "displayName": "Model Provenance",
           "dataType": "Any",
           "isRequired": null
         }
@@ -19034,13 +19128,13 @@
       "displayName": "Planar Matching",
       "description": "Feature-based planar matching with homography verification. Suitable for textured planar targets under perspective change.",
       "category": "匹配定位",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Feature homography planar matching",
       "inputPorts": [
         {
           "name": "Image",
@@ -19360,13 +19454,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/PlanarMatching.md"
     },
@@ -19376,13 +19470,13 @@
       "displayName": "Local Deformable Matching",
       "description": "Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback.",
       "category": "匹配定位",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Coarse-to-fine local deformable matching",
       "inputPorts": [
         {
           "name": "Image",
@@ -19603,13 +19697,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/LocalDeformableMatching.md"
     },
@@ -19619,13 +19713,13 @@
       "displayName": "Distance Transform",
       "description": "Computes the distance from each pixel to the nearest zero pixel. Supports multiple distance metrics and signed distances.",
       "category": "Analysis",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "OpenCV binary distance transform",
       "inputPorts": [
         {
           "name": "Image",
@@ -19761,13 +19855,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/DistanceTransform.md"
     },
@@ -19777,13 +19871,13 @@
       "displayName": "Min Enclosing Geometry",
       "description": "Computes minimum enclosing geometry (circle, rectangle, triangle) and robust arc fitting with RANSAC.",
       "category": "检测",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": null,
+      "algorithm": "Contour-derived enclosing geometry and robust fitting",
       "inputPorts": [
         {
           "name": "Image",
@@ -19961,13 +20055,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/MinEnclosingGeometry.md"
     },
@@ -19977,13 +20071,13 @@
       "displayName": "Region Erosion",
       "description": "Erodes a region using a specified structuring element (Region-based morphology).",
       "category": "Morphology",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Region morphology erosion",
       "inputPorts": [
         {
           "name": "Region",
@@ -20078,13 +20172,13 @@
         }
       ],
       "quality": {
-        "totalScore": 63,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 90,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/RegionErosion.md"
     },
@@ -20094,13 +20188,13 @@
       "displayName": "Region Dilation",
       "description": "Dilates a region using a specified structuring element (Region-based morphology).",
       "category": "Morphology",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Region morphology dilation",
       "inputPorts": [
         {
           "name": "Region",
@@ -20195,13 +20289,13 @@
         }
       ],
       "quality": {
-        "totalScore": 63,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 90,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/RegionDilation.md"
     },
@@ -20211,13 +20305,13 @@
       "displayName": "Region Opening",
       "description": "Opening operation (erosion followed by dilation) for noise removal and smooth region boundaries.",
       "category": "Morphology",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Region morphology opening",
       "inputPorts": [
         {
           "name": "Region",
@@ -20301,13 +20395,13 @@
         }
       ],
       "quality": {
-        "totalScore": 63,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 90,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/RegionOpening.md"
     },
@@ -20317,13 +20411,13 @@
       "displayName": "Region Closing",
       "description": "Closing operation (dilation followed by erosion) for filling small holes and connecting nearby regions.",
       "category": "Morphology",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Region morphology closing",
       "inputPorts": [
         {
           "name": "Region",
@@ -20407,13 +20501,13 @@
         }
       ],
       "quality": {
-        "totalScore": 63,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 90,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/RegionClosing.md"
     },
@@ -20423,13 +20517,13 @@
       "displayName": "Region Skeleton",
       "description": "Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivity.",
       "category": "Morphology",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Zhang-Suen thinning",
       "inputPorts": [
         {
           "name": "Region",
@@ -20501,13 +20595,13 @@
         }
       ],
       "quality": {
-        "totalScore": 63,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 90,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/RegionSkeleton.md"
     },
@@ -20517,13 +20611,13 @@
       "displayName": "Region Union",
       "description": "Computes the union of two regions (A ∪ B).",
       "category": "Region",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Run-length region union",
       "inputPorts": [
         {
           "name": "Region1",
@@ -20560,13 +20654,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 89,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/RegionUnion.md"
     },
@@ -20576,13 +20670,13 @@
       "displayName": "Region Intersection",
       "description": "Computes the intersection of two regions (A ∩ B).",
       "category": "Region",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Run-length row intersection",
       "inputPorts": [
         {
           "name": "Region1",
@@ -20619,13 +20713,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 89,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/RegionIntersection.md"
     },
@@ -20635,13 +20729,13 @@
       "displayName": "Region Difference",
       "description": "Computes the difference of two regions (A - B).",
       "category": "Region",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Run-length row subtraction",
       "inputPorts": [
         {
           "name": "Region1",
@@ -20678,13 +20772,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 89,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/RegionDifference.md"
     },
@@ -20694,13 +20788,13 @@
       "displayName": "Region Complement",
       "description": "Computes the complement of a region relative to an image size.",
       "category": "Region",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Bounded run-length complement",
       "inputPorts": [
         {
           "name": "Region",
@@ -20749,13 +20843,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 58,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 85,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/RegionComplement.md"
     },
@@ -20765,13 +20859,13 @@
       "displayName": "Arc Caliper",
       "description": "Detects edges along an arc path with subpixel accuracy.",
       "category": "检测",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Radial band-profile arc edge scan",
       "inputPorts": [
         {
           "name": "Image",
@@ -20832,13 +20926,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 64,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 91,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=85"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ArcCaliper.md"
     },
@@ -20848,13 +20942,13 @@
       "displayName": "Contour Extrema",
       "description": "Finds extremal points of a contour in specified directions.",
       "category": "检测",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Directional contour extrema scan",
       "inputPorts": [
         {
           "name": "Contour",
@@ -20915,13 +21009,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 89,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/ContourExtrema.md"
     },
@@ -21138,13 +21232,13 @@
       "displayName": "Phase Closure",
       "description": "Unwraps wrapped phase maps while preserving the original phase domain semantics.",
       "category": "检测",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Itoh/quality-guided phase unwrapping",
       "inputPorts": [
         {
           "name": "PhaseImage",
@@ -21199,13 +21293,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 61,
-        "level": "C",
-        "documentationScore": 60,
-        "testCoverageScore": 30,
+        "totalScore": 89,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/PhaseClosure.md"
     }

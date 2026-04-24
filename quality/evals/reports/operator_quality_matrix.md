@@ -1,45 +1,27 @@
 # Operator Quality Matrix
 
-GeneratedAtUtc: `2026-04-24T12:51:24+00:00`
+GeneratedAtUtc: `2026-04-24T15:33:30+00:00`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
 CardDirectory: `docs/算子资料/算子名片`
-GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
+GoldenEvidence: `quality/evals/reports/*_baseline.json`
 
 ## Summary
 
 - Total operators: 155
-- Level counts: A=115, B=27, C=13
-- Priority counts: P0=19, P1=8, P2=21, P3=107
-- Golden test status: Yes=9, No=146
-- Cards with TODO: 20
-- P0 without golden evidence: 10
-- C-level without golden evidence: 4
+- Level counts: A=128, B=27
+- Priority counts: P1=8, P2=24, P3=123
+- Golden test status: Yes=13, No=142
+- Cards with TODO: 0
+- P0 without golden evidence: 0
+- C-level without golden evidence: 0
 
 ## Focus Rows
 
 | Operator | Q | Level | Card TODO | Known Limitations | Golden Test | Cases | Benchmark | Priority | Next Action |
 |---|---:|---|---:|---:|---|---:|---|---|---|
-| RegionComplement | 58 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| Comment | 61 | C | 0 | 1 | No | 0 | No | P0 | Add golden tests and failure triage |
-| ContourExtrema | 61 | C | 5 | 1 | No | 0 | No | P0 | Add golden tests and failure triage |
-| PhaseClosure | 61 | C | 5 | 1 | No | 0 | No | P0 | Add golden tests and failure triage |
-| RegionDifference | 61 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionIntersection | 61 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionUnion | 61 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionClosing | 63 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionDilation | 63 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionErosion | 63 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionOpening | 63 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| RegionSkeleton | 63 | C | 5 | 1 | Yes | 100 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| ArcCaliper | 64 | C | 5 | 1 | No | 0 | No | P0 | Add arc ROI boundary, polarity, and sub-pixel golden tests |
-| VoxelDownsample | 85 | A | 5 | 1 | No | 0 | No | P0 | Clear card TODO and known limitations |
-| GlcmTexture | 90 | A | 5 | 1 | No | 0 | No | P0 | Clear card TODO and known limitations |
-| LawsTextureFilter | 90 | A | 5 | 1 | No | 0 | No | P0 | Clear card TODO and known limitations |
-| LocalDeformableMatching | 90 | A | 5 | 1 | No | 0 | No | P0 | Clear card TODO and known limitations |
-| MinEnclosingGeometry | 90 | A | 5 | 1 | No | 0 | No | P0 | Clear card TODO and known limitations |
-| PlanarMatching | 90 | A | 5 | 1 | No | 0 | No | P0 | Clear card TODO and known limitations |
 | FFT1D | 71 | B | 0 | 2 | No | 0 | No | P1 | Add frequency-domain synthetic signal golden tests |
 | GradientShapeMatch | 83 | B | 0 | 5 | No | 0 | No | P1 | Fix cache/Position contract and add multi-candidate tests |
+| RegionUnion | 89 | A | 0 | 2 | Yes | 100 | Yes | P2 | Review QScore/Level from golden evidence |
 | CaliperTool | 96 | A | 0 | 2 | No | 0 | No | P2 | Add caliper robustness baseline and failure triage |
 | TemplateMatching | 96 | A | 0 | 3 | No | 0 | No | P2 | Add score contract baseline and fixed-scale failure boundary tests |
 | AnomalyDetection | 100 | A | 0 | 3 | No | 0 | No | P2 | Run MVTec AD baseline and record Image/Pixel AUROC |
@@ -49,25 +31,6 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 
 | OperatorType | DisplayName | Category | QScore | Level | Version | Maturity | Inputs | Outputs | Params | AlgorithmSummary | KnownLimitationsCount | CardTodoCount | HasGoldenTest | GoldenCases | HasPublicDataset | HasFieldDataset | HasBenchmark | Priority | OwnerAgent | NextAction |
 |---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---:|---|---:|---|---|---|---|---|---|
-| OperatorType.RegionComplement | Region Complement | Region | 58 | C | 1.0.0 | 稳定 Stable | 4 | 3 | 0 | Computes the complement of a region relative to an image size.。 | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.Comment | 注释 | 辅助 | 61 | C | 1.0.0 | 稳定 Stable | 1 | 2 | 1 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P0 | Golden Dataset Agent | Add golden tests and failure triage |
-| OperatorType.ContourExtrema | Contour Extrema | 检测 | 61 | C | 1.0.0 | 稳定 Stable | 3 | 6 | 0 | Finds extremal points of a contour in specified directions.。 | 1 | 5 | No | 0 | No | No | No | P0 | Golden Dataset Agent | Add golden tests and failure triage |
-| OperatorType.PhaseClosure | Phase Closure | 检测 | 61 | C | 1.0.0 | 稳定 Stable | 4 | 4 | 0 | Computes phase closure by unwrapping wrapped phase from interferometric measurements.。 | 1 | 5 | No | 0 | No | No | No | P0 | Golden Dataset Agent | Add golden tests and failure triage |
-| OperatorType.RegionDifference | Region Difference | Region | 61 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 0 | Computes the difference of two regions (A - B).。 | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionIntersection | Region Intersection | Region | 61 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 0 | Computes the intersection of two regions (A ∩ B).。 | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionUnion | Region Union | Region | 61 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 0 | Computes the union of two regions (A ∪ B).。 | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionClosing | Region Closing | Morphology | 63 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 3 | Closing operation (dilation followed by erosion) for filling small holes and connecting n... | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionDilation | Region Dilation | Morphology | 63 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 4 | Dilates a region using a specified structuring element (Region-based morphology).。 | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionErosion | Region Erosion | Morphology | 63 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 4 | Erodes a region using a specified structuring element (Region-based morphology).。 | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionOpening | Region Opening | Morphology | 63 | C | 1.0.0 | 稳定 Stable | 2 | 3 | 3 | Opening operation (erosion followed by dilation) for noise removal and smooth region boun... | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.RegionSkeleton | Region Skeleton | Morphology | 63 | C | 1.0.0 | 稳定 Stable | 2 | 5 | 2 | Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivit... | 1 | 5 | Yes | 100 | No | No | Yes | P0 | Card Auditor Agent | Backfill card/source TODO, then review QScore/Level |
-| OperatorType.ArcCaliper | Arc Caliper | 检测 | 64 | C | 1.0.0 | 稳定 Stable | 7 | 2 | 0 | Detects edges along an arc path with subpixel accuracy.。 | 1 | 5 | No | 0 | No | No | No | P0 | Golden Dataset Agent | Add arc ROI boundary, polarity, and sub-pixel golden tests |
-| OperatorType.VoxelDownsample | 体素下采样 | 3D | 85 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 1 | Voxel grid downsampling for point clouds (centroid per voxel).。 | 1 | 5 | No | 0 | No | No | No | P0 | Card Auditor Agent | Clear card TODO and known limitations |
-| OperatorType.GlcmTexture | GLCM Texture Features | Texture | 90 | A | 1.0.0 | 稳定 Stable | 1 | 6 | 9 | Compute Gray-Level Co-occurrence Matrix (GLCM) texture features.。 | 1 | 5 | No | 0 | No | No | No | P0 | Card Auditor Agent | Clear card TODO and known limitations |
-| OperatorType.LawsTextureFilter | Laws Texture Filter | Texture | 90 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 5 | Apply 5x5 Laws texture filtering and compute local energy.。 | 1 | 5 | No | 0 | No | No | No | P0 | Card Auditor Agent | Clear card TODO and known limitations |
-| OperatorType.LocalDeformableMatching | Local Deformable Matching | 匹配定位 | 90 | A | 1.1.0 | 稳定 Stable | 2 | 6 | 15 | Local deformable matching with TPS deformation field estimation, multi-candidate search a... | 1 | 5 | No | 0 | No | No | No | P0 | Card Auditor Agent | Clear card TODO and known limitations |
-| OperatorType.MinEnclosingGeometry | Min Enclosing Geometry | 检测 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 10 | Computes minimum enclosing geometry (circle, rectangle, triangle) and robust arc fitting... | 1 | 5 | No | 0 | No | No | No | P0 | Card Auditor Agent | Clear card TODO and known limitations |
-| OperatorType.PlanarMatching | Planar Matching | 匹配定位 | 90 | A | 1.1.1 | 稳定 Stable | 2 | 13 | 19 | Detects planar objects using feature matching and homography estimation. Supports perspec... | 1 | 5 | No | 0 | No | No | No | P0 | Card Auditor Agent | Clear card TODO and known limitations |
 | OperatorType.FFT1D | FFT 1D | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 2 | 4 | 0 | Performs 1D Fast Fourier Transform on input signal or image rows/columns.。 | 2 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add frequency-domain synthetic signal golden tests |
 | OperatorType.FrequencyFilter | Frequency Filter | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 5 | 3 | 0 | Applies frequency domain filters (low-pass, high-pass, band-pass, band-stop) to spectrum.。 | 2 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add cutoff/phase preservation golden tests |
 | OperatorType.InverseFFT1D | Inverse FFT 1D | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 2 | 4 | 0 | Performs 1D Inverse Fast Fourier Transform to convert frequency spectrum back to time dom... | 2 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add inverse reconstruction and energy preservation tests |
@@ -76,7 +39,8 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 | OperatorType.GradientShapeMatch | 梯度形状匹配 | 匹配定位 | 83 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 11 | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | 5 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Fix cache/Position contract and add multi-candidate tests |
 | OperatorType.HandEyeCalibrationValidator | Hand-Eye Calibration Validator | 标定 | 83 | B | 1.0.1 | - | 3 | 8 | 1 | Hand-Eye Consistency Validation | 0 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PyramidShapeMatch | 金字塔形状匹配 | 匹配定位 | 83 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 15 | 该算子围绕模板、特征或几何相似性执行定位匹配，用于判断目标是否存在以及位姿大致位置。 | 4 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.SemanticSegmentation | 语义分割 | AI检测 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 5 | 11 | Runs an ONNX semantic segmentation model and returns class map, colored visualization, an... | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.RegionUnion | Region Union | Region | 89 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 0 | Run-length region union | 2 | 0 | Yes | 100 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.SemanticSegmentation | 语义分割 | AI检测 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 10 | 11 | Runs an ONNX semantic segmentation model and returns class map, colored visualization, an... | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.Undistort | Undistort | 标定 | 91 | A | 1.0.0 | - | 2 | 1 | 0 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.DualModalVoting | Dual Modal Voting | AI Detection | 94 | A | 1.0.0 | 稳定 Stable | 2 | 3 | 6 | 该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。 | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.CaliperTool | 卡尺工具 | 检测 | 96 | A | 1.0.0 | 稳定 Stable | 2 | 7 | 9 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add caliper robustness baseline and failure triage |
@@ -87,12 +51,14 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 | OperatorType.CalibrationLoader | Calibration Loader | 标定 | 100 | A | 1.0.0 | - | 0 | 3 | 1 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.CameraCalibration | Camera Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 7 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.CoordinateTransform | Coordinate Transform | 标定 | 100 | A | 1.0.0 | - | 4 | 3 | 2 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.DeepLearning | 深度学习 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 7 | 10 | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | 5 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Lock YOLO output contract and expose NMS IoU tests |
+| OperatorType.DeepLearning | 深度学习 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 12 | 12 | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | 5 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Lock YOLO output contract and expose NMS IoU tests |
 | OperatorType.DetectionSequenceJudge | Detection Sequence Judge | AI Inspection | 100 | A | 1.0.0 | Experimental | 4 | 13 | 13 | - | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.FisheyeCalibration | Fisheye Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 9 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.HandEyeCalibration | Hand-Eye Calibration | 标定 | 100 | A | 1.0.0 | - | 2 | 7 | 4 | OpenCV Hand-Eye Calibration | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.LocalDeformableMatching | Local Deformable Matching | 匹配定位 | 100 | A | 1.1.1 | 稳定 Stable | 2 | 6 | 15 | Coarse-to-fine local deformable matching | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.NPointCalibration | N Point Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 3 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PixelToWorldTransform | Pixel To World Transform | 标定 | 100 | A | 1.0.0 | - | 3 | 3 | 7 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.PlanarMatching | Planar Matching | 匹配定位 | 100 | A | 1.1.2 | 稳定 Stable | 2 | 13 | 19 | Feature homography planar matching | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ShapeMatching | 旋转尺度模板匹配 | 匹配定位 | 100 | A | 1.2.0 | 稳定 Stable | 2 | 2 | 13 | 虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子… | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.StereoCalibration | Stereo Calibration | 标定 | 100 | A | 1.0.0 | - | 2 | 6 | 11 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.SurfaceDefectDetection | 表面缺陷检测 | AI检测 | 100 | A | 2.0.0 | Experimental | 2 | 8 | 10 | - | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
@@ -116,15 +82,25 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 | OperatorType.TypeConvert | Type Convert | 通用 | 83 | B | 1.0.0 | 稳定 Stable | 1 | 6 | 2 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.ResultJudgment | Result Judgment | Flow Control | 84 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 8 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.TimerStatistics | 计时统计 | 逻辑工具 | 84 | B | 1.0.0 | 稳定 Stable | 1 | 4 | 2 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.RoiTransform | ROI跟踪 | 辅助 | 86 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 1 | Transforms a base ROI using match pose (CenterX/CenterY/Angle/Scale) and outputs SearchRe... | 1 | 5 | No | 0 | No | No | No | P3 | Card Auditor Agent | Clear card TODO and known limitations |
+| OperatorType.RegionComplement | Region Complement | Region | 85 | A | 1.0.1 | 稳定 Stable | 4 | 3 | 0 | Bounded run-length complement | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.ContourExtrema | Contour Extrema | 检测 | 89 | A | 1.0.1 | 稳定 Stable | 3 | 6 | 0 | Directional contour extrema scan | 2 | 0 | Yes | 22 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.ImageDiff | 图像对比 | 预处理 | 89 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 0 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ImageSubtract | Image Subtract | 预处理 | 89 | A | 1.0.0 | 稳定 Stable | 2 | 4 | 1 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 3 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.PhaseClosure | Phase Closure | 检测 | 89 | A | 1.0.1 | 稳定 Stable | 4 | 4 | 0 | Itoh/quality-guided phase unwrapping | 2 | 0 | Yes | 22 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.RegionDifference | Region Difference | Region | 89 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 0 | Run-length row subtraction | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.RegionIntersection | Region Intersection | Region | 89 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 0 | Run-length row intersection | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.BoxNms | 候选框抑制 | 数据处理 | 90 | A | 1.0.0 | 稳定 Stable | 3 | 7 | 4 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.Comment | 注释 | 辅助 | 90 | A | 1.0.1 | 稳定 Stable | 1 | 2 | 1 | Workflow annotation passthrough | 2 | 0 | Yes | 22 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |
 | OperatorType.ConditionalBranch | 条件分支 | 流程控制 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 3 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.DistanceTransform | Distance Transform | Analysis | 90 | A | 1.0.0 | 稳定 Stable | 1 | 4 | 7 | Computes the distance from each pixel to the nearest zero pixel. Supports multiple distan... | 1 | 5 | No | 0 | No | No | No | P3 | Card Auditor Agent | Clear card TODO and known limitations |
 | OperatorType.PointSetTool | 点集工具 | 逻辑工具 | 90 | A | 1.0.0 | 稳定 Stable | 2 | 4 | 6 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.RegionClosing | Region Closing | Morphology | 90 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 3 | Region morphology closing | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.RegionDilation | Region Dilation | Morphology | 90 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 4 | Region morphology dilation | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.RegionErosion | Region Erosion | Morphology | 90 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 4 | Region morphology erosion | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.RegionOpening | Region Opening | Morphology | 90 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 3 | Region morphology opening | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.RegionSkeleton | Region Skeleton | Morphology | 90 | A | 1.0.1 | 稳定 Stable | 2 | 5 | 2 | Zhang-Suen thinning | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.Statistics | Statistics | 通用 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 7 | 5 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.TriggerModule | 触发模块 | 逻辑工具 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 3 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.ArcCaliper | Arc Caliper | 检测 | 91 | A | 1.0.1 | 稳定 Stable | 7 | 2 | 0 | Radial band-profile arc edge scan | 2 | 0 | Yes | 31 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.TryCatch | 异常捕获 | 流程控制 | 93 | A | 1.0.0 | 稳定 Stable | 1 | 4 | 3 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.AdaptiveThreshold | Adaptive Threshold | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 5 | 自适应阈值不会对整幅图使用一个全局阈值，而是针对每个像素在其邻域窗口 W(x, y)… | 5 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.Aggregator | 数据聚合 | 数据处理 | 94 | A | 1.0.0 | 稳定 Stable | 3 | 6 | 1 | 该算子把多路输入聚合成列表，并在可解析为有限数值的输入上计算统计结果。 | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
@@ -162,8 +138,9 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 | OperatorType.Thresholding | Threshold | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 4 | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PPFEstimation | PPF点对特征 | 3D | 95 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 3 | PPF（Point Pair Feature）是点对的 4 维描述子：距离 \|\|p2-p1\|\|、法向与连线角度 ∠(n1,d) / ∠(n2,d)、法向夹角 ∠(n1,n2)。本... | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PPFMatch | PPF表面匹配 | 3D | 95 | A | 1.0.4 | 稳定 Stable | 2 | 16 | 10 | Simplified PPF-based 3D surface matching (model -> scene pose).。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.RansacPlaneSegmentation | RANSAC平面分割 | 3D | 95 | A | 1.0.0 | 稳定 Stable | 1 | 8 | 3 | RANSAC 平面分割：随机采样 3 点拟合平面，统计距离平面小于阈值的内点数，迭代若干次选取内点最多的模型；最终使用内点做一次 PCA 平面精修（协方差矩阵最小特征向量作为法向... | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.RansacPlaneSegmentation | RANSAC平面分割 | 3D | 95 | A | 1.0.0 | 稳定 Stable | 1 | 8 | 4 | RANSAC 平面分割：随机采样 3 点拟合平面，统计距离平面小于阈值的内点数，迭代若干次选取内点最多的模型；最终使用内点做一次 PCA 平面精修（协方差矩阵最小特征向量作为法向... | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.StatisticalOutlierRemoval | 统计滤波 | 3D | 95 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 2 | 统计离群点移除（SOR）：对每个点计算其 K 近邻的平均距离 mean_dist，统计所有点的全局均值 global_mean 与标准差 global_std，移除 mean_d... | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.VoxelDownsample | 体素下采样 | 3D | 95 | A | 1.0.1 | 稳定 Stable | 1 | 2 | 1 | Voxel grid centroid downsampling | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.AngleMeasurement | Angle Measurement | Detection | 96 | A | 1.0.0 | 稳定 Stable | 6 | 3 | 7 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 1 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ColorDetection | 颜色检测 | 颜色处理 | 96 | A | 2.0.0 | Experimental | 2 | 10 | 18 | - | 3 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ColorMeasurement | 颜色测量 | 颜色处理 | 96 | A | 2.0.0 | - | 2 | 8 | 9 | - | 0 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
@@ -178,6 +155,7 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 | OperatorType.PointAlignment | 点位对齐 | 数据处理 | 96 | A | 1.0.3 | Stable | 2 | 3 | 2 | - | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.PointCorrection | 点位修正 | 数据处理 | 96 | A | 1.0.3 | Stable | 4 | 5 | 4 | - | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.PointLineDistance | 点线距离 | 检测 | 96 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 2 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 0 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.RoiTransform | ROI跟踪 | 辅助 | 96 | A | 1.0.1 | 稳定 Stable | 2 | 1 | 1 | Pose-driven ROI rectangle transform | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.ShadingCorrection | 光照校正 | 预处理 | 96 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 3 | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.SharpnessEvaluation | 清晰度评估 | 检测 | 96 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 7 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.UnitConvert | 单位换算 | 数据处理 | 96 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 4 | 该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
@@ -189,11 +167,15 @@ GoldenEvidence: `quality/evals/reports/RegionMorphology_baseline.json`
 | OperatorType.CircleMeasurement | 圆测量 | 检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 7 | 7 | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | 3 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.CodeRecognition | 条码识别 | 识别 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 4 | 2 | 该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.DatabaseWrite | 数据库写入 | 数据处理 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 3 | 该算子把输入数据持久化到数据库表中，当前正式支持 SQLite、SQLServer、… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.DistanceTransform | Distance Transform | Analysis | 100 | A | 1.0.1 | 稳定 Stable | 1 | 4 | 7 | OpenCV binary distance transform | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.EuclideanClusterExtraction | 欧氏聚类分割 | 3D | 100 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 3 | 欧氏聚类分割：以 ClusterTolerance 为连通阈值，对点云做 3D 连通域（BFS/DFS）。两点距离小于阈值则视为连通，最终输出每个连通分量的点索引集合。 | 1 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.GeometricFitting | Geometric Fitting | 检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 8 | 当前实现的几何拟合流程并不是直接接收点集输入，而是： | 5 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.GlcmTexture | GLCM Texture Features | Texture | 100 | A | 1.0.1 | 稳定 Stable | 1 | 6 | 9 | Quantized gray-level co-occurrence matrix | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.HttpRequest | HTTP 请求 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 3 | 6 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.ImageAdd | 图像加法 | 预处理 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 6 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ImageSave | 图像保存 | 输出 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 3 | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.LawsTextureFilter | Laws Texture Filter | Texture | 100 | A | 1.0.1 | 稳定 Stable | 1 | 3 | 5 | Laws 5x5 texture energy filtering | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.MinEnclosingGeometry | Min Enclosing Geometry | 检测 | 100 | A | 1.0.1 | 稳定 Stable | 1 | 2 | 10 | Contour-derived enclosing geometry and robust fitting | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ModbusCommunication | Modbus通信 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 8 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.MqttPublish | MQTT 发布 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 6 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.OcrRecognition | OCR 识别 | 识别 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 0 | 该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。 | 0 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |

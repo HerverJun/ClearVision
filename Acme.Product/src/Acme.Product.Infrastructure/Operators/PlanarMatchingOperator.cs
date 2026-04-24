@@ -24,7 +24,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Category = "Matching",
     IconName = "planar-match",
     Keywords = new[] { "Planar", "Matching", "Homography", "Perspective", "ORB", "AKAZE", "RANSAC" },
-    Version = "1.1.1"
+    Version = "1.1.2"
+)]
+[AlgorithmInfo(
+    Name = "Feature homography planar matching",
+    CoreApi = "ORB/AKAZE/BRISK DetectAndCompute -> BFMatcher ratio test -> HomographyVerificationHelper -> multi-scale score selection",
+    ImplementationStrategy = "Extracts binary local features from template and search ROI, applies descriptor matching and Lowe ratio filtering, estimates and verifies homography with geometric checks, and reports score, corners, inliers, and diagnostics.",
+    TimeComplexity = "O(S*(F log F + M + R*I))",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by planar matching regression and operator tests",
+    SpaceComplexity = "O(F + M + W*H)",
+    SuitableUseCases = new[] { "Textured planar objects under perspective change where homography is a valid geometric model.", "Inspection flows that need match score, projected corners, inlier metrics, and failure diagnostics." },
+    UnsuitableUseCases = new[] { "Non-planar, strongly deformable, or textureless targets.", "Scenes with many repeated local features unless ROI, detector, and score thresholds are constrained." },
+    KnownLimitations = new[] { "Detector support is limited to ORB, AKAZE, and BRISK.", "Multi-scale search uses a small fixed scale candidate set rather than exhaustive scale-space optimization." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Search Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Template", "Template Image", PortDataType.Image, IsRequired = false)]

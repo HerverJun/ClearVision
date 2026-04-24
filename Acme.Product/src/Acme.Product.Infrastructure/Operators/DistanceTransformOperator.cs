@@ -21,7 +21,20 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Computes the distance from each pixel to the nearest zero pixel. Supports multiple distance metrics and signed distances.",
     Category = "Analysis",
     IconName = "distance-transform",
-    Keywords = new[] { "Distance", "Transform", "EDT", "Chamfer", "Signed", "Euclidean" }
+    Keywords = new[] { "Distance", "Transform", "EDT", "Chamfer", "Signed", "Euclidean" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "OpenCV binary distance transform",
+    CoreApi = "EnsureSingleChannelGray -> Threshold -> Cv2.DistanceTransform -> MinMaxLoc/Normalize/ApplyColorMap",
+    ImplementationStrategy = "Converts the input image to single-channel gray, thresholds it to a binary mask, computes OpenCV distance maps for the requested metric, optionally builds a signed foreground/background map, and returns both visualization and float-map statistics.",
+    TimeComplexity = "O(W*H)",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by distance-transform unit tests",
+    SpaceComplexity = "O(W*H)",
+    SuitableUseCases = new[] { "Binary-mask analysis that needs maximum inscribed distance, center candidates, or distance-map visualization.", "Foreground/background signed-distance measurements after a stable threshold has isolated the target." },
+    UnsuitableUseCases = new[] { "Gray-scale distance analysis without first binarizing the image.", "High-throughput signed-distance workloads where the extra foreground/background transform and pixel loop dominate latency." },
+    KnownLimitations = new[] { "Input is thresholded before distance computation, so result quality depends on Threshold and Invert parameters.", "Parameter validation currently accepts standard mask sizes 3 and 5; precise-mask execution is not exposed through validation." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Input Image (Binary or Grayscale)", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Distance Transform Result", PortDataType.Image)]

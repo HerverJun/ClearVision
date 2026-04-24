@@ -14,6 +14,7 @@ DEFAULT_CARD_DIR = REPO_ROOT / "docs" / "算子资料" / "算子名片"
 DEFAULT_CATALOG = DEFAULT_CARD_DIR / "CATALOG.md"
 DEFAULT_BASELINE = REPO_ROOT / "quality" / "evals" / "reports" / "RegionMorphology_baseline.json"
 DEFAULT_OUTPUT = REPO_ROOT / "quality" / "evals" / "reports" / "operator_quality_matrix.md"
+DEFAULT_REPORTS_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 
 QUALITY_RE = re.compile(r"(?P<score>\d+)\s*\((?P<level>[^)]+)\)")
 DOC_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
@@ -293,33 +294,44 @@ def parse_card(card_path: Path) -> CardFacts:
     )
 
 
-def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
-    if not baseline_path.exists():
-        return {}
+def candidate_baseline_paths(baseline_path: Path) -> list[Path]:
+    if baseline_path == DEFAULT_BASELINE and DEFAULT_REPORTS_DIR.exists():
+        return sorted(DEFAULT_REPORTS_DIR.glob("*_baseline.json"))
+    return [baseline_path]
 
-    data = json.loads(baseline_path.read_text(encoding="utf-8"))
+
+def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
     evidence: dict[str, GoldenEvidence] = {}
 
-    for item in data.get("Operators", []):
-        operator = str(item.get("Operator", "")).strip()
-        case_count = int(item.get("CaseCount", 0) or 0)
-        failed = int(item.get("Failed", 0) or 0)
-        has_runtime = "RuntimeMsAvg" in item and "MemoryAllocationBytesAvg" in item
-
-        if not operator or case_count <= 0:
+    for path in candidate_baseline_paths(baseline_path):
+        if not path.exists():
             continue
 
-        if case_count >= 20 and failed == 0:
-            status = "Yes"
-        else:
-            status = "Partial"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
 
-        evidence[operator] = GoldenEvidence(
-            status=status,
-            benchmark="Yes" if has_runtime else "No",
-            case_count=case_count,
-            failed=failed,
-        )
+        for item in data.get("Operators", []):
+            operator = str(item.get("Operator", "")).strip()
+            case_count = int(item.get("CaseCount", 0) or 0)
+            failed = int(item.get("Failed", 0) or 0)
+            has_runtime = "RuntimeMsAvg" in item and "MemoryAllocationBytesAvg" in item
+
+            if not operator or case_count <= 0:
+                continue
+
+            if case_count >= 20 and failed == 0:
+                status = "Yes"
+            else:
+                status = "Partial"
+
+            evidence[operator] = GoldenEvidence(
+                status=status,
+                benchmark="Yes" if has_runtime else "No",
+                case_count=case_count,
+                failed=failed,
+            )
 
     return evidence
 
@@ -400,7 +412,7 @@ def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, ba
         f"GeneratedAtUtc: `{datetime.now(timezone.utc).isoformat(timespec='seconds')}`",
         f"SourceCatalog: `{catalog_path.relative_to(REPO_ROOT).as_posix()}`",
         f"CardDirectory: `{card_dir.relative_to(REPO_ROOT).as_posix()}`",
-        f"GoldenEvidence: `{baseline_path.relative_to(REPO_ROOT).as_posix()}`",
+        f"GoldenEvidence: `{golden_evidence_label(baseline_path)}`",
         "",
         "## Summary",
         "",
@@ -493,6 +505,12 @@ def format_counts(counter: Counter[str], order: list[str]) -> str:
     ordered = [f"{key}={counter.get(key, 0)}" for key in order if counter.get(key, 0) > 0]
     extras = [f"{key}={value}" for key, value in sorted(counter.items()) if key not in order]
     return ", ".join(ordered + extras) if ordered or extras else "-"
+
+
+def golden_evidence_label(baseline_path: Path) -> str:
+    if baseline_path == DEFAULT_BASELINE:
+        return "quality/evals/reports/*_baseline.json"
+    return baseline_path.relative_to(REPO_ROOT).as_posix()
 
 
 def main() -> int:

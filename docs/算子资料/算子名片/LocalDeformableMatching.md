@@ -10,15 +10,15 @@
 | ä½œè€… (Author) | è˜…èŠœå› |
 
 ## ç®—æ³•åŸç† / Algorithm Principle
-> ä¸­æ–‡ï¼šLocal deformable matching with TPS deformation field estimation, multi-candidate search and NMS-based multi-target output.ã€‚
-> English: Local deformable matching with TPS deformation field estimation, multi-candidate search and NMS-based multi-target output..
+> ä¸­æ–‡ï¼šExperimental local deformable matching backed by moving least squares deformation and verified rigid fallback.ã€‚
+> English: Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback..
 
 ## å®ç°ç­–ç•¥ / Implementation Strategy
-> ä¸­æ–‡ï¼šTODOï¼šè¡¥å……å®ç°ç­–ç•¥ä¸æ–¹æ¡ˆå¯¹æ¯”ã€‚
-> English: TODO: Add implementation strategy and alternatives comparison.
+> ä¸­æ–‡ï¼šGenerates template-match candidate windows, evaluates each candidate through coarse-to-fine ORB feature alignment, refines the control grid with moving-least-squares deformation, verifies occlusion and deformation limits, and applies NMS across accepted matches.ã€‚
+> English: Generates template-match candidate windows, evaluates each candidate through coarse-to-fine ORB feature alignment, refines the control grid with moving-least-squares deformation, verifies occlusion and deformation limits, and applies NMS across accepted matches..
 
 ## æ ¸å¿ƒ API è°ƒç”¨é“¾ / Core API Call Chain
-- TODOï¼šè¡¥å……å…³é”® API è°ƒç”¨é“¾
+- `candidate windows -> ORB pyramid matching -> homography seed -> MLS/TPS-style warp -> occlusion verification -> NMS`
 
 ## å‚æ•°è¯´æ˜ / Parameters
 | å‚æ•°å (Name) | ç±»å‹ (Type) | é»˜è®¤å€¼ (Default) | èŒƒå›´ (Range) | è¯´æ˜ (Description) |
@@ -30,7 +30,7 @@
 | `MaxDeformation` | `double` | 20 | [5, 100] | - |
 | `OcclusionThreshold` | `double` | 0.3 | [0.1, 0.9] | - |
 | `MinMatchScore` | `double` | 0.6 | [0, 1] | - |
-| `EnableFallback` | `bool` | true | - | - |
+| `EnableFallback` | `bool` | false | - | - |
 | `MaxIterations` | `int` | 5 | [1, 20] | - |
 | `ConvergenceThreshold` | `double` | 0.5 | [0.1, 5] | - |
 | `MaxMatches` | `int` | 5 | [1, 20] | - |
@@ -59,24 +59,21 @@
 ## æ€§èƒ½ç‰¹å¾ / Performance
 | æŒ‡æ ‡ (Metric) | å€¼ (Value) |
 |------|------|
-| æ—¶é—´å¤æ‚åº¦ (Time Complexity) | O(?) |
-| å…¸å‹è€—æ—¶ (Typical Latency) | ~?ms (1920x1080) |
-| å†…å­˜ç‰¹å¾ (Memory Profile) | ? |
+| æ—¶é—´å¤æ‚åº¦ (Time Complexity) | O(C*L*(F+M) + C*G*I*P) |
+| å…¸å‹è€—æ—¶ (Typical Latency) | No dedicated golden benchmark yet; covered by deformable matching operator tests |
+| å†…å­˜ç‰¹å¾ (Memory Profile) | O(W*H + C*G + F) |
 
 ## é€‚ç”¨åœºæ™¯ / Use Cases
-- é€‚åˆ (Suitable)ï¼šTODO
-- ä¸é€‚åˆ (Not Suitable)ï¼šTODO
+- é€‚åˆ (Suitable)ï¼šTextured templates that may undergo local deformation, mild occlusion, or multiple target instances.
+- é€‚åˆ (Suitable)ï¼šWorkflows that need deformation field, occlusion mask, and rigid fallback diagnostics in addition to match score.
+- ä¸é€‚åˆ (Not Suitable)ï¼šBlank or low-texture templates where ORB feature support is insufficient.
+- ä¸é€‚åˆ (Not Suitable)ï¼šReal-time high-throughput matching without constraining candidate count, pyramid levels, and deformation grid size.
 
 ## å·²çŸ¥é™åˆ¶ / Known Limitations
-1. TODO
+1. The implementation uses MLS-style deformation under the legacy TPS parameter names.
+2. Candidate generation still starts from normalized template matching, so strong repetitive backgrounds can require ROI constraints or higher thresholds.
 
 ## å˜æ›´è®°å½• / Changelog
 | ç‰ˆæœ¬ (Version) | æ—¥æœŸ (Date) | å˜æ›´å†…å®¹ (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-18 | è‡ªåŠ¨ç”Ÿæˆæ–‡æ¡£éª¨æ¶ / Generated skeleton |
-
-## 2026-04-12 Compatibility Update / ¼æÈİĞÔ¸üĞÂ
-- Ä£°å»º´æ¸ÄÎªÓĞ½çÇÒ´øÄÚÈİÖ¸ÎÆ£¬±ÜÃâÍ¬Â·¾¶Ä£°å¸üĞÂºó¾²Ä¬¸´ÓÃ¾ÉÃèÊö×Ó¡£
-- NmsThreshold ÏÖ»ùÓÚ¸¡µã IoU ÉúĞ§£¬²»ÔÙÊÜÕûÊı³ı·¨Ó°Ïì¡£
-- Ä£°å½ğ×ÖËş¡¢ËÑË÷½ğ×ÖËş¡¢ºòÑ¡½á¹ûÓë fallback ×ÊÔ´¶¼²¹ÁËÊÍ·ÅÂ·¾¶£¬ÓÃÓÚ³¤ÅÜÎÈ¶¨ĞÔ³¡¾°¡£
-
+| 1.1.1 | 2026-04-24 | è‡ªåŠ¨ç”Ÿæˆæ–‡æ¡£éª¨æ¶ / Generated skeleton |

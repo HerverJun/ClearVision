@@ -11,7 +11,7 @@
 | `OperatorType.PPFMatch` | PPF表面匹配 | 3D | `1.0.4` |
 | `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | 3D | `1.0.0` |
 | `OperatorType.StatisticalOutlierRemoval` | 统计滤波 | 3D | `1.0.0` |
-| `OperatorType.VoxelDownsample` | 体素下采样 | 3D | `1.0.0` |
+| `OperatorType.VoxelDownsample` | 体素下采样 | 3D | `1.0.1` |
 | `OperatorType.DualModalVoting` | Dual Modal Voting | AI Detection | `1.0.0` |
 | `OperatorType.DetectionSequenceJudge` | Detection Sequence Judge | AI Inspection | `1.0.0` |
 | `OperatorType.AnomalyDetection` | 异常检测 | AI检测 | `1.0.0` |
@@ -19,7 +19,7 @@
 | `OperatorType.EdgePairDefect` | 边缘对缺陷 | AI检测 | `1.0.0` |
 | `OperatorType.SemanticSegmentation` | 语义分割 | AI检测 | `1.0.0` |
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | AI检测 | `2.0.0` |
-| `OperatorType.DistanceTransform` | Distance Transform | Analysis | `1.0.0` |
+| `OperatorType.DistanceTransform` | Distance Transform | Analysis | `1.0.1` |
 | `OperatorType.MitsubishiMcCommunication` | Mitsubishi MC Communication | Communication | `1.0.0` |
 | `OperatorType.AngleMeasurement` | Angle Measurement | Detection | `1.0.0` |
 | `OperatorType.ContourMeasurement` | Contour Measurement | Detection | `1.0.0` |
@@ -27,22 +27,22 @@
 | `OperatorType.FFT1D` | FFT 1D | Frequency | `1.0.0` |
 | `OperatorType.FrequencyFilter` | Frequency Filter | Frequency | `1.0.0` |
 | `OperatorType.InverseFFT1D` | Inverse FFT 1D | Frequency | `1.0.0` |
-| `OperatorType.RegionClosing` | Region Closing | Morphology | `1.0.0` |
-| `OperatorType.RegionDilation` | Region Dilation | Morphology | `1.0.0` |
-| `OperatorType.RegionErosion` | Region Erosion | Morphology | `1.0.0` |
-| `OperatorType.RegionOpening` | Region Opening | Morphology | `1.0.0` |
-| `OperatorType.RegionSkeleton` | Region Skeleton | Morphology | `1.0.0` |
-| `OperatorType.RegionComplement` | Region Complement | Region | `1.0.0` |
-| `OperatorType.RegionDifference` | Region Difference | Region | `1.0.0` |
-| `OperatorType.RegionIntersection` | Region Intersection | Region | `1.0.0` |
-| `OperatorType.RegionUnion` | Region Union | Region | `1.0.0` |
-| `OperatorType.GlcmTexture` | GLCM Texture Features | Texture | `1.0.0` |
-| `OperatorType.LawsTextureFilter` | Laws Texture Filter | Texture | `1.0.0` |
+| `OperatorType.RegionClosing` | Region Closing | Morphology | `1.0.1` |
+| `OperatorType.RegionDilation` | Region Dilation | Morphology | `1.0.1` |
+| `OperatorType.RegionErosion` | Region Erosion | Morphology | `1.0.1` |
+| `OperatorType.RegionOpening` | Region Opening | Morphology | `1.0.1` |
+| `OperatorType.RegionSkeleton` | Region Skeleton | Morphology | `1.0.1` |
+| `OperatorType.RegionComplement` | Region Complement | Region | `1.0.1` |
+| `OperatorType.RegionDifference` | Region Difference | Region | `1.0.1` |
+| `OperatorType.RegionIntersection` | Region Intersection | Region | `1.0.1` |
+| `OperatorType.RegionUnion` | Region Union | Region | `1.0.1` |
+| `OperatorType.GlcmTexture` | GLCM Texture Features | Texture | `1.0.1` |
+| `OperatorType.LawsTextureFilter` | Laws Texture Filter | Texture | `1.0.1` |
 | `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 匹配定位 | `1.0.0` |
 | `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 匹配定位 | `1.0.0` |
-| `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 匹配定位 | `1.1.0` |
+| `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 匹配定位 | `1.1.1` |
 | `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 匹配定位 | `1.0.0` |
-| `OperatorType.PlanarMatching` | Planar Matching | 匹配定位 | `1.1.1` |
+| `OperatorType.PlanarMatching` | Planar Matching | 匹配定位 | `1.1.2` |
 | `OperatorType.PyramidShapeMatch` | 金字塔形状匹配 | 匹配定位 | `1.0.0` |
 | `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | 匹配定位 | `1.2.0` |
 | `OperatorType.TemplateMatching` | 模板匹配 | 匹配定位 | `1.2.0` |
@@ -85,10 +85,10 @@
 | `OperatorType.StereoCalibration` | Stereo Calibration | 标定 | `1.0.0` |
 | `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | 标定 | `1.0.0` |
 | `OperatorType.Undistort` | Undistort | 标定 | `1.0.0` |
-| `OperatorType.ArcCaliper` | Arc Caliper | 检测 | `1.0.0` |
+| `OperatorType.ArcCaliper` | Arc Caliper | 检测 | `1.0.1` |
 | `OperatorType.CaliperTool` | 卡尺工具 | 检测 | `1.0.0` |
 | `OperatorType.CircleMeasurement` | 圆测量 | 检测 | `1.0.0` |
-| `OperatorType.ContourExtrema` | Contour Extrema | 检测 | `1.0.0` |
+| `OperatorType.ContourExtrema` | Contour Extrema | 检测 | `1.0.1` |
 | `OperatorType.GapMeasurement` | 间隙测量 | 检测 | `1.0.0` |
 | `OperatorType.GeoMeasurement` | 几何测量 | 检测 | `1.0.0` |
 | `OperatorType.GeometricFitting` | Geometric Fitting | 检测 | `1.0.0` |
@@ -97,8 +97,8 @@
 | `OperatorType.LineLineDistance` | 线线距离 | 检测 | `1.0.0` |
 | `OperatorType.LineMeasurement` | 直线测量 | 检测 | `1.0.0` |
 | `OperatorType.Measurement` | 测量 | 检测 | `1.0.0` |
-| `OperatorType.MinEnclosingGeometry` | Min Enclosing Geometry | 检测 | `1.0.0` |
-| `OperatorType.PhaseClosure` | Phase Closure | 检测 | `1.0.0` |
+| `OperatorType.MinEnclosingGeometry` | Min Enclosing Geometry | 检测 | `1.0.1` |
+| `OperatorType.PhaseClosure` | Phase Closure | 检测 | `1.0.1` |
 | `OperatorType.PixelStatistics` | 像素统计 | 检测 | `1.0.0` |
 | `OperatorType.PointLineDistance` | 点线距离 | 检测 | `1.0.0` |
 | `OperatorType.SharpnessEvaluation` | 清晰度评估 | 检测 | `1.0.0` |
@@ -114,9 +114,9 @@
 | `OperatorType.SubpixelEdgeDetection` | Subpixel Edge Detection | 特征提取 | `1.0.0` |
 | `OperatorType.CodeRecognition` | 条码识别 | 识别 | `1.0.0` |
 | `OperatorType.OcrRecognition` | OCR 识别 | 识别 | `1.0.0` |
-| `OperatorType.Comment` | 注释 | 辅助 | `1.0.0` |
+| `OperatorType.Comment` | 注释 | 辅助 | `1.0.1` |
 | `OperatorType.RoiManager` | ROI管理器 | 辅助 | `1.0.0` |
-| `OperatorType.RoiTransform` | ROI跟踪 | 辅助 | `1.0.0` |
+| `OperatorType.RoiTransform` | ROI跟踪 | 辅助 | `1.0.1` |
 | `OperatorType.ImageSave` | 图像保存 | 输出 | `1.0.0` |
 | `OperatorType.ResultOutput` | 结果输出 | 输出 | `1.0.1` |
 | `OperatorType.HttpRequest` | HTTP 请求 | 通信 | `1.0.0` |
@@ -220,6 +220,7 @@
 ### OperatorType.ArcCaliper / Arc Caliper
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T21:50:17.7971617+08:00` | `7B276C2CF5C1` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `C78E51E6B0B4` |
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `540CC39DD98E` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `BD6BC33A07AE` |
@@ -370,6 +371,7 @@
 ### OperatorType.Comment / 注释
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:15:19.4916106+08:00` | `0551D0079C76` |
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `3D88605226ED` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `D088230EC428` |
 
@@ -397,6 +399,7 @@
 ### OperatorType.ContourExtrema / Contour Extrema
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:15:19.4916106+08:00` | `E1CE0C0D5287` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `C36BDB58E279` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `89D3C64A1F06` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `CF1814DC72D3` |
@@ -488,6 +491,7 @@
 ### OperatorType.DistanceTransform / Distance Transform
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:33:19.3146997+08:00` | `0D125088BA31` |
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `4CCCB1271AB4` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `F7E7D8FDA5AC` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `067E9764FAD3` |
@@ -639,6 +643,7 @@
 ### OperatorType.GlcmTexture / GLCM Texture Features
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:25:12.6473691+08:00` | `876C8124C99F` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `0AD9F465A363` |
 | `1.0.0` | `2026-03-17T17:07:32.7286304+08:00` | `1D82B3EEEF43` |
 
@@ -783,6 +788,7 @@
 ### OperatorType.LawsTextureFilter / Laws Texture Filter
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:25:12.6473691+08:00` | `2603C53F2983` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `40D5DCDD709C` |
 | `1.0.0` | `2026-03-17T16:52:44.2376192+08:00` | `261438B3A43B` |
 
@@ -809,6 +815,7 @@
 ### OperatorType.LocalDeformableMatching / Local Deformable Matching
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.1.1` | `2026-04-24T23:25:12.6473691+08:00` | `74C13D77D48A` |
 | `1.1.0` | `2026-04-18T22:49:10.0250597+08:00` | `A6291C9EBAE5` |
 | `1.0.4` | `2026-04-13T19:14:52.1190277+08:00` | `D0691119B5D3` |
 | `1.0.4` | `2026-04-12T20:43:23.0238145+08:00` | `8333DAA86430` |
@@ -849,6 +856,7 @@
 ### OperatorType.MinEnclosingGeometry / Min Enclosing Geometry
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:25:12.6473691+08:00` | `E5137B091A95` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `1575F5D91455` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `9A00C29AC41A` |
 
@@ -962,6 +970,7 @@
 ### OperatorType.PhaseClosure / Phase Closure
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:15:19.4916106+08:00` | `F89CB39F71A3` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `10DB4D181363` |
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `598E1EA010DF` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `0AA74A983A97` |
@@ -991,6 +1000,7 @@
 ### OperatorType.PlanarMatching / Planar Matching
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.1.2` | `2026-04-24T23:25:12.6473691+08:00` | `11D54C8907EE` |
 | `1.1.1` | `2026-04-18T22:49:10.0250597+08:00` | `547733BF24E3` |
 | `1.1.1` | `2026-04-13T19:14:52.1190277+08:00` | `804A46C17AD8` |
 | `1.1.1` | `2026-04-12T20:43:23.0238145+08:00` | `CD1D6DEF0F5F` |
@@ -1093,20 +1103,47 @@
 ### OperatorType.RegionClosing / Region Closing
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `1CD4872250EC` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `98C3BA2E149D` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `51C06A810144` |
 
 ### OperatorType.RegionComplement / Region Complement
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `2A590B4CC7B3` |
 | `1.0.0` | `2026-04-24T20:31:31.4396535+08:00` | `2A900E9345C6` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `2A46F259A55C` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `AE6829D33D5A` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `8BD7259C4E0C` |
 
+### OperatorType.RegionDifference / Region Difference
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `352DD8966BC9` |
+| `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `4035E96533FB` |
+
+### OperatorType.RegionDilation / Region Dilation
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `4498ABDC40C9` |
+| `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `665F8400F9BB` |
+
+### OperatorType.RegionErosion / Region Erosion
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `30B22EB3B176` |
+| `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `08885F6CC301` |
+
+### OperatorType.RegionIntersection / Region Intersection
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `52CB74CC5F93` |
+| `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `B29DEF5EB888` |
+
 ### OperatorType.RegionOpening / Region Opening
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `5F7760676F85` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `8AE1BD3C0157` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `BFA8EED40F07` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `B1DA89F6441D` |
@@ -1114,10 +1151,17 @@
 ### OperatorType.RegionSkeleton / Region Skeleton
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `268718F7CC19` |
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `E0E288BA3665` |
 | `1.0.0` | `2026-04-12T20:43:23.0238145+08:00` | `D9F748831F97` |
 | `1.0.0` | `2026-04-12T12:53:52.9929473+08:00` | `618A97A0B08E` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `0B331757C5AA` |
+
+### OperatorType.RegionUnion / Region Union
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `346E066817F1` |
+| `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `148881C196DD` |
 
 ### OperatorType.ResultJudgment / Result Judgment
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
@@ -1143,6 +1187,7 @@
 ### OperatorType.RoiTransform / ROI跟踪
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:33:19.3146997+08:00` | `F8DD7BB5F11C` |
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `259F54709B54` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `2BA2591DC83F` |
 | `1.0.0` | `2026-03-17T14:27:11.6128169+08:00` | `72CC34B3C57B` |
@@ -1400,6 +1445,7 @@
 ### OperatorType.VoxelDownsample / 体素下采样
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-24T23:25:12.6473691+08:00` | `36B1AD6878B2` |
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `37C219635A89` |
 | `1.0.0` | `2026-03-17T15:02:44.2227737+08:00` | `1FDE2F2206BC` |
 

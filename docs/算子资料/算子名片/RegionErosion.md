@@ -14,11 +14,11 @@
 > English: Erodes a region using a specified structuring element (Region-based morphology)..
 
 ## 实现策略 / Implementation Strategy
-> 中文：TODO：补充实现策略与方案对比。
-> English: TODO: Add implementation strategy and alternatives comparison.
+> 中文：Builds a discrete structuring element, tests whether all kernel offsets remain inside the source region for each candidate point, and converts accepted points back to RLE runs.。
+> English: Builds a discrete structuring element, tests whether all kernel offsets remain inside the source region for each candidate point, and converts accepted points back to RLE runs..
 
 ## 核心 API 调用链 / Core API Call Chain
-- TODO：补充关键 API 调用链
+- `MorphologyKernel.GetOffsets -> Region.ContainsPoint -> PointsToRuns`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
@@ -45,18 +45,19 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | O(?) |
-| 典型耗时 (Typical Latency) | ~?ms (1920x1080) |
-| 内存特征 (Memory Profile) | ? |
+| 时间复杂度 (Time Complexity) | O(I*P*K*log Rrow) |
+| 典型耗时 (Typical Latency) | Avg 0.359 ms, max 1.585 ms over 100 synthetic golden cases |
+| 内存特征 (Memory Profile) | O(P+K) |
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：TODO
-- 不适合 (Not Suitable)：TODO
+- 适合 (Suitable)：Shrinking foreground regions, removing boundary noise, and enforcing minimum feature width before measurement.
+- 不适合 (Not Suitable)：Subpixel morphology or grayscale morphology on raw image intensity.
 
 ## 已知限制 / Known Limitations
-1. TODO
+1. Large kernels can remove small or thin regions entirely, which is expected erosion behavior.
+2. Kernel shapes are discrete Rectangle/Ellipse/Cross rasterizations rather than analytic continuous geometry.
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-18 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.1 | 2026-04-24 | 自动生成文档骨架 / Generated skeleton |

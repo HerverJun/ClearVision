@@ -13,6 +13,7 @@ using Acme.Product.Infrastructure.Operators;
 var repoRoot = ResolveRepoRoot(args);
 var overwrite = args.Any(arg => string.Equals(arg, "--overwrite", StringComparison.OrdinalIgnoreCase));
 var enforceVersionBump = args.Any(arg => string.Equals(arg, "--enforce-version-bump", StringComparison.OrdinalIgnoreCase));
+var onlyOperators = ParseOnlyOperators(args);
 var operatorDocsRoot = Path.Combine(repoRoot, "docs", "算子资料");
 var docsRoot = Path.Combine(operatorDocsRoot, "算子名片");
 var legacyMirrorRoot = Path.Combine(repoRoot, "算子资料");
@@ -48,7 +49,7 @@ var candidates = typeof(OperatorBase).Assembly
     .OrderBy(x => x.OperatorType!.Value.ToString(), StringComparer.Ordinal)
     .ToList();
 
-var (generated, skipped) = GenerateOperatorDocuments(candidates, docsRoot, overwrite);
+var (generated, skipped) = GenerateOperatorDocuments(candidates, docsRoot, overwrite, onlyOperators);
 var operators = candidates
     .Select(item => ToCatalogOperator(item, qualityContext))
     .OrderBy(item => item.Type)
@@ -81,7 +82,11 @@ if (enforceVersionBump && versionTracking.Violations.Count > 0)
 
 return 0;
 
-static (int generated, int skipped) GenerateOperatorDocuments(IReadOnlyList<OperatorDocModel> candidates, string docsRoot, bool overwrite)
+static (int generated, int skipped) GenerateOperatorDocuments(
+    IReadOnlyList<OperatorDocModel> candidates,
+    string docsRoot,
+    bool overwrite,
+    IReadOnlySet<string> onlyOperators)
 {
     var generated = 0;
     var skipped = 0;
@@ -89,6 +94,13 @@ static (int generated, int skipped) GenerateOperatorDocuments(IReadOnlyList<Oper
     foreach (var item in candidates)
     {
         var fileName = $"{item.OperatorType}.md";
+        var operatorId = item.OperatorType!.Value.ToString();
+        if (onlyOperators.Count > 0 && !onlyOperators.Contains(operatorId))
+        {
+            skipped++;
+            continue;
+        }
+
         var filePath = Path.Combine(docsRoot, fileName);
         if (File.Exists(filePath) && !overwrite)
         {
@@ -101,6 +113,34 @@ static (int generated, int skipped) GenerateOperatorDocuments(IReadOnlyList<Oper
     }
 
     return (generated, skipped);
+}
+
+static HashSet<string> ParseOnlyOperators(string[] args)
+{
+    var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var arg in args)
+    {
+        var value = arg.StartsWith("--only=", StringComparison.OrdinalIgnoreCase)
+            ? arg["--only=".Length..]
+            : arg.StartsWith("--operators=", StringComparison.OrdinalIgnoreCase)
+                ? arg["--operators=".Length..]
+                : null;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            continue;
+        }
+
+        foreach (var item in value.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            selected.Add(item.StartsWith("OperatorType.", StringComparison.Ordinal)
+                ? item["OperatorType.".Length..]
+                : item);
+        }
+    }
+
+    return selected;
 }
 
 static void GenerateCatalogJson(IReadOnlyList<CatalogOperator> operators, string docsRoot, DateTimeOffset generatedAt)
@@ -339,8 +379,9 @@ static string BuildDocument(OperatorDocModel item)
     sb.AppendLine($"> English: {Fallback(item.Meta.Description, "TODO: Add algorithm principle.")}.");
     sb.AppendLine();
     sb.AppendLine("## 实现策略 / Implementation Strategy");
-    sb.AppendLine("> 中文：TODO：补充实现策略与方案对比。");
-    sb.AppendLine("> English: TODO: Add implementation strategy and alternatives comparison.");
+    var implementationStrategy = Fallback(item.Algo?.ImplementationStrategy, "TODO：补充实现策略与方案对比");
+    sb.AppendLine($"> 中文：{implementationStrategy}。");
+    sb.AppendLine($"> English: {implementationStrategy}.");
     sb.AppendLine();
     sb.AppendLine("## 核心 API 调用链 / Core API Call Chain");
     if (!string.IsNullOrWhiteSpace(item.Algo?.CoreApi))
@@ -409,17 +450,51 @@ static string BuildDocument(OperatorDocModel item)
     sb.AppendLine("| 指标 (Metric) | 值 (Value) |");
     sb.AppendLine("|------|------|");
     sb.AppendLine($"| 时间复杂度 (Time Complexity) | {EscapeCell(Fallback(item.Algo?.TimeComplexity, "O(?)"))} |");
-    sb.AppendLine($"| 典型耗时 (Typical Latency) | {EscapeCell("~?ms (1920x1080)")} |");
+    sb.AppendLine($"| 典型耗时 (Typical Latency) | {EscapeCell(Fallback(item.Algo?.TypicalLatency, "~?ms (1920x1080)"))} |");
     sb.AppendLine($"| 内存特征 (Memory Profile) | {EscapeCell(Fallback(item.Algo?.SpaceComplexity, "?"))} |");
 
     sb.AppendLine();
     sb.AppendLine("## 适用场景 / Use Cases");
-    sb.AppendLine("- 适合 (Suitable)：TODO");
-    sb.AppendLine("- 不适合 (Not Suitable)：TODO");
+    var suitableUseCases = NonEmptyItems(item.Algo?.SuitableUseCases).ToArray();
+    if (suitableUseCases.Length == 0)
+    {
+        sb.AppendLine("- 适合 (Suitable)：TODO");
+    }
+    else
+    {
+        foreach (var useCase in suitableUseCases)
+        {
+            sb.AppendLine($"- 适合 (Suitable)：{useCase}");
+        }
+    }
+
+    var unsuitableUseCases = NonEmptyItems(item.Algo?.UnsuitableUseCases).ToArray();
+    if (unsuitableUseCases.Length == 0)
+    {
+        sb.AppendLine("- 不适合 (Not Suitable)：TODO");
+    }
+    else
+    {
+        foreach (var useCase in unsuitableUseCases)
+        {
+            sb.AppendLine($"- 不适合 (Not Suitable)：{useCase}");
+        }
+    }
 
     sb.AppendLine();
     sb.AppendLine("## 已知限制 / Known Limitations");
-    sb.AppendLine("1. TODO");
+    var knownLimitations = NonEmptyItems(item.Algo?.KnownLimitations).ToArray();
+    if (knownLimitations.Length == 0)
+    {
+        sb.AppendLine("1. TODO");
+    }
+    else
+    {
+        for (var index = 0; index < knownLimitations.Length; index++)
+        {
+            sb.AppendLine($"{index + 1}. {knownLimitations[index]}");
+        }
+    }
 
     sb.AppendLine();
     sb.AppendLine("## 变更记录 / Changelog");
@@ -990,7 +1065,8 @@ static QualityContext BuildQualityContext(string repoRoot, string docsRoot)
         docsRoot,
         sourceIndex.SourcePathByTypeName,
         sourceIndex.SourceTextByTypeName,
-        testIndex);
+        testIndex,
+        BuildGoldenEvidenceIndex(repoRoot));
 }
 
 static (Dictionary<string, string> SourcePathByTypeName, Dictionary<string, string> SourceTextByTypeName) BuildOperatorSourceIndex(string repoRoot)
@@ -1050,9 +1126,62 @@ static HashSet<string> BuildOperatorTestIndex(string repoRoot)
                 index.Add(candidate[..^"Operator".Length]);
             }
         }
+
     }
 
     return index;
+}
+
+static HashSet<string> BuildGoldenEvidenceIndex(string repoRoot)
+{
+    var index = new HashSet<string>(StringComparer.Ordinal);
+    var reportsRoot = Path.Combine(repoRoot, "quality", "evals", "reports");
+    if (!Directory.Exists(reportsRoot))
+    {
+        return index;
+    }
+
+    foreach (var baselinePath in Directory.EnumerateFiles(reportsRoot, "*_baseline.json", SearchOption.TopDirectoryOnly))
+    {
+        AddGoldenEvidenceFromBaseline(baselinePath, index);
+    }
+
+    return index;
+}
+
+static void AddGoldenEvidenceFromBaseline(string baselinePath, HashSet<string> index)
+{
+    try
+    {
+        using var stream = File.OpenRead(baselinePath);
+        using var document = JsonDocument.Parse(stream);
+        if (!document.RootElement.TryGetProperty("Operators", out var operators) || operators.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var item in operators.EnumerateArray())
+        {
+            var operatorId = item.TryGetProperty("Operator", out var operatorElement)
+                ? operatorElement.GetString()
+                : null;
+            var caseCount = item.TryGetProperty("CaseCount", out var caseCountElement)
+                ? caseCountElement.GetInt32()
+                : 0;
+            var failed = item.TryGetProperty("Failed", out var failedElement)
+                ? failedElement.GetInt32()
+                : 0;
+
+            if (!string.IsNullOrWhiteSpace(operatorId) && caseCount >= 20 && failed == 0)
+            {
+                index.Add(operatorId);
+            }
+        }
+    }
+    catch (JsonException)
+    {
+        return;
+    }
 }
 
 static CatalogQuality ComputeQuality(OperatorDocModel item, QualityContext qualityContext)
@@ -1107,7 +1236,9 @@ static int EvaluateDocumentationScore(string operatorId, QualityContext qualityC
 
 static int EvaluateTestCoverageScore(string operatorId, string typeName, QualityContext qualityContext)
 {
-    return qualityContext.TestIndex.Contains(typeName) || qualityContext.TestIndex.Contains(operatorId)
+    return qualityContext.TestIndex.Contains(typeName) ||
+        qualityContext.TestIndex.Contains(operatorId) ||
+        qualityContext.GoldenEvidenceIndex.Contains(operatorId)
         ? 100
         : 30;
 }
@@ -1271,6 +1402,12 @@ static string BoolToMark(bool value) => value ? "Yes" : "No";
 
 static string Fallback(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
+static IEnumerable<string> NonEmptyItems(string[]? values) =>
+    values?
+        .Select(value => value?.Trim())
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value!) ?? Enumerable.Empty<string>();
+
 static string EscapeCell(string input) => input.Replace("|", "\\|", StringComparison.Ordinal);
 
 internal sealed record OperatorDocModel(
@@ -1426,5 +1563,6 @@ internal sealed record QualityContext(
     string DocsRoot,
     IReadOnlyDictionary<string, string> SourcePathByTypeName,
     IReadOnlyDictionary<string, string> SourceTextByTypeName,
-    IReadOnlySet<string> TestIndex);
+    IReadOnlySet<string> TestIndex,
+    IReadOnlySet<string> GoldenEvidenceIndex);
 

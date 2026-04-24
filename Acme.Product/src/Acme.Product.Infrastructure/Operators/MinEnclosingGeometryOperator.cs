@@ -22,7 +22,20 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Computes minimum enclosing geometry (circle, rectangle, triangle) and robust arc fitting with RANSAC.",
     Category = "Measurement",
     IconName = "enclosing-geometry",
-    Keywords = new[] { "MinEnclosing", "SmallestCircle", "MinAreaRect", "ArcFit", "RANSAC", "Geometry" }
+    Keywords = new[] { "MinEnclosing", "SmallestCircle", "MinAreaRect", "ArcFit", "RANSAC", "Geometry" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Contour-derived enclosing geometry and robust fitting",
+    CoreApi = "Threshold -> FindContours -> contour selection -> MinEnclosingCircle/MinAreaRect/ConvexHull/RANSAC fit",
+    ImplementationStrategy = "Segments the input image into external contours, selects contour points by the requested policy, then computes the selected enclosing or fitting geometry and overlays the result on the source image.",
+    TimeComplexity = "O(W*H + P log P + I*P)",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by geometry operator tests",
+    SpaceComplexity = "O(W*H + P)",
+    SuitableUseCases = new[] { "Measuring minimum enclosing circle, rotated rectangle, triangle, or convex hull for segmented parts.", "Fitting circles, arcs, or ellipses when contour points are available and outliers are expected." },
+    UnsuitableUseCases = new[] { "Low-contrast scenes where threshold segmentation does not isolate the target contour.", "Metrology that requires calibrated subpixel edge extraction before geometry fitting." },
+    KnownLimitations = new[] { "Contour extraction is threshold-based and uses external contours only.", "Robust arc and circle fitting depend on RANSAC iteration and inlier-threshold parameters." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]

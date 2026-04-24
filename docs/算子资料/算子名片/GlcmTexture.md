@@ -14,11 +14,11 @@
 > English: Compute Gray-Level Co-occurrence Matrix (GLCM) texture features..
 
 ## 实现策略 / Implementation Strategy
-> 中文：TODO：补充实现策略与方案对比。
-> English: TODO: Add implementation strategy and alternatives comparison.
+> 中文：Converts the selected ROI to gray, quantizes intensities to the configured number of levels, builds co-occurrence matrices for 0/45/90/135-degree directions, and returns mean plus per-direction texture statistics.。
+> English: Converts the selected ROI to gray, quantizes intensities to the configured number of levels, builds co-occurrence matrices for 0/45/90/135-degree directions, and returns mean plus per-direction texture statistics..
 
 ## 核心 API 调用链 / Core API Call Chain
-- TODO：补充关键 API 调用链
+- `ROI -> GlcmTexture.Compute -> quantize gray image -> per-direction GLCM -> averaged Haralick features`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
@@ -52,18 +52,21 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | O(?) |
-| 典型耗时 (Typical Latency) | ~?ms (1920x1080) |
-| 内存特征 (Memory Profile) | ? |
+| 时间复杂度 (Time Complexity) | O(D*(W*H+L^2)) |
+| 典型耗时 (Typical Latency) | No dedicated golden benchmark yet; covered by texture unit and integration tests |
+| 内存特征 (Memory Profile) | O(L^2) |
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：TODO
-- 不适合 (Not Suitable)：TODO
+- 适合 (Suitable)：Texture inspection where contrast, energy, homogeneity, entropy, and correlation are meaningful summary features.
+- 适合 (Suitable)：ROI-based material or surface comparison with fixed quantization and direction settings.
+- 不适合 (Not Suitable)：Rotation-invariant texture classification without downstream aggregation or augmentation.
+- 不适合 (Not Suitable)：Large images with high quantization levels when per-frame latency is tightly bounded.
 
 ## 已知限制 / Known Limitations
-1. TODO
+1. Supported directions are currently limited to 0, 45, 90, and 135 degrees.
+2. The operator reports statistical texture features only; it does not classify texture defects by itself.
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-17 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.1 | 2026-04-24 | 自动生成文档骨架 / Generated skeleton |

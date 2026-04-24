@@ -16,7 +16,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Detects edges along an arc path with subpixel accuracy.",
     Category = "Measurement",
     IconName = "arc-caliper",
-    Keywords = new[] { "Caliper", "Arc", "Edge", "Measurement", "Circle" }
+    Keywords = new[] { "Caliper", "Arc", "Edge", "Measurement", "Circle" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Radial band-profile arc edge scan",
+    CoreApi = "arc sampling -> IndustrialCaliperKernel.SampleBandProfile -> DetectEdges -> InterpolatePosition",
+    ImplementationStrategy = "Samples one radial band profile per arc angle, applies polarity-aware edge detection on the profile, and converts the strongest edge position back to subpixel image coordinates.",
+    TimeComplexity = "O(A*S)",
+    TypicalLatency = "Avg 4.169 ms, max 5.747 ms over 31 synthetic golden cases",
+    SpaceComplexity = "O(S+P)",
+    SuitableUseCases = new[] { "Measuring circular or annular edges when center, radius, and angular search span are already constrained." },
+    UnsuitableUseCases = new[] { "Discovering unknown circles without a prior center/radius estimate.", "Low-texture arcs where no edge response should be treated as a low-confidence measurement." },
+    KnownLimitations = new[] { "The current scan step is fixed at one degree, so very short arcs may need a tighter dedicated measurement operator.", "The output reports detected points and count, but does not yet expose per-point uncertainty or an explicit no-edge failure status." }
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [InputPort("CenterX", "Arc Center X", PortDataType.Integer, IsRequired = true)]

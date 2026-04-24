@@ -14,7 +14,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Category = "Texture",
     IconName = "texture",
     Keywords = new[] { "Texture", "Laws", "Energy", "Filter", "GLCM" },
-    Version = "1.0.0"
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Laws 5x5 texture energy filtering",
+    CoreApi = "LawsTextureFilter.Apply -> OpenCV Filter2D -> LawsTextureFilter.ComputeEnergy -> local mean squared response",
+    ImplementationStrategy = "Converts the image to normalized gray float data, optionally subtracts local mean illumination, applies the configured 5x5 separable Laws kernel pair, and computes a local energy image from squared filter response.",
+    TimeComplexity = "O(W*H*(K^2+M^2+E^2))",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by texture unit and integration tests",
+    SpaceComplexity = "O(W*H)",
+    SuitableUseCases = new[] { "Highlighting local texture energy for material, surface, or defect pre-screening.", "Comparing fixed Laws kernel responses such as E5E5, E5L5, S5S5, W5W5, and R5R5." },
+    UnsuitableUseCases = new[] { "Semantic texture classification without downstream thresholds or model features.", "Images whose illumination drift cannot be corrected by local mean subtraction alone." },
+    KnownLimitations = new[] { "Kernel combo must use the classic L/E/S/W/R 5-tap Laws codes.", "Output energy depends on the selected window size and is not normalized across unrelated acquisition setups." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("FilteredImage", "Filtered Image", PortDataType.Image)]

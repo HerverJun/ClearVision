@@ -14,7 +14,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Category = "3D",
     IconName = "voxel",
     Keywords = new[] { "PointCloud", "Voxel", "Downsample", "3D" },
-    Version = "1.0.0"
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Voxel grid centroid downsampling",
+    CoreApi = "VoxelGridFilter.Downsample -> VoxelKey dictionary -> centroid/color/normal accumulation",
+    ImplementationStrategy = "Bins each point into a leaf-size voxel, accumulates point coordinates and optional color/normal channels per voxel, then emits one centroid representative for every occupied voxel.",
+    TimeComplexity = "O(N)",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by point-cloud unit and flow tests",
+    SpaceComplexity = "O(V)",
+    SuitableUseCases = new[] { "Reducing dense point clouds before registration, clustering, or surface inspection.", "Keeping approximate geometry while preserving averaged colors and normalized normals per voxel." },
+    UnsuitableUseCases = new[] { "Applications that require preserving every raw point or organized point-cloud topology.", "Very small leaf sizes that produce nearly one voxel per input point and little reduction." },
+    KnownLimitations = new[] { "Output is always unorganized even when the input cloud is organized.", "Voxel representatives are centroids rather than nearest original samples, so exact raw-point identity is not preserved." },
+    Dependencies = new[] { "OpenCvSharp", "Acme.Product.Infrastructure.PointCloud" }
 )]
 [InputPort("PointCloud", "Point Cloud", PortDataType.Any, IsRequired = true)]
 [OutputPort("PointCloud", "Point Cloud", PortDataType.Any)]

@@ -14,11 +14,11 @@
 > English: Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivity..
 
 ## 实现策略 / Implementation Strategy
-> 中文：TODO：补充实现策略与方案对比。
-> English: TODO: Add implementation strategy and alternatives comparison.
+> 中文：Converts the region to a padded binary mask, applies iterative Zhang-Suen thinning, translates the skeleton back to original coordinates, and reports endpoint/branchpoint diagnostics.。
+> English: Converts the region to a padded binary mask, applies iterative Zhang-Suen thinning, translates the skeleton back to original coordinates, and reports endpoint/branchpoint diagnostics..
 
 ## 核心 API 调用链 / Core API Call Chain
-- TODO：补充关键 API 调用链
+- `Region.ToMat -> ZhangSuenThinning -> Region.FromMat -> AnalyzeSkeleton`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
@@ -45,18 +45,19 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | O(?) |
-| 典型耗时 (Typical Latency) | ~?ms (1920x1080) |
-| 内存特征 (Memory Profile) | ? |
+| 时间复杂度 (Time Complexity) | O(I*W*H) |
+| 典型耗时 (Typical Latency) | Avg 1.438 ms, max 18.477 ms over 100 synthetic golden cases |
+| 内存特征 (Memory Profile) | O(W*H) |
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：TODO
-- 不适合 (Not Suitable)：TODO
+- 适合 (Suitable)：Extracting pixel skeletons for topology checks, centerline-like diagnostics, and coarse branch/end point counting.
+- 不适合 (Not Suitable)：Subpixel centerline extraction, metrology-grade medial-axis fitting, or topology guarantees beyond the implemented Zhang-Suen rules.
 
 ## 已知限制 / Known Limitations
-1. TODO
+1. Endpoint and branchpoint counts are based on discrete 8-neighborhood diagnostics and may over-count near thick junctions.
+2. PreserveTopology is reported in output metadata, but the execution path currently always uses the Zhang-Suen thinning implementation.
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-18 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.1 | 2026-04-24 | 自动生成文档骨架 / Generated skeleton |

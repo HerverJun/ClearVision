@@ -10,15 +10,15 @@
 | 作者 (Author) | 蘅芜君 |
 
 ## 算法原理 / Algorithm Principle
-> 中文：Computes phase closure by unwrapping wrapped phase from interferometric measurements.。
-> English: Computes phase closure by unwrapping wrapped phase from interferometric measurements..
+> 中文：Unwraps wrapped phase maps while preserving the original phase domain semantics.。
+> English: Unwraps wrapped phase maps while preserving the original phase domain semantics..
 
 ## 实现策略 / Implementation Strategy
-> 中文：TODO：补充实现策略与方案对比。
-> English: TODO: Add implementation strategy and alternatives comparison.
+> 中文：Normalizes phase input to a wrapped float map, unwraps adjacent phase differences with Itoh, quality-guided, or flood-fill traversal, and emits the unwrapped phase plus discontinuity visualization.。
+> English: Normalizes phase input to a wrapped float map, unwraps adjacent phase differences with Itoh, quality-guided, or flood-fill traversal, and emits the unwrapped phase plus discontinuity visualization..
 
 ## 核心 API 调用链 / Core API Call Chain
-- TODO：补充关键 API 调用链
+- `ImageWrapper -> wrapped CV_32F phase -> Itoh/quality/floodfill unwrap -> discontinuity map`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
@@ -45,18 +45,21 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | O(?) |
-| 典型耗时 (Typical Latency) | ~?ms (1920x1080) |
-| 内存特征 (Memory Profile) | ? |
+| 时间复杂度 (Time Complexity) | O(W*H log(W*H)) for quality-guided mode, O(W*H) for Itoh/floodfill |
+| 典型耗时 (Typical Latency) | Avg 1.429 ms, max 4.590 ms over 22 synthetic golden cases |
+| 内存特征 (Memory Profile) | O(W*H) |
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：TODO
-- 不适合 (Not Suitable)：TODO
+- 适合 (Suitable)：Smooth wrapped phase maps whose adjacent phase step stays within the unwrap assumptions.
+- 适合 (Suitable)：Interferometry-style inspection where a discontinuity map and quality metric are needed with the unwrapped phase.
+- 不适合 (Not Suitable)：Severely noisy phase maps without masking or preprocessing.
+- 不适合 (Not Suitable)：Topology-heavy phase fields that require branch-cut optimization or domain-specific residue handling.
 
 ## 已知限制 / Known Limitations
-1. TODO
+1. Quality-guided mode uses a local gradient-derived quality map when no external map is provided.
+2. The current output quality is a stability heuristic, not a calibrated metrology uncertainty.
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-18 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.1 | 2026-04-24 | 自动生成文档骨架 / Generated skeleton |

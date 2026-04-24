@@ -343,4 +343,52 @@ public class CommentOperatorTests
         result.OutputData!["Output"].Should().BeSameAs(payload);
         result.OutputData["Message"].Should().Be("checkpoint");
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithImagePayload_ShouldPreserveImageReference()
+    {
+        var payload = TestHelpers.CreateTestImage(width: 24, height: 16);
+        var op = new Operator("comment", OperatorType.Comment, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Text", "image checkpoint", "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Input"] = payload
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        var output = result.OutputData!["Output"].Should().BeOfType<ImageWrapper>().Subject;
+        output.Should().BeSameAs(payload);
+        output.RefCount.Should().Be(1);
+        result.OutputData["Message"].Should().Be("image checkpoint");
+
+        output.Release();
+    }
+
+    [Fact]
+    public void ValidateParameters_ShouldRejectOversizedText()
+    {
+        var op = new Operator("comment", OperatorType.Comment, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Text", new string('x', 4097), "string"));
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle().Which.Should().Contain("4096");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldFail_WhenTextExceedsContractLimit()
+    {
+        var op = new Operator("comment", OperatorType.Comment, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Text", new string('x', 4097), "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Input"] = "payload"
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("4096");
+    }
 }

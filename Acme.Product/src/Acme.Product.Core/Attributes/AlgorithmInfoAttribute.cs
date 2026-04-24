@@ -13,9 +13,19 @@ public sealed class AlgorithmInfoAttribute : Attribute
 
     public string? CoreApi { get; set; }
 
+    public string? ImplementationStrategy { get; set; }
+
     public string? TimeComplexity { get; set; }
 
+    public string? TypicalLatency { get; set; }
+
     public string? SpaceComplexity { get; set; }
+
+    public string[]? SuitableUseCases { get; set; }
+
+    public string[]? UnsuitableUseCases { get; set; }
+
+    public string[]? KnownLimitations { get; set; }
 
     public string[]? Dependencies { get; set; }
 }
