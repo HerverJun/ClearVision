@@ -30,6 +30,9 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("PreserveTopology", "Preserve Topology", "bool", DefaultValue = true)]
 public class RegionSkeletonOperator : OperatorBase
 {
+    private const string SkeletonAlgorithm = "Zhang-Suen";
+    private const int SkeletonConnectivity = (int)ConnectivityType.EightConnected;
+
     public override OperatorType OperatorType => OperatorType.RegionSkeleton;
 
     public RegionSkeletonOperator(ILogger<RegionSkeletonOperator> logger) : base(logger) { }
@@ -49,13 +52,14 @@ public class RegionSkeletonOperator : OperatorBase
         // 转换为二值图像进行骨架化
         var originalBounds = region.BoundingBox;
         using var binaryMat = region.ToMat();
-        using var skeletonMat = ZhangSuenThinning(binaryMat, maxIterations);
-        var skeletonRegion = Region.FromMat(skeletonMat).Translate(originalBounds.X, originalBounds.Y);
+        using var paddedBinaryMat = CreatePaddedBinary(binaryMat);
+        using var skeletonMat = ZhangSuenThinning(paddedBinaryMat, maxIterations);
+        var skeletonRegion = Region.FromMat(skeletonMat).Translate(originalBounds.X - 1, originalBounds.Y - 1);
 
         // 分析骨架特征
         var (localEndPoints, localBranchPoints) = AnalyzeSkeleton(skeletonMat);
-        var endPoints = TranslatePoints(localEndPoints, originalBounds.X, originalBounds.Y);
-        var branchPoints = TranslatePoints(localBranchPoints, originalBounds.X, originalBounds.Y);
+        var endPoints = TranslatePoints(localEndPoints, originalBounds.X - 1, originalBounds.Y - 1);
+        var branchPoints = TranslatePoints(localBranchPoints, originalBounds.X - 1, originalBounds.Y - 1);
 
         stopwatch.Stop();
 
@@ -71,9 +75,18 @@ public class RegionSkeletonOperator : OperatorBase
             { "BranchPoints", branchPoints.Count },
             { "OriginalArea", region.Area },
             { "ReductionRatio", region.Area > 0 ? 1.0 - (double)skeletonRegion.Area / region.Area : 0 },
+            { "Algorithm", SkeletonAlgorithm },
+            { "Connectivity", SkeletonConnectivity },
             { "PreserveTopology", preserveTopology },
             { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
         })));
+    }
+
+    private static Mat CreatePaddedBinary(Mat binaryMat)
+    {
+        var padded = new Mat(binaryMat.Rows + 2, binaryMat.Cols + 2, MatType.CV_8UC1, Scalar.All(0));
+        binaryMat.CopyTo(padded[new Rect(1, 1, binaryMat.Cols, binaryMat.Rows)]);
+        return padded;
     }
 
     private Mat ZhangSuenThinning(Mat binaryInput, int maxIter)
@@ -251,7 +264,17 @@ public class RegionSkeletonOperator : OperatorBase
     {
         var m = new Mat(300, 400, MatType.CV_8UC3, Scalar.Black);
         Cv2.PutText(m, "Empty Region", new Point(10, 30), HersheyFonts.HersheySimplex, 0.7, new Scalar(0, 0, 255), 2);
-        return OperatorExecutionOutput.Success(CreateImageOutput(m, new Dictionary<string, object> { { "Region", new Region() }, { "SkeletonLength", 0 }, { "EndPoints", 0 }, { "BranchPoints", 0 } }));
+        return OperatorExecutionOutput.Success(CreateImageOutput(m, new Dictionary<string, object>
+        {
+            { "Region", new Region() },
+            { "SkeletonLength", 0 },
+            { "EndPoints", 0 },
+            { "BranchPoints", 0 },
+            { "Algorithm", SkeletonAlgorithm },
+            { "Connectivity", SkeletonConnectivity },
+            { "PreserveTopology", true },
+            { "Message", "Input region is empty" }
+        }));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)

@@ -18,9 +18,44 @@ public class SubpixelEdgePoint
         $"({X:F4}, {Y:F4}) N=({NormalX:F4}, {NormalY:F4}) S={Strength:F4}";
 }
 
+public sealed class StegerDetectionDiagnostics
+{
+    public static StegerDetectionDiagnostics Empty { get; } = new();
+
+    public int ImageWidth { get; set; }
+
+    public int ImageHeight { get; set; }
+
+    public int KernelRadius { get; set; }
+
+    public int CandidateEdgePixels { get; set; }
+
+    public int AcceptedEdgePoints { get; set; }
+
+    public int DerivativePlaneCount { get; set; }
+
+    public long DerivativeRegionPixels { get; set; }
+
+    public long ApproxDerivativeBufferBytes { get; set; }
+
+    public bool UsedFullImageDerivatives { get; set; }
+
+    public bool ShouldConsiderRoiCropping { get; set; }
+
+    public double CandidateEdgeDensity =>
+        ImageWidth <= 0 || ImageHeight <= 0
+            ? 0.0
+            : CandidateEdgePixels / (double)(ImageWidth * ImageHeight);
+
+    public double ApproxDerivativeBufferMegabytes => ApproxDerivativeBufferBytes / (1024.0 * 1024.0);
+}
+
 public class StegerSubpixelEdgeDetector : IDisposable
 {
     private const double NumericalEpsilon = 1e-10;
+    private const int DerivativePlaneCount = 5;
+    private const long RoiCroppingHintBytesThreshold = 128L * 1024 * 1024;
+    private const double RoiCroppingHintDensityThreshold = 0.02;
 
     public double EdgeThreshold { get; set; } = 10.0;
 
@@ -28,9 +63,12 @@ public class StegerSubpixelEdgeDetector : IDisposable
 
     public double Sigma { get; set; } = 1.0;
 
+    public StegerDetectionDiagnostics LastDiagnostics { get; private set; } = StegerDetectionDiagnostics.Empty;
+
     public List<SubpixelEdgePoint> DetectEdges(Mat image, double cannyLow = 50, double cannyHigh = 150)
     {
         var edgePoints = new List<SubpixelEdgePoint>();
+        LastDiagnostics = StegerDetectionDiagnostics.Empty;
 
         using var gray = new Mat();
         if (image.Channels() > 1)
@@ -47,6 +85,22 @@ public class StegerSubpixelEdgeDetector : IDisposable
 
         using var edges = new Mat();
         Cv2.Canny(cannySource, edges, cannyLow, cannyHigh);
+
+        var width = edges.Cols;
+        var height = edges.Rows;
+        var margin = GetKernelRadius();
+        var candidateEdgePixels = Cv2.CountNonZero(edges);
+        if (candidateEdgePixels == 0)
+        {
+            LastDiagnostics = CreateDiagnostics(
+                width,
+                height,
+                margin,
+                candidateEdgePixels,
+                acceptedEdgePoints: 0,
+                usedFullImageDerivatives: false);
+            return edgePoints;
+        }
 
         using var dx = new Mat();
         using var dy = new Mat();
@@ -66,9 +120,6 @@ public class StegerSubpixelEdgeDetector : IDisposable
 
             var edgeStep = (int)edges.Step();
             var derivStep = (int)dx.Step() / sizeof(double);
-            var width = edges.Cols;
-            var height = edges.Rows;
-            var margin = GetKernelRadius();
 
             for (var y = margin; y < height - margin; y++)
             {
@@ -96,6 +147,14 @@ public class StegerSubpixelEdgeDetector : IDisposable
                 }
             }
         }
+
+        LastDiagnostics = CreateDiagnostics(
+            width,
+            height,
+            margin,
+            candidateEdgePixels,
+            edgePoints.Count,
+            usedFullImageDerivatives: true);
 
         return edgePoints;
     }
@@ -288,6 +347,37 @@ public class StegerSubpixelEdgeDetector : IDisposable
     private int GetKernelRadius() => Math.Max(1, (int)Math.Ceiling(EffectiveSigma * 3.0));
 
     private double EffectiveSigma => Math.Max(0.1, Sigma);
+
+    private static StegerDetectionDiagnostics CreateDiagnostics(
+        int width,
+        int height,
+        int kernelRadius,
+        int candidateEdgePixels,
+        int acceptedEdgePoints,
+        bool usedFullImageDerivatives)
+    {
+        var derivativeRegionPixels = usedFullImageDerivatives ? (long)width * height : 0L;
+        var approxDerivativeBufferBytes = derivativeRegionPixels * DerivativePlaneCount * sizeof(double);
+        var candidateEdgeDensity = width <= 0 || height <= 0
+            ? 0.0
+            : candidateEdgePixels / (double)(width * height);
+
+        return new StegerDetectionDiagnostics
+        {
+            ImageWidth = width,
+            ImageHeight = height,
+            KernelRadius = kernelRadius,
+            CandidateEdgePixels = candidateEdgePixels,
+            AcceptedEdgePoints = acceptedEdgePoints,
+            DerivativePlaneCount = usedFullImageDerivatives ? DerivativePlaneCount : 0,
+            DerivativeRegionPixels = derivativeRegionPixels,
+            ApproxDerivativeBufferBytes = approxDerivativeBufferBytes,
+            UsedFullImageDerivatives = usedFullImageDerivatives,
+            ShouldConsiderRoiCropping = usedFullImageDerivatives &&
+                approxDerivativeBufferBytes >= RoiCroppingHintBytesThreshold &&
+                candidateEdgeDensity <= RoiCroppingHintDensityThreshold
+        };
+    }
 
     public (double cx, double cy, double radius, double rmse) FitCircle(List<SubpixelEdgePoint> points)
     {

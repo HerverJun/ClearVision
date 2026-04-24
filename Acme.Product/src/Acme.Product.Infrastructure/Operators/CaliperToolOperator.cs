@@ -562,9 +562,9 @@ public class CaliperToolOperator : OperatorBase
         if (detector != null)
         {
             if (subPixelMode.Equals("zernike", StringComparison.OrdinalIgnoreCase) &&
-                TryRefineSubpixelZernike(samples, idx, sampleCount, edgeThreshold, polarity, detector, out var refinedZernike))
+                TryRefineSubpixelGradientMoment(samples, idx, sampleCount, edgeThreshold, polarity, detector, out var refinedGradientMoment))
             {
-                return refinedZernike;
+                return refinedGradientMoment;
             }
 
             if (TryRefineSubpixelCentroid(samples, idx, sampleCount, edgeThreshold, polarity, detector, out var refinedCentroid))
@@ -664,7 +664,7 @@ public class CaliperToolOperator : OperatorBase
         return true;
     }
 
-    private static bool TryRefineSubpixelZernike(
+    private static bool TryRefineSubpixelGradientMoment(
         IReadOnlyList<double> samples,
         int edgeIndex,
         int sampleCount,
@@ -682,13 +682,13 @@ public class CaliperToolOperator : OperatorBase
         using var lineProfile = Mat.FromArray(window);
         lineProfile.Reshape(1, 1);
         detector.EdgeThreshold = (byte)Math.Clamp(edgeThreshold, 1.0, 255.0);
-        var zernike = detector.DetectZernike(lineProfile);
-        if (zernike < 0)
+        var gradientMoment = detector.DetectGradientMoment(lineProfile);
+        if (gradientMoment < 0)
         {
             return false;
         }
 
-        var refinedGradientIndex = start + zernike;
+        var refinedGradientIndex = start + gradientMoment;
         var refinedSampleIndex = refinedGradientIndex + 1;
         refinedT = Math.Clamp(refinedSampleIndex / Math.Max(sampleCount - 1, 1), 0.0, 1.0);
         return true;

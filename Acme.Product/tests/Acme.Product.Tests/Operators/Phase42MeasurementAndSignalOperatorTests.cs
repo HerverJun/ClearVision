@@ -37,6 +37,85 @@ public class Phase42MeasurementAndSignalOperatorTests
     }
 
     [Fact]
+    public async Task ArcCaliper_ShouldFail_OnEmptyImage()
+    {
+        var sut = new ArcCaliperOperator(Substitute.For<ILogger<ArcCaliperOperator>>());
+        var op = new Operator("ArcCaliper", OperatorType.ArcCaliper, 0, 0);
+        using var empty = new Mat();
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = empty
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("empty");
+    }
+
+    [Fact]
+    public async Task ArcCaliper_ShouldFail_WhenRadiusPlacesArcOutsideSamplingRegion()
+    {
+        var sut = new ArcCaliperOperator(Substitute.For<ILogger<ArcCaliperOperator>>());
+        var op = new Operator("ArcCaliper", OperatorType.ArcCaliper, 0, 0);
+        using var image = CreateArcEdgeImage();
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["CenterX"] = 100,
+            ["CenterY"] = 100,
+            ["Radius"] = 160,
+            ["StartAngle"] = 25.0,
+            ["EndAngle"] = 155.0
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("sampling region");
+    }
+
+    [Fact]
+    public async Task ArcCaliper_ShouldFail_WhenArcSpanIsZero()
+    {
+        var sut = new ArcCaliperOperator(Substitute.For<ILogger<ArcCaliperOperator>>());
+        var op = new Operator("ArcCaliper", OperatorType.ArcCaliper, 0, 0);
+        using var image = CreateArcEdgeImage();
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["CenterX"] = 100,
+            ["CenterY"] = 100,
+            ["Radius"] = 55,
+            ["StartAngle"] = 45.0,
+            ["EndAngle"] = 45.0
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("span");
+    }
+
+    [Fact]
+    public async Task ArcCaliper_ShouldFail_WhenAnglesAreNotFinite()
+    {
+        var sut = new ArcCaliperOperator(Substitute.For<ILogger<ArcCaliperOperator>>());
+        var op = new Operator("ArcCaliper", OperatorType.ArcCaliper, 0, 0);
+        using var image = CreateArcEdgeImage();
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["CenterX"] = 100,
+            ["CenterY"] = 100,
+            ["Radius"] = 55,
+            ["StartAngle"] = double.NaN,
+            ["EndAngle"] = 135.0
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("finite");
+    }
+
+    [Fact]
     public async Task ContourExtrema_ShouldReportMinAndMaxPoints()
     {
         var sut = new ContourExtremaOperator(Substitute.For<ILogger<ContourExtremaOperator>>());
@@ -60,6 +139,110 @@ public class Phase42MeasurementAndSignalOperatorTests
         var maxPoint = (Point2f)result.OutputData["MaxPoint"];
         minPoint.Y.Should().BeApproximately(12, 0.1f);
         maxPoint.Y.Should().BeApproximately(60, 0.1f);
+    }
+
+    [Fact]
+    public async Task ContourExtrema_ShouldFail_OnEmptyContour()
+    {
+        var sut = new ContourExtremaOperator(Substitute.For<ILogger<ContourExtremaOperator>>());
+        var op = new Operator("ContourExtrema", OperatorType.ContourExtrema, 0, 0);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Contour"] = Array.Empty<Point2f>()
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("at least one point");
+    }
+
+    [Fact]
+    public async Task ContourExtrema_ShouldHandleSinglePointContour()
+    {
+        var sut = new ContourExtremaOperator(Substitute.For<ILogger<ContourExtremaOperator>>());
+        var op = new Operator("ContourExtrema", OperatorType.ContourExtrema, 0, 0);
+        var point = new Point2f(12, 34);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Contour"] = new[] { point },
+            ["Direction"] = "horizontal"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        ((Point2f)result.OutputData!["MinPoint"]).Should().Be(point);
+        ((Point2f)result.OutputData["MaxPoint"]).Should().Be(point);
+        result.OutputData["ExtremaPoints"].Should().BeOfType<List<Point2f>>().Subject.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ContourExtrema_ShouldUseDeterministicTieBreak_ForCollinearContour()
+    {
+        var sut = new ContourExtremaOperator(Substitute.For<ILogger<ContourExtremaOperator>>());
+        var op = new Operator("ContourExtrema", OperatorType.ContourExtrema, 0, 0);
+        var contour = new[]
+        {
+            new Point2f(40, 10),
+            new Point2f(10, 10),
+            new Point2f(25, 10)
+        };
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Contour"] = contour,
+            ["Direction"] = "vertical"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        var minPoint = (Point2f)result.OutputData!["MinPoint"];
+        var maxPoint = (Point2f)result.OutputData["MaxPoint"];
+        minPoint.X.Should().BeApproximately(10, 0.1f);
+        maxPoint.X.Should().BeApproximately(40, 0.1f);
+    }
+
+    [Fact]
+    public async Task ContourExtrema_ShouldFail_ForDistanceDirectionWithoutReferencePoint()
+    {
+        var sut = new ContourExtremaOperator(Substitute.For<ILogger<ContourExtremaOperator>>());
+        var op = new Operator("ContourExtrema", OperatorType.ContourExtrema, 0, 0);
+        var contour = new[]
+        {
+            new Point2f(1, 1),
+            new Point2f(4, 5)
+        };
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Contour"] = contour,
+            ["Direction"] = "distance"
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("ReferencePoint");
+    }
+
+    [Fact]
+    public async Task ContourExtrema_ShouldComputeDistanceExtrema_WithReferencePoint()
+    {
+        var sut = new ContourExtremaOperator(Substitute.For<ILogger<ContourExtremaOperator>>());
+        var op = new Operator("ContourExtrema", OperatorType.ContourExtrema, 0, 0);
+        var contour = new[]
+        {
+            new Point2f(1, 1),
+            new Point2f(3, 4),
+            new Point2f(8, 6)
+        };
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Contour"] = contour,
+            ["Direction"] = "distance",
+            ["ReferencePoint"] = new Point2f(0, 0)
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        ((Point2f)result.OutputData!["MinPoint"]).Should().Be(new Point2f(1, 1));
+        ((Point2f)result.OutputData["MaxPoint"]).Should().Be(new Point2f(8, 6));
     }
 
     [Fact]
@@ -315,6 +498,102 @@ public class Phase42MeasurementAndSignalOperatorTests
     }
 
     [Fact]
+    public async Task PhaseClosure_ShouldKeepUniformPhaseStable()
+    {
+        var sut = new PhaseClosureOperator(Substitute.For<ILogger<PhaseClosureOperator>>());
+        var op = new Operator("PhaseClosure", OperatorType.PhaseClosure, 0, 0);
+        using var phase = CreateUniformPhaseImage(size: 40, value: 1.25f);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["PhaseImage"] = phase,
+            ["UnwrapMethod"] = "itoh"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        Convert.ToDouble(result.OutputData!["Quality"]).Should().BeGreaterThan(0.99);
+
+        using var unwrappedWrapper = result.OutputData["UnwrappedPhase"].Should().BeOfType<ImageWrapper>().Subject;
+        using var unwrapped = unwrappedWrapper.GetMat();
+        using var discontinuitiesWrapper = result.OutputData["Discontinuities"].Should().BeOfType<ImageWrapper>().Subject;
+        using var discontinuities = discontinuitiesWrapper.GetMat();
+
+        Cv2.CountNonZero(discontinuities).Should().Be(0);
+        CountNonFinitePixels(unwrapped).Should().Be(0);
+        unwrapped.At<float>(0, 0).Should().BeApproximately(1.25f, 1e-4f);
+    }
+
+    [Fact]
+    public async Task PhaseClosure_ShouldUseExternalQualityMap_ForQualityMethod()
+    {
+        var sut = new PhaseClosureOperator(Substitute.For<ILogger<PhaseClosureOperator>>());
+        var op = new Operator("PhaseClosure", OperatorType.PhaseClosure, 0, 0);
+        using var phase = CreateWrappedPhaseImage();
+        using var qualityMap = CreatePhaseQualityMap(phase.Rows, phase.Cols);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["PhaseImage"] = phase,
+            ["QualityMap"] = qualityMap,
+            ["UnwrapMethod"] = "quality"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["Method"].Should().Be("quality");
+
+        using var unwrappedWrapper = result.OutputData["UnwrappedPhase"].Should().BeOfType<ImageWrapper>().Subject;
+        using var unwrapped = unwrappedWrapper.GetMat();
+
+        CountNonFinitePixels(unwrapped).Should().Be(0);
+        ComputeRampMaeAllowingGlobalOffset(unwrapped).Should().BeLessThan(0.35);
+    }
+
+    [Fact]
+    public async Task PhaseClosure_ShouldFail_WhenQualityMapSizeDoesNotMatch()
+    {
+        var sut = new PhaseClosureOperator(Substitute.For<ILogger<PhaseClosureOperator>>());
+        var op = new Operator("PhaseClosure", OperatorType.PhaseClosure, 0, 0);
+        using var phase = CreateWrappedPhaseImage();
+        using var qualityMap = CreatePhaseQualityMap(phase.Rows / 2, phase.Cols / 2);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["PhaseImage"] = phase,
+            ["QualityMap"] = qualityMap,
+            ["UnwrapMethod"] = "quality"
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("QualityMap");
+    }
+
+    [Fact]
+    public async Task PhaseClosure_FloodFill_ShouldMarkLargeDiscontinuities()
+    {
+        var sut = new PhaseClosureOperator(Substitute.For<ILogger<PhaseClosureOperator>>());
+        var op = new Operator("PhaseClosure", OperatorType.PhaseClosure, 0, 0);
+        using var phase = CreateWrappedPhaseImageWithDiscontinuity();
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["PhaseImage"] = phase,
+            ["UnwrapMethod"] = "floodfill"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["Method"].Should().Be("floodfill");
+        Convert.ToDouble(result.OutputData["Quality"]).Should().BeGreaterThan(0.0).And.BeLessOrEqualTo(1.0);
+
+        using var unwrappedWrapper = result.OutputData["UnwrappedPhase"].Should().BeOfType<ImageWrapper>().Subject;
+        using var unwrapped = unwrappedWrapper.GetMat();
+        using var discontinuitiesWrapper = result.OutputData["Discontinuities"].Should().BeOfType<ImageWrapper>().Subject;
+        using var discontinuities = discontinuitiesWrapper.GetMat();
+
+        CountNonFinitePixels(unwrapped).Should().Be(0);
+        Cv2.CountNonZero(discontinuities).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task MorphologicalOperation_ShouldSupportTopHatAndBlackHat()
     {
         var sut = new MorphologicalOperationOperator(Substitute.For<ILogger<MorphologicalOperationOperator>>());
@@ -355,6 +634,50 @@ public class Phase42MeasurementAndSignalOperatorTests
         return phase;
     }
 
+    private static Mat CreateUniformPhaseImage(int size, float value)
+    {
+        return new Mat(size, size, MatType.CV_32FC1, Scalar.All(value));
+    }
+
+    private static Mat CreateWrappedPhaseImageWithDiscontinuity()
+    {
+        var phase = new Mat(48, 48, MatType.CV_32FC1);
+        for (var y = 0; y < phase.Rows; y++)
+        {
+            for (var x = 0; x < phase.Cols; x++)
+            {
+                var value = y * 0.04;
+                if (x >= phase.Cols / 2)
+                {
+                    value += Math.PI - 0.05;
+                }
+
+                phase.Set(y, x, WrapPhase(value));
+            }
+        }
+
+        return phase;
+    }
+
+    private static Mat CreatePhaseQualityMap(int rows, int cols)
+    {
+        var quality = new Mat(rows, cols, MatType.CV_8UC1);
+        var centerX = (cols - 1) / 2.0;
+        var centerY = (rows - 1) / 2.0;
+
+        for (var y = 0; y < rows; y++)
+        {
+            for (var x = 0; x < cols; x++)
+            {
+                var distance = Math.Sqrt(Math.Pow(x - centerX, 2) + Math.Pow(y - centerY, 2));
+                var value = 255.0 - (distance * 6.0);
+                quality.Set(y, x, (byte)Math.Clamp((int)Math.Round(value), 1, 255));
+            }
+        }
+
+        return quality;
+    }
+
     private static ImageWrapper CreateFrequencyImage()
     {
         var mat = new Mat(48, 64, MatType.CV_8UC1);
@@ -388,5 +711,60 @@ public class Phase42MeasurementAndSignalOperatorTests
         }
 
         return Math.Clamp(parsed, minValue, maxValue);
+    }
+
+    private static double ComputeRampMae(Mat unwrapped)
+    {
+        var mae = 0.0;
+        for (var y = 0; y < unwrapped.Rows; y++)
+        {
+            for (var x = 0; x < unwrapped.Cols; x++)
+            {
+                var expected = (x * 0.25) + (y * 0.18);
+                mae += Math.Abs(unwrapped.At<float>(y, x) - expected);
+            }
+        }
+
+        return mae / (unwrapped.Rows * unwrapped.Cols);
+    }
+
+    private static double ComputeRampMaeAllowingGlobalOffset(Mat unwrapped)
+    {
+        var globalOffset = unwrapped.At<float>(0, 0);
+        var mae = 0.0;
+
+        for (var y = 0; y < unwrapped.Rows; y++)
+        {
+            for (var x = 0; x < unwrapped.Cols; x++)
+            {
+                var expected = (x * 0.25) + (y * 0.18);
+                mae += Math.Abs((unwrapped.At<float>(y, x) - globalOffset) - expected);
+            }
+        }
+
+        return mae / (unwrapped.Rows * unwrapped.Cols);
+    }
+
+    private static int CountNonFinitePixels(Mat mat)
+    {
+        var count = 0;
+        for (var y = 0; y < mat.Rows; y++)
+        {
+            for (var x = 0; x < mat.Cols; x++)
+            {
+                var value = mat.At<float>(y, x);
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static float WrapPhase(double value)
+    {
+        return (float)Math.Atan2(Math.Sin(value), Math.Cos(value));
     }
 }

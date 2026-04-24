@@ -1,146 +1,134 @@
 /* ==========================================================================
-   ClearVision UI 2.0 - Digital Ink Components
+   ClearVision UI - Spatial Elegance Components
    Button, Input, Modal, Toast, TreeView, SplitPanel Styles
+   Philosophy: Restraint is elegance. Every pixel must earn its place.
    ========================================================================== */
 
 /* ==========================================================================
-   Ink Buttons (水墨按钮)
+   Buttons - Minimal Line Aesthetic
    ========================================================================== */
 
 .cv-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 10px 20px;
+    gap: 6px;
+    padding: 7px 16px;
     font-size: var(--font-size-sm);
     font-weight: 500;
-    border: none;
-    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all var(--duration-fast) var(--ease-ink);
     line-height: 1.5;
     white-space: nowrap;
     position: relative;
     overflow: hidden;
+    background: transparent;
+    color: var(--text-secondary);
+    letter-spacing: 0.01em;
 }
 
 .cv-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.35;
     cursor: not-allowed;
-    filter: grayscale(100%);
 }
 
-/* Primary Button - Cinnabar Neon */
+/* Primary - Warm amber, not aggressive */
 .cv-btn-primary {
-    background: var(--gradient-cinnabar);
-    color: var(--paper-white);
-    box-shadow: 
-        0 4px 15px rgba(231, 76, 60, 0.3),
-        0 0 0 1px rgba(231, 76, 60, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    background: var(--cinnabar);
+    color: var(--ink-deep);
+    border-color: transparent;
+    font-weight: 600;
 }
 
 .cv-btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 
-        0 8px 25px rgba(231, 76, 60, 0.4),
-        0 0 0 1px rgba(231, 76, 60, 0.6),
-        var(--neon-cinnabar-strong),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    background: var(--gold-accent);
+    box-shadow: var(--neon-cinnabar);
+    transform: translateY(-1px);
 }
 
 .cv-btn-primary:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 
-        0 2px 8px rgba(231, 76, 60, 0.3),
-        inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    transform: translateY(0) scale(0.97);
+    background: var(--cinnabar-dark);
+    box-shadow: none;
 }
 
-/* Ink Ripple Effect */
-.cv-btn-primary::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: radial-gradient(
-        circle,
-        rgba(255, 255, 255, 0.4) 0%,
-        transparent 60%
-    );
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
-}
-
-.cv-btn-primary:active::after {
-    width: 300px;
-    height: 300px;
-}
-
-/* Secondary Button - Glass Border */
+/* Secondary - Ghost */
 .cv-btn-secondary {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--paper-white);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-inset);
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--glass-border);
 }
 
 .cv-btn-secondary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--gold-accent);
-    box-shadow: 
-        0 0 20px rgba(212, 175, 55, 0.15),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    background: var(--hover-color);
+    border-color: var(--theme-border);
+    color: var(--text-primary);
+    transform: translateY(-1px);
 }
 
-/* Danger Button */
+.cv-btn-secondary:active:not(:disabled) {
+    transform: translateY(0) scale(0.97);
+}
+
+/* Danger - Outlined warning */
 .cv-btn-danger {
-    background: rgba(192, 57, 43, 0.15);
+    background: transparent;
     color: var(--error-cinnabar);
-    border: 1px solid rgba(192, 57, 43, 0.3);
+    border-color: rgba(248, 113, 113, 0.2);
 }
 
 .cv-btn-danger:hover:not(:disabled) {
-    background: rgba(192, 57, 43, 0.25);
-    border-color: var(--error-cinnabar);
-    box-shadow: 0 0 20px rgba(192, 57, 43, 0.2);
+    background: rgba(248, 113, 113, 0.06);
+    border-color: rgba(248, 113, 113, 0.35);
+    transform: translateY(-1px);
+}
+
+.cv-btn-danger:active:not(:disabled) {
+    transform: translateY(0) scale(0.97);
 }
 
 /* Icon Button */
 .cv-btn-icon {
-    padding: 8px;
-    width: 36px;
-    height: 36px;
+    padding: 6px;
+    width: 32px;
+    height: 32px;
     background: transparent;
-    color: var(--ink-gray);
-    font-size: 16px;
-    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    border: none;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .cv-btn-icon:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--gold-accent);
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
+    background: var(--hover-color);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.cv-btn-icon:active:not(:disabled) {
+    transform: translateY(0) scale(0.92);
 }
 
 /* ==========================================================================
-   Ink Inputs (水墨输入框)
+   Inputs - Understated Elegance
    ========================================================================== */
 
 .cv-input-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 6px;
+    margin-bottom: 14px;
     position: relative;
 }
 
 .cv-input-label {
     font-size: var(--font-size-xs);
-    font-weight: 500;
-    color: var(--gold-accent);
+    font-weight: 600;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -152,33 +140,36 @@
 
 .cv-input {
     width: 100%;
-    padding: 12px 14px;
+    padding: 10px 14px;
     font-size: var(--font-size-base);
-    background: rgba(13, 27, 42, 0.5);
+    background: var(--bg-color);
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    color: var(--paper-white);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
     transition: all var(--duration-fast) var(--ease-ink);
+    box-shadow: var(--shadow-sm), var(--shadow-inset);
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
 }
 
 .cv-input::placeholder {
-    color: var(--ink-gray);
+    color: var(--text-muted);
+    opacity: 0.6;
 }
 
 .cv-input:focus {
     outline: none;
     border-color: var(--cinnabar);
-    box-shadow: 
-        0 0 0 3px rgba(231, 76, 60, 0.1),
-        var(--neon-cinnabar),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    background: rgba(13, 27, 42, 0.7);
+    box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.06), var(--neon-cinnabar);
+    background: var(--bg-subtle);
+    transform: translateY(-1px);
 }
 
 .cv-input:disabled {
-    background: rgba(13, 27, 42, 0.3);
-    color: var(--ink-gray);
+    background: transparent;
+    color: var(--text-muted);
     cursor: not-allowed;
+    opacity: 0.5;
 }
 
 /* Floating Label Input */
@@ -187,7 +178,7 @@
 }
 
 .cv-input-floating .cv-input {
-    padding: 16px 14px 8px;
+    padding: 14px 14px 6px;
 }
 
 .cv-input-floating .cv-input-label {
@@ -195,57 +186,62 @@
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--ink-gray);
+    color: var(--text-muted);
     font-size: var(--font-size-base);
     text-transform: none;
     letter-spacing: 0;
+    font-weight: 400;
     pointer-events: none;
     transition: all var(--duration-fast) var(--ease-ink);
 }
 
 .cv-input-floating .cv-input:focus + .cv-input-label,
 .cv-input-floating .cv-input:not(:placeholder-shown) + .cv-input-label {
-    top: 4px;
-    font-size: 10px;
+    top: 2px;
+    font-size: 9px;
     color: var(--cinnabar);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
 /* ==========================================================================
-   Select (下拉选择)
+   Select
    ========================================================================== */
 
 .cv-select {
     appearance: none;
     width: 100%;
-    padding: 12px 36px 12px 14px;
+    padding: 10px 36px 10px 14px;
     font-size: var(--font-size-base);
-    background: 
-        rgba(13, 27, 42, 0.5)
-        url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238b9da8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")
+    background:
+        var(--bg-color)
+        url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236e6e73' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")
         right 12px center / 1.5em no-repeat;
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    color: var(--paper-white);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
     cursor: pointer;
-    transition: all var(--duration-fast);
+    transition: all var(--duration-fast) var(--ease-ink);
+    box-shadow: var(--shadow-sm), var(--shadow-inset);
+    font-family: var(--font-display);
 }
 
 .cv-select:focus {
     outline: none;
     border-color: var(--cinnabar);
-    box-shadow: 
-        0 0 0 3px rgba(231, 76, 60, 0.1),
-        var(--neon-cinnabar);
+    box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.06), var(--neon-cinnabar);
+    background-color: var(--bg-subtle);
 }
 
 /* ==========================================================================
-   Checkbox (复选框)
+   Checkbox - Minimal
    ========================================================================== */
 
 .cv-checkbox {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     cursor: pointer;
     user-select: none;
 }
@@ -255,28 +251,31 @@
 }
 
 .cv-checkbox-mark {
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--glass-border);
-    border-radius: 5px;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--glass-border);
+    border-radius: 3px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all var(--duration-fast);
-    background: rgba(13, 27, 42, 0.3);
+    background: var(--bg-color);
+    box-shadow: var(--shadow-inset);
 }
 
 .cv-checkbox-input:checked + .cv-checkbox-mark {
-    background: var(--gradient-cinnabar);
+    background: var(--cinnabar);
     border-color: var(--cinnabar);
     box-shadow: var(--neon-cinnabar);
 }
 
 .cv-checkbox-input:checked + .cv-checkbox-mark::after {
-    content: '✓';
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
+    content: '';
+    width: 4px;
+    height: 7px;
+    border: solid var(--ink-deep);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg) translate(-0.5px, -0.5px);
 }
 
 .cv-checkbox-label {
@@ -285,31 +284,31 @@
 }
 
 /* ==========================================================================
-   Toast Notifications (水墨通知)
+   Toast Notifications - Borderless Pill
    ========================================================================== */
 
 .cv-toast-container {
     position: fixed;
-    top: 80px;
-    right: 24px;
+    top: 68px;
+    right: 20px;
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    max-width: 400px;
+    gap: 8px;
+    max-width: 340px;
 }
 
 .cv-toast {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 20px;
+    gap: 12px;
+    padding: 12px 16px;
     background: var(--glass-panel);
     backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-lg);
-    animation: slideInRight 0.4s var(--ease-ink-bounce);
+    border: none;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg), var(--shadow-ambient);
+    animation: slideInRight 0.3s var(--ease-ink-bounce);
     position: relative;
     overflow: hidden;
 }
@@ -320,101 +319,68 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: 4px;
+    width: 3px;
 }
 
 .cv-toast-hiding {
-    animation: fadeOut 0.3s ease-out forwards;
+    animation: fadeOut 0.2s ease-out forwards;
 }
 
-/* Toast Types */
-.cv-toast-success::before {
-    background: var(--success-jade);
-    box-shadow: 0 0 10px var(--success-jade);
-}
-
-.cv-toast-error::before {
-    background: var(--error-cinnabar);
-    box-shadow: 0 0 10px var(--error-cinnabar);
-}
-
-.cv-toast-warning::before {
-    background: var(--warning-amber);
-    box-shadow: 0 0 10px var(--warning-amber);
-}
-
-.cv-toast-info::before {
-    background: var(--info-azure);
-    box-shadow: 0 0 10px var(--info-azure);
-}
+.cv-toast-success::before { background: var(--success-jade); box-shadow: 0 0 8px var(--success-jade); }
+.cv-toast-error::before { background: var(--error-cinnabar); box-shadow: 0 0 8px var(--error-cinnabar); }
+.cv-toast-warning::before { background: var(--warning-amber); box-shadow: 0 0 8px var(--warning-amber); }
+.cv-toast-info::before { background: var(--info-azure); box-shadow: 0 0 8px var(--info-azure); }
 
 .cv-toast-icon {
-    font-size: 20px;
-    width: 32px;
-    height: 32px;
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    animation: iconPop 0.4s var(--ease-ink-bounce);
+    animation: iconPop 0.3s var(--ease-ink-bounce);
 }
 
-.cv-toast-success .cv-toast-icon {
-    color: var(--success-jade);
-    background: rgba(46, 204, 113, 0.1);
-}
-
-.cv-toast-error .cv-toast-icon {
-    color: var(--error-cinnabar);
-    background: rgba(192, 57, 43, 0.1);
-}
-
-.cv-toast-warning .cv-toast-icon {
-    color: var(--warning-amber);
-    background: rgba(243, 156, 18, 0.1);
-}
-
-.cv-toast-info .cv-toast-icon {
-    color: var(--info-azure);
-    background: rgba(52, 152, 219, 0.1);
-}
+.cv-toast-success .cv-toast-icon { color: var(--success-jade); background: rgba(74, 222, 128, 0.08); }
+.cv-toast-error .cv-toast-icon { color: var(--error-cinnabar); background: rgba(248, 113, 113, 0.08); }
+.cv-toast-warning .cv-toast-icon { color: var(--warning-amber); background: rgba(251, 191, 36, 0.08); }
+.cv-toast-info .cv-toast-icon { color: var(--info-azure); background: rgba(56, 189, 248, 0.08); }
 
 .cv-toast-message {
     flex: 1;
     font-size: var(--font-size-sm);
-    color: var(--paper-white);
+    color: var(--text-primary);
     line-height: 1.5;
+    font-weight: 500;
 }
 
 .cv-toast-close {
     padding: 4px;
     background: none;
     border: none;
-    color: var(--ink-gray);
-    font-size: 18px;
+    color: var(--text-muted);
+    font-size: 14px;
     cursor: pointer;
-    transition: color var(--duration-fast);
+    transition: all var(--duration-fast);
     line-height: 1;
+    border-radius: var(--radius-sm);
 }
 
 .cv-toast-close:hover {
-    color: var(--cinnabar);
+    color: var(--text-primary);
+    background: var(--hover-color);
 }
 
-/* Progress Bar for Toast */
 .cv-toast::after {
     content: '';
     position: absolute;
     bottom: 0;
     left: 0;
-    height: 2px;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        var(--cinnabar),
-        transparent
-    );
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, var(--cinnabar), transparent);
     animation: toastProgress 3s linear forwards;
+    opacity: 0.5;
 }
 
 @keyframes toastProgress {
@@ -424,12 +390,12 @@
 
 @keyframes iconPop {
     0% { transform: scale(0); }
-    50% { transform: scale(1.2); }
+    50% { transform: scale(1.15); }
     100% { transform: scale(1); }
 }
 
 /* ==========================================================================
-   Loading States (加载状态)
+   Loading States
    ========================================================================== */
 
 .cv-loading-fullscreen {
@@ -438,109 +404,72 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(13, 27, 42, 0.9);
-    backdrop-filter: blur(8px);
+    background: rgba(8, 8, 10, 0.92);
+    backdrop-filter: blur(12px) saturate(120%);
     z-index: 9999;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 20px;
+    gap: 16px;
 }
 
 .cv-loading-spinner {
-    width: 48px;
-    height: 48px;
-    border: 3px solid var(--glass-border);
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--glass-border);
     border-top-color: var(--cinnabar);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    box-shadow: 0 0 20px rgba(231, 76, 60, 0.2);
+    animation: spin 0.85s linear infinite;
+    box-shadow: 0 0 12px rgba(212, 168, 83, 0.1);
 }
 
 .cv-loading-text {
     font-size: var(--font-size-sm);
     color: var(--ink-gray);
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     text-transform: uppercase;
+    font-weight: 600;
 }
 
 .cv-loading-dots {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .cv-loading-dots span {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     background: var(--cinnabar);
     border-radius: 50%;
     animation: bounce 1.4s ease-in-out infinite both;
-    box-shadow: 0 0 10px var(--cinnabar);
+    box-shadow: 0 0 6px var(--cinnabar);
 }
 
-.cv-loading-dots span:nth-child(1) {
-    animation-delay: -0.32s;
-}
-
-.cv-loading-dots span:nth-child(2) {
-    animation-delay: -0.16s;
-}
+.cv-loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.cv-loading-dots span:nth-child(2) { animation-delay: -0.16s; }
 
 @keyframes bounce {
-    0%, 80%, 100% { 
-        transform: scale(0);
-        opacity: 0.5;
-    }
-    40% { 
-        transform: scale(1);
-        opacity: 1;
-    }
+    0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+    40% { transform: scale(1); opacity: 1; }
 }
 
-/* Skeleton Loading */
+/* Skeleton */
 .cv-skeleton {
-    background: linear-gradient(
-        90deg,
-        rgba(45, 74, 94, 0.3) 25%,
-        rgba(45, 74, 94, 0.5) 50%,
-        rgba(45, 74, 94, 0.3) 75%
-    );
+    background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
 }
 
-.cv-skeleton-text {
-    height: 1em;
-    margin-bottom: 8px;
-}
-
-.cv-skeleton-text:last-child {
-    width: 80%;
-}
-
-.cv-skeleton-title {
-    height: 1.5em;
-    width: 60%;
-    margin-bottom: 16px;
-}
-
-.cv-skeleton-rect {
-    height: 120px;
-    width: 100%;
-    margin-bottom: 16px;
-    border-radius: var(--radius-lg);
-}
-
-.cv-skeleton-circle {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-}
+.cv-skeleton-text { height: 1em; margin-bottom: 8px; }
+.cv-skeleton-text:last-child { width: 80%; }
+.cv-skeleton-title { height: 1.5em; width: 60%; margin-bottom: 14px; }
+.cv-skeleton-rect { height: 120px; width: 100%; margin-bottom: 14px; border-radius: var(--radius-md); }
+.cv-skeleton-circle { width: 40px; height: 40px; border-radius: 50%; }
 
 /* ==========================================================================
-   Tree View (树形控件)
+   Tree View - Minimal Hierarchy
    ========================================================================== */
 
 .cv-treeview {
@@ -554,65 +483,71 @@
 }
 
 .cv-treeview-item {
-    padding: 2px 0;
+    padding: 1px 0;
 }
 
 .cv-treeview-node {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 6px 10px;
     cursor: pointer;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     transition: all var(--duration-fast) var(--ease-ink);
     border: 1px solid transparent;
 }
 
 .cv-treeview-node:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover-color);
 }
 
 .cv-treeview-node.selected {
-    background: rgba(231, 76, 60, 0.1);
-    border-color: rgba(231, 76, 60, 0.2);
+    background: rgba(212, 168, 83, 0.06);
+    border-color: rgba(212, 168, 83, 0.12);
     color: var(--cinnabar);
 }
 
 .cv-treeview-toggle {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
-    border-radius: 4px;
-    color: var(--ink-gray);
+    font-size: 9px;
+    border-radius: 3px;
+    color: var(--text-muted);
     transition: all var(--duration-fast);
 }
 
 .cv-treeview-toggle:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--paper-white);
+    background: var(--hover-color);
+    color: var(--text-primary);
 }
 
 .cv-treeview-toggle-placeholder {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     display: inline-block;
 }
 
 .cv-treeview-icon {
-    font-size: 16px;
-    width: 20px;
+    font-size: 14px;
+    width: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--gold-accent);
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.cv-treeview-node.selected .cv-treeview-icon {
+    color: var(--cinnabar);
+    opacity: 1;
 }
 
 .cv-treeview-text {
     font-size: var(--font-size-sm);
-    color: var(--paper-dim);
+    color: var(--text-secondary);
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -625,7 +560,7 @@
 }
 
 /* ==========================================================================
-   Split Panel (分割面板)
+   Split Panel
    ========================================================================== */
 
 .cv-split-panel {
@@ -635,13 +570,8 @@
     overflow: hidden;
 }
 
-.cv-split-horizontal {
-    flex-direction: row;
-}
-
-.cv-split-vertical {
-    flex-direction: column;
-}
+.cv-split-horizontal { flex-direction: row; }
+.cv-split-vertical { flex-direction: column; }
 
 .cv-split-first,
 .cv-split-second {
@@ -654,36 +584,60 @@
 }
 
 .cv-splitter {
-    background: var(--glass-border);
+    background: transparent;
     transition: background-color var(--duration-fast);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 10;
+    position: relative;
 }
 
-.cv-splitter:hover,
-.cv-splitter.dragging {
+.cv-splitter::before {
+    content: '';
+    position: absolute;
+    background: linear-gradient(180deg, transparent, var(--glass-border), transparent);
+    transition: all var(--duration-fast);
+}
+
+.cv-split-horizontal .cv-splitter::before {
+    width: 1px;
+    height: 60%;
+}
+
+.cv-split-vertical .cv-splitter::before {
+    height: 1px;
+    width: 60%;
+}
+
+.cv-splitter:hover::before,
+.cv-splitter.dragging::before {
     background: var(--cinnabar);
-    box-shadow: var(--neon-cinnabar);
+    opacity: 0.5;
 }
 
 .cv-splitter-handle {
     background: var(--glass-panel);
     border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-sm);
-    color: var(--ink-gray);
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    color: var(--text-muted);
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 8px;
+    opacity: 0;
+    transition: opacity var(--duration-fast);
+}
+
+.cv-splitter:hover .cv-splitter-handle {
+    opacity: 1;
 }
 
 /* ==========================================================================
-   Image Viewer (图像查看器)
+   Image Viewer
    ========================================================================== */
 
 .image-viewer-wrapper {
@@ -700,7 +654,7 @@
     align-items: center;
     justify-content: center;
     background: var(--ink-deep);
-    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+    box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.4);
     position: relative;
     flex: 1;
 }
@@ -709,11 +663,9 @@
     content: '';
     position: absolute;
     inset: 0;
-    background-image: 
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px);
-    background-size: 30px 30px, 100% 30px;
-    opacity: 0.5;
+    background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.4;
     pointer-events: none;
 }
 
@@ -722,15 +674,15 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 300px;
-    height: 200px;
-    border: 2px dashed var(--glass-border);
-    border-radius: var(--radius-xl);
+    width: 260px;
+    height: 160px;
+    border: 1.5px dashed var(--glass-border);
+    border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.01);
     backdrop-filter: blur(4px);
     transition: all var(--duration-normal) var(--ease-ink);
     z-index: 10;
@@ -739,129 +691,127 @@
 
 .viewer-canvas-container.drag-over .viewer-placeholder {
     border-color: var(--cinnabar);
-    background: rgba(231, 76, 60, 0.05);
-    transform: translate(-50%, -50%) scale(1.02);
-    box-shadow: 0 0 30px rgba(231, 76, 60, 0.1);
+    background: rgba(212, 168, 83, 0.03);
+    transform: translate(-50%, -50%) scale(1.01);
+    box-shadow: 0 0 20px rgba(212, 168, 83, 0.06);
 }
 
 .placeholder-content {
     text-align: center;
-    color: var(--ink-gray);
+    color: var(--text-muted);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
 .placeholder-icon {
-    font-size: 48px;
-    margin-bottom: 8px;
-    opacity: 0.7;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+    font-size: 40px;
+    margin-bottom: 4px;
+    opacity: 0.5;
 }
 
 .placeholder-content p {
     margin: 0;
     font-size: var(--font-size-base);
-    color: var(--paper-dim);
-    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    letter-spacing: 0.3px;
 }
 
 .placeholder-hint {
     font-size: var(--font-size-xs) !important;
-    color: var(--ink-gray) !important;
-    opacity: 0.6;
+    color: var(--text-muted) !important;
+    opacity: 0.5;
 }
 
 .viewer-toolbar {
     background: var(--glass-panel);
     backdrop-filter: var(--glass-blur);
     border-top: 1px solid var(--glass-border);
-    padding: 8px 16px;
+    padding: 6px 14px;
     display: flex;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
 }
 
-/* Defect Sidebar in Image Viewer */
+/* Defect Sidebar */
 .defect-sidebar {
     background: var(--glass-panel);
     backdrop-filter: var(--glass-blur);
     border-left: 1px solid var(--glass-border);
-    width: 280px;
+    width: 260px;
     overflow-y: auto;
 }
 
 .defect-item {
-    padding: 12px 16px;
-    background: rgba(45, 74, 94, 0.2);
+    padding: 10px 14px;
+    background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    margin-bottom: 8px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
     cursor: pointer;
     transition: all var(--duration-fast);
 }
 
 .defect-item:hover {
-    background: rgba(45, 74, 94, 0.4);
-    border-color: rgba(231, 76, 60, 0.2);
+    background: var(--hover-color);
+    border-color: var(--glass-border);
 }
 
 .defect-item.selected {
-    background: rgba(231, 76, 60, 0.1);
-    border-color: rgba(231, 76, 60, 0.3);
-    box-shadow: 0 0 15px rgba(231, 76, 60, 0.1);
+    background: rgba(212, 168, 83, 0.06);
+    border-color: rgba(212, 168, 83, 0.15);
 }
 
 .defect-index {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
-    background: var(--ink-gray);
-    color: var(--paper-white);
-    font-size: 11px;
+    width: 18px;
+    height: 18px;
+    background: var(--text-muted);
+    color: var(--bg-color);
+    font-size: 10px;
     font-weight: 600;
     border-radius: 50%;
-    margin-right: 8px;
+    margin-right: 6px;
 }
 
 .defect-item.selected .defect-index {
     background: var(--cinnabar);
-    box-shadow: 0 0 8px var(--cinnabar);
+    box-shadow: 0 0 6px var(--cinnabar);
 }
 
 /* ==========================================================================
-   Operator Preview (算子预览)
+   Operator Preview
    ========================================================================== */
 
 .operator-preview {
     background: var(--glass-card);
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     padding: var(--card-padding);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 /* Library Actions */
 .library-actions {
     display: flex;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 10px;
     border-top: 1px solid var(--glass-border);
-    background: rgba(13, 27, 42, 0.3);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .library-actions .cv-btn {
     flex: 1;
     justify-content: center;
-    padding: 8px;
+    padding: 6px;
     font-size: var(--font-size-xs);
 }
 
 /* ==========================================================================
-   Modal Dialog (模态对话框)
+   Modal Dialog - Borderless Overlay
    ========================================================================== */
 
 .cv-modal-overlay {
@@ -870,12 +820,12 @@
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(13, 27, 42, 0.8);
-    backdrop-filter: blur(8px);
+    background: rgba(8, 8, 10, 0.75);
+    backdrop-filter: blur(16px) saturate(120%);
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
-    z-index: 99999 !important; /* 确保在最顶层 */
+    z-index: 99999 !important;
     opacity: 0;
     visibility: hidden;
     transition: all var(--duration-normal) var(--ease-ink);
@@ -894,15 +844,13 @@
     max-width: 95vw;
     background: var(--glass-panel);
     backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow: 
-        var(--shadow-float),
-        0 0 0 1px rgba(231, 76, 60, 0.1);
+    border: none;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-float), var(--shadow-ambient);
     width: 90%;
-    max-width: 500px;
+    max-width: 440px;
     max-height: 85vh;
-    transform: translateY(-20px) scale(0.95);
+    transform: translateY(-12px) scale(0.98);
     transition: all var(--duration-normal) var(--ease-ink-bounce);
     display: flex !important;
     flex-direction: column !important;
@@ -917,22 +865,23 @@
 }
 
 .cv-modal-header {
-    padding: 24px 24px 0 24px;
+    padding: 20px 20px 0 20px;
     border-bottom: none;
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: transparent;
 }
+
 .cv-modal-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
-    color: var(--paper-white);
-    letter-spacing: 0.5px;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .cv-modal-close {
@@ -940,48 +889,45 @@
 }
 
 .cv-modal-body {
-    padding: 24px;
-    color: var(--paper-dim);
+    padding: 20px;
+    color: var(--text-secondary);
     overflow-y: auto;
     max-height: 60vh;
+    line-height: 1.6;
 }
 
 .cv-modal-footer {
-    padding: 16px 24px 32px 24px; /* Increased bottom padding */
+    padding: 12px 20px 24px 20px;
     border-top: 1px solid var(--glass-border);
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    background: rgba(13, 27, 42, 0.3);
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
 }
 
 /* Modal Types */
-.cv-modal-confirm .cv-modal-header {
-    border-bottom-color: rgba(231, 76, 60, 0.3);
-}
-
 .cv-modal-confirm .cv-modal-title {
     color: var(--cinnabar);
 }
 
-/* Modal Form Styles (新建工程等表单) */
+/* Modal Form */
 .new-project-form,
 .cv-modal-form {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .form-group label {
     font-size: var(--font-size-sm);
     font-weight: 500;
-    color: var(--paper-dim);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -994,45 +940,50 @@
 
 .form-group .cv-input {
     width: 100%;
-    padding: 12px 16px;
+    padding: 10px 14px;
     font-size: var(--font-size-base);
-    background: var(--ink-tertiary);
+    background: var(--bg-color);
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    color: var(--paper-white);
-    transition: all var(--duration-fast) var(--ease-ink);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    transition: all var(--duration-fast);
+    box-shadow: var(--shadow-inset);
+    font-family: var(--font-display);
 }
 
 .form-group .cv-input:focus {
     outline: none;
     border-color: var(--cinnabar);
-    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.15);
-    background: var(--ink-secondary);
+    box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.06), var(--neon-cinnabar);
+    background: var(--bg-subtle);
 }
 
 .form-group .cv-input::placeholder {
-    color: var(--ink-gray);
+    color: var(--text-muted);
+    opacity: 0.5;
 }
 
 /* ==========================================================================
-   Tooltip (提示框)
+   Tooltip - Minimal Hint
    ========================================================================== */
 
 .cv-tooltip {
     position: absolute;
-    padding: 8px 12px;
-    background: var(--ink-secondary);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    color: var(--paper-white);
+    padding: 6px 10px;
+    background: rgba(20, 20, 22, 0.95);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
     font-size: var(--font-size-xs);
     white-space: nowrap;
     z-index: var(--z-tooltip);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
     pointer-events: none;
     opacity: 0;
-    transform: translateY(4px);
-    transition: all var(--duration-fast);
+    transform: translateY(3px);
+    transition: all var(--duration-fast) var(--ease-ink);
+    font-weight: 500;
+    letter-spacing: 0.02em;
 }
 
 .cv-tooltip.show {
@@ -1043,158 +994,175 @@
 .cv-tooltip::before {
     content: '';
     position: absolute;
-    bottom: -5px;
+    bottom: -4px;
     left: 50%;
     transform: translateX(-50%);
-    border-width: 5px 5px 0;
+    border-width: 4px 4px 0;
     border-style: solid;
-    border-color: var(--glass-border) transparent transparent;
+    border-color: rgba(20, 20, 22, 0.95) transparent transparent;
 }
 
 /* ==========================================================================
-   Badge (徽章)
+   Badge - Minimal Dot
    ========================================================================== */
 
 .cv-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 6px;
-    font-size: 11px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 5px;
+    font-size: 10px;
     font-weight: 600;
-    border-radius: 9px;
+    border-radius: var(--radius-full);
     background: var(--cinnabar);
-    color: var(--paper-white);
+    color: var(--ink-deep);
     box-shadow: var(--neon-cinnabar);
+    letter-spacing: 0.02em;
 }
 
 .cv-badge-success {
     background: var(--success-jade);
     box-shadow: var(--neon-jade);
+    color: #052e16;
 }
 
 .cv-badge-warning {
     background: var(--warning-amber);
+    color: #422006;
 }
 
 .cv-badge-info {
     background: var(--info-azure);
+    color: #082f49;
 }
 
 /* ==========================================================================
-   Divider (分隔线)
+   Divider - Fading Line
    ========================================================================== */
 
 .cv-divider {
     height: 1px;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        var(--glass-border) 50%,
-        transparent 100%
-    );
-    margin: 16px 0;
+    background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+    margin: 14px 0;
 }
 
 .cv-divider-vertical {
     width: 1px;
     height: 100%;
-    background: linear-gradient(
-        180deg,
-        transparent 0%,
-        var(--glass-border) 50%,
-        transparent 100%
-    );
-    margin: 0 16px;
+    background: linear-gradient(180deg, transparent, var(--glass-border), transparent);
+    margin: 0 14px;
 }
 
 /* ==========================================================================
-   Tag (标签)
+   Tag - Minimal Label
    ========================================================================== */
 
 .cv-tag {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 10px;
+    padding: 2px 8px;
     font-size: var(--font-size-xs);
     font-weight: 500;
-    border-radius: var(--radius-full);
-    background: rgba(45, 74, 94, 0.4);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--glass-border);
-    color: var(--paper-dim);
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
 }
 
 .cv-tag-primary {
-    background: rgba(231, 76, 60, 0.15);
-    border-color: rgba(231, 76, 60, 0.3);
+    background: rgba(212, 168, 83, 0.08);
+    border-color: rgba(212, 168, 83, 0.18);
     color: var(--cinnabar);
 }
 
 .cv-tag-success {
-    background: rgba(46, 204, 113, 0.15);
-    border-color: rgba(46, 204, 113, 0.3);
+    background: rgba(74, 222, 128, 0.08);
+    border-color: rgba(74, 222, 128, 0.18);
     color: var(--success-jade);
 }
 
 .cv-tag-gold {
-    background: rgba(212, 175, 55, 0.15);
-    border-color: rgba(212, 175, 55, 0.3);
+    background: rgba(201, 169, 110, 0.08);
+    border-color: rgba(201, 169, 110, 0.18);
     color: var(--gold-accent);
 }
 
 /* ==========================================================================
-   ☀️ Light Theme — Image Viewer & Defect Sidebar
+   Light Theme Adaptations
    ========================================================================== */
 
 [data-theme="light"] .image-viewer-wrapper {
-    background: #f1f5f9;
+    background: #f5f5f5;
 }
 
 [data-theme="light"] .viewer-canvas-container {
-    background: #e2e8f0;
+    background: #e5e5e5;
     box-shadow: none;
 }
 
 [data-theme="light"] .viewer-canvas-container::before {
-    display: none; /* Hide dark grid pattern in light mode */
+    display: none;
 }
 
 [data-theme="light"] .viewer-placeholder {
-    border-color: #cbd5e1;
+    border-color: #d4d4d4;
     background: rgba(255, 255, 255, 0.5);
 }
 
 [data-theme="light"] .placeholder-content {
-    color: #64748b;
+    color: #a3a3a3;
 }
 
 [data-theme="light"] .placeholder-content p {
-    color: #64748b;
+    color: #737373;
 }
 
 [data-theme="light"] .viewer-toolbar {
     background: #ffffff;
-    border-top-color: #e2e8f0;
+    border-top-color: rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="light"] .defect-sidebar {
     background: #ffffff;
-    border-left-color: #e2e8f0;
+    border-left-color: rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="light"] .defect-sidebar h4 {
-    color: #334155;
+    color: #404040;
 }
 
 [data-theme="light"] .defect-item {
-    background: #f8fafc;
-    border-color: #e2e8f0;
+    background: transparent;
 }
 
 [data-theme="light"] .defect-item:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Light Theme Disabled */
+[data-theme="light"] input:disabled,
+[data-theme="light"] select:disabled,
+[data-theme="light"] textarea:disabled,
+[data-theme="light"] .cv-input:disabled,
+[data-theme="light"] .cv-select:disabled,
+[data-theme="light"] .form-control:disabled {
+    background: #f5f5f5;
+    border-color: rgba(0, 0, 0, 0.05);
+    color: #a3a3a3;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+[data-theme="light"] button:disabled,
+[data-theme="light"] .cv-btn:disabled,
+[data-theme="light"] .btn:disabled {
+    background: transparent;
+    border-color: rgba(0, 0, 0, 0.05);
+    color: #a3a3a3;
+    opacity: 0.45;
 }

@@ -458,7 +458,7 @@ public class SubPixelEdgeDetectorTests : IDisposable
     }
 
     [Fact]
-    public void Test_Zernike_CompareWithOpenCV()
+    public void Test_GradientMoment_CompareWithOpenCV()
     {
         // Arrange: simple corner image (black background with white square).
         using var cornerImage = new Mat(100, 100, MatType.CV_8UC1, Scalar.All(0));
@@ -476,15 +476,15 @@ public class SubPixelEdgeDetectorTests : IDisposable
         var detector = new SubPixelEdgeDetector { EdgeThreshold = 0 };
         int startX = 40;
         int length = 21;
-        float ourOffset = DetectZernikeOnScanline(detector, blurred, true, 25, startX, length);
+        float ourOffset = DetectGradientMomentOnScanline(detector, blurred, true, 25, startX, length);
         float ourResult = startX + ourOffset;
 
         float error = Math.Abs(ourResult - openCvResult) / openCvResult * 100f;
-        error.Should().BeLessThan(1.0f, $"Zernike subpixel edge error should be < 1%, actual {error:F2}%");
+        error.Should().BeLessThan(1.0f, $"First-order gradient moment edge error should be < 1%, actual {error:F2}%");
     }
 
     [Fact]
-    public void Test_Zernike_SlantEdgeAccuracy()
+    public void Test_GradientMoment_SlantEdgeAccuracy()
     {
         using var image = LoadTestGray("iso12233_slant_edge_512.png");
         image.Empty().Should().BeFalse();
@@ -519,14 +519,32 @@ public class SubPixelEdgeDetectorTests : IDisposable
 
         using var lineProfile = Mat.FromArray(values);
         lineProfile.Reshape(1, 1);
-        float pos = detector.DetectZernike(lineProfile);
+        float pos = detector.DetectGradientMoment(lineProfile);
         double error = Math.Abs(pos - expected);
 
-        error.Should().BeLessOrEqualTo(0.05, $"Slant-edge subpixel error should be <= 0.05px, actual {error:F4}px");
+        error.Should().BeLessOrEqualTo(0.05, $"Gradient-moment slant-edge error should be <= 0.05px, actual {error:F4}px");
     }
 
     [Fact]
-    public void Test_Zernike_Repeatability_1000Runs()
+    public void Test_LegacyDetectZernike_WrapsGradientMoment()
+    {
+        var detector = new SubPixelEdgeDetector { EdgeThreshold = 0 };
+        float[] values = { 0f, 0f, 32f, 128f, 255f, 255f };
+        using var lineProfile = Mat.FromArray(values);
+        lineProfile.Reshape(1, 1);
+
+        float gradientMoment = detector.DetectGradientMoment(lineProfile);
+
+#pragma warning disable CS0618
+        float legacyWrapper = detector.DetectZernike(lineProfile);
+#pragma warning restore CS0618
+
+        legacyWrapper.Should().BeApproximately(gradientMoment, 1e-6f,
+            "the legacy DetectZernike entry should remain a compatibility wrapper over the gradient-moment implementation");
+    }
+
+    [Fact]
+    public void Test_GradientMoment_Repeatability_1000Runs()
     {
         using var image = LoadTestGray("iso12233_slant_edge_512.png");
         image.Empty().Should().BeFalse();
@@ -557,12 +575,12 @@ public class SubPixelEdgeDetectorTests : IDisposable
         var results = new double[runs];
         for (int i = 0; i < runs; i++)
         {
-            results[i] = detector.DetectZernike(lineProfile);
+            results[i] = detector.DetectGradientMoment(lineProfile);
         }
 
         double mean = results.Average();
         double std = Math.Sqrt(results.Select(r => (r - mean) * (r - mean)).Average());
-        std.Should().BeLessThan(0.02, $"Repeatability std should be < 0.02px, actual {std:F4}px");
+        std.Should().BeLessThan(0.02, $"Gradient-moment repeatability std should be < 0.02px, actual {std:F4}px");
     }
 
     private static string ResolveTestDataPath(string fileName)
@@ -606,10 +624,10 @@ public class SubPixelEdgeDetectorTests : IDisposable
         return (start, end - start + 1);
     }
 
-    private static float DetectZernikeOnScanline(SubPixelEdgeDetector detector, Mat image, bool horizontal, int fixedCoord, int start, int length)
+    private static float DetectGradientMomentOnScanline(SubPixelEdgeDetector detector, Mat image, bool horizontal, int fixedCoord, int start, int length)
     {
         using var lineProfile = ExtractScanline(image, horizontal, fixedCoord, start, length);
-        return detector.DetectZernike(lineProfile);
+        return detector.DetectGradientMoment(lineProfile);
     }
 
     private static Mat ExtractScanline(Mat image, bool horizontal, int fixedCoord, int start, int length)

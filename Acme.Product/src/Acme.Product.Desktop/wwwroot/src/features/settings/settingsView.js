@@ -2480,15 +2480,15 @@ class SettingsView {
                     <h2>执行与控制 (Runtime)</h2>
                     <p>配置自动运行逻辑、异常停机条件及硬件联动保护。</p>
                 </div>
-                <div class="settings-status-badge status-connected" style="background:#fef2f2; color:#b91c1c; border-color:#fca5a5;">
-                    <span class="status-dot" style="background:#dc2626;"></span> 保护机制已启用
+                <div class="settings-status-badge status-connected" style="background:rgba(232, 85, 78, 0.08); color:#c0392b; border-color:rgba(232, 85, 78, 0.25);">
+                    <span class="status-dot" style="background:#e74c3c;"></span> 保护机制已启用
                 </div>
             </div>
 
             <div class="settings-modern-card">
                 <div class="settings-card-header">
                     <div class="settings-header-left">
-                        <svg viewBox="0 0 24 24" class="settings-header-icon" style="fill:#dc2626;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                        <svg viewBox="0 0 24 24" class="settings-header-icon" style="fill:#e74c3c;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                         <span>生产保护机制 (Production Guards)</span>
                     </div>
                 </div>
@@ -2845,7 +2845,7 @@ class SettingsView {
                 let roleName = '角色未知';
                 
                 if (u.role === 'Admin' || u.role === 0) {
-                    roleColor = '#b91c1c'; roleBg = '#fef2f2'; roleName = '系统管理员';
+                    roleColor = '#c0392b'; roleBg = 'rgba(232, 85, 78, 0.08)'; roleName = '系统管理员';
                 } else if (u.role === 'Engineer' || u.role === 1) {
                     roleColor = '#1d4ed8'; roleBg = '#dbeafe'; roleName = '工程师';
                 } else if (u.role === 'Operator' || u.role === 2) {

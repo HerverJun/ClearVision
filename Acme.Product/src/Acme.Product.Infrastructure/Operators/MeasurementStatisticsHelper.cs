@@ -2,6 +2,8 @@ namespace Acme.Product.Infrastructure.Operators;
 
 internal static class MeasurementStatisticsHelper
 {
+    internal const double NormalConsistencyMadScaleFactor = 1.4826;
+
     public static double ComputePercentile(IReadOnlyList<double> values, double percentile)
     {
         if (values.Count == 0)
@@ -9,7 +11,7 @@ internal static class MeasurementStatisticsHelper
             return 0.0;
         }
 
-        var ordered = values.OrderBy(value => value).ToArray();
+        var ordered = values.OrderBy(static value => value).ToArray();
         if (ordered.Length == 1)
         {
             return ordered[0];
@@ -33,6 +35,10 @@ internal static class MeasurementStatisticsHelper
         return ComputePercentile(values, 0.5);
     }
 
+    /// <summary>
+    /// Returns the raw MAD (median absolute deviation) without the normal-consistency scale factor.
+    /// Use <see cref="ComputeScaledMedianAbsoluteDeviation"/> when a sigma-like robust spread estimate is required.
+    /// </summary>
     public static double ComputeMedianAbsoluteDeviation(IReadOnlyList<double> values, double median)
     {
         if (values.Count == 0)
@@ -40,8 +46,21 @@ internal static class MeasurementStatisticsHelper
             return 0.0;
         }
 
-        var deviations = values.Select(value => Math.Abs(value - median)).ToArray();
+        var deviations = new double[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            deviations[i] = Math.Abs(values[i] - median);
+        }
+
         return ComputeMedian(deviations);
+    }
+
+    /// <summary>
+    /// Returns the MAD scaled by 1.4826, which is a normal-consistency factor often used as a robust sigma estimate.
+    /// </summary>
+    public static double ComputeScaledMedianAbsoluteDeviation(IReadOnlyList<double> values, double median)
+    {
+        return ComputeMedianAbsoluteDeviation(values, median) * NormalConsistencyMadScaleFactor;
     }
 
     public static double ComputePopulationStdDev(IReadOnlyList<double> values, double mean)
@@ -84,6 +103,10 @@ internal static class MeasurementStatisticsHelper
         return (meanAngle * 180.0 / Math.PI, stdDegrees);
     }
 
+    /// <summary>
+    /// Maps uncertainty to an empirical [0,1] confidence score.
+    /// This is not a statistical confidence interval.
+    /// </summary>
     public static double ComputeConfidenceFromUncertainty(double uncertainty)
     {
         if (!double.IsFinite(uncertainty))

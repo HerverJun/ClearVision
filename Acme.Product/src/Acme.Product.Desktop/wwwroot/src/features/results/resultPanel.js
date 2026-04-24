@@ -110,6 +110,14 @@ class ResultPanel {
                 }
             });
         }
+
+        // 【后端对接占位符 1】：生成深度报告按钮
+        const advancedReportBtn = document.getElementById('btn-advanced-report');
+        if (advancedReportBtn) {
+            advancedReportBtn.addEventListener('click', () => {
+                this.generatePdfReport(this.getAnalyticsQueryParams());
+            });
+        }
     }
     
     /**
@@ -385,9 +393,8 @@ class ResultPanel {
 
         const trendPromise = commonParams.startTime && commonParams.endTime
             ? httpClient.get(`/analysis/trend/${projectId}`, {
+                ...commonParams,
                 interval: this.timeRange === 'today' ? 'Hour' : 'Day',
-                startTime: commonParams.startTime,
-                endTime: commonParams.endTime
             }).catch(error => {
                 console.warn('[ResultPanel] 获取趋势分析失败:', error);
                 return null;
@@ -763,180 +770,172 @@ class ResultPanel {
     render() {
         this.renderKPIs();
         this.renderYieldChart();
-        this.renderDefectDistribution();
-        this.renderTrendChart();
+        this.renderRadarChart();
+        this.renderThroughputChart();
+        this.renderAdvancedStats();
         this.renderResultsList();
         this.renderPagination();
     }
     
     /**
-     * 渲染KPI卡片
+     * 渲染KPI卡片 (V3 工业看板风格)
      */
     renderKPIs() {
         const { total, ok, ng, error, avgTime } = this.statistics;
         const yieldRate = total > 0 ? ((ok / total) * 100).toFixed(1) : '0';
-        
-        const kpiTotal = document.getElementById('kpi-total');
-        const kpiOk = document.getElementById('kpi-ok');
-        const kpiNg = document.getElementById('kpi-ng');
-        const kpiYield = document.getElementById('kpi-yield');
-        const kpiAvgTime = document.getElementById('kpi-avg-time');
-        
-        if (kpiTotal) kpiTotal.textContent = total;
-        if (kpiOk) kpiOk.textContent = ok;
-        if (kpiNg) kpiNg.textContent = ng;
-        if (kpiYield) kpiYield.textContent = `${yieldRate}%`;
-        if (kpiAvgTime) kpiAvgTime.textContent = `${avgTime}ms`;
+        const timeSec = avgTime > 1000 ? (avgTime / 1000).toFixed(1) : avgTime;
+        const timeUnit = avgTime > 1000 ? 's' : 'ms';
+
+        const setKPI = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        setKPI('kpi-total', total.toLocaleString());
+        setKPI('kpi-ok', ok.toLocaleString());
+        setKPI('kpi-ng', ng.toLocaleString());
+        setKPI('kpi-error', error.toLocaleString());
+        setKPI('kpi-yield', `${yieldRate}%`);
+        setKPI('kpi-avg-time', `${timeSec}${timeUnit}`);
+
+        // 更新时间戳
+        const updateTimeEl = document.getElementById('last-update-time');
+        if (updateTimeEl) {
+            updateTimeEl.textContent = '更新于 刚刚';
+        }
     }
     
     /**
-     * 渲染良率环形图
+     * 渲染良率仪表盘 — 半圆弧 SVG
      */
     renderYieldChart() {
         const { total, ok } = this.statistics;
         const yieldRate = total > 0 ? (ok / total) : 0;
         const percentage = (yieldRate * 100).toFixed(1);
-        
-        // 更新百分比文字
-        const yieldPercentage = document.getElementById('yield-percentage');
-        if (yieldPercentage) yieldPercentage.textContent = `${percentage}%`;
-        
-        // 更新SVG环形图
-        const fillCircle = document.getElementById('yield-chart-fill');
-        if (fillCircle) {
-            const circumference = 2 * Math.PI * 60; // r=60
-            const offset = circumference * (1 - yieldRate);
-            fillCircle.style.strokeDasharray = circumference;
-            fillCircle.style.strokeDashoffset = offset;
-            fillCircle.style.stroke = yieldRate > 0.9 ? '#2ecc71' : yieldRate > 0.7 ? '#f1c40f' : '#e74c3c';
-            fillCircle.style.transition = 'stroke-dashoffset 0.5s ease';
+
+        // 更新数值文字
+        const gaugeValue = document.getElementById('gauge-percentage');
+        if (gaugeValue) gaugeValue.textContent = percentage;
+
+        // 状态评级
+        const gaugeStatus = document.getElementById('gauge-status');
+        if (gaugeStatus) {
+            let status = 'Critical';
+            if (yieldRate >= 0.95) status = 'Excellent';
+            else if (yieldRate >= 0.85) status = 'Good';
+            else if (yieldRate >= 0.7) status = 'Warning';
+            gaugeStatus.textContent = `Status: ${status}`;
+        }
+
+        // 更新 SVG 半圆弧 — 总长度 282.7，按良率比例显示
+        const arcFill = document.getElementById('gauge-arc-fill');
+        if (arcFill) {
+            const totalLength = 282.7;
+            const offset = totalLength * (1 - yieldRate);
+            arcFill.style.strokeDashoffset = offset;
+            arcFill.style.transition = 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
         }
     }
     
     /**
-     * 渲染缺陷类型分布
+     * 渲染缺陷雷达图 — 基于缺陷类型分布计算五维数据
      */
-    renderDefectDistribution() {
-        const container = document.getElementById('defect-bars');
-        if (!container) return;
-        
+    renderRadarChart() {
+        const radarData = document.getElementById('radar-data');
+        if (!radarData) return;
+
+        // 五个维度：划伤、脏污、缺角、气泡、其他
+        const dimensions = ['划伤', '脏污', '缺角', '气泡', '其他'];
         const types = Object.entries(this.defectTypes);
+
         if (types.length === 0) {
-            container.innerHTML = '<p class="empty-text">暂无缺陷数据</p>';
+            // 无数据时保持默认形状
             return;
         }
-        
-        const maxCount = Math.max(...types.map(([, count]) => count));
-        
-        container.innerHTML = types.map(([type, count]) => `
-            <div class="defect-bar-item">
-                <div class="defect-bar-header">
-                    <span class="defect-bar-label">${type}</span>
-                    <span class="defect-bar-value">${count}</span>
-                </div>
-                <div class="defect-bar-track">
-                    <div class="defect-bar-fill" style="width:${(count/maxCount*100).toFixed(1)}%"></div>
-                </div>
-            </div>
-        `).join('');
+
+        const maxCount = Math.max(...types.map(([, count]) => count)) || 1;
+
+        // 将缺陷类型映射到五维（简单归一化）
+        const getValue = (dim) => {
+            const match = types.find(([t]) => t.includes(dim));
+            return match ? Math.max(0.15, match[1] / maxCount) : 0.15;
+        };
+
+        const values = dimensions.map(d => getValue(d));
+
+        // 雷达图中心 (100,100)，半径方向：上、右上、右下、左下、左上
+        // 对应角度: 270°, 342°, 54°, 126°, 198°（从正上方顺时针）
+        // 但 SVG 坐标系中，我们手动计算五个顶点的位置
+        // R=80 (外圈), R=15 (内圈基线)
+        const baseR = 15;
+        const maxR = 80;
+        const centers = [
+            { x: 100, y: 100 - maxR },      // 上 (划伤)
+            { x: 100 + maxR * 0.95, y: 100 - maxR * 0.31 }, // 右上 (脏污)
+            { x: 100 + maxR * 0.59, y: 100 + maxR * 0.81 }, // 右下 (缺角)
+            { x: 100 - maxR * 0.59, y: 100 + maxR * 0.81 }, // 左下 (气泡)
+            { x: 100 - maxR * 0.95, y: 100 - maxR * 0.31 }, // 左上 (其他)
+        ];
+
+        const points = centers.map((c, i) => {
+            const r = baseR + (maxR - baseR) * values[i];
+            const ratio = r / maxR;
+            return `${100 + (c.x - 100) * ratio},${100 + (c.y - 100) * ratio}`;
+        });
+
+        radarData.setAttribute('points', points.join(' '));
     }
     
     /**
-     * 渲染趋势图
+     * 渲染吞吐量面积图 — SVG Path
      */
-    renderTrendChart() {
-        const canvas = document.getElementById('trend-canvas');
-        if (!canvas) return;
-        
-        // Optimize for Retina display
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.parentElement.getBoundingClientRect();
-        
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-        
-        const width = rect.width;
-        const height = rect.height;
-        const padding = 20;
-        
-        // 清空画布
-        ctx.clearRect(0, 0, width, height);
-        
+    renderThroughputChart() {
+        const areaPath = document.getElementById('throughput-area');
+        const linePath = document.getElementById('throughput-line');
+        if (!areaPath || !linePath) return;
+
         if (this.trendData.length < 2) {
-            ctx.fillStyle = '#64748b';
-            ctx.font = '14px "Inter", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('数据不足，无法显示趋势图', width / 2, height / 2);
+            // 保持默认 Mock 路径
             return;
         }
-        
-        // 绘制背景网格
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= 5; i++) {
-            const y = padding + (height - 2 * padding) * i / 5;
-            ctx.beginPath();
-            ctx.moveTo(padding, y);
-            ctx.lineTo(width - padding, y);
-            ctx.stroke();
+
+        // 将趋势数据映射为检测量（每个时间点的总检测数）
+        // 按时间分组统计每小时的检测量
+        const bucketMap = new Map();
+        this.trendData.forEach(p => {
+            const hour = new Date(p.time).getHours();
+            bucketMap.set(hour, (bucketMap.get(hour) || 0) + 1);
+        });
+
+        const buckets = Array.from(bucketMap.entries()).sort((a, b) => a[0] - b[0]);
+        if (buckets.length < 2) return;
+
+        const maxCount = Math.max(...buckets.map(([, c]) => c));
+        const width = 400;
+        const height = 160;
+        const padding = { top: 10, bottom: 10 };
+        const chartHeight = height - padding.top - padding.bottom;
+
+        const stepX = width / (buckets.length - 1);
+
+        const getY = (count) => padding.top + chartHeight * (1 - count / maxCount);
+
+        // 构建平滑曲线路径（使用三次贝塞尔）
+        let lineD = `M 0 ${getY(buckets[0][1])}`;
+        for (let i = 0; i < buckets.length - 1; i++) {
+            const x0 = i * stepX;
+            const y0 = getY(buckets[i][1]);
+            const x1 = (i + 1) * stepX;
+            const y1 = getY(buckets[i + 1][1]);
+            const cpx1 = x0 + stepX * 0.5;
+            const cpx2 = x1 - stepX * 0.5;
+            lineD += ` C ${cpx1} ${y0}, ${cpx2} ${y1}, ${x1} ${y1}`;
         }
-        
-        const chartWidth = width - 2 * padding;
-        const chartHeight = height - 2 * padding;
-        const stepX = chartWidth / (this.trendData.length - 1);
-        
-        // 状态映射到Y坐标
-        const statusY = {
-            'OK': padding + chartHeight * 0.2,
-            'NG': padding + chartHeight * 0.5,
-            'Error': padding + chartHeight * 0.8
-        };
-        
-        // 绘制连线
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        
-        this.trendData.forEach((point, index) => {
-            const x = padding + index * stepX;
-            const y = statusY[point.status] || padding + chartHeight * 0.5;
-            
-            if (index === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        });
-        ctx.stroke();
-        
-        // 绘制数据点
-        this.trendData.forEach((point, index) => {
-            const x = padding + index * stepX;
-            const y = statusY[point.status] || padding + chartHeight * 0.5;
-            
-            if (point.status === 'OK') {
-                ctx.fillStyle = '#10b981';
-            } else if (point.status === 'NG') {
-                ctx.fillStyle = '#ef4444';
-            } else {
-                ctx.fillStyle = '#f59e0b';
-            }
-            
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        
-        // 绘制Y轴标签
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText('OK', padding - 8, padding + chartHeight * 0.2 + 4);
-        ctx.fillText('NG', padding - 8, padding + chartHeight * 0.5 + 4);
-        ctx.fillText('Error', padding - 8, padding + chartHeight * 0.8 + 4);
+
+        const areaD = `${lineD} L ${width} ${height} L 0 ${height} Z`;
+
+        linePath.setAttribute('d', lineD);
+        areaPath.setAttribute('d', areaD);
     }
     
     /**
@@ -1158,7 +1157,24 @@ class ResultPanel {
             r.defects?.[0]?.confidenceScore ? (r.defects[0].confidenceScore * 100).toFixed(1) + '%' : ''
         ]);
         
-        return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        return [this.toCsvRow(headers), ...rows.map(row => this.toCsvRow(row))].join('\n');
+    }
+
+    toCsvRow(fields) {
+        return fields.map(value => this.escapeCsvField(value)).join(',');
+    }
+
+    escapeCsvField(value) {
+        let text = value === null || value === undefined ? '' : String(value);
+        if (/^[=+\-@]/.test(text)) {
+            text = `'${text}`;
+        }
+
+        if (/[",\r\n]/.test(text)) {
+            return `"${text.replace(/"/g, '""')}"`;
+        }
+
+        return text;
     }
     
     /**
@@ -1178,28 +1194,28 @@ class ResultPanel {
             || [];
 
         const lines = [
-            'Section,Key,Value',
-            `Summary,ProjectId,${report?.projectId || report?.ProjectId || this.projectId || ''}`,
-            `Summary,GeneratedAt,${report?.generatedAt || report?.GeneratedAt || ''}`,
-            `Summary,StartTime,${period.startTime || period.StartTime || ''}`,
-            `Summary,EndTime,${period.endTime || period.EndTime || ''}`,
-            `Summary,TotalCount,${summary.totalCount ?? summary.TotalCount ?? 0}`,
-            `Summary,OKCount,${summary.okCount ?? summary.OKCount ?? 0}`,
-            `Summary,NGCount,${summary.ngCount ?? summary.NGCount ?? 0}`,
-            `Summary,ErrorCount,${summary.errorCount ?? summary.ErrorCount ?? 0}`,
-            `Summary,AverageProcessingTimeMs,${summary.averageProcessingTimeMs ?? summary.AverageProcessingTimeMs ?? 0}`
+            this.toCsvRow(['Section', 'Key', 'Value']),
+            this.toCsvRow(['Summary', 'ProjectId', report?.projectId || report?.ProjectId || this.projectId || '']),
+            this.toCsvRow(['Summary', 'GeneratedAt', report?.generatedAt || report?.GeneratedAt || '']),
+            this.toCsvRow(['Summary', 'StartTime', period.startTime || period.StartTime || '']),
+            this.toCsvRow(['Summary', 'EndTime', period.endTime || period.EndTime || '']),
+            this.toCsvRow(['Summary', 'TotalCount', summary.totalCount ?? summary.TotalCount ?? 0]),
+            this.toCsvRow(['Summary', 'OKCount', summary.okCount ?? summary.OKCount ?? 0]),
+            this.toCsvRow(['Summary', 'NGCount', summary.ngCount ?? summary.NGCount ?? 0]),
+            this.toCsvRow(['Summary', 'ErrorCount', summary.errorCount ?? summary.ErrorCount ?? 0]),
+            this.toCsvRow(['Summary', 'AverageProcessingTimeMs', summary.averageProcessingTimeMs ?? summary.AverageProcessingTimeMs ?? 0])
         ];
 
         defectItems.forEach(item => {
-            lines.push(`DefectDistribution,${item.defectType || item.DefectType || '未知'},${item.count ?? item.Count ?? 0}`);
+            lines.push(this.toCsvRow(['DefectDistribution', item.defectType || item.DefectType || '未知', item.count ?? item.Count ?? 0]));
         });
 
         trendItems.forEach(point => {
-            lines.push(`Trend,${point.timestamp || point.Timestamp || ''},${point.totalCount ?? point.TotalCount ?? 0}`);
+            lines.push(this.toCsvRow(['Trend', point.timestamp || point.Timestamp || '', point.totalCount ?? point.TotalCount ?? 0]));
         });
 
         recommendations.forEach((recommendation, index) => {
-            lines.push(`Recommendation,${index + 1},"${String(recommendation).replace(/"/g, '""')}"`);
+            lines.push(this.toCsvRow(['Recommendation', index + 1, recommendation]));
         });
 
         return lines.join('\n');
@@ -1516,6 +1532,111 @@ class ResultPanel {
      */
     getAllResults() {
         return [...this.filteredResults];
+    }
+
+    // ==========================================================================
+    // 【后端对接占位符】高级功能扩展
+    // ==========================================================================
+
+    /**
+     * 【后端对接占位符 1】：WebSocket / SignalR 实时连接
+     * 后端需要提供: /hub/inspection-results 端点
+     */
+    async connectResultsHub() {
+        console.log('[ResultPanel][Placeholder] 正在尝试连接实时结果 Hub...');
+        // placeholder for SignalR connection
+        // const connection = new signalR.HubConnectionBuilder()
+        //     .withUrl('/hub/inspection-results')
+        //     .build();
+        // connection.on('ReceiveNewResult', (result) => {
+        //     this.addResult(result);
+        // });
+        // await connection.start();
+    }
+
+    /**
+     * 【后端对接占位符 2】：高级统计 API
+     * 后端需要提供: GET /api/v1/analytics/advanced?timeRange=xxx
+     */
+    async fetchAdvancedAnalytics() {
+        console.log('[ResultPanel][Placeholder] 正在请求高级分析数据...');
+        // placeholder for fetching CPK, MTBF, Defect Clustering data.
+        try {
+            // const response = await httpClient.get('/api/v1/analytics/advanced', {
+            //     projectId: this.projectId,
+            //     ...this.getAnalyticsQueryParams()
+            // });
+            // this.serverAnalysis = { ...this.serverAnalysis, ...response };
+            // this.renderAdvancedStats();
+
+            // Mock UI feedback for verification
+            this.serverAnalysis = {
+                ...this.serverAnalysis,
+                cpk: { value: '1.52', change: '+0.05' },
+                mtbf: { value: '480h', change: '+12h' },
+                defectCluster: { topRegion: '高频区域: 左上边缘划伤' }
+            };
+            this.renderAdvancedStats();
+        } catch (error) {
+            console.warn('[ResultPanel][Placeholder] 高级分析数据获取失败:', error);
+        }
+    }
+
+    /**
+     * 【后端对接占位符 3】：报表生成与图片打包
+     * 后端需要提供: POST /api/v1/reports/generate (生成 PDF)
+     * 后端需要提供: POST /api/v1/results/export-images (打包 ZIP)
+     */
+    async generatePdfReport(filters) {
+        console.log('[ResultPanel][Placeholder] 正在生成深度报告...', filters);
+        // 1. 前端显示 Loading (带有 Tech Red 动效)
+        const btn = document.getElementById('btn-advanced-report');
+        if (btn) {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<svg class="spin" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg> 生成中...`;
+            btn.disabled = true;
+
+            // Mock async operation
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                console.log('[ResultPanel][Placeholder] 报告生成完成（Mock）');
+                // 调用后端，后端负责渲染 PDF 并返回下载链接
+                // const response = await httpClient.post('/api/v1/reports/generate', filters);
+                // window.open(response.downloadUrl, '_blank');
+            }, 1500);
+        }
+    }
+
+    /**
+     * 渲染高级分析占位数据到 UI
+     */
+    /**
+     * 渲染高级统计卡片 (V3)
+     */
+    renderAdvancedStats() {
+        // Mock 数据 — 后端补齐后改为真实数据
+        const cpk = this.serverAnalysis?.cpk ?? { value: '1.52', change: '+0.05' };
+        const mtbf = this.serverAnalysis?.mtbf ?? { value: '480h', change: '+12h' };
+        const cluster = this.serverAnalysis?.defectCluster ?? { topRegion: '高频区域: 左上边缘划伤' };
+
+        const cpkEl = document.getElementById('stat-cpk');
+        const cpkChange = document.getElementById('stat-cpk-change');
+        const mtbfEl = document.getElementById('stat-mtbf');
+        const mtbfChange = document.getElementById('stat-mtbf-change');
+        const clusterEl = document.getElementById('stat-cluster');
+
+        if (cpkEl) cpkEl.textContent = cpk.value ?? '--';
+        if (cpkChange) {
+            cpkChange.textContent = cpk.change ?? '';
+            cpkChange.className = 'stat-card-change' + ((cpk.change || '').startsWith('-') ? ' down' : '');
+        }
+        if (mtbfEl) mtbfEl.textContent = mtbf.value ?? '--';
+        if (mtbfChange) {
+            mtbfChange.textContent = mtbf.change ?? '';
+            mtbfChange.className = 'stat-card-change' + ((mtbf.change || '').startsWith('-') ? ' down' : '');
+        }
+        if (clusterEl) clusterEl.textContent = cluster.topRegion ?? '--';
     }
 }
 

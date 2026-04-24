@@ -43,12 +43,22 @@ public class PhaseClosureOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("PhaseImage required."));
         }
 
+        var sourcePhase = phaseWrapper.GetMat();
+        if (sourcePhase.Empty())
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("PhaseImage is empty."));
+        }
+
         var wavelength = GetDouble(inputs, "Wavelength", 0.0);
         var method = GetString(inputs, "UnwrapMethod", "itoh").Trim().ToLowerInvariant();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        using var wrappedPhase = PrepareWrappedPhaseInput(phaseWrapper.GetMat());
+        using var wrappedPhase = PrepareWrappedPhaseInput(sourcePhase);
         using var qualityMap = TryGetOptionalQualityMap(inputs);
+        if (qualityMap != null && (qualityMap.Empty() || qualityMap.Size() != wrappedPhase.Size()))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("QualityMap must match PhaseImage dimensions."));
+        }
 
         Mat unwrappedPhase;
         double quality;
@@ -338,7 +348,8 @@ public class PhaseClosureOperator : OperatorBase
         Cv2.Magnitude(dx, dy, magnitude);
         Cv2.MeanStdDev(magnitude, out _, out var stddev);
 
-        return 1.0 / (1.0 + stddev.Val0);
+        var quality = 1.0 / (1.0 + Math.Max(0.0, stddev.Val0));
+        return double.IsFinite(quality) ? quality : 0.0;
     }
 
     private static Mat CreateVisualization(Mat wrapped, Mat unwrapped, Mat discontinuities)

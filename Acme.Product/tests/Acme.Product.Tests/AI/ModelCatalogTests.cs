@@ -44,4 +44,24 @@ public sealed class ModelCatalogTests
         entry!.Type.Should().Be("anomaly_embedding");
         File.Exists(resolved).Should().BeTrue();
     }
+
+    [Fact]
+    public void ResolveExplicitOrCatalog_WithModelId_ShouldReturnCatalogProvenance()
+    {
+        var resolved = ModelCatalog.ResolveExplicitOrCatalog(
+            explicitPath: null,
+            modelId: "semantic_identity_2x2",
+            catalogPath: null,
+            expectedTypes: ["segmentation"]);
+
+        resolved.Source.Should().Be("ModelCatalog");
+        resolved.ModelId.Should().Be("semantic_identity_2x2");
+        resolved.Entry.Should().NotBeNull();
+        File.Exists(resolved.ResolvedPath).Should().BeTrue();
+
+        var provenance = resolved.ToProvenancePayload();
+        provenance["ResolutionSource"].Should().Be("ModelCatalog");
+        provenance["ModelType"].Should().Be("segmentation");
+        provenance["ModelVersion"].Should().Be("1.0.0");
+    }
 }

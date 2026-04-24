@@ -14,7 +14,7 @@ namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "Subpixel Edge Detection",
-    Description = "Extracts subpixel edges using Steger or interpolation-based methods.",
+    Description = "Extracts subpixel edges using Steger or lightweight gradient/interpolation refinements.",
     Category = "Feature Extraction",
     IconName = "edge-subpixel",
     Tags = new[] { "experimental", "industrial-remediation", "subpixel-edge" }
@@ -60,10 +60,11 @@ public class SubpixelEdgeDetectionOperator : OperatorBase
         return RunCpuBoundWork(() =>
         {
             var resultImage = src.Clone();
+            var isSteger = method.Equals("Steger", StringComparison.OrdinalIgnoreCase);
 
             List<SubpixelEdgePoint> edgePoints;
             int contourCount;
-            if (method.Equals("Steger", StringComparison.OrdinalIgnoreCase))
+            if (isSteger)
             {
                 using var detector = new StegerSubpixelEdgeDetector
                 {
@@ -106,6 +107,7 @@ public class SubpixelEdgeDetectionOperator : OperatorBase
                 { "Strength", p.Strength }
             }).ToList();
 
+            // Keep the diagnostics conservative so lightweight refinements are not presented as a metrology guarantee.
             var additionalData = new Dictionary<string, object>
             {
                 { "Edges", subpixelEdges },
@@ -113,14 +115,20 @@ public class SubpixelEdgeDetectionOperator : OperatorBase
                 { "ContourCount", contourCount },
                 { "Method", method },
                 { "SigmaUsed", sigma },
-                { "AlgorithmClass", method.Equals("Steger", StringComparison.OrdinalIgnoreCase) ? "HessianRidgeSubpixel" : "InterpolationRefinement" },
-                { "IndustrialGradeModel", method.Equals("Steger", StringComparison.OrdinalIgnoreCase) },
-                { "Diagnostics", method.Equals("Steger", StringComparison.OrdinalIgnoreCase)
-                    ? Array.Empty<string>()
+                { "AlgorithmClass", isSteger ? "HessianRidgeSubpixel" : "GradientInterpolationRefinement" },
+                { "MethodDisclosure", isSteger ? "Steger Hessian-ridge detector" : "Gradient/interpolation refinement" },
+                { "IndustrialGradeModel", false },
+                { "RequiresApplicationValidation", true },
+                { "Diagnostics", isSteger
+                    ? new[]
+                    {
+                        "Steger mode follows a Hessian-ridge subpixel detector.",
+                        "Validate repeatability, calibration, and GR&R data before marketing it as a production metrology model."
+                    }
                     : new[]
                     {
-                        "GradientInterp/GaussianFit are interpolation refinements on top of binary edge candidates.",
-                        "They are suitable for lightweight subpixel localization but are not a full industrial metrology edge model."
+                        "GradientInterp/GaussianFit are lightweight gradient/interpolation refinements on top of binary edge candidates.",
+                        "They are not Zernike moments and should not be presented as a full industrial metrology edge model without application validation."
                     } }
             };
 

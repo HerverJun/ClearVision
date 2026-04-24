@@ -10,7 +10,7 @@
     position: absolute;
     top: 0;
     left: 0;
-    background: #f8fafc; /* 极浅的蓝灰白作为大底色 */
+    background: var(--workspace-bg);
     z-index: 10;
     display: flex;
     flex-direction: column;
@@ -497,13 +497,13 @@
 }
 
 .plc-invalid-input {
-    border-color: #dc2626 !important;
+    border-color: #e74c3c !important;
     box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.12);
 }
 
 .plc-field-error {
     margin-top: 6px;
-    color: #b91c1c;
+    color: #c0392b;
     font-size: 12px;
     line-height: 1.4;
 }

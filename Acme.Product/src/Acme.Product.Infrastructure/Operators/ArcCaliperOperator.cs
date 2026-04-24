@@ -39,6 +39,8 @@ public class ArcCaliperOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Image required."));
 
         var image = imageWrapper.GetMat();
+        if (image.Empty())
+            return Task.FromResult(OperatorExecutionOutput.Failure("Input image is empty."));
 
         int cx = GetInt(inputs, "CenterX", image.Width / 2);
         int cy = GetInt(inputs, "CenterY", image.Height / 2);
@@ -47,18 +49,37 @@ public class ArcCaliperOperator : OperatorBase
         double endAngle = GetDouble(inputs, "EndAngle", 360);
         string transition = GetString(inputs, "Transition", "all").ToLower();
 
+        if (radius <= 0)
+            return Task.FromResult(OperatorExecutionOutput.Failure("Radius must be greater than zero."));
+
+        if (!double.IsFinite(startAngle) || !double.IsFinite(endAngle))
+            return Task.FromResult(OperatorExecutionOutput.Failure("StartAngle and EndAngle must be finite."));
+
+        double normalizedStartAngle = NormalizeAngleDegrees(startAngle);
+        double arcSpan = ComputePositiveArcSpanDegrees(startAngle, endAngle);
+        if (arcSpan <= 1e-6)
+            return Task.FromResult(OperatorExecutionOutput.Failure("Arc span must be greater than zero."));
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         using var gray = image.Channels() == 3 ? image.CvtColor(ColorConversionCodes.BGR2GRAY) : image.Clone();
 
         var points = new List<ArcCaliperPoint>();
-        double angleStep = 1.0; // 1 degree resolution
-        int steps = (int)((endAngle - startAngle) / angleStep);
+        const double angleStep = 1.0;
+        int steps = Math.Max(1, (int)Math.Ceiling(arcSpan / angleStep));
+        int accessibleSamples = 0;
 
-        for (int i = 0; i < steps; i++)
+        for (int i = 0; i <= steps; i++)
         {
-            double angle = startAngle + i * angleStep;
-            double rad = angle * Math.PI / 180;
+            double angle = normalizedStartAngle + (arcSpan * i / steps);
+            double rad = angle * Math.PI / 180.0;
+            double sampleX = cx + radius * Math.Cos(rad);
+            double sampleY = cy + radius * Math.Sin(rad);
+
+            if (IsWithinSamplingRegion(gray, sampleX, sampleY))
+            {
+                accessibleSamples++;
+            }
 
             if (TryLocateArcEdge(gray, cx, cy, radius, rad, transition, out double subpixX, out double subpixY, out double contrast))
             {
@@ -73,9 +94,12 @@ public class ArcCaliperOperator : OperatorBase
             }
         }
 
+        if (accessibleSamples == 0)
+            return Task.FromResult(OperatorExecutionOutput.Failure("Arc path lies outside the valid sampling region."));
+
         stopwatch.Stop();
 
-        var vis = CreateVisualization(image, cx, cy, radius, startAngle, endAngle, points);
+        var vis = CreateVisualization(image, cx, cy, radius, normalizedStartAngle, normalizedStartAngle + arcSpan, points);
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(vis, new Dictionary<string, object>
         {
@@ -106,7 +130,7 @@ public class ArcCaliperOperator : OperatorBase
         double px = subpixX;
         double py = subpixY;
 
-        if (px < 6 || px >= gray.Width - 6 || py < 6 || py >= gray.Height - 6)
+        if (!IsWithinSamplingRegion(gray, px, py))
         {
             return false;
         }
@@ -137,6 +161,43 @@ public class ArcCaliperOperator : OperatorBase
         subpixY = point.Y;
         contrast = bestEdge.Strength;
         return true;
+    }
+
+    private static bool IsWithinSamplingRegion(Mat gray, double px, double py)
+    {
+        return px >= 6 && px < gray.Width - 6 && py >= 6 && py < gray.Height - 6;
+    }
+
+    private static double NormalizeAngleDegrees(double angle)
+    {
+        var normalized = angle % 360.0;
+        return normalized < 0 ? normalized + 360.0 : normalized;
+    }
+
+    private static double ComputePositiveArcSpanDegrees(double startAngle, double endAngle)
+    {
+        const double epsilon = 1e-6;
+        var rawSpan = endAngle - startAngle;
+        if (Math.Abs(rawSpan) <= epsilon)
+        {
+            return 0.0;
+        }
+
+        if (Math.Abs(rawSpan) > 360.0)
+        {
+            rawSpan %= 360.0;
+            if (Math.Abs(rawSpan) <= epsilon)
+            {
+                return 360.0;
+            }
+        }
+
+        while (rawSpan < 0.0)
+        {
+            rawSpan += 360.0;
+        }
+
+        return rawSpan;
     }
 
     private Mat CreateVisualization(Mat image, int cx, int cy, int radius, double start, double end, List<ArcCaliperPoint> points)

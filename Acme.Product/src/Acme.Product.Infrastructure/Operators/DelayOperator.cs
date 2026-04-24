@@ -23,13 +23,26 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("Milliseconds", "延时毫秒", "int", DefaultValue = 200, Min = 0, Max = 60000)]
 public class DelayOperator : OperatorBase
 {
+    private const int DefaultDelayMs = 200;
+    private const int MaxDelayMs = 60_000;
+
     public override OperatorType OperatorType => OperatorType.Delay;
 
     public DelayOperator(ILogger<DelayOperator> logger) : base(logger) { }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(Operator @operator, Dictionary<string, object>? inputs, CancellationToken cancellationToken)
     {
-        var ms = GetIntParam(@operator, "Milliseconds", 200, 0, 60000);
+        var ms = GetParam(@operator, "Milliseconds", DefaultDelayMs);
+        if (ms < 0)
+        {
+            return OperatorExecutionOutput.Failure("Milliseconds must be greater than or equal to 0.");
+        }
+
+        if (ms > MaxDelayMs)
+        {
+            return OperatorExecutionOutput.Failure($"Milliseconds must be less than or equal to {MaxDelayMs}.");
+        }
+
         var start = DateTime.UtcNow;
         await Task.Delay(ms, cancellationToken);
         var elapsed = (int)(DateTime.UtcNow - start).TotalMilliseconds;
@@ -44,5 +57,19 @@ public class DelayOperator : OperatorBase
         });
     }
 
-    public override ValidationResult ValidateParameters(Operator @operator) => ValidationResult.Valid();
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        var ms = GetParam(@operator, "Milliseconds", DefaultDelayMs);
+        if (ms < 0)
+        {
+            return ValidationResult.Invalid("Milliseconds must be greater than or equal to 0.");
+        }
+
+        if (ms > MaxDelayMs)
+        {
+            return ValidationResult.Invalid($"Milliseconds must be less than or equal to {MaxDelayMs}.");
+        }
+
+        return ValidationResult.Valid();
+    }
 }

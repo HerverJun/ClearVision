@@ -1,618 +1,402 @@
-/*
- * 分析卡片 (Analysis Cards) 样式
- * 设计参考：工业检测界面，要求紧凑、清晰、直观
- */
+/* ==========================================================================
+   Analysis Cards — ClearVision 检测分析卡片
+   Phase 3: 统一为 glass-card + 深红主色系统
+   与 results.css 风格一致，适配 Spatial Elegance 主题
+   ========================================================================== */
 
- .analysis-cards-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-bottom: 12px;
+/* ===== 卡片外层 ===== */
+.ac-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(225, 190, 188, 0.5);
+    border-radius: 12px;
+    padding: 14px;
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    position: relative;
+    overflow: hidden;
 }
 
-/* ==================================
- * 通用卡片外壳
- * ================================== */
-.ac-card {
-    background-color: var(--bg-color);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    overflow: hidden;
-    position: relative;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+.ac-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #af262c, #c0392b);
+    border-radius: 12px 12px 0 0;
 }
 
 .ac-card:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     transform: translateY(-2px);
+    border-color: rgba(175, 38, 44, 0.3);
+    box-shadow: 0 8px 24px rgba(175, 38, 44, 0.08);
 }
 
+/* 状态修饰器 */
+.ac-card.status-ok::before   { background: linear-gradient(90deg, #00685b, #1a9987); }
+.ac-card.status-ng::before   { background: linear-gradient(90deg, #ba1a1a, #e74c3c); }
+.ac-card.status-error::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
 
-
-/* 折叠状态 */
-.ac-card.collapsed .ac-card-body {
-    display: none;
-}
-
+/* ===== 卡片标题栏 ===== */
 .ac-card-header {
     display: flex;
     align-items: center;
-    padding: 8px 12px 8px 12px;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-    background-color: var(--bg-color);
-    cursor: pointer;
-}
-
-.ac-card-icon {
-    font-size: 16px;
-    margin-right: 8px;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding-top: 2px;
+    position: relative;
+    z-index: 1;
 }
 
 .ac-card-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-color);
-    flex-grow: 1;
-}
-
-.ac-card-toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-secondary);
-    padding: 2px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: background-color 0.2s;
-}
-
-.ac-card-toggle:hover {
-    background-color: var(--hover-color);
-    color: var(--text-color);
-}
-
-.ac-card-toggle svg {
-    transition: transform 0.2s ease;
-}
-
-.ac-card-body {
-    padding: 8px 12px 10px 12px;
-}
-
-/* ==================================
- * 通用徽章 (Badge)
- * ================================== */
-.ac-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px 6px;
-    border-radius: 9999px;
-    font-size: 10px;
-    font-weight: 600;
-    line-height: normal;
-}
-
-.ac-badge-ok {
-    background-color: #f8fafc; /* slate-50 */
-    color: #10b981;            /* emerald */
-    border: 1px solid #e2e8f0;
-}
-
-.ac-badge-ng {
-    background-color: #f8fafc; /* slate-50 */
-    color: #e11d48;            /* rose */
-    border: 1px solid #e2e8f0;
-}
-
-/* ==================================
- * 1. 测量卡片 (Measurement)
- * ================================== */
-.ac-measurement-row {
-    margin-bottom: 16px;
-}
-
-.ac-measurement-row:last-child {
-    margin-bottom: 0;
-}
-
-.ac-measurement-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 4px;
-}
-
-.ac-measurement-icon {
-    font-size: 14px;
-    margin-right: 6px;
-    color: var(--text-secondary);
-}
-
-.ac-measurement-label {
     font-size: 12px;
-    color: var(--text-secondary);
-    flex-grow: 1;
+    font-weight: 600;
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.ac-card-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.ac-card-badge.status-ok { background: rgba(0, 104, 91, 0.1); color: #00685b; border: 1px solid rgba(0, 104, 91, 0.15); }
+.ac-card-badge.status-ng { background: rgba(186, 26, 26, 0.1); color: #ba1a1a; border: 1px solid rgba(186, 26, 26, 0.15); }
+.ac-card-badge.status-error { background: rgba(217, 119, 6, 0.1); color: #d97706; border: 1px solid rgba(217, 119, 6, 0.15); }
+
+/* ===== 测量卡片 ===== */
+.ac-measurement-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 8px;
+    position: relative;
+    z-index: 1;
 }
 
 .ac-measurement-value {
-    display: flex;
-    align-items: baseline;
-    margin-bottom: 8px;
-    padding-left: 20px;
-}
-
-.ac-measurement-value .ac-big-number {
-    font-family: 'Inter', 'Roboto Mono', monospace;
-    font-size: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
     font-weight: 700;
-    letter-spacing: -0.5px;
-}
-
-.ac-measurement-value .ac-unit {
-    margin-left: 4px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.ac-measurement-value.ok .ac-big-number {
-    color: #10b981;
-}
-
-.ac-measurement-value.ng .ac-big-number {
-    color: #e11d48;
-}
-
-/* ==================================
- * 2. OCR/条码卡片 (OCR/Code)
- * ================================== */
-.ac-ocr-section {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.ac-ocr-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ac-ocr-type-label {
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.ac-ocr-text-box {
-    background-color: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-family: 'Roboto Mono', monospace;
-    font-size: 15px;
-    font-weight: 600;
-}
-
-.ac-ocr-text-box.ok {
-    border-color: rgba(16, 185, 129, 0.3);
-}
-
-.ac-ocr-text-box.ng {
-    border-color: rgba(239, 68, 68, 0.3);
-}
-
-.ac-ocr-text {
-    word-break: break-all;
     color: var(--text-color);
+    line-height: 1;
+    letter-spacing: -0.02em;
 }
 
-.ac-ocr-check { color: #10b981; font-weight: bold; display: flex; align-items: center; justify-content: center; }
-.ac-ocr-cross { color: #e11d48; font-weight: bold; display: flex; align-items: center; justify-content: center; }
-
-.ac-ocr-confidence {
-    margin-top: 4px;
+.ac-measurement-unit {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
-.ac-ocr-conf-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 4px;
+.ac-measurement-status {
+    margin-left: auto;
     font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
 }
 
+/* ===== 进度条 ===== */
 .ac-progress-bar {
-    height: 6px;
-    background-color: var(--border-color);
-    border-radius: 3px;
+    height: 8px;
+    background: rgba(225, 190, 188, 0.25);
+    border-radius: 4px;
     overflow: hidden;
+    margin-top: 10px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .ac-progress-fill {
     height: 100%;
-    border-radius: 3px;
-    transition: width 0.3s ease;
-}
-
-.ac-progress-fill.high { background-color: #10b981; }
-.ac-progress-fill.medium { background-color: #f59e0b; }
-.ac-progress-fill.low { background-color: #e11d48; }
-.ac-ocr-conf-value.high { color: #10b981; font-weight: bold;}
-.ac-ocr-conf-value.medium { color: #f59e0b; font-weight: bold;}
-.ac-ocr-conf-value.low { color: #e11d48; font-weight: bold;}
-
-
-.ac-ocr-chars {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.ac-ocr-chars-label {
-    font-size: 11px;
-    color: var(--text-secondary);
-}
-
-.ac-ocr-char-bars {
-    display: flex;
-    gap: 2px;
-}
-
-.ac-ocr-char-bar {
-    width: 6px;
-    height: 8px;
-    border-radius: 1px;
-}
-
-.ac-ocr-char-bar.good { background-color: #10b981; }
-.ac-ocr-char-bar.bad { background-color: #e11d48; }
-
-
-/* ==================================
- * 3. 缺陷检测卡片 (Defect)
- * ================================== */
-.ac-defect-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed var(--border-color);
-    margin-bottom: 8px;
-}
-
-.ac-defect-count-label {
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.ac-defect-count {
-    font-size: 18px;
-    font-weight: bold;
-    font-family: 'Inter', monospace;
-}
-
-.ac-defect-count.ok { color: var(--text-secondary); }
-.ac-defect-count.ng { color: #e11d48; }
-
-.ac-defect-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.ac-defect-item {
-    display: flex;
-    align-items: center;
-    background-color: var(--hover-color);
-    padding: 6px 8px;
     border-radius: 4px;
-    font-size: 12px;
-}
-
-.ac-defect-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    margin-right: 8px;
-}
-
-.ac-defect-dot.ok { background-color: #10b981; }
-.ac-defect-dot.ng { background-color: #e11d48; }
-
-.ac-defect-name {
-    flex-grow: 1;
-    color: var(--text-color);
-    font-weight: 500;
-}
-
-.ac-defect-conf {
-    color: var(--text-secondary);
-    font-family: 'Roboto Mono', monospace;
-    font-size: 11px;
-}
-
-
-/* ==================================
- * 4. 匹配卡片 (Match)
- * ================================== */
-.ac-match-status-badge {
-    text-align: center;
-    padding: 6px;
-    border-radius: 9999px;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-.ac-match-status-badge.matched {
-    background-color: rgba(16, 185, 129, 0.1);
-    color: var(--success-color, #10b981);
-}
-
-.ac-match-status-badge.unmatched {
-    background-color: rgba(239, 68, 68, 0.1);
-    color: var(--error-color, #ef4444);
-}
-
-.ac-match-details {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.ac-match-score-row, .ac-match-position-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ac-match-score-label {
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.ac-match-score-value {
-    font-family: 'Inter', monospace;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.ac-match-score-value.high { color: #10b981; }
-.ac-match-score-value.medium { color: #f59e0b; }
-.ac-match-score-value.low { color: #e11d48; }
-
-.ac-match-position-val {
-    font-family: 'Roboto Mono', monospace;
-    font-size: 12px;
-    color: var(--text-color);
-    background-color: var(--input-bg);
-    padding: 2px 6px;
-    border-radius: 3px;
-    border: 1px solid var(--border-color);
-}
-
-/* ==================================
- * 5. 通用数据卡片 (Generic)
- * ================================== */
-.ac-generic-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--border-color);
-    font-size: 12px;
-}
-
-.ac-generic-row:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.ac-generic-key {
-    color: var(--text-secondary);
-    max-width: 45%;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.ac-generic-value {
-    color: var(--text-color);
-    text-align: right;
-    max-width: 50%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.ac-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background-image: linear-gradient(45deg,rgba(255,255,255,.2) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.2) 75%,transparent 75%,transparent);
+    background-size: 1rem 1rem;
 }
 
-.ac-bool-true { color: #10b981; }
-.ac-bool-false { color: #e11d48; }
+.ac-progress-fill.high   { background: #00685b; }
+.ac-progress-fill.medium { background: #d97706; }
+.ac-progress-fill.low    { background: #ba1a1a; }
 
-.ac-json-code {
-    background-color: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 3px;
-    padding: 2px 4px;
-    font-family: 'Roboto Mono', monospace;
-    font-size: 10px;
-    color: var(--text-secondary);
-}
-
-/* ==================================
- * 6. 诊断卡片 (Diagnostics)
- * ================================== */
-.ac-diagnostics-inline {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.ac-card-diagnostic {
-    border-left: 4px solid rgba(15, 23, 42, 0.08);
-}
-
-.ac-card-diagnostic.ac-status-ok {
-    border-left-color: rgba(16, 185, 129, 0.55);
-}
-
-.ac-card-diagnostic.ac-status-ng {
-    border-left-color: rgba(225, 29, 72, 0.6);
-}
-
-.ac-diagnostic-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 36px;
-    padding: 3px 8px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-}
-
-.ac-diagnostic-badge.ok {
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.12);
-}
-
-.ac-diagnostic-badge.ng {
-    color: #e11d48;
-    background: rgba(225, 29, 72, 0.12);
-}
-
-.ac-diagnostic-message {
-    margin-bottom: 10px;
-    padding: 8px 10px;
+/* ===== OCR / 识别卡片 ===== */
+.ac-ocr-text-box {
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(225, 190, 188, 0.3);
     border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--text-color);
+    word-break: break-all;
+    position: relative;
+    z-index: 1;
+}
+
+.ac-confidence-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.ac-confidence-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.ac-confidence-value {
     font-size: 12px;
-    line-height: 1.5;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    background: rgba(248, 250, 252, 0.85);
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
     color: var(--text-color);
 }
 
-.ac-diagnostic-message.ok {
-    border-color: rgba(16, 185, 129, 0.28);
-    background: rgba(236, 253, 245, 0.9);
-}
-
-.ac-diagnostic-message.ng {
-    border-color: rgba(225, 29, 72, 0.28);
-    background: rgba(255, 241, 242, 0.92);
-}
-
+/* ===== 诊断卡片网格 ===== */
 .ac-diagnostic-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+    position: relative;
+    z-index: 1;
+}
+
+.ac-diagnostic-item {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 2px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(225, 190, 188, 0.3);
+    border-radius: 8px;
+    transition: background 180ms;
 }
 
-.ac-diagnostic-row {
-    display: grid;
-    grid-template-columns: minmax(90px, 120px) 1fr;
-    gap: 10px;
-    align-items: start;
+.ac-diagnostic-item:hover {
+    background: rgba(175, 38, 44, 0.04);
+    border-color: rgba(175, 38, 44, 0.2);
 }
 
-.ac-diagnostic-label {
-    font-size: 12px;
-    color: var(--text-secondary);
+.ac-diagnostic-key {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
 }
 
 .ac-diagnostic-value {
-    min-width: 0;
-    font-size: 12px;
-    color: var(--text-color);
-}
-
-.ac-diagnostic-number {
-    font-family: var(--font-mono);
-    font-weight: 600;
-    color: var(--text-color);
-}
-
-.ac-diagnostic-text {
-    color: var(--text-color);
-    line-height: 1.5;
-}
-
-.ac-diagnostic-empty {
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-.ac-diagnostic-status {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
+    color: var(--text-color);
+    font-family: 'JetBrains Mono', monospace;
 }
 
-.ac-diagnostic-status.ok {
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.12);
-}
-
-.ac-diagnostic-status.ng {
-    color: #e11d48;
-    background: rgba(225, 29, 72, 0.12);
-}
-
-.ac-diagnostic-sequence,
-.ac-diagnostic-chip-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
+/* 诊断 chip（序列/标签） */
 .ac-diagnostic-chip {
     display: inline-flex;
     align-items: center;
+    gap: 4px;
     padding: 3px 8px;
     border-radius: 999px;
-    background: rgba(15, 23, 42, 0.06);
-    border: 1px solid rgba(148, 163, 184, 0.22);
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
+}
+
+.ac-diagnostic-chip.sequence-match {
+    background: rgba(0, 104, 91, 0.1);
+    color: #00685b;
+    border: 1px solid rgba(0, 104, 91, 0.15);
+}
+
+.ac-diagnostic-chip.sequence-mismatch {
+    background: rgba(186, 26, 26, 0.1);
+    color: #ba1a1a;
+    border: 1px solid rgba(186, 26, 26, 0.15);
+}
+
+.ac-diagnostic-chip.status-pending {
+    background: rgba(217, 119, 6, 0.1);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.15);
+}
+
+/* 诊断状态指示 */
+.ac-diagnostic-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 11px;
-    line-height: 1.3;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
 }
 
-.ac-diagnostic-sequence .ac-diagnostic-chip::after {
-    content: '→';
-    margin-left: 6px;
-    color: var(--text-secondary);
+.ac-diagnostic-status.ok { background: rgba(0, 104, 91, 0.1); color: #00685b; }
+.ac-diagnostic-status.ng { background: rgba(186, 26, 26, 0.1); color: #ba1a1a; }
+
+/* ===== 通用键值对 ===== */
+.ac-generic-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(225, 190, 188, 0.25);
+    position: relative;
+    z-index: 1;
 }
 
-.ac-diagnostic-sequence .ac-diagnostic-chip:last-child::after {
-    content: '';
-    margin: 0;
-}
+.ac-generic-row:last-child { border-bottom: none; }
 
-.ac-diagnostic-hint {
-    margin-top: 10px;
+.ac-generic-key {
     font-size: 11px;
-    color: var(--text-secondary);
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
-html[data-theme="dark"] .ac-badge-ok,
-html[data-theme="dark"] .ac-badge-ng,
-html[data-theme="dark"] .ac-diagnostic-chip {
-    background: var(--bg-subtle);
-    border-color: var(--border-color);
+.ac-generic-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-color);
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+}
+
+/* ===== 诊断详情面板 ===== */
+.ac-diagnostic-detail {
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(225, 190, 188, 0.3);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+}
+
+.ac-diagnostic-detail-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ===== 辅助文本 ===== */
+.ac-empty-text {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* ===== 动画 ===== */
+@keyframes ac-card-appear {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.ac-card {
+    animation: ac-card-appear 0.3s ease-out both;
+}
+
+.ac-card:nth-child(1) { animation-delay: 0ms; }
+.ac-card:nth-child(2) { animation-delay: 60ms; }
+.ac-card:nth-child(3) { animation-delay: 120ms; }
+.ac-card:nth-child(4) { animation-delay: 180ms; }
+
+/* ==========================================================================
+   ☀️ Light Theme 精细适配
+   ========================================================================== */
+
+[data-theme="light"] .ac-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(225, 190, 188, 0.6);
+}
+
+[data-theme="light"] .ac-diagnostic-item,
+[data-theme="light"] .ac-ocr-text-box,
+[data-theme="light"] .ac-diagnostic-detail {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(225, 190, 188, 0.4);
+}
+
+/* ==========================================================================
+   🌙 Dark Theme 全面适配
+   ========================================================================== */
+
+[data-theme="dark"] .ac-card {
+    background: rgba(30, 22, 22, 0.6);
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+}
+
+[data-theme="dark"] .ac-card::before {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+[data-theme="dark"] .ac-card.status-ok::before   { background: linear-gradient(90deg, #10b981, #34d399); }
+[data-theme="dark"] .ac-card.status-ng::before   { background: linear-gradient(90deg, #e74c3c, #f87171); }
+[data-theme="dark"] .ac-card.status-error::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+[data-theme="dark"] .ac-card:hover {
+    border-color: rgba(231, 76, 60, 0.4);
+    box-shadow: 0 8px 24px rgba(231, 76, 60, 0.1);
+}
+
+[data-theme="dark"] .ac-card-badge.status-ok { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+[data-theme="dark"] .ac-card-badge.status-ng { background: rgba(231, 76, 60, 0.15); color: #f87171; }
+[data-theme="dark"] .ac-card-badge.status-error { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+[data-theme="dark"] .ac-diagnostic-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .ac-diagnostic-item:hover {
+    background: rgba(231, 76, 60, 0.08);
+    border-color: rgba(231, 76, 60, 0.2);
+}
+
+[data-theme="dark"] .ac-diagnostic-chip.sequence-match { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+[data-theme="dark"] .ac-diagnostic-chip.sequence-mismatch { background: rgba(231, 76, 60, 0.15); color: #f87171; }
+
+[data-theme="dark"] .ac-ocr-text-box,
+[data-theme="dark"] .ac-diagnostic-detail {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .ac-progress-bar {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .ac-generic-row {
+    border-color: rgba(255, 255, 255, 0.06);
 }

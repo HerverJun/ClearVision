@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-04-19 23:24:05 +08:00`
+> 生成时间 / Generated At: `2026-04-22 00:43:58 +08:00`
 > 算子总数 / Total Operators: **155**
 
 ## 分类统计 / Category Summary
@@ -39,12 +39,12 @@
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **89.4**
+- 平均分 / Average: **89.7**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 115 |
-| B | 25 |
-| C | 15 |
+| B | 27 |
+| C | 13 |
 
 ## 分类索引 / Grouped Index
 
@@ -143,7 +143,7 @@
 ### 变量 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 66 (C) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [CycleCounter](./CycleCounter.md) |
+| `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 79 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [CycleCounter](./CycleCounter.md) |
 | `OperatorType.VariableIncrement` | 变量递增 | 0 | 5 | 5 | 73 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableIncrement](./VariableIncrement.md) |
 | `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 3 | 73 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableRead](./VariableRead.md) |
 | `OperatorType.VariableWrite` | 变量写入 | 1 | 3 | 4 | 73 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableWrite](./VariableWrite.md) |
@@ -206,10 +206,10 @@
 ### 检测 (18)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.ArcCaliper` | Arc Caliper | 7 | 2 | 0 | 58 (C) | `1.0.0` | - | [ArcCaliper](./ArcCaliper.md) |
+| `OperatorType.ArcCaliper` | Arc Caliper | 7 | 2 | 0 | 64 (C) | `1.0.0` | - | [ArcCaliper](./ArcCaliper.md) |
 | `OperatorType.CaliperTool` | 卡尺工具 | 2 | 7 | 9 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [CaliperTool](./CaliperTool.md) |
 | `OperatorType.CircleMeasurement` | 圆测量 | 1 | 7 | 7 | 100 (A) | `1.0.0` | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | [CircleMeasurement](./CircleMeasurement.md) |
-| `OperatorType.ContourExtrema` | Contour Extrema | 3 | 6 | 0 | 58 (C) | `1.0.0` | - | [ContourExtrema](./ContourExtrema.md) |
+| `OperatorType.ContourExtrema` | Contour Extrema | 3 | 6 | 0 | 61 (C) | `1.0.0` | - | [ContourExtrema](./ContourExtrema.md) |
 | `OperatorType.GapMeasurement` | 间隙测量 | 2 | 9 | 8 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [GapMeasurement](./GapMeasurement.md) |
 | `OperatorType.GeoMeasurement` | 几何测量 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [GeoMeasurement](./GeoMeasurement.md) |
 | `OperatorType.GeometricFitting` | Geometric Fitting | 1 | 2 | 8 | 100 (A) | `1.0.0` | 当前实现的几何拟合流程并不是直接接收点集输入，而是： | [GeometricFitting](./GeometricFitting.md) |
@@ -219,7 +219,7 @@
 | `OperatorType.LineMeasurement` | 直线测量 | 1 | 5 | 4 | 96 (A) | `1.0.0` | 该算子从边缘图中提取直线段候选，再基于几何关系输出线结构或测量结果。 | [LineMeasurement](./LineMeasurement.md) |
 | `OperatorType.Measurement` | 测量 | 3 | 2 | 5 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [Measurement](./Measurement.md) |
 | `OperatorType.MinEnclosingGeometry` | Min Enclosing Geometry | 1 | 2 | 10 | 90 (A) | `1.0.0` | - | [MinEnclosingGeometry](./MinEnclosingGeometry.md) |
-| `OperatorType.PhaseClosure` | Phase Closure | 4 | 4 | 0 | 58 (C) | `1.0.0` | - | [PhaseClosure](./PhaseClosure.md) |
+| `OperatorType.PhaseClosure` | Phase Closure | 4 | 4 | 0 | 61 (C) | `1.0.0` | - | [PhaseClosure](./PhaseClosure.md) |
 | `OperatorType.PixelStatistics` | 像素统计 | 2 | 6 | 5 | 96 (A) | `1.0.0` | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | [PixelStatistics](./PixelStatistics.md) |
 | `OperatorType.PointLineDistance` | 点线距离 | 2 | 2 | 2 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [PointLineDistance](./PointLineDistance.md) |
 | `OperatorType.SharpnessEvaluation` | 清晰度评估 | 1 | 3 | 7 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [SharpnessEvaluation](./SharpnessEvaluation.md) |
@@ -230,7 +230,7 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 71 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Comparator](./Comparator.md) |
 | `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ConditionalBranch](./ConditionalBranch.md) |
-| `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 61 (C) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Delay](./Delay.md) |
+| `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Delay](./Delay.md) |
 | `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ForEach](./ForEach.md) |
 | `OperatorType.TryCatch` | 异常捕获 | 1 | 4 | 3 | 93 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TryCatch](./TryCatch.md) |
 

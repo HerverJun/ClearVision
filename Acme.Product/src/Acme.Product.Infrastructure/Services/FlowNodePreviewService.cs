@@ -3,6 +3,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.AI.Runtime;
 using Acme.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
@@ -11,6 +12,8 @@ namespace Acme.Product.Infrastructure.Services;
 
 public sealed class FlowNodePreviewService : IFlowNodePreviewService
 {
+    private static readonly string[] DeepLearningCatalogTypes = ["detection", "object_detection", "deep_learning", "yolo"];
+
     private readonly ILogger<FlowNodePreviewService> _logger;
     private readonly IFlowExecutionService _flowExecution;
     private readonly IPreviewMetricsAnalyzer _metricsAnalyzer;
@@ -163,8 +166,28 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
 
         foreach (var op in relevantOperators.Where(item => item.Type == OperatorType.DeepLearning))
         {
-            var modelPath = GetStringParam(op, "ModelPath");
-            if (string.IsNullOrWhiteSpace(modelPath) || !PathExists(modelPath))
+            var explicitModelPath = GetStringParam(op, "ModelPath");
+            var modelId = GetStringParam(op, "ModelId");
+            var modelCatalogPath = GetStringParam(op, "ModelCatalogPath");
+            var resolvedModelPath = explicitModelPath;
+            var modelResolutionError = string.Empty;
+            if (string.IsNullOrWhiteSpace(resolvedModelPath) && !string.IsNullOrWhiteSpace(modelId))
+            {
+                try
+                {
+                    resolvedModelPath = ModelCatalog.ResolveExplicitOrCatalogPath(null, modelId, modelCatalogPath, DeepLearningCatalogTypes, out _);
+                }
+                catch (Exception ex)
+                {
+                    modelResolutionError = ex.Message;
+                }
+            }
+
+            var modelPath = resolvedModelPath;
+
+            if ((string.IsNullOrWhiteSpace(explicitModelPath) && string.IsNullOrWhiteSpace(modelId)) ||
+                !string.IsNullOrWhiteSpace(modelResolutionError) ||
+                !PathExists(resolvedModelPath))
             {
                 missing.Add(new PreviewMissingResource
                 {

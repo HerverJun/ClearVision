@@ -263,8 +263,8 @@ export class ProjectView {
      */
     getStatusConfig(status) {
         const configs = {
-            'ready': { label: '就绪', color: '#2ecc71' },
-            'running': { label: '运行中', color: '#3498db' },
+            'ready': { label: '就绪', color: '#34c759' },
+            'running': { label: '运行中', color: '#5ac8fa' },
             'error': { label: '错误', color: '#e74c3c' },
             'draft': { label: '草稿', color: '#95a5a6' }
         };

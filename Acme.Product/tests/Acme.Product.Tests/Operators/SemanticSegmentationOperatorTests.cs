@@ -89,6 +89,12 @@ public sealed class SemanticSegmentationOperatorTests
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         result.OutputData!["ClassCount"].Should().Be(3);
         result.OutputData["PresentClasses"].Should().BeOfType<string[]>().Subject.Should().BeEquivalentTo(["red", "green", "blue"]);
+        result.OutputData["ResolvedModelId"].Should().Be("semantic_identity_2x2");
+        result.OutputData["ModelSource"].Should().Be("ModelCatalog");
+        result.OutputData["ResolvedModelCatalogPath"].Should().Be(ResolveRepoPath("models/model_catalog.json"));
+        result.OutputData["ResolvedModelPath"].Should().BeOfType<string>().Which.Should().NotBeNullOrWhiteSpace();
+        result.OutputData["ModelProvenance"].Should().BeOfType<Dictionary<string, object>>()
+            .Which["ModelType"].Should().Be("segmentation");
 
         var segmentationMap = result.OutputData["SegmentationMap"].Should().BeOfType<ImageWrapper>().Subject;
         var coloredMap = result.OutputData["ColoredMap"].Should().BeOfType<ImageWrapper>().Subject;

@@ -47,6 +47,7 @@
                     "src/shared/styles/analysisCards.css",
                     "src/shared/styles/inspection.css",
                     "src/shared/styles/results.css",
+                    "src/shared/styles/visual-upgrade.css",
                     "css/planarScaleOffsetCalibWizard.css",
                 ];
 
@@ -381,193 +382,241 @@
                         class="results-view-container hidden"
                         id="results-view"
                     >
-                        <!-- 头部标题和时间范围选择 -->
+                        <!-- 头部 — 看板标题 + 状态 Pill + 时间范围 -->
                         <div class="results-view-header">
-                            <h2>检测结果历史</h2>
-                            <div class="time-range-selector">
-                                <button
-                                    class="time-range-btn active"
-                                    data-range="today"
-                                >
-                                    今天
-                                </button>
-                                <button
-                                    class="time-range-btn"
-                                    data-range="week"
-                                >
-                                    本周
-                                </button>
-                                <button
-                                    class="time-range-btn"
-                                    data-range="month"
-                                >
-                                    本月
-                                </button>
-                                <button
-                                    class="time-range-btn"
-                                    data-range="custom"
-                                >
-                                    自定义
-                                </button>
+                            <div>
+                                <h2>实时生产看板</h2>
+                                <p class="results-view-subtitle" id="production-line-info">2号生产线 视觉质检节点 A-04</p>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:16px;">
+                                <div class="time-range-selector">
+                                    <button class="time-range-btn active" data-range="today">今天</button>
+                                    <button class="time-range-btn" data-range="week">本周</button>
+                                    <button class="time-range-btn" data-range="month">本月</button>
+                                    <button class="time-range-btn" data-range="custom">自定义</button>
+                                </div>
+                                <div class="status-pill">
+                                    <span class="status-dot"></span>
+                                    <span class="status-pill-text">监控运行中</span>
+                                    <span class="status-pill-time" id="last-update-time">更新于 10秒前</span>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- 仪表板区域 -->
-                        <div class="results-dashboard" id="results-dashboard">
-                            <!-- 左侧：KPI卡片和图表 -->
-                            <div class="dashboard-left">
-                                <!-- KPI卡片组 -->
-                                <div class="kpi-cards" id="kpi-cards">
-                                    <div class="kpi-card">
-                                        <span
-                                            class="kpi-value total"
-                                            id="kpi-total"
-                                            >0</span
-                                        >
-                                        <span class="kpi-label">总检测数</span>
-                                    </div>
-                                    <div class="kpi-card">
-                                        <span class="kpi-value ok" id="kpi-ok"
-                                            >0</span
-                                        >
-                                        <span class="kpi-label">OK</span>
-                                    </div>
-                                    <div class="kpi-card">
-                                        <span class="kpi-value ng" id="kpi-ng"
-                                            >0</span
-                                        >
-                                        <span class="kpi-label">NG</span>
-                                    </div>
-                                    <div class="kpi-card">
-                                        <span
-                                            class="kpi-value yield"
-                                            id="kpi-yield"
-                                            >0%</span
-                                        >
-                                        <span class="kpi-label">良率</span>
-                                    </div>
-                                    <div class="kpi-card">
-                                        <span
-                                            class="kpi-value time"
-                                            id="kpi-avg-time"
-                                            >0ms</span
-                                        >
-                                        <span class="kpi-label">平均耗时</span>
+                        <!-- Section 1: KPI 网格 -->
+                        <div class="kpi-grid" id="kpi-grid">
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">总检测量</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-total">0</span>
+                                    <div class="kpi-change-v3 up" id="kpi-total-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
+                                        <span class="change-value">+5.2%</span>
+                                        <span class="change-ref">较昨日</span>
                                     </div>
                                 </div>
-
-                                <!-- 良率环形图 -->
-                                <div class="yield-chart-container">
-                                    <div class="yield-chart-title">
-                                        良率统计
+                            </div>
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">合格 (OK)</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-ok">0</span>
+                                    <div class="kpi-change-v3 up" id="kpi-ok-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
+                                        <span class="change-value">+6.1%</span>
+                                        <span class="change-ref">较昨日</span>
                                     </div>
-                                    <div class="yield-chart" id="yield-chart">
-                                        <svg
-                                            viewBox="0 0 150 150"
-                                            width="150"
-                                            height="150"
-                                        >
+                                </div>
+                            </div>
+                            <div class="glass-card kpi-card-v3 alert-glow">
+                                <span class="kpi-label-v3">不良 (NG)</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-ng">0</span>
+                                    <div class="kpi-change-v3 down" id="kpi-ng-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
+                                        <span class="change-value">-1.5%</span>
+                                        <span class="change-ref">较昨日</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">异常报警</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3 error" id="kpi-error">0</span>
+                                    <div class="kpi-change-v3 down" id="kpi-error-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
+                                        <span class="change-value">-0.8%</span>
+                                        <span class="change-ref">较昨日</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">综合良率</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-yield">0%</span>
+                                    <div class="kpi-change-v3 up" id="kpi-yield-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
+                                        <span class="change-value">+0.8%</span>
+                                        <span class="change-ref">较昨日</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass-card kpi-card-v3">
+                                <span class="kpi-label-v3">平均检测耗时</span>
+                                <div class="mt-2">
+                                    <span class="kpi-value-v3" id="kpi-avg-time">0<span class="kpi-unit-v3">ms</span></span>
+                                    <div class="kpi-change-v3 down" id="kpi-time-change">
+                                        <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
+                                        <span class="change-value">-0.1s</span>
+                                        <span class="change-ref">较昨日</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 2: 图表网格 — 仪表盘 / 雷达图 / 面积图 -->
+                        <div class="charts-grid">
+                            <!-- 实时良率仪表 -->
+                            <div class="glass-card chart-card">
+                                <div class="chart-card-header">
+                                    <span class="chart-card-title">实时良率仪表</span>
+                                    <svg class="chart-card-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58L5.07 3.41A8 8 0 0 1 12 2a8.1 8.1 0 0 1 8.38 6.57zM12 4a6 6 0 0 0-4.24 1.76L8.1 7.42a6 6 0 0 1 7.8 7.8l1.66 1.34A6 6 0 0 0 12 4zM3.41 5.07L7.58 9.24a6 6 0 0 0 7.18 7.18l4.17 4.17a8 8 0 0 1-15.52-3.41z"/></svg>
+                                </div>
+                                <div class="chart-card-body">
+                                    <div class="gauge-container">
+                                        <svg class="gauge-svg" viewBox="0 0 240 130">
                                             <defs>
-                                                <linearGradient
-                                                    id="yield-gradient"
-                                                    x1="0%"
-                                                    y1="0%"
-                                                    x2="100%"
-                                                    y2="0%"
-                                                >
-                                                    <stop
-                                                        offset="0%"
-                                                        style="
-                                                            stop-color: #2ecc71;
-                                                        "
-                                                    />
-                                                    <stop
-                                                        offset="50%"
-                                                        style="
-                                                            stop-color: #f1c40f;
-                                                        "
-                                                    />
-                                                    <stop
-                                                        offset="100%"
-                                                        style="
-                                                            stop-color: #e74c3c;
-                                                        "
-                                                    />
+                                                <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                    <stop offset="0%" stop-color="#b2292e" />
+                                                    <stop offset="100%" stop-color="#00685b" />
                                                 </linearGradient>
+                                                <filter id="gaugeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                                                    <feGaussianBlur stdDeviation="4" result="blur" />
+                                                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                                </filter>
                                             </defs>
-                                            <circle
-                                                class="yield-chart-bg"
-                                                cx="75"
-                                                cy="75"
-                                                r="60"
-                                            />
-                                            <circle
-                                                class="yield-chart-fill"
-                                                id="yield-chart-fill"
-                                                cx="75"
-                                                cy="75"
-                                                r="60"
-                                                stroke-dasharray="377"
-                                                stroke-dashoffset="377"
-                                            />
+                                            <path d="M 30 120 A 90 90 0 0 1 210 120" fill="none" stroke="#eed4d2" stroke-width="12" stroke-linecap="round" />
+                                            <path id="gauge-arc-fill" d="M 30 120 A 90 90 0 0 1 210 120" fill="none" stroke="url(#arcGradient)" stroke-width="12" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="282.7" filter="url(#gaugeGlow)" />
+                                            <g opacity="0.4" stroke="#8d706e" stroke-width="1.5">
+                                                <line x1="120" y1="20" x2="120" y2="30" />
+                                                <line x1="45" y1="65" x2="52" y2="68" />
+                                                <line x1="195" y1="65" x2="188" y2="68" />
+                                            </g>
                                         </svg>
-                                        <div class="yield-chart-center">
-                                            <div
-                                                class="yield-percentage"
-                                                id="yield-percentage"
-                                            >
-                                                0%
-                                            </div>
-                                            <div class="yield-label">良率</div>
+                                        <div class="gauge-value-overlay">
+                                            <div class="gauge-value"><span id="gauge-percentage">0</span><span class="gauge-value-unit">%</span></div>
+                                            <div class="gauge-status" id="gauge-status">Status: --</div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                <!-- 缺陷类型分布 -->
-                                <div class="defect-distribution">
-                                    <div class="defect-distribution-title">
-                                        缺陷类型分布
-                                    </div>
-                                    <div class="defect-bars" id="defect-bars">
-                                        <!-- 动态生成 -->
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- 右侧：趋势折线图 -->
-                            <div class="dashboard-right">
-                                <div class="trend-chart-container">
-                                    <div class="trend-chart-title">
-                                        检测趋势
+                            <!-- 缺陷特征多维雷达 -->
+                            <div class="glass-card chart-card">
+                                <div class="chart-card-header">
+                                    <span class="chart-card-title">缺陷特征多维雷达</span>
+                                    <svg class="chart-card-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                                </div>
+                                <div class="chart-card-body">
+                                    <svg class="radar-svg" viewBox="0 0 200 200" id="radar-chart">
+                                        <g fill="none" stroke="#e1bebc" stroke-width="1" opacity="0.6">
+                                            <polygon points="100,20 176,75 147,165 53,165 24,75" />
+                                            <polygon points="100,60 138,87 123,132 77,132 62,87" />
+                                        </g>
+                                        <g stroke="#e1bebc" stroke-width="1" stroke-dasharray="2,2" opacity="0.6">
+                                            <line x1="100" y1="100" x2="100" y2="20" />
+                                            <line x1="100" y1="100" x2="176" y2="75" />
+                                            <line x1="100" y1="100" x2="147" y2="165" />
+                                            <line x1="100" y1="100" x2="53" y2="165" />
+                                            <line x1="100" y1="100" x2="24" y2="75" />
+                                        </g>
+                                        <polygon id="radar-data" class="chart-glow" fill="#ffdad7" fill-opacity="0.6" points="100,35 145,85 137,151 81,125 46,82" stroke="#af262c" stroke-width="2" />
+                                        <g fill="#b2292e" stroke="#fff" stroke-width="1.5">
+                                            <circle cx="100" cy="35" r="4" />
+                                            <circle cx="145" cy="85" r="4" />
+                                            <circle cx="137" cy="151" r="4" />
+                                            <circle cx="81" cy="125" r="4" />
+                                            <circle cx="46" cy="82" r="4" />
+                                        </g>
+                                        <g fill="#59413f" font-family="Inter, sans-serif" font-size="10" font-weight="600">
+                                            <text x="100" y="12" text-anchor="middle">划伤</text>
+                                            <text x="182" y="78" text-anchor="start">脏污</text>
+                                            <text x="152" y="176" text-anchor="start">缺角</text>
+                                            <text x="48" y="176" text-anchor="end">气泡</text>
+                                            <text x="18" y="78" text-anchor="end">其他</text>
+                                        </g>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- 吞吐量时序分析 -->
+                            <div class="glass-card chart-card">
+                                <div class="chart-card-header">
+                                    <span class="chart-card-title">吞吐量时序分析</span>
+                                    <div style="display:flex;align-items:center;gap:6px;">
+                                        <span style="width:8px;height:8px;border-radius:2px;background:#af262c;display:inline-block;"></span>
+                                        <span style="font-size:11px;color:var(--r-text-muted);">检测量</span>
                                     </div>
-                                    <div class="trend-chart-wrapper">
-                                        <canvas
-                                            class="trend-chart-canvas"
-                                            id="trend-canvas"
-                                            width="800"
-                                            height="300"
-                                        ></canvas>
+                                </div>
+                                <div class="chart-card-body">
+                                    <div class="area-chart-wrapper">
+                                        <svg class="area-chart-svg" viewBox="0 0 400 160" preserveAspectRatio="none" id="throughput-chart">
+                                            <defs>
+                                                <linearGradient id="areaGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+                                                    <stop offset="0%" stop-color="#ffdad7" stop-opacity="0.8" />
+                                                    <stop offset="100%" stop-color="#eef2ef" stop-opacity="0.1" />
+                                                </linearGradient>
+                                            </defs>
+                                            <g opacity="0.5" stroke="#eed4d2" stroke-dasharray="4,4" stroke-width="1">
+                                                <line x1="0" y1="40" x2="400" y2="40" />
+                                                <line x1="0" y1="80" x2="400" y2="80" />
+                                                <line x1="0" y1="120" x2="400" y2="120" />
+                                            </g>
+                                            <path id="throughput-area" d="M 0 100 C 40 100, 60 50, 100 60 C 140 70, 160 30, 200 40 C 240 50, 260 90, 300 80 C 340 70, 360 20, 400 30 L 400 160 L 0 160 Z" fill="url(#areaGradient)" />
+                                            <path id="throughput-line" class="chart-glow" d="M 0 100 C 40 100, 60 50, 100 60 C 140 70, 160 30, 200 40 C 240 50, 260 90, 300 80 C 340 70, 360 20, 400 30" fill="none" stroke="#af262c" stroke-width="2.5" stroke-linecap="round" />
+                                        </svg>
+                                        <div class="area-chart-xlabels">
+                                            <span>08:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span>
+                                        </div>
                                     </div>
-                                    <div class="trend-chart-legend">
-                                        <span class="legend-item"
-                                            ><span
-                                                class="legend-color ok"
-                                            ></span>
-                                            OK</span
-                                        >
-                                        <span class="legend-item"
-                                            ><span
-                                                class="legend-color ng"
-                                            ></span>
-                                            NG</span
-                                        >
-                                        <span class="legend-item"
-                                            ><span
-                                                class="legend-color yield"
-                                            ></span>
-                                            良率</span
-                                        >
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 3: 高级统计 -->
+                        <div class="advanced-stats-grid">
+                            <div class="glass-card stat-card">
+                                <div class="stat-card-content">
+                                    <span class="stat-card-label">制程能力指数 (CPK)</span>
+                                    <div>
+                                        <span class="stat-card-value" id="stat-cpk">--</span>
+                                        <span class="stat-card-change" id="stat-cpk-change">+0.05</span>
                                     </div>
+                                </div>
+                                <div class="stat-card-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                                </div>
+                            </div>
+                            <div class="glass-card stat-card">
+                                <div class="stat-card-content">
+                                    <span class="stat-card-label">平均无故障时间 (MTBF)</span>
+                                    <div>
+                                        <span class="stat-card-value" id="stat-mtbf">--</span>
+                                        <span class="stat-card-change" id="stat-mtbf-change">+12h</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                                </div>
+                            </div>
+                            <div class="glass-card stat-card">
+                                <div class="stat-card-content">
+                                    <span class="stat-card-label">缺陷聚类核心特征</span>
+                                    <div style="margin-top:4px;">
+                                        <span class="stat-card-value error" style="font-size:18px;" id="stat-cluster">--</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card-icon error-bg">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4 0 2.21 1.79 4 4 4 2.21 0 4-1.79 4-4 0-2.21-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
                                 </div>
                             </div>
                         </div>
