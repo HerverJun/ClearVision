@@ -1,0 +1,68 @@
+{
+  "name": "MVTec AD Lite",
+  "source_dataset": "MVTec AD",
+  "collected_at": "2026-04-25",
+  "source_pages": [
+    "https://www.mvtec.com/company/research/datasets/mvtec-ad",
+    "https://www.mvtec.com/company/research/datasets/mvtec-ad/downloads"
+  ],
+  "license": {
+    "name": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+    "spdx_like": "CC-BY-NC-SA-4.0",
+    "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+  },
+  "local_root": "quality/public_datasets/mvtec_ad_lite",
+  "git_policy": "The local_root is ignored by git; keep downloaded archives and extracted images local.",
+  "categories": [
+    {
+      "name": "toothbrush",
+      "kind": "object",
+      "archive": {
+        "path": "quality/public_datasets/mvtec_ad_lite/_downloads/toothbrush.tar.xz",
+        "source_url": "https://www.mydrive.ch/shares/38536/3830184030e49fe74747669442f0f283/download/420938134-1629960477/toothbrush.tar.xz",
+        "size_bytes": 109357096,
+        "sha256": "FE72A34B4B0D074F84E844BE7EF8C4F64F7F02F20E25F19C9E3B4A231C8BEA77"
+      },
+      "extracted_path": "quality/public_datasets/mvtec_ad_lite/toothbrush",
+      "splits": {
+        "train_good": 60,
+        "test_good": 12,
+        "test_anomaly": {
+          "defective": 30
+        },
+        "ground_truth_masks": {
+          "defective": 30
+        }
+      }
+    },
+    {
+      "name": "grid",
+      "kind": "texture",
+      "archive": {
+        "path": "quality/public_datasets/mvtec_ad_lite/_downloads/grid.tar.xz",
+        "source_url": "https://www.mydrive.ch/shares/38536/3830184030e49fe74747669442f0f283/download/420937487-1629959044/grid.tar.xz",
+        "size_bytes": 160763852,
+        "sha256": "D94A9A651CBFAEE22C94D06CF8FA8204A590C872362DE0489EB34F1645328DE8"
+      },
+      "extracted_path": "quality/public_datasets/mvtec_ad_lite/grid",
+      "splits": {
+        "train_good": 264,
+        "test_good": 21,
+        "test_anomaly": {
+          "bent": 12,
+          "broken": 12,
+          "glue": 11,
+          "metal_contamination": 11,
+          "thread": 11
+        },
+        "ground_truth_masks": {
+          "bent": 12,
+          "broken": 12,
+          "glue": 11,
+          "metal_contamination": 11,
+          "thread": 11
+        }
+      }
+    }
+  ]
+}
