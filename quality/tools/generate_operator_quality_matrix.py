@@ -63,6 +63,8 @@ FIRST_BATCH_OPERATORS = {
     "DeepLearning",
     "CaliperTool",
     "FFT1D",
+    "InverseFFT1D",
+    "FrequencyFilter",
 }
 
 NEXT_ACTION_OVERRIDES = {
@@ -108,6 +110,7 @@ class GoldenEvidence:
     benchmark: str
     case_count: int
     failed: int
+    public_dataset: str = "No"
 
 
 def split_markdown_row(line: str) -> list[str]:
@@ -317,6 +320,7 @@ def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
             case_count = int(item.get("CaseCount", 0) or 0)
             failed = int(item.get("Failed", 0) or 0)
             has_runtime = "RuntimeMsAvg" in item and "MemoryAllocationBytesAvg" in item
+            has_public_dataset = bool(item.get("HasPublicDataset", False))
 
             if not operator or case_count <= 0:
                 continue
@@ -331,6 +335,7 @@ def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
                 benchmark="Yes" if has_runtime else "No",
                 case_count=case_count,
                 failed=failed,
+                public_dataset="Yes" if has_public_dataset else "No",
             )
 
     return evidence
@@ -383,7 +388,7 @@ def owner_for(row: CatalogRow, card: CardFacts, golden: GoldenEvidence, priority
 
 
 def evidence_or_default(evidence: dict[str, GoldenEvidence], operator: str) -> GoldenEvidence:
-    return evidence.get(operator, GoldenEvidence(status="No", benchmark="No", case_count=0, failed=0))
+    return evidence.get(operator, GoldenEvidence(status="No", benchmark="No", case_count=0, failed=0, public_dataset="No"))
 
 
 def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, baseline_path: Path, evidence: dict[str, GoldenEvidence]) -> str:
@@ -486,7 +491,7 @@ def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, ba
                     str(card.card_todo_count),
                     golden.status,
                     str(golden.case_count),
-                    "No",
+                    golden.public_dataset,
                     "No",
                     golden.benchmark,
                     priority,

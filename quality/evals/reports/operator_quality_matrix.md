@@ -1,6 +1,6 @@
 # Operator Quality Matrix
 
-GeneratedAtUtc: `2026-04-24T15:33:30+00:00`
+GeneratedAtUtc: `2026-04-26T08:17:43+00:00`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
 CardDirectory: `docs/算子资料/算子名片`
 GoldenEvidence: `quality/evals/reports/*_baseline.json`
@@ -10,7 +10,7 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 - Total operators: 155
 - Level counts: A=128, B=27
 - Priority counts: P1=8, P2=24, P3=123
-- Golden test status: Yes=13, No=142
+- Golden test status: Yes=23, No=132
 - Cards with TODO: 0
 - P0 without golden evidence: 0
 - C-level without golden evidence: 0
@@ -19,39 +19,41 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 
 | Operator | Q | Level | Card TODO | Known Limitations | Golden Test | Cases | Benchmark | Priority | Next Action |
 |---|---:|---|---:|---:|---|---:|---|---|---|
-| FFT1D | 71 | B | 0 | 2 | No | 0 | No | P1 | Add frequency-domain synthetic signal golden tests |
-| GradientShapeMatch | 83 | B | 0 | 5 | No | 0 | No | P1 | Fix cache/Position contract and add multi-candidate tests |
+| FFT1D | 71 | B | 0 | 2 | Yes | 117 | Yes | P1 | Review QScore/Level from golden evidence |
+| FrequencyFilter | 71 | B | 0 | 2 | Yes | 117 | Yes | P1 | Review QScore/Level from golden evidence |
+| InverseFFT1D | 71 | B | 0 | 2 | Yes | 117 | Yes | P1 | Review QScore/Level from golden evidence |
+| GradientShapeMatch | 83 | B | 0 | 5 | Yes | 117 | Yes | P1 | Review QScore/Level from golden evidence |
 | RegionUnion | 89 | A | 0 | 2 | Yes | 100 | Yes | P2 | Review QScore/Level from golden evidence |
-| CaliperTool | 96 | A | 0 | 2 | No | 0 | No | P2 | Add caliper robustness baseline and failure triage |
-| TemplateMatching | 96 | A | 0 | 3 | No | 0 | No | P2 | Add score contract baseline and fixed-scale failure boundary tests |
-| AnomalyDetection | 100 | A | 0 | 3 | No | 0 | No | P2 | Run MVTec AD baseline and record Image/Pixel AUROC |
-| DeepLearning | 100 | A | 0 | 5 | No | 0 | No | P2 | Lock YOLO output contract and expose NMS IoU tests |
+| CaliperTool | 96 | A | 0 | 2 | Yes | 117 | Yes | P2 | Review QScore/Level from golden evidence |
+| TemplateMatching | 96 | A | 0 | 3 | Yes | 117 | Yes | P2 | Review QScore/Level from golden evidence |
+| AnomalyDetection | 100 | A | 0 | 3 | Yes | 120 | Yes | P2 | Review QScore/Level from golden evidence |
+| DeepLearning | 100 | A | 0 | 5 | Yes | 26 | Yes | P2 | Review QScore/Level from golden evidence |
 
 ## Full Matrix
 
 | OperatorType | DisplayName | Category | QScore | Level | Version | Maturity | Inputs | Outputs | Params | AlgorithmSummary | KnownLimitationsCount | CardTodoCount | HasGoldenTest | GoldenCases | HasPublicDataset | HasFieldDataset | HasBenchmark | Priority | OwnerAgent | NextAction |
 |---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---:|---|---:|---|---|---|---|---|---|
-| OperatorType.FFT1D | FFT 1D | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 2 | 4 | 0 | Performs 1D Fast Fourier Transform on input signal or image rows/columns.。 | 2 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add frequency-domain synthetic signal golden tests |
-| OperatorType.FrequencyFilter | Frequency Filter | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 5 | 3 | 0 | Applies frequency domain filters (low-pass, high-pass, band-pass, band-stop) to spectrum.。 | 2 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add cutoff/phase preservation golden tests |
-| OperatorType.InverseFFT1D | Inverse FFT 1D | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 2 | 4 | 0 | Performs 1D Inverse Fast Fourier Transform to convert frequency spectrum back to time dom... | 2 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add inverse reconstruction and energy preservation tests |
+| OperatorType.FFT1D | FFT 1D | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 2 | 4 | 0 | Performs 1D Fast Fourier Transform on input signal or image rows/columns.。 | 2 | 0 | Yes | 117 | No | No | Yes | P1 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.FrequencyFilter | Frequency Filter | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 5 | 3 | 0 | Applies frequency domain filters (low-pass, high-pass, band-pass, band-stop) to spectrum.。 | 2 | 0 | Yes | 117 | No | No | Yes | P1 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.InverseFFT1D | Inverse FFT 1D | Frequency | 71 | B | 1.0.0 | 稳定 Stable | 2 | 4 | 0 | Performs 1D Inverse Fast Fourier Transform to convert frequency spectrum back to time dom... | 2 | 0 | Yes | 117 | No | No | Yes | P1 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.AkazeFeatureMatch | AKAZE特征匹配 | 匹配定位 | 73 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 8 | 该算子基于局部特征点匹配完成模板定位，核心流程是： | 8 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.OrbFeatureMatch | ORB特征匹配 | 匹配定位 | 73 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 10 | 该算子与 AkazeFeatureMatchOperator 属于同一类局部特征匹配… | 5 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.GradientShapeMatch | 梯度形状匹配 | 匹配定位 | 83 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 11 | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | 5 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Fix cache/Position contract and add multi-candidate tests |
+| OperatorType.GradientShapeMatch | 梯度形状匹配 | 匹配定位 | 83 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 11 | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | 5 | 0 | Yes | 117 | No | No | Yes | P1 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.HandEyeCalibrationValidator | Hand-Eye Calibration Validator | 标定 | 83 | B | 1.0.1 | - | 3 | 8 | 1 | Hand-Eye Consistency Validation | 0 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PyramidShapeMatch | 金字塔形状匹配 | 匹配定位 | 83 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 15 | 该算子围绕模板、特征或几何相似性执行定位匹配，用于判断目标是否存在以及位姿大致位置。 | 4 | 0 | No | 0 | No | No | No | P1 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.RegionUnion | Region Union | Region | 89 | A | 1.0.1 | 稳定 Stable | 2 | 3 | 0 | Run-length region union | 2 | 0 | Yes | 100 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
-| OperatorType.SemanticSegmentation | 语义分割 | AI检测 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 10 | 11 | Runs an ONNX semantic segmentation model and returns class map, colored visualization, an... | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.SemanticSegmentation | 语义分割 | AI检测 | 90 | A | 1.0.0 | 稳定 Stable | 1 | 10 | 11 | Runs an ONNX semantic segmentation model and returns class map, colored visualization, an... | 2 | 0 | Yes | 27 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.Undistort | Undistort | 标定 | 91 | A | 1.0.0 | - | 2 | 1 | 0 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.DualModalVoting | Dual Modal Voting | AI Detection | 94 | A | 1.0.0 | 稳定 Stable | 2 | 3 | 6 | 该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。 | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.CaliperTool | 卡尺工具 | 检测 | 96 | A | 1.0.0 | 稳定 Stable | 2 | 7 | 9 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add caliper robustness baseline and failure triage |
-| OperatorType.EdgePairDefect | 边缘对缺陷 | AI检测 | 96 | A | 1.0.0 | 稳定 Stable | 3 | 4 | 4 | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.CaliperTool | 卡尺工具 | 检测 | 96 | A | 1.0.0 | 稳定 Stable | 2 | 7 | 9 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 2 | 0 | Yes | 117 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.EdgePairDefect | 边缘对缺陷 | AI检测 | 96 | A | 1.0.0 | 稳定 Stable | 3 | 4 | 4 | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | 2 | 0 | Yes | 27 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.FisheyeUndistort | Fisheye Undistort | 标定 | 96 | A | 1.0.0 | - | 2 | 2 | 4 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.TemplateMatching | 模板匹配 | 匹配定位 | 96 | A | 1.2.0 | 稳定 Stable | 3 | 8 | 12 | 该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NM… | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add score contract baseline and fixed-scale failure boundary tests |
-| OperatorType.AnomalyDetection | 异常检测 | AI检测 | 100 | A | 1.0.0 | Experimental | 2 | 8 | 13 | Simplified PatchCore | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Run MVTec AD baseline and record Image/Pixel AUROC |
+| OperatorType.TemplateMatching | 模板匹配 | 匹配定位 | 96 | A | 1.2.0 | 稳定 Stable | 3 | 8 | 12 | 该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NM… | 3 | 0 | Yes | 117 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.AnomalyDetection | 异常检测 | AI检测 | 100 | A | 1.0.0 | Experimental | 2 | 8 | 13 | Simplified PatchCore | 3 | 0 | Yes | 120 | Yes | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.CalibrationLoader | Calibration Loader | 标定 | 100 | A | 1.0.0 | - | 0 | 3 | 1 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.CameraCalibration | Camera Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 7 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.CoordinateTransform | Coordinate Transform | 标定 | 100 | A | 1.0.0 | - | 4 | 3 | 2 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.DeepLearning | 深度学习 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 12 | 12 | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | 5 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Lock YOLO output contract and expose NMS IoU tests |
+| OperatorType.DeepLearning | 深度学习 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 12 | 12 | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | 5 | 0 | Yes | 26 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.DetectionSequenceJudge | Detection Sequence Judge | AI Inspection | 100 | A | 1.0.0 | Experimental | 4 | 13 | 13 | - | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.FisheyeCalibration | Fisheye Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 9 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.HandEyeCalibration | Hand-Eye Calibration | 标定 | 100 | A | 1.0.0 | - | 2 | 7 | 4 | OpenCV Hand-Eye Calibration | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
