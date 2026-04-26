@@ -264,8 +264,8 @@ quality/evals/reports/operator_quality_matrix.md
 
 矩阵快照：
 - Total operators 155
-- Level counts A=128, B=27
-- Golden test status Yes=13, No=142
+- Level counts A=132, B=23
+- Golden test status Yes=28, No=127
 - Cards with TODO=0
 - P0 without golden evidence=0
 - C-level without golden evidence=0
@@ -348,6 +348,36 @@ P1-Next-4:
 关键发现：
 - 当前实现会先 normalize `CutoffLow` / `CutoffHigh`，再取 min/max；因此 highpass 场景如果传入非法 `CutoffHigh`，也会影响有效 cutoff。
 - 频域滤波必须同时检查 mask 数值、滤波后频谱、IFFT 重建误差和实数谱共轭对称，单看输出 shape 不足以证明正确性。
+
+P1-Next-5:
+[x] 已完成 AkazeFeatureMatch / OrbFeatureMatch contract baseline：
+1. 新增 quality/tools/FeatureMatchContractRunner（44 cases）。
+2. AkazeFeatureMatch 22/22 passed，OrbFeatureMatch 22/22 passed。
+3. 覆盖 template input/path、origin mode、symmetry/min-match/max-feature 参数、平移/尺度/旋转、灰度输入、失败输出和参数校验。
+4. operator_quality_matrix 已自动纳入两者 golden evidence（各 22 cases，Yes）。
+关键发现：
+- TemplatePath 证据必须确认参数覆盖路径，避免重复参数导致读取默认空路径。
+- 失败契约应验证 IsMatch=false / ScoreDefinition / 输出图存在，FailureReason 文案不要绑定具体语言。
+
+P1-Next-6:
+[x] 已完成 PyramidShapeMatch contract baseline：
+1. 新增 quality/tools/PyramidShapeMatchContractRunner（24 cases）。
+2. 覆盖 Template / ShapeDescriptor 两种模式、TemplatePath、灰度输入、MaxMatches、低阈值、空场景/空模板/缺失模板和参数校验。
+3. PyramidShapeMatch 24/24 passed。
+4. operator_quality_matrix 已自动纳入 golden evidence（24 cases，Yes）。
+关键发现：
+- Template 模式当前输出位置与 UI 绘制中心语义存在偏差，baseline 先用 allowed-position contract 锁住现状。
+- ShapeDescriptor 模式输出更接近轮廓中心，适合后续单独收紧 position contract。
+
+P1-Next-7:
+[x] 已完成 HandEyeCalibrationValidator contract baseline：
+1. 新增 quality/tools/HandEyeCalibrationValidatorContractRunner（24 cases）。
+2. 覆盖 eye_in_hand / eye_to_hand 一致性验证、CalibrationBundleV2 输入/输出、HTML/Suggestions/SuggestedValidationPoses、扰动矩阵、坏输入和参数校验。
+3. HandEyeCalibrationValidator 24/24 passed。
+4. operator_quality_matrix 已自动纳入 golden evidence（24 cases，Yes）。
+关键发现：
+- JSON pose 输入必须使用 Pose3DSerialization 的 Matrix4x4 行序；CalibrationBundleV2 的 4x4 helper 是 bundle 矩阵约定，不能混用。
+- 当前缺失 RobotPoses / CalibrationBoardPoses 会失败，但错误消息可能为空；baseline 先锁定失败契约，不绑定文案。
 
 ---
 
@@ -501,6 +531,61 @@ fixed_scale_boundary：缩放/旋转边界均 IsMatch=false，锁定固定尺度
 
 ---
 
+### 2.1b AKAZE / ORB 特征匹配：B 级证据补强
+
+当前结果：
+
+```text
+AkazeFeatureMatch contract baseline 已完成：22/22 passed
+OrbFeatureMatch contract baseline 已完成：22/22 passed
+报告：quality/evals/reports/FeatureMatch_contract_baseline.md
+矩阵：AkazeFeatureMatch / OrbFeatureMatch Golden Test=Yes, Cases=22, Benchmark=Yes
+```
+
+覆盖重点：
+
+```text
+template input / TemplatePath
+Center / TopLeft / Custom origin
+EnableSymmetryTest / MinMatchCount / MaxFeatures
+平移、轻微尺度、轻微旋转
+彩色 / 灰度输入
+低纹理场景、空模板、缺失模板、缺失输入
+参数校验失败
+```
+
+---
+
+### 2.1c PyramidShapeMatch：B 级证据补强
+
+当前结果：
+
+```text
+PyramidShapeMatch contract baseline 已完成：24/24 passed
+报告：quality/evals/reports/PyramidShapeMatch_contract_baseline.md
+矩阵：PyramidShapeMatch Golden Test=Yes, Cases=24, Benchmark=Yes
+```
+
+覆盖重点：
+
+```text
+Template mode / ShapeDescriptor mode
+Template input / TemplatePath
+MinScore / MaxMatches / PyramidLevels / NumFeatures / SpreadT / AngleRange / AngleStep
+灰度输入
+空场景、空模板、缺失模板
+ShapeDescriptor area tolerance rejection
+```
+
+当前观察：
+
+```text
+Template mode 的 Position 当前允许 top-left 或 center 两种兼容语义，后续若要提升名片可信度，应收紧为单一明确语义。
+ShapeDescriptor mode 的 Position 更接近轮廓中心，但 synthetic 形状的轮廓质心与模板几何中心存在约 12.8 px 偏移。
+```
+
+---
+
 ### 2.2 GradientShapeMatch：B 级升级为 A
 
 #### 名片约束
@@ -627,6 +712,7 @@ AnomalyDetection        Q=100 A
 DeepLearning            Q=100 A
 SurfaceDefectDetection  Q=100 A
 EdgePairDefect          Q=96 A
+DualModalVoting         Q=94 A
 SemanticSegmentation    Q=90 A
 ```
 
@@ -1128,6 +1214,11 @@ Undistort                     Q=91 A
 
 这里不需要先大改算法，重点是补“可证明几何误差”。
 
+当前已完成：
+```text
+[x] HandEyeCalibrationValidator contract baseline：24/24 passed
+```
+
 #### TODO
 
 创建：
@@ -1349,6 +1440,7 @@ AnomalyDetection
 DeepLearning
 SemanticSegmentation
 EdgePairDefect
+DualModalVoting
 SurfaceDefectDetection
 ```
 
@@ -1362,6 +1454,7 @@ TODO：
 [x] DeepLearning 暴露 NMS IoU 参数方案
 [x] SemanticSegmentation 完成 repo-local identity ONNX contract baseline（27/27 passed）
 [x] EdgePairDefect 完成 synthetic edge-pair contract baseline（27/27 passed）
+[x] DualModalVoting 完成 decision-fusion contract baseline（31/31 passed）
 [x] 生成 AI 检测证据报告
 ```
 
@@ -1372,6 +1465,7 @@ AnomalyDetection 不再只说 Simplified PatchCore，而是有 Image AUROC / Pix
 DeepLearning 不再只说支持 YOLO，而是有 26/26 contract baseline 覆盖输出格式、坐标映射、NMS、标签契约测试
 SemanticSegmentation 不再只说 ONNX segmentation，而是有 27/27 contract baseline 覆盖 class map、mask、palette、catalog、preprocess、failure contract
 EdgePairDefect 不再只说 edge-pair spacing，而是有 27/27 contract baseline 覆盖偏差、容差边界、采样数、Canny/Sobel、line input、failure contract
+DualModalVoting 不再只说双模态投票，而是有 31/31 contract baseline 覆盖加权/一致/多数/优先策略、输入提取、缺失输入、输出值和校验失败契约
 ```
 
 ---
@@ -1514,7 +1608,8 @@ Step 4:
 补齐 P0 名片中的 TODO / 已知限制 / 性能特征
 
 Step 5:
-锁定 P1：GradientShapeMatch / CaliperTool / Akaze / ORB / PyramidShapeMatch
+锁定 P1：GradientShapeMatch / CaliperTool / Akaze / ORB / PyramidShapeMatch / HandEyeCalibrationValidator
+当前已完成：GradientShapeMatch / CaliperTool / Akaze / ORB / PyramidShapeMatch / HandEyeCalibrationValidator
 
 Step 6:
 按名片已知限制生成失败测试
@@ -1550,6 +1645,10 @@ Calibration → synthetic geometry
 [x] DeepLearning 完成 YOLO 输出契约测试（26/26 passed）
 [x] SemanticSegmentation 完成 contract baseline（27/27 passed）
 [x] EdgePairDefect 完成 contract baseline（27/27 passed）
+[x] DualModalVoting 完成 contract baseline（31/31 passed）
+[x] AkazeFeatureMatch / OrbFeatureMatch 完成 contract baseline（44/44 passed，各 22 cases）
+[x] PyramidShapeMatch 完成 contract baseline（24/24 passed）
+[x] HandEyeCalibrationValidator 完成 contract baseline（24/24 passed）
 ```
 
 ### 90 天目标
