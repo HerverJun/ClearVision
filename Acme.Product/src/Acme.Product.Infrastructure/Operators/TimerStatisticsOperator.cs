@@ -17,7 +17,8 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Measures elapsed and cycle time statistics.",
     Category = "逻辑工具",
     IconName = "timer",
-    Keywords = new[] { "timer", "elapsed", "cycle time", "ct", "statistics" }
+    Keywords = new[] { "timer", "elapsed", "cycle time", "ct", "statistics" },
+    Version = "1.0.1"
 )]
 [InputPort("Trigger", "Trigger", PortDataType.Any, IsRequired = false)]
 [OutputPort("ElapsedMs", "Elapsed (ms)", PortDataType.Float)]
@@ -42,7 +43,21 @@ public class TimerStatisticsOperator : OperatorBase
         CancellationToken cancellationToken)
     {
         var mode = GetStringParam(@operator, "Mode", "SingleShot");
-        var resetInterval = GetIntParam(@operator, "ResetInterval", 0, 0, 1_000_000);
+        if (!IsValidMode(mode))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("Mode must be SingleShot or Cumulative"));
+        }
+
+        var resetInterval = GetIntParam(@operator, "ResetInterval", 0);
+        if (resetInterval < 0)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("ResetInterval must be >= 0"));
+        }
+
+        if (resetInterval > 1_000_000)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("ResetInterval must be <= 1000000"));
+        }
 
         double elapsedMs;
         double totalMs;
@@ -107,8 +122,7 @@ public class TimerStatisticsOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var mode = GetStringParam(@operator, "Mode", "SingleShot");
-        var validModes = new[] { "SingleShot", "Cumulative" };
-        if (!validModes.Contains(mode, StringComparer.OrdinalIgnoreCase))
+        if (!IsValidMode(mode))
         {
             return ValidationResult.Invalid("Mode must be SingleShot or Cumulative");
         }
@@ -120,6 +134,12 @@ public class TimerStatisticsOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static bool IsValidMode(string mode)
+    {
+        return mode.Equals("SingleShot", StringComparison.OrdinalIgnoreCase)
+            || mode.Equals("Cumulative", StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class TimerState

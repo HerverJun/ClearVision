@@ -1,0 +1,3577 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-26T15:31:01.5032501+00:00",
+    "CaseCount": 192,
+    "Passed": 192,
+    "Failed": 0,
+    "RuntimeMs": 4.651,
+    "MemoryAllocationBytes": 148760,
+    "DatasetKind": "deterministic synthetic geometry round-trip"
+  },
+  "Operators": [
+    {
+      "Operator": "CameraCalibration",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.098,
+      "MemoryAllocationBytesAvg": 750,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "CoordinateTransform",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.018,
+      "MemoryAllocationBytesAvg": 576,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "FisheyeCalibration",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.017,
+      "MemoryAllocationBytesAvg": 736,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "FisheyeUndistort",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.003,
+      "MemoryAllocationBytesAvg": 736,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "HandEyeCalibration",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.035,
+      "MemoryAllocationBytesAvg": 1672,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "PixelToWorldTransform",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.003,
+      "MemoryAllocationBytesAvg": 576,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "StereoCalibration",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.009,
+      "MemoryAllocationBytesAvg": 408,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    },
+    {
+      "Operator": "Undistort",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.011,
+      "MemoryAllocationBytesAvg": 744,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0,
+      "HasSyntheticGeometry": true
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "2D homography round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "AX=XB rigid transform round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "Camera intrinsics planar round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "Fisheye undistort round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "Pixel/world homography round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    },
+    {
+      "Scenario": "Stereo disparity depth round-trip",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "MeanRoundTripError": 0,
+      "MaxRoundTripError": 0
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "CameraCalibration_round_trip_0000",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 2.293,
+      "MemoryAllocationBytes": 896,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0000",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.212,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0000",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.765,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0000",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.371,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0000",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.023,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0000",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.16,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0000",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.353,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0000",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.021,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0001",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0001",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0001",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0001",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0001",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0001",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0001",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0001",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0002",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0002",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0002",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0002",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0002",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0002",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0002",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0002",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0003",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0003",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0003",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0003",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0003",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0003",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0003",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0003",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0004",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0004",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0004",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0004",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0004",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0004",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0004",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0004",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0005",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0005",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0005",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0005",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0005",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0005",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0005",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0005",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0006",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0006",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0006",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0006",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0006",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0006",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0006",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0006",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0007",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0007",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0007",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0007",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0007",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0007",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0007",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0007",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0008",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0008",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0008",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0008",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0008",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0008",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0008",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0008",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0009",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0009",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0009",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0009",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0009",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0009",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0009",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0009",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0010",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0010",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0010",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0010",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0010",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0010",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0010",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0010",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0011",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0011",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0011",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0011",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0011",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0011",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0011",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0011",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0012",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0012",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0012",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0012",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0012",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0012",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0012",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0012",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0013",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0013",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0013",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0013",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0013",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0013",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0013",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0013",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0014",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0014",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0014",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0014",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0014",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0014",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0014",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0014",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0015",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0015",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0015",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0015",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0015",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0015",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0015",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0015",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0016",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0016",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0016",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0016",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0016",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0016",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0016",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0016",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0017",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0017",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0017",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0017",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0017",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0017",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0017",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0017",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0018",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0018",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0018",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0018",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0018",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0018",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0018",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0018",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0019",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0019",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0019",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0019",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0019",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0019",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0019",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0019",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0020",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0020",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0020",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0020",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0020",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0020",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0020",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0020",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0021",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0021",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0021",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0021",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0021",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0021",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0021",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0021",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0022",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0022",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0022",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0022",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0022",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0022",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0022",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0022",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "CameraCalibration_round_trip_0023",
+      "Operator": "CameraCalibration",
+      "Scenario": "Camera intrinsics planar round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.001,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "ExpectedX": -70,
+        "ExpectedY": 70,
+        "RecoveredX": -70.00000000000006,
+        "RecoveredY": 69.99999999999997
+      }
+    },
+    {
+      "CaseId": "Undistort_round_trip_0023",
+      "Operator": "Undistort",
+      "Scenario": "Brown-Conrady undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 744,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 302.65476097058985,
+        "PixelY": 742.5956516374472,
+        "IdealX": 294.2,
+        "IdealY": 752.1666666666667
+      }
+    },
+    {
+      "CaseId": "HandEyeCalibration_round_trip_0023",
+      "Operator": "HandEyeCalibration",
+      "Scenario": "AX=XB rigid transform round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1672,
+      "ErrorValue": 0,
+      "Tolerance": 1E-09,
+      "Unit": "matrix_abs",
+      "Failure": null,
+      "Metrics": {
+        "Residual": 1.4210854715202004E-14
+      }
+    },
+    {
+      "CaseId": "CoordinateTransform_round_trip_0023",
+      "Operator": "CoordinateTransform",
+      "Scenario": "2D homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "CoordinateTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "PixelToWorldTransform_round_trip_0023",
+      "Operator": "PixelToWorldTransform",
+      "Scenario": "Pixel/world homography round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 576,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "Operator": "PixelToWorldTransform",
+        "PixelX": 80,
+        "PixelY": 416,
+        "WorldX": -9.72559358271577,
+        "WorldY": 25.222241869886027
+      }
+    },
+    {
+      "CaseId": "StereoCalibration_round_trip_0023",
+      "Operator": "StereoCalibration",
+      "Scenario": "Stereo disparity depth round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 408,
+      "ErrorValue": 0,
+      "Tolerance": 1E-06,
+      "Unit": "mm",
+      "Failure": null,
+      "Metrics": {
+        "Disparity": 122.84482758620692,
+        "ExpectedZ": 928,
+        "RecoveredZ": 927.9999999999999
+      }
+    },
+    {
+      "CaseId": "FisheyeCalibration_round_trip_0023",
+      "Operator": "FisheyeCalibration",
+      "Scenario": "Kannala-Brandt fisheye round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    },
+    {
+      "CaseId": "FisheyeUndistort_round_trip_0023",
+      "Operator": "FisheyeUndistort",
+      "Scenario": "Fisheye undistort round-trip",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 736,
+      "ErrorValue": 0,
+      "Tolerance": 0.02,
+      "Unit": "px",
+      "Failure": null,
+      "Metrics": {
+        "PixelX": 328.30619423802403,
+        "PixelY": 717.1491524355974,
+        "IdealX": 265.59999999999997,
+        "IdealY": 789
+      }
+    }
+  ]
+}

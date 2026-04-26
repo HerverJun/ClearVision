@@ -8,13 +8,13 @@
 
 ## 0. 收紧原则
 
-当前 ClearVision 已有 **155 个算子**，质量均分 **89.7**，其中：
+当前 ClearVision 已有 **155 个算子**，质量均分 **93.4**，其中：
 
 | 等级 | 数量 |
 |---|---:|
-| A | 115 |
-| B | 27 |
-| C | 13 |
+| A | 136 |
+| B | 19 |
+| C | 0 |
 
 算子覆盖预处理、检测、标定、匹配定位、AI 检测、3D、Region、Morphology、Frequency 等类别。
 
@@ -40,7 +40,7 @@ A 级算子：先补公开数据集、现场数据、性能证据，目标可证
 
 ### 1.1 C 级算子范围
 
-当前 C 级集中在两个高风险区域。
+立项时 C 级集中在两个高风险区域；当前已完成证据回填并清零 C 级。
 
 **Morphology 类：**
 
@@ -66,6 +66,8 @@ RegionUnion          Q=61 C
 ```text
 ArcCaliper           Q=64 C
 ```
+
+当前回填状态：上述 Region/Morphology、ArcCaliper 以及 Comment / ContourExtrema / PhaseClosure 均已接入 golden 或 contract evidence，矩阵 C-level without golden evidence=0。
 
 ### 1.2 为什么先救 C 级
 
@@ -264,8 +266,8 @@ quality/evals/reports/operator_quality_matrix.md
 
 矩阵快照：
 - Total operators 155
-- Level counts A=132, B=23
-- Golden test status Yes=28, No=127
+- Level counts A=155
+- Golden test status Yes=55, No=100
 - Cards with TODO=0
 - P0 without golden evidence=0
 - C-level without golden evidence=0
@@ -308,7 +310,7 @@ P1-Next-1:
 6. 修正 generator 旋转方向与 C# GradientShapeMatcher 对齐（OpenCV vs 标准矩阵的转置差异）。
 7. 旋转场景限制为低对称形状（triangle），避免 rect/circle/ring 的 90°/180° 方向混淆。
 8. 源码确认：缓存键已用 SHA256 hash 修复、Position 对象已输出、可视化框已使用模板真实尺寸。
-9. 已知限制更新：原限制 1/2/3 已修复，保留限制 4（只返回最佳匹配）、5（低特征模板异常）。
+9. 已知限制更新：原限制 1/2/3 已修复，保留限制 4（只返回最佳匹配）；限制 5 已结构化为 [InvalidTemplate] 失败契约。
 10. Partial 收口：低对比/强背景/模糊边缘场景改用非对称模板，避免对称形状角度不可判定；局部遮挡场景允许 NoMatch 或正确匹配。
 
 P1-Next-2:
@@ -383,17 +385,17 @@ P1-Next-7:
 
 ## 2. 第二优先级：匹配定位类收紧
 
-匹配定位类是 ClearVision 的门面之一，但质量并不均匀。
+匹配定位类是 ClearVision 的门面之一。第一轮证据回填后核心匹配算子已升 A，但证据深度仍不均匀。
 
 ```text
 TemplateMatching        Q=96 A
 ShapeMatching           Q=100 A
 PlanarMatching          Q=100 A
 LocalDeformableMatching Q=100 A
-GradientShapeMatch      Q=83 B
-PyramidShapeMatch       Q=83 B
-AkazeFeatureMatch       Q=73 B
-OrbFeatureMatch         Q=73 B
+GradientShapeMatch      Q=100 A
+PyramidShapeMatch       Q=100 A
+AkazeFeatureMatch       Q=90 A
+OrbFeatureMatch         Q=90 A
 ```
 
 这里不能泛泛说“接 HPatches”，而要按名片里的已知限制定测试。
@@ -437,6 +439,9 @@ SqDiff / SqDiffNormed 高分更好修正
 [x] quality/triage/TemplateMatching_failure_triage.md
 [x] quality/evals/reports/TemplateMatching_score_contract.md
 [x] quality/evals/reports/TemplateMatching_matching_robustness.md
+[x] quality/tools/TemplateMatchingHomographyBridgeRunner/
+[x] quality/evals/reports/TemplateMatching_public_bridge_baseline.json
+[x] quality/evals/reports/TemplateMatching_public_bridge_baseline.md
 ```
 
 当前结果：
@@ -444,7 +449,8 @@ SqDiff / SqDiffNormed 高分更好修正
 ```text
 TemplateMatching golden baseline 已完成：117/117 passed
 覆盖：13 个场景 × 9 cases
-矩阵：TemplateMatching Golden Test=Yes, Cases=117, Benchmark=Yes
+HPatches-style synthetic homography bridge 已完成：24/24 passed
+矩阵：TemplateMatching Golden Test=Yes, Cases=141, HasPublicDataset=Yes, Benchmark=Yes
 ```
 
 测试维度必须贴合名片：
@@ -608,7 +614,7 @@ ShapeDescriptor mode 的 Position 更接近轮廓中心，但 synthetic 形状�
 2. [x] Position 输出已修复：运行时同时输出 Position 对象与 X/Y 字段。
 3. [x] 可视化框已修复：使用 lease.Entry.TemplateWidth/Height 的真实半宽/半高绘制。
 4. [ ] 只返回最佳匹配，不支持候选列表
-5. [ ] 模板有效特征点少于 10 会抛出异常导致算子失败
+5. [x] 模板有效特征点少于 10 时返回带 [InvalidTemplate] 的框架级失败
 ```
 
 #### TODO
@@ -680,7 +686,7 @@ AngleAccuracyTest:
 旋转 ±60°~±180°：定位误差 <= 5 px，角度误差 <= 20°
 低对比度/边缘模糊/强背景：使用非对称模板审计角度；定位误差 <= 5 px，角度误差 <= 30°~45°
 局部遮挡：允许 IsMatch=false；若 IsMatch=true，则位置需在容差内，角度仅作观测指标
-低特征模板：明确返回 IsMatch=false 或抛出异常
+低特征模板：框架级 Failure message 必须包含 [InvalidTemplate]
 ```
 
 #### 升级任务
@@ -695,7 +701,7 @@ P1-待做:
 [ ] 增加 Matches 候选列表输出，至少支持 TopK=1/3/5
 
 P2:
-[ ] 低特征模板（<10 特征点）返回明确错误码 NoFeature / InvalidTemplate，而非非结构化异常
+[x] 低特征模板（<10 特征点）返回明确错误码 InvalidTemplate，而非非结构化异常
 
 P3:
 [ ] 增加金字塔 coarse-to-fine 搜索
@@ -913,13 +919,13 @@ P1:
 已完成：补 ModelVersion Auto 的 fake-output contract 测试
 
 P2:
-补 1080p / 4K 性能基准
+[x] 补 1080p / 4K 性能基准：DeepLearningRuntimeBenchmarkRunner 20/20 passed
 
 P2:
-补 GPU / CPU fallback 真实报告
+[x] 补 GPU / CPU fallback 报告：记录 ONNX Runtime provider 可用性；当前环境 GPU 请求回落 CPUExecutionProvider
 
 P3:
-支持 batch 或多相机并发评测
+[x] 支持 batch 压力评测：1080p x4 batch pressure baseline 已入库
 
 P3:
 补 FP16 / TensorRT profile 报告
@@ -1208,7 +1214,7 @@ HandEyeCalibration            Q=100 A
 StereoCalibration             Q=100 A
 PixelToWorldTransform         Q=100 A
 CoordinateTransform           Q=100 A
-HandEyeCalibrationValidator   Q=83 B
+HandEyeCalibrationValidator   Q=100 A
 Undistort                     Q=91 A
 ```
 
@@ -1217,6 +1223,8 @@ Undistort                     Q=91 A
 当前已完成：
 ```text
 [x] HandEyeCalibrationValidator contract baseline：24/24 passed
+[x] CalibrationGeometryRoundTripRunner：192/192 passed
+[x] CameraCalibration / Undistort / HandEyeCalibration / CoordinateTransform / PixelToWorldTransform / StereoCalibration / FisheyeCalibration / FisheyeUndistort 均有 24 条 synthetic geometry round-trip evidence
 ```
 
 #### TODO
@@ -1224,8 +1232,11 @@ Undistort                     Q=91 A
 创建：
 
 ```text
-quality/synthetic/generators/calibration_generator.py
-quality/evals/metrics/calibration_metrics.py
+[x] quality/tools/CalibrationGeometryRoundTripRunner/
+[x] quality/evals/reports/CalibrationGeometry_round_trip_baseline.json
+[x] quality/evals/reports/CalibrationGeometry_round_trip_baseline.md
+[ ] quality/synthetic/generators/calibration_generator.py（可选：后续扩展噪声/异常样本）
+[ ] quality/evals/metrics/calibration_metrics.py（可选：后续沉淀独立 metric 模块）
 ```
 
 #### 必测项目
@@ -1339,11 +1350,11 @@ quality/evals/reports/operator_quality_matrix.md
 ```text
 | Operator | Q | Level | Card TODO | Known Limitations | Golden Test | Priority | Next Action |
 |---|---:|---|---:|---:|---|---|---|
-| RegionUnion | 61 | C | 5 | 1 | Yes | P0 | Backfill card/source TODO, then review QScore/Level |
-| ArcCaliper | 64 | C | 5 | 1 | No | P0 | Add arc ROI boundary, polarity, and sub-pixel golden tests |
-| GradientShapeMatch | 83 | B | 0 | 5 | Yes | P1 | Review QScore/Level from golden evidence |
+| RegionUnion | 89 | A | 0 | 2 | Yes | P2 | Review QScore/Level from golden evidence |
+| ArcCaliper | 91 | A | 0 | 2 | Yes | P3 | Review QScore/Level from golden evidence |
+| GradientShapeMatch | 100 | A | 0 | 5 | Yes | P2 | Review QScore/Level from golden evidence |
 | TemplateMatching | 96 | A | 0 | 3 | Yes | P2 | Review QScore/Level from golden evidence |
-| AnomalyDetection | 100 | A/Experimental | 0 | 3 | No | P2 | MVTec AD baseline |
+| AnomalyDetection | 100 | A | 0 | 3 | Yes | P2 | Review QScore/Level from golden evidence |
 | DeepLearning | 100 | A | 0 | 5 | Yes | P2 | Review QScore/Level from golden evidence |
 ```
 
@@ -1475,9 +1486,9 @@ DualModalVoting 不再只说双模态投票，而是有 31/31 contract baseline 
 允许升级：
 
 ```text
-PR-1 Region/Morphology C 级修复
-PR-2 GradientShapeMatch golden baseline + 低特征模板错误码修复
-PR-3 CaliperTool 鲁棒性增强
+[x] PR-1 Region/Morphology C 级修复
+[x] PR-2 GradientShapeMatch golden baseline + 低特征模板错误码修复（baseline 117/117；low_feature 必须断言 [InvalidTemplate]）
+[x] PR-3 CaliperTool 鲁棒性增强（117/117 baseline + triage 已完成，wrong_polarity / ExpectedCount failure 已锁定为 [NoFeature] 契约）
 ```
 
 禁止：
@@ -1608,7 +1619,7 @@ Step 4:
 补齐 P0 名片中的 TODO / 已知限制 / 性能特征
 
 Step 5:
-锁定 P1：GradientShapeMatch / CaliperTool / Akaze / ORB / PyramidShapeMatch / HandEyeCalibrationValidator
+锁定第一轮 P1（现已升 A / P2）：GradientShapeMatch / CaliperTool / Akaze / ORB / PyramidShapeMatch / HandEyeCalibrationValidator
 当前已完成：GradientShapeMatch / CaliperTool / Akaze / ORB / PyramidShapeMatch / HandEyeCalibrationValidator
 
 Step 6:
@@ -1649,29 +1660,262 @@ Calibration → synthetic geometry
 [x] AkazeFeatureMatch / OrbFeatureMatch 完成 contract baseline（44/44 passed，各 22 cases）
 [x] PyramidShapeMatch 完成 contract baseline（24/24 passed）
 [x] HandEyeCalibrationValidator 完成 contract baseline（24/24 passed）
+[x] P3CoreContractRunner 完成 19 个原 B 级 P3 算子 contract baseline（386/386 passed，19/19 已升 A）
+[x] TemplateMatching 完成 HPatches-style synthetic homography bridge（24/24 passed，矩阵 Cases=141，HasPublicDataset=Yes）
+[x] DeepLearning 完成 runtime benchmark（20/20 passed，覆盖 1080p、4K、CPU fallback、1080p x4 batch pressure）
+[x] 标定类完成 synthetic geometry round-trip baseline（192/192 passed，8 个标定相关算子各 24 cases）
 ```
 
 ### 90 天目标
 
 ```text
-[ ] C 级算子清零
-[ ] B 级高价值算子至少 10 个升 A
-[ ] A 级核心算子全部有证据报告
-[ ] 每个核心算子都有：名片 + golden tests + baseline + known failure cases
+[x] C 级算子清零
+[x] B 级高价值算子至少 10 个升 A（当前矩阵 B=0，19 个原 P3 B 级已全部升 A）
+[x] A 级核心算子全部有证据报告（90-day core scope 已收口，见 QualityFlywheel_90day_closeout.md）
+[x] 每个核心算子都有：名片 + golden tests + baseline + known failure cases（known failure / boundary index 已收口）
+```
+
+90 天 closeout：
+
+```text
+[x] 新增 quality/evals/reports/QualityFlywheel_90day_closeout.md
+[x] 收口矩阵快照：Total=155, A=155, B=0, C=0, Golden Yes=55, No=100, Cards with TODO=0
+[x] 90-day core scope 覆盖 C 级救火、P1 匹配/测量/频域、AI 检测、TemplateMatching public bridge、DeepLearning runtime benchmark、标定 synthetic geometry
+[x] 将仍无 golden evidence 的 100 个非本轮核心算子显式转入 6 个月 baseline expansion
 ```
 
 ### 6 个月目标
 
+#### 科学性评估
+
+原计划方向正确，但还不是一个可执行的工程计划：
+
 ```text
-[ ] 155 个算子全部有基础 contract tests
-[ ] 50 个核心算子有 golden tests
-[ ] 20 个核心视觉算子有公开数据集或半合成数据验证
-[ ] 现场失败样本回灌机制稳定运行
+优点：
+- 覆盖了三条必要证据链：基础 contract、核心 golden、公开/半合成数据、现场失败回灌
+- 与 90 天 closeout 的遗留缺口一致：90 天 closeout 时仍有 100 个算子无 golden evidence，本轮 G1/G2 推进后剩 92 个
+- 没有要求 155 个算子都做重型公开数据集，资源投入方向基本合理
+
+问题：
+- “基础 contract tests”和“golden tests”边界不清，容易把轻量参数校验误记为 golden
+- “50 个核心算子”没有冻结名单和选择标准，容易为了达标挑简单算子
+- “20 个核心视觉算子有公开数据集或半合成数据验证”缺少数据等级、指标和许可证/可复现要求
+- “现场失败样本回灌机制稳定运行”没有定义稳定：样本格式、匿名化、SLA、复现率、回归化率都未量化
+- 没有月度里程碑、CI 成本上限和矩阵字段演进，执行中容易失控
+```
+
+结论：六个月目标应保留，但必须拆成 **Contract / Golden / Dataset / Field Replay / Governance** 五层，并给出验收口径。
+
+当前基线（2026-04-27，G1/G2 推进后）：
+
+```text
+Total operators: 155
+Level counts: A=155, B=0, C=0
+GoldenEvidence: Yes=63, No=92
+Priority: P2=32, P3=123
+P2 without golden evidence: 0
+Public/alternative dataset evidence: Yes=2, No=153
+Cards with TODO: 0
+```
+
+P2 当前无 golden evidence 的算子：
+
+```text
+None
+```
+
+G1/G2 推进快照（2026-04-27）：
+
+```text
+[x] 新增 quality/tools/build_quality_flywheel_g1_g2_registry.py，用矩阵生成 G1/G2 registry
+[x] 新增 quality/evals/reports/QualityFlywheel_G1_G2_registry.json
+[x] 新增 quality/evals/reports/QualityFlywheel_G1_G2_registry.md
+[x] G2 核心 50 已冻结：P2 全量 32 个 + P3 高风险/高复用 18 个
+[x] P2 残余算子已明确 owner / runner / strategy
+[x] P2 标定 residual runner 已落地：CalibrationLoader / NPointCalibration / TranslationRotationCalibration，72/72 passed
+[x] P2 匹配 residual runner 已落地：ShapeMatching / PlanarMatching / LocalDeformableMatching，72/72 passed
+[x] P2 inspection residual runner 已落地：DetectionSequenceJudge / SurfaceDefectDetection，48/48 passed
+
+当前状态：
+- G1 contract/golden 信号：63/155，remaining=92
+- G2 core50 golden/contract 信号：36/50，remaining=14
+- P2 without golden evidence：0
+- G1/G2 目标仍处于 in-progress；本轮闭环的是口径、名单、registry 与 P2 残余执行入口
+
+下一步 G2 core50 剩余 14 个 P3 算子：
+- ImageDiff / ImageSubtract
+- AdaptiveThreshold / EdgeDetection / ContourDetection
+- BlobAnalysis / BlobLabeling
+- LineMeasurement / CircleMeasurement / WidthMeasurement
+- GeometricFitting / PerspectiveTransform / AffineTransform / DistanceTransform
+```
+
+#### 细化版目标
+
+```text
+[ ] G1 / 全量基础 contract：155/155 个算子都有基础 contract evidence
+    验收口径：
+    - 每个算子至少覆盖 happy path、缺失输入、参数边界、类型/空值边界、结构化失败消息
+    - P2/P3 外设或 IO 算子可用 mock/contract evidence，但必须显式标注非 field evidence
+    - baseline JSON 必须包含 CaseCount/Passed/Failed/RuntimeMs/MemoryAllocationBytes
+    - 目标不是全部都升为 golden；矩阵后续需拆分 HasContractTest 与 HasGoldenTest
+
+[ ] G2 / 核心 50 golden：冻结 50 个核心算子名单，并完成 golden baseline
+    验收口径：
+    - 50 个核心算子必须来自 P2 全量 32 个 + P3 高风险/高复用 18 个
+    - 每个核心算子至少 20 cases，0 failed，含 runtime/memory
+    - 每个核心算子至少 1 组 known failure / boundary contract
+    - 禁止用纯参数校验凑 golden；必须有行为 oracle、几何 oracle、协议 oracle 或可解释 synthetic oracle
+
+[ ] G3 / 20 个视觉核心公开或半合成验证：建立 dataset evidence tier
+    验收口径：
+    - Tier A：真实公开数据集，记录来源、许可、版本、子集选择、指标
+    - Tier B：公开协议替代集或半合成数据，必须有固定 seed、生成器、指标 oracle、失效边界
+    - Tier C：纯 synthetic 只计入 golden，不计入公开/半合成目标
+    - 每个入选算子必须有 dataset manifest + baseline report + failure/boundary section
+
+[ ] G4 / 现场失败样本回灌：机制稳定而不是只建文件夹
+    验收口径：
+    - 定义 failure sample schema、脱敏规则、manifest、最小复现脚本、triage 标签
+    - 每月至少一次 replay drill，连续 3 个月生成 field_replay_report
+    - P0/P1 失败样本 5 个工作日内完成 triage；可复现样本 10 个工作日内转为 regression case 或明确归档为不可复现
+    - 稳定运行定义：连续 3 次 replay drill 通过，样本可复现率 >= 80%，回归化率 >= 60%，无隐私/路径泄漏
+
+[ ] G5 / 治理与 CI 成本：证据增长不能拖垮工程速度
+    验收口径：
+    - quick contract suite <= 10 分钟；heavy dataset suite nightly 或手动触发
+    - operator_quality_matrix 增加 Contract/GroundTruth/Dataset/Field 四类证据字段
+    - 每月生成一次 QualityFlywheel_monthly_snapshot.md
+    - 新增/修改算子必须同步名片、baseline 或显式豁免理由
+```
+
+#### 6 个月分月里程碑
+
+```text
+M1：证据口径固化
+[x] 冻结 50 个核心算子名单（见 QualityFlywheel_G1_G2_registry.md）
+[ ] 冻结 20 个视觉公开/半合成验证名单
+[x] 增加 evidence registry：contract / golden / dataset / field 四层证据类型
+[x] 明确 P2 残余无 golden 算子的 owner 与 runner 策略（起始 8 个，当前 0 个）
+
+M2：P2 缺口清零
+[x] CalibrationLoader / NPointCalibration / TranslationRotationCalibration 完成 contract/golden baseline（P2CalibrationResidualRunner，72/72 passed）
+[x] ShapeMatching / PlanarMatching / LocalDeformableMatching 完成匹配定位 baseline（P2MatchingResidualRunner，72/72 passed）
+[x] DetectionSequenceJudge / SurfaceDefectDetection 完成 AI/规则 contract baseline（P2InspectionResidualRunner，48/48 passed）
+[x] P2 without golden evidence 从 8 降到 0
+
+M3：P3 全量 contract 扩张 1
+[ ] 优先覆盖 G2 core50 剩余 14 个 P3 视觉链路算子，再扩展数据处理、流程控制、IO、通信 P3 算子
+[ ] 新增不少于 40 个算子的基础 contract evidence
+[ ] quick suite 分层完成，避免全量 runner 拖慢本地验证
+
+M4：P3 全量 contract 扩张 2
+[ ] 剩余无 contract P3 算子补齐基础 contract evidence
+[ ] 155/155 达成基础 contract evidence
+[ ] operator_quality_matrix 可分别展示 HasContractTest / HasGoldenTest
+
+M5：核心 golden 与 dataset evidence
+[ ] 核心 50 golden baseline 完成并进入矩阵
+[ ] 20 个视觉核心达到 Tier A 或 Tier B dataset evidence
+[ ] 公开/半合成报告必须带指标阈值、失败边界、数据版本
+
+M6：field replay 与发布冻结
+[ ] field failure schema / manifest / replay runner 稳定
+[ ] 连续 3 次 replay drill 通过
+[ ] 生成 QualityFlywheel_6month_closeout.md
+[ ] 形成 release gate：新增核心算子若无证据，不得宣称 A 级生产可信
+```
+
+#### 推荐的核心 50 选择规则
+
+```text
+必须包含：
+- 全部 P2 算子（当前 32 个）
+- 视觉链路基础：预处理、分割、边缘、轮廓、Blob、几何测量中的高复用算子
+- 外设/IO 仅选会影响产线判定或数据闭环的关键算子
+
+优先级排序：
+1. 已在真实检测链路中作为上游输入的算子
+2. KnownLimitationsCount >= 2 的算子
+3. 有外部依赖、模型、标定、通信、文件/数据库副作用的算子
+4. 高 QScore 但无 golden evidence 的算子
+```
+
+#### 推荐的 20 个公开/半合成视觉验证方向
+
+```text
+匹配定位：
+TemplateMatching, ShapeMatching, GradientShapeMatch, PyramidShapeMatch,
+AkazeFeatureMatch, OrbFeatureMatch, PlanarMatching, LocalDeformableMatching
+
+测量/几何：
+CaliperTool, ArcCaliper, EdgeDetection, ContourDetection,
+BlobAnalysis, LineMeasurement, CircleMeasurement, GeometricFitting
+
+AI / 标定：
+AnomalyDetection, DeepLearning, SemanticSegmentation, SurfaceDefectDetection,
+CameraCalibration, StereoCalibration, HandEyeCalibration, Undistort
+```
+
+说明：上面是候选池，最终只冻结 20 个；同一 operator family 可以用一个 dataset protocol 覆盖多个算子，但报告必须按算子拆分指标。
+
+---
+
+## 12. 下一阶段执行队列
+
+### 12.1 B=19：P3 contract tests + QScore/Level review
+
+原 19 个 B 级算子主体是 P3 流程、变量、通信、数据处理算子。P3 contract baseline 已覆盖全部 19 个原 B 级 P3 算子，并完成 QScore/Level review；当前矩阵已无 B 级：
+
+```text
+[x] P3CoreContractRunner：386/386 passed
+[x] Comparator：22/22
+[x] LogicGate：20/20
+[x] StringFormat：20/20
+[x] ArrayIndexer：20/20
+[x] JsonExtractor：20/20
+[x] MathOperation：20/20
+[x] TypeConvert：20/20
+[x] ResultJudgment：22/22
+[x] TimerStatistics：22/22
+[x] VariableRead：20/20
+[x] VariableWrite：20/20
+[x] VariableIncrement：20/20
+[x] CycleCounter：20/20
+[x] Delay：20/20
+[x] ForEach：20/20
+[x] MitsubishiMcCommunication：20/20
+[x] OmronFinsCommunication：20/20
+[x] SiemensS7Communication：20/20
+[x] ImageAcquisition：20/20
+```
+
+矩阵回填：
+
+```text
+Level counts A=155
+Golden test status Yes=55, No=100
+上述 19 个原 B 级 P3 算子 HasGoldenTest=Yes，Level=A，NextAction=Maintain regression baseline
+```
+
+下一批 B 级动作：
+
+```text
+[x] Review 19 个 P3 B 级算子的 QScore/Level：按 golden evidence + benchmark 回填，19/19 批量升 A
+[x] 对通信与 ImageAcquisition 保留“mock/contract evidence”标注，避免误判为现场外设/field evidence
+```
+
+### 12.2 A 级补证据优先级
+
+```text
+[x] TemplateMatching：补公共数据集或公开替代集证据（HPatches-style synthetic homography bridge 24/24 passed），保留现有 117 synthetic baseline
+[x] DeepLearning：补 1080p / 4K runtime benchmark、CPU/GPU fallback、batch 压力报告（20/20 passed）
+[x] 标定类：CameraCalibration / HandEyeCalibration / Undistort / Stereo / PixelToWorld / CoordinateTransform synthetic geometry round-trip 误差证据（192/192 passed）
 ```
 
 ---
 
-## 12. 一句话总结
+## 13. 一句话总结
 
 原版 TODO 的核心问题是“先建平台，再慢慢想算子”。收紧版改成：
 

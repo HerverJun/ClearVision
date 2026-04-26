@@ -145,25 +145,25 @@ internal static class GoldenRunner
 
             if (!execution.IsSuccess)
             {
-                // For low_feature scenario, failure is expected
-                var expectedNode1 = expectedJson["expected"];
-                var expectedIsMatch1 = expectedNode1?["is_match"]?.GetValue<bool>() ?? true;
-                if (!expectedIsMatch1)
+                if (TryCreateExpectedFailureResult(
+                    caseId,
+                    operatorName,
+                    scenario,
+                    inputPath,
+                    expectedJson["expected"],
+                    execution.ErrorMessage ?? "Execution failed.",
+                    runtimeMs,
+                    memoryBytes,
+                    out var expectedFailureResult))
                 {
-                    var fallbackMetrics = new Dictionary<string, object>
-                    {
-                        ["PositionErrorPx"] = 0.0,
-                        ["AngleErrorDeg"] = 0.0,
-                        ["IsMatchCorrect"] = true,
-                        ["ScoreValue"] = 0.0,
-                    };
-                    return new CaseResult(caseId, operatorName, scenario, inputPath, true, Math.Round(runtimeMs, 3), memoryBytes, null, fallbackMetrics);
+                    return expectedFailureResult;
                 }
 
                 return CaseResult.Failed(caseId, operatorName, scenario, inputPath, runtimeMs, memoryBytes, execution.ErrorMessage ?? "Execution failed.");
             }
 
             var metrics = Evaluate(execution.OutputData, expectedJson["expected"]);
+            AppendExpectedFailureCodeMetric(metrics, execution.OutputData, expectedJson["expected"], scenario);
             var passed = IsPassing(metrics, scenario);
 
             ReleaseImageOutputs(execution.OutputData);
@@ -172,21 +172,6 @@ internal static class GoldenRunner
         }
         catch (Exception ex)
         {
-            // For low_feature scenario, exception (e.g., feature count < 10) is acceptable
-            var expectedNode2 = expectedJson["expected"];
-            var expectedIsMatch2 = expectedNode2?["is_match"]?.GetValue<bool>() ?? true;
-            if (!expectedIsMatch2)
-            {
-                var fallbackMetrics2 = new Dictionary<string, object>
-                {
-                    ["PositionErrorPx"] = 0.0,
-                    ["AngleErrorDeg"] = 0.0,
-                    ["IsMatchCorrect"] = true,
-                    ["ScoreValue"] = 0.0,
-                };
-                return new CaseResult(caseId, operatorName, scenario, inputPath, true, 0, 0, null, fallbackMetrics2);
-            }
-
             return CaseResult.Failed(caseId, operatorName, scenario, inputPath, 0, 0, ex.Message);
         }
         finally
@@ -194,6 +179,88 @@ internal static class GoldenRunner
             templateWrapper?.Dispose();
             sceneWrapper?.Dispose();
         }
+    }
+
+    private static bool TryCreateExpectedFailureResult(
+        string caseId,
+        string operatorName,
+        string scenario,
+        string inputPath,
+        JsonNode? expectedNode,
+        string errorMessage,
+        double runtimeMs,
+        long memoryBytes,
+        out CaseResult result)
+    {
+        result = CaseResult.Failed(caseId, operatorName, scenario, inputPath, runtimeMs, memoryBytes, errorMessage);
+
+        var expectedIsMatch = expectedNode?["is_match"]?.GetValue<bool>() ?? true;
+        if (expectedIsMatch)
+        {
+            return false;
+        }
+
+        var expectedFailureReason = ExpectedFailureReason(expectedNode, scenario);
+        if (string.IsNullOrWhiteSpace(expectedFailureReason))
+        {
+            return false;
+        }
+
+        var expectedCode = ToFailureCode(expectedFailureReason);
+        if (!errorMessage.Contains(expectedCode, StringComparison.Ordinal))
+        {
+            result = CaseResult.Failed(
+                caseId,
+                operatorName,
+                scenario,
+                inputPath,
+                runtimeMs,
+                memoryBytes,
+                $"Expected failure code {expectedCode}, got: {errorMessage}");
+            return true;
+        }
+
+        var metrics = new Dictionary<string, object>
+        {
+            ["PositionErrorPx"] = 0.0,
+            ["AngleErrorDeg"] = 0.0,
+            ["IsMatchCorrect"] = true,
+            ["ScoreValue"] = 0.0,
+            ["ErrorCodeCorrect"] = true,
+            ["FailureReason"] = expectedFailureReason,
+        };
+        result = new CaseResult(
+            caseId,
+            operatorName,
+            scenario,
+            inputPath,
+            true,
+            Math.Round(runtimeMs, 3),
+            memoryBytes,
+            errorMessage,
+            metrics);
+        return true;
+    }
+
+    private static string ExpectedFailureReason(JsonNode? expectedNode, string scenario)
+    {
+        var configured = expectedNode?["failure_reason"]?.GetValue<string>();
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        return scenario.Equals("low_feature", StringComparison.OrdinalIgnoreCase)
+            ? "InvalidTemplate"
+            : string.Empty;
+    }
+
+    private static string ToFailureCode(string reason)
+    {
+        var trimmed = reason.Trim();
+        return trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal)
+            ? trimmed
+            : $"[{trimmed}]";
     }
 
     private static Operator CreateOperator(JsonNode inputJson)
@@ -327,8 +394,59 @@ internal static class GoldenRunner
         var angleChecked = !metrics.TryGetValue("AngleChecked", out var ac) || ac is not bool check || check;
         if (angleChecked && angleError > maxAngleError)
             return false;
+        if (metrics.TryGetValue("ErrorCodeCorrect", out var ecc) && ecc is bool errorCodeCorrect && !errorCodeCorrect)
+            return false;
 
         return true;
+    }
+
+    private static void AppendExpectedFailureCodeMetric(
+        Dictionary<string, object> metrics,
+        Dictionary<string, object>? outputData,
+        JsonNode? expectedNode,
+        string scenario)
+    {
+        var expectedIsMatch = expectedNode?["is_match"]?.GetValue<bool>() ?? true;
+        if (expectedIsMatch)
+        {
+            return;
+        }
+
+        var expectedFailureReason = ExpectedFailureReason(expectedNode, scenario);
+        if (string.IsNullOrWhiteSpace(expectedFailureReason))
+        {
+            return;
+        }
+
+        var expectedCode = ToFailureCode(expectedFailureReason);
+        var hasCode =
+            TryOutputText(outputData, "FailureReason", out var failureReason) &&
+            (failureReason.Equals(expectedFailureReason, StringComparison.OrdinalIgnoreCase) ||
+             failureReason.Contains(expectedCode, StringComparison.Ordinal));
+
+        hasCode = hasCode ||
+            (TryOutputText(outputData, "Message", out var message) &&
+             (message.Equals(expectedFailureReason, StringComparison.OrdinalIgnoreCase) ||
+              message.Contains(expectedCode, StringComparison.Ordinal)));
+
+        metrics["ErrorCodeCorrect"] = hasCode;
+        metrics["ExpectedFailureCode"] = expectedCode;
+        if (hasCode)
+        {
+            metrics["FailureReason"] = expectedFailureReason;
+        }
+    }
+
+    private static bool TryOutputText(Dictionary<string, object>? outputData, string key, out string value)
+    {
+        value = string.Empty;
+        if (outputData is null || !outputData.TryGetValue(key, out var obj) || obj is null)
+        {
+            return false;
+        }
+
+        value = Convert.ToString(obj) ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(value);
     }
 
     private static async Task<JsonNode> ReadJsonAsync(string path)

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-26T21:31:56.5042156+08:00",
+  "generatedAt": "2026-04-27T01:04:42.9008694+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -436,13 +436,13 @@
         }
       ],
       "quality": {
-        "totalScore": 78,
-        "level": "B",
+        "totalScore": 95,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ImageAcquisition.md"
     },
@@ -1918,6 +1918,17 @@
           "defaultValue": "true",
           "min": null,
           "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "NmsIouThreshold",
+          "displayName": "NMS IoU Threshold",
+          "dataType": "double",
+          "description": "内部 NMS 与预览 NMS 使用的 IoU 阈值。",
+          "defaultValue": "0.45",
+          "min": "0",
+          "max": "1",
           "isRequired": true,
           "options": null
         },
@@ -6328,13 +6339,13 @@
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
+        "totalScore": 98,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=90"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
       },
       "docPath": "算子资料/算子名片/SiemensS7Communication.md"
     },
@@ -6591,13 +6602,13 @@
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
+        "totalScore": 98,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=90"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
       },
       "docPath": "算子资料/算子名片/MitsubishiMcCommunication.md"
     },
@@ -6854,13 +6865,13 @@
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
+        "totalScore": 98,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=90"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
       },
       "docPath": "算子资料/算子名片/OmronFinsCommunication.md"
     },
@@ -6870,7 +6881,7 @@
       "displayName": "Result Judgment",
       "description": "Generic business judgment with numeric/string condition checks.",
       "category": "Flow Control",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:流程",
         "成熟度:稳定",
@@ -7043,13 +7054,13 @@
         }
       ],
       "quality": {
-        "totalScore": 84,
-        "level": "B",
+        "totalScore": 90,
+        "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=35"
+        "errorHandlingScore": 60,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/ResultJudgment.md"
     },
@@ -8141,13 +8152,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 90,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/VariableRead.md"
     },
@@ -8256,13 +8267,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 90,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/VariableWrite.md"
     },
@@ -8387,13 +8398,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 90,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/VariableIncrement.md"
     },
@@ -8574,13 +8585,13 @@
         }
       ],
       "quality": {
-        "totalScore": 79,
-        "level": "B",
+        "totalScore": 96,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=85"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/CycleCounter.md"
     },
@@ -9636,13 +9647,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ForEach.md"
     },
@@ -9748,13 +9759,13 @@
         }
       ],
       "quality": {
-        "totalScore": 79,
-        "level": "B",
+        "totalScore": 96,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=85"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ArrayIndexer.md"
     },
@@ -9840,13 +9851,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/JsonExtractor.md"
     },
@@ -9950,13 +9961,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/MathOperation.md"
     },
@@ -10034,13 +10045,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/LogicGate.md"
     },
@@ -10145,13 +10156,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/TypeConvert.md"
     },
@@ -10461,13 +10472,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/StringFormat.md"
     },
@@ -11084,13 +11095,13 @@
         }
       ],
       "quality": {
-        "totalScore": 71,
-        "level": "B",
+        "totalScore": 89,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/Comparator.md"
     },
@@ -11143,13 +11154,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/Delay.md"
     },
@@ -12709,7 +12720,7 @@
       "displayName": "计时统计",
       "description": "Measures elapsed and cycle time statistics.",
       "category": "逻辑工具",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "tags": [
         "功能域:流程",
         "成熟度:稳定",
@@ -12784,13 +12795,13 @@
         }
       ],
       "quality": {
-        "totalScore": 84,
-        "level": "B",
+        "totalScore": 94,
+        "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=35"
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/TimerStatistics.md"
     },

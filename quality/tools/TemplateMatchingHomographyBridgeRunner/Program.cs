@@ -1,0 +1,567 @@
+using System.Diagnostics;
+using System.Text.Json;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.Operators;
+using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Operators;
+using Microsoft.Extensions.Logging.Abstractions;
+using OpenCvSharp;
+
+var options = RunnerOptions.Parse(args);
+if (options.ShowHelp)
+{
+    RunnerOptions.PrintHelp();
+    return options.ParseError is null ? 0 : 2;
+}
+
+if (options.ParseError is not null)
+{
+    Console.Error.WriteLine(options.ParseError);
+    RunnerOptions.PrintHelp();
+    return 2;
+}
+
+var result = await HomographyBridgeRunner.RunAsync(options);
+Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.OutputPath))!);
+await File.WriteAllTextAsync(options.OutputPath, JsonSerializer.Serialize(result, JsonSettings.Indented));
+
+if (!string.IsNullOrWhiteSpace(options.ReportPath))
+{
+    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.ReportPath))!);
+    await File.WriteAllTextAsync(options.ReportPath, MarkdownReport.Create(result));
+}
+
+Console.WriteLine(
+    $"TemplateMatching homography bridge complete: {result.Summary.Passed}/{result.Summary.CaseCount} passed, " +
+    $"failed={result.Summary.Failed}, output={options.OutputPath}");
+
+return result.Summary.Failed == 0 ? 0 : 1;
+
+internal static class HomographyBridgeRunner
+{
+    private const int SceneWidth = 320;
+    private const int SceneHeight = 240;
+    private const int PatchWidth = 40;
+    private const int PatchHeight = 32;
+    private const double PositionTolerancePx = 1.5;
+
+    public static async Task<BridgeResult> RunAsync(RunnerOptions options)
+    {
+        var specs = BuildCases().ToList();
+        var results = new List<BridgeCaseResult>(specs.Count);
+        foreach (var spec in specs)
+        {
+            results.Add(await RunCaseAsync(spec));
+        }
+
+        var passed = results.Count(item => item.Passed);
+        var failed = results.Count - passed;
+        var errors = results.Select(item => item.PositionErrorPx).Where(double.IsFinite).OrderBy(x => x).ToArray();
+        var summary = new BridgeSummary(
+            DateTimeOffset.UtcNow,
+            "HPatches-style synthetic homography bridge",
+            "In-repo public-protocol proxy for planar homography and illumination evidence",
+            results.Count,
+            passed,
+            failed,
+            PositionTolerancePx,
+            Math.Round(errors.Length == 0 ? 0 : errors.Average(), 4),
+            Math.Round(Percentile(errors, 0.95), 4),
+            Math.Round(results.Sum(item => item.RuntimeMs), 3));
+
+        var operators = new[]
+        {
+            new OperatorEvidence(
+                "TemplateMatching",
+                results.Count,
+                passed,
+                failed,
+                Math.Round(results.Average(item => item.RuntimeMs), 3),
+                Math.Round(results.Max(item => item.RuntimeMs), 3),
+                Convert.ToInt64(Math.Round(results.Average(item => item.MemoryAllocationBytes))),
+                true,
+                summary.DatasetName)
+        };
+
+        return new BridgeResult(summary, operators, results);
+    }
+
+    private static async Task<BridgeCaseResult> RunCaseAsync(BridgeCaseSpec spec)
+    {
+        using var baseScene = CreateBaseScene();
+        using var warpedScene = ApplyHomography(baseScene, spec);
+        using var sceneForSearch = ApplyPhotometric(warpedScene, spec);
+        using var template = CreateTemplate(baseScene, sceneForSearch, spec);
+
+        ImageWrapper? sceneWrapper = null;
+        ImageWrapper? templateWrapper = null;
+        OperatorExecutionOutput? execution = null;
+        var stopwatch = Stopwatch.StartNew();
+        var allocationBefore = GC.GetTotalAllocatedBytes(precise: true);
+
+        try
+        {
+            sceneWrapper = new ImageWrapper(sceneForSearch.Clone());
+            templateWrapper = new ImageWrapper(template.Clone());
+            var executor = new TemplateMatchOperator(NullLogger<TemplateMatchOperator>.Instance);
+            var op = CreateOperator(spec);
+            execution = await executor.ExecuteAsync(op, new Dictionary<string, object>
+            {
+                ["Image"] = sceneWrapper,
+                ["Template"] = templateWrapper
+            });
+        }
+        finally
+        {
+            stopwatch.Stop();
+        }
+
+        var allocationAfter = GC.GetTotalAllocatedBytes(precise: true);
+        var actual = ReadPosition(execution);
+        var positionError = Distance(actual, spec.ExpectedCenter);
+        var score = ReadDouble(execution, "Score");
+        var normalizedScore = ReadDouble(execution, "NormalizedScore");
+        var isMatch = execution?.IsSuccess == true &&
+            execution.OutputData?.TryGetValue("IsMatch", out var isMatchObj) == true &&
+            isMatchObj is bool b &&
+            b;
+        var passed = execution?.IsSuccess == true &&
+            isMatch &&
+            double.IsFinite(positionError) &&
+            positionError <= PositionTolerancePx &&
+            normalizedScore >= 0.75 &&
+            normalizedScore <= 1.000001;
+
+        ReleaseImageOutputs(execution?.OutputData);
+        sceneWrapper?.Dispose();
+        templateWrapper?.Dispose();
+
+        return new BridgeCaseResult(
+            spec.CaseId,
+            "TemplateMatching",
+            spec.Sequence,
+            spec.TemplateSource,
+            passed,
+            Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+            Math.Max(0, allocationAfter - allocationBefore),
+            Math.Round(spec.ExpectedCenter.X, 3),
+            Math.Round(spec.ExpectedCenter.Y, 3),
+            Math.Round(actual.X, 3),
+            Math.Round(actual.Y, 3),
+            Math.Round(positionError, 4),
+            Math.Round(score, 6),
+            Math.Round(normalizedScore, 6),
+            passed ? null : execution?.ErrorMessage ?? "Position/score contract failed");
+    }
+
+    private static IEnumerable<BridgeCaseSpec> BuildCases()
+    {
+        var anchors = new[]
+        {
+            new Point2d(70, 58),
+            new Point2d(132, 72),
+            new Point2d(214, 62),
+            new Point2d(82, 148),
+            new Point2d(166, 152),
+            new Point2d(238, 164)
+        };
+
+        var sequences = new[]
+        {
+            new SequenceSpec("illumination_translation", Translation(18, 12), "Source", 1.18, 14),
+            new SequenceSpec("viewpoint_translation", Translation(-16, 19), "WarpedScene", 1.0, 0),
+            new SequenceSpec("homography_shear", HomographyFromCorners(
+                new Point2f(0, 0), new Point2f(SceneWidth - 1, 0), new Point2f(SceneWidth - 1, SceneHeight - 1), new Point2f(0, SceneHeight - 1),
+                new Point2f(18, 8), new Point2f(SceneWidth - 24, 14), new Point2f(SceneWidth - 9, SceneHeight - 18), new Point2f(28, SceneHeight - 7)), "WarpedScene", 1.0, 0),
+            new SequenceSpec("homography_perspective", HomographyFromCorners(
+                new Point2f(0, 0), new Point2f(SceneWidth - 1, 0), new Point2f(SceneWidth - 1, SceneHeight - 1), new Point2f(0, SceneHeight - 1),
+                new Point2f(10, 18), new Point2f(SceneWidth - 34, 4), new Point2f(SceneWidth - 19, SceneHeight - 24), new Point2f(34, SceneHeight - 16)), "WarpedScene", 0.92, 8)
+        };
+
+        foreach (var sequence in sequences)
+        {
+            for (var i = 0; i < anchors.Length; i++)
+            {
+                var anchor = anchors[i];
+                var projected = Transform(anchor, sequence.Homography);
+                var topLeft = new Point2d(
+                    Math.Clamp(Math.Round(projected.X - PatchWidth / 2.0), 0, SceneWidth - PatchWidth),
+                    Math.Clamp(Math.Round(projected.Y - PatchHeight / 2.0), 0, SceneHeight - PatchHeight));
+                var center = new Point2d(topLeft.X + PatchWidth / 2.0, topLeft.Y + PatchHeight / 2.0);
+                yield return new BridgeCaseSpec(
+                    $"TemplateMatching_{sequence.Name}_{i:0000}",
+                    sequence.Name,
+                    sequence.TemplateSource,
+                    sequence.Homography,
+                    sequence.Alpha,
+                    sequence.Beta,
+                    anchor,
+                    topLeft,
+                    center);
+            }
+        }
+    }
+
+    private static Mat CreateBaseScene()
+    {
+        var scene = new Mat(SceneHeight, SceneWidth, MatType.CV_8UC3, new Scalar(35, 38, 42));
+        for (var y = 0; y < SceneHeight; y += 16)
+        {
+            Cv2.Line(scene, new Point(0, y), new Point(SceneWidth - 1, y), new Scalar(55 + y % 80, 70, 90), 1);
+        }
+
+        for (var x = 0; x < SceneWidth; x += 20)
+        {
+            Cv2.Line(scene, new Point(x, 0), new Point(x, SceneHeight - 1), new Scalar(80, 45 + x % 100, 65), 1);
+        }
+
+        for (var i = 0; i < 36; i++)
+        {
+            var x = 18 + (i * 47) % (SceneWidth - 42);
+            var y = 22 + (i * 31) % (SceneHeight - 50);
+            var color = new Scalar(60 + (i * 17) % 170, 50 + (i * 29) % 170, 70 + (i * 37) % 150);
+            Cv2.Rectangle(scene, new Rect(x, y, 11 + i % 17, 8 + i % 13), color, -1);
+            Cv2.Circle(scene, new Point((x + 23) % SceneWidth, (y + 19) % SceneHeight), 4 + i % 6, color, -1);
+        }
+
+        Cv2.PutText(scene, "CV-H", new Point(116, 124), HersheyFonts.HersheySimplex, 0.9, new Scalar(230, 230, 210), 2);
+        Cv2.GaussianBlur(scene, scene, new Size(3, 3), 0.2);
+        return scene;
+    }
+
+    private static Mat ApplyHomography(Mat source, BridgeCaseSpec spec)
+    {
+        var output = new Mat();
+        using var homography = Mat.FromArray(spec.Homography);
+        Cv2.WarpPerspective(source, output, homography, new Size(SceneWidth, SceneHeight), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(18, 20, 24));
+        return output;
+    }
+
+    private static Mat ApplyPhotometric(Mat source, BridgeCaseSpec spec)
+    {
+        var output = new Mat();
+        source.ConvertTo(output, source.Type(), spec.Alpha, spec.Beta);
+        return output;
+    }
+
+    private static Mat CreateTemplate(Mat baseScene, Mat targetScene, BridgeCaseSpec spec)
+    {
+        if (spec.TemplateSource == "Source")
+        {
+            var sourceTopLeft = new Point(
+                (int)Math.Round(spec.SourceAnchor.X - PatchWidth / 2.0),
+                (int)Math.Round(spec.SourceAnchor.Y - PatchHeight / 2.0));
+            return new Mat(baseScene, new Rect(sourceTopLeft.X, sourceTopLeft.Y, PatchWidth, PatchHeight)).Clone();
+        }
+
+        return new Mat(targetScene, new Rect((int)spec.TargetTopLeft.X, (int)spec.TargetTopLeft.Y, PatchWidth, PatchHeight)).Clone();
+    }
+
+    private static Operator CreateOperator(BridgeCaseSpec spec)
+    {
+        var op = new Operator("TemplateMatchingHomographyBridge", OperatorType.TemplateMatching, 0, 0);
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "Method", "Method", string.Empty, "string", "CCoeffNormed"));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "Domain", "Domain", string.Empty, "string", "Gray"));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "Threshold", "Threshold", string.Empty, "double", 0.72));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "MaxMatches", "MaxMatches", string.Empty, "int", 1));
+        var roiX = Math.Max(0, (int)spec.TargetTopLeft.X - 18);
+        var roiY = Math.Max(0, (int)spec.TargetTopLeft.Y - 18);
+        var roiRight = Math.Min(SceneWidth, (int)spec.TargetTopLeft.X + PatchWidth + 18);
+        var roiBottom = Math.Min(SceneHeight, (int)spec.TargetTopLeft.Y + PatchHeight + 18);
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "UseRoi", "UseRoi", string.Empty, "bool", true));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiX", "RoiX", string.Empty, "int", roiX));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiY", "RoiY", string.Empty, "int", roiY));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiWidth", "RoiWidth", string.Empty, "int", Math.Max(PatchWidth, roiRight - roiX)));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiHeight", "RoiHeight", string.Empty, "int", Math.Max(PatchHeight, roiBottom - roiY)));
+        return op;
+    }
+
+    private static double[,] Translation(double dx, double dy)
+    {
+        return new[,] { { 1d, 0d, dx }, { 0d, 1d, dy }, { 0d, 0d, 1d } };
+    }
+
+    private static double[,] HomographyFromCorners(
+        Point2f s0,
+        Point2f s1,
+        Point2f s2,
+        Point2f s3,
+        Point2f d0,
+        Point2f d1,
+        Point2f d2,
+        Point2f d3)
+    {
+        using var src = Mat.FromArray(new[] { s0, s1, s2, s3 });
+        using var dst = Mat.FromArray(new[] { d0, d1, d2, d3 });
+        using var h = Cv2.GetPerspectiveTransform(src, dst);
+        return new[,]
+        {
+            { h.At<double>(0, 0), h.At<double>(0, 1), h.At<double>(0, 2) },
+            { h.At<double>(1, 0), h.At<double>(1, 1), h.At<double>(1, 2) },
+            { h.At<double>(2, 0), h.At<double>(2, 1), h.At<double>(2, 2) }
+        };
+    }
+
+    private static Point2d Transform(Point2d point, double[,] h)
+    {
+        var denominator = h[2, 0] * point.X + h[2, 1] * point.Y + h[2, 2];
+        return new Point2d(
+            (h[0, 0] * point.X + h[0, 1] * point.Y + h[0, 2]) / denominator,
+            (h[1, 0] * point.X + h[1, 1] * point.Y + h[1, 2]) / denominator);
+    }
+
+    private static Point2d ReadPosition(OperatorExecutionOutput? output)
+    {
+        if (output?.OutputData is null || !output.OutputData.TryGetValue("Position", out var raw))
+        {
+            return new Point2d(double.NaN, double.NaN);
+        }
+
+        if (raw is Position pos)
+        {
+            return new Point2d(pos.X, pos.Y);
+        }
+
+        return new Point2d(double.NaN, double.NaN);
+    }
+
+    private static double ReadDouble(OperatorExecutionOutput? output, string key)
+    {
+        if (output?.OutputData is null || !output.OutputData.TryGetValue(key, out var raw))
+        {
+            return double.NaN;
+        }
+
+        try
+        {
+            return Convert.ToDouble(raw);
+        }
+        catch
+        {
+            return double.NaN;
+        }
+    }
+
+    private static double Distance(Point2d a, Point2d b)
+    {
+        if (!double.IsFinite(a.X) || !double.IsFinite(a.Y))
+        {
+            return double.NaN;
+        }
+
+        var dx = a.X - b.X;
+        var dy = a.Y - b.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    private static double Percentile(IReadOnlyList<double> ordered, double p)
+    {
+        if (ordered.Count == 0)
+        {
+            return 0;
+        }
+
+        var index = Math.Clamp((int)Math.Ceiling(p * ordered.Count) - 1, 0, ordered.Count - 1);
+        return ordered[index];
+    }
+
+    private static void ReleaseImageOutputs(IReadOnlyDictionary<string, object>? outputData)
+    {
+        if (outputData is null)
+        {
+            return;
+        }
+
+        foreach (var value in outputData.Values)
+        {
+            if (value is ImageWrapper image)
+            {
+                image.Release();
+            }
+        }
+    }
+}
+
+internal sealed record BridgeCaseSpec(
+    string CaseId,
+    string Sequence,
+    string TemplateSource,
+    double[,] Homography,
+    double Alpha,
+    double Beta,
+    Point2d SourceAnchor,
+    Point2d TargetTopLeft,
+    Point2d ExpectedCenter);
+
+internal sealed record SequenceSpec(
+    string Name,
+    double[,] Homography,
+    string TemplateSource,
+    double Alpha,
+    double Beta);
+
+internal sealed record BridgeResult(
+    BridgeSummary Summary,
+    IReadOnlyList<OperatorEvidence> Operators,
+    IReadOnlyList<BridgeCaseResult> Cases);
+
+internal sealed record BridgeSummary(
+    DateTimeOffset GeneratedAtUtc,
+    string DatasetName,
+    string DatasetKind,
+    int CaseCount,
+    int Passed,
+    int Failed,
+    double PositionTolerancePx,
+    double MeanPositionErrorPx,
+    double P95PositionErrorPx,
+    double RuntimeMs);
+
+internal sealed record OperatorEvidence(
+    string Operator,
+    int CaseCount,
+    int Passed,
+    int Failed,
+    double RuntimeMsAvg,
+    double RuntimeMsMax,
+    long MemoryAllocationBytesAvg,
+    bool HasPublicDataset,
+    string DatasetName);
+
+internal sealed record BridgeCaseResult(
+    string CaseId,
+    string Operator,
+    string Sequence,
+    string TemplateSource,
+    bool Passed,
+    double RuntimeMs,
+    long MemoryAllocationBytes,
+    double ExpectedX,
+    double ExpectedY,
+    double ActualX,
+    double ActualY,
+    double PositionErrorPx,
+    double Score,
+    double NormalizedScore,
+    string? ErrorMessage);
+
+internal static class MarkdownReport
+{
+    public static string Create(BridgeResult result)
+    {
+        var lines = new List<string>
+        {
+            "# TemplateMatching Homography Bridge Baseline",
+            string.Empty,
+            $"GeneratedAtUtc: `{result.Summary.GeneratedAtUtc:O}`",
+            $"Dataset: `{result.Summary.DatasetName}`",
+            $"DatasetKind: `{result.Summary.DatasetKind}`",
+            string.Empty,
+            "## Summary",
+            string.Empty,
+            "| Metric | Value |",
+            "| --- | ---: |",
+            $"| Cases | {result.Summary.CaseCount} |",
+            $"| Passed | {result.Summary.Passed} |",
+            $"| Failed | {result.Summary.Failed} |",
+            $"| Position tolerance px | {result.Summary.PositionTolerancePx:0.###} |",
+            $"| Mean position error px | {result.Summary.MeanPositionErrorPx:0.####} |",
+            $"| P95 position error px | {result.Summary.P95PositionErrorPx:0.####} |",
+            $"| Runtime ms | {result.Summary.RuntimeMs:0.###} |",
+            string.Empty,
+            "## Operators",
+            string.Empty,
+            "| Operator | Cases | Passed | Failed | Avg ms | Max ms | Avg bytes | Public/Alternative Dataset |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+        };
+
+        lines.AddRange(result.Operators.Select(item =>
+            $"| {item.Operator} | {item.CaseCount} | {item.Passed} | {item.Failed} | {item.RuntimeMsAvg:0.###} | {item.RuntimeMsMax:0.###} | {item.MemoryAllocationBytesAvg} | {item.DatasetName} |"));
+
+        lines.AddRange(
+        [
+            string.Empty,
+            "## Cases",
+            string.Empty,
+            "| Case | Sequence | Template | Passed | Pos Error Px | Score | Norm Score | Runtime Ms | Error |",
+            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |"
+        ]);
+
+        lines.AddRange(result.Cases.Select(item =>
+            $"| {item.CaseId} | {item.Sequence} | {item.TemplateSource} | {item.Passed} | {item.PositionErrorPx:0.####} | {item.Score:0.######} | {item.NormalizedScore:0.######} | {item.RuntimeMs:0.###} | {item.ErrorMessage ?? "-"} |"));
+
+        lines.Add(string.Empty);
+        return string.Join(Environment.NewLine, lines);
+    }
+}
+
+internal sealed record RunnerOptions(
+    string OutputPath,
+    string? ReportPath,
+    bool ShowHelp,
+    string? ParseError)
+{
+    public static RunnerOptions Parse(string[] args)
+    {
+        var output = "quality/evals/reports/TemplateMatching_public_bridge_baseline.json";
+        string? report = "quality/evals/reports/TemplateMatching_public_bridge_baseline.md";
+        var showHelp = false;
+        string? parseError = null;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "-h":
+                case "--help":
+                    showHelp = true;
+                    break;
+                case "--output":
+                    output = NextValue(args, ref i, "--output", ref parseError);
+                    break;
+                case "--report":
+                    report = NextValue(args, ref i, "--report", ref parseError);
+                    break;
+                default:
+                    parseError = $"Unknown argument: {args[i]}";
+                    break;
+            }
+        }
+
+        return new RunnerOptions(output, report, showHelp, parseError);
+    }
+
+    public static void PrintHelp()
+    {
+        Console.WriteLine(
+            """
+            TemplateMatching homography bridge runner
+
+            Options:
+              --output <path>  Baseline JSON output path.
+              --report <path>  Markdown report output path.
+              --help           Show help.
+            """);
+    }
+
+    private static string NextValue(string[] args, ref int index, string optionName, ref string? parseError)
+    {
+        if (index + 1 >= args.Length)
+        {
+            parseError = $"Missing value for {optionName}";
+            return string.Empty;
+        }
+
+        index++;
+        return args[index];
+    }
+}
+
+internal static class JsonSettings
+{
+    public static readonly JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true
+    };
+}

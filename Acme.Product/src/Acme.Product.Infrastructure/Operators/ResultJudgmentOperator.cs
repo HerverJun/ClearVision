@@ -12,7 +12,8 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Generic business judgment with numeric/string condition checks.",
     Category = "Flow Control",
     IconName = "result-judgment",
-    Keywords = new[] { "judgment", "ok", "ng", "condition", "threshold" }
+    Keywords = new[] { "judgment", "ok", "ng", "condition", "threshold" },
+    Version = "1.0.1"
 )]
 [InputPort("Value", "Value", PortDataType.Any, IsRequired = false)]
 [InputPort("Confidence", "Confidence", PortDataType.Float, IsRequired = false)]
@@ -60,6 +61,11 @@ public sealed class ResultJudgmentOperator : OperatorBase
         var absTol = GetDoubleParam(@operator, "NumericAbsTolerance", 1e-4, 0.0, 1_000_000.0);
         var relTol = GetDoubleParam(@operator, "NumericRelTolerance", 1e-6, 0.0, 1.0);
 
+        if (!IsSupportedCondition(condition))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure($"Unsupported condition: {condition}"));
+        }
+
         inputs ??= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         var actualValue = ResolveActualValue(inputs, fieldName);
 
@@ -85,6 +91,12 @@ public sealed class ResultJudgmentOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        var condition = GetStringParam(@operator, "Condition", "Equal");
+        if (!IsSupportedCondition(condition))
+        {
+            return ValidationResult.Invalid($"Unsupported condition: {condition}");
+        }
+
         var minConfidence = GetDoubleParam(@operator, "MinConfidence", 0.0);
         if (minConfidence is < 0 or > 1)
         {
@@ -142,6 +154,18 @@ public sealed class ResultJudgmentOperator : OperatorBase
         }
 
         return null;
+    }
+
+    private static bool IsSupportedCondition(string condition)
+    {
+        return condition.Trim().ToLowerInvariant() is
+            "equal" or
+            "notequal" or
+            "greaterthan" or
+            "lessthan" or
+            "greaterorequal" or
+            "lessorequal" or
+            "range";
     }
 
     private static (bool isOk, string details) EvaluateCondition(

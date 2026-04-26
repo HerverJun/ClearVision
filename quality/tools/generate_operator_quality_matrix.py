@@ -325,6 +325,13 @@ def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
             if not operator or case_count <= 0:
                 continue
 
+            if operator in evidence:
+                existing = evidence[operator]
+                case_count += existing.case_count
+                failed += existing.failed
+                has_runtime = has_runtime or existing.benchmark == "Yes"
+                has_public_dataset = has_public_dataset or existing.public_dataset == "Yes"
+
             if case_count >= 20 and failed == 0:
                 status = "Yes"
             else:
@@ -362,6 +369,8 @@ def next_action_for(row: CatalogRow, card: CardFacts, golden: GoldenEvidence) ->
         return NEXT_ACTION_OVERRIDES[row.operator]
     if golden.status == "Yes" and card.card_todo_count > 0:
         return "Backfill card/source TODO, then review QScore/Level"
+    if golden.status == "Yes" and row.level == "A":
+        return "Maintain regression baseline"
     if golden.status == "Yes":
         return "Review QScore/Level from golden evidence"
     if row.level == "C":

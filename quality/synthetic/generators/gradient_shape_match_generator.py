@@ -364,6 +364,9 @@ def build_case(
             "MemoryAllocation",
         ],
     }
+    if scenario == "low_feature":
+        case["expected"]["failure_reason"] = "InvalidTemplate"
+
     case["meta"]["shape"] = shape
     return case, template, scene
 

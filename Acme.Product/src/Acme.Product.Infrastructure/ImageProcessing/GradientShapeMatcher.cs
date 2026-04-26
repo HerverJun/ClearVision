@@ -71,12 +71,27 @@ internal sealed class RotatedTemplate
     }
 }
 
+public sealed class GradientShapeInvalidTemplateException : InvalidOperationException
+{
+    public GradientShapeInvalidTemplateException(int featureCount, int minFeatureCount)
+        : base($"[InvalidTemplate] Template has insufficient gradient features ({featureCount}/{minFeatureCount}).")
+    {
+        FeatureCount = featureCount;
+        MinFeatureCount = minFeatureCount;
+    }
+
+    public int FeatureCount { get; }
+
+    public int MinFeatureCount { get; }
+}
+
 /// <summary>
 /// 基于梯度形状的模板匹配器 - 从清霜V3移植
 /// </summary>
 public sealed class GradientShapeMatcher : IDisposable
 {
     private const int NumDirections = 8;
+    private const int MinTemplateFeatureCount = 10;
     private const double DirectionStep = Math.PI / 4.0;
     private const int DefaultMagnitudeThreshold = 30;
     private const int DefaultAngleStep = 1;
@@ -107,8 +122,8 @@ public sealed class GradientShapeMatcher : IDisposable
         using var gray = EnsureGray(image);
         var baseFeatures = ExtractFeatures(gray, mask);
 
-        if (baseFeatures.Count < 10)
-            throw new InvalidOperationException($"特征点不足 ({baseFeatures.Count})");
+        if (baseFeatures.Count < MinTemplateFeatureCount)
+            throw new GradientShapeInvalidTemplateException(baseFeatures.Count, MinTemplateFeatureCount);
 
         int centerX = gray.Width / 2;
         int centerY = gray.Height / 2;

@@ -375,6 +375,27 @@ public class OperatorContractReconciliationTests
     }
 
     [Fact]
+    public async Task GradientShapeMatch_LowFeatureTemplate_Should_Return_InvalidTemplate_Code()
+    {
+        var sut = new GradientShapeMatchOperator(Substitute.For<ILogger<GradientShapeMatchOperator>>());
+        var op = new Operator("low_feature_template", OperatorType.GradientShapeMatch, 0, 0);
+
+        using var templateMat = new Mat(80, 80, MatType.CV_8UC3, Scalar.Black);
+        using var sceneMat = new Mat(160, 160, MatType.CV_8UC3, Scalar.Black);
+        using var template = new ImageWrapper(templateMat);
+        using var scene = new ImageWrapper(sceneMat);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = scene,
+            ["Template"] = template
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("[InvalidTemplate]");
+    }
+
+    [Fact]
     public async Task ArrayIndexer_Should_Use_List_Input_And_Item_Output()
     {
         // 测试 ArrayIndexer 输入输出契约一致性

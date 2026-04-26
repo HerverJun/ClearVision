@@ -1,0 +1,2178 @@
+{
+  "schemaVersion": "2026-04-27.g1-g2",
+  "generatedAtUtc": "2026-04-26T16:47:20+00:00",
+  "sourceMatrix": "quality/evals/reports/operator_quality_matrix.md",
+  "scopeNote": "Current matrix has HasGoldenTest only; G1 treats existing golden/contract baselines as contract evidence until HasContractTest is split out.",
+  "baseline": {
+    "totalOperators": 155,
+    "levelCounts": {
+      "A": 155
+    },
+    "priorityCounts": {
+      "P2": 32,
+      "P3": 123
+    },
+    "goldenOrContractSignalYes": 63,
+    "goldenOrContractSignalNo": 92,
+    "p2WithoutGoldenEvidence": 0,
+    "publicOrAlternativeDatasetYes": 2,
+    "fieldDatasetYes": 0
+  },
+  "evidenceLayers": [
+    {
+      "id": "contract",
+      "acceptance": "Happy path, missing input, parameter boundary, type/null boundary, and structured failure message."
+    },
+    {
+      "id": "golden",
+      "acceptance": "Behavior, geometry, protocol, or synthetic oracle with at least 20 cases, 0 failures, runtime, and memory."
+    },
+    {
+      "id": "dataset",
+      "acceptance": "Public dataset or licensed alternative/semi-synthetic tier with manifest, fixed version/seed, metrics, and failure boundaries."
+    },
+    {
+      "id": "field",
+      "acceptance": "Anonymized failure sample with manifest, minimal replay, triage labels, and regression conversion status."
+    }
+  ],
+  "g1": {
+    "target": "155/155 operators have basic contract evidence.",
+    "currentContractOrGoldenSignal": 63,
+    "remainingOperatorsWithoutSignal": 92,
+    "status": "in-progress",
+    "nextGate": "Split matrix into HasContractTest and HasGoldenTest, then expand P3 contract runners."
+  },
+  "g2": {
+    "target": "Core 50 operators have golden baselines.",
+    "core50Frozen": true,
+    "p2Included": 32,
+    "p3Included": 18,
+    "currentCore50GoldenOrContractSignal": 36,
+    "remainingCore50WithoutGolden": 14,
+    "status": "in-progress",
+    "nextGate": "Implement P2 residual runners first, then cover the selected P3 vision chain."
+  },
+  "p2ResidualGoldenPlan": [],
+  "visual20CandidatePool": [
+    "FFT1D",
+    "FrequencyFilter",
+    "InverseFFT1D",
+    "RegionUnion",
+    "AkazeFeatureMatch",
+    "OrbFeatureMatch",
+    "SemanticSegmentation",
+    "DualModalVoting",
+    "CaliperTool",
+    "EdgePairDefect",
+    "TemplateMatching",
+    "AnomalyDetection",
+    "DeepLearning",
+    "DetectionSequenceJudge",
+    "GradientShapeMatch",
+    "LocalDeformableMatching",
+    "PlanarMatching",
+    "PyramidShapeMatch",
+    "ShapeMatching",
+    "SurfaceDefectDetection"
+  ],
+  "core50": [
+    {
+      "operator": "FFT1D",
+      "priority": "P2",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 117,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "FrequencyFilter",
+      "priority": "P2",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 117,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "InverseFFT1D",
+      "priority": "P2",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 117,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionUnion",
+      "priority": "P2",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 100,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "AkazeFeatureMatch",
+      "priority": "P2",
+      "qscore": 90,
+      "level": "A",
+      "knownLimitations": 8,
+      "hasGolden": true,
+      "cases": 22,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "priority": "P2",
+      "qscore": 90,
+      "level": "A",
+      "knownLimitations": 5,
+      "hasGolden": true,
+      "cases": 22,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "SemanticSegmentation",
+      "priority": "P2",
+      "qscore": 90,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 27,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "Undistort",
+      "priority": "P2",
+      "qscore": 91,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "DualModalVoting",
+      "priority": "P2",
+      "qscore": 94,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 31,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CaliperTool",
+      "priority": "P2",
+      "qscore": 96,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 117,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "EdgePairDefect",
+      "priority": "P2",
+      "qscore": 96,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 27,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "FisheyeUndistort",
+      "priority": "P2",
+      "qscore": 96,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "TemplateMatching",
+      "priority": "P2",
+      "qscore": 96,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": true,
+      "cases": 141,
+      "hasPublicDataset": true,
+      "hasBenchmark": true,
+      "evidenceLayer": "dataset+golden",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "AnomalyDetection",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": true,
+      "cases": 120,
+      "hasPublicDataset": true,
+      "hasBenchmark": true,
+      "evidenceLayer": "dataset+golden",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CalibrationLoader",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Calibration Evidence Agent",
+      "nextAction": "Load valid CalibrationBundleV2 fixtures; assert missing path, invalid JSON, version mismatch, and unit metadata failures."
+    },
+    {
+      "operator": "CameraCalibration",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CoordinateTransform",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "DeepLearning",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 5,
+      "hasGolden": true,
+      "cases": 46,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "DetectionSequenceJudge",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "AI/Rule Contract Agent",
+      "nextAction": "Replay deterministic sequence windows; assert order, threshold, missing stream, timeout, and structured reject contracts."
+    },
+    {
+      "operator": "FisheyeCalibration",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "GradientShapeMatch",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 5,
+      "hasGolden": true,
+      "cases": 117,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "HandEyeCalibration",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "HandEyeCalibrationValidator",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "LocalDeformableMatching",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Matching Evidence Agent",
+      "nextAction": "Use seeded template/scene pairs with local warp; assert pose, score, blank template, low texture, ROI, and deformation bounds."
+    },
+    {
+      "operator": "NPointCalibration",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Calibration Evidence Agent",
+      "nextAction": "Use synthetic point correspondences with known affine/projective mapping; assert round-trip error and degenerate point failures."
+    },
+    {
+      "operator": "PixelToWorldTransform",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "PlanarMatching",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Matching Evidence Agent",
+      "nextAction": "Use seeded homography scenes; assert inlier count, reprojection error, blank scene, insufficient features, and mask/ROI behavior."
+    },
+    {
+      "operator": "PyramidShapeMatch",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 4,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ShapeMatching",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Matching Evidence Agent",
+      "nextAction": "Use seeded rotation/scale templates; assert pose, angle/scale tolerance, score floor, and no-match structured failure."
+    },
+    {
+      "operator": "StereoCalibration",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "SurfaceDefectDetection",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "AI/Rule Contract Agent",
+      "nextAction": "Use synthetic clean/scratch/blob/pinhole surfaces; assert defect count, bounding boxes, score thresholds, and invalid parameter failures."
+    },
+    {
+      "operator": "TranslationRotationCalibration",
+      "priority": "P2",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": true,
+      "cases": 24,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Calibration Evidence Agent",
+      "nextAction": "Use synthetic rigid/similarity transforms; assert translation/rotation error, inverse mapping, insufficient pairs, and collinear failures."
+    },
+    {
+      "operator": "ArcCaliper",
+      "priority": "P3",
+      "qscore": 91,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 31,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionComplement",
+      "priority": "P3",
+      "qscore": 85,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 100,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionDifference",
+      "priority": "P3",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 100,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionIntersection",
+      "priority": "P3",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": true,
+      "cases": 100,
+      "hasPublicDataset": false,
+      "hasBenchmark": true,
+      "evidenceLayer": "golden-or-contract",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ImageDiff",
+      "priority": "P3",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageSubtract",
+      "priority": "P3",
+      "qscore": 89,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "AdaptiveThreshold",
+      "priority": "P3",
+      "qscore": 94,
+      "level": "A",
+      "knownLimitations": 5,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "EdgeDetection",
+      "priority": "P3",
+      "qscore": 94,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ContourDetection",
+      "priority": "P3",
+      "qscore": 94,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "BlobAnalysis",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "BlobLabeling",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "LineMeasurement",
+      "priority": "P3",
+      "qscore": 96,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "CircleMeasurement",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 3,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "GeometricFitting",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 5,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PerspectiveTransform",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 1,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "AffineTransform",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 1,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "DistanceTransform",
+      "priority": "P3",
+      "qscore": 100,
+      "level": "A",
+      "knownLimitations": 2,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "WidthMeasurement",
+      "priority": "P3",
+      "qscore": 96,
+      "level": "A",
+      "knownLimitations": 0,
+      "hasGolden": false,
+      "cases": 0,
+      "hasPublicDataset": false,
+      "hasBenchmark": false,
+      "evidenceLayer": "planned",
+      "owner": "Quality Flywheel Agent",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    }
+  ],
+  "allOperators": [
+    {
+      "operator": "FFT1D",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 117,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "FrequencyFilter",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 117,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "InverseFFT1D",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 117,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionUnion",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "AkazeFeatureMatch",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "SemanticSegmentation",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 27,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "Undistort",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "DualModalVoting",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 31,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CaliperTool",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 117,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "EdgePairDefect",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 27,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "FisheyeUndistort",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "TemplateMatching",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 141,
+      "evidenceLayer": "dataset+golden",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "AnomalyDetection",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 120,
+      "evidenceLayer": "dataset+golden",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CalibrationLoader",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CameraCalibration",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "CoordinateTransform",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "DeepLearning",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 46,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "DetectionSequenceJudge",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "FisheyeCalibration",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "GradientShapeMatch",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 117,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "HandEyeCalibration",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "HandEyeCalibrationValidator",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "LocalDeformableMatching",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "NPointCalibration",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "PixelToWorldTransform",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "PlanarMatching",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "PyramidShapeMatch",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ShapeMatching",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "StereoCalibration",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "SurfaceDefectDetection",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "TranslationRotationCalibration",
+      "priority": "P2",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 24,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionComplement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "Comparator",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ContourExtrema",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ImageDiff",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageSubtract",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PhaseClosure",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionDifference",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionIntersection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "BoxNms",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "Comment",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ConditionalBranch",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "PointSetTool",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "RegionClosing",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionDilation",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionErosion",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionOpening",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "RegionSkeleton",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 100,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ResultJudgment",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "Statistics",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "TriggerModule",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "VariableIncrement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "VariableRead",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "VariableWrite",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ArcCaliper",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 31,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "TryCatch",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "AdaptiveThreshold",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "Aggregator",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "BilateralFilter",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "BoxFilter",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "ClaheEnhancement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ColorConversion",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ContourDetection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ContourMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "CopyMakeBorder",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "CornerDetection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "Delay",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "EdgeDetection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "Filtering",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "FrameAveraging",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "HistogramAnalysis",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "HistogramEqualization",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageBlend",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageCompose",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "ImageCrop",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageNormalize",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageResize",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageRotate",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageStitching",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageTiling",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "LaplacianSharpen",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "LogicGate",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "MeanFilter",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "MedianBlur",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "MorphologicalOperation",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "Morphology",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ParallelLineFind",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PositionCorrection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "QuadrilateralFind",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "RectangleDetection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "StringFormat",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "SubpixelEdgeDetection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "Thresholding",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "TimerStatistics",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 22,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ImageAcquisition",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "PPFEstimation",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PPFMatch",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "RansacPlaneSegmentation",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "StatisticalOutlierRemoval",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "VoxelDownsample",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "AngleMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ArrayIndexer",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ColorDetection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ColorMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "CycleCounter",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "EdgeIntersection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "GapMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "GeoMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "GeometricTolerance",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "LineLineDistance",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "LineMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "Measurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PixelStatistics",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PointAlignment",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "PointCorrection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "PointLineDistance",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "RoiTransform",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "ShadingCorrection",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "SharpnessEvaluation",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "UnitConvert",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "WidthMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "MitsubishiMcCommunication",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "OmronFinsCommunication",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "ResultOutput",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "SiemensS7Communication",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "AffineTransform",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "BlobAnalysis",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "BlobLabeling",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "CircleMeasurement",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "CodeRecognition",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "DatabaseWrite",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "DistanceTransform",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "EuclideanClusterExtraction",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ForEach",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "GeometricFitting",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "GlcmTexture",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "HttpRequest",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "ImageAdd",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ImageSave",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "JsonExtractor",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "LawsTextureFilter",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "MathOperation",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    },
+    {
+      "operator": "MinEnclosingGeometry",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "ModbusCommunication",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "MqttPublish",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "OcrRecognition",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PerspectiveTransform",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "PolarUnwrap",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add baseline evidence if operator stays in quality scope"
+    },
+    {
+      "operator": "RoiManager",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "ScriptOperator",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "SerialCommunication",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "TcpCommunication",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "TextSave",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": false,
+      "cases": 0,
+      "evidenceLayer": "planned",
+      "nextAction": "Add parameter and error-contract tests"
+    },
+    {
+      "operator": "TypeConvert",
+      "priority": "P3",
+      "level": "A",
+      "hasGolden": true,
+      "cases": 20,
+      "evidenceLayer": "golden-or-contract",
+      "nextAction": "Maintain regression baseline"
+    }
+  ]
+}

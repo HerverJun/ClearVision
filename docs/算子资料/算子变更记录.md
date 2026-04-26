@@ -23,7 +23,7 @@
 | `OperatorType.MitsubishiMcCommunication` | Mitsubishi MC Communication | Communication | `1.0.0` |
 | `OperatorType.AngleMeasurement` | Angle Measurement | Detection | `1.0.0` |
 | `OperatorType.ContourMeasurement` | Contour Measurement | Detection | `1.0.0` |
-| `OperatorType.ResultJudgment` | Result Judgment | Flow Control | `1.0.0` |
+| `OperatorType.ResultJudgment` | Result Judgment | Flow Control | `1.0.1` |
 | `OperatorType.FFT1D` | FFT 1D | Frequency | `1.0.0` |
 | `OperatorType.FrequencyFilter` | Frequency Filter | Frequency | `1.0.0` |
 | `OperatorType.InverseFFT1D` | Inverse FFT 1D | Frequency | `1.0.0` |
@@ -133,7 +133,7 @@
 | `OperatorType.PointSetTool` | 点集工具 | 逻辑工具 | `1.0.0` |
 | `OperatorType.ScriptOperator` | 脚本算子 | 逻辑工具 | `1.0.0` |
 | `OperatorType.TextSave` | Text Save | 逻辑工具 | `1.0.0` |
-| `OperatorType.TimerStatistics` | 计时统计 | 逻辑工具 | `1.0.0` |
+| `OperatorType.TimerStatistics` | 计时统计 | 逻辑工具 | `1.0.1` |
 | `OperatorType.TriggerModule` | 触发模块 | 逻辑工具 | `1.0.0` |
 | `OperatorType.ImageAcquisition` | 图像采集 | 采集 | `1.0.0` |
 | `OperatorType.AdaptiveThreshold` | Adaptive Threshold | 预处理 | `1.0.0` |
@@ -1170,6 +1170,8 @@
 ### OperatorType.ResultJudgment / Result Judgment
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-26T23:05:23.4040741+08:00` | `1BA85E5F1871` |
+| `1.0.0` | `2026-04-26T23:04:22.3546450+08:00` | `CF2A076702DE` |
 | `1.0.0` | `2026-04-13T23:21:39.1176099+08:00` | `FFDC0A297FC6` |
 | `1.0.0` | `2026-04-12T20:43:23.0238145+08:00` | `53985764ED7F` |
 | `1.0.0` | `2026-03-26T18:46:50.6676488+08:00` | `D6D6EF86DA89` |
@@ -1357,6 +1359,8 @@
 ### OperatorType.TimerStatistics / 计时统计
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.1` | `2026-04-26T23:05:23.4040741+08:00` | `1E4C3D63C2AD` |
+| `1.0.0` | `2026-04-26T23:04:22.3546450+08:00` | `C606DD7708E3` |
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `E7DB3FB15227` |
 | `1.0.0` | `2026-04-12T20:43:23.0238145+08:00` | `5AE68CD325A0` |
 | `1.0.0` | `2026-03-26T18:46:50.6676488+08:00` | `A2DAA30341B0` |
