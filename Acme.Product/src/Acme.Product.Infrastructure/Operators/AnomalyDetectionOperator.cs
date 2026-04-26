@@ -302,6 +302,8 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             ["StdNearestDistance"] = bank.StdNearestDistance
         };
 
+        result.ScoreMap.Dispose();
+
         return new Dictionary<string, object>
         {
             ["AnomalyScore"] = result.Score,

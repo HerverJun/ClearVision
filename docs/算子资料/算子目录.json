@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-24T23:35:17.0337549+08:00",
+  "generatedAt": "2026-04-26T16:47:36.9318375+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -9135,13 +9135,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 100,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/GradientShapeMatch.md"
     },
@@ -21074,13 +21074,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 71,
-        "level": "B",
+        "totalScore": 89,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/FFT1D.md"
     },
@@ -21151,13 +21151,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 71,
-        "level": "B",
+        "totalScore": 89,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/FrequencyFilter.md"
     },
@@ -21216,13 +21216,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 71,
-        "level": "B",
+        "totalScore": 89,
+        "level": "A",
         "documentationScore": 100,
-        "testCoverageScore": 30,
+        "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/InverseFFT1D.md"
     },

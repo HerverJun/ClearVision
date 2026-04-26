@@ -96,10 +96,12 @@ public sealed class AnomalyDetectionOperatorTests
             result.Score.Should().BeLessThan(0.15f);
             result.IsAnomaly.Should().BeFalse();
             Cv2.CountNonZero(result.Mask).Should().Be(0);
+            result.ScoreMap.Type().Should().Be(MatType.CV_32FC1);
             result.ThresholdScoreDomain.Should().Be(SimplePatchCoreAnalysisResult.NormalizedDistance01Domain);
         }
         finally
         {
+            result.ScoreMap.Dispose();
             result.Mask.Dispose();
             result.Heatmap.Dispose();
         }

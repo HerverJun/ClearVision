@@ -73,6 +73,8 @@ public sealed class SimplePatchCoreAnalysisResult
 
     public required Mat Heatmap { get; init; }
 
+    public required Mat ScoreMap { get; init; }
+
     public required Mat Mask { get; init; }
 
     public required int PatchCount { get; init; }
@@ -205,6 +207,7 @@ public static class SimplePatchCoreDetector
             Score = maxScore,
             IsAnomaly = maxScore >= clampedThreshold,
             Heatmap = heatmap,
+            ScoreMap = blurred.Clone(),
             Mask = mask,
             PatchCount = patches.Count,
             ThresholdUsed = clampedThreshold,
@@ -428,14 +431,17 @@ public static class SimplePatchCoreDetector
         }
 
         var selected = new List<float[]>(sampleCount);
-        var selectedIndices = new HashSet<int>();
+        var selectedIndices = new bool[features.Count];
+        var minDistancesToSelected = new double[features.Count];
+        Array.Fill(minDistancesToSelected, double.PositiveInfinity);
 
         var seedIndex = Enumerable.Range(0, features.Count)
             .OrderByDescending(i => SquaredNorm(features[i]))
             .First();
 
-        selectedIndices.Add(seedIndex);
+        selectedIndices[seedIndex] = true;
         selected.Add(CloneFeature(features[seedIndex]));
+        UpdateMinDistances(features, selectedIndices, minDistancesToSelected, features[seedIndex]);
 
         while (selected.Count < sampleCount)
         {
@@ -444,15 +450,14 @@ public static class SimplePatchCoreDetector
 
             for (var i = 0; i < features.Count; i++)
             {
-                if (selectedIndices.Contains(i))
+                if (selectedIndices[i])
                 {
                     continue;
                 }
 
-                var minDistance = selected.Min(item => SquaredDistance(features[i], item));
-                if (minDistance > bestDistance)
+                if (minDistancesToSelected[i] > bestDistance)
                 {
-                    bestDistance = minDistance;
+                    bestDistance = minDistancesToSelected[i];
                     bestIndex = i;
                 }
             }
@@ -462,11 +467,34 @@ public static class SimplePatchCoreDetector
                 break;
             }
 
-            selectedIndices.Add(bestIndex);
+            selectedIndices[bestIndex] = true;
             selected.Add(CloneFeature(features[bestIndex]));
+            UpdateMinDistances(features, selectedIndices, minDistancesToSelected, features[bestIndex]);
         }
 
         return selected;
+    }
+
+    private static void UpdateMinDistances(
+        IReadOnlyList<float[]> features,
+        IReadOnlyList<bool> selectedIndices,
+        double[] minDistancesToSelected,
+        IReadOnlyList<float> selectedFeature)
+    {
+        for (var i = 0; i < features.Count; i++)
+        {
+            if (selectedIndices[i])
+            {
+                minDistancesToSelected[i] = 0d;
+                continue;
+            }
+
+            var distance = SquaredDistance(features[i], selectedFeature);
+            if (distance < minDistancesToSelected[i])
+            {
+                minDistancesToSelected[i] = distance;
+            }
+        }
     }
 
     private static List<double> ComputeNearestNeighborDistances(IReadOnlyList<float[]> features, bool includeSelf)

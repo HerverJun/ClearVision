@@ -107,6 +107,39 @@ public class EdgePairDefectOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithIncompleteLineDictionary_ShouldFailGracefully()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "ExpectedWidth", 20.0 },
+            { "Tolerance", 1.0 },
+            { "NumSamples", 25 },
+            { "EdgeMethod", "Canny" }
+        });
+
+        using var image = CreateBlankImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["Line1"] = new Dictionary<string, object>
+        {
+            ["StartX"] = 10,
+            ["StartY"] = 20
+        };
+        inputs["Line2"] = new Dictionary<string, object>
+        {
+            ["StartX"] = 10,
+            ["StartY"] = 40,
+            ["EndX"] = 110,
+            ["EndY"] = 40
+        };
+
+        var result = await sut.ExecuteAsync(op, inputs);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Failed to resolve Line1/Line2", result.ErrorMessage);
+    }
+
+    [Fact]
     public void ValidateParameters_WithInvalidEdgeMethod_ShouldReturnInvalid()
     {
         var sut = CreateSut();

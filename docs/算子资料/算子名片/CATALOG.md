@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-04-24 23:35:17 +08:00`
+> 生成时间 / Generated At: `2026-04-26 16:47:36 +08:00`
 > 算子总数 / Total Operators: **155**
 
 ## 分类统计 / Category Summary
@@ -39,11 +39,11 @@
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **92.5**
+- 平均分 / Average: **92.9**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
-| A | 128 |
-| B | 27 |
+| A | 132 |
+| B | 23 |
 
 ## 分类索引 / Grouped Index
 
@@ -100,9 +100,9 @@
 ### Frequency (3)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.FFT1D` | FFT 1D | 2 | 4 | 0 | 71 (B) | `1.0.0` | - | [FFT1D](./FFT1D.md) |
-| `OperatorType.FrequencyFilter` | Frequency Filter | 5 | 3 | 0 | 71 (B) | `1.0.0` | - | [FrequencyFilter](./FrequencyFilter.md) |
-| `OperatorType.InverseFFT1D` | Inverse FFT 1D | 2 | 4 | 0 | 71 (B) | `1.0.0` | - | [InverseFFT1D](./InverseFFT1D.md) |
+| `OperatorType.FFT1D` | FFT 1D | 2 | 4 | 0 | 89 (A) | `1.0.0` | - | [FFT1D](./FFT1D.md) |
+| `OperatorType.FrequencyFilter` | Frequency Filter | 5 | 3 | 0 | 89 (A) | `1.0.0` | - | [FrequencyFilter](./FrequencyFilter.md) |
+| `OperatorType.InverseFFT1D` | Inverse FFT 1D | 2 | 4 | 0 | 89 (A) | `1.0.0` | - | [InverseFFT1D](./InverseFFT1D.md) |
 
 ### Morphology (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -131,7 +131,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 2 | 5 | 8 | 73 (B) | `1.0.0` | 该算子基于局部特征点匹配完成模板定位，核心流程是： | [AkazeFeatureMatch](./AkazeFeatureMatch.md) |
-| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 2 | 5 | 11 | 83 (B) | `1.0.0` | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | [GradientShapeMatch](./GradientShapeMatch.md) |
+| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 2 | 5 | 11 | 100 (A) | `1.0.0` | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | [GradientShapeMatch](./GradientShapeMatch.md) |
 | `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 2 | 6 | 15 | 100 (A) | `1.1.1` | Coarse-to-fine local deformable matching | [LocalDeformableMatching](./LocalDeformableMatching.md) |
 | `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 2 | 5 | 10 | 73 (B) | `1.0.0` | 该算子与 AkazeFeatureMatchOperator 属于同一类局部特征匹配… | [OrbFeatureMatch](./OrbFeatureMatch.md) |
 | `OperatorType.PlanarMatching` | Planar Matching | 2 | 13 | 19 | 100 (A) | `1.1.2` | Feature homography planar matching | [PlanarMatching](./PlanarMatching.md) |

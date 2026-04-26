@@ -79,6 +79,7 @@ public enum YoloVersion
 [OperatorParam("TargetClasses", "目标类别", "string", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别", DefaultValue = "")]
 [OperatorParam("LabelsPath", "标签文件路径", "file", Description = "自定义标签文件路径（每行一个标签），为空则优先使用模型 metadata names 或自动查找模型目录下的 labels.txt；仍不可用时执行失败", DefaultValue = "")]
 [OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。", DefaultValue = true)]
+[OperatorParam("NmsIouThreshold", "NMS IoU Threshold", "double", Description = "内部 NMS 与预览 NMS 使用的 IoU 阈值。", DefaultValue = 0.45, Min = 0.0, Max = 1.0)]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
 [OutputPort("ResolvedModelPath", "Resolved Model Path", PortDataType.String)]
 [OutputPort("ResolvedModelId", "Resolved Model Id", PortDataType.String)]
@@ -261,6 +262,7 @@ public class DeepLearningOperator : OperatorBase
         var targetClassesStr = GetStringParam(@operator, "TargetClasses", string.Empty);
         var labelsPath = ResolveLabelsPath(@operator);
         var enableInternalNms = GetBoolParam(@operator, "EnableInternalNms", true);
+        var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f, 0.0f, 1.0f);
 
         // 2.1 加载自定义标签
         var labels = Array.Empty<string>();
@@ -361,14 +363,14 @@ public class DeepLearningOperator : OperatorBase
         Logger.LogInformation("[DeepLearning] 最终使用YOLO版本: {YoloVersion}, 置信度阈值: {Confidence}", yoloVersion, confidenceThreshold);
 
         // 9. 后处理
-        var detections = PostprocessResults(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses, enableInternalNms);
+        var detections = PostprocessResults(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses, enableInternalNms, nmsIouThreshold);
         Logger.LogInformation("[DeepLearning] 检测到目标数量: {DetectionCount}", detections.Count);
 
         var detectionMode = GetStringParam(@operator, "DetectionMode", "Defect");
         var isObjectMode = detectionMode.Equals("Object", StringComparison.OrdinalIgnoreCase);
 
         // 10. 绘制结果
-        var visualizationDetections = BuildVisualizationDetections(detections, confidenceThreshold, enableInternalNms);
+        var visualizationDetections = BuildVisualizationDetections(detections, confidenceThreshold, enableInternalNms, nmsIouThreshold);
         var outputImage = DrawResults(src, visualizationDetections, labels, detectionMode);
 
         // 11. 构建输出 - Sprint 1 Task 1.2: 使用 DetectionList 类型
@@ -395,6 +397,7 @@ public class DeepLearningOperator : OperatorBase
         {
             { "DetectionMode", detectionMode },
             { "InternalNmsEnabled", enableInternalNms },
+            { "NmsIouThreshold", nmsIouThreshold },
             { "RawCandidateCount", detections.Count },
             { "VisualizationDetectionCount", visualizationDetections.Count },
             { "DetectionList", detectionList },
@@ -1012,6 +1015,7 @@ public class DeepLearningOperator : OperatorBase
         var modelPath = GetStringParam(@operator, "ModelPath", string.Empty);
         var modelId = GetStringParam(@operator, "ModelId", string.Empty);
         var confidence = GetFloatParam(@operator, "Confidence", 0.5f);
+        var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f);
 
         if (string.IsNullOrWhiteSpace(modelPath) && string.IsNullOrWhiteSpace(modelId))
         {
@@ -1030,6 +1034,11 @@ public class DeepLearningOperator : OperatorBase
         if (confidence < 0 || confidence > 1)
         {
             return ValidationResult.Invalid("置信度阈值必须在 0-1 之间");
+        }
+
+        if (nmsIouThreshold < 0 || nmsIouThreshold > 1)
+        {
+            return ValidationResult.Invalid("NMS IoU threshold must be between 0 and 1.");
         }
 
         return ValidationResult.Valid();
@@ -1059,16 +1068,17 @@ public class DeepLearningOperator : OperatorBase
         int inputSize,
         YoloVersion yoloVersion,
         HashSet<int>? targetClasses,
-        bool enableInternalNms)
+        bool enableInternalNms,
+        float nmsIouThreshold)
     {
         // 根据 YOLO 版本选择处理方式
         var detections = yoloVersion switch
         {
-            YoloVersion.YOLOv5 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
-            YoloVersion.YOLOv6 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
-            YoloVersion.YOLOv8 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
-            YoloVersion.YOLOv11 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms),
-            _ => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms)
+            YoloVersion.YOLOv5 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms, nmsIouThreshold),
+            YoloVersion.YOLOv6 => PostprocessYoloV5V6(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms, nmsIouThreshold),
+            YoloVersion.YOLOv8 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms, nmsIouThreshold),
+            YoloVersion.YOLOv11 => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms, nmsIouThreshold),
+            _ => PostprocessYoloV8V11(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, enableInternalNms, nmsIouThreshold)
         };
 
         // 如果指定了目标类别，进行过滤
@@ -1102,7 +1112,8 @@ public class DeepLearningOperator : OperatorBase
         int originalWidth,
         int originalHeight,
         int inputSize,
-        bool enableInternalNms)
+        bool enableInternalNms,
+        float nmsIouThreshold)
     {
         var detections = new List<DetectionResult>();
         var shape = outputTensor.Dimensions.ToArray();
@@ -1222,7 +1233,7 @@ public class DeepLearningOperator : OperatorBase
             return detections;
         }
 
-        var nmsResult = ApplyNMS(detections, 0.45f);
+        var nmsResult = ApplyNMS(detections, nmsIouThreshold);
         Logger.LogDebug("[DeepLearning] NMS后检测数: {NmsCount}", nmsResult.Count);
         return nmsResult;
     }
@@ -1236,7 +1247,8 @@ public class DeepLearningOperator : OperatorBase
         int originalWidth,
         int originalHeight,
         int inputSize,
-        bool enableInternalNms)
+        bool enableInternalNms,
+        float nmsIouThreshold)
     {
         var detections = new List<DetectionResult>();
         var shape = outputTensor.Dimensions.ToArray();
@@ -1304,7 +1316,7 @@ public class DeepLearningOperator : OperatorBase
             return detections;
         }
 
-        var nmsResult = ApplyNMS(detections, 0.45f);
+        var nmsResult = ApplyNMS(detections, nmsIouThreshold);
         Logger.LogDebug("[DeepLearning] NMS后检测数: {NmsCount}", nmsResult.Count);
         return nmsResult;
     }
@@ -1898,7 +1910,8 @@ public class DeepLearningOperator : OperatorBase
     private List<DetectionResult> BuildVisualizationDetections(
         List<DetectionResult> detections,
         float confidenceThreshold,
-        bool enableInternalNms)
+        bool enableInternalNms,
+        float nmsIouThreshold)
     {
         if (detections.Count == 0)
         {
@@ -1926,7 +1939,7 @@ public class DeepLearningOperator : OperatorBase
             filtered = detections;
         }
 
-        return ApplyNMS(filtered, 0.45f);
+        return ApplyNMS(filtered, nmsIouThreshold);
     }
 
     private static string BuildStatisticsLabel(int count, string detectionMode)
