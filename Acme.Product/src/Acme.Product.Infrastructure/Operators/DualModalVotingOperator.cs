@@ -39,6 +39,7 @@ public class DualModalVotingOperator : OperatorBase
         CancellationToken cancellationToken)
     {
         var strategy = GetStringParam(@operator, "VotingStrategy", "WeightedAverage");
+        var normalizedStrategy = NormalizeStrategy(strategy);
         var dlWeight = GetDoubleParam(@operator, "DLWeight", 0.6);
         var traditionalWeight = GetDoubleParam(@operator, "TraditionalWeight", 0.4);
         var confidenceThreshold = GetDoubleParam(@operator, "ConfidenceThreshold", 0.5);
@@ -63,7 +64,7 @@ public class DualModalVotingOperator : OperatorBase
         double confidence;
         string details;
 
-        switch (strategy)
+        switch (normalizedStrategy)
         {
             case "WeightedAverage":
             {
@@ -140,7 +141,7 @@ public class DualModalVotingOperator : OperatorBase
 
         Logger.LogInformation(
             "[DualModalVoting] Voting completed. Strategy: {Strategy}, IsOk: {IsOk}, Confidence: {Confidence:F2}, Details: {Details}",
-            strategy,
+            normalizedStrategy,
             isOk,
             confidence,
             details);
@@ -180,6 +181,7 @@ public class DualModalVotingOperator : OperatorBase
         var defectCount = Convert.ToInt32(defectCountVal);
         var isOk = defectCount == 0;
         var maxDefectConfidence = 0.0;
+        var hasDefectConfidence = false;
 
         if (dict.TryGetValue("Defects", out var defectsVal) && defectsVal is IEnumerable<object> defectsList)
         {
@@ -188,12 +190,17 @@ public class DualModalVotingOperator : OperatorBase
                 if (defect is Dictionary<string, object> defectDict &&
                     defectDict.TryGetValue("Confidence", out var defectConfidenceValue))
                 {
+                    hasDefectConfidence = true;
                     maxDefectConfidence = Math.Max(maxDefectConfidence, Convert.ToDouble(defectConfidenceValue));
                 }
             }
         }
 
-        var labelConfidence = isOk ? 1.0 : Math.Clamp(maxDefectConfidence, 0.0, 1.0);
+        var labelConfidence = isOk
+            ? 1.0
+            : hasDefectConfidence
+                ? Math.Clamp(maxDefectConfidence, 0.0, 1.0)
+                : 1.0;
         return DetectionResult.Success(isOk, labelConfidence);
     }
 
@@ -224,35 +231,43 @@ public class DualModalVotingOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var strategy = GetStringParam(@operator, "VotingStrategy", "WeightedAverage");
-        var validStrategies = new[]
-        {
-            "Unanimous",
-            "Majority",
-            "WeightedAverage",
-            "PrioritizeDeepLearning",
-            "PrioritizeTraditional"
-        };
+        var normalizedStrategy = NormalizeStrategy(strategy);
 
-        if (!validStrategies.Contains(strategy, StringComparer.OrdinalIgnoreCase))
+        if (normalizedStrategy == null)
         {
-            return ValidationResult.Invalid($"VotingStrategy must be one of: {string.Join(", ", validStrategies)}");
+            return ValidationResult.Invalid($"VotingStrategy must be one of: {string.Join(", ", ValidStrategies)}");
         }
 
         var dlWeight = GetDoubleParam(@operator, "DLWeight", 0.6, 0.0, 1.0);
         var traditionalWeight = GetDoubleParam(@operator, "TraditionalWeight", 0.4, 0.0, 1.0);
         var weightSum = dlWeight + traditionalWeight;
 
-        if (strategy.Equals("WeightedAverage", StringComparison.OrdinalIgnoreCase) && weightSum <= 1e-12)
+        if (normalizedStrategy == "WeightedAverage" && weightSum <= 1e-12)
         {
             return ValidationResult.Invalid("WeightedAverage requires DLWeight + TraditionalWeight > 0.");
         }
 
-        if (strategy.Equals("WeightedAverage", StringComparison.OrdinalIgnoreCase) && Math.Abs(weightSum - 1.0) > 0.01)
+        if (normalizedStrategy == "WeightedAverage" && Math.Abs(weightSum - 1.0) > 0.01)
         {
             return ValidationResult.Invalid(
                 $"In WeightedAverage mode, DLWeight ({dlWeight}) + TraditionalWeight ({traditionalWeight}) must be approximately 1.0 (current={weightSum:F2}).");
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static readonly string[] ValidStrategies =
+    [
+        "Unanimous",
+        "Majority",
+        "WeightedAverage",
+        "PrioritizeDeepLearning",
+        "PrioritizeTraditional"
+    ];
+
+    private static string? NormalizeStrategy(string? strategy)
+    {
+        return ValidStrategies.FirstOrDefault(
+            valid => valid.Equals(strategy?.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 }
