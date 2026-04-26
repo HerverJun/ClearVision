@@ -1,0 +1,341 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-26T09:07:51.1929552+00:00",
+    "CaseCount": 31,
+    "Passed": 31,
+    "Failed": 0,
+    "RuntimeMs": 51.038
+  },
+  "Operators": [
+    {
+      "Operator": "DualModalVoting",
+      "CaseCount": 31,
+      "Passed": 31,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.646,
+      "MemoryAllocationBytesAvg": 22614
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Input extraction",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.229
+    },
+    {
+      "Scenario": "Majority strategy",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.22
+    },
+    {
+      "Scenario": "Missing input contract",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.202
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.182
+    },
+    {
+      "Scenario": "Priority strategies",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.285
+    },
+    {
+      "Scenario": "Private helper contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.344
+    },
+    {
+      "Scenario": "Strategy parsing",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.537
+    },
+    {
+      "Scenario": "Unanimous strategy",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.188
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.077
+    },
+    {
+      "Scenario": "WeightedAverage strategy",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 7.587
+    }
+  ],
+  "Cases": [
+    {
+      "Case": "weighted_average_ok_probability_mixed_modalities",
+      "Scenario": "WeightedAverage strategy",
+      "Passed": true,
+      "RuntimeMs": 44.331,
+      "MemoryAllocationBytes": 499712,
+      "Failure": null
+    },
+    {
+      "Case": "weighted_average_high_confidence_ng_wins",
+      "Scenario": "WeightedAverage strategy",
+      "Passed": true,
+      "RuntimeMs": 0.277,
+      "MemoryAllocationBytes": 7368,
+      "Failure": null
+    },
+    {
+      "Case": "weighted_average_boundary_is_ok",
+      "Scenario": "WeightedAverage strategy",
+      "Passed": true,
+      "RuntimeMs": 0.199,
+      "MemoryAllocationBytes": 7360,
+      "Failure": null
+    },
+    {
+      "Case": "weighted_average_custom_threshold_flips_to_ng",
+      "Scenario": "WeightedAverage strategy",
+      "Passed": true,
+      "RuntimeMs": 0.184,
+      "MemoryAllocationBytes": 7368,
+      "Failure": null
+    },
+    {
+      "Case": "weighted_average_zero_weights_fail",
+      "Scenario": "WeightedAverage strategy",
+      "Passed": true,
+      "RuntimeMs": 0.312,
+      "MemoryAllocationBytes": 8456,
+      "Failure": null
+    },
+    {
+      "Case": "weighted_average_custom_weights_normalized",
+      "Scenario": "WeightedAverage strategy",
+      "Passed": true,
+      "RuntimeMs": 0.218,
+      "MemoryAllocationBytes": 7368,
+      "Failure": null
+    },
+    {
+      "Case": "unanimous_both_ok_is_ok",
+      "Scenario": "Unanimous strategy",
+      "Passed": true,
+      "RuntimeMs": 0.189,
+      "MemoryAllocationBytes": 7280,
+      "Failure": null
+    },
+    {
+      "Case": "unanimous_one_ng_is_ng_confidence",
+      "Scenario": "Unanimous strategy",
+      "Passed": true,
+      "RuntimeMs": 0.188,
+      "MemoryAllocationBytes": 7296,
+      "Failure": null
+    },
+    {
+      "Case": "majority_same_ok_averages_ok_probability",
+      "Scenario": "Majority strategy",
+      "Passed": true,
+      "RuntimeMs": 0.274,
+      "MemoryAllocationBytes": 7264,
+      "Failure": null
+    },
+    {
+      "Case": "majority_same_ng_uses_final_ng_confidence",
+      "Scenario": "Majority strategy",
+      "Passed": true,
+      "RuntimeMs": 0.239,
+      "MemoryAllocationBytes": 7216,
+      "Failure": null
+    },
+    {
+      "Case": "majority_conflict_higher_dl_confidence_wins",
+      "Scenario": "Majority strategy",
+      "Passed": true,
+      "RuntimeMs": 0.22,
+      "MemoryAllocationBytes": 7208,
+      "Failure": null
+    },
+    {
+      "Case": "majority_conflict_higher_traditional_confidence_wins",
+      "Scenario": "Majority strategy",
+      "Passed": true,
+      "RuntimeMs": 0.191,
+      "MemoryAllocationBytes": 7216,
+      "Failure": null
+    },
+    {
+      "Case": "majority_conflict_equal_confidence_prefers_dl",
+      "Scenario": "Majority strategy",
+      "Passed": true,
+      "RuntimeMs": 0.178,
+      "MemoryAllocationBytes": 7208,
+      "Failure": null
+    },
+    {
+      "Case": "prioritize_deep_learning_follows_dl",
+      "Scenario": "Priority strategies",
+      "Passed": true,
+      "RuntimeMs": 0.34,
+      "MemoryAllocationBytes": 7520,
+      "Failure": null
+    },
+    {
+      "Case": "prioritize_traditional_follows_traditional",
+      "Scenario": "Priority strategies",
+      "Passed": true,
+      "RuntimeMs": 0.23,
+      "MemoryAllocationBytes": 7352,
+      "Failure": null
+    },
+    {
+      "Case": "case_insensitive_strategy_executes",
+      "Scenario": "Strategy parsing",
+      "Passed": true,
+      "RuntimeMs": 0.537,
+      "MemoryAllocationBytes": 9472,
+      "Failure": null
+    },
+    {
+      "Case": "dictionary_isok_confidence_clamps_high",
+      "Scenario": "Input extraction",
+      "Passed": true,
+      "RuntimeMs": 0.23,
+      "MemoryAllocationBytes": 7624,
+      "Failure": null
+    },
+    {
+      "Case": "dictionary_isok_confidence_clamps_low",
+      "Scenario": "Input extraction",
+      "Passed": true,
+      "RuntimeMs": 0.208,
+      "MemoryAllocationBytes": 7624,
+      "Failure": null
+    },
+    {
+      "Case": "defect_count_good_maps_to_ok",
+      "Scenario": "Input extraction",
+      "Passed": true,
+      "RuntimeMs": 0.228,
+      "MemoryAllocationBytes": 7664,
+      "Failure": null
+    },
+    {
+      "Case": "defect_count_uses_max_defect_confidence",
+      "Scenario": "Input extraction",
+      "Passed": true,
+      "RuntimeMs": 0.253,
+      "MemoryAllocationBytes": 8216,
+      "Failure": null
+    },
+    {
+      "Case": "defect_count_missing_confidence_is_conservative_ng",
+      "Scenario": "Input extraction",
+      "Passed": true,
+      "RuntimeMs": 0.228,
+      "MemoryAllocationBytes": 7880,
+      "Failure": null
+    },
+    {
+      "Case": "missing_traditional_uses_neutral_probability",
+      "Scenario": "Missing input contract",
+      "Passed": true,
+      "RuntimeMs": 0.251,
+      "MemoryAllocationBytes": 7328,
+      "Failure": null
+    },
+    {
+      "Case": "missing_dl_uses_neutral_probability",
+      "Scenario": "Missing input contract",
+      "Passed": true,
+      "RuntimeMs": 0.179,
+      "MemoryAllocationBytes": 7336,
+      "Failure": null
+    },
+    {
+      "Case": "no_valid_inputs_fail",
+      "Scenario": "Missing input contract",
+      "Passed": true,
+      "RuntimeMs": 0.177,
+      "MemoryAllocationBytes": 6232,
+      "Failure": null
+    },
+    {
+      "Case": "custom_judgment_values_are_used",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.182,
+      "MemoryAllocationBytes": 7448,
+      "Failure": null
+    },
+    {
+      "Case": "validate_defaults_valid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.072,
+      "MemoryAllocationBytes": 3456,
+      "Failure": null
+    },
+    {
+      "Case": "validate_bad_strategy_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.141,
+      "MemoryAllocationBytes": 3272,
+      "Failure": null
+    },
+    {
+      "Case": "validate_weight_sum_zero_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.053,
+      "MemoryAllocationBytes": 3768,
+      "Failure": null
+    },
+    {
+      "Case": "validate_weight_sum_not_one_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.041,
+      "MemoryAllocationBytes": 4112,
+      "Failure": null
+    },
+    {
+      "Case": "normalize_strategy_trims_and_canonicalizes",
+      "Scenario": "Private helper contract",
+      "Passed": true,
+      "RuntimeMs": 0.561,
+      "MemoryAllocationBytes": 5728,
+      "Failure": null
+    },
+    {
+      "Case": "failed_detection_result_is_neutral",
+      "Scenario": "Private helper contract",
+      "Passed": true,
+      "RuntimeMs": 0.127,
+      "MemoryAllocationBytes": 672,
+      "Failure": null
+    }
+  ]
+}
