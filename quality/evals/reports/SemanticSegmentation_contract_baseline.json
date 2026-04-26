@@ -1,0 +1,295 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-26T08:08:20.2827409+00:00",
+    "CaseCount": 27,
+    "Passed": 27,
+    "Failed": 0,
+    "RuntimeMs": 134.264
+  },
+  "Operators": [
+    {
+      "Operator": "SemanticSegmentation",
+      "CaseCount": 27,
+      "Passed": 27,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.973,
+      "MemoryAllocationBytesAvg": 36766
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Class-name contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.806
+    },
+    {
+      "Scenario": "End-to-end identity model",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 23.541
+    },
+    {
+      "Scenario": "Failure contract",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.409
+    },
+    {
+      "Scenario": "Model catalog contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.269
+    },
+    {
+      "Scenario": "Parser contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.221
+    },
+    {
+      "Scenario": "Preprocess contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.48
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.168
+    },
+    {
+      "Scenario": "Visualization contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.091
+    }
+  ],
+  "Cases": [
+    {
+      "Case": "identity_direct_class_map_exact",
+      "Scenario": "End-to-end identity model",
+      "Passed": true,
+      "RuntimeMs": 111.504,
+      "MemoryAllocationBytes": 486352,
+      "Failure": null
+    },
+    {
+      "Case": "identity_output_types_and_size",
+      "Scenario": "End-to-end identity model",
+      "Passed": true,
+      "RuntimeMs": 1.944,
+      "MemoryAllocationBytes": 55928,
+      "Failure": null
+    },
+    {
+      "Case": "identity_present_classes_and_count",
+      "Scenario": "End-to-end identity model",
+      "Passed": true,
+      "RuntimeMs": 1.288,
+      "MemoryAllocationBytes": 50080,
+      "Failure": null
+    },
+    {
+      "Case": "identity_class_masks_exact",
+      "Scenario": "End-to-end identity model",
+      "Passed": true,
+      "RuntimeMs": 1.012,
+      "MemoryAllocationBytes": 33840,
+      "Failure": null
+    },
+    {
+      "Case": "identity_colored_map_matches_palette",
+      "Scenario": "End-to-end identity model",
+      "Passed": true,
+      "RuntimeMs": 1.958,
+      "MemoryAllocationBytes": 56688,
+      "Failure": null
+    },
+    {
+      "Case": "catalog_resolves_model_defaults",
+      "Scenario": "Model catalog contract",
+      "Passed": true,
+      "RuntimeMs": 7.793,
+      "MemoryAllocationBytes": 152136,
+      "Failure": null
+    },
+    {
+      "Case": "validate_catalog_defaults_valid",
+      "Scenario": "Model catalog contract",
+      "Passed": true,
+      "RuntimeMs": 0.745,
+      "MemoryAllocationBytes": 27480,
+      "Failure": null
+    },
+    {
+      "Case": "validate_missing_model_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.379,
+      "MemoryAllocationBytes": 8872,
+      "Failure": null
+    },
+    {
+      "Case": "validate_bad_input_size_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.111,
+      "MemoryAllocationBytes": 9168,
+      "Failure": null
+    },
+    {
+      "Case": "validate_zero_std_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 11064,
+      "Failure": null
+    },
+    {
+      "Case": "validate_bad_execution_provider_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.086,
+      "MemoryAllocationBytes": 11608,
+      "Failure": null
+    },
+    {
+      "Case": "execute_missing_image_fails",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.298,
+      "MemoryAllocationBytes": 10064,
+      "Failure": null
+    },
+    {
+      "Case": "execute_missing_model_fails",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.518,
+      "MemoryAllocationBytes": 13088,
+      "Failure": null
+    },
+    {
+      "Case": "execute_bad_mean_fails",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.411,
+      "MemoryAllocationBytes": 14520,
+      "Failure": null
+    },
+    {
+      "Case": "parse_size_accepts_trimmed_pair",
+      "Scenario": "Parser contract",
+      "Passed": true,
+      "RuntimeMs": 0.231,
+      "MemoryAllocationBytes": 896,
+      "Failure": null
+    },
+    {
+      "Case": "parse_size_rejects_zero",
+      "Scenario": "Parser contract",
+      "Passed": true,
+      "RuntimeMs": 0.156,
+      "MemoryAllocationBytes": 3048,
+      "Failure": null
+    },
+    {
+      "Case": "parse_float_triplet_accepts_three_values",
+      "Scenario": "Parser contract",
+      "Passed": true,
+      "RuntimeMs": 0.406,
+      "MemoryAllocationBytes": 704,
+      "Failure": null
+    },
+    {
+      "Case": "parse_float_triplet_rejects_two_values",
+      "Scenario": "Parser contract",
+      "Passed": true,
+      "RuntimeMs": 0.092,
+      "MemoryAllocationBytes": 2152,
+      "Failure": null
+    },
+    {
+      "Case": "class_names_json_expands_missing",
+      "Scenario": "Class-name contract",
+      "Passed": true,
+      "RuntimeMs": 0.504,
+      "MemoryAllocationBytes": 1584,
+      "Failure": null
+    },
+    {
+      "Case": "class_names_comma_truncates_extra",
+      "Scenario": "Class-name contract",
+      "Passed": true,
+      "RuntimeMs": 0.149,
+      "MemoryAllocationBytes": 2680,
+      "Failure": null
+    },
+    {
+      "Case": "class_names_empty_fallback",
+      "Scenario": "Class-name contract",
+      "Passed": true,
+      "RuntimeMs": 0.075,
+      "MemoryAllocationBytes": 696,
+      "Failure": null
+    },
+    {
+      "Case": "class_names_bad_json_fails",
+      "Scenario": "Class-name contract",
+      "Passed": true,
+      "RuntimeMs": 2.495,
+      "MemoryAllocationBytes": 28104,
+      "Failure": null
+    },
+    {
+      "Case": "preprocess_rgb_channel_order",
+      "Scenario": "Preprocess contract",
+      "Passed": true,
+      "RuntimeMs": 1.195,
+      "MemoryAllocationBytes": 2096,
+      "Failure": null
+    },
+    {
+      "Case": "preprocess_bgr_channel_order",
+      "Scenario": "Preprocess contract",
+      "Passed": true,
+      "RuntimeMs": 0.442,
+      "MemoryAllocationBytes": 5096,
+      "Failure": null
+    },
+    {
+      "Case": "preprocess_unit_range_mean_std",
+      "Scenario": "Preprocess contract",
+      "Passed": true,
+      "RuntimeMs": 0.14,
+      "MemoryAllocationBytes": 1400,
+      "Failure": null
+    },
+    {
+      "Case": "preprocess_grayscale_promotes_to_three_channels",
+      "Scenario": "Preprocess contract",
+      "Passed": true,
+      "RuntimeMs": 0.144,
+      "MemoryAllocationBytes": 1480,
+      "Failure": null
+    },
+    {
+      "Case": "palette_color_is_stable_per_class",
+      "Scenario": "Visualization contract",
+      "Passed": true,
+      "RuntimeMs": 0.091,
+      "MemoryAllocationBytes": 1856,
+      "Failure": null
+    }
+  ]
+}

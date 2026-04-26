@@ -1,0 +1,2129 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-25T12:42:26.1076243+00:00",
+    "CasesRoot": "..\\..\\..\\quality\\synthetic\\cases\\fft",
+    "CaseCount": 117,
+    "Passed": 117,
+    "Failed": 0,
+    "MemoryAllocationBytesAvgSum": 48600
+  },
+  "Operators": [
+    {
+      "Operator": "FFT1D",
+      "CaseCount": 117,
+      "Passed": 117,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.723,
+      "RuntimeMsMax": 35.123,
+      "MemoryAllocationBytesAvg": 48600
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "FFT1D_composite_0000",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 35.123,
+      "MemoryAllocationBytes": 69896,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 2.6960442261587825E-08,
+        "MaxMagnitudeError": 4.010528174520026E-08,
+        "ReconstructionRmse": 4.257644014223553E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0001",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.29,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 7.579058569082114E-08,
+        "MaxMagnitudeError": 7.579058569082114E-08,
+        "ReconstructionRmse": 3.9273966568490127E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0002",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.302,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 4.053671508884186E-08,
+        "MaxMagnitudeError": 4.053671508884186E-08,
+        "ReconstructionRmse": 4.047227912332832E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0003",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.593,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.537155350129061E-07,
+        "MaxMagnitudeError": 1.2225075264269235E-08,
+        "ReconstructionRmse": 2.353026127879752E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0004",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.2,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.1612901815073323E-08,
+        "MaxMagnitudeError": 3.078357872282423E-08,
+        "ReconstructionRmse": 2.244839557352988E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0005",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.25,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.261827980472209E-08,
+        "MaxMagnitudeError": 1.261827980472209E-08,
+        "ReconstructionRmse": 4.231151868613989E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0006",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.314,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 5.31843515818065E-08,
+        "MaxMagnitudeError": 1.0249561993196186E-08,
+        "ReconstructionRmse": 2.9418443849963436E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0007",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.62,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 2.0896386581881838E-08,
+        "MaxMagnitudeError": 2.0896386581881838E-08,
+        "ReconstructionRmse": 3.4688888189342756E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0008",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.952,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.1656286255577706E-06,
+        "MaxMagnitudeError": 2.8552799808078653E-08,
+        "ReconstructionRmse": 2.2215960792235027E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0009",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1.031,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.8586492724059384E-07,
+        "MaxMagnitudeError": 3.930386598886568E-08,
+        "ReconstructionRmse": 2.3811392020067032E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0010",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.916,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 6.952696660613309E-09,
+        "MaxMagnitudeError": 6.952696660613309E-09,
+        "ReconstructionRmse": 4.450747169297373E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0011",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.329,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 5.844905684650946E-08,
+        "MaxMagnitudeError": 5.844905684650946E-08,
+        "ReconstructionRmse": 4.278261331717648E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_composite_0012",
+      "Operator": "FFT1D",
+      "Scenario": "composite",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_composite_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.411,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 6.128121981888491E-08,
+        "MaxMagnitudeError": 3.859843931355832E-08,
+        "ReconstructionRmse": 2.1024295390758667E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0000",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.23,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0001",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.421,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0002",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1.246,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0003",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.092,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0004",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.811,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0005",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.989,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0006",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.206,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0007",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.604,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0008",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.128,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0009",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.18,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0010",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.396,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0011",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.542,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_constant_signal_0012",
+      "Operator": "FFT1D",
+      "Scenario": "constant_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_constant_signal_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.147,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0000",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.917,
+      "MemoryAllocationBytes": 106104,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0001",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.455,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0002",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.427,
+      "MemoryAllocationBytes": 104656,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0003",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.46,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0004",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.456,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0005",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.417,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0006",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.409,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0007",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.418,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0008",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.412,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0009",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.436,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0010",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.431,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0011",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.429,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_image_2d_0012",
+      "Operator": "FFT1D",
+      "Scenario": "image_2d",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_image_2d_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.43,
+      "MemoryAllocationBytes": 104208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2147483647,
+        "DcMagnitudeError": 1.7976931348623157E+308,
+        "MaxMagnitudeError": 1.7976931348623157E+308,
+        "ReconstructionRmse": 1.7976931348623157E+308,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0000",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.213,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 4,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.7314727812921547E-08,
+        "ReconstructionRmse": 3.778780855463123E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0001",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.113,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 4,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 1.5871705505432487E-08,
+        "ReconstructionRmse": 7.188878351520844E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0002",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.19,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 3,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.7314727812921547E-08,
+        "ReconstructionRmse": 3.3255685800034647E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0003",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.464,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 26,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.4961153749790697E-08,
+        "ReconstructionRmse": 2.1971726075397978E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0004",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.067,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 3,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.7314727812921547E-08,
+        "ReconstructionRmse": 3.98811236825475E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0005",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.114,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 5,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.7314727812921547E-08,
+        "ReconstructionRmse": 3.4978445260348466E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0006",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.169,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 30,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 5.408787973060214E-08,
+        "ReconstructionRmse": 4.577544629961234E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0007",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1.136,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 4,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.4961153749790697E-08,
+        "ReconstructionRmse": 2.353840320772145E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0008",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.132,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 1,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 3.725290298461914E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0009",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.865,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 16,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 1.5871705505432487E-08,
+        "ReconstructionRmse": 7.537049309598285E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0010",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.244,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 4,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 3.1320455274017284E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0011",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.484,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 21,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.4961153749790697E-08,
+        "ReconstructionRmse": 3.044676547208161E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_impulse_0012",
+      "Operator": "FFT1D",
+      "Scenario": "impulse",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_impulse_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.137,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 2,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.108523111665761E-08,
+        "ReconstructionRmse": 5.740314593503946E-09,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0000",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.124,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.184135630442655E-08,
+        "ReconstructionRmse": 5.301189315844798E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0001",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.304,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 3.5762786865234375E-07,
+        "MaxMagnitudeError": 5.82657102999863E-08,
+        "ReconstructionRmse": 4.489567202499594E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0002",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.493,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 2.86102294921875E-06,
+        "MaxMagnitudeError": 7.619300076135006E-09,
+        "ReconstructionRmse": 4.849811940829836E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0003",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.631,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.184738801792896E-08,
+        "ReconstructionRmse": 3.5585530252060457E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0004",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.077,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 4.027709145300679E-08,
+        "ReconstructionRmse": 2.256735421550437E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0005",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.106,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 7.867813110351562E-06,
+        "MaxMagnitudeError": 6.460611430016537E-08,
+        "ReconstructionRmse": 5.992733208304265E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0006",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.174,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 9.238719940185547E-07,
+        "MaxMagnitudeError": 1.3831870518604344E-08,
+        "ReconstructionRmse": 2.4736346363557215E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0007",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.439,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.5720725059509277E-06,
+        "MaxMagnitudeError": 4.296308946250138E-08,
+        "ReconstructionRmse": 3.204984493968962E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0008",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.187,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 1.5534408988747243E-08,
+        "ReconstructionRmse": 3.6363127159163736E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0009",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.108,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 4.187337728772441E-08,
+        "ReconstructionRmse": 2.1743171857801784E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0010",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.17,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 4.291534423828125E-06,
+        "MaxMagnitudeError": 1.2470426140257807E-08,
+        "ReconstructionRmse": 1.8024952974662272E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0011",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.862,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.7881393432617188E-07,
+        "MaxMagnitudeError": 1.8512599115190617E-08,
+        "ReconstructionRmse": 3.284130146441353E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_multi_frequency_0012",
+      "Operator": "FFT1D",
+      "Scenario": "multi_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_multi_frequency_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.1,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 9.5367431640625E-07,
+        "MaxMagnitudeError": 1.5294090491683452E-08,
+        "ReconstructionRmse": 3.341125880762017E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0000",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.087,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.2379862971984112E-08,
+        "MaxMagnitudeError": 1.2379862971984112E-08,
+        "ReconstructionRmse": 1.310018130485377E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0001",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.193,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 3.676866278255725E-09,
+        "MaxMagnitudeError": 3.676866278255725E-09,
+        "ReconstructionRmse": 1.1385064595861495E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0002",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.243,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.4800055153320088E-08,
+        "MaxMagnitudeError": 1.4800055153320088E-08,
+        "ReconstructionRmse": 1.7752660144632867E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0003",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1.602,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 4.415396124532896E-07,
+        "MaxMagnitudeError": 1.4767614269247693E-08,
+        "ReconstructionRmse": 1.1903668780464625E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0004",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.088,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 3.389292278943275E-08,
+        "MaxMagnitudeError": 3.481078753199119E-08,
+        "ReconstructionRmse": 9.113129917399866E-08,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0005",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.116,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 9.948616232040456E-08,
+        "MaxMagnitudeError": 2.1028398462666164E-08,
+        "ReconstructionRmse": 1.0214637901588035E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0006",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.193,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 6.391378929556299E-08,
+        "MaxMagnitudeError": 6.391378929556299E-08,
+        "ReconstructionRmse": 1.5254967571264234E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0007",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1.051,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 3.772245227200444E-09,
+        "MaxMagnitudeError": 3.772245227200444E-09,
+        "ReconstructionRmse": 1.2835714132391598E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0008",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.144,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 7.47097828657648E-08,
+        "MaxMagnitudeError": 7.47097828657648E-08,
+        "ReconstructionRmse": 1.8782929944207068E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0009",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.175,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.7954111498265022E-07,
+        "MaxMagnitudeError": 4.747723000937031E-08,
+        "ReconstructionRmse": 9.944201383695314E-08,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0010",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.271,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 4.70829171450658E-09,
+        "MaxMagnitudeError": 4.70829171450658E-09,
+        "ReconstructionRmse": 1.68459468594096E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0011",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1.178,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 8.171977177760058E-08,
+        "MaxMagnitudeError": 8.171977177760058E-08,
+        "ReconstructionRmse": 1.1432275005892938E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_random_noise_0012",
+      "Operator": "FFT1D",
+      "Scenario": "random_noise",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_random_noise_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.136,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 1.5384627934581093E-08,
+        "MaxMagnitudeError": 1.5384627934581093E-08,
+        "ReconstructionRmse": 1.3479039400648627E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0000",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.095,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.1850345740359105E-08,
+        "ReconstructionRmse": 3.6207850691183484E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0001",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.269,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.035519476070121E-08,
+        "ReconstructionRmse": 2.729517302448488E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0002",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.454,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 1.0702187386661818E-08,
+        "ReconstructionRmse": 5.784325884135821E-08,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0003",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.938,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 7.733207049231818E-10,
+        "ReconstructionRmse": 2.950615338275067E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0004",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.207,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.2354925694649723E-09,
+        "ReconstructionRmse": 2.6166169328441183E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0005",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.254,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 1.4909804255145934E-10,
+        "ReconstructionRmse": 1.066737248543901E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0006",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.406,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 5.143234590254339E-08,
+        "ReconstructionRmse": 6.913002868750013E-08,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0007",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.795,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 4.50658982254788E-08,
+        "ReconstructionRmse": 3.664727052130519E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0008",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.075,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 6.726808395784677E-11,
+        "ReconstructionRmse": 3.764477644086996E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0009",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.101,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.982432219306896E-09,
+        "ReconstructionRmse": 3.6232491406064525E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0010",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.152,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 7.187635357882352E-10,
+        "ReconstructionRmse": 2.1207431037402639E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0011",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.463,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 2.0139819322358633E-08,
+        "ReconstructionRmse": 3.5327061765443666E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_single_frequency_0012",
+      "Operator": "FFT1D",
+      "Scenario": "single_frequency",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_single_frequency_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.076,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.98159054202671E-09,
+        "ReconstructionRmse": 4.736683075748921E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0000",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.067,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 7.494722428603167E-08,
+        "ReconstructionRmse": 1.1445799094242763E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0001",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.096,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.062496995566769E-08,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0002",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.158,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0003",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.4,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 7.494722428603167E-08,
+        "ReconstructionRmse": 1.2013700229374393E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0004",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.074,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 7.494722428603167E-08,
+        "ReconstructionRmse": 1.1445799094242763E-07,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0005",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.104,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0006",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.173,
+      "MemoryAllocationBytes": 46160,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0007",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.484,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0008",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.113,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0009",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.094,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.062496995566769E-08,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0010",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.136,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0011",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.535,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 3.3614684355106214E-08,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_square_wave_0012",
+      "Operator": "FFT1D",
+      "Scenario": "square_wave",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_square_wave_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.08,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 8.97353372738555E-11,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0000",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.066,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0001",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.095,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0002",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.141,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0003",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.54,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0004",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0005",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.104,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0006",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.141,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0007",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.534,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0008",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.084,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0009",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.102,
+      "MemoryAllocationBytes": 24544,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0010",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.148,
+      "MemoryAllocationBytes": 46048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0011",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.697,
+      "MemoryAllocationBytes": 89056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    },
+    {
+      "CaseId": "FFT1D_zero_signal_0012",
+      "Operator": "FFT1D",
+      "Scenario": "zero_signal",
+      "InputPath": "..\\..\\..\\quality\\synthetic\\cases\\fft\\FFT1D\\FFT1D_zero_signal_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.08,
+      "MemoryAllocationBytes": 13792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "DominantIndexError": 0,
+        "DcMagnitudeError": 0,
+        "MaxMagnitudeError": 0,
+        "ReconstructionRmse": 0,
+        "IsFinite": true,
+        "OutputShapeCorrect": true
+      }
+    }
+  ]
+}

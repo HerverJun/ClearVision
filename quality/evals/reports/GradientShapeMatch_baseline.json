@@ -1,0 +1,2103 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-25T13:59:40.1035989+00:00",
+    "CasesRoot": "quality/synthetic/cases/gradient_shape_match",
+    "CaseCount": 117,
+    "Passed": 117,
+    "Failed": 0,
+    "MemoryAllocationBytesAvgSum": 634189
+  },
+  "Operators": [
+    {
+      "Operator": "GradientShapeMatch",
+      "CaseCount": 117,
+      "Passed": 117,
+      "Failed": 0,
+      "RuntimeMsAvg": 157.667,
+      "RuntimeMsMax": 1670.661,
+      "MemoryAllocationBytesAvg": 634189
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 78.52,
+      "MemoryAllocationBytes": 731904,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 2.23606797749979,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 52.414,
+      "MemoryAllocationBytes": 704736,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 3,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 96.857,
+      "MemoryAllocationBytes": 721080,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1.4142135623730951,
+        "AngleErrorDeg": 4,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 50.868,
+      "MemoryAllocationBytes": 697896,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 2,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 27.164,
+      "MemoryAllocationBytes": 669360,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 2,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 185.156,
+      "MemoryAllocationBytes": 772168,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 2,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 94.741,
+      "MemoryAllocationBytes": 717016,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 2,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 525.424,
+      "MemoryAllocationBytes": 1009344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 4,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 119.492,
+      "MemoryAllocationBytes": 725944,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 3,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 97.401,
+      "MemoryAllocationBytes": 726240,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 102.261,
+      "MemoryAllocationBytes": 721480,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 3,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 96.22,
+      "MemoryAllocationBytes": 717728,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1.4142135623730951,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_blurred_edge_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "blurred_edge",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_blurred_edge_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 31.071,
+      "MemoryAllocationBytes": 681960,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 2,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 17.882,
+      "MemoryAllocationBytes": 661168,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 52.68,
+      "MemoryAllocationBytes": 693976,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 100.061,
+      "MemoryAllocationBytes": 714560,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 48.262,
+      "MemoryAllocationBytes": 689032,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 22.828,
+      "MemoryAllocationBytes": 664056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 2,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 94.23076923076923
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 187.541,
+      "MemoryAllocationBytes": 765784,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 92.741,
+      "MemoryAllocationBytes": 711048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 529.556,
+      "MemoryAllocationBytes": 990472,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 120.913,
+      "MemoryAllocationBytes": 722016,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 98.07692307692307
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 97.401,
+      "MemoryAllocationBytes": 715272,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 97.846,
+      "MemoryAllocationBytes": 711080,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 101.439,
+      "MemoryAllocationBytes": 711216,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 81.73076923076923
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_contrast_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_contrast",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_contrast_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 32.765,
+      "MemoryAllocationBytes": 677648,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.558,
+      "MemoryAllocationBytes": 21160,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.315,
+      "MemoryAllocationBytes": 20992,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.287,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.314,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.322,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.302,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.323,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.274,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.3,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.286,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.315,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.288,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_low_feature_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "low_feature",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_low_feature_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 0.312,
+      "MemoryAllocationBytes": 19432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 22.62,
+      "MemoryAllocationBytes": 657808,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 42.027,
+      "MemoryAllocationBytes": 693696,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 2,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 63.52941176470588
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 78.229,
+      "MemoryAllocationBytes": 687328,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 49.07,
+      "MemoryAllocationBytes": 677616,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 22.266,
+      "MemoryAllocationBytes": 653008,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 282.082,
+      "MemoryAllocationBytes": 830952,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 97.07,
+      "MemoryAllocationBytes": 707048,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 457.771,
+      "MemoryAllocationBytes": 927320,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 98.415,
+      "MemoryAllocationBytes": 698464,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 94.087,
+      "MemoryAllocationBytes": 704696,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 86.128,
+      "MemoryAllocationBytes": 692688,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 144.855,
+      "MemoryAllocationBytes": 749352,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 0
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_partial_occlusion_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "partial_occlusion",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_partial_occlusion_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 28.968,
+      "MemoryAllocationBytes": 666560,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1.4142135623730951,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": true,
+        "AngleChecked": false,
+        "ScoreValue": 72.11538461538461
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.206,
+      "MemoryAllocationBytes": 649864,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.316,
+      "MemoryAllocationBytes": 641776,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.102,
+      "MemoryAllocationBytes": 640856,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.235,
+      "MemoryAllocationBytes": 648736,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.246,
+      "MemoryAllocationBytes": 641944,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 3.948,
+      "MemoryAllocationBytes": 662224,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.37,
+      "MemoryAllocationBytes": 649000,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.126,
+      "MemoryAllocationBytes": 641296,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.074,
+      "MemoryAllocationBytes": 640808,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.652,
+      "MemoryAllocationBytes": 648552,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.686,
+      "MemoryAllocationBytes": 642984,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.804,
+      "MemoryAllocationBytes": 661520,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_roi_search_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "roi_search",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_roi_search_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 2.139,
+      "MemoryAllocationBytes": 648904,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 439.22,
+      "MemoryAllocationBytes": 927080,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 217.281,
+      "MemoryAllocationBytes": 785600,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 151.743,
+      "MemoryAllocationBytes": 743672,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 81.796,
+      "MemoryAllocationBytes": 694480,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 234.064,
+      "MemoryAllocationBytes": 789336,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 457.664,
+      "MemoryAllocationBytes": 925528,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 707.144,
+      "MemoryAllocationBytes": 928280,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 386.229,
+      "MemoryAllocationBytes": 711080,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 479.768,
+      "MemoryAllocationBytes": 737928,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 490.513,
+      "MemoryAllocationBytes": 737344,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 764.036,
+      "MemoryAllocationBytes": 781632,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 729.589,
+      "MemoryAllocationBytes": 782568,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_large_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_large",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_large_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1447.185,
+      "MemoryAllocationBytes": 918728,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 241.562,
+      "MemoryAllocationBytes": 688056,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 131.244,
+      "MemoryAllocationBytes": 672152,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 260.087,
+      "MemoryAllocationBytes": 693384,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 125.033,
+      "MemoryAllocationBytes": 671632,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 38.549,
+      "MemoryAllocationBytes": 652792,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 491.047,
+      "MemoryAllocationBytes": 735368,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 254.474,
+      "MemoryAllocationBytes": 689992,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 122.937,
+      "MemoryAllocationBytes": 671112,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 126.822,
+      "MemoryAllocationBytes": 673256,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 238.239,
+      "MemoryAllocationBytes": 693856,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 119.024,
+      "MemoryAllocationBytes": 670904,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 72.034,
+      "MemoryAllocationBytes": 651696,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_rotation_small_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "rotation_small",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_rotation_small_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 501.25,
+      "MemoryAllocationBytes": 736104,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 33.306,
+      "MemoryAllocationBytes": 657728,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 149.641,
+      "MemoryAllocationBytes": 688952,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 283.841,
+      "MemoryAllocationBytes": 710584,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 2,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 130.44,
+      "MemoryAllocationBytes": 683712,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 67.87,
+      "MemoryAllocationBytes": 662584,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 2,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 95.1923076923077
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 546.359,
+      "MemoryAllocationBytes": 766176,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 272.963,
+      "MemoryAllocationBytes": 709776,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 1670.661,
+      "MemoryAllocationBytes": 994208,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 303.756,
+      "MemoryAllocationBytes": 725192,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 281.404,
+      "MemoryAllocationBytes": 711552,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 241.586,
+      "MemoryAllocationBytes": 712832,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 192.777,
+      "MemoryAllocationBytes": 710376,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 1,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 99.03846153846155
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_strong_background_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "strong_background",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_strong_background_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 35.915,
+      "MemoryAllocationBytes": 657688,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0000",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0000\\input.json",
+      "Passed": true,
+      "RuntimeMs": 38.444,
+      "MemoryAllocationBytes": 647432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0001",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0001\\input.json",
+      "Passed": true,
+      "RuntimeMs": 32.322,
+      "MemoryAllocationBytes": 639904,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0002",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0002\\input.json",
+      "Passed": true,
+      "RuntimeMs": 31.204,
+      "MemoryAllocationBytes": 641968,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0003",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0003\\input.json",
+      "Passed": true,
+      "RuntimeMs": 40.844,
+      "MemoryAllocationBytes": 647104,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0004",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0004\\input.json",
+      "Passed": true,
+      "RuntimeMs": 31.786,
+      "MemoryAllocationBytes": 640392,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0005",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0005\\input.json",
+      "Passed": true,
+      "RuntimeMs": 17.759,
+      "MemoryAllocationBytes": 660064,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0006",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0006\\input.json",
+      "Passed": true,
+      "RuntimeMs": 12.516,
+      "MemoryAllocationBytes": 647432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0007",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0007\\input.json",
+      "Passed": true,
+      "RuntimeMs": 10.53,
+      "MemoryAllocationBytes": 640000,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0008",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0008\\input.json",
+      "Passed": true,
+      "RuntimeMs": 19.607,
+      "MemoryAllocationBytes": 640264,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 1,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0009",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0009\\input.json",
+      "Passed": true,
+      "RuntimeMs": 11.851,
+      "MemoryAllocationBytes": 647264,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0010",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0010\\input.json",
+      "Passed": true,
+      "RuntimeMs": 10.804,
+      "MemoryAllocationBytes": 640736,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0011",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0011\\input.json",
+      "Passed": true,
+      "RuntimeMs": 58.913,
+      "MemoryAllocationBytes": 660064,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    },
+    {
+      "CaseId": "GradientShapeMatch_translation_0012",
+      "Operator": "GradientShapeMatch",
+      "Scenario": "translation",
+      "InputPath": "quality\\synthetic\\cases\\gradient_shape_match\\GradientShapeMatch\\GradientShapeMatch_translation_0012\\input.json",
+      "Passed": true,
+      "RuntimeMs": 12.188,
+      "MemoryAllocationBytes": 647432,
+      "ErrorMessage": null,
+      "Metrics": {
+        "PositionErrorPx": 0,
+        "AngleErrorDeg": 0,
+        "IsMatchCorrect": true,
+        "NoMatchAllowed": false,
+        "AngleChecked": true,
+        "ScoreValue": 100
+      }
+    }
+  ]
+}

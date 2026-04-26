@@ -1,0 +1,396 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-26T07:59:32.617512+00:00",
+    "CaseCount": 26,
+    "Passed": 26,
+    "Failed": 0,
+    "RuntimeMs": 52.544,
+    "MemoryAllocationBytes": 672504
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 26,
+      "Passed": 26,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.021,
+      "MemoryAllocationBytesAvg": 25866
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Label contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.429
+    },
+    {
+      "Scenario": "NMS contract",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.375
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.13
+    },
+    {
+      "Scenario": "Output tensor selection",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.21
+    },
+    {
+      "Scenario": "Preprocess contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 6.588
+    },
+    {
+      "Scenario": "Target class contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.39
+    },
+    {
+      "Scenario": "Visualization contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.287
+    },
+    {
+      "Scenario": "YOLO output parsing",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.048
+    },
+    {
+      "Scenario": "YOLO version detection",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.291
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "yolov8_standard_box_mapping",
+      "Scenario": "YOLO output parsing",
+      "Passed": true,
+      "RuntimeMs": 16.939,
+      "MemoryAllocationBytes": 40056,
+      "Failure": null,
+      "Metrics": {
+        "DetectionCount": 1,
+        "X": 120,
+        "Y": 100,
+        "Width": 80,
+        "Height": 40,
+        "Confidence": 0.95
+      }
+    },
+    {
+      "CaseId": "yolov8_transposed_box_mapping",
+      "Scenario": "YOLO output parsing",
+      "Passed": true,
+      "RuntimeMs": 1.716,
+      "MemoryAllocationBytes": 25776,
+      "Failure": null,
+      "Metrics": {
+        "DetectionCount": 1,
+        "ClassId": 1,
+        "Y": 100,
+        "Confidence": 0.93
+      }
+    },
+    {
+      "CaseId": "yolov8_coordinate_clamp",
+      "Scenario": "YOLO output parsing",
+      "Passed": true,
+      "RuntimeMs": 0.202,
+      "MemoryAllocationBytes": 8288,
+      "Failure": null,
+      "Metrics": {
+        "X": 0,
+        "Y": 0,
+        "Width": 50,
+        "Height": 45
+      }
+    },
+    {
+      "CaseId": "yolov5_standard_objectness_product",
+      "Scenario": "YOLO output parsing",
+      "Passed": true,
+      "RuntimeMs": 0.878,
+      "MemoryAllocationBytes": 6440,
+      "Failure": null,
+      "Metrics": {
+        "DetectionCount": 1,
+        "ClassId": 1,
+        "Confidence": 0.6
+      }
+    },
+    {
+      "CaseId": "yolov5_transposed_objectness_product",
+      "Scenario": "YOLO output parsing",
+      "Passed": true,
+      "RuntimeMs": 0.507,
+      "MemoryAllocationBytes": 8632,
+      "Failure": null,
+      "Metrics": {
+        "DetectionCount": 1,
+        "ClassId": 0,
+        "Confidence": 0.63
+      }
+    },
+    {
+      "CaseId": "auto_detect_yolov8_custom_labels",
+      "Scenario": "YOLO version detection",
+      "Passed": true,
+      "RuntimeMs": 2.237,
+      "MemoryAllocationBytes": 4048,
+      "Failure": null,
+      "Metrics": {
+        "DetectedVersion": "YOLOv8"
+      }
+    },
+    {
+      "CaseId": "auto_detect_yolov5_custom_labels",
+      "Scenario": "YOLO version detection",
+      "Passed": true,
+      "RuntimeMs": 0.345,
+      "MemoryAllocationBytes": 4792,
+      "Failure": null,
+      "Metrics": {
+        "DetectedVersion": "YOLOv5"
+      }
+    },
+    {
+      "CaseId": "select_detection_output_known_label_count",
+      "Scenario": "Output tensor selection",
+      "Passed": true,
+      "RuntimeMs": 0.973,
+      "MemoryAllocationBytes": 2656,
+      "Failure": null,
+      "Metrics": {
+        "SelectedIndex": 1,
+        "SelectionRule": "KnownLabelFeature\u002B4"
+      }
+    },
+    {
+      "CaseId": "select_detection_output_rank3_heuristic",
+      "Scenario": "Output tensor selection",
+      "Passed": true,
+      "RuntimeMs": 0.433,
+      "MemoryAllocationBytes": 3416,
+      "Failure": null,
+      "Metrics": {
+        "SelectedIndex": 1,
+        "SelectionRule": "Rank3Heuristic"
+      }
+    },
+    {
+      "CaseId": "select_detection_output_fail_closed",
+      "Scenario": "Output tensor selection",
+      "Passed": true,
+      "RuntimeMs": 2.223,
+      "MemoryAllocationBytes": 19496,
+      "Failure": null,
+      "Metrics": {
+        "FailClosed": true
+      }
+    },
+    {
+      "CaseId": "nms_same_class_suppresses_overlap",
+      "Scenario": "NMS contract",
+      "Passed": true,
+      "RuntimeMs": 1.264,
+      "MemoryAllocationBytes": 27728,
+      "Failure": null,
+      "Metrics": {
+        "Kept": 2,
+        "Comparisons": 1
+      }
+    },
+    {
+      "CaseId": "nms_different_class_keeps_overlap",
+      "Scenario": "NMS contract",
+      "Passed": true,
+      "RuntimeMs": 0.264,
+      "MemoryAllocationBytes": 5696,
+      "Failure": null,
+      "Metrics": {
+        "Kept": 2,
+        "Comparisons": 0
+      }
+    },
+    {
+      "CaseId": "nms_iou_threshold_low_suppresses",
+      "Scenario": "NMS contract",
+      "Passed": true,
+      "RuntimeMs": 0.134,
+      "MemoryAllocationBytes": 2760,
+      "Failure": null,
+      "Metrics": {
+        "Kept": 1,
+        "IouThreshold": 0.1
+      }
+    },
+    {
+      "CaseId": "nms_iou_threshold_high_keeps",
+      "Scenario": "NMS contract",
+      "Passed": true,
+      "RuntimeMs": 0.107,
+      "MemoryAllocationBytes": 2760,
+      "Failure": null,
+      "Metrics": {
+        "Kept": 2,
+        "IouThreshold": 0.9
+      }
+    },
+    {
+      "CaseId": "nms_invalid_box_discarded",
+      "Scenario": "NMS contract",
+      "Passed": true,
+      "RuntimeMs": 0.106,
+      "MemoryAllocationBytes": 2776,
+      "Failure": null,
+      "Metrics": {
+        "Kept": 1
+      }
+    },
+    {
+      "CaseId": "target_classes_numeric_filter",
+      "Scenario": "Target class contract",
+      "Passed": true,
+      "RuntimeMs": 1.218,
+      "MemoryAllocationBytes": 12208,
+      "Failure": null,
+      "Metrics": {
+        "DetectionCount": 1,
+        "ClassId": 1
+      }
+    },
+    {
+      "CaseId": "target_classes_named_parse",
+      "Scenario": "Target class contract",
+      "Passed": true,
+      "RuntimeMs": 7.562,
+      "MemoryAllocationBytes": 3832,
+      "Failure": null,
+      "Metrics": {
+        "TargetClasses": "1,2"
+      }
+    },
+    {
+      "CaseId": "label_contract_match_valid",
+      "Scenario": "Label contract",
+      "Passed": true,
+      "RuntimeMs": 0.825,
+      "MemoryAllocationBytes": 8376,
+      "Failure": null,
+      "Metrics": {
+        "ValidationStatus": "MetadataValidatedWithExternalLabels",
+        "ResolvedLabelSource": "ModelMetadata"
+      }
+    },
+    {
+      "CaseId": "label_contract_mismatch_fails",
+      "Scenario": "Label contract",
+      "Passed": true,
+      "RuntimeMs": 0.469,
+      "MemoryAllocationBytes": 20000,
+      "Failure": null,
+      "Metrics": {
+        "ValidationStatus": "Mismatch"
+      }
+    },
+    {
+      "CaseId": "label_contract_missing_fails",
+      "Scenario": "Label contract",
+      "Passed": true,
+      "RuntimeMs": 0.254,
+      "MemoryAllocationBytes": 1096,
+      "Failure": null,
+      "Metrics": {
+        "ValidationStatus": "MissingLabelContract"
+      }
+    },
+    {
+      "CaseId": "visualization_nms_when_internal_disabled",
+      "Scenario": "Visualization contract",
+      "Passed": true,
+      "RuntimeMs": 0.287,
+      "MemoryAllocationBytes": 4592,
+      "Failure": null,
+      "Metrics": {
+        "VisualizationDetectionCount": 2
+      }
+    },
+    {
+      "CaseId": "statistics_label_object_mode",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.136,
+      "MemoryAllocationBytes": 880,
+      "Failure": null,
+      "Metrics": {
+        "Label": "Objects: 3"
+      }
+    },
+    {
+      "CaseId": "statistics_label_defect_mode",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.123,
+      "MemoryAllocationBytes": 2416,
+      "Failure": null,
+      "Metrics": {
+        "Label": "Defects: 2"
+      }
+    },
+    {
+      "CaseId": "preprocess_grayscale_to_chw_rgb",
+      "Scenario": "Preprocess contract",
+      "Passed": true,
+      "RuntimeMs": 12.086,
+      "MemoryAllocationBytes": 219408,
+      "Failure": null,
+      "Metrics": {
+        "Shape": "1,3,64,64"
+      }
+    },
+    {
+      "CaseId": "preprocess_float_unit_range",
+      "Scenario": "Preprocess contract",
+      "Passed": true,
+      "RuntimeMs": 1.089,
+      "MemoryAllocationBytes": 232936,
+      "Failure": null,
+      "Metrics": {
+        "FirstValue": 0.5019608
+      }
+    },
+    {
+      "CaseId": "class_name_fallback_is_class_id",
+      "Scenario": "Label contract",
+      "Passed": true,
+      "RuntimeMs": 0.167,
+      "MemoryAllocationBytes": 1440,
+      "Failure": null,
+      "Metrics": {
+        "Label": "class_7"
+      }
+    }
+  ]
+}
