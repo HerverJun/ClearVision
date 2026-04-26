@@ -118,3 +118,6 @@ test_zxing.cs
 
 # Generated quality flywheel cases; regenerate from quality/synthetic/generators/
 /quality/synthetic/cases/
+
+# Local public datasets used by quality evals; keep large downloaded data out of git.
+/quality/public_datasets/
