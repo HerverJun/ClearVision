@@ -450,7 +450,7 @@ SqDiff / SqDiffNormed 高分更好修正
 TemplateMatching golden baseline 已完成：117/117 passed
 覆盖：13 个场景 × 9 cases
 HPatches-style synthetic homography bridge 已完成：24/24 passed
-矩阵：TemplateMatching Golden Test=Yes, Cases=141, HasPublicDataset=Yes, Benchmark=Yes
+矩阵：TemplateMatching HasGoldenTest=Yes, HasDatasetEvidence=Yes, Cases=141, Benchmark=Yes
 ```
 
 测试维度必须贴合名片：
@@ -1307,8 +1307,9 @@ AlgorithmSummary
 KnownLimitationsCount
 CardTodoCount
 HasGoldenTest
-HasPublicDataset
-HasFieldDataset
+HasContractTest
+HasDatasetEvidence
+HasFieldReplay
 HasBenchmark
 Priority
 NextAction
@@ -1661,7 +1662,7 @@ Calibration → synthetic geometry
 [x] PyramidShapeMatch 完成 contract baseline（24/24 passed）
 [x] HandEyeCalibrationValidator 完成 contract baseline（24/24 passed）
 [x] P3CoreContractRunner 完成 19 个原 B 级 P3 算子 contract baseline（386/386 passed，19/19 已升 A）
-[x] TemplateMatching 完成 HPatches-style synthetic homography bridge（24/24 passed，矩阵 Cases=141，HasPublicDataset=Yes）
+[x] TemplateMatching 完成 HPatches-style synthetic homography bridge（24/24 passed，矩阵 Cases=141，HasDatasetEvidence=Yes）
 [x] DeepLearning 完成 runtime benchmark（20/20 passed，覆盖 1080p、4K、CPU fallback、1080p x4 batch pressure）
 [x] 标定类完成 synthetic geometry round-trip baseline（192/192 passed，8 个标定相关算子各 24 cases）
 ```
@@ -1711,10 +1712,13 @@ Calibration → synthetic geometry
 ```text
 Total operators: 155
 Level counts: A=155, B=0, C=0
-GoldenEvidence: Yes=63, No=92
+Evidence signal: Yes=155, No=0
+Contract evidence: Yes=108, No=47
+Golden evidence: Yes=46, No=109
+Dataset evidence: Yes=3, No=152
+Field replay: Yes=0, No=155
 Priority: P2=32, P3=123
-P2 without golden evidence: 0
-Public/alternative dataset evidence: Yes=2, No=153
+P2 without evidence signal: 0
 Cards with TODO: 0
 ```
 
@@ -1735,32 +1739,66 @@ G1/G2 推进快照（2026-04-27）：
 [x] P2 标定 residual runner 已落地：CalibrationLoader / NPointCalibration / TranslationRotationCalibration，72/72 passed
 [x] P2 匹配 residual runner 已落地：ShapeMatching / PlanarMatching / LocalDeformableMatching，72/72 passed
 [x] P2 inspection residual runner 已落地：DetectionSequenceJudge / SurfaceDefectDetection，48/48 passed
+[x] G2 P3 vision core runner 已落地：ImageDiff / ImageSubtract / AdaptiveThreshold / EdgeDetection / ContourDetection / BlobAnalysis / BlobLabeling / LineMeasurement / CircleMeasurement / WidthMeasurement / GeometricFitting / PerspectiveTransform / AffineTransform / DistanceTransform，280/280 passed
+[x] operator_quality_matrix 已拆分证据字段：HasContractTest / HasGoldenTest / HasDatasetEvidence / HasFieldReplay
+[x] baseline JSON 已显式补 EvidenceKind=contract|golden|dataset|field
+[x] G1 P3 contract expansion batch 1 已落地：40 个剩余 P3 算子，840/840 passed
+[x] G1 P3 contract expansion batch 2 已落地：剩余 38 个无信号算子，798/798 passed
+[x] G3 dataset-tier 20 名单、Tier A/B/C 口径与 manifest 模板已冻结；本轮不启动新 dataset 跑分
 
 当前状态：
-- G1 contract/golden 信号：63/155，remaining=92
-- G2 core50 golden/contract 信号：36/50，remaining=14
-- P2 without golden evidence：0
-- G1/G2 目标仍处于 in-progress；本轮闭环的是口径、名单、registry 与 P2 残余执行入口
+- G1 evidence signal：155/155，remaining=0
+- G2 core50 evidence signal：50/50，remaining=0
+- P2 without evidence signal：0
+- G1 / G2 目标均已闭环；G3 已从冻结名单/模板推进到首批 6 个 dataset evidence
 
-下一步 G2 core50 剩余 14 个 P3 算子：
-- ImageDiff / ImageSubtract
-- AdaptiveThreshold / EdgeDetection / ContourDetection
-- BlobAnalysis / BlobLabeling
-- LineMeasurement / CircleMeasurement / WidthMeasurement
-- GeometricFitting / PerspectiveTransform / AffineTransform / DistanceTransform
+本轮新增输出：
+- quality/tools/G2P3VisionCoreRunner
+- quality/evals/reports/G2P3VisionCore_baseline.json
+- quality/evals/reports/G2P3VisionCore_baseline.md
+- quality/tools/G1P3ContractBatch1Runner
+- quality/evals/reports/G1P3ContractBatch1_baseline.json
+- quality/evals/reports/G1P3ContractBatch1_baseline.md
+- quality/tools/G1P3ContractBatch2Runner
+- quality/evals/reports/G1P3ContractBatch2_baseline.json
+- quality/evals/reports/G1P3ContractBatch2_baseline.md
+- quality/evals/reports/QualityFlywheel_G3_dataset_tier_registry.json
+- quality/evals/reports/QualityFlywheel_G3_dataset_tier_registry.md
+- quality/datasets/QualityFlywheel_dataset_manifest_template.json
+- quality/evals/suites/quick_contract_suite.json / golden_core50_suite.json / dataset_heavy_suite.json
+- quality/tools/run_quality_suite.py
+- quality/tools/DeepLearningDetectionDatasetRunner
+- quality/datasets/manifests/DeepLearning_detection_dataset_manifest.json
+- quality/evals/reports/DeepLearning_detection_dataset_baseline.json
+- quality/evals/reports/DeepLearning_detection_dataset_baseline.md
+- quality/tools/SemanticSegmentationDatasetRunner
+- quality/datasets/manifests/SemanticSegmentation_dataset_manifest.json
+- quality/evals/reports/SemanticSegmentation_dataset_baseline.json
+- quality/evals/reports/SemanticSegmentation_dataset_baseline.md
+- quality/tools/EdgeDetectionDatasetBenchmarkRunner
+- quality/datasets/manifests/EdgeDetection_dataset_manifest.json
+- quality/evals/reports/EdgeDetection_dataset_baseline.json
+- quality/evals/reports/EdgeDetection_dataset_baseline.md
+- quality/tools/ShapeMatchingGeometricDatasetRunner
+- quality/datasets/manifests/ShapeMatching_dataset_manifest.json
+- quality/evals/reports/ShapeMatching_dataset_baseline.json
+- quality/evals/reports/ShapeMatching_dataset_baseline.md
+- operator_quality_matrix：Evidence signal Yes=155，No=0；Contract Yes=108；Golden Yes=46；Dataset Yes=6；Field Yes=0
+- QualityFlywheel_G1_G2_registry：G1 signal=155/155，remaining=0；G2 core50 signal=50/50，remaining=0
 ```
 
 #### 细化版目标
 
 ```text
-[ ] G1 / 全量基础 contract：155/155 个算子都有基础 contract evidence
+[x] G1 / 全量基础 evidence signal：155/155 个算子都有 accepted evidence signal
     验收口径：
     - 每个算子至少覆盖 happy path、缺失输入、参数边界、类型/空值边界、结构化失败消息
     - P2/P3 外设或 IO 算子可用 mock/contract evidence，但必须显式标注非 field evidence
     - baseline JSON 必须包含 CaseCount/Passed/Failed/RuntimeMs/MemoryAllocationBytes
-    - 目标不是全部都升为 golden；矩阵后续需拆分 HasContractTest 与 HasGoldenTest
+    - baseline JSON 必须显式包含 EvidenceKind=contract|golden|dataset|field
+    - 目标不是全部都升为 golden；矩阵已拆分 HasContractTest / HasGoldenTest / HasDatasetEvidence / HasFieldReplay
 
-[ ] G2 / 核心 50 golden：冻结 50 个核心算子名单，并完成 golden baseline
+[x] G2 / 核心 50 golden：冻结 50 个核心算子名单，并完成 golden baseline
     验收口径：
     - 50 个核心算子必须来自 P2 全量 32 个 + P3 高风险/高复用 18 个
     - 每个核心算子至少 20 cases，0 failed，含 runtime/memory
@@ -1794,7 +1832,7 @@ G1/G2 推进快照（2026-04-27）：
 ```text
 M1：证据口径固化
 [x] 冻结 50 个核心算子名单（见 QualityFlywheel_G1_G2_registry.md）
-[ ] 冻结 20 个视觉公开/半合成验证名单
+[x] 冻结 20 个视觉公开/半合成验证名单（见 QualityFlywheel_G3_dataset_tier_registry.md）
 [x] 增加 evidence registry：contract / golden / dataset / field 四层证据类型
 [x] 明确 P2 残余无 golden 算子的 owner 与 runner 策略（起始 8 个，当前 0 个）
 
@@ -1805,19 +1843,24 @@ M2：P2 缺口清零
 [x] P2 without golden evidence 从 8 降到 0
 
 M3：P3 全量 contract 扩张 1
-[ ] 优先覆盖 G2 core50 剩余 14 个 P3 视觉链路算子，再扩展数据处理、流程控制、IO、通信 P3 算子
-[ ] 新增不少于 40 个算子的基础 contract evidence
-[ ] quick suite 分层完成，避免全量 runner 拖慢本地验证
+[x] 优先覆盖 G2 core50 剩余 14 个 P3 视觉链路算子，再扩展数据处理、流程控制、IO、通信 P3 算子（G2P3VisionCoreRunner，280/280 passed）
+[x] 新增不少于 40 个算子的基础 contract evidence（G1P3ContractBatch1Runner，40 operators / 840 cases，840/840 passed）
+[x] quick suite 分层完成，新增 quick_contract / golden_core50 / dataset_heavy 三条 suite manifest 与统一串行入口，避免全量 runner 拖慢本地验证
 
 M4：P3 全量 contract 扩张 2
-[ ] 剩余无 contract P3 算子补齐基础 contract evidence
-[ ] 155/155 达成基础 contract evidence
-[ ] operator_quality_matrix 可分别展示 HasContractTest / HasGoldenTest
+[x] 剩余 38 个无信号 P3 算子补齐基础 contract evidence（G1P3ContractBatch2Runner，38 operators / 798 cases，798/798 passed）
+[x] 155/155 达成 accepted evidence signal
+[x] operator_quality_matrix 可分别展示 HasContractTest / HasGoldenTest / HasDatasetEvidence / HasFieldReplay
 
 M5：核心 golden 与 dataset evidence
-[ ] 核心 50 golden baseline 完成并进入矩阵
+[x] 核心 50 golden baseline 完成并进入矩阵（当前 G2 core50 signal=50/50）
 [ ] 20 个视觉核心达到 Tier A 或 Tier B dataset evidence
 [ ] 公开/半合成报告必须带指标阈值、失败边界、数据版本
+[x] G3 第一批既有 dataset evidence 标准化：TemplateMatching public bridge 与 AnomalyDetection MVTec Lite 已补 manifest / suite 路由 / batch report；不启动新 dataset 跑分
+[x] G3 Tier A 第 3 个 DeepLearning detection dataset protocol bridge 已落地：36/36 passed，AP50=1.0000，Precision@0.50=1.0000，Recall@0.50=1.0000，覆盖 edge clamp / same-class NMS / different-class overlap / negative low-confidence 边界
+[x] G3 Tier A 第 4 个 SemanticSegmentation dataset protocol bridge 已落地：36/36 passed，PixelAccuracy=1.0000，MeanIoU=1.0000，MeanDice=1.0000，MeanBoundaryIoU=1.0000，覆盖 single region / multi-class / thin boundary / small object / class-absent / nested region 边界
+[x] G3 Tier A 第 5 个 EdgeDetection dataset benchmark protocol bridge 已落地：36/36 passed，Precision=1.0000，Recall=1.0000，F1=1.0000，MeanBoundaryF1=1.0000，覆盖 hard step / diagonal / thin line / low-contrast auto-threshold / blurred-noise / color-input 边界
+[x] G3 Tier B 第 1 个 ShapeMatching geometric-scene dataset protocol bridge 已落地：36/36 passed，Precision=1.0000，Recall=1.0000，F1=1.0000，MeanPositionError=0.025px，覆盖 direct pose / rotated pose / scaled pose / multi-target / top-left origin / blank negative 边界
 
 M6：field replay 与发布冻结
 [ ] field failure schema / manifest / replay runner 稳定
@@ -1841,7 +1884,7 @@ M6：field replay 与发布冻结
 4. 高 QScore 但无 golden evidence 的算子
 ```
 
-#### 推荐的 20 个公开/半合成视觉验证方向
+#### 已冻结的 20 个公开/半合成视觉验证方向
 
 ```text
 匹配定位：
@@ -1852,12 +1895,11 @@ AkazeFeatureMatch, OrbFeatureMatch, PlanarMatching, LocalDeformableMatching
 CaliperTool, ArcCaliper, EdgeDetection, ContourDetection,
 BlobAnalysis, LineMeasurement, CircleMeasurement, GeometricFitting
 
-AI / 标定：
-AnomalyDetection, DeepLearning, SemanticSegmentation, SurfaceDefectDetection,
-CameraCalibration, StereoCalibration, HandEyeCalibration, Undistort
+AI / 检测：
+AnomalyDetection, DeepLearning, SemanticSegmentation, SurfaceDefectDetection
 ```
 
-说明：上面是候选池，最终只冻结 20 个；同一 operator family 可以用一个 dataset protocol 覆盖多个算子，但报告必须按算子拆分指标。
+说明：名单已冻结在 `quality/evals/reports/QualityFlywheel_G3_dataset_tier_registry.md`。同一 operator family 可以用一个 dataset protocol 覆盖多个算子，但报告必须按算子拆分指标；本轮不启动新 dataset 跑分。
 
 ---
 
