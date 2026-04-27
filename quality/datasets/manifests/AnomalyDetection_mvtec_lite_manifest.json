@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest",
+  "datasetId": "anomaly_detection_mvtec_ad_lite_grid_toothbrush_v1",
+  "operator": "AnomalyDetection",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "public",
+    "name": "MVTec AD Lite",
+    "version": "grid+toothbrush subset collected 2026-04-25",
+    "uri": "https://www.mvtec.com/company/research/datasets/mvtec-ad",
+    "license": "CC-BY-NC-SA-4.0",
+    "citation": "MVTec AD public anomaly detection dataset; local lite subset uses grid and toothbrush.",
+    "checksumSha256": "grid:D94A9A651CBFAEE22C94D06CF8FA8204A590C872362DE0489EB34F1645328DE8;toothbrush:FE72A34B4B0D074F84E844BE7EF8C4F64F7F02F20E25F19C9E3B4A231C8BEA77"
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_DATASET_ROOT",
+    "relativePath": "quality/public_datasets/mvtec_ad_lite",
+    "gitPolicy": "manifest-only"
+  },
+  "split": {
+    "strategy": "source-defined",
+    "seed": 0,
+    "trainCount": 324,
+    "validationCount": 0,
+    "testCount": 120,
+    "caseListPath": "quality/datasets/mvtec_ad_lite_index.json"
+  },
+  "labels": {
+    "schema": "MVTec category/split/defect_type with optional binary ground-truth mask",
+    "positiveClasses": ["grid:bent", "grid:broken", "grid:glue", "grid:metal_contamination", "grid:thread", "toothbrush:defective"],
+    "negativeClasses": ["grid:good", "toothbrush:good"],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "ImageAuroc",
+    "secondary": ["PixelAuroc", "RuntimeMs", "MemoryAllocationBytes", "CategoryImageAuroc", "CategoryPixelAuroc"],
+    "thresholds": {
+      "Failed": 0,
+      "ImageAurocBaseline": 0.66092,
+      "PixelAurocBaseline": 0.670852
+    }
+  },
+  "runner": {
+    "project": "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj",
+    "command": "dotnet run --project quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj -- --index quality/datasets/mvtec_ad_lite_index.json --output quality/evals/reports/AnomalyDetection_mvtec_baseline.json --report quality/evals/reports/AnomalyDetection_mvtec_baseline.md",
+    "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+    "reportMarkdown": "quality/evals/reports/AnomalyDetection_mvtec_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["low_image_auroc", "low_pixel_auroc", "missing_mask", "dataset_file_missing", "category_regression"],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Public dataset subset only; images remain under ignored quality/public_datasets."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "2026-04-27.quality-suite.v1",
+  "suiteId": "dataset_heavy_suite",
+  "description": "Manual/scheduled lane for dataset-tier and heavy benchmark evidence. Planned G3 entries are visible but not runnable by default.",
+  "ciBudgetMinutes": 120,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "g3-promoted-existing",
+      "entries": [
+        {
+          "id": "template_matching_public_bridge",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["TemplateMatching"],
+          "datasetManifest": "quality/datasets/manifests/TemplateMatching_public_bridge_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/TemplateMatchingHomographyBridgeRunner/TemplateMatchingHomographyBridgeRunner.csproj", "--", "--output", "quality/evals/reports/TemplateMatching_public_bridge_baseline.json", "--report", "quality/evals/reports/TemplateMatching_public_bridge_baseline.md"],
+          "baselineJson": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json",
+          "reportMarkdown": "quality/evals/reports/TemplateMatching_public_bridge_baseline.md",
+          "estimatedSeconds": 60
+        },
+        {
+          "id": "anomaly_detection_mvtec_lite",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["AnomalyDetection"],
+          "datasetManifest": "quality/datasets/manifests/AnomalyDetection_mvtec_lite_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj", "--", "--index", "quality/datasets/mvtec_ad_lite_index.json", "--output", "quality/evals/reports/AnomalyDetection_mvtec_baseline.json", "--report", "quality/evals/reports/AnomalyDetection_mvtec_baseline.md"],
+          "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_mvtec_baseline.md",
+          "estimatedSeconds": 360
+        },
+        {
+          "id": "deep_learning_detection_dataset",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["DeepLearning"],
+          "datasetManifest": "quality/datasets/manifests/DeepLearning_detection_dataset_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningDetectionDatasetRunner/DeepLearningDetectionDatasetRunner.csproj", "--", "--output", "quality/evals/reports/DeepLearning_detection_dataset_baseline.json", "--report", "quality/evals/reports/DeepLearning_detection_dataset_baseline.md"],
+          "baselineJson": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_detection_dataset_baseline.md",
+          "estimatedSeconds": 120
+        },
+        {
+          "id": "semantic_segmentation_dataset",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["SemanticSegmentation"],
+          "datasetManifest": "quality/datasets/manifests/SemanticSegmentation_dataset_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/SemanticSegmentationDatasetRunner/SemanticSegmentationDatasetRunner.csproj", "--", "--output", "quality/evals/reports/SemanticSegmentation_dataset_baseline.json", "--report", "quality/evals/reports/SemanticSegmentation_dataset_baseline.md"],
+          "baselineJson": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SemanticSegmentation_dataset_baseline.md",
+          "estimatedSeconds": 180
+        },
+        {
+          "id": "edge_detection_dataset",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["EdgeDetection"],
+          "datasetManifest": "quality/datasets/manifests/EdgeDetection_dataset_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/EdgeDetectionDatasetBenchmarkRunner/EdgeDetectionDatasetBenchmarkRunner.csproj", "--", "--output", "quality/evals/reports/EdgeDetection_dataset_baseline.json", "--report", "quality/evals/reports/EdgeDetection_dataset_baseline.md"],
+          "baselineJson": "quality/evals/reports/EdgeDetection_dataset_baseline.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_dataset_baseline.md",
+          "estimatedSeconds": 180
+        },
+        {
+          "id": "shape_matching_dataset",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["ShapeMatching"],
+          "datasetManifest": "quality/datasets/manifests/ShapeMatching_dataset_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/ShapeMatchingGeometricDatasetRunner/ShapeMatchingGeometricDatasetRunner.csproj", "--", "--output", "quality/evals/reports/ShapeMatching_dataset_baseline.json", "--report", "quality/evals/reports/ShapeMatching_dataset_baseline.md"],
+          "baselineJson": "quality/evals/reports/ShapeMatching_dataset_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ShapeMatching_dataset_baseline.md",
+          "estimatedSeconds": 240
+        },
+        {
+          "id": "deep_learning_runtime_benchmark",
+          "status": "manual",
+          "evidenceKind": "contract",
+          "operators": ["DeepLearning"],
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningRuntimeBenchmarkRunner/DeepLearningRuntimeBenchmarkRunner.csproj", "--", "--output", "quality/evals/reports/DeepLearning_runtime_benchmark_baseline.json", "--report", "quality/evals/reports/DeepLearning_runtime_benchmark_baseline.md"],
+          "baselineJson": "quality/evals/reports/DeepLearning_runtime_benchmark_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_runtime_benchmark_baseline.md",
+          "estimatedSeconds": 600,
+          "notes": "Benchmark evidence is kept with heavy work even though it is not dataset evidence."
+        }
+      ]
+    },
+    {
+      "id": "g3-next-five",
+      "entries": [
+        {
+          "id": "gradient_shape_match_dataset",
+          "status": "planned",
+          "evidenceKind": "dataset",
+          "operators": ["GradientShapeMatch"],
+          "datasetMode": "semi-synthetic-template-scenes",
+          "baselineJson": "quality/evals/reports/GradientShapeMatch_dataset_baseline.json",
+          "reportMarkdown": "quality/evals/reports/GradientShapeMatch_dataset_baseline.md",
+          "estimatedSeconds": 900
+        }
+      ]
+    }
+  ]
+}

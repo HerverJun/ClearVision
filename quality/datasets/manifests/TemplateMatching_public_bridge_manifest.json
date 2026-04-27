@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest",
+  "datasetId": "template_matching_public_bridge_hpatches_style_v1",
+  "operator": "TemplateMatching",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "semi-synthetic-public-protocol",
+    "name": "HPatches-style synthetic homography bridge",
+    "version": "v1",
+    "uri": "in-repo generated protocol",
+    "license": "repo-local synthetic protocol",
+    "citation": "HPatches-style viewpoint and illumination protocol proxy; no external images are stored.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 0,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 24,
+    "caseListPath": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json"
+  },
+  "labels": {
+    "schema": "expected center position per generated case",
+    "positiveClasses": ["translation", "illumination_translation", "homography_shear", "homography_perspective"],
+    "negativeClasses": [],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "P95PositionErrorPx",
+    "secondary": ["MeanPositionErrorPx", "Passed", "Failed", "RuntimeMs"],
+    "thresholds": {
+      "PositionTolerancePx": 1.5,
+      "Failed": 0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/TemplateMatchingHomographyBridgeRunner/TemplateMatchingHomographyBridgeRunner.csproj",
+    "command": "dotnet run --project quality/tools/TemplateMatchingHomographyBridgeRunner/TemplateMatchingHomographyBridgeRunner.csproj -- --output quality/evals/reports/TemplateMatching_public_bridge_baseline.json --report quality/evals/reports/TemplateMatching_public_bridge_baseline.md",
+    "baselineJson": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json",
+    "reportMarkdown": "quality/evals/reports/TemplateMatching_public_bridge_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["position_error_above_tolerance", "score_below_threshold", "fixed_scale_boundary", "homography_protocol_proxy"],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Generated images only; no customer or public image pixels are stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

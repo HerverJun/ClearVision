@@ -1,0 +1,163 @@
+{
+  "schemaVersion": "2026-04-27.quality-suite.v1",
+  "suiteId": "golden_core50_suite",
+  "description": "Serial synthetic/protocol oracle lane for the frozen G2 Core 50. This lane is heavier than quick_contract_suite.",
+  "ciBudgetMinutes": 45,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "p0-p1-golden",
+      "entries": [
+        {
+          "id": "region_morphology_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["RegionUnion", "RegionComplement", "RegionDifference", "RegionIntersection", "RegionOpening", "RegionClosing", "RegionDilation", "RegionErosion", "RegionSkeleton"],
+          "command": ["dotnet", "run", "--project", "quality/tools/RegionMorphologyGoldenRunner/RegionMorphologyGoldenRunner.csproj", "--", "--output", "quality/evals/reports/RegionMorphology_baseline.json", "--report", "quality/evals/reports/RegionMorphology_before_after_report.md"],
+          "baselineJson": "quality/evals/reports/RegionMorphology_baseline.json",
+          "reportMarkdown": "quality/evals/reports/RegionMorphology_before_after_report.md",
+          "estimatedSeconds": 120
+        },
+        {
+          "id": "c_level_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["Comment", "ContourExtrema", "PhaseClosure"],
+          "command": ["dotnet", "run", "--project", "quality/tools/CLevelGoldenRunner/CLevelGoldenRunner.csproj", "--", "--output", "quality/evals/reports/CLevel_contract_baseline.json", "--report", "quality/evals/reports/CLevel_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/CLevel_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CLevel_contract_baseline.md",
+          "estimatedSeconds": 45
+        },
+        {
+          "id": "arc_caliper_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["ArcCaliper"],
+          "command": ["dotnet", "run", "--project", "quality/tools/ArcCaliperGoldenRunner/ArcCaliperGoldenRunner.csproj", "--", "--output", "quality/evals/reports/ArcCaliper_baseline.json", "--report", "quality/evals/reports/ArcCaliper_baseline.md"],
+          "baselineJson": "quality/evals/reports/ArcCaliper_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ArcCaliper_baseline.md",
+          "estimatedSeconds": 45
+        },
+        {
+          "id": "caliper_tool_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["CaliperTool"],
+          "command": ["dotnet", "run", "--project", "quality/tools/CaliperToolGoldenRunner/CaliperToolGoldenRunner.csproj", "--", "--output", "quality/evals/reports/CaliperTool_baseline.json", "--report", "quality/evals/reports/CaliperTool_baseline.md"],
+          "baselineJson": "quality/evals/reports/CaliperTool_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CaliperTool_baseline.md",
+          "estimatedSeconds": 60
+        },
+        {
+          "id": "template_matching_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["TemplateMatching"],
+          "command": ["dotnet", "run", "--project", "quality/tools/TemplateMatchingGoldenRunner/TemplateMatchingGoldenRunner.csproj", "--", "--output", "quality/evals/reports/TemplateMatching_baseline.json", "--report", "quality/evals/reports/TemplateMatching_baseline.md"],
+          "baselineJson": "quality/evals/reports/TemplateMatching_baseline.json",
+          "reportMarkdown": "quality/evals/reports/TemplateMatching_baseline.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "gradient_shape_match_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["GradientShapeMatch"],
+          "command": ["dotnet", "run", "--project", "quality/tools/GradientShapeMatchGoldenRunner/GradientShapeMatchGoldenRunner.csproj", "--", "--output", "quality/evals/reports/GradientShapeMatch_baseline.json", "--report", "quality/evals/reports/GradientShapeMatch_baseline.md"],
+          "baselineJson": "quality/evals/reports/GradientShapeMatch_baseline.json",
+          "reportMarkdown": "quality/evals/reports/GradientShapeMatch_baseline.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "frequency_family_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["FFT1D", "InverseFFT1D", "FrequencyFilter"],
+          "command": ["dotnet", "run", "--project", "quality/tools/FFT1DGoldenRunner/FFT1DGoldenRunner.csproj", "--", "--output", "quality/evals/reports/FFT1D_baseline.json", "--report", "quality/evals/reports/FFT1D_baseline.md"],
+          "baselineJson": "quality/evals/reports/FFT1D_baseline.json",
+          "reportMarkdown": "quality/evals/reports/FFT1D_baseline.md",
+          "estimatedSeconds": 60,
+          "notes": "Use individual entries below when re-running only IFFT or FrequencyFilter."
+        },
+        {
+          "id": "inverse_fft_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["InverseFFT1D"],
+          "command": ["dotnet", "run", "--project", "quality/tools/InverseFFT1DGoldenRunner/InverseFFT1DGoldenRunner.csproj", "--", "--output", "quality/evals/reports/InverseFFT1D_baseline.json", "--report", "quality/evals/reports/InverseFFT1D_baseline.md"],
+          "baselineJson": "quality/evals/reports/InverseFFT1D_baseline.json",
+          "reportMarkdown": "quality/evals/reports/InverseFFT1D_baseline.md",
+          "estimatedSeconds": 60
+        },
+        {
+          "id": "frequency_filter_golden",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["FrequencyFilter"],
+          "command": ["dotnet", "run", "--project", "quality/tools/FrequencyFilterGoldenRunner/FrequencyFilterGoldenRunner.csproj", "--", "--output", "quality/evals/reports/FrequencyFilter_baseline.json", "--report", "quality/evals/reports/FrequencyFilter_baseline.md"],
+          "baselineJson": "quality/evals/reports/FrequencyFilter_baseline.json",
+          "reportMarkdown": "quality/evals/reports/FrequencyFilter_baseline.md",
+          "estimatedSeconds": 60
+        }
+      ]
+    },
+    {
+      "id": "core50-residual",
+      "entries": [
+        {
+          "id": "p2_calibration_residual",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["CalibrationLoader", "NPointCalibration", "TranslationRotationCalibration"],
+          "command": ["dotnet", "run", "--project", "quality/tools/P2CalibrationResidualRunner/P2CalibrationResidualRunner.csproj", "--", "--output", "quality/evals/reports/P2CalibrationResidual_baseline.json", "--report", "quality/evals/reports/P2CalibrationResidual_baseline.md"],
+          "baselineJson": "quality/evals/reports/P2CalibrationResidual_baseline.json",
+          "reportMarkdown": "quality/evals/reports/P2CalibrationResidual_baseline.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "p2_matching_residual",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["ShapeMatching", "PlanarMatching", "LocalDeformableMatching"],
+          "command": ["dotnet", "run", "--project", "quality/tools/P2MatchingResidualRunner/P2MatchingResidualRunner.csproj", "--", "--output", "quality/evals/reports/P2MatchingResidual_baseline.json", "--report", "quality/evals/reports/P2MatchingResidual_baseline.md"],
+          "baselineJson": "quality/evals/reports/P2MatchingResidual_baseline.json",
+          "reportMarkdown": "quality/evals/reports/P2MatchingResidual_baseline.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "p2_inspection_residual",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["DetectionSequenceJudge", "SurfaceDefectDetection"],
+          "command": ["dotnet", "run", "--project", "quality/tools/P2InspectionResidualRunner/P2InspectionResidualRunner.csproj", "--", "--output", "quality/evals/reports/P2InspectionResidual_baseline.json", "--report", "quality/evals/reports/P2InspectionResidual_baseline.md"],
+          "baselineJson": "quality/evals/reports/P2InspectionResidual_baseline.json",
+          "reportMarkdown": "quality/evals/reports/P2InspectionResidual_baseline.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "calibration_geometry_round_trip",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["CameraCalibration", "HandEyeCalibration", "Undistort", "FisheyeUndistort", "StereoCalibration", "PixelToWorldTransform", "CoordinateTransform", "FisheyeCalibration"],
+          "command": ["dotnet", "run", "--project", "quality/tools/CalibrationGeometryRoundTripRunner/CalibrationGeometryRoundTripRunner.csproj", "--", "--output", "quality/evals/reports/CalibrationGeometry_round_trip_baseline.json", "--report", "quality/evals/reports/CalibrationGeometry_round_trip_baseline.md"],
+          "baselineJson": "quality/evals/reports/CalibrationGeometry_round_trip_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CalibrationGeometry_round_trip_baseline.md",
+          "estimatedSeconds": 120
+        },
+        {
+          "id": "g2_p3_vision_core",
+          "status": "active",
+          "evidenceKind": "golden",
+          "operators": ["ImageDiff", "ImageSubtract", "AdaptiveThreshold", "EdgeDetection", "ContourDetection", "BlobAnalysis", "BlobLabeling", "LineMeasurement", "CircleMeasurement", "WidthMeasurement", "GeometricFitting", "PerspectiveTransform", "AffineTransform", "DistanceTransform"],
+          "command": ["dotnet", "run", "--project", "quality/tools/G2P3VisionCoreRunner/G2P3VisionCoreRunner.csproj", "--", "--output", "quality/evals/reports/G2P3VisionCore_baseline.json", "--report", "quality/evals/reports/G2P3VisionCore_baseline.md"],
+          "baselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+          "reportMarkdown": "quality/evals/reports/G2P3VisionCore_baseline.md",
+          "estimatedSeconds": 180
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest",
+  "datasetId": "deep_learning_coco_style_detection_protocol_bridge_v1",
+  "operator": "DeepLearning",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "semi-synthetic-public-protocol",
+    "name": "COCO-style semi-synthetic detection protocol bridge",
+    "version": "v1",
+    "uri": "in-repo generated protocol",
+    "license": "repo-local synthetic protocol",
+    "citation": "COCO-style AP50/precision/recall object-detection protocol proxy; no external images are stored.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 20260427,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 36,
+    "caseListPath": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json"
+  },
+  "labels": {
+    "schema": "class-specific boxes with COCO-style IoU matching at 0.50",
+    "positiveClasses": ["scratch", "missing_part", "extra_part"],
+    "negativeClasses": ["negative_low_confidence"],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "AP50",
+    "secondary": ["PrecisionAt50", "RecallAt50", "MeanMatchedIoU", "FalsePositiveCount", "FalseNegativeCount", "RuntimeMs"],
+    "thresholds": {
+      "AP50": 0.95,
+      "PrecisionAt50": 0.95,
+      "RecallAt50": 0.95,
+      "Failed": 0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/DeepLearningDetectionDatasetRunner/DeepLearningDetectionDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/DeepLearningDetectionDatasetRunner/DeepLearningDetectionDatasetRunner.csproj -- --output quality/evals/reports/DeepLearning_detection_dataset_baseline.json --report quality/evals/reports/DeepLearning_detection_dataset_baseline.md",
+    "baselineJson": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json",
+    "reportMarkdown": "quality/evals/reports/DeepLearning_detection_dataset_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["edge_clamp", "same_class_nms", "different_class_overlap", "negative_low_confidence", "ap50_regression", "false_positive_regression", "false_negative_regression"],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Generated geometric fixtures only; no public or customer image pixels are stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}
