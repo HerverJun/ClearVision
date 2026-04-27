@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-25T13:15:03.2742253+00:00",
     "CasesRoot": "quality/synthetic/cases/fft",
@@ -15,7 +16,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.687,
       "RuntimeMsMax": 38.518,
-      "MemoryAllocationBytesAvg": 26539
+      "MemoryAllocationBytesAvg": 26539,
+      "EvidenceKind": "golden"
     }
   ],
   "Cases": [
@@ -30,12 +32,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.033772276259342E-08,
-        "RmseReal": 1.830449322879815E-08,
-        "MaxImaginaryError": 4.190796204506242E-08,
+        "MaxRealError": 6.033772276259342e-08,
+        "RmseReal": 1.830449322879815e-08,
+        "MaxImaginaryError": 4.190796204506242e-08,
         "ImaginaryMaxAbs": 0.4722323715686798,
-        "EnergyError": 5.4775068964668924E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 5.4775068964668924e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -51,12 +53,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.5476031496072267E-08,
-        "RmseReal": 1.2688008978208463E-08,
-        "MaxImaginaryError": 5.151893006649644E-08,
+        "MaxRealError": 4.5476031496072267e-08,
+        "RmseReal": 1.2688008978208463e-08,
+        "MaxImaginaryError": 5.151893006649644e-08,
         "ImaginaryMaxAbs": 0.4083101749420166,
-        "EnergyError": 2.840004099090242E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 2.840004099090242e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -72,12 +74,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.4745547472226903E-08,
-        "RmseReal": 9.244383899580029E-09,
-        "MaxImaginaryError": 4.1581237786303404E-08,
+        "MaxRealError": 2.4745547472226903e-08,
+        "RmseReal": 9.244383899580029e-09,
+        "MaxImaginaryError": 4.1581237786303404e-08,
         "ImaginaryMaxAbs": 0.31451064348220825,
-        "EnergyError": 4.2650825891338325E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 4.2650825891338325e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -93,12 +95,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.5127685925052656E-08,
-        "RmseReal": 7.300996295634657E-09,
-        "MaxImaginaryError": 2.7457699586230788E-08,
+        "MaxRealError": 2.5127685925052656e-08,
+        "RmseReal": 7.300996295634657e-09,
+        "MaxImaginaryError": 2.7457699586230788e-08,
         "ImaginaryMaxAbs": 0.23783648014068604,
-        "EnergyError": 1.362624882555317E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.362624882555317e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -114,12 +116,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.181184086795355E-08,
-        "RmseReal": 1.81325936604179E-08,
-        "MaxImaginaryError": 5.682575987542293E-08,
+        "MaxRealError": 6.181184086795355e-08,
+        "RmseReal": 1.81325936604179e-08,
+        "MaxImaginaryError": 5.682575987542293e-08,
         "ImaginaryMaxAbs": 0.45119979977607727,
-        "EnergyError": 2.1594187373830452E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 2.1594187373830452e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -135,12 +137,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.238104856473356E-08,
-        "RmseReal": 1.1728075259525406E-08,
-        "MaxImaginaryError": 4.495556793493449E-08,
+        "MaxRealError": 3.238104856473356e-08,
+        "RmseReal": 1.1728075259525406e-08,
+        "MaxImaginaryError": 4.495556793493449e-08,
         "ImaginaryMaxAbs": 0.35675108432769775,
-        "EnergyError": 1.3320309003023336E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.3320309003023336e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -156,12 +158,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.9185424799127446E-08,
-        "RmseReal": 9.775065621005915E-09,
-        "MaxImaginaryError": 3.5589422603399257E-08,
+        "MaxRealError": 2.9185424799127446e-08,
+        "RmseReal": 9.775065621005915e-09,
+        "MaxImaginaryError": 3.5589422603399257e-08,
         "ImaginaryMaxAbs": 0.36402779817581177,
-        "EnergyError": 4.609286630848758E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 4.609286630848758e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -177,12 +179,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.293649444846558E-08,
-        "RmseReal": 8.14737509287584E-09,
-        "MaxImaginaryError": 3.1633212271842126E-08,
+        "MaxRealError": 3.293649444846558e-08,
+        "RmseReal": 8.14737509287584e-09,
+        "MaxImaginaryError": 3.1633212271842126e-08,
         "ImaginaryMaxAbs": 0.24986770749092102,
-        "EnergyError": 7.194501328460753E-09,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 7.194501328460753e-09,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -198,12 +200,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.004823608323328E-08,
-        "RmseReal": 1.8178785977141706E-08,
-        "MaxImaginaryError": 6.80343322789767E-08,
+        "MaxRealError": 5.004823608323328e-08,
+        "RmseReal": 1.8178785977141706e-08,
+        "MaxImaginaryError": 6.80343322789767e-08,
         "ImaginaryMaxAbs": 0.5257109999656677,
-        "EnergyError": 3.7473648543228847E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 3.7473648543228847e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -219,12 +221,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.4464913917519056E-08,
-        "RmseReal": 1.5441699697201756E-08,
-        "MaxImaginaryError": 5.2935382077734516E-08,
+        "MaxRealError": 4.4464913917519056e-08,
+        "RmseReal": 1.5441699697201756e-08,
+        "MaxImaginaryError": 5.2935382077734516e-08,
         "ImaginaryMaxAbs": 0.4501248598098755,
-        "EnergyError": 2.0333778029566106E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 2.0333778029566106e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -240,12 +242,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.3329312136565203E-08,
-        "RmseReal": 1.0099453949250885E-08,
-        "MaxImaginaryError": 2.949529112616922E-08,
+        "MaxRealError": 3.3329312136565203e-08,
+        "RmseReal": 1.0099453949250885e-08,
+        "MaxImaginaryError": 2.949529112616922e-08,
         "ImaginaryMaxAbs": 0.27685678005218506,
-        "EnergyError": 6.10826012060457E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 6.10826012060457e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -261,12 +263,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.415595704019502E-08,
-        "RmseReal": 7.824761911358215E-09,
-        "MaxImaginaryError": 2.2901582338863413E-08,
+        "MaxRealError": 2.415595704019502e-08,
+        "RmseReal": 7.824761911358215e-09,
+        "MaxImaginaryError": 2.2901582338863413e-08,
         "ImaginaryMaxAbs": 0.20876677334308624,
-        "EnergyError": 5.799902713798089E-09,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 5.799902713798089e-09,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -282,12 +284,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 8.022595210377403E-08,
-        "RmseReal": 1.8409143698037293E-08,
-        "MaxImaginaryError": 4.197137448702648E-08,
+        "MaxRealError": 8.022595210377403e-08,
+        "RmseReal": 1.8409143698037293e-08,
+        "MaxImaginaryError": 4.197137448702648e-08,
         "ImaginaryMaxAbs": 0.572767972946167,
-        "EnergyError": 4.831117933624469E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 4.831117933624469e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -308,7 +310,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -329,7 +331,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -350,7 +352,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -371,7 +373,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -392,7 +394,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -413,7 +415,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -434,7 +436,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -455,7 +457,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -476,7 +478,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -497,7 +499,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -518,7 +520,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -539,7 +541,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -560,7 +562,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -576,12 +578,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.072190909023941E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.072190909023941e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -597,12 +599,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 9.337649268683846E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 9.337649268683846e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -618,12 +620,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 7.604959925543459E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 7.604959925543459e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -639,12 +641,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.56061011252511E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.56061011252511e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -660,12 +662,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.585756844582474E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.585756844582474e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -681,12 +683,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.459971595780165E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.459971595780165e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -702,12 +704,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 1.154902479573133E-05,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 1.154902479573133e-05,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -723,12 +725,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.986686599434215E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.986686599434215e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -744,12 +746,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 7.88424304941644E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 7.88424304941644e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -765,12 +767,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 1.154902479573133E-05,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 1.154902479573133e-05,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -786,12 +788,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.029196987762359E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.029196987762359e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -807,12 +809,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 7.604959925543459E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 7.604959925543459e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -828,12 +830,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.7976931348623157E+308,
-        "RmseReal": 1.7976931348623157E+308,
-        "MaxImaginaryError": 1.7976931348623157E+308,
-        "ImaginaryMaxAbs": 1.7976931348623157E+308,
-        "EnergyError": 1.7976931348623157E+308,
-        "ImageRmse": 8.072190909023941E-06,
+        "MaxRealError": 1.7976931348623157e+308,
+        "RmseReal": 1.7976931348623157e+308,
+        "MaxImaginaryError": 1.7976931348623157e+308,
+        "ImaginaryMaxAbs": 1.7976931348623157e+308,
+        "EnergyError": 1.7976931348623157e+308,
+        "ImageRmse": 8.072190909023941e-06,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -849,12 +851,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.798729343249761E-08,
-        "RmseReal": 4.16500126299563E-09,
-        "MaxImaginaryError": 8.12365286151362E-09,
-        "ImaginaryMaxAbs": 8.12365286151362E-09,
-        "EnergyError": 1.3322676295501878E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.798729343249761e-08,
+        "RmseReal": 4.16500126299563e-09,
+        "MaxImaginaryError": 8.12365286151362e-09,
+        "ImaginaryMaxAbs": 8.12365286151362e-09,
+        "EnergyError": 1.3322676295501878e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -870,12 +872,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.214685134229512E-08,
-        "RmseReal": 9.211844135062141E-09,
-        "MaxImaginaryError": 6.193239698859543E-08,
-        "ImaginaryMaxAbs": 6.193239698859543E-08,
-        "EnergyError": 2.7632217501781674E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.214685134229512e-08,
+        "RmseReal": 9.211844135062141e-09,
+        "MaxImaginaryError": 6.193239698859543e-08,
+        "ImaginaryMaxAbs": 6.193239698859543e-08,
+        "EnergyError": 2.7632217501781674e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -891,12 +893,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.118933981724695E-08,
-        "RmseReal": 8.605365217687653E-09,
-        "MaxImaginaryError": 2.9005649437863212E-08,
-        "ImaginaryMaxAbs": 2.9005649437863212E-08,
-        "EnergyError": 1.973729821555834E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 6.118933981724695e-08,
+        "RmseReal": 8.605365217687653e-09,
+        "MaxImaginaryError": 2.9005649437863212e-08,
+        "ImaginaryMaxAbs": 2.9005649437863212e-08,
+        "EnergyError": 1.973729821555834e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -912,12 +914,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.7428289800800485E-08,
-        "RmseReal": 4.2248718331415466E-09,
-        "MaxImaginaryError": 6.732658164310124E-08,
-        "ImaginaryMaxAbs": 6.732658164310124E-08,
-        "EnergyError": 5.551115123125783E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.7428289800800485e-08,
+        "RmseReal": 4.2248718331415466e-09,
+        "MaxImaginaryError": 6.732658164310124e-08,
+        "ImaginaryMaxAbs": 6.732658164310124e-08,
+        "EnergyError": 5.551115123125783e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -933,12 +935,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.1920928955078125E-07,
-        "RmseReal": 1.4901161193847656E-08,
-        "MaxImaginaryError": 1.2859814546573034E-08,
-        "ImaginaryMaxAbs": 1.2859814546573034E-08,
-        "EnergyError": 1.578983857244667E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.1920928955078125e-07,
+        "RmseReal": 1.4901161193847656e-08,
+        "MaxImaginaryError": 1.2859814546573034e-08,
+        "ImaginaryMaxAbs": 1.2859814546573034e-08,
+        "EnergyError": 1.578983857244667e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -954,12 +956,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.0112782550540942E-08,
-        "RmseReal": 2.975760578313293E-09,
-        "MaxImaginaryError": 1.0168531794363389E-08,
-        "ImaginaryMaxAbs": 1.0168531794363389E-08,
-        "EnergyError": 1.1102230246251565E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 2.0112782550540942e-08,
+        "RmseReal": 2.975760578313293e-09,
+        "MaxImaginaryError": 1.0168531794363389e-08,
+        "ImaginaryMaxAbs": 1.0168531794363389e-08,
+        "EnergyError": 1.1102230246251565e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -975,12 +977,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.491922211968813E-08,
-        "RmseReal": 4.0796402015755874E-09,
-        "MaxImaginaryError": 3.943767268310694E-08,
-        "ImaginaryMaxAbs": 3.943767268310694E-08,
-        "EnergyError": 1.5543122344752192E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.491922211968813e-08,
+        "RmseReal": 4.0796402015755874e-09,
+        "MaxImaginaryError": 3.943767268310694e-08,
+        "ImaginaryMaxAbs": 3.943767268310694e-08,
+        "EnergyError": 1.5543122344752192e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1001,7 +1003,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1017,12 +1019,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.1920928955078125E-07,
-        "RmseReal": 1.9061424328097452E-08,
-        "MaxImaginaryError": 6.515788797401001E-09,
-        "ImaginaryMaxAbs": 6.515788797401001E-09,
-        "EnergyError": 1.1920928366659922E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.1920928955078125e-07,
+        "RmseReal": 1.9061424328097452e-08,
+        "MaxImaginaryError": 6.515788797401001e-09,
+        "ImaginaryMaxAbs": 6.515788797401001e-09,
+        "EnergyError": 1.1920928366659922e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1038,12 +1040,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.83452949392904E-08,
-        "RmseReal": 7.1657974244277984E-09,
-        "MaxImaginaryError": 3.1014060652978515E-08,
-        "ImaginaryMaxAbs": 3.1014060652978515E-08,
-        "EnergyError": 2.220446049250313E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.83452949392904e-08,
+        "RmseReal": 7.1657974244277984e-09,
+        "MaxImaginaryError": 3.1014060652978515e-08,
+        "ImaginaryMaxAbs": 3.1014060652978515e-08,
+        "EnergyError": 2.220446049250313e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1059,12 +1061,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.992222895656596E-08,
-        "RmseReal": 8.394491183673786E-09,
-        "MaxImaginaryError": 6.525557694203599E-08,
-        "ImaginaryMaxAbs": 6.525557694203599E-08,
-        "EnergyError": 4.144832625267251E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 5.992222895656596e-08,
+        "RmseReal": 8.394491183673786e-09,
+        "MaxImaginaryError": 6.525557694203599e-08,
+        "ImaginaryMaxAbs": 6.525557694203599e-08,
+        "EnergyError": 4.144832625267251e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1080,12 +1082,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.3493078654391866E-08,
-        "RmseReal": 1.9971797363328408E-09,
-        "MaxImaginaryError": 3.28209459610207E-08,
-        "ImaginaryMaxAbs": 3.28209459610207E-08,
-        "EnergyError": 6.439293542825908E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.3493078654391866e-08,
+        "RmseReal": 1.9971797363328408e-09,
+        "MaxImaginaryError": 3.28209459610207e-08,
+        "ImaginaryMaxAbs": 3.28209459610207e-08,
+        "EnergyError": 6.439293542825908e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1101,12 +1103,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.1920928955078125E-07,
-        "RmseReal": 2.1211623203120506E-08,
-        "MaxImaginaryError": 3.301997253402078E-08,
-        "ImaginaryMaxAbs": 3.301997253402078E-08,
-        "EnergyError": 3.3553406966449175E-15,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.1920928955078125e-07,
+        "RmseReal": 2.1211623203120506e-08,
+        "MaxImaginaryError": 3.301997253402078e-08,
+        "ImaginaryMaxAbs": 3.301997253402078e-08,
+        "EnergyError": 3.3553406966449175e-15,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1122,12 +1124,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.4009648447176346E-07,
-        "RmseReal": 7.675751785779778E-08,
-        "MaxImaginaryError": 7.158724457667631E-08,
-        "ImaginaryMaxAbs": 7.158724457667631E-08,
-        "EnergyError": 1.6331154353630308E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 2.4009648447176346e-07,
+        "RmseReal": 7.675751785779778e-08,
+        "MaxImaginaryError": 7.158724457667631e-08,
+        "ImaginaryMaxAbs": 7.158724457667631e-08,
+        "EnergyError": 1.6331154353630308e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1143,12 +1145,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 8.97716699199691E-07,
-        "RmseReal": 2.509714717052031E-07,
-        "MaxImaginaryError": 3.51254982433602E-07,
-        "ImaginaryMaxAbs": 3.51254982433602E-07,
-        "EnergyError": 1.2762640534006129E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 8.97716699199691e-07,
+        "RmseReal": 2.509714717052031e-07,
+        "MaxImaginaryError": 3.51254982433602e-07,
+        "ImaginaryMaxAbs": 3.51254982433602e-07,
+        "EnergyError": 1.2762640534006129e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1164,12 +1166,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.969446531002177E-07,
-        "RmseReal": 2.1655994849486513E-07,
-        "MaxImaginaryError": 3.012958700310264E-07,
-        "ImaginaryMaxAbs": 3.012958700310264E-07,
-        "EnergyError": 3.441195004938722E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 6.969446531002177e-07,
+        "RmseReal": 2.1655994849486513e-07,
+        "MaxImaginaryError": 3.012958700310264e-07,
+        "ImaginaryMaxAbs": 3.012958700310264e-07,
+        "EnergyError": 3.441195004938722e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1185,12 +1187,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.1061146487634232E-06,
-        "RmseReal": 2.885528398760618E-07,
-        "MaxImaginaryError": 7.002565780567238E-07,
-        "ImaginaryMaxAbs": 7.002565780567238E-07,
-        "EnergyError": 3.7413476291527934E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.1061146487634232e-06,
+        "RmseReal": 2.885528398760618e-07,
+        "MaxImaginaryError": 7.002565780567238e-07,
+        "ImaginaryMaxAbs": 7.002565780567238e-07,
+        "EnergyError": 3.7413476291527934e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1206,12 +1208,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 8.501398927052151E-07,
-        "RmseReal": 2.5722904615781543E-07,
-        "MaxImaginaryError": 2.3049261699270573E-07,
-        "ImaginaryMaxAbs": 2.3049261699270573E-07,
-        "EnergyError": 1.2141474442154374E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 8.501398927052151e-07,
+        "RmseReal": 2.5722904615781543e-07,
+        "MaxImaginaryError": 2.3049261699270573e-07,
+        "ImaginaryMaxAbs": 2.3049261699270573e-07,
+        "EnergyError": 1.2141474442154374e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1227,12 +1229,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.191922361509228E-07,
-        "RmseReal": 1.9027260117070142E-07,
-        "MaxImaginaryError": 2.4586915969848633E-07,
-        "ImaginaryMaxAbs": 2.4586915969848633E-07,
-        "EnergyError": 4.840844425545547E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 6.191922361509228e-07,
+        "RmseReal": 1.9027260117070142e-07,
+        "MaxImaginaryError": 2.4586915969848633e-07,
+        "ImaginaryMaxAbs": 2.4586915969848633e-07,
+        "EnergyError": 4.840844425545547e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1248,12 +1250,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.2908335929040504E-06,
-        "RmseReal": 3.4215363766844885E-07,
-        "MaxImaginaryError": 8.940696716308594E-07,
-        "ImaginaryMaxAbs": 8.940696716308594E-07,
-        "EnergyError": 9.704407813542533E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.2908335929040504e-06,
+        "RmseReal": 3.4215363766844885e-07,
+        "MaxImaginaryError": 8.940696716308594e-07,
+        "ImaginaryMaxAbs": 8.940696716308594e-07,
+        "EnergyError": 9.704407813542533e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1269,12 +1271,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.4603339866000624E-07,
-        "RmseReal": 1.4302332294997853E-07,
-        "MaxImaginaryError": 4.76837158203125E-07,
-        "ImaginaryMaxAbs": 4.76837158203125E-07,
-        "EnergyError": 3.014461387870108E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.4603339866000624e-07,
+        "RmseReal": 1.4302332294997853e-07,
+        "MaxImaginaryError": 4.76837158203125e-07,
+        "ImaginaryMaxAbs": 4.76837158203125e-07,
+        "EnergyError": 3.014461387870108e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1290,12 +1292,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.772869627243324E-07,
-        "RmseReal": 1.3947673119395858E-07,
-        "MaxImaginaryError": 2.1490481572072895E-07,
-        "ImaginaryMaxAbs": 2.1490481572072895E-07,
-        "EnergyError": 8.383640943673413E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 2.772869627243324e-07,
+        "RmseReal": 1.3947673119395858e-07,
+        "MaxImaginaryError": 2.1490481572072895e-07,
+        "ImaginaryMaxAbs": 2.1490481572072895e-07,
+        "EnergyError": 8.383640943673413e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1311,12 +1313,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 7.668821284667615E-07,
-        "RmseReal": 2.3548367250803304E-07,
-        "MaxImaginaryError": 3.7375917827375815E-07,
-        "ImaginaryMaxAbs": 3.7375917827375815E-07,
-        "EnergyError": 8.878705695340258E-09,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 7.668821284667615e-07,
+        "RmseReal": 2.3548367250803304e-07,
+        "MaxImaginaryError": 3.7375917827375815e-07,
+        "ImaginaryMaxAbs": 3.7375917827375815e-07,
+        "EnergyError": 8.878705695340258e-09,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1332,12 +1334,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 7.898704099673637E-07,
-        "RmseReal": 1.7281445409456896E-07,
-        "MaxImaginaryError": 3.3347521366522415E-07,
-        "ImaginaryMaxAbs": 3.3347521366522415E-07,
-        "EnergyError": 5.737992767923084E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 7.898704099673637e-07,
+        "RmseReal": 1.7281445409456896e-07,
+        "MaxImaginaryError": 3.3347521366522415e-07,
+        "ImaginaryMaxAbs": 3.3347521366522415e-07,
+        "EnergyError": 5.737992767923084e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1353,12 +1355,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.961840816581798E-07,
-        "RmseReal": 1.3215143788827871E-07,
-        "MaxImaginaryError": 3.5762786865234375E-07,
-        "ImaginaryMaxAbs": 3.5762786865234375E-07,
-        "EnergyError": 1.903690058496828E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 5.961840816581798e-07,
+        "RmseReal": 1.3215143788827871e-07,
+        "MaxImaginaryError": 3.5762786865234375e-07,
+        "ImaginaryMaxAbs": 3.5762786865234375e-07,
+        "EnergyError": 1.903690058496828e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1374,12 +1376,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 7.639325199093605E-07,
-        "RmseReal": 2.426668243376328E-07,
-        "MaxImaginaryError": 2.5365037004121405E-07,
-        "ImaginaryMaxAbs": 2.5365037004121405E-07,
-        "EnergyError": 4.694690869531798E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 7.639325199093605e-07,
+        "RmseReal": 2.426668243376328e-07,
+        "MaxImaginaryError": 2.5365037004121405e-07,
+        "ImaginaryMaxAbs": 2.5365037004121405e-07,
+        "EnergyError": 4.694690869531798e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1395,12 +1397,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.635847655227622E-07,
-        "RmseReal": 1.8449953898810854E-07,
-        "MaxImaginaryError": 4.768038084357329E-07,
+        "MaxRealError": 5.635847655227622e-07,
+        "RmseReal": 1.8449953898810854e-07,
+        "MaxImaginaryError": 4.768038084357329e-07,
         "ImaginaryMaxAbs": 2.7693674564361572,
-        "EnergyError": 1.4212613018056088E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.4212613018056088e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1416,12 +1418,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.784856079074416E-07,
-        "RmseReal": 1.0127883344384342E-07,
-        "MaxImaginaryError": 3.5330578596060036E-07,
+        "MaxRealError": 2.784856079074416e-07,
+        "RmseReal": 1.0127883344384342e-07,
+        "MaxImaginaryError": 3.5330578596060036e-07,
         "ImaginaryMaxAbs": 2.8093156814575195,
-        "EnergyError": 1.6281587076971992E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.6281587076971992e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1437,12 +1439,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.729403076415451E-07,
-        "RmseReal": 1.460227878586222E-07,
-        "MaxImaginaryError": 3.9455463873849794E-07,
+        "MaxRealError": 5.729403076415451e-07,
+        "RmseReal": 1.460227878586222e-07,
+        "MaxImaginaryError": 3.9455463873849794e-07,
         "ImaginaryMaxAbs": 2.7797656059265137,
-        "EnergyError": 6.87180527579923E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 6.87180527579923e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1458,12 +1460,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.072689939211728E-07,
-        "RmseReal": 1.3408091731719598E-07,
-        "MaxImaginaryError": 4.977252441307201E-07,
+        "MaxRealError": 5.072689939211728e-07,
+        "RmseReal": 1.3408091731719598e-07,
+        "MaxImaginaryError": 4.977252441307201e-07,
         "ImaginaryMaxAbs": 2.72613787651062,
-        "EnergyError": 3.933158979128558E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 3.933158979128558e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1479,12 +1481,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.505164429233986E-07,
-        "RmseReal": 1.345318699923415E-07,
-        "MaxImaginaryError": 3.540172852645185E-07,
+        "MaxRealError": 2.505164429233986e-07,
+        "RmseReal": 1.345318699923415e-07,
+        "MaxImaginaryError": 3.540172852645185e-07,
         "ImaginaryMaxAbs": 3.0662150382995605,
-        "EnergyError": 1.535362807226718E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.535362807226718e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1500,12 +1502,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.348472901176791E-07,
-        "RmseReal": 1.1927448166143811E-07,
-        "MaxImaginaryError": 3.133946533395715E-07,
+        "MaxRealError": 3.348472901176791e-07,
+        "RmseReal": 1.1927448166143811e-07,
+        "MaxImaginaryError": 3.133946533395715e-07,
         "ImaginaryMaxAbs": 2.7570464611053467,
-        "EnergyError": 2.4974890613895624E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 2.4974890613895624e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1521,12 +1523,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.9010419916607475E-07,
-        "RmseReal": 1.2475784188570282E-07,
-        "MaxImaginaryError": 4.6019362809346376E-07,
+        "MaxRealError": 3.9010419916607475e-07,
+        "RmseReal": 1.2475784188570282e-07,
+        "MaxImaginaryError": 4.6019362809346376e-07,
         "ImaginaryMaxAbs": 2.9419398307800293,
-        "EnergyError": 1.0104486941898751E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.0104486941898751e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1542,12 +1544,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.28736914251482E-07,
-        "RmseReal": 1.5121028773158392E-07,
-        "MaxImaginaryError": 5.934691404974046E-07,
+        "MaxRealError": 5.28736914251482e-07,
+        "RmseReal": 1.5121028773158392e-07,
+        "MaxImaginaryError": 5.934691404974046e-07,
         "ImaginaryMaxAbs": 2.7912800312042236,
-        "EnergyError": 7.580231027972041E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 7.580231027972041e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1563,12 +1565,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.949028319321201E-07,
-        "RmseReal": 1.0267912777806915E-07,
-        "MaxImaginaryError": 1.7614348135630564E-07,
+        "MaxRealError": 2.949028319321201e-07,
+        "RmseReal": 1.0267912777806915e-07,
+        "MaxImaginaryError": 1.7614348135630564e-07,
         "ImaginaryMaxAbs": 2.7044832706451416,
-        "EnergyError": 4.504559323129366E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 4.504559323129366e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1584,12 +1586,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.6502646489088306E-07,
-        "RmseReal": 1.8510247712550333E-07,
-        "MaxImaginaryError": 4.0777617194009963E-07,
+        "MaxRealError": 4.6502646489088306e-07,
+        "RmseReal": 1.8510247712550333e-07,
+        "MaxImaginaryError": 4.0777617194009963e-07,
         "ImaginaryMaxAbs": 2.8616719245910645,
-        "EnergyError": 1.4995000361743133E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.4995000361743133e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1605,12 +1607,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.685176024921134E-07,
-        "RmseReal": 1.3377419775020426E-07,
-        "MaxImaginaryError": 6.417804687686157E-07,
+        "MaxRealError": 4.685176024921134e-07,
+        "RmseReal": 1.3377419775020426e-07,
+        "MaxImaginaryError": 6.417804687686157e-07,
         "ImaginaryMaxAbs": 2.7854318618774414,
-        "EnergyError": 2.2111526261208455E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 2.2111526261208455e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1626,12 +1628,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.923813719554971E-07,
-        "RmseReal": 1.5605801419021017E-07,
-        "MaxImaginaryError": 5.618785645644664E-07,
+        "MaxRealError": 5.923813719554971e-07,
+        "RmseReal": 1.5605801419021017e-07,
+        "MaxImaginaryError": 5.618785645644664e-07,
         "ImaginaryMaxAbs": 2.8401975631713867,
-        "EnergyError": 1.0664646247172282E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.0664646247172282e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1647,12 +1649,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.5222468247321217E-07,
-        "RmseReal": 9.97769239417687E-08,
-        "MaxImaginaryError": 2.1678499750876767E-07,
+        "MaxRealError": 2.5222468247321217e-07,
+        "RmseReal": 9.97769239417687e-08,
+        "MaxImaginaryError": 2.1678499750876767e-07,
         "ImaginaryMaxAbs": 2.6637609004974365,
-        "EnergyError": 1.7784568683738628E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "EnergyError": 1.7784568683738628e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1668,12 +1670,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.503331909016083E-07,
-        "RmseReal": 1.1576258261283921E-07,
-        "MaxImaginaryError": 1.3229231399236596E-07,
-        "ImaginaryMaxAbs": 1.3229231399236596E-07,
-        "EnergyError": 3.616786730737765E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.503331909016083e-07,
+        "RmseReal": 1.1576258261283921e-07,
+        "MaxImaginaryError": 1.3229231399236596e-07,
+        "ImaginaryMaxAbs": 1.3229231399236596e-07,
+        "EnergyError": 3.616786730737765e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1689,12 +1691,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.664167969041898E-07,
-        "RmseReal": 1.2720060810453219E-07,
-        "MaxImaginaryError": 2.7997336360385816E-07,
-        "ImaginaryMaxAbs": 2.7997336360385816E-07,
-        "EnergyError": 5.3681177333089085E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.664167969041898e-07,
+        "RmseReal": 1.2720060810453219e-07,
+        "MaxImaginaryError": 2.7997336360385816e-07,
+        "ImaginaryMaxAbs": 2.7997336360385816e-07,
+        "EnergyError": 5.3681177333089085e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1710,12 +1712,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.2401464828145663E-07,
-        "RmseReal": 1.3102697321386188E-07,
-        "MaxImaginaryError": 2.19529709966082E-07,
-        "ImaginaryMaxAbs": 2.19529709966082E-07,
-        "EnergyError": 4.2213543158644566E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.2401464828145663e-07,
+        "RmseReal": 1.3102697321386188e-07,
+        "MaxImaginaryError": 2.19529709966082e-07,
+        "ImaginaryMaxAbs": 2.19529709966082e-07,
+        "EnergyError": 4.2213543158644566e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1731,12 +1733,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.294608396155809E-07,
-        "RmseReal": 1.3131328384530733E-07,
-        "MaxImaginaryError": 2.9110907462381874E-07,
-        "ImaginaryMaxAbs": 2.9110907462381874E-07,
-        "EnergyError": 6.394465902244681E-09,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 5.294608396155809e-07,
+        "RmseReal": 1.3131328384530733e-07,
+        "MaxImaginaryError": 2.9110907462381874e-07,
+        "ImaginaryMaxAbs": 2.9110907462381874e-07,
+        "EnergyError": 6.394465902244681e-09,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1752,12 +1754,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 2.669550291933831E-07,
-        "RmseReal": 1.0350535052423361E-07,
-        "MaxImaginaryError": 1.5291554689156328E-07,
-        "ImaginaryMaxAbs": 1.5291554689156328E-07,
-        "EnergyError": 3.916382269904415E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 2.669550291933831e-07,
+        "RmseReal": 1.0350535052423361e-07,
+        "MaxImaginaryError": 1.5291554689156328e-07,
+        "ImaginaryMaxAbs": 1.5291554689156328e-07,
+        "EnergyError": 3.916382269904415e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1773,12 +1775,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.500753051888239E-07,
-        "RmseReal": 1.1427582056633007E-07,
-        "MaxImaginaryError": 1.7239875660379766E-07,
-        "ImaginaryMaxAbs": 1.7239875660379766E-07,
-        "EnergyError": 2.5677287947098274E-09,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.500753051888239e-07,
+        "RmseReal": 1.1427582056633007e-07,
+        "MaxImaginaryError": 1.7239875660379766e-07,
+        "ImaginaryMaxAbs": 1.7239875660379766e-07,
+        "EnergyError": 2.5677287947098274e-09,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1794,12 +1796,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.8955019521225154E-07,
-        "RmseReal": 1.1342714798746203E-07,
-        "MaxImaginaryError": 2.211915983707513E-07,
-        "ImaginaryMaxAbs": 2.211915983707513E-07,
-        "EnergyError": 1.7540326683252068E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.8955019521225154e-07,
+        "RmseReal": 1.1342714798746203e-07,
+        "MaxImaginaryError": 2.211915983707513e-07,
+        "ImaginaryMaxAbs": 2.211915983707513e-07,
+        "EnergyError": 1.7540326683252068e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1815,12 +1817,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.478768552753422E-07,
-        "RmseReal": 1.335455120388373E-07,
-        "MaxImaginaryError": 3.370811612057878E-07,
-        "ImaginaryMaxAbs": 3.370811612057878E-07,
-        "EnergyError": 2.552001181669052E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 6.478768552753422e-07,
+        "RmseReal": 1.335455120388373e-07,
+        "MaxImaginaryError": 3.370811612057878e-07,
+        "ImaginaryMaxAbs": 3.370811612057878e-07,
+        "EnergyError": 2.552001181669052e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1836,12 +1838,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.778611814553301E-07,
-        "RmseReal": 1.2099742511151373E-07,
-        "MaxImaginaryError": 1.2052691999997478E-07,
-        "ImaginaryMaxAbs": 1.2052691999997478E-07,
-        "EnergyError": 2.0743359794266326E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.778611814553301e-07,
+        "RmseReal": 1.2099742511151373e-07,
+        "MaxImaginaryError": 1.2052691999997478e-07,
+        "ImaginaryMaxAbs": 1.2052691999997478e-07,
+        "EnergyError": 2.0743359794266326e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1857,12 +1859,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.136822755462788E-07,
-        "RmseReal": 1.2857036341818973E-07,
-        "MaxImaginaryError": 2.539260890443984E-07,
-        "ImaginaryMaxAbs": 2.539260890443984E-07,
-        "EnergyError": 2.9374574033628905E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.136822755462788e-07,
+        "RmseReal": 1.2857036341818973e-07,
+        "MaxImaginaryError": 2.539260890443984e-07,
+        "ImaginaryMaxAbs": 2.539260890443984e-07,
+        "EnergyError": 2.9374574033628905e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1878,12 +1880,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.251173828517807E-07,
-        "RmseReal": 1.3259747687120765E-07,
-        "MaxImaginaryError": 1.7562251741765067E-07,
-        "ImaginaryMaxAbs": 1.7562251741765067E-07,
-        "EnergyError": 3.117117416069478E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.251173828517807e-07,
+        "RmseReal": 1.3259747687120765e-07,
+        "MaxImaginaryError": 1.7562251741765067e-07,
+        "ImaginaryMaxAbs": 1.7562251741765067e-07,
+        "EnergyError": 3.117117416069478e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1899,12 +1901,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 4.912262695500047E-07,
-        "RmseReal": 1.464854537355314E-07,
-        "MaxImaginaryError": 3.9571287402395683E-07,
-        "ImaginaryMaxAbs": 3.9571287402395683E-07,
-        "EnergyError": 6.189376966447317E-10,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 4.912262695500047e-07,
+        "RmseReal": 1.464854537355314e-07,
+        "MaxImaginaryError": 3.9571287402395683e-07,
+        "ImaginaryMaxAbs": 3.9571287402395683e-07,
+        "EnergyError": 6.189376966447317e-10,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1920,12 +1922,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.142095947872292E-07,
-        "RmseReal": 1.1973688450624177E-07,
-        "MaxImaginaryError": 1.380373646497901E-07,
-        "ImaginaryMaxAbs": 1.380373646497901E-07,
-        "EnergyError": 5.005433441718562E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.142095947872292e-07,
+        "RmseReal": 1.1973688450624177e-07,
+        "MaxImaginaryError": 1.380373646497901e-07,
+        "ImaginaryMaxAbs": 1.380373646497901e-07,
+        "EnergyError": 5.005433441718562e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1941,12 +1943,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 6.661793943152361E-07,
-        "RmseReal": 2.386727288715612E-07,
-        "MaxImaginaryError": 2.384185791015625E-07,
-        "ImaginaryMaxAbs": 2.384185791015625E-07,
-        "EnergyError": 1.0291331401141388E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 6.661793943152361e-07,
+        "RmseReal": 2.386727288715612e-07,
+        "MaxImaginaryError": 2.384185791015625e-07,
+        "ImaginaryMaxAbs": 2.384185791015625e-07,
+        "EnergyError": 1.0291331401141388e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1962,12 +1964,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.3692685530439803E-07,
-        "RmseReal": 1.430698192994491E-07,
-        "MaxImaginaryError": 2.384185791015625E-07,
-        "ImaginaryMaxAbs": 2.384185791015625E-07,
-        "EnergyError": 4.7078051949608326E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.3692685530439803e-07,
+        "RmseReal": 1.430698192994491e-07,
+        "MaxImaginaryError": 2.384185791015625e-07,
+        "ImaginaryMaxAbs": 2.384185791015625e-07,
+        "EnergyError": 4.7078051949608326e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -1983,12 +1985,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 9.006895751451083E-08,
-        "RmseReal": 4.4124836259060574E-08,
-        "MaxImaginaryError": 2.9802322387695312E-08,
-        "ImaginaryMaxAbs": 2.9802322387695312E-08,
-        "EnergyError": 1.5005329569703894E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 9.006895751451083e-08,
+        "RmseReal": 4.4124836259060574e-08,
+        "MaxImaginaryError": 2.9802322387695312e-08,
+        "ImaginaryMaxAbs": 2.9802322387695312e-08,
+        "EnergyError": 1.5005329569703894e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2004,12 +2006,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 7.002640627362666E-07,
-        "RmseReal": 2.2644632182637468E-07,
-        "MaxImaginaryError": 7.152557373046875E-07,
-        "ImaginaryMaxAbs": 7.152557373046875E-07,
-        "EnergyError": 5.013985790897786E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 7.002640627362666e-07,
+        "RmseReal": 2.2644632182637468e-07,
+        "MaxImaginaryError": 7.152557373046875e-07,
+        "ImaginaryMaxAbs": 7.152557373046875e-07,
+        "EnergyError": 5.013985790897786e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2025,12 +2027,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.5437148415695674E-07,
-        "RmseReal": 1.5073432279368184E-07,
-        "MaxImaginaryError": 7.668461421417305E-08,
-        "ImaginaryMaxAbs": 7.668461421417305E-08,
-        "EnergyError": 2.9545206864102938E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.5437148415695674e-07,
+        "RmseReal": 1.5073432279368184e-07,
+        "MaxImaginaryError": 7.668461421417305e-08,
+        "ImaginaryMaxAbs": 7.668461421417305e-08,
+        "EnergyError": 2.9545206864102938e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2046,12 +2048,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.957963624680929E-07,
-        "RmseReal": 1.6722195772047856E-07,
-        "MaxImaginaryError": 1.4901161193847656E-07,
-        "ImaginaryMaxAbs": 1.4901161193847656E-07,
-        "EnergyError": 4.5003782841597676E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 5.957963624680929e-07,
+        "RmseReal": 1.6722195772047856e-07,
+        "MaxImaginaryError": 1.4901161193847656e-07,
+        "ImaginaryMaxAbs": 1.4901161193847656e-07,
+        "EnergyError": 4.5003782841597676e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2067,12 +2069,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 3.607680176820338E-07,
-        "RmseReal": 1.4038929993473048E-07,
-        "MaxImaginaryError": 2.384185791015625E-07,
-        "ImaginaryMaxAbs": 2.384185791015625E-07,
-        "EnergyError": 6.191599583833723E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 3.607680176820338e-07,
+        "RmseReal": 1.4038929993473048e-07,
+        "MaxImaginaryError": 2.384185791015625e-07,
+        "ImaginaryMaxAbs": 2.384185791015625e-07,
+        "EnergyError": 6.191599583833723e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2088,12 +2090,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.483830074481943E-07,
-        "RmseReal": 1.9875461173858306E-07,
-        "MaxImaginaryError": 4.76837158203125E-07,
-        "ImaginaryMaxAbs": 4.76837158203125E-07,
-        "EnergyError": 1.4277098958695839E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 5.483830074481943e-07,
+        "RmseReal": 1.9875461173858306e-07,
+        "MaxImaginaryError": 4.76837158203125e-07,
+        "ImaginaryMaxAbs": 4.76837158203125e-07,
+        "EnergyError": 1.4277098958695839e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2109,12 +2111,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 8.647619631485526E-08,
-        "RmseReal": 4.137858207800487E-08,
-        "MaxImaginaryError": 2.9802322387695312E-08,
-        "ImaginaryMaxAbs": 2.9802322387695312E-08,
-        "EnergyError": 9.571013887682898E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 8.647619631485526e-08,
+        "RmseReal": 4.137858207800487e-08,
+        "MaxImaginaryError": 2.9802322387695312e-08,
+        "ImaginaryMaxAbs": 2.9802322387695312e-08,
+        "EnergyError": 9.571013887682898e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2130,12 +2132,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 8.082361331318566E-07,
-        "RmseReal": 3.319611106172277E-07,
-        "MaxImaginaryError": 4.76837158203125E-07,
-        "ImaginaryMaxAbs": 4.76837158203125E-07,
-        "EnergyError": 1.4954518052531183E-07,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 8.082361331318566e-07,
+        "RmseReal": 3.319611106172277e-07,
+        "MaxImaginaryError": 4.76837158203125e-07,
+        "ImaginaryMaxAbs": 4.76837158203125e-07,
+        "EnergyError": 1.4954518052531183e-07,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2151,12 +2153,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 8.83124389172707E-08,
-        "RmseReal": 2.986336820395603E-08,
-        "MaxImaginaryError": 5.960464477539063E-08,
-        "ImaginaryMaxAbs": 5.960464477539063E-08,
-        "EnergyError": 5.326757109905613E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 8.83124389172707e-08,
+        "RmseReal": 2.986336820395603e-08,
+        "MaxImaginaryError": 5.960464477539063e-08,
+        "ImaginaryMaxAbs": 5.960464477539063e-08,
+        "EnergyError": 5.326757109905613e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2172,12 +2174,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 1.5541425790743801E-07,
-        "RmseReal": 4.8470946551397975E-08,
-        "MaxImaginaryError": 1.0373604197866371E-07,
-        "ImaginaryMaxAbs": 1.0373604197866371E-07,
-        "EnergyError": 1.5939960189699215E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 1.5541425790743801e-07,
+        "RmseReal": 4.8470946551397975e-08,
+        "MaxImaginaryError": 1.0373604197866371e-07,
+        "ImaginaryMaxAbs": 1.0373604197866371e-07,
+        "EnergyError": 1.5939960189699215e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2193,12 +2195,12 @@
       "ErrorMessage": null,
       "Metrics": {
         "SignalLengthCorrect": true,
-        "MaxRealError": 5.8293408322640516E-08,
-        "RmseReal": 3.4696349887773045E-08,
-        "MaxImaginaryError": 7.553871483878538E-08,
-        "ImaginaryMaxAbs": 7.553871483878538E-08,
-        "EnergyError": 1.1928337498532912E-08,
-        "ImageRmse": 1.7976931348623157E+308,
+        "MaxRealError": 5.8293408322640516e-08,
+        "RmseReal": 3.4696349887773045e-08,
+        "MaxImaginaryError": 7.553871483878538e-08,
+        "ImaginaryMaxAbs": 7.553871483878538e-08,
+        "EnergyError": 1.1928337498532912e-08,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2219,7 +2221,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2240,7 +2242,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2261,7 +2263,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2282,7 +2284,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2303,7 +2305,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2324,7 +2326,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2345,7 +2347,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2366,7 +2368,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2387,7 +2389,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2408,7 +2410,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2429,7 +2431,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2450,7 +2452,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }
@@ -2471,7 +2473,7 @@
         "MaxImaginaryError": 0,
         "ImaginaryMaxAbs": 0,
         "EnergyError": 0,
-        "ImageRmse": 1.7976931348623157E+308,
+        "ImageRmse": 1.7976931348623157e+308,
         "IsFinite": true,
         "OutputShapeCorrect": true
       }

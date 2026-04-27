@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-24T15:14:34.6234679+00:00",
     "CasesRoot": "embedded synthetic C-level cases",
@@ -15,7 +16,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 1.176,
       "RuntimeMsMax": 21.034,
-      "MemoryAllocationBytesAvg": 35571
+      "MemoryAllocationBytesAvg": 35571,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "ContourExtrema",
@@ -24,7 +26,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.244,
       "RuntimeMsMax": 1.171,
-      "MemoryAllocationBytesAvg": 8815
+      "MemoryAllocationBytesAvg": 8815,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "PhaseClosure",
@@ -33,7 +36,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 1.429,
       "RuntimeMsMax": 4.59,
-      "MemoryAllocationBytesAvg": 279578
+      "MemoryAllocationBytesAvg": 279578,
+      "EvidenceKind": "contract"
     }
   ],
   "Cases": [
@@ -526,7 +530,7 @@
         "ActualSuccess": false,
         "Direction": "distance",
         "PayloadKind": "Point2fArray",
-        "ErrorMessage": "ReferencePoint is required when Direction is \u0027distance\u0027."
+        "ErrorMessage": "ReferencePoint is required when Direction is 'distance'."
       }
     },
     {
@@ -566,7 +570,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.878136,
-        "Mae": 1E-06
+        "Mae": 1e-06
       }
     },
     {
@@ -646,7 +650,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.794604,
-        "Mae": 1E-06
+        "Mae": 1e-06
       }
     },
     {
@@ -706,7 +710,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.903419,
-        "Mae": 1E-06
+        "Mae": 1e-06
       }
     },
     {
@@ -726,7 +730,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.891591,
-        "Mae": 2E-06
+        "Mae": 2e-06
       }
     },
     {
@@ -806,7 +810,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.890819,
-        "Mae": 1E-06
+        "Mae": 1e-06
       }
     },
     {
@@ -926,7 +930,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.912073,
-        "Mae": 1.2E-05
+        "Mae": 1.2e-05
       }
     },
     {
@@ -1077,7 +1081,7 @@
         "ErrorMessage": null,
         "ExpectedMessageLength": 4,
         "ActualMessageLength": 4,
-        "OutputType": "Dictionary\u00602",
+        "OutputType": "Dictionary`2",
         "ReferencePreserved": true
       }
     },
@@ -1097,7 +1101,7 @@
         "ErrorMessage": null,
         "ExpectedMessageLength": 4,
         "ActualMessageLength": 4,
-        "OutputType": "List\u00601",
+        "OutputType": "List`1",
         "ReferencePreserved": true
       }
     },

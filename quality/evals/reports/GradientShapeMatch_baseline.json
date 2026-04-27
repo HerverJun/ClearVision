@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T14:01:45.6026969+00:00",
     "CasesRoot": "quality/synthetic/cases/gradient_shape_match",
@@ -15,7 +16,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 113.47,
       "RuntimeMsMax": 763.995,
-      "MemoryAllocationBytesAvg": 635498
+      "MemoryAllocationBytesAvg": 635498,
+      "EvidenceKind": "golden"
     }
   ],
   "Cases": [
@@ -495,7 +497,7 @@
       "Passed": true,
       "RuntimeMs": 0.751,
       "MemoryAllocationBytes": 21528,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -513,7 +515,7 @@
       "Passed": true,
       "RuntimeMs": 0.367,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -531,7 +533,7 @@
       "Passed": true,
       "RuntimeMs": 0.276,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -549,7 +551,7 @@
       "Passed": true,
       "RuntimeMs": 0.32,
       "MemoryAllocationBytes": 21360,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -567,7 +569,7 @@
       "Passed": true,
       "RuntimeMs": 0.269,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -585,7 +587,7 @@
       "Passed": true,
       "RuntimeMs": 0.299,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -603,7 +605,7 @@
       "Passed": true,
       "RuntimeMs": 0.289,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -621,7 +623,7 @@
       "Passed": true,
       "RuntimeMs": 0.278,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -639,7 +641,7 @@
       "Passed": true,
       "RuntimeMs": 0.268,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -657,7 +659,7 @@
       "Passed": true,
       "RuntimeMs": 0.277,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -675,7 +677,7 @@
       "Passed": true,
       "RuntimeMs": 0.47,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -693,7 +695,7 @@
       "Passed": true,
       "RuntimeMs": 0.32,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,
@@ -711,7 +713,7 @@
       "Passed": true,
       "RuntimeMs": 0.343,
       "MemoryAllocationBytes": 19800,
-      "ErrorMessage": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5931\u8D25: [InvalidTemplate] Template has insufficient gradient features (0/10).",
+      "ErrorMessage": "梯度形状匹配失败: [InvalidTemplate] Template has insufficient gradient features (0/10).",
       "Metrics": {
         "PositionErrorPx": 0,
         "AngleErrorDeg": 0,

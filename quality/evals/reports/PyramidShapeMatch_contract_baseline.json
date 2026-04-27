@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T12:52:32.2435434+00:00",
     "CaseCount": 24,
@@ -13,7 +14,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 4.433,
-      "MemoryAllocationBytesAvg": 45643
+      "MemoryAllocationBytesAvg": 45643,
+      "EvidenceKind": "contract"
     }
   ],
   "Scenarios": [
@@ -486,7 +488,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5C0F\u5206\u6570\u5FC5\u987B\u5728 0-100 \u4E4B\u95F4",
+        "ErrorMessage": "最小分数必须在 0-100 之间",
         "Passed": true
       }
     },
@@ -502,7 +504,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5C0F\u5206\u6570\u5FC5\u987B\u5728 0-100 \u4E4B\u95F4",
+        "ErrorMessage": "最小分数必须在 0-100 之间",
         "Passed": true
       }
     },
@@ -518,7 +520,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u91D1\u5B57\u5854\u5C42\u6570\u5FC5\u987B\u5728 1-5 \u4E4B\u95F4",
+        "ErrorMessage": "金字塔层数必须在 1-5 之间",
         "Passed": true
       }
     },
@@ -534,7 +536,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u91D1\u5B57\u5854\u5C42\u6570\u5FC5\u987B\u5728 1-5 \u4E4B\u95F4",
+        "ErrorMessage": "金字塔层数必须在 1-5 之间",
         "Passed": true
       }
     },
@@ -550,7 +552,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u7279\u5F81\u70B9\u6570\u91CF\u5FC5\u987B\u5728 50-8191 \u4E4B\u95F4",
+        "ErrorMessage": "特征点数量必须在 50-8191 之间",
         "Passed": true
       }
     },
@@ -566,7 +568,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u7279\u5F81\u70B9\u6570\u91CF\u5FC5\u987B\u5728 50-8191 \u4E4B\u95F4",
+        "ErrorMessage": "特征点数量必须在 50-8191 之间",
         "Passed": true
       }
     },
@@ -582,7 +584,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "SpreadT \u5FC5\u987B\u5728 1-16 \u4E4B\u95F4",
+        "ErrorMessage": "SpreadT 必须在 1-16 之间",
         "Passed": true
       }
     },
@@ -598,7 +600,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u89D2\u5EA6\u8303\u56F4\u5FC5\u987B\u5728 0-180 \u4E4B\u95F4",
+        "ErrorMessage": "角度范围必须在 0-180 之间",
         "Passed": true
       }
     },
@@ -614,7 +616,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u89D2\u5EA6\u6B65\u957F\u5FC5\u987B\u5728 1-45 \u4E4B\u95F4",
+        "ErrorMessage": "角度步长必须在 1-45 之间",
         "Passed": true
       }
     }

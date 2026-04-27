@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T15:31:01.5032501+00:00",
     "CaseCount": 192,
@@ -18,7 +19,8 @@
       "MemoryAllocationBytesAvg": 750,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "CoordinateTransform",
@@ -29,7 +31,8 @@
       "MemoryAllocationBytesAvg": 576,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "FisheyeCalibration",
@@ -40,7 +43,8 @@
       "MemoryAllocationBytesAvg": 736,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "FisheyeUndistort",
@@ -51,7 +55,8 @@
       "MemoryAllocationBytesAvg": 736,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "HandEyeCalibration",
@@ -62,7 +67,8 @@
       "MemoryAllocationBytesAvg": 1672,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "PixelToWorldTransform",
@@ -73,7 +79,8 @@
       "MemoryAllocationBytesAvg": 576,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "StereoCalibration",
@@ -84,7 +91,8 @@
       "MemoryAllocationBytesAvg": 408,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "Undistort",
@@ -95,7 +103,8 @@
       "MemoryAllocationBytesAvg": 744,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true
+      "HasSyntheticGeometry": true,
+      "EvidenceKind": "golden"
     }
   ],
   "Scenarios": [
@@ -209,11 +218,11 @@
       "RuntimeMs": 0.765,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -224,7 +233,7 @@
       "RuntimeMs": 0.371,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -243,7 +252,7 @@
       "RuntimeMs": 0.023,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -262,7 +271,7 @@
       "RuntimeMs": 0.16,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -351,11 +360,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -366,7 +375,7 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -385,7 +394,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -404,7 +413,7 @@
       "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -493,11 +502,11 @@
       "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -508,7 +517,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -527,7 +536,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -546,7 +555,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -635,11 +644,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -650,7 +659,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -669,7 +678,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -688,7 +697,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -777,11 +786,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -792,7 +801,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -811,7 +820,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -830,7 +839,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -919,11 +928,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -934,7 +943,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -953,7 +962,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -972,7 +981,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1061,11 +1070,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1076,7 +1085,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1095,7 +1104,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1114,7 +1123,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1203,11 +1212,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1218,7 +1227,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1237,7 +1246,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1256,7 +1265,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1345,11 +1354,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1360,7 +1369,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1379,7 +1388,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1398,7 +1407,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1487,11 +1496,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1502,7 +1511,7 @@
       "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1521,7 +1530,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1540,7 +1549,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1629,11 +1638,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1644,7 +1653,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1663,7 +1672,7 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1682,7 +1691,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1771,11 +1780,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1786,7 +1795,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1805,7 +1814,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1824,7 +1833,7 @@
       "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1913,11 +1922,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -1928,7 +1937,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1947,7 +1956,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1966,7 +1975,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2055,11 +2064,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2070,7 +2079,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2089,7 +2098,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2108,7 +2117,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2197,11 +2206,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2212,7 +2221,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2231,7 +2240,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2250,7 +2259,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2339,11 +2348,11 @@
       "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2354,7 +2363,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2373,7 +2382,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2392,7 +2401,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2481,11 +2490,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2496,7 +2505,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2515,7 +2524,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2534,7 +2543,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2623,11 +2632,11 @@
       "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2638,7 +2647,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2657,7 +2666,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2676,7 +2685,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2765,11 +2774,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2780,7 +2789,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2799,7 +2808,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2818,7 +2827,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2907,11 +2916,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -2922,7 +2931,7 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2941,7 +2950,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2960,7 +2969,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3049,11 +3058,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -3064,7 +3073,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3083,7 +3092,7 @@
       "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3102,7 +3111,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3191,11 +3200,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -3206,7 +3215,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3225,7 +3234,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3244,7 +3253,7 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3333,11 +3342,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -3348,7 +3357,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3367,7 +3376,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3386,7 +3395,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3475,11 +3484,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1E-09,
+      "Tolerance": 1e-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004E-14
+        "Residual": 1.4210854715202004e-14
       }
     },
     {
@@ -3490,7 +3499,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3509,7 +3518,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3528,7 +3537,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1E-06,
+      "Tolerance": 1e-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {

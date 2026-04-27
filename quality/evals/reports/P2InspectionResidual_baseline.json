@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T16:46:16.0695106+00:00",
     "CaseCount": 48,
@@ -13,7 +14,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 32.114,
-      "MemoryAllocationBytesAvg": 51635
+      "MemoryAllocationBytesAvg": 51635,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "SurfaceDefectDetection",
@@ -21,7 +23,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 1.546,
-      "MemoryAllocationBytesAvg": 16118
+      "MemoryAllocationBytesAvg": 16118,
+      "EvidenceKind": "golden"
     }
   ],
   "Scenarios": [

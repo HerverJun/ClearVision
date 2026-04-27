@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T13:09:28.2840723+00:00",
     "CaseCount": 24,
@@ -13,7 +14,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 1.791,
-      "MemoryAllocationBytesAvg": 23921
+      "MemoryAllocationBytesAvg": 23921,
+      "EvidenceKind": "contract"
     }
   ],
   "Scenarios": [
@@ -93,7 +95,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1E-07,
+        "MeanError": 1e-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -105,7 +107,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8E-07,
+        "MaxError": 1.8e-07,
         "MeanRotationError": 0
       }
     },
@@ -120,7 +122,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 8E-08,
+        "MeanError": 8e-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -132,7 +134,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.4E-07,
+        "MaxError": 1.4e-07,
         "MeanRotationError": 0
       }
     },
@@ -147,7 +149,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1E-07,
+        "MeanError": 1e-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -159,7 +161,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8E-07,
+        "MaxError": 1.8e-07,
         "MeanRotationError": 0
       }
     },
@@ -174,7 +176,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 8E-08,
+        "MeanError": 8e-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -186,7 +188,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.4E-07,
+        "MaxError": 1.4e-07,
         "MeanRotationError": 0
       }
     },
@@ -201,7 +203,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1E-07,
+        "MeanError": 1e-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -213,7 +215,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8E-07,
+        "MaxError": 1.8e-07,
         "MeanRotationError": 0
       }
     },
@@ -228,7 +230,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1E-07,
+        "MeanError": 1e-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -240,7 +242,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8E-07,
+        "MaxError": 1.8e-07,
         "MeanRotationError": 0
       }
     },
@@ -255,7 +257,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1E-07,
+        "MeanError": 1e-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -267,7 +269,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8E-07,
+        "MaxError": 1.8e-07,
         "MeanRotationError": 0
       }
     },
@@ -282,7 +284,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 8E-08,
+        "MeanError": 8e-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -294,7 +296,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.4E-07,
+        "MaxError": 1.4e-07,
         "MeanRotationError": 0
       }
     },
@@ -309,7 +311,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 9E-08,
+        "MeanError": 9e-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -321,7 +323,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.5E-07,
+        "MaxError": 1.5e-07,
         "MeanRotationError": 0
       }
     },
@@ -390,7 +392,7 @@
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1E-07,
+        "MeanError": 1e-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -402,7 +404,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8E-07,
+        "MaxError": 1.8e-07,
         "MeanRotationError": 0
       }
     },
@@ -575,7 +577,7 @@
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
-        "ErrorMessage": "CalibrationType must be \u0027eye_in_hand\u0027 or \u0027eye_to_hand\u0027.",
+        "ErrorMessage": "CalibrationType must be 'eye_in_hand' or 'eye_to_hand'.",
         "Passed": true
       }
     },

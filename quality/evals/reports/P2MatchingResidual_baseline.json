@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T16:41:58.7658772+00:00",
     "CaseCount": 72,
@@ -13,7 +14,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 28.791,
-      "MemoryAllocationBytesAvg": 9876733
+      "MemoryAllocationBytesAvg": 9876733,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "PlanarMatching",
@@ -21,7 +23,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 30.356,
-      "MemoryAllocationBytesAvg": 285161
+      "MemoryAllocationBytesAvg": 285161,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "ShapeMatching",
@@ -29,7 +32,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 21.372,
-      "MemoryAllocationBytesAvg": 39562277
+      "MemoryAllocationBytesAvg": 39562277,
+      "EvidenceKind": "golden"
     }
   ],
   "Scenarios": [

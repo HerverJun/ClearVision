@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T16:35:52.6512919+00:00",
     "CaseCount": 72,
@@ -13,7 +14,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 5.125,
-      "MemoryAllocationBytesAvg": 40263
+      "MemoryAllocationBytesAvg": 40263,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "NPointCalibration",
@@ -21,7 +23,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 28.377,
-      "MemoryAllocationBytesAvg": 19952
+      "MemoryAllocationBytesAvg": 19952,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "TranslationRotationCalibration",
@@ -29,7 +32,8 @@
       "Passed": 24,
       "Failed": 0,
       "RuntimeMsAvg": 0.545,
-      "MemoryAllocationBytesAvg": 21322
+      "MemoryAllocationBytesAvg": 21322,
+      "EvidenceKind": "golden"
     }
   ],
   "Scenarios": [
@@ -410,7 +414,7 @@
       "MemoryAllocationBytes": 89416,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 3.0939509755270964E-06,
+        "ReprojectionError": 3.0939509755270964e-06,
         "TransformModel": "Affine"
       }
     },
@@ -423,7 +427,7 @@
       "MemoryAllocationBytes": 20576,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 1.1217691117462884E-06,
+        "ReprojectionError": 1.1217691117462884e-06,
         "TransformModel": "Affine"
       }
     },
@@ -436,7 +440,7 @@
       "MemoryAllocationBytes": 20536,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 2.870548787179986E-06,
+        "ReprojectionError": 2.870548787179986e-06,
         "TransformModel": "Affine"
       }
     },
@@ -449,7 +453,7 @@
       "MemoryAllocationBytes": 20864,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 2.2364525487035887E-06,
+        "ReprojectionError": 2.2364525487035887e-06,
         "TransformModel": "Affine"
       }
     },
@@ -462,7 +466,7 @@
       "MemoryAllocationBytes": 20512,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 1.7113537741625245E-06,
+        "ReprojectionError": 1.7113537741625245e-06,
         "TransformModel": "Affine"
       }
     },
@@ -475,7 +479,7 @@
       "MemoryAllocationBytes": 20584,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 1.3403303824014752E-06,
+        "ReprojectionError": 1.3403303824014752e-06,
         "TransformModel": "Affine"
       }
     },
@@ -488,7 +492,7 @@
       "MemoryAllocationBytes": 20832,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 2.22126192815652E-06,
+        "ReprojectionError": 2.22126192815652e-06,
         "TransformModel": "Affine"
       }
     },
@@ -501,7 +505,7 @@
       "MemoryAllocationBytes": 20856,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 2.6954970914631877E-06,
+        "ReprojectionError": 2.6954970914631877e-06,
         "TransformModel": "Affine"
       }
     },
@@ -514,7 +518,7 @@
       "MemoryAllocationBytes": 21480,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 5.293834137830427E-07,
+        "ReprojectionError": 5.293834137830427e-07,
         "TransformModel": "Homography"
       }
     },
@@ -527,7 +531,7 @@
       "MemoryAllocationBytes": 21768,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 1.4428920668468004E-06,
+        "ReprojectionError": 1.4428920668468004e-06,
         "TransformModel": "Homography"
       }
     },
@@ -540,7 +544,7 @@
       "MemoryAllocationBytes": 21736,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 5.19255093141359E-07,
+        "ReprojectionError": 5.19255093141359e-07,
         "TransformModel": "Homography"
       }
     },
@@ -553,7 +557,7 @@
       "MemoryAllocationBytes": 22064,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 5.826024804072933E-07,
+        "ReprojectionError": 5.826024804072933e-07,
         "TransformModel": "Homography"
       }
     },
@@ -566,7 +570,7 @@
       "MemoryAllocationBytes": 21768,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 7.905541937697487E-07,
+        "ReprojectionError": 7.905541937697487e-07,
         "TransformModel": "Homography"
       }
     },
@@ -579,7 +583,7 @@
       "MemoryAllocationBytes": 21784,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 5.321941600114903E-07,
+        "ReprojectionError": 5.321941600114903e-07,
         "TransformModel": "Homography"
       }
     },
@@ -592,7 +596,7 @@
       "MemoryAllocationBytes": 22048,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 5.335428299111836E-07,
+        "ReprojectionError": 5.335428299111836e-07,
         "TransformModel": "Homography"
       }
     },
@@ -605,7 +609,7 @@
       "MemoryAllocationBytes": 22048,
       "ErrorMessage": null,
       "Observed": {
-        "ReprojectionError": 8.848250346429478E-07,
+        "ReprojectionError": 8.848250346429478e-07,
         "TransformModel": "Homography"
       }
     },
@@ -714,7 +718,7 @@
       "MemoryAllocationBytes": 65936,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 8.444704010915923E-15,
+        "CalibrationError": 8.444704010915923e-15,
         "TransformModel": "Similarity"
       }
     },
@@ -727,7 +731,7 @@
       "MemoryAllocationBytes": 24696,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 1.0048591735576161E-14,
+        "CalibrationError": 1.0048591735576161e-14,
         "TransformModel": "Similarity"
       }
     },
@@ -740,7 +744,7 @@
       "MemoryAllocationBytes": 24720,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 9.697021187062789E-15,
+        "CalibrationError": 9.697021187062789e-15,
         "TransformModel": "Similarity"
       }
     },
@@ -753,7 +757,7 @@
       "MemoryAllocationBytes": 24920,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 9.031512475762442E-15,
+        "CalibrationError": 9.031512475762442e-15,
         "TransformModel": "Similarity"
       }
     },
@@ -766,7 +770,7 @@
       "MemoryAllocationBytes": 24528,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 3.809860975949991E-15,
+        "CalibrationError": 3.809860975949991e-15,
         "TransformModel": "Similarity"
       }
     },
@@ -779,7 +783,7 @@
       "MemoryAllocationBytes": 24712,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 9.204545682473235E-15,
+        "CalibrationError": 9.204545682473235e-15,
         "TransformModel": "Similarity"
       }
     },
@@ -792,7 +796,7 @@
       "MemoryAllocationBytes": 25056,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 1.0539051923921737E-14,
+        "CalibrationError": 1.0539051923921737e-14,
         "TransformModel": "Similarity"
       }
     },
@@ -805,7 +809,7 @@
       "MemoryAllocationBytes": 25048,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 6.4047456679787536E-15,
+        "CalibrationError": 6.4047456679787536e-15,
         "TransformModel": "Similarity"
       }
     },
@@ -818,7 +822,7 @@
       "MemoryAllocationBytes": 23816,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 2.1018137570293106E-15,
+        "CalibrationError": 2.1018137570293106e-15,
         "TransformModel": "Rigid"
       }
     },
@@ -831,7 +835,7 @@
       "MemoryAllocationBytes": 24392,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 1.1064863871295526E-14,
+        "CalibrationError": 1.1064863871295526e-14,
         "TransformModel": "Rigid"
       }
     },
@@ -844,7 +848,7 @@
       "MemoryAllocationBytes": 24232,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 3.462756959325817E-15,
+        "CalibrationError": 3.462756959325817e-15,
         "TransformModel": "Rigid"
       }
     },
@@ -857,7 +861,7 @@
       "MemoryAllocationBytes": 24728,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 3.972054645195637E-15,
+        "CalibrationError": 3.972054645195637e-15,
         "TransformModel": "Rigid"
       }
     },
@@ -870,7 +874,7 @@
       "MemoryAllocationBytes": 24288,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 3.1776437161565094E-15,
+        "CalibrationError": 3.1776437161565094e-15,
         "TransformModel": "Rigid"
       }
     },
@@ -883,7 +887,7 @@
       "MemoryAllocationBytes": 24360,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 7.983731028902322E-15,
+        "CalibrationError": 7.983731028902322e-15,
         "TransformModel": "Rigid"
       }
     },
@@ -896,7 +900,7 @@
       "MemoryAllocationBytes": 24696,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 1.103630933628286E-14,
+        "CalibrationError": 1.103630933628286e-14,
         "TransformModel": "Rigid"
       }
     },
@@ -909,7 +913,7 @@
       "MemoryAllocationBytes": 24680,
       "ErrorMessage": null,
       "Observed": {
-        "CalibrationError": 1.0892413880551923E-14,
+        "CalibrationError": 1.0892413880551923e-14,
         "TransformModel": "Rigid"
       }
     },

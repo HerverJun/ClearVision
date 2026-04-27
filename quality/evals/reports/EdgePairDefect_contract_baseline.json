@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T08:17:33.7451398+00:00",
     "CaseCount": 27,
@@ -13,7 +14,8 @@
       "Passed": 27,
       "Failed": 0,
       "RuntimeMsAvg": 5.711,
-      "MemoryAllocationBytesAvg": 44626
+      "MemoryAllocationBytesAvg": 44626,
+      "EvidenceKind": "contract"
     }
   ],
   "Scenarios": [

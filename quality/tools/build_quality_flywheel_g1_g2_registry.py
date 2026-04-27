@@ -85,14 +85,26 @@ class MatrixRow:
     qscore: int
     level: str
     known_limitations: int
+    has_contract: bool
+    contract_cases: int
     has_golden: bool
     golden_cases: int
-    has_public_dataset: bool
-    has_field_dataset: bool
+    has_dataset: bool
+    dataset_cases: int
+    has_field: bool
+    field_cases: int
     has_benchmark: bool
     priority: str
     owner_agent: str
     next_action: str
+
+    @property
+    def has_signal(self) -> bool:
+        return self.has_contract or self.has_golden or self.has_dataset or self.has_field
+
+    @property
+    def signal_cases(self) -> int:
+        return max(self.contract_cases, self.golden_cases, self.dataset_cases, self.field_cases)
 
 
 def split_markdown_row(line: str) -> list[str]:
@@ -136,7 +148,7 @@ def parse_matrix(path: Path) -> list[MatrixRow]:
             continue
 
         cells = split_markdown_row(line)
-        if len(cells) < 21:
+        if len(cells) < 25:
             raise ValueError(f"Unexpected matrix row shape ({len(cells)} cells): {line[:120]}")
 
         rows.append(
@@ -147,14 +159,18 @@ def parse_matrix(path: Path) -> list[MatrixRow]:
                 qscore=parse_int(cells[3]),
                 level=cells[4],
                 known_limitations=parse_int(cells[11]),
-                has_golden=parse_bool(cells[13]),
-                golden_cases=parse_int(cells[14]),
-                has_public_dataset=parse_bool(cells[15]),
-                has_field_dataset=parse_bool(cells[16]),
-                has_benchmark=parse_bool(cells[17]),
-                priority=cells[18],
-                owner_agent=cells[19],
-                next_action=cells[20],
+                has_contract=parse_bool(cells[13]),
+                contract_cases=parse_int(cells[14]),
+                has_golden=parse_bool(cells[15]),
+                golden_cases=parse_int(cells[16]),
+                has_dataset=parse_bool(cells[17]),
+                dataset_cases=parse_int(cells[18]),
+                has_field=parse_bool(cells[19]),
+                field_cases=parse_int(cells[20]),
+                has_benchmark=parse_bool(cells[21]),
+                priority=cells[22],
+                owner_agent=cells[23],
+                next_action=cells[24],
             )
         )
 
@@ -165,12 +181,20 @@ def parse_matrix(path: Path) -> list[MatrixRow]:
 
 
 def evidence_layer(row: MatrixRow) -> str:
-    if row.has_field_dataset:
+    if row.has_field and row.has_dataset and row.has_golden:
         return "field+dataset+golden"
-    if row.has_public_dataset:
+    if row.has_field:
+        return "field"
+    if row.has_dataset and row.has_golden:
         return "dataset+golden"
+    if row.has_dataset:
+        return "dataset"
+    if row.has_contract and row.has_golden:
+        return "contract+golden"
     if row.has_golden:
-        return "golden-or-contract"
+        return "golden"
+    if row.has_contract:
+        return "contract"
     return "planned"
 
 
@@ -186,12 +210,14 @@ def build_registry(rows: list[MatrixRow]) -> dict:
     if len(core50) != 50:
         raise ValueError(f"Expected core50 length 50, got {len(core50)}")
 
-    p2_without_golden = [
-        row.operator for row in rows if row.priority == "P2" and not row.has_golden
+    p2_without_signal = [
+        row.operator for row in rows if row.priority == "P2" and not row.has_signal
     ]
     core_rows = [by_operator[operator] for operator in core50]
-    all_with_signal = [row for row in rows if row.has_golden]
-    core_with_signal = [row for row in core_rows if row.has_golden]
+    all_with_signal = [row for row in rows if row.has_signal]
+    core_with_signal = [row for row in core_rows if row.has_signal]
+    g1_remaining = len(rows) - len(all_with_signal)
+    g2_remaining = len(core_rows) - len(core_with_signal)
     visual20_candidates = [
         row.operator
         for row in rows
@@ -214,19 +240,21 @@ def build_registry(rows: list[MatrixRow]) -> dict:
     ][:20]
 
     return {
-        "schemaVersion": "2026-04-27.g1-g2",
+        "schemaVersion": "2026-04-27.g1-g2.evidence-split",
         "generatedAtUtc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "sourceMatrix": str(MATRIX_PATH.relative_to(REPO_ROOT)).replace("\\", "/"),
-        "scopeNote": "Current matrix has HasGoldenTest only; G1 treats existing golden/contract baselines as contract evidence until HasContractTest is split out.",
+        "scopeNote": "Matrix evidence is split into HasContractTest, HasGoldenTest, HasDatasetEvidence, and HasFieldReplay. G1 counts any accepted evidence signal; G2 Core50 counts accepted contract/golden/dataset/field signal without drifting into new dataset runs.",
         "baseline": {
             "totalOperators": len(rows),
             "levelCounts": dict(sorted({level: sum(1 for row in rows if row.level == level) for level in {row.level for row in rows}}.items())),
             "priorityCounts": dict(sorted({priority: sum(1 for row in rows if row.priority == priority) for priority in {row.priority for row in rows}}.items())),
-            "goldenOrContractSignalYes": len(all_with_signal),
-            "goldenOrContractSignalNo": len(rows) - len(all_with_signal),
-            "p2WithoutGoldenEvidence": len(p2_without_golden),
-            "publicOrAlternativeDatasetYes": sum(1 for row in rows if row.has_public_dataset),
-            "fieldDatasetYes": sum(1 for row in rows if row.has_field_dataset),
+            "anyEvidenceSignalYes": len(all_with_signal),
+            "anyEvidenceSignalNo": len(rows) - len(all_with_signal),
+            "contractSignalYes": sum(1 for row in rows if row.has_contract),
+            "goldenSignalYes": sum(1 for row in rows if row.has_golden),
+            "datasetEvidenceYes": sum(1 for row in rows if row.has_dataset),
+            "fieldReplayYes": sum(1 for row in rows if row.has_field),
+            "p2WithoutEvidenceSignal": len(p2_without_signal),
         },
         "evidenceLayers": [
             {
@@ -247,25 +275,33 @@ def build_registry(rows: list[MatrixRow]) -> dict:
             },
         ],
         "g1": {
-            "target": "155/155 operators have basic contract evidence.",
-            "currentContractOrGoldenSignal": len(all_with_signal),
-            "remainingOperatorsWithoutSignal": len(rows) - len(all_with_signal),
-            "status": "in-progress",
-            "nextGate": "Split matrix into HasContractTest and HasGoldenTest, then expand P3 contract runners.",
+            "target": "155/155 operators have accepted evidence signal across contract/golden/dataset/field layers.",
+            "currentEvidenceSignal": len(all_with_signal),
+            "remainingOperatorsWithoutSignal": g1_remaining,
+            "status": "complete" if g1_remaining == 0 else "in-progress",
+            "nextGate": (
+                "Maintain contract evidence and move to G3 dataset-tier execution."
+                if g1_remaining == 0
+                else "Expand P3 contract runners while preserving the split evidence columns."
+            ),
         },
         "g2": {
-            "target": "Core 50 operators have golden baselines.",
+            "target": "Core 50 operators have accepted contract/golden/dataset evidence signals.",
             "core50Frozen": True,
             "p2Included": len(p2_operators),
             "p3Included": len(P3_CORE18),
-            "currentCore50GoldenOrContractSignal": len(core_with_signal),
-            "remainingCore50WithoutGolden": len(core_rows) - len(core_with_signal),
-            "status": "in-progress",
-            "nextGate": "Implement P2 residual runners first, then cover the selected P3 vision chain.",
+            "currentCore50EvidenceSignal": len(core_with_signal),
+            "remainingCore50WithoutEvidenceSignal": g2_remaining,
+            "status": "complete" if g2_remaining == 0 else "in-progress",
+            "nextGate": (
+                "Keep Core50 baselines in regression and move next effort to G1 P3 contract expansion / G3 dataset-tier selection."
+                if g2_remaining == 0
+                else "Implement P2 residual runners first, then cover the selected P3 vision chain."
+            ),
         },
         "p2ResidualGoldenPlan": [
             {"operator": operator, **P2_RESIDUAL_STRATEGY[operator]}
-            for operator in p2_without_golden
+            for operator in p2_without_signal
         ],
         "visual20CandidatePool": visual20_candidates,
         "core50": [
@@ -275,9 +311,15 @@ def build_registry(rows: list[MatrixRow]) -> dict:
                 "qscore": row.qscore,
                 "level": row.level,
                 "knownLimitations": row.known_limitations,
+                "hasContract": row.has_contract,
+                "contractCases": row.contract_cases,
                 "hasGolden": row.has_golden,
-                "cases": row.golden_cases,
-                "hasPublicDataset": row.has_public_dataset,
+                "goldenCases": row.golden_cases,
+                "hasDatasetEvidence": row.has_dataset,
+                "datasetCases": row.dataset_cases,
+                "hasFieldReplay": row.has_field,
+                "fieldReplayCases": row.field_cases,
+                "cases": row.signal_cases,
                 "hasBenchmark": row.has_benchmark,
                 "evidenceLayer": evidence_layer(row),
                 "owner": (
@@ -298,8 +340,11 @@ def build_registry(rows: list[MatrixRow]) -> dict:
                 "operator": row.operator,
                 "priority": row.priority,
                 "level": row.level,
+                "hasContract": row.has_contract,
                 "hasGolden": row.has_golden,
-                "cases": row.golden_cases,
+                "hasDatasetEvidence": row.has_dataset,
+                "hasFieldReplay": row.has_field,
+                "cases": row.signal_cases,
                 "evidenceLayer": evidence_layer(row),
                 "nextAction": row.next_action,
             }
@@ -331,12 +376,14 @@ def write_markdown(registry: dict) -> None:
             "",
             "## Status",
             "",
-            f"- G1 current signal: {g1['currentContractOrGoldenSignal']}/{baseline['totalOperators']} operators.",
+            f"- G1 current evidence signal: {g1['currentEvidenceSignal']}/{baseline['totalOperators']} operators.",
             f"- G1 remaining without signal: {g1['remainingOperatorsWithoutSignal']}.",
+            f"- G1 status: {g1['status']}.",
             f"- G2 Core50 frozen: {g2['core50Frozen']} ({g2['p2Included']} P2 + {g2['p3Included']} P3).",
-            f"- G2 current Core50 signal: {g2['currentCore50GoldenOrContractSignal']}/50.",
-            f"- G2 remaining Core50 without golden signal: {g2['remainingCore50WithoutGolden']}.",
-            f"- P2 without golden evidence: {baseline['p2WithoutGoldenEvidence']}.",
+            f"- G2 current Core50 evidence signal: {g2['currentCore50EvidenceSignal']}/50.",
+            f"- G2 remaining Core50 without evidence signal: {g2['remainingCore50WithoutEvidenceSignal']}.",
+            f"- G2 status: {g2['status']}.",
+            f"- P2 without evidence signal: {baseline['p2WithoutEvidenceSignal']}.",
             "",
             "## Evidence Layers",
             "",
@@ -370,13 +417,13 @@ def write_markdown(registry: dict) -> None:
             "",
             "## Frozen Core 50",
             "",
-            "| # | Operator | Priority | Has Golden | Cases | Evidence Layer | Owner |",
-            "|---:|---|---|---|---:|---|---|",
+            "| # | Operator | Priority | Contract | Golden | Dataset | Field | Cases | Evidence Layer | Owner |",
+            "|---:|---|---|---|---|---|---|---:|---|---|",
         ]
     )
     for index, item in enumerate(registry["core50"], start=1):
         lines.append(
-            f"| {index} | {item['operator']} | {item['priority']} | {md_bool(item['hasGolden'])} | {item['cases']} | {item['evidenceLayer']} | {item['owner']} |"
+            f"| {index} | {item['operator']} | {item['priority']} | {md_bool(item['hasContract'])} | {md_bool(item['hasGolden'])} | {md_bool(item['hasDatasetEvidence'])} | {md_bool(item['hasFieldReplay'])} | {item['cases']} | {item['evidenceLayer']} | {item['owner']} |"
         )
 
     lines.extend(

@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-24T12:40:24.0914516+00:00",
     "CasesRoot": "quality/synthetic/cases",
@@ -15,7 +16,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.963,
       "RuntimeMsMax": 32.974,
-      "MemoryAllocationBytesAvg": 96959
+      "MemoryAllocationBytesAvg": 96959,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionComplement",
@@ -24,7 +26,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.186,
       "RuntimeMsMax": 4.522,
-      "MemoryAllocationBytesAvg": 37540
+      "MemoryAllocationBytesAvg": 37540,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionDifference",
@@ -33,7 +36,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.267,
       "RuntimeMsMax": 2.112,
-      "MemoryAllocationBytesAvg": 20142
+      "MemoryAllocationBytesAvg": 20142,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionDilation",
@@ -42,7 +46,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.536,
       "RuntimeMsMax": 6.379,
-      "MemoryAllocationBytesAvg": 62196
+      "MemoryAllocationBytesAvg": 62196,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionErosion",
@@ -51,7 +56,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.359,
       "RuntimeMsMax": 1.585,
-      "MemoryAllocationBytesAvg": 21978
+      "MemoryAllocationBytesAvg": 21978,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionIntersection",
@@ -60,7 +66,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.209,
       "RuntimeMsMax": 1.402,
-      "MemoryAllocationBytesAvg": 13649
+      "MemoryAllocationBytesAvg": 13649,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionOpening",
@@ -69,7 +76,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.437,
       "RuntimeMsMax": 3.141,
-      "MemoryAllocationBytesAvg": 53126
+      "MemoryAllocationBytesAvg": 53126,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionSkeleton",
@@ -78,7 +86,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 1.438,
       "RuntimeMsMax": 18.477,
-      "MemoryAllocationBytesAvg": 445934
+      "MemoryAllocationBytesAvg": 445934,
+      "EvidenceKind": "golden"
     },
     {
       "Operator": "RegionUnion",
@@ -87,7 +96,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 0.312,
       "RuntimeMsMax": 1.415,
-      "MemoryAllocationBytesAvg": 16555
+      "MemoryAllocationBytesAvg": 16555,
+      "EvidenceKind": "golden"
     }
   ],
   "Cases": [

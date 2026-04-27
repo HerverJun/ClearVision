@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T12:44:43.3566447+00:00",
     "CaseCount": 44,
@@ -13,7 +14,8 @@
       "Passed": 22,
       "Failed": 0,
       "RuntimeMsAvg": 11.666,
-      "MemoryAllocationBytesAvg": 53554
+      "MemoryAllocationBytesAvg": 53554,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "OrbFeatureMatch",
@@ -21,7 +23,8 @@
       "Passed": 22,
       "Failed": 0,
       "RuntimeMsAvg": 7.568,
-      "MemoryAllocationBytesAvg": 152028
+      "MemoryAllocationBytesAvg": 152028,
+      "EvidenceKind": "contract"
     }
   ],
   "Scenarios": [
@@ -132,7 +135,7 @@
         "ScoreInRange": true,
         "MinScoreSatisfied": true,
         "MinInliersSatisfied": true,
-        "PositionErrorPx": 1.1E-05,
+        "PositionErrorPx": 1.1e-05,
         "PositionCorrect": true,
         "ScoreDefinitionCorrect": true,
         "FailureReasonCorrect": true,
@@ -486,7 +489,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "\u573A\u666F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
+        "FailureReason": "场景特征点不足。"
       }
     },
     {
@@ -515,7 +518,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "\u573A\u666F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
+        "FailureReason": "场景特征点不足。"
       }
     },
     {
@@ -544,7 +547,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "\u6A21\u677F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
+        "FailureReason": "模板特征点不足。"
       }
     },
     {
@@ -603,7 +606,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
         "Passed": true
       }
     },
@@ -619,7 +622,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
         "Passed": true
       }
     },
@@ -635,7 +638,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u68C0\u6D4B\u9608\u503C\u5FC5\u987B\u5728 0.0001-0.1 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "检测阈值必须在 0.0001-0.1 之间。",
         "Passed": true
       }
     },
@@ -651,7 +654,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u68C0\u6D4B\u9608\u503C\u5FC5\u987B\u5728 0.0001-0.1 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "检测阈值必须在 0.0001-0.1 之间。",
         "Passed": true
       }
     },
@@ -1058,7 +1061,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "\u573A\u666F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
+        "FailureReason": "场景特征点不足。"
       }
     },
     {
@@ -1087,7 +1090,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "\u6A21\u677F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
+        "FailureReason": "模板特征点不足。"
       }
     },
     {
@@ -1116,7 +1119,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "\u6A21\u677F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
+        "FailureReason": "模板特征点不足。"
       }
     },
     {
@@ -1175,7 +1178,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
         "Passed": true
       }
     },
@@ -1191,7 +1194,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
         "Passed": true
       }
     },
@@ -1207,7 +1210,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u5C3A\u5EA6\u56E0\u5B50\u5FC5\u987B\u5728 1.0-2.0 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "尺度因子必须在 1.0-2.0 之间。",
         "Passed": true
       }
     },
@@ -1223,7 +1226,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "\u6700\u5927\u7279\u5F81\u70B9\u5FC5\u987B\u5728 100-2000 \u4E4B\u95F4\u3002",
+        "ErrorMessage": "最大特征点必须在 100-2000 之间。",
         "Passed": true
       }
     }

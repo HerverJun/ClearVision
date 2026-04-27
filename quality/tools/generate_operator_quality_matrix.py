@@ -105,12 +105,17 @@ class CardFacts:
 
 
 @dataclass(frozen=True)
-class GoldenEvidence:
-    status: str
+class EvidenceFacts:
+    contract_status: str
+    golden_status: str
+    dataset_status: str
+    field_status: str
     benchmark: str
-    case_count: int
+    contract_cases: int
+    golden_cases: int
+    dataset_cases: int
+    field_cases: int
     failed: int
-    public_dataset: str = "No"
 
 
 def split_markdown_row(line: str) -> list[str]:
@@ -303,8 +308,66 @@ def candidate_baseline_paths(baseline_path: Path) -> list[Path]:
     return [baseline_path]
 
 
-def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
-    evidence: dict[str, GoldenEvidence] = {}
+EVIDENCE_KIND_ORDER = ["contract", "golden", "dataset", "field"]
+
+
+def normalize_evidence_kind(raw_value: object) -> str:
+    value = str(raw_value or "").strip().lower()
+    aliases = {
+        "contracttest": "contract",
+        "goldentest": "golden",
+        "public-dataset": "dataset",
+        "public_dataset": "dataset",
+        "dataset-tier": "dataset",
+        "field-replay": "field",
+        "field_replay": "field",
+    }
+    value = aliases.get(value, value)
+    if value in EVIDENCE_KIND_ORDER:
+        return value
+    return "golden"
+
+
+def infer_evidence_kind(path: Path) -> str:
+    name = path.name.lower()
+    if "mvtec" in name or "public_bridge" in name or "dataset" in name:
+        return "dataset"
+    if (
+        "_contract_" in name
+        or name.startswith("p2")
+        or "p3corecontracts" in name
+        or "runtime_benchmark" in name
+    ):
+        return "contract"
+    return "golden"
+
+
+def evidence_status(cases: int, failed: int) -> str:
+    if cases >= 20 and failed == 0:
+        return "Yes"
+    if cases > 0:
+        return "Partial"
+    return "No"
+
+
+def has_any_signal(evidence: EvidenceFacts) -> bool:
+    return any(
+        status == "Yes"
+        for status in (
+            evidence.contract_status,
+            evidence.golden_status,
+            evidence.dataset_status,
+            evidence.field_status,
+        )
+    )
+
+
+def best_case_count(evidence: EvidenceFacts) -> int:
+    return max(evidence.contract_cases, evidence.golden_cases, evidence.dataset_cases, evidence.field_cases)
+
+
+def load_golden_evidence(baseline_path: Path) -> dict[str, EvidenceFacts]:
+    accumulator: dict[str, dict[str, object]] = {}
 
     for path in candidate_baseline_paths(baseline_path):
         if not path.exists():
@@ -315,35 +378,56 @@ def load_golden_evidence(baseline_path: Path) -> dict[str, GoldenEvidence]:
         except json.JSONDecodeError:
             continue
 
+        root_evidence_kind = normalize_evidence_kind(data.get("EvidenceKind") or infer_evidence_kind(path))
+
         for item in data.get("Operators", []):
             operator = str(item.get("Operator", "")).strip()
             case_count = int(item.get("CaseCount", 0) or 0)
             failed = int(item.get("Failed", 0) or 0)
             has_runtime = "RuntimeMsAvg" in item and "MemoryAllocationBytesAvg" in item
             has_public_dataset = bool(item.get("HasPublicDataset", False))
+            evidence_kind = normalize_evidence_kind(item.get("EvidenceKind") or root_evidence_kind)
 
             if not operator or case_count <= 0:
                 continue
 
-            if operator in evidence:
-                existing = evidence[operator]
-                case_count += existing.case_count
-                failed += existing.failed
-                has_runtime = has_runtime or existing.benchmark == "Yes"
-                has_public_dataset = has_public_dataset or existing.public_dataset == "Yes"
+            if operator not in accumulator:
+                accumulator[operator] = {
+                    "cases": Counter(),
+                    "failed": Counter(),
+                    "benchmark": False,
+                }
 
-            if case_count >= 20 and failed == 0:
-                status = "Yes"
-            else:
-                status = "Partial"
+            cases_by_kind = accumulator[operator]["cases"]
+            failed_by_kind = accumulator[operator]["failed"]
+            if not isinstance(cases_by_kind, Counter) or not isinstance(failed_by_kind, Counter):
+                raise TypeError("Invalid evidence accumulator")
 
-            evidence[operator] = GoldenEvidence(
-                status=status,
-                benchmark="Yes" if has_runtime else "No",
-                case_count=case_count,
-                failed=failed,
-                public_dataset="Yes" if has_public_dataset else "No",
-            )
+            cases_by_kind[evidence_kind] += case_count
+            failed_by_kind[evidence_kind] += failed
+            if has_public_dataset and evidence_kind != "dataset":
+                cases_by_kind["dataset"] += case_count
+                failed_by_kind["dataset"] += failed
+            accumulator[operator]["benchmark"] = bool(accumulator[operator]["benchmark"]) or has_runtime
+
+    evidence: dict[str, EvidenceFacts] = {}
+    for operator, values in accumulator.items():
+        cases = values["cases"]
+        failed = values["failed"]
+        if not isinstance(cases, Counter) or not isinstance(failed, Counter):
+            raise TypeError("Invalid evidence accumulator")
+        evidence[operator] = EvidenceFacts(
+            contract_status=evidence_status(cases["contract"], failed["contract"]),
+            golden_status=evidence_status(cases["golden"], failed["golden"]),
+            dataset_status=evidence_status(cases["dataset"], failed["dataset"]),
+            field_status=evidence_status(cases["field"], failed["field"]),
+            benchmark="Yes" if values["benchmark"] else "No",
+            contract_cases=cases["contract"],
+            golden_cases=cases["golden"],
+            dataset_cases=cases["dataset"],
+            field_cases=cases["field"],
+            failed=sum(failed.values()),
+        )
 
     return evidence
 
@@ -364,17 +448,18 @@ def priority_for(row: CatalogRow, card: CardFacts) -> str:
     return "P3"
 
 
-def next_action_for(row: CatalogRow, card: CardFacts, golden: GoldenEvidence) -> str:
-    if row.operator in NEXT_ACTION_OVERRIDES and golden.status != "Yes":
+def next_action_for(row: CatalogRow, card: CardFacts, evidence: EvidenceFacts) -> str:
+    has_signal = has_any_signal(evidence)
+    if row.operator in NEXT_ACTION_OVERRIDES and not has_signal:
         return NEXT_ACTION_OVERRIDES[row.operator]
-    if golden.status == "Yes" and card.card_todo_count > 0:
+    if has_signal and card.card_todo_count > 0:
         return "Backfill card/source TODO, then review QScore/Level"
-    if golden.status == "Yes" and row.level == "A":
+    if has_signal and row.level == "A":
         return "Maintain regression baseline"
-    if golden.status == "Yes":
-        return "Review QScore/Level from golden evidence"
+    if has_signal:
+        return "Review QScore/Level from evidence"
     if row.level == "C":
-        return "Add golden tests and failure triage"
+        return "Add contract/golden evidence and failure triage"
     if card.card_todo_count > 0:
         return "Clear card TODO and known limitations"
     if row.operator in NEXT_ACTION_OVERRIDES:
@@ -384,41 +469,60 @@ def next_action_for(row: CatalogRow, card: CardFacts, golden: GoldenEvidence) ->
     return "Add baseline evidence if operator stays in quality scope"
 
 
-def owner_for(row: CatalogRow, card: CardFacts, golden: GoldenEvidence, priority: str) -> str:
-    if row.level == "C" and golden.status != "Yes":
+def owner_for(row: CatalogRow, card: CardFacts, evidence: EvidenceFacts, priority: str) -> str:
+    has_signal = has_any_signal(evidence)
+    if row.level == "C" and not has_signal:
         return "Golden Dataset Agent"
     if card.card_todo_count > 0:
         return "Card Auditor Agent"
-    if golden.status != "Yes" and priority in {"P0", "P1", "P2"}:
+    if not has_signal and priority in {"P0", "P1", "P2"}:
         return "Golden Dataset Agent"
     if row.category in NON_CORE_CATEGORIES:
         return "Contract Test Agent"
     return "Quality Flywheel Agent"
 
 
-def evidence_or_default(evidence: dict[str, GoldenEvidence], operator: str) -> GoldenEvidence:
-    return evidence.get(operator, GoldenEvidence(status="No", benchmark="No", case_count=0, failed=0, public_dataset="No"))
+def evidence_or_default(evidence: dict[str, EvidenceFacts], operator: str) -> EvidenceFacts:
+    return evidence.get(
+        operator,
+        EvidenceFacts(
+            contract_status="No",
+            golden_status="No",
+            dataset_status="No",
+            field_status="No",
+            benchmark="No",
+            contract_cases=0,
+            golden_cases=0,
+            dataset_cases=0,
+            field_cases=0,
+            failed=0,
+        ),
+    )
 
 
-def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, baseline_path: Path, evidence: dict[str, GoldenEvidence]) -> str:
+def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, baseline_path: Path, evidence: dict[str, EvidenceFacts]) -> str:
     facts_by_operator = {row.operator: parse_card(row.card_path) for row in rows}
 
     enriched = []
     for row in rows:
         card = facts_by_operator[row.operator]
-        golden = evidence_or_default(evidence, row.operator)
+        evidence_facts = evidence_or_default(evidence, row.operator)
         priority = priority_for(row, card)
-        enriched.append((priority, row.qscore, row.operator, row, card, golden))
+        enriched.append((priority, row.qscore, row.operator, row, card, evidence_facts))
 
     enriched.sort(key=lambda item: (item[0], item[1], item[2]))
 
     level_counts = Counter(row.level for _, _, _, row, _, _ in enriched)
     priority_counts = Counter(priority for priority, *_ in enriched)
-    golden_counts = Counter(golden.status for *_, golden in enriched)
+    signal_counts = Counter("Yes" if has_any_signal(evidence_facts) else "No" for *_, evidence_facts in enriched)
+    contract_counts = Counter(evidence_facts.contract_status for *_, evidence_facts in enriched)
+    golden_counts = Counter(evidence_facts.golden_status for *_, evidence_facts in enriched)
+    dataset_counts = Counter(evidence_facts.dataset_status for *_, evidence_facts in enriched)
+    field_counts = Counter(evidence_facts.field_status for *_, evidence_facts in enriched)
     todo_rows = [item for item in enriched if item[4].card_todo_count > 0]
     p0_rows = [item for item in enriched if item[0] == "P0"]
-    p0_without_golden = [item for item in p0_rows if item[5].status != "Yes"]
-    c_without_golden = [item for item in enriched if item[3].level == "C" and item[5].status != "Yes"]
+    p0_without_signal = [item for item in p0_rows if not has_any_signal(item[5])]
+    c_without_signal = [item for item in enriched if item[3].level == "C" and not has_any_signal(item[5])]
 
     lines: list[str] = [
         "# Operator Quality Matrix",
@@ -426,27 +530,31 @@ def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, ba
         f"GeneratedAtUtc: `{datetime.now(timezone.utc).isoformat(timespec='seconds')}`",
         f"SourceCatalog: `{catalog_path.relative_to(REPO_ROOT).as_posix()}`",
         f"CardDirectory: `{card_dir.relative_to(REPO_ROOT).as_posix()}`",
-        f"GoldenEvidence: `{golden_evidence_label(baseline_path)}`",
+        f"EvidenceSources: `{golden_evidence_label(baseline_path)}`",
         "",
         "## Summary",
         "",
         f"- Total operators: {len(enriched)}",
         f"- Level counts: {format_counts(level_counts, ['A', 'B', 'C'])}",
         f"- Priority counts: {format_counts(priority_counts, ['P0', 'P1', 'P2', 'P3'])}",
+        f"- Any evidence signal: {format_counts(signal_counts, ['Yes', 'No'])}",
+        f"- Contract evidence status: {format_counts(contract_counts, ['Yes', 'Partial', 'No'])}",
         f"- Golden test status: {format_counts(golden_counts, ['Yes', 'Partial', 'No'])}",
+        f"- Dataset evidence status: {format_counts(dataset_counts, ['Yes', 'Partial', 'No'])}",
+        f"- Field replay status: {format_counts(field_counts, ['Yes', 'Partial', 'No'])}",
         f"- Cards with TODO: {len(todo_rows)}",
-        f"- P0 without golden evidence: {len(p0_without_golden)}",
-        f"- C-level without golden evidence: {len(c_without_golden)}",
+        f"- P0 without evidence signal: {len(p0_without_signal)}",
+        f"- C-level without evidence signal: {len(c_without_signal)}",
         "",
         "## Focus Rows",
         "",
-        "| Operator | Q | Level | Card TODO | Known Limitations | Golden Test | Cases | Benchmark | Priority | Next Action |",
-        "|---|---:|---|---:|---:|---|---:|---|---|---|",
+        "| Operator | Q | Level | Card TODO | Known Limitations | Contract | Golden | Dataset | Field | Cases | Benchmark | Priority | Next Action |",
+        "|---|---:|---|---:|---:|---|---|---|---|---:|---|---|---|",
     ]
 
     focus_operators = {item[3].operator for item in p0_rows}
     focus_operators.update(FIRST_BATCH_OPERATORS)
-    for priority, _, _, row, card, golden in enriched:
+    for priority, _, _, row, card, evidence_facts in enriched:
         if row.operator not in focus_operators:
             continue
         lines.append(
@@ -458,11 +566,14 @@ def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, ba
                     clean_cell(row.level),
                     str(card.card_todo_count),
                     str(card.known_limitations_count),
-                    golden.status,
-                    str(golden.case_count),
-                    golden.benchmark,
+                    evidence_facts.contract_status,
+                    evidence_facts.golden_status,
+                    evidence_facts.dataset_status,
+                    evidence_facts.field_status,
+                    str(best_case_count(evidence_facts)),
+                    evidence_facts.benchmark,
                     priority,
-                    clean_cell(next_action_for(row, card, golden)),
+                    clean_cell(next_action_for(row, card, evidence_facts)),
                 ]
             )
             + " |"
@@ -473,14 +584,14 @@ def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, ba
             "",
             "## Full Matrix",
             "",
-            "| OperatorType | DisplayName | Category | QScore | Level | Version | Maturity | Inputs | Outputs | Params | AlgorithmSummary | KnownLimitationsCount | CardTodoCount | HasGoldenTest | GoldenCases | HasPublicDataset | HasFieldDataset | HasBenchmark | Priority | OwnerAgent | NextAction |",
-            "|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---:|---|---:|---|---|---|---|---|---|",
+            "| OperatorType | DisplayName | Category | QScore | Level | Version | Maturity | Inputs | Outputs | Params | AlgorithmSummary | KnownLimitationsCount | CardTodoCount | HasContractTest | ContractCases | HasGoldenTest | GoldenCases | HasDatasetEvidence | DatasetCases | HasFieldReplay | FieldReplayCases | HasBenchmark | Priority | OwnerAgent | NextAction |",
+            "|---|---|---|---:|---|---|---|---:|---:|---:|---|---:|---:|---|---:|---|---:|---|---:|---|---:|---|---|---|---|",
         ]
     )
 
-    for priority, _, _, row, card, golden in enriched:
+    for priority, _, _, row, card, evidence_facts in enriched:
         algorithm_summary = row.algorithm_summary if row.algorithm_summary != "-" else card.algorithm_summary
-        owner = owner_for(row, card, golden, priority)
+        owner = owner_for(row, card, evidence_facts, priority)
         lines.append(
             "| "
             + " | ".join(
@@ -498,14 +609,18 @@ def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, ba
                     clean_cell(algorithm_summary),
                     str(card.known_limitations_count),
                     str(card.card_todo_count),
-                    golden.status,
-                    str(golden.case_count),
-                    golden.public_dataset,
-                    "No",
-                    golden.benchmark,
+                    evidence_facts.contract_status,
+                    str(evidence_facts.contract_cases),
+                    evidence_facts.golden_status,
+                    str(evidence_facts.golden_cases),
+                    evidence_facts.dataset_status,
+                    str(evidence_facts.dataset_cases),
+                    evidence_facts.field_status,
+                    str(evidence_facts.field_cases),
+                    evidence_facts.benchmark,
                     priority,
                     clean_cell(owner),
-                    clean_cell(next_action_for(row, card, golden)),
+                    clean_cell(next_action_for(row, card, evidence_facts)),
                 ]
             )
             + " |"

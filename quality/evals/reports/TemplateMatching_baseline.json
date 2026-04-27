@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-25T14:30:39.3981847+00:00",
     "CasesRoot": "quality/synthetic/cases/template_matching",
@@ -15,7 +16,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 1.819,
       "RuntimeMsMax": 30.242,
-      "MemoryAllocationBytesAvg": 474764
+      "MemoryAllocationBytesAvg": 474764,
+      "EvidenceKind": "golden"
     }
   ],
   "Cases": [

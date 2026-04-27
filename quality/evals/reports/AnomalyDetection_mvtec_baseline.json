@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "dataset",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T07:33:26.6807218+00:00",
     "IndexPath": "quality/datasets/mvtec_ad_lite_index.json",
@@ -26,7 +27,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 42.533,
       "MemoryAllocationBytesAvg": 55230928,
-      "HasPublicDataset": true
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset"
     }
   ],
   "Categories": [

@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "golden",
   "Summary": {
     "GeneratedAtUtc": "2026-04-24T13:49:42.8652766+00:00",
     "CasesRoot": "embedded synthetic arc scenes",
@@ -15,7 +16,8 @@
       "Failed": 0,
       "RuntimeMsAvg": 4.169,
       "RuntimeMsMax": 5.747,
-      "MemoryAllocationBytesAvg": 762741
+      "MemoryAllocationBytesAvg": 762741,
+      "EvidenceKind": "golden"
     }
   ],
   "Cases": [

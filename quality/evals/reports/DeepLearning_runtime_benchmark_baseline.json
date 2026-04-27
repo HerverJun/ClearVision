@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T15:30:45.1735996+00:00",
     "CaseCount": 20,
@@ -13,7 +14,7 @@
     "RequestedProvider": "GPU",
     "ActiveProvider": "CPUExecutionProvider",
     "FallbackToCpu": true,
-    "Scope": "preprocess\u002BYOLO postprocess benchmark; ONNX provider availability/fallback metadata is recorded without model inference"
+    "Scope": "preprocess+YOLO postprocess benchmark; ONNX provider availability/fallback metadata is recorded without model inference"
   },
   "Operators": [
     {
@@ -25,7 +26,8 @@
       "MemoryAllocationBytesAvg": 35916528,
       "HasBenchmark": true,
       "ActiveProvider": "CPUExecutionProvider",
-      "FallbackToCpu": true
+      "FallbackToCpu": true,
+      "EvidenceKind": "contract"
     }
   ],
   "Scenarios": [

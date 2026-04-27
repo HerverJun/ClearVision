@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "dataset",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T15:30:30.9223855+00:00",
     "DatasetName": "HPatches-style synthetic homography bridge",
@@ -21,7 +22,8 @@
       "RuntimeMsMax": 44.347,
       "MemoryAllocationBytesAvg": 49328,
       "HasPublicDataset": true,
-      "DatasetName": "HPatches-style synthetic homography bridge"
+      "DatasetName": "HPatches-style synthetic homography bridge",
+      "EvidenceKind": "dataset"
     }
   ],
   "Cases": [

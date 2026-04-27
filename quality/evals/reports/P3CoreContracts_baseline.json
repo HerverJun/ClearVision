@@ -1,4 +1,5 @@
 {
+  "EvidenceKind": "contract",
   "Summary": {
     "GeneratedAtUtc": "2026-04-26T15:30:15.6095877+00:00",
     "CaseCount": 386,
@@ -13,7 +14,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.255,
-      "MemoryAllocationBytesAvg": 13011
+      "MemoryAllocationBytesAvg": 13011,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "Comparator",
@@ -21,7 +23,8 @@
       "Passed": 22,
       "Failed": 0,
       "RuntimeMsAvg": 4.528,
-      "MemoryAllocationBytesAvg": 27757
+      "MemoryAllocationBytesAvg": 27757,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "CycleCounter",
@@ -29,7 +32,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.102,
-      "MemoryAllocationBytesAvg": 5032
+      "MemoryAllocationBytesAvg": 5032,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "Delay",
@@ -37,7 +41,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.166,
-      "MemoryAllocationBytesAvg": 3584
+      "MemoryAllocationBytesAvg": 3584,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "ForEach",
@@ -45,7 +50,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.666,
-      "MemoryAllocationBytesAvg": 7617
+      "MemoryAllocationBytesAvg": 7617,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "ImageAcquisition",
@@ -53,7 +59,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.788,
-      "MemoryAllocationBytesAvg": 4918
+      "MemoryAllocationBytesAvg": 4918,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "JsonExtractor",
@@ -61,7 +68,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.286,
-      "MemoryAllocationBytesAvg": 6861
+      "MemoryAllocationBytesAvg": 6861,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "LogicGate",
@@ -69,7 +77,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.086,
-      "MemoryAllocationBytesAvg": 3312
+      "MemoryAllocationBytesAvg": 3312,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "MathOperation",
@@ -77,7 +86,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.129,
-      "MemoryAllocationBytesAvg": 4058
+      "MemoryAllocationBytesAvg": 4058,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "MitsubishiMcCommunication",
@@ -85,7 +95,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.253,
-      "MemoryAllocationBytesAvg": 11533
+      "MemoryAllocationBytesAvg": 11533,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "OmronFinsCommunication",
@@ -93,7 +104,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.024,
-      "MemoryAllocationBytesAvg": 6111
+      "MemoryAllocationBytesAvg": 6111,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "ResultJudgment",
@@ -101,7 +113,8 @@
       "Passed": 22,
       "Failed": 0,
       "RuntimeMsAvg": 0.119,
-      "MemoryAllocationBytesAvg": 4971
+      "MemoryAllocationBytesAvg": 4971,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "SiemensS7Communication",
@@ -109,7 +122,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.031,
-      "MemoryAllocationBytesAvg": 6949
+      "MemoryAllocationBytesAvg": 6949,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "StringFormat",
@@ -117,7 +131,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.532,
-      "MemoryAllocationBytesAvg": 5893
+      "MemoryAllocationBytesAvg": 5893,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "TimerStatistics",
@@ -125,7 +140,8 @@
       "Passed": 22,
       "Failed": 0,
       "RuntimeMsAvg": 0.145,
-      "MemoryAllocationBytesAvg": 4315
+      "MemoryAllocationBytesAvg": 4315,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "TypeConvert",
@@ -133,7 +149,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.173,
-      "MemoryAllocationBytesAvg": 3224
+      "MemoryAllocationBytesAvg": 3224,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "VariableIncrement",
@@ -141,7 +158,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.087,
-      "MemoryAllocationBytesAvg": 6187
+      "MemoryAllocationBytesAvg": 6187,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "VariableRead",
@@ -149,7 +167,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.096,
-      "MemoryAllocationBytesAvg": 4142
+      "MemoryAllocationBytesAvg": 4142,
+      "EvidenceKind": "contract"
     },
     {
       "Operator": "VariableWrite",
@@ -157,7 +176,8 @@
       "Passed": 20,
       "Failed": 0,
       "RuntimeMsAvg": 0.117,
-      "MemoryAllocationBytesAvg": 7940
+      "MemoryAllocationBytesAvg": 7940,
+      "EvidenceKind": "contract"
     }
   ],
   "Scenarios": [
