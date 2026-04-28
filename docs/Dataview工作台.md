@@ -1,17 +1,17 @@
 ---
 title: "Dataview 工作台"
 doc_type: "index"
-status: "template"
+status: "active"
 topic: "文档索引"
 created: "2026-03-21"
-updated: "2026-03-21"
+updated: "2026-04-28"
 ---
 
 # Dataview 工作台
 
-- [Active 索引](./active/索引.md)
-- [Needs-Review 索引](./needs-review/索引.md)
-- [Closed 索引](./closed/索引.md)
+- [进行中](./进行中/README.md)
+- [待复核索引](./进行中/待复核/索引.md)
+- [已关闭事项索引](./归档/已关闭事项/索引.md)
 
 ## 全局总览
 
