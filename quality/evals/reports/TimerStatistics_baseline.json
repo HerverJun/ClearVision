@@ -1,0 +1,503 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T05:39:32.3708272+00:00",
+    "CaseCount": 23,
+    "Passed": 23,
+    "Failed": 0,
+    "RuntimeMs": 667.294
+  },
+  "Operators": [
+    {
+      "Operator": "TimerStatistics",
+      "CaseCount": 23,
+      "Passed": 23,
+      "Failed": 0,
+      "RuntimeMsAvg": 29.013,
+      "MemoryAllocationBytesAvg": 6017
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Average correctness",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 91.729
+    },
+    {
+      "Scenario": "Cumulative",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 30.309
+    },
+    {
+      "Scenario": "Mode parsing",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 30.934
+    },
+    {
+      "Scenario": "Numeric finiteness",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 31.664
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 20.441
+    },
+    {
+      "Scenario": "Reset interval",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 82.342
+    },
+    {
+      "Scenario": "SingleShot",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 27.42
+    },
+    {
+      "Scenario": "Trigger passthrough",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.03
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.088
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "singleshot_first_call_zero",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot",
+      "Passed": true,
+      "RuntimeMs": 10.626,
+      "MemoryAllocationBytes": 13880,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 1,
+        "StepsPassed": 1,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 0,
+        "FinalTotalMs": 0,
+        "FinalAverageMs": 0,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "singleshot_second_call_positive",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot",
+      "Passed": true,
+      "RuntimeMs": 40.708,
+      "MemoryAllocationBytes": 17392,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 40.6452,
+        "FinalTotalMs": 40.6452,
+        "FinalAverageMs": 40.6452,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "singleshot_default_mode",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot",
+      "Passed": true,
+      "RuntimeMs": 30.927,
+      "MemoryAllocationBytes": 9504,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 30.8815,
+        "FinalTotalMs": 30.8815,
+        "FinalAverageMs": 30.8815,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "cumulative_first_call_count_one",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative",
+      "Passed": true,
+      "RuntimeMs": 0.187,
+      "MemoryAllocationBytes": 2680,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 1,
+        "StepsPassed": 1,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 0,
+        "FinalTotalMs": 0,
+        "FinalAverageMs": 0,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "cumulative_second_call_count_two",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative",
+      "Passed": true,
+      "RuntimeMs": 30.423,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 2,
+        "FinalElapsedMs": 30.3621,
+        "FinalTotalMs": 30.3621,
+        "FinalAverageMs": 15.18105,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "cumulative_three_calls_count_three",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative",
+      "Passed": true,
+      "RuntimeMs": 60.316,
+      "MemoryAllocationBytes": 8128,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 3,
+        "StepsPassed": 3,
+        "StepsFailed": 0,
+        "FinalCount": 3,
+        "FinalElapsedMs": 30.1282,
+        "FinalTotalMs": 60.272800000000004,
+        "FinalAverageMs": 20.090933333333336,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "cumulative_average_equals_total_over_count",
+      "Operator": "TimerStatistics",
+      "Scenario": "Average correctness",
+      "Passed": true,
+      "RuntimeMs": 91.729,
+      "MemoryAllocationBytes": 10720,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 4,
+        "StepsPassed": 4,
+        "StepsFailed": 0,
+        "FinalCount": 4,
+        "FinalElapsedMs": 31.1377,
+        "FinalTotalMs": 91.67049999999999,
+        "FinalAverageMs": 22.917624999999997,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "reset_interval_zero_no_reset",
+      "Operator": "TimerStatistics",
+      "Scenario": "Reset interval",
+      "Passed": true,
+      "RuntimeMs": 92.634,
+      "MemoryAllocationBytes": 10720,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 4,
+        "StepsPassed": 4,
+        "StepsFailed": 0,
+        "FinalCount": 4,
+        "FinalElapsedMs": 30.9887,
+        "FinalTotalMs": 92.5767,
+        "FinalAverageMs": 23.144175,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "reset_interval_two_resets",
+      "Operator": "TimerStatistics",
+      "Scenario": "Reset interval",
+      "Passed": true,
+      "RuntimeMs": 61.736,
+      "MemoryAllocationBytes": 8128,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 3,
+        "StepsPassed": 3,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 30.045,
+        "FinalTotalMs": 30.045,
+        "FinalAverageMs": 30.045,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "reset_interval_three_resets",
+      "Operator": "TimerStatistics",
+      "Scenario": "Reset interval",
+      "Passed": true,
+      "RuntimeMs": 92.656,
+      "MemoryAllocationBytes": 10720,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 4,
+        "StepsPassed": 4,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 30.8637,
+        "FinalTotalMs": 30.8637,
+        "FinalAverageMs": 30.8637,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_singleshot",
+      "Operator": "TimerStatistics",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 30.853,
+      "MemoryAllocationBytes": 5648,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 30.7968,
+        "FinalTotalMs": 30.7968,
+        "FinalAverageMs": 30.7968,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_cumulative",
+      "Operator": "TimerStatistics",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 30.441,
+      "MemoryAllocationBytes": 5648,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 2,
+        "FinalElapsedMs": 30.3843,
+        "FinalTotalMs": 30.3843,
+        "FinalAverageMs": 15.19215,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_no_trigger_when_absent",
+      "Operator": "TimerStatistics",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.028,
+      "MemoryAllocationBytes": 2680,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 1,
+        "StepsPassed": 1,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 0,
+        "FinalTotalMs": 0,
+        "FinalAverageMs": 0,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "trigger_passthrough_string",
+      "Operator": "TimerStatistics",
+      "Scenario": "Trigger passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 2816,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 1,
+        "StepsPassed": 1,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 0,
+        "FinalTotalMs": 0,
+        "FinalAverageMs": 0,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "trigger_passthrough_int",
+      "Operator": "TimerStatistics",
+      "Scenario": "Trigger passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.043,
+      "MemoryAllocationBytes": 2816,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 1,
+        "StepsPassed": 1,
+        "StepsFailed": 0,
+        "FinalCount": 1,
+        "FinalElapsedMs": 0,
+        "FinalTotalMs": 0,
+        "FinalAverageMs": 0,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "mode_lowercase_cumulative",
+      "Operator": "TimerStatistics",
+      "Scenario": "Mode parsing",
+      "Passed": true,
+      "RuntimeMs": 31.123,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 2,
+        "FinalElapsedMs": 31.0923,
+        "FinalTotalMs": 31.0923,
+        "FinalAverageMs": 15.54615,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "mode_uppercase_cumulative",
+      "Operator": "TimerStatistics",
+      "Scenario": "Mode parsing",
+      "Passed": true,
+      "RuntimeMs": 30.746,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 2,
+        "FinalElapsedMs": 30.7062,
+        "FinalTotalMs": 30.7062,
+        "FinalAverageMs": 15.3531,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "numeric_outputs_finite",
+      "Operator": "TimerStatistics",
+      "Scenario": "Numeric finiteness",
+      "Passed": true,
+      "RuntimeMs": 31.664,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null,
+      "Metrics": {
+        "StepCount": 2,
+        "StepsPassed": 2,
+        "StepsFailed": 0,
+        "FinalCount": 2,
+        "FinalElapsedMs": 31.6273,
+        "FinalTotalMs": 31.6273,
+        "FinalAverageMs": 15.81365,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_default_mode_ok",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.329,
+      "MemoryAllocationBytes": 744,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "ErrorMessage": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_singleshot_ok",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.033,
+      "MemoryAllocationBytes": 1176,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "ErrorMessage": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_cumulative_ok",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 1176,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "ErrorMessage": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_invalid_mode",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.058,
+      "MemoryAllocationBytes": 832,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "ErrorMessage": "Mode must be SingleShot or Cumulative",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_reset_interval_negative",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 832,
+      "ErrorMessage": null,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "ErrorMessage": "ResetInterval must be \u003E= 0",
+        "Passed": true
+      }
+    }
+  ]
+}

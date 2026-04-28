@@ -1,6 +1,6 @@
 # Operator Quality Matrix
 
-GeneratedAtUtc: `2026-04-28T04:44:58+00:00`
+GeneratedAtUtc: `2026-04-28T09:17:40+00:00`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
 CardDirectory: `docs/算子资料/算子名片`
 GoldenEvidence: `quality/evals/reports/*_baseline.json`
@@ -8,9 +8,9 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 ## Summary
 
 - Total operators: 155
-- Level counts: A=136, B=19
+- Level counts: A=142, B=13
 - Priority counts: P2=32, P3=123
-- Golden test status: Yes=37, No=118
+- Golden test status: Yes=43, No=112
 - Cards with TODO: 0
 - P0 without golden evidence: 0
 - C-level without golden evidence: 0
@@ -78,12 +78,6 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 | OperatorType.MitsubishiMcCommunication | Mitsubishi MC Communication | Communication | 80 | B | 1.0.0 | 稳定 Stable | 1 | 2 | 13 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.OmronFinsCommunication | 欧姆龙FINS通信 | 通信 | 80 | B | 1.0.0 | 稳定 Stable | 1 | 2 | 13 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.SiemensS7Communication | 西门子S7通信 | 通信 | 80 | B | 1.0.0 | 稳定 Stable | 1 | 2 | 15 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.ForEach | ForEach 循环 | 流程控制 | 83 | B | 1.0.0 | 稳定 Stable | 1 | 1 | 4 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.JsonExtractor | JSON 提取器 | 数据处理 | 83 | B | 1.0.0 | - | 1 | 2 | 4 | - | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.MathOperation | 数值计算 | 数据处理 | 83 | B | 1.0.0 | 稳定 Stable | 2 | 2 | 1 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.TypeConvert | Type Convert | 通用 | 83 | B | 1.0.0 | 稳定 Stable | 1 | 6 | 2 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.ResultJudgment | Result Judgment | Flow Control | 84 | B | 1.0.0 | 稳定 Stable | 2 | 5 | 8 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
-| OperatorType.TimerStatistics | 计时统计 | 逻辑工具 | 84 | B | 1.0.0 | 稳定 Stable | 1 | 4 | 2 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.RegionComplement | Region Complement | Region | 85 | A | 1.0.1 | 稳定 Stable | 4 | 3 | 0 | Bounded run-length complement | 2 | 0 | Yes | 100 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.ContourExtrema | Contour Extrema | 检测 | 89 | A | 1.0.1 | 稳定 Stable | 3 | 6 | 0 | Directional contour extrema scan | 2 | 0 | Yes | 22 | No | No | Yes | P3 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.ImageDiff | 图像对比 | 预处理 | 89 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 0 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
@@ -171,20 +165,26 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 | OperatorType.DatabaseWrite | 数据库写入 | 数据处理 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 3 | 该算子把输入数据持久化到数据库表中，当前正式支持 SQLite、SQLServer、… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.DistanceTransform | Distance Transform | Analysis | 100 | A | 1.0.1 | 稳定 Stable | 1 | 4 | 7 | OpenCV binary distance transform | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.EuclideanClusterExtraction | 欧氏聚类分割 | 3D | 100 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 3 | 欧氏聚类分割：以 ClusterTolerance 为连通阈值，对点云做 3D 连通域（BFS/DFS）。两点距离小于阈值则视为连通，最终输出每个连通分量的点索引集合。 | 1 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.ForEach | ForEach 循环 | 流程控制 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 4 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | Yes | 20 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |
 | OperatorType.GeometricFitting | Geometric Fitting | 检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 8 | 当前实现的几何拟合流程并不是直接接收点集输入，而是： | 5 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.GlcmTexture | GLCM Texture Features | Texture | 100 | A | 1.0.1 | 稳定 Stable | 1 | 6 | 9 | Quantized gray-level co-occurrence matrix | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.HttpRequest | HTTP 请求 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 3 | 6 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.ImageAdd | 图像加法 | 预处理 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 6 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ImageSave | 图像保存 | 输出 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 3 | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.JsonExtractor | JSON 提取器 | 数据处理 | 100 | A | 1.0.0 | - | 1 | 2 | 4 | - | 0 | 0 | Yes | 22 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |
 | OperatorType.LawsTextureFilter | Laws Texture Filter | Texture | 100 | A | 1.0.1 | 稳定 Stable | 1 | 3 | 5 | Laws 5x5 texture energy filtering | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.MathOperation | 数值计算 | 数据处理 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 1 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | Yes | 27 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |
 | OperatorType.MinEnclosingGeometry | Min Enclosing Geometry | 检测 | 100 | A | 1.0.1 | 稳定 Stable | 1 | 2 | 10 | Contour-derived enclosing geometry and robust fitting | 2 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.ModbusCommunication | Modbus通信 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 8 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.MqttPublish | MQTT 发布 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 6 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 2 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.OcrRecognition | OCR 识别 | 识别 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 0 | 该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。 | 0 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PerspectiveTransform | 透视变换 | 预处理 | 100 | A | 1.0.0 | 稳定 Stable | 3 | 1 | 20 | 该算子利用单应性矩阵对图像做透视变换，用于视角校正或几何对齐。 | 1 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.PolarUnwrap | 极坐标展开 | 图像处理 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 8 | 该算子把以某个中心为参考的环形区域，从笛卡尔坐标系展开到极坐标平面。 | 5 | 0 | No | 0 | No | No | No | P3 | Quality Flywheel Agent | Add baseline evidence if operator stays in quality scope |
+| OperatorType.ResultJudgment | Result Judgment | Flow Control | 100 | A | 1.0.0 | 稳定 Stable | 2 | 5 | 8 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | Yes | 29 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |
 | OperatorType.RoiManager | ROI管理器 | 辅助 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 10 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.ScriptOperator | 脚本算子 | 逻辑工具 | 100 | A | 1.0.0 | 稳定 Stable | 4 | 2 | 3 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.SerialCommunication | 串口通信 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 8 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 0 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.TcpCommunication | TCP通信 | 通信 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 6 | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
 | OperatorType.TextSave | Text Save | 逻辑工具 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 5 | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | 1 | 0 | No | 0 | No | No | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.TimerStatistics | 计时统计 | 逻辑工具 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 4 | 2 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | Yes | 23 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |
+| OperatorType.TypeConvert | Type Convert | 通用 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 6 | 2 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 0 | 0 | Yes | 23 | No | No | Yes | P3 | Contract Test Agent | Review QScore/Level from golden evidence |

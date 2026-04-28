@@ -95,7 +95,7 @@
 ### Flow Control (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.ResultJudgment` | Result Judgment | 2 | 5 | 8 | 84 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ResultJudgment](./ResultJudgment.md) |
+| `OperatorType.ResultJudgment` | Result Judgment | 2 | 5 | 8 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ResultJudgment](./ResultJudgment.md) |
 
 ### Frequency (3)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -180,8 +180,8 @@
 | `OperatorType.BoxFilter` | 候选框过滤 (Bounding Box) | 2 | 3 | 9 | 94 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [BoxFilter](./BoxFilter.md) |
 | `OperatorType.BoxNms` | 候选框抑制 | 3 | 7 | 4 | 90 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [BoxNms](./BoxNms.md) |
 | `OperatorType.DatabaseWrite` | 数据库写入 | 2 | 2 | 3 | 100 (A) | `1.0.0` | 该算子把输入数据持久化到数据库表中，当前正式支持 SQLite、SQLServer、… | [DatabaseWrite](./DatabaseWrite.md) |
-| `OperatorType.JsonExtractor` | JSON 提取器 | 1 | 2 | 4 | 83 (B) | `1.0.0` | - | [JsonExtractor](./JsonExtractor.md) |
-| `OperatorType.MathOperation` | 数值计算 | 2 | 2 | 1 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [MathOperation](./MathOperation.md) |
+| `OperatorType.JsonExtractor` | JSON 提取器 | 1 | 2 | 4 | 100 (A) | `1.0.0` | - | [JsonExtractor](./JsonExtractor.md) |
+| `OperatorType.MathOperation` | 数值计算 | 2 | 2 | 1 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [MathOperation](./MathOperation.md) |
 | `OperatorType.PointAlignment` | 点位对齐 | 2 | 3 | 2 | 96 (A) | `1.0.3` | - | [PointAlignment](./PointAlignment.md) |
 | `OperatorType.PointCorrection` | 点位修正 | 4 | 5 | 4 | 96 (A) | `1.0.3` | - | [PointCorrection](./PointCorrection.md) |
 | `OperatorType.UnitConvert` | 单位换算 | 2 | 2 | 4 | 96 (A) | `1.0.0` | 该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。 | [UnitConvert](./UnitConvert.md) |
@@ -230,7 +230,7 @@
 | `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 71 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Comparator](./Comparator.md) |
 | `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ConditionalBranch](./ConditionalBranch.md) |
 | `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Delay](./Delay.md) |
-| `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ForEach](./ForEach.md) |
+| `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ForEach](./ForEach.md) |
 | `OperatorType.TryCatch` | 异常捕获 | 1 | 4 | 3 | 93 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TryCatch](./TryCatch.md) |
 
 ### 特征提取 (4)
@@ -277,7 +277,7 @@
 | `OperatorType.LogicGate` | 逻辑门 | 2 | 1 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [LogicGate](./LogicGate.md) |
 | `OperatorType.Statistics` | Statistics | 1 | 7 | 5 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Statistics](./Statistics.md) |
 | `OperatorType.StringFormat` | 字符串格式化 | 2 | 1 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [StringFormat](./StringFormat.md) |
-| `OperatorType.TypeConvert` | Type Convert | 1 | 6 | 2 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TypeConvert](./TypeConvert.md) |
+| `OperatorType.TypeConvert` | Type Convert | 1 | 6 | 2 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TypeConvert](./TypeConvert.md) |
 
 ### 逻辑工具 (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -285,7 +285,7 @@
 | `OperatorType.PointSetTool` | 点集工具 | 2 | 4 | 6 | 90 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [PointSetTool](./PointSetTool.md) |
 | `OperatorType.ScriptOperator` | 脚本算子 | 4 | 2 | 3 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ScriptOperator](./ScriptOperator.md) |
 | `OperatorType.TextSave` | Text Save | 2 | 2 | 5 | 100 (A) | `1.0.0` | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | [TextSave](./TextSave.md) |
-| `OperatorType.TimerStatistics` | 计时统计 | 1 | 4 | 2 | 84 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TimerStatistics](./TimerStatistics.md) |
+| `OperatorType.TimerStatistics` | 计时统计 | 1 | 4 | 2 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TimerStatistics](./TimerStatistics.md) |
 | `OperatorType.TriggerModule` | 触发模块 | 1 | 3 | 3 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TriggerModule](./TriggerModule.md) |
 
 ### 采集 (1)

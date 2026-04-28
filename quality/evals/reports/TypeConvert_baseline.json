@@ -1,0 +1,434 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T05:51:00.5988952+00:00",
+    "CaseCount": 23,
+    "Passed": 23,
+    "Failed": 0,
+    "RuntimeMs": 18.065
+  },
+  "Operators": [
+    {
+      "Operator": "TypeConvert",
+      "CaseCount": 23,
+      "Passed": 23,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.785,
+      "MemoryAllocationBytesAvg": 2495
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Boolean",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.005
+    },
+    {
+      "Scenario": "Error handling",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.047
+    },
+    {
+      "Scenario": "Float",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.428
+    },
+    {
+      "Scenario": "Integer",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.14
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.013
+    },
+    {
+      "Scenario": "String",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.556
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.12
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "string_to_string",
+      "Operator": "TypeConvert",
+      "Scenario": "String",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 14.8379,
+      "MemoryAllocationBytes": 14800,
+      "Metrics": {
+        "Input": "hello",
+        "TargetType": "String",
+        "Output": "hello",
+        "OriginalType": "String",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "string_to_float",
+      "Operator": "TypeConvert",
+      "Scenario": "Float",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 1.6972,
+      "MemoryAllocationBytes": 1952,
+      "Metrics": {
+        "Input": "3.14",
+        "TargetType": "Float",
+        "Output": "3.14",
+        "OriginalType": "String",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "string_to_integer",
+      "Operator": "TypeConvert",
+      "Scenario": "Integer",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.6781,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "42",
+        "TargetType": "Integer",
+        "Output": "42",
+        "OriginalType": "String",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "string_to_boolean",
+      "Operator": "TypeConvert",
+      "Scenario": "Boolean",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0073,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "true",
+        "TargetType": "Boolean",
+        "Output": "True",
+        "OriginalType": "String",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "int_to_string",
+      "Operator": "TypeConvert",
+      "Scenario": "String",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.017,
+      "MemoryAllocationBytes": 2136,
+      "Metrics": {
+        "Input": "42",
+        "TargetType": "String",
+        "Output": "42",
+        "OriginalType": "Int32",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "int_to_float",
+      "Operator": "TypeConvert",
+      "Scenario": "Float",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0037,
+      "MemoryAllocationBytes": 1952,
+      "Metrics": {
+        "Input": "42",
+        "TargetType": "Float",
+        "Output": "42",
+        "OriginalType": "Int32",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "int_to_integer",
+      "Operator": "TypeConvert",
+      "Scenario": "Integer",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0057,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "42",
+        "TargetType": "Integer",
+        "Output": "42",
+        "OriginalType": "Int32",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "int_to_boolean",
+      "Operator": "TypeConvert",
+      "Scenario": "Boolean",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0032,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "1",
+        "TargetType": "Boolean",
+        "Output": "True",
+        "OriginalType": "Int32",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "float_to_string",
+      "Operator": "TypeConvert",
+      "Scenario": "String",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0046,
+      "MemoryAllocationBytes": 2176,
+      "Metrics": {
+        "Input": "3.14",
+        "TargetType": "String",
+        "Output": "3.14",
+        "OriginalType": "Single",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "float_to_float",
+      "Operator": "TypeConvert",
+      "Scenario": "Float",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0033,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "3.14",
+        "TargetType": "Float",
+        "Output": "3.14",
+        "OriginalType": "Single",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "float_to_integer",
+      "Operator": "TypeConvert",
+      "Scenario": "Integer",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0035,
+      "MemoryAllocationBytes": 2016,
+      "Metrics": {
+        "Input": "3.9",
+        "TargetType": "Integer",
+        "Output": "3",
+        "OriginalType": "Single",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "float_to_boolean_zero",
+      "Operator": "TypeConvert",
+      "Scenario": "Boolean",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0034,
+      "MemoryAllocationBytes": 2008,
+      "Metrics": {
+        "Input": "0",
+        "TargetType": "Boolean",
+        "Output": "False",
+        "OriginalType": "Single",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "bool_to_string",
+      "Operator": "TypeConvert",
+      "Scenario": "String",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0038,
+      "MemoryAllocationBytes": 2144,
+      "Metrics": {
+        "Input": "True",
+        "TargetType": "String",
+        "Output": "True",
+        "OriginalType": "Boolean",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "bool_to_float",
+      "Operator": "TypeConvert",
+      "Scenario": "Float",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0072,
+      "MemoryAllocationBytes": 1952,
+      "Metrics": {
+        "Input": "True",
+        "TargetType": "Float",
+        "Output": "1",
+        "OriginalType": "Boolean",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "bool_to_integer",
+      "Operator": "TypeConvert",
+      "Scenario": "Integer",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0032,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "False",
+        "TargetType": "Integer",
+        "Output": "0",
+        "OriginalType": "Boolean",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "bool_to_boolean",
+      "Operator": "TypeConvert",
+      "Scenario": "Boolean",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0066,
+      "MemoryAllocationBytes": 1984,
+      "Metrics": {
+        "Input": "True",
+        "TargetType": "Boolean",
+        "Output": "True",
+        "OriginalType": "Boolean",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "double_to_string",
+      "Operator": "TypeConvert",
+      "Scenario": "String",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.2353,
+      "MemoryAllocationBytes": 2176,
+      "Metrics": {
+        "Input": "2.5",
+        "TargetType": "String",
+        "Output": "2.5",
+        "OriginalType": "Double",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "double_to_integer",
+      "Operator": "TypeConvert",
+      "Scenario": "Integer",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0085,
+      "MemoryAllocationBytes": 2016,
+      "Metrics": {
+        "Input": "2.9",
+        "TargetType": "Integer",
+        "Output": "2",
+        "OriginalType": "Double",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "format_number",
+      "Operator": "TypeConvert",
+      "Scenario": "String",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.2351,
+      "MemoryAllocationBytes": 2368,
+      "Metrics": {
+        "Input": "1234.5",
+        "TargetType": "String",
+        "Output": "1234.50",
+        "OriginalType": "Double",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_invalid_target",
+      "Operator": "TypeConvert",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.2135,
+      "MemoryAllocationBytes": 792,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "TargetType must be String, Float, Integer or Boolean.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_valid_target",
+      "Operator": "TypeConvert",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0274,
+      "MemoryAllocationBytes": 680,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "Errors": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_present",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0126,
+      "MemoryAllocationBytes": 2016,
+      "Metrics": {
+        "RequiredKeys": "Output, AsString, AsFloat, AsInteger, AsBoolean, OriginalType",
+        "MissingKeys": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "null_input_fails",
+      "Operator": "TypeConvert",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.047,
+      "MemoryAllocationBytes": 2304,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "Passed": true
+      }
+    }
+  ]
+}
