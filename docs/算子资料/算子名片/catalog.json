@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-28T10:54:57.1979469+08:00",
+  "generatedAt": "2026-04-28T12:42:25.6626086+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -8969,13 +8969,13 @@
       "displayName": "梯度形状匹配",
       "description": "基于梯度方向特征的形状匹配，支持可选 ROI 搜索。",
       "category": "匹配定位",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": "该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape…",
+      "algorithm": "Gradient Direction Template Match",
       "inputPorts": [
         {
           "name": "Image",
@@ -9020,6 +9020,12 @@
           "displayName": "匹配分数",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "Matches",
+          "displayName": "匹配列表",
+          "dataType": "Any",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -9042,6 +9048,17 @@
           "defaultValue": "80",
           "min": "0",
           "max": "100",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TopK",
+          "displayName": "返回候选数",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "1",
+          "min": "1",
+          "max": "10",
           "isRequired": true,
           "options": null
         },

@@ -39,7 +39,7 @@
 | `OperatorType.GlcmTexture` | GLCM Texture Features | Texture | `1.0.1` |
 | `OperatorType.LawsTextureFilter` | Laws Texture Filter | Texture | `1.0.1` |
 | `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 匹配定位 | `1.0.0` |
-| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 匹配定位 | `1.0.0` |
+| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 匹配定位 | `1.1.0` |
 | `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 匹配定位 | `1.1.1` |
 | `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 匹配定位 | `1.0.0` |
 | `OperatorType.PlanarMatching` | Planar Matching | 匹配定位 | `1.1.2` |
@@ -701,6 +701,7 @@
 ### OperatorType.GradientShapeMatch / 梯度形状匹配
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.1.0` | `2026-04-28T12:42:25.6626086+08:00` | `5D188ECFFC24` |
 | `1.0.0` | `2026-04-28T10:51:32.3393648+08:00` | `1D5483E6F3D3` |
 | `1.0.0` | `2026-04-13T19:14:52.1190277+08:00` | `4B10EFE2FDDF` |
 | `1.0.0` | `2026-04-12T20:43:23.0238145+08:00` | `BE1DD761D410` |
