@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "2026-04-29.quality-suite.v1",
+  "suiteId": "field_replay_suite",
+  "description": "Manual/monthly lane for anonymized field failure replay drills. This suite validates the replay manifest and writes the current field replay baseline.",
+  "ciBudgetMinutes": 30,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "g4-field-replay",
+      "entries": [
+        {
+          "id": "quality_flywheel_field_replay",
+          "status": "manual",
+          "evidenceKind": "field",
+          "operators": ["DeepLearning", "TemplateMatching", "CaliperTool", "SurfaceDefectDetection", "CameraCalibration"],
+          "fieldReplayManifest": "quality/field_replay/manifests/field_replay_manifest.json",
+          "command": ["python", "quality/tools/run_field_replay.py", "--manifest", "quality/field_replay/manifests/field_replay_manifest.json", "--drill-id", "manual-field-replay", "--output", "quality/evals/reports/field_replay_manual.json", "--report", "quality/evals/reports/field_replay_manual.md", "--baseline-output", "quality/evals/reports/QualityFlywheel_field_replay_baseline.json"],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_field_replay_baseline.json",
+          "reportMarkdown": "quality/evals/reports/field_replay_drill_2026_04_03.md",
+          "estimatedSeconds": 60
+        }
+      ]
+    }
+  ]
+}

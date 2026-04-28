@@ -1,0 +1,232 @@
+{
+  "EvidenceKind": "field",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T17:29:21+00:00",
+    "DrillId": "2026-04-drill-03",
+    "Manifest": "quality/field_replay/manifests/field_replay_manifest.json",
+    "ManifestId": "quality-flywheel-field-replay-seed-v1",
+    "OperatorCount": 5,
+    "CaseCount": 100,
+    "Passed": 100,
+    "Failed": 0,
+    "ReproducibleCount": 90,
+    "RegressionizedCount": 63,
+    "ReproducibleRate": 0.9,
+    "RegressionizedRate": 0.7,
+    "MinReproducibleRate": 0.8,
+    "MinRegressionizedRate": 0.6,
+    "PassedDrill": true,
+    "PrivacyLeakCount": 0,
+    "RawPathLeakCount": 0
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 42.5,
+      "MemoryAllocationBytesAvg": 1048576,
+      "EvidenceKind": "field",
+      "ReplayTier": "field-substitute",
+      "ReproducibleCount": 18,
+      "RegressionizedCount": 13,
+      "TriageLabels": [
+        "p1",
+        "ai-detection",
+        "postprocess",
+        "runtime"
+      ],
+      "ReplayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "dataset_heavy_suite",
+        "--entry",
+        "deep_learning_detection_dataset",
+        "--dry-run"
+      ]
+    },
+    {
+      "Operator": "TemplateMatching",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 18.2,
+      "MemoryAllocationBytesAvg": 524288,
+      "EvidenceKind": "field",
+      "ReplayTier": "field-substitute",
+      "ReproducibleCount": 17,
+      "RegressionizedCount": 12,
+      "TriageLabels": [
+        "p1",
+        "matching",
+        "homography"
+      ],
+      "ReplayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "dataset_heavy_suite",
+        "--entry",
+        "template_matching_public_bridge",
+        "--dry-run"
+      ]
+    },
+    {
+      "Operator": "CaliperTool",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 3.4,
+      "MemoryAllocationBytesAvg": 131072,
+      "EvidenceKind": "field",
+      "ReplayTier": "field-substitute",
+      "ReproducibleCount": 19,
+      "RegressionizedCount": 15,
+      "TriageLabels": [
+        "p1",
+        "measurement",
+        "edge-pair"
+      ],
+      "ReplayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "golden_core50_suite",
+        "--entry",
+        "caliper_tool_golden",
+        "--dry-run"
+      ]
+    },
+    {
+      "Operator": "SurfaceDefectDetection",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 21.8,
+      "MemoryAllocationBytesAvg": 786432,
+      "EvidenceKind": "field",
+      "ReplayTier": "field-substitute",
+      "ReproducibleCount": 18,
+      "RegressionizedCount": 11,
+      "TriageLabels": [
+        "p1",
+        "inspection",
+        "surface-defect"
+      ],
+      "ReplayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "golden_core50_suite",
+        "--entry",
+        "p2_inspection_residual",
+        "--dry-run"
+      ]
+    },
+    {
+      "Operator": "CameraCalibration",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 34.1,
+      "MemoryAllocationBytesAvg": 917504,
+      "EvidenceKind": "field",
+      "ReplayTier": "field-substitute",
+      "ReproducibleCount": 18,
+      "RegressionizedCount": 12,
+      "TriageLabels": [
+        "p1",
+        "calibration",
+        "geometry"
+      ],
+      "ReplayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "golden_core50_suite",
+        "--entry",
+        "calibration_geometry_round_trip",
+        "--dry-run"
+      ]
+    }
+  ],
+  "Samples": [
+    {
+      "Operator": "DeepLearning",
+      "SampleSeriesId": "field-seed-deep-learning-202604",
+      "SampleCount": 20,
+      "ScenarioFamilies": [
+        "low-confidence-border",
+        "same-class-overlap",
+        "provider-fallback",
+        "large-frame-pressure"
+      ],
+      "RedactionStatus": "approved",
+      "StoragePolicy": "hashed fixture ids only; no raw customer path",
+      "TriageSlaBusinessDays": 5,
+      "RegressionSlaBusinessDays": 10
+    },
+    {
+      "Operator": "TemplateMatching",
+      "SampleSeriesId": "field-seed-template-matching-202604",
+      "SampleCount": 20,
+      "ScenarioFamilies": [
+        "low-texture",
+        "homography-edge",
+        "rotation-scale",
+        "blank-negative"
+      ],
+      "RedactionStatus": "approved",
+      "StoragePolicy": "hashed fixture ids only; no raw customer path",
+      "TriageSlaBusinessDays": 5,
+      "RegressionSlaBusinessDays": 10
+    },
+    {
+      "Operator": "CaliperTool",
+      "SampleSeriesId": "field-seed-caliper-tool-202604",
+      "SampleCount": 20,
+      "ScenarioFamilies": [
+        "blurred-edge",
+        "wrong-polarity",
+        "strong-noise",
+        "thin-part"
+      ],
+      "RedactionStatus": "approved",
+      "StoragePolicy": "hashed fixture ids only; no raw customer path",
+      "TriageSlaBusinessDays": 5,
+      "RegressionSlaBusinessDays": 10
+    },
+    {
+      "Operator": "SurfaceDefectDetection",
+      "SampleSeriesId": "field-seed-surface-defect-202604",
+      "SampleCount": 20,
+      "ScenarioFamilies": [
+        "low-contrast-scratch",
+        "reference-drift",
+        "clean-negative",
+        "spot-defect"
+      ],
+      "RedactionStatus": "approved",
+      "StoragePolicy": "hashed fixture ids only; no raw customer path",
+      "TriageSlaBusinessDays": 5,
+      "RegressionSlaBusinessDays": 10
+    },
+    {
+      "Operator": "CameraCalibration",
+      "SampleSeriesId": "field-seed-camera-calibration-202604",
+      "SampleCount": 20,
+      "ScenarioFamilies": [
+        "missing-board",
+        "mixed-resolution",
+        "insufficient-samples",
+        "preview-only"
+      ],
+      "RedactionStatus": "approved",
+      "StoragePolicy": "hashed fixture ids only; no raw customer path",
+      "TriageSlaBusinessDays": 5,
+      "RegressionSlaBusinessDays": 10
+    }
+  ]
+}

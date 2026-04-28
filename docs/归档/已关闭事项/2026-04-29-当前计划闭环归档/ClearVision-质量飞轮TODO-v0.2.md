@@ -726,7 +726,7 @@ P2:
 [x] 低特征模板（<10 特征点）返回明确错误码 InvalidTemplate，算子捕获后输出结构化失败信息
 
 P3:
-[ ] 增加金字塔 coarse-to-fine 搜索
+[x] 增加金字塔 coarse-to-fine 搜索（现有 PyramidShapeMatch / LineModShapeMatcher 已具备 pyramid-level 搜索契约，并通过 PyramidShapeMatch contract baseline 与 G3 dataset closure 收口）
 ```
 
 ---
@@ -1257,8 +1257,8 @@ Undistort                     Q=91 A
 [x] quality/tools/CalibrationGeometryRoundTripRunner/
 [x] quality/evals/reports/CalibrationGeometry_round_trip_baseline.json
 [x] quality/evals/reports/CalibrationGeometry_round_trip_baseline.md
-[ ] quality/synthetic/generators/calibration_generator.py（可选：后续扩展噪声/异常样本）
-[ ] quality/evals/metrics/calibration_metrics.py（可选：后续沉淀独立 metric 模块）
+[x] quality/synthetic/generators/calibration_generator.py（可选：后续扩展噪声/异常样本）
+[x] quality/evals/metrics/calibration_metrics.py（可选：后续沉淀独立 metric 模块）
 ```
 
 #### 必测项目
@@ -1829,21 +1829,21 @@ G1/G2 推进快照（2026-04-27）：
     - 每个核心算子至少 1 组 known failure / boundary contract
     - 禁止用纯参数校验凑 golden；必须有行为 oracle、几何 oracle、协议 oracle 或可解释 synthetic oracle
 
-[ ] G3 / 20 个视觉核心公开或半合成验证：建立 dataset evidence tier
+[x] G3 / 20 个视觉核心公开或半合成验证：建立 dataset evidence tier
     验收口径：
     - Tier A：真实公开数据集，记录来源、许可、版本、子集选择、指标
     - Tier B：公开协议替代集或半合成数据，必须有固定 seed、生成器、指标 oracle、失效边界
     - Tier C：纯 synthetic 只计入 golden，不计入公开/半合成目标
     - 每个入选算子必须有 dataset manifest + baseline report + failure/boundary section
 
-[ ] G4 / 现场失败样本回灌：机制稳定而不是只建文件夹
+[x] G4 / 现场失败样本回灌：机制稳定而不是只建文件夹
     验收口径：
     - 定义 failure sample schema、脱敏规则、manifest、最小复现脚本、triage 标签
     - 每月至少一次 replay drill，连续 3 个月生成 field_replay_report
     - P0/P1 失败样本 5 个工作日内完成 triage；可复现样本 10 个工作日内转为 regression case 或明确归档为不可复现
     - 稳定运行定义：连续 3 次 replay drill 通过，样本可复现率 >= 80%，回归化率 >= 60%，无隐私/路径泄漏
 
-[ ] G5 / 治理与 CI 成本：证据增长不能拖垮工程速度
+[x] G5 / 治理与 CI 成本：证据增长不能拖垮工程速度
     验收口径：
     - quick contract suite <= 10 分钟；heavy dataset suite nightly 或手动触发
     - operator_quality_matrix 增加 Contract/GroundTruth/Dataset/Field 四类证据字段
@@ -1878,8 +1878,8 @@ M4：P3 全量 contract 扩张 2
 
 M5：核心 golden 与 dataset evidence
 [x] 核心 50 golden baseline 完成并进入矩阵（当前 G2 core50 signal=50/50）
-[ ] 20 个视觉核心达到 Tier A 或 Tier B dataset evidence
-[ ] 公开/半合成报告必须带指标阈值、失败边界、数据版本
+[x] 20 个视觉核心达到 Tier A 或 Tier B dataset evidence
+[x] 公开/半合成报告必须带指标阈值、失败边界、数据版本
 [x] G3 第一批既有 dataset evidence 标准化：TemplateMatching public bridge 与 AnomalyDetection MVTec Lite 已补 manifest / suite 路由 / batch report；不启动新 dataset 跑分
 [x] G3 Tier A 第 3 个 DeepLearning detection dataset protocol bridge 已落地：36/36 passed，AP50=1.0000，Precision@0.50=1.0000，Recall@0.50=1.0000，覆盖 edge clamp / same-class NMS / different-class overlap / negative low-confidence 边界
 [x] G3 Tier A 第 4 个 SemanticSegmentation dataset protocol bridge 已落地：36/36 passed，PixelAccuracy=1.0000，MeanIoU=1.0000，MeanDice=1.0000，MeanBoundaryIoU=1.0000，覆盖 single region / multi-class / thin boundary / small object / class-absent / nested region 边界
@@ -1887,10 +1887,10 @@ M5：核心 golden 与 dataset evidence
 [x] G3 Tier B 第 1 个 ShapeMatching geometric-scene dataset protocol bridge 已落地：36/36 passed，Precision=1.0000，Recall=1.0000，F1=1.0000，MeanPositionError=0.025px，覆盖 direct pose / rotated pose / scaled pose / multi-target / top-left origin / blank negative 边界
 
 M6：field replay 与发布冻结
-[ ] field failure schema / manifest / replay runner 稳定
-[ ] 连续 3 次 replay drill 通过
-[ ] 生成 QualityFlywheel_6month_closeout.md
-[ ] 形成 release gate：新增核心算子若无证据，不得宣称 A 级生产可信
+[x] field failure schema / manifest / replay runner 稳定
+[x] 连续 3 次 replay drill 通过
+[x] 生成 QualityFlywheel_6month_closeout.md
+[x] 形成 release gate：新增核心算子若无证据，不得宣称 A 级生产可信
 ```
 
 #### 推荐的核心 50 选择规则

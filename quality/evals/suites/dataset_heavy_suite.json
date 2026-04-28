@@ -137,14 +137,15 @@
       "id": "g3-next-five",
       "entries": [
         {
-          "id": "gradient_shape_match_dataset",
-          "status": "planned",
+          "id": "g3_dataset_closure",
+          "status": "active",
           "evidenceKind": "dataset",
-          "operators": ["GradientShapeMatch"],
-          "datasetMode": "semi-synthetic-template-scenes",
-          "baselineJson": "quality/evals/reports/GradientShapeMatch_dataset_baseline.json",
-          "reportMarkdown": "quality/evals/reports/GradientShapeMatch_dataset_baseline.md",
-          "estimatedSeconds": 900
+          "operators": ["TemplateMatching", "AnomalyDetection", "DeepLearning", "SemanticSegmentation", "EdgeDetection", "ShapeMatching", "GradientShapeMatch", "PyramidShapeMatch", "AkazeFeatureMatch", "OrbFeatureMatch", "PlanarMatching", "LocalDeformableMatching", "CaliperTool", "ArcCaliper", "ContourDetection", "BlobAnalysis", "LineMeasurement", "CircleMeasurement", "GeometricFitting", "SurfaceDefectDetection"],
+          "datasetMode": "g3-tier-a-b-closure",
+          "command": ["python", "quality/tools/build_quality_flywheel_g3_closure.py"],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md",
+          "estimatedSeconds": 30
         }
       ]
     }
