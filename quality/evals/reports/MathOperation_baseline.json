@@ -1,0 +1,584 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T05:50:57.8492119+00:00",
+    "CaseCount": 27,
+    "Passed": 27,
+    "Failed": 0,
+    "RuntimeMs": 15.911
+  },
+  "Operators": [
+    {
+      "Operator": "MathOperation",
+      "CaseCount": 27,
+      "Passed": 27,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.589,
+      "MemoryAllocationBytesAvg": 2856
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Abs",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.01
+    },
+    {
+      "Scenario": "Add",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 3.674
+    },
+    {
+      "Scenario": "Add errors",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.006
+    },
+    {
+      "Scenario": "Divide",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.003
+    },
+    {
+      "Scenario": "Divide errors",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.159
+    },
+    {
+      "Scenario": "Max",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.004
+    },
+    {
+      "Scenario": "Min",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.004
+    },
+    {
+      "Scenario": "Modulo",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.01
+    },
+    {
+      "Scenario": "Modulo errors",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.01
+    },
+    {
+      "Scenario": "Multiply",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.003
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.01
+    },
+    {
+      "Scenario": "Power",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.007
+    },
+    {
+      "Scenario": "Round",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.026
+    },
+    {
+      "Scenario": "Sqrt",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.006
+    },
+    {
+      "Scenario": "Sqrt errors",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.024
+    },
+    {
+      "Scenario": "Subtract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.342
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.1
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "add_positive",
+      "Operator": "MathOperation",
+      "Scenario": "Add",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 11.1451,
+      "MemoryAllocationBytes": 15248,
+      "Metrics": {
+        "ExpectedResult": 5,
+        "ActualResult": 5,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "add_negative",
+      "Operator": "MathOperation",
+      "Scenario": "Add",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0427,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": -5,
+        "ActualResult": -5,
+        "IsPositive": false,
+        "IsZero": false,
+        "IsNegative": true,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "subtract_positive",
+      "Operator": "MathOperation",
+      "Scenario": "Subtract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.6777,
+      "MemoryAllocationBytes": 2656,
+      "Metrics": {
+        "ExpectedResult": 2,
+        "ActualResult": 2,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "subtract_negative",
+      "Operator": "MathOperation",
+      "Scenario": "Subtract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0065,
+      "MemoryAllocationBytes": 2600,
+      "Metrics": {
+        "ExpectedResult": -3,
+        "ActualResult": -3,
+        "IsPositive": false,
+        "IsZero": false,
+        "IsNegative": true,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "multiply_basic",
+      "Operator": "MathOperation",
+      "Scenario": "Multiply",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0036,
+      "MemoryAllocationBytes": 2600,
+      "Metrics": {
+        "ExpectedResult": 20,
+        "ActualResult": 20,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "multiply_by_zero",
+      "Operator": "MathOperation",
+      "Scenario": "Multiply",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0033,
+      "MemoryAllocationBytes": 2600,
+      "Metrics": {
+        "ExpectedResult": 0,
+        "ActualResult": 0,
+        "IsPositive": false,
+        "IsZero": true,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "divide_basic",
+      "Operator": "MathOperation",
+      "Scenario": "Divide",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0038,
+      "MemoryAllocationBytes": 2584,
+      "Metrics": {
+        "ExpectedResult": 5,
+        "ActualResult": 5,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "divide_fraction",
+      "Operator": "MathOperation",
+      "Scenario": "Divide",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0031,
+      "MemoryAllocationBytes": 2584,
+      "Metrics": {
+        "ExpectedResult": 0.25,
+        "ActualResult": 0.25,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "divide_by_zero",
+      "Operator": "MathOperation",
+      "Scenario": "Divide errors",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.1587,
+      "MemoryAllocationBytes": 4528,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Computation failed: Divisor cannot be zero.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "abs_negative",
+      "Operator": "MathOperation",
+      "Scenario": "Abs",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0104,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 7.5,
+        "ActualResult": 7.5,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "min_basic",
+      "Operator": "MathOperation",
+      "Scenario": "Min",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0044,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 3,
+        "ActualResult": 3,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "max_basic",
+      "Operator": "MathOperation",
+      "Scenario": "Max",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 8,
+        "ActualResult": 8,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "power_basic",
+      "Operator": "MathOperation",
+      "Scenario": "Power",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0105,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 8,
+        "ActualResult": 8,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "power_zero_exp",
+      "Operator": "MathOperation",
+      "Scenario": "Power",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0044,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 1,
+        "ActualResult": 1,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "sqrt_perfect",
+      "Operator": "MathOperation",
+      "Scenario": "Sqrt",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0055,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 3,
+        "ActualResult": 3,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "sqrt_negative",
+      "Operator": "MathOperation",
+      "Scenario": "Sqrt errors",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0236,
+      "MemoryAllocationBytes": 1680,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Computation failed: Cannot calculate sqrt for a negative number.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "round_up",
+      "Operator": "MathOperation",
+      "Scenario": "Round",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0487,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 4,
+        "ActualResult": 4,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "round_down",
+      "Operator": "MathOperation",
+      "Scenario": "Round",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0036,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 3,
+        "ActualResult": 3,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "modulo_basic",
+      "Operator": "MathOperation",
+      "Scenario": "Modulo",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0104,
+      "MemoryAllocationBytes": 2584,
+      "Metrics": {
+        "ExpectedResult": 1,
+        "ActualResult": 1,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "modulo_by_zero",
+      "Operator": "MathOperation",
+      "Scenario": "Modulo errors",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0098,
+      "MemoryAllocationBytes": 1672,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Computation failed: Modulo divisor cannot be zero.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "add_int_input",
+      "Operator": "MathOperation",
+      "Scenario": "Add",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0037,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "ExpectedResult": 5,
+        "ActualResult": 5,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "add_string_input",
+      "Operator": "MathOperation",
+      "Scenario": "Add",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 3.5057,
+      "MemoryAllocationBytes": 3072,
+      "Metrics": {
+        "ExpectedResult": 6,
+        "ActualResult": 6,
+        "IsPositive": true,
+        "IsZero": false,
+        "IsNegative": false,
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "non_finite_input_nan",
+      "Operator": "MathOperation",
+      "Scenario": "Add errors",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 1296,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Input \u0027ValueA\u0027 must be a finite number.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "non_finite_input_infinity",
+      "Operator": "MathOperation",
+      "Scenario": "Add errors",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0028,
+      "MemoryAllocationBytes": 1296,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Input \u0027ValueA\u0027 must be a finite number.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_present",
+      "Operator": "MathOperation",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0105,
+      "MemoryAllocationBytes": 2560,
+      "Metrics": {
+        "RequiredKeys": "Result, ResultFloat, ResultInt, IsPositive, IsZero, IsNegative, InputA, InputB, Operation",
+        "MissingKeys": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_invalid_operation",
+      "Operator": "MathOperation",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.1817,
+      "MemoryAllocationBytes": 1224,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "Operation must be one of: Add, Subtract, Multiply, Divide, Abs, Min, Max, Power, Sqrt, Round, Modulo",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_valid_operation",
+      "Operator": "MathOperation",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0181,
+      "MemoryAllocationBytes": 736,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "Errors": "",
+        "Passed": true
+      }
+    }
+  ]
+}

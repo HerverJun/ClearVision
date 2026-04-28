@@ -1,0 +1,376 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T09:16:56.1120278+00:00",
+    "CaseCount": 20,
+    "Passed": 20,
+    "Failed": 0,
+    "RuntimeMs": 27.5
+  },
+  "Operators": [
+    {
+      "Operator": "ForEach",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.375,
+      "MemoryAllocationBytesAvg": 7457
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Error handling",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.027
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.309
+    },
+    {
+      "Scenario": "Parallel",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.123
+    },
+    {
+      "Scenario": "Sequential",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.483
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.026
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "empty_items",
+      "Operator": "ForEach",
+      "Scenario": "Parallel",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 7.3395,
+      "MemoryAllocationBytes": 10480,
+      "Metrics": {
+        "IoMode": "Parallel",
+        "Count": "0",
+        "PassCount": "0",
+        "AllPass": "True",
+        "AllSucceeded": "null",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "single_item_parallel",
+      "Operator": "ForEach",
+      "Scenario": "Parallel",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 15.6178,
+      "MemoryAllocationBytes": 31736,
+      "Metrics": {
+        "IoMode": "Parallel",
+        "Count": "1",
+        "PassCount": "1",
+        "AllPass": "True",
+        "AllSucceeded": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "single_item_sequential",
+      "Operator": "ForEach",
+      "Scenario": "Sequential",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 1.3402,
+      "MemoryAllocationBytes": 6440,
+      "Metrics": {
+        "IoMode": "Sequential",
+        "Count": "1",
+        "PassCount": "1",
+        "AllPass": "True",
+        "AllSucceeded": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "three_items_parallel_all_pass",
+      "Operator": "ForEach",
+      "Scenario": "Parallel",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.5189,
+      "MemoryAllocationBytes": 11616,
+      "Metrics": {
+        "IoMode": "Parallel",
+        "Count": "3",
+        "PassCount": "3",
+        "AllPass": "True",
+        "AllSucceeded": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "three_items_sequential_all_pass",
+      "Operator": "ForEach",
+      "Scenario": "Sequential",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.095,
+      "MemoryAllocationBytes": 9464,
+      "Metrics": {
+        "IoMode": "Sequential",
+        "Count": "3",
+        "PassCount": "3",
+        "AllPass": "True",
+        "AllSucceeded": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "five_items_parallel_all_pass",
+      "Operator": "ForEach",
+      "Scenario": "Parallel",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.2945,
+      "MemoryAllocationBytes": 14640,
+      "Metrics": {
+        "IoMode": "Parallel",
+        "Count": "5",
+        "PassCount": "5",
+        "AllPass": "True",
+        "AllSucceeded": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "failfast_true_sequential_first_fails",
+      "Operator": "ForEach",
+      "Scenario": "Sequential",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.4468,
+      "MemoryAllocationBytes": 7288,
+      "Metrics": {
+        "IoMode": "Sequential",
+        "Count": "1",
+        "PassCount": "0",
+        "AllPass": "False",
+        "AllSucceeded": "False",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "failfast_false_parallel_mixed",
+      "Operator": "ForEach",
+      "Scenario": "Parallel",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.726,
+      "MemoryAllocationBytes": 13608,
+      "Metrics": {
+        "IoMode": "Parallel",
+        "Count": "4",
+        "PassCount": "2",
+        "AllPass": "False",
+        "AllSucceeded": "False",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "failfast_false_sequential_mixed",
+      "Operator": "ForEach",
+      "Scenario": "Sequential",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0504,
+      "MemoryAllocationBytes": 9480,
+      "Metrics": {
+        "IoMode": "Sequential",
+        "Count": "4",
+        "PassCount": "2",
+        "AllPass": "False",
+        "AllSucceeded": "False",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_parallel",
+      "Operator": "ForEach",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.5897,
+      "MemoryAllocationBytes": 7584,
+      "Metrics": {
+        "RequiredKeys": "Results, Count, PassCount, AllPass, SuccessCount, FailureCount, AllSucceeded",
+        "MissingKeys": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_sequential",
+      "Operator": "ForEach",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0278,
+      "MemoryAllocationBytes": 5504,
+      "Metrics": {
+        "RequiredKeys": "Results, Count, PassCount, AllPass, SuccessCount, FailureCount, AllSucceeded",
+        "MissingKeys": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "max_parallelism_one",
+      "Operator": "ForEach",
+      "Scenario": "Parallel",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.2428,
+      "MemoryAllocationBytes": 9640,
+      "Metrics": {
+        "IoMode": "Parallel",
+        "Count": "3",
+        "PassCount": "3",
+        "AllPass": "True",
+        "AllSucceeded": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "null_items_fails",
+      "Operator": "ForEach",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0475,
+      "MemoryAllocationBytes": 2848,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "\u672A\u63D0\u4F9B Items \u8F93\u5165",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "non_enumerable_fails",
+      "Operator": "ForEach",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0062,
+      "MemoryAllocationBytes": 752,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Items \u5FC5\u987B\u662F\u53EF\u679A\u4E3E\u7C7B\u578B\uFF0C\u5B9E\u9645\u7C7B\u578B: String",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_invalid_iomode",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.1206,
+      "MemoryAllocationBytes": 1000,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "IoMode \u5FC5\u987B\u662F \u0027Parallel\u0027 \u6216 \u0027Sequential\u0027",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_maxparallelism_too_low",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0108,
+      "MemoryAllocationBytes": 1352,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "MaxParallelism \u5FC5\u987B\u5728 1-64 \u4E4B\u95F4",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_maxparallelism_too_high",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0038,
+      "MemoryAllocationBytes": 1352,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "MaxParallelism \u5FC5\u987B\u5728 1-64 \u4E4B\u95F4",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_timeout_too_low",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0034,
+      "MemoryAllocationBytes": 1352,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "TimeoutMs \u5FC5\u987B\u5728 1000-300000 \u4E4B\u95F4",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_timeout_too_high",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0035,
+      "MemoryAllocationBytes": 1368,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "TimeoutMs \u5FC5\u987B\u5728 1000-300000 \u4E4B\u95F4",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_valid_params",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "FailureMessage": null,
+      "RuntimeMs": 0.0145,
+      "MemoryAllocationBytes": 1632,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "Errors": "",
+        "Passed": true
+      }
+    }
+  ]
+}

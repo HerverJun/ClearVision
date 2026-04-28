@@ -5,7 +5,13 @@
       "Bash(ls -1 /c/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/*.cs)",
       "Bash(find /c/Users/11234/Desktop/ClearVision -type f -name *Performance* -o -name *TestData* -o -name *Benchmark* -o -name *MemoryLeak*)",
       "Bash(find /c/Users/11234/Desktop/ClearVision -name *.cs -type f -exec grep -l TestDataGenerator {})",
-      "Bash(2)"
+      "Bash(2)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet restore *)",
+      "Bash(python *)",
+      "Bash(dotnet run *)"
     ]
   }
 }

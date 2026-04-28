@@ -31,6 +31,33 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("OriginMode", "Origin Mode", "enum", DefaultValue = "Center", Options = new[] { "Center|Center", "TopLeft|TopLeft", "Custom|Custom" })]
 [OperatorParam("OriginX", "Origin X", "double", DefaultValue = 0.0)]
 [OperatorParam("OriginY", "Origin Y", "double", DefaultValue = 0.0)]
+[AlgorithmInfo(
+    Name = "ORB Homography Feature Match",
+    CoreApi = "OpenCvSharp.ORB + BFMatcher(Hamming) + FindHomography(RANSAC)",
+    ImplementationStrategy = "Extract ORB descriptors from the scene and template, filter candidate matches with ratio and optional symmetry tests, verify geometry with a RANSAC homography, then emit Position, MatchPoint, Score, and NG diagnostics.",
+    TimeComplexity = "O(P + T*S) where P is image pixels and T/S are retained template and scene descriptors",
+    TypicalLatency = "FeatureMatchContractRunner baseline: 22 cases passed, avg runtime about 7.6 ms on synthetic contract images.",
+    SpaceComplexity = "O(P + T + S) plus bounded static template cache entries for TemplatePath mode.",
+    SuitableUseCases = new[]
+    {
+        "Realtime feature-based localization when the template has enough repeatable ORB corners.",
+        "Moderate rotation and small scale changes where a homography can explain the target pose.",
+        "Contract-driven pipelines that use IsMatch and FailureReason rather than execution status alone."
+    },
+    UnsuitableUseCases = new[]
+    {
+        "Low-texture or repetitive-pattern templates that produce unstable descriptor matches.",
+        "Precision measurement workflows that require a calibrated target center or subpixel edge result.",
+        "Scenes where a large number of background features should be searched without ROI or threshold tuning."
+    },
+    KnownLimitations = new[]
+    {
+        "Score is a homography verification score based on inlier evidence, not a descriptor distance.",
+        "The inlier-ratio gate is fixed in code, while MinMatchCount and ORB detector settings are configurable.",
+        "TemplatePath mode uses a bounded in-process cache keyed by file fingerprint and detector configuration."
+    },
+    Dependencies = new[] { "OpenCvSharp" }
+)]
 public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
 {
     public override OperatorType OperatorType => OperatorType.OrbFeatureMatch;

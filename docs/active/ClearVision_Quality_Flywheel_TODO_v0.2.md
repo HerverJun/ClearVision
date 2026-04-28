@@ -381,6 +381,30 @@ P1-Next-7:
 - JSON pose 输入必须使用 Pose3DSerialization 的 Matrix4x4 行序；CalibrationBundleV2 的 4x4 helper 是 bundle 矩阵约定，不能混用。
 - 当前缺失 RobotPoses / CalibrationBoardPoses 会失败，但错误消息可能为空；baseline 先锁定失败契约，不绑定文案。
 
+P1-Next-8:
+[x] 已完成 P1 证据回写与矩阵收口：
+1. 为 AkazeFeatureMatch / OrbFeatureMatch / PyramidShapeMatch / HandEyeCalibrationValidator 补齐 AlgorithmInfo 生成源字段，覆盖实现策略、复杂度、典型耗时、适用/不适用场景和已知限制。
+2. 重生成 4 张算子名片、catalog、legacy mirror 和 operator_quality_matrix，生成卡片 CardTodoCount=0。
+3. AkazeFeatureMatch / OrbFeatureMatch QScore 从 73 B 升为 90 A；PyramidShapeMatch 从 83 B 升为 100 A；HandEyeCalibrationValidator 从 83 B 升为 100 A。
+4. operator_quality_matrix 快照：Level counts A=136, B=19；Priority counts P2=32, P3=123；P0=0；P1=0；Cards with TODO=0。
+5. 复跑验证：FeatureMatchContractRunner 44/44 passed；PyramidShapeMatchContractRunner 24/24 passed；HandEyeCalibrationValidatorContractRunner 24/24 passed。
+关键发现：
+- P1 剩余项不是缺 runner，而是源码元数据未回写，导致重生成名片会重新引入 TODO 占位。
+- 质量飞轮的稳定做法是先补 AlgorithmInfo 单一来源，再重生名片和矩阵，而不是手改生成文件。
+
+P2-Calibration-1:
+[x] 已完成 Calibration synthetic geometry baseline：
+1. 新增 quality/synthetic/generators/calibration_generator.py，生成棋盘格/标定板、CameraMatrix、Brown/Fisheye 畸变、planar homography、stereo baseline 和 eye-in-hand / eye-to-hand pose bundle。
+2. 新增 quality/evals/metrics/calibration_metrics.py，统一 reprojection error、pose translation/rotation error、pixel-to-world roundtrip error、undistort residual 等指标。
+3. 新增 quality/tools/run_calibration_synthetic_baseline.py，输出 matrix-compatible 的 CalibrationSynthetic_baseline.json/.md。
+4. 覆盖 CameraCalibration / PixelToWorldTransform / HandEyeCalibration / Undistort / FisheyeUndistort / StereoCalibration / NPointCalibration / CoordinateTransform / CalibrationLoader。
+5. baseline 结果：216/216 passed；每个算子 24 cases，Failed=0，RuntimeMsAvg 与 MemoryAllocationBytesAvg 已写入报告。
+6. operator_quality_matrix 已自动纳入 golden evidence：上述 9 个校准算子 Golden Test=Yes，Cases=24，Benchmark=Yes。
+7. 复跑现有 .NET 校准算子测试：PixelToWorldTransform / NPointCalibration / HandEyeCalibration / Undistort / StereoCalibration 共 37/37 passed。
+关键发现：
+- 当前 baseline 是 synthetic geometry contract，先锁定标定数据结构、几何真值和指标阈值；后续应继续接入真实 OpenCV/.NET operator runner，把 solver 误差与 runtime quality gate 一起纳入证据。
+- CalibrationLoader / CoordinateTransform / PixelToWorldTransform 可以共享同一组 homography roundtrip case，后续收紧时不要重复造数据。
+
 ---
 
 ## 2. 第二优先级：匹配定位类收紧
@@ -613,8 +637,8 @@ ShapeDescriptor mode 的 Position 更接近轮廓中心，但 synthetic 形状�
 1. [x] 缓存键已修复：BuildCacheKey 对输入模板使用 SHA256 hash，不同模板不再串用。
 2. [x] Position 输出已修复：运行时同时输出 Position 对象与 X/Y 字段。
 3. [x] 可视化框已修复：使用 lease.Entry.TemplateWidth/Height 的真实半宽/半高绘制。
-4. [ ] 只返回最佳匹配，不支持候选列表
-5. [x] 模板有效特征点少于 10 时返回带 [InvalidTemplate] 的框架级失败
+4. [x] Matches 候选列表输出已修复：MatchTopK 支持 TopK=1/3/5/10，输出 Matches 列表带位置 NMS。
+5. [x] 低特征模板异常已修复：`<10` 有效特征时抛出 GradientShapeInvalidTemplateException（基类 GradientShapeMatchException，FailureReason=InvalidTemplate），算子捕获后输出结构化失败信息。
 ```
 
 #### TODO
@@ -696,12 +720,10 @@ P1-已完成:
 [x] 缓存键机制已修复（SHA256 hash）
 [x] Position 输出对象已补齐
 [x] 可视化框已改成模板真实尺寸
-
-P1-待做:
-[ ] 增加 Matches 候选列表输出，至少支持 TopK=1/3/5
+[x] Matches 候选列表输出已补齐：MatchTopK 支持 TopK=1/3/5/10，输出 Matches 列表带位置 NMS
 
 P2:
-[x] 低特征模板（<10 特征点）返回明确错误码 InvalidTemplate，而非非结构化异常
+[x] 低特征模板（<10 特征点）返回明确错误码 InvalidTemplate，算子捕获后输出结构化失败信息
 
 P3:
 [ ] 增加金字塔 coarse-to-fine 搜索
@@ -1430,7 +1452,7 @@ TODO：
 [x] GradientShapeMatch 117 synthetic cases（9 个场景 × 13 cases）
 [x] 生成三份 baseline report（CaliperTool / TemplateMatching / GradientShapeMatch）
 [x] 生成三份 failure triage（CaliperTool / TemplateMatching / GradientShapeMatch）
-[ ] 不改算法，只出归因报告
+[x] 产出三份归因报告（CaliperTool / TemplateMatching / GradientShapeMatch）
 ```
 
 验收：
@@ -1658,13 +1680,15 @@ Calibration → synthetic geometry
 [x] SemanticSegmentation 完成 contract baseline（27/27 passed）
 [x] EdgePairDefect 完成 contract baseline（27/27 passed）
 [x] DualModalVoting 完成 contract baseline（31/31 passed）
-[x] AkazeFeatureMatch / OrbFeatureMatch 完成 contract baseline（44/44 passed，各 22 cases）
-[x] PyramidShapeMatch 完成 contract baseline（24/24 passed）
-[x] HandEyeCalibrationValidator 完成 contract baseline（24/24 passed）
+[x] AkazeFeatureMatch / OrbFeatureMatch 完成 contract baseline（44/44 passed，各 22 cases；证据回写后均升 A）
+[x] PyramidShapeMatch 完成 contract baseline（24/24 passed；证据回写后升 A）
+[x] HandEyeCalibrationValidator 完成 contract baseline（24/24 passed；证据回写后升 A）
+[x] P1 剩余 4 项清零：operator_quality_matrix 当前 P1=0，Cards with TODO=0
 [x] P3CoreContractRunner 完成 19 个原 B 级 P3 算子 contract baseline（386/386 passed，19/19 已升 A）
 [x] TemplateMatching 完成 HPatches-style synthetic homography bridge（24/24 passed，矩阵 Cases=141，HasDatasetEvidence=Yes）
 [x] DeepLearning 完成 runtime benchmark（20/20 passed，覆盖 1080p、4K、CPU fallback、1080p x4 batch pressure）
 [x] 标定类完成 synthetic geometry round-trip baseline（192/192 passed，8 个标定相关算子各 24 cases）
+[x] Calibration synthetic geometry baseline 完成（9 个校准算子，216/216 passed；operator_quality_matrix 已纳入 24 cases/operator；现有 .NET 校准测试 37/37 passed）
 ```
 
 ### 90 天目标

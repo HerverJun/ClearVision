@@ -36,6 +36,7 @@ SCENARIOS = (
     "strong_background",
     "low_feature",
     "roi_search",
+    "topk_multi",
 )
 
 # Key parameter combos: (AngleRange, AngleStep, MagnitudeThreshold)
@@ -202,6 +203,18 @@ def make_scene(
         scene, _, _ = embed_template(scene, template, angle, decoy_tx, decoy_ty)
         scene, cx, cy = embed_template(scene, template, angle, tx, ty)
         meta["decoy_position"] = {"x": decoy_tx, "y": decoy_ty}
+    elif scenario == "topk_multi":
+        # Place 3 identical shapes at different locations
+        positions = []
+        base_tx, base_ty = tx, ty
+        offsets = [(0, 0), (140, 50), (-120, 90)]
+        for dx, dy in offsets:
+            px = max(TEMPLATE_SIZE // 2, min(SCENE_W - TEMPLATE_SIZE // 2, base_tx + dx))
+            py = max(TEMPLATE_SIZE // 2, min(SCENE_H - TEMPLATE_SIZE // 2, base_ty + dy))
+            scene, _, _ = embed_template(scene, template, angle, px, py)
+            positions.append({"x": px, "y": py})
+        meta["multi_positions"] = positions
+        cx, cy = base_tx, base_ty
     else:
         scene, cx, cy = embed_template(scene, template, angle, tx, ty)
 
@@ -246,6 +259,8 @@ def choose_params(scenario: str, index: int) -> tuple[int, int, int]:
         return (0, 1, 30)
     if scenario == "roi_search":
         return (0, 1, 30)
+    if scenario == "topk_multi":
+        return (0, 1, 30)
     return PARAM_COMBOS[index % len(PARAM_COMBOS)]
 
 
@@ -263,6 +278,8 @@ def choose_angle(scenario: str, index: int, rng: random.Random) -> float:
         return 0.0
     if scenario == "roi_search":
         return 0.0
+    if scenario == "topk_multi":
+        return 0.0
     # others: small random rotation
     return float(rng.randint(-10, 10))
 
@@ -279,6 +296,8 @@ def choose_shape(scenario: str, index: int) -> str:
     if scenario in ("blurred_edge", "strong_background"):
         return "asym"
     if scenario == "strong_background":
+        return "asym"
+    if scenario == "topk_multi":
         return "asym"
     return shapes[index % len(shapes)]
 
@@ -302,8 +321,15 @@ def build_case(
 
     # Choose embedding position
     margin = TEMPLATE_SIZE // 2 + 10
-    tx = rng.randint(margin, SCENE_W - margin)
-    ty = rng.randint(margin, SCENE_H - margin)
+    if scenario == "topk_multi":
+        # Constrain base position so that all 3 shapes fit without block overlap
+        # Offsets: (0,0), (140,50), (-120,90)
+        # Need tx+140 <= SCENE_W - TEMPLATE_SIZE//2 and tx-120 >= TEMPLATE_SIZE//2
+        tx = rng.randint(200, 292)
+        ty = rng.randint(90, 214)
+    else:
+        tx = rng.randint(margin, SCENE_W - margin)
+        ty = rng.randint(margin, SCENE_H - margin)
 
     scene, meta = make_scene(template, scenario, angle, tx, ty, rng)
 
@@ -321,6 +347,7 @@ def build_case(
         "MagnitudeThreshold": magnitude_threshold,
         "EnableCache": True,
         "UseRoi": scenario == "roi_search",
+        "TopK": 3 if scenario == "topk_multi" else 1,
     }
 
     if scenario == "roi_search":
@@ -335,6 +362,22 @@ def build_case(
         params["RoiHeight"] = roi_h
         meta["roi"] = {"x": roi_x, "y": roi_y, "width": roi_w, "height": roi_h}
 
+    expected: dict[str, object] = {
+        "is_match": is_match_expected,
+        "allow_no_match": scenario == "partial_occlusion",
+        "angle_optional": scenario == "partial_occlusion",
+        "position": {"x": tx, "y": ty},
+        "angle": round(angle, 2),
+        "score_min": score_min,
+    }
+
+    if scenario == "low_feature":
+        expected["failure_reason"] = "InvalidTemplate"
+
+    if scenario == "topk_multi":
+        expected["match_count_min"] = 2
+        expected["topk"] = 3
+
     case = {
         "version": 1,
         "case_id": case_id,
@@ -347,19 +390,13 @@ def build_case(
             "template": "template.png",
             "scene": "scene.png",
         },
-        "expected": {
-            "is_match": is_match_expected,
-            "allow_no_match": scenario == "partial_occlusion",
-            "angle_optional": scenario == "partial_occlusion",
-            "position": {"x": tx, "y": ty},
-            "angle": round(angle, 2),
-            "score_min": score_min,
-        },
+        "expected": expected,
         "metrics": [
             "PositionErrorPx",
             "AngleErrorDeg",
             "IsMatchCorrect",
             "ScoreValue",
+            "MatchCountCorrect",
             "RuntimeMs",
             "MemoryAllocation",
         ],
