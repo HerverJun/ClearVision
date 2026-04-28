@@ -40,6 +40,66 @@ public class TimerStatisticsOperatorTests
         Assert.NotNull(result.OutputData);
         Assert.Equal(2, (int)result.OutputData!["Count"]);
         Assert.True(Convert.ToDouble(result.OutputData["TotalMs"]) >= Convert.ToDouble(result.OutputData["AverageMs"]));
+        Assert.Equal("OperatorInstance", result.OutputData["StateScope"]);
+        Assert.Equal(120, (int)result.OutputData["StateTtlMinutes"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDifferentOperatorIds_ShouldKeepIndependentState()
+    {
+        var opA = CreateOperator(Guid.NewGuid(), new Dictionary<string, object> { { "Mode", "Cumulative" } });
+        var opB = CreateOperator(Guid.NewGuid(), new Dictionary<string, object> { { "Mode", "Cumulative" } });
+
+        await _operator.ExecuteAsync(opA, null);
+        await _operator.ExecuteAsync(opA, null);
+        var resultB = await _operator.ExecuteAsync(opB, null);
+
+        Assert.True(resultB.IsSuccess);
+        Assert.Equal(1, (int)resultB.OutputData!["Count"]);
+        Assert.Equal(opB.Id, Assert.IsType<Guid>(resultB.OutputData["StateKey"]));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithReset_ShouldClearCumulativeState()
+    {
+        var operatorId = Guid.NewGuid();
+        var op = CreateOperator(operatorId, new Dictionary<string, object> { { "Mode", "Cumulative" } });
+
+        await _operator.ExecuteAsync(op, null);
+        await _operator.ExecuteAsync(op, null);
+
+        var resetOp = CreateOperator(operatorId, new Dictionary<string, object>
+        {
+            { "Mode", "Cumulative" },
+            { "Reset", true }
+        });
+        var resetResult = await _operator.ExecuteAsync(resetOp, null);
+        var afterReset = await _operator.ExecuteAsync(op, null);
+
+        Assert.True(resetResult.IsSuccess);
+        Assert.Equal(0, (int)resetResult.OutputData!["Count"]);
+        Assert.Equal(0.0, Convert.ToDouble(resetResult.OutputData["TotalMs"]));
+        Assert.True((bool)resetResult.OutputData["ResetApplied"]);
+        Assert.Equal(1, (int)afterReset.OutputData!["Count"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithExpiredTtl_ShouldDropOldOperatorState()
+    {
+        var opA = CreateOperator(Guid.NewGuid(), new Dictionary<string, object>
+        {
+            { "Mode", "Cumulative" },
+            { "StateTtlMinutes", 0 }
+        });
+        var opB = CreateOperator(Guid.NewGuid(), new Dictionary<string, object> { { "Mode", "Cumulative" } });
+
+        await _operator.ExecuteAsync(opA, null);
+        await Task.Delay(5);
+        await _operator.ExecuteAsync(opB, null);
+        var resultA = await _operator.ExecuteAsync(opA, null);
+
+        Assert.True(resultA.IsSuccess);
+        Assert.Equal(1, (int)resultA.OutputData!["Count"]);
     }
 
     [Fact]
@@ -54,7 +114,12 @@ public class TimerStatisticsOperatorTests
 
     private static Operator CreateOperator(Dictionary<string, object>? parameters = null)
     {
-        var op = new Operator("Timer", OperatorType.TimerStatistics, 0, 0);
+        return CreateOperator(Guid.NewGuid(), parameters);
+    }
+
+    private static Operator CreateOperator(Guid id, Dictionary<string, object>? parameters = null)
+    {
+        var op = new Operator(id, "Timer", OperatorType.TimerStatistics, 0, 0);
 
         if (parameters != null)
         {
