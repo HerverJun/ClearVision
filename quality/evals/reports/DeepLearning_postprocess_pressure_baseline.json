@@ -1,0 +1,78 @@
+{
+  "EvidenceKind": "contract",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T16:12:02.1894665+00:00",
+    "CaseCount": 3,
+    "Passed": 3,
+    "Failed": 0
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "HasBenchmark": true,
+      "Benchmark": "postprocess-pressure"
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "postprocess_1k_balanced_classes",
+      "CandidateCount": 1000,
+      "ClassDistributionMode": "balanced",
+      "CandidatesByClass": {
+        "0": 334,
+        "1": 333,
+        "2": 333
+      },
+      "Passed": true,
+      "RuntimeMs": 16.961,
+      "RuntimeBudgetMs": 750,
+      "MemoryAllocationBytes": 1042680,
+      "MemoryBudgetBytes": 8388608,
+      "SelectedCount": 1000,
+      "CandidateLimit": 10000,
+      "DroppedBeforeNms": 0,
+      "Failure": null
+    },
+    {
+      "CaseId": "postprocess_5k_balanced_classes",
+      "CandidateCount": 5000,
+      "ClassDistributionMode": "balanced",
+      "CandidatesByClass": {
+        "0": 1667,
+        "1": 1667,
+        "2": 1666
+      },
+      "Passed": true,
+      "RuntimeMs": 8.221,
+      "RuntimeBudgetMs": 750,
+      "MemoryAllocationBytes": 4988136,
+      "MemoryBudgetBytes": 25165824,
+      "SelectedCount": 5000,
+      "CandidateLimit": 10000,
+      "DroppedBeforeNms": 0,
+      "Failure": null
+    },
+    {
+      "CaseId": "postprocess_10k_skewed_classes",
+      "CandidateCount": 10000,
+      "ClassDistributionMode": "skewed",
+      "CandidatesByClass": {
+        "1": 1000,
+        "0": 8710,
+        "2": 290
+      },
+      "Passed": true,
+      "RuntimeMs": 15.424,
+      "RuntimeBudgetMs": 1000,
+      "MemoryAllocationBytes": 7976432,
+      "MemoryBudgetBytes": 50331648,
+      "SelectedCount": 6420,
+      "CandidateLimit": 10000,
+      "DroppedBeforeNms": 0,
+      "Failure": null
+    }
+  ]
+}

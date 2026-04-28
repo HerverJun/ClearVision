@@ -106,6 +106,7 @@ public class DeepLearningOperator : OperatorBase
     /// </summary>
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _modelLocks = new();
     private const int MaxCachedModels = 3;
+    private const int DefaultNmsCandidateLimit = 10000;
     private static readonly LinkedList<string> _modelAccessOrder = new();
     private static readonly Dictionary<string, LinkedListNode<string>> _modelAccessNodes = new();
     private static readonly object _modelCacheEvictionLock = new();
@@ -363,7 +364,8 @@ public class DeepLearningOperator : OperatorBase
         Logger.LogInformation("[DeepLearning] 最终使用YOLO版本: {YoloVersion}, 置信度阈值: {Confidence}", yoloVersion, confidenceThreshold);
 
         // 9. 后处理
-        var detections = PostprocessResults(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses, enableInternalNms, nmsIouThreshold);
+        var postprocessResult = PostprocessResultsWithDiagnostics(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses, enableInternalNms, nmsIouThreshold);
+        var detections = postprocessResult.Detections;
         Logger.LogInformation("[DeepLearning] 检测到目标数量: {DetectionCount}", detections.Count);
 
         var detectionMode = GetStringParam(@operator, "DetectionMode", "Defect");
@@ -398,7 +400,8 @@ public class DeepLearningOperator : OperatorBase
             { "DetectionMode", detectionMode },
             { "InternalNmsEnabled", enableInternalNms },
             { "NmsIouThreshold", nmsIouThreshold },
-            { "RawCandidateCount", detections.Count },
+            { "RawCandidateCount", postprocessResult.Diagnostics.RawCandidateCount },
+            { "PostprocessDiagnostics", postprocessResult.Diagnostics.ToPayload() },
             { "VisualizationDetectionCount", visualizationDetections.Count },
             { "DetectionList", detectionList },
             { "Objects", isObjectMode ? detectionList : new DetectionList() },
@@ -865,13 +868,26 @@ public class DeepLearningOperator : OperatorBase
         var selection = SelectDetectionOutputIndex(outputNames, outputShapes, knownLabelCount);
         var selectedShape = outputShapes[selection.SelectedIndex];
         var selectedTensor = outputTensors[selection.SelectedIndex];
-        var selectedDenseTensor = new DenseTensor<float>(selectedTensor.ToArray(), selectedShape);
+        var selectedDenseTensor = selectedTensor as DenseTensor<float>
+            ?? CopyTensorToDense(selectedTensor, selectedShape);
 
         return new InferenceTensorSelection(
             selectedDenseTensor,
             outputNames[selection.SelectedIndex],
             selectedShape,
             selection.SelectionRule);
+    }
+
+    private static DenseTensor<float> CopyTensorToDense(Tensor<float> source, int[] shape)
+    {
+        var values = new float[source.Length];
+        var index = 0;
+        foreach (var value in source)
+        {
+            values[index++] = value;
+        }
+
+        return new DenseTensor<float>(values, shape);
     }
 
     private static (int SelectedIndex, string SelectionRule) SelectDetectionOutputIndex(
@@ -1100,6 +1116,38 @@ public class DeepLearningOperator : OperatorBase
         }
 
         return detections;
+    }
+
+    private PostprocessResult PostprocessResultsWithDiagnostics(
+        DenseTensor<float> outputTensor,
+        float confidenceThreshold,
+        int originalWidth,
+        int originalHeight,
+        int inputSize,
+        YoloVersion yoloVersion,
+        HashSet<int>? targetClasses,
+        bool enableInternalNms,
+        float nmsIouThreshold)
+    {
+        var detections = PostprocessResults(
+            outputTensor,
+            confidenceThreshold,
+            originalWidth,
+            originalHeight,
+            inputSize,
+            yoloVersion,
+            targetClasses,
+            enableInternalNms,
+            nmsIouThreshold);
+
+        return new PostprocessResult(
+            detections,
+            PostprocessDiagnostics.FromRawCandidates(
+                detections,
+                DefaultNmsCandidateLimit,
+                droppedBeforeNms: 0,
+                nmsApplied: enableInternalNms,
+                iouComparisons: 0));
     }
 
 
@@ -1525,6 +1573,53 @@ public class DeepLearningOperator : OperatorBase
         }
 
         return (keep, iouComparisons);
+    }
+
+    private sealed record PostprocessResult(List<DetectionResult> Detections, PostprocessDiagnostics Diagnostics);
+
+    private sealed record PostprocessDiagnostics(
+        int RawCandidateCount,
+        int NmsCandidateLimit,
+        int NmsPrefilteredCount,
+        int DroppedBeforeNms,
+        bool NmsApplied,
+        long NmsIoUComparisons,
+        Dictionary<int, int> CandidatesByClass)
+    {
+        public static PostprocessDiagnostics FromRawCandidates(
+            IReadOnlyList<DetectionResult> detections,
+            int candidateLimit,
+            int droppedBeforeNms,
+            bool nmsApplied,
+            long iouComparisons)
+        {
+            var byClass = new Dictionary<int, int>();
+            for (var i = 0; i < detections.Count; i++)
+            {
+                var classId = detections[i].ClassId;
+                byClass[classId] = byClass.TryGetValue(classId, out var count) ? count + 1 : 1;
+            }
+
+            return new PostprocessDiagnostics(
+                detections.Count,
+                candidateLimit,
+                Math.Max(0, detections.Count - droppedBeforeNms),
+                droppedBeforeNms,
+                nmsApplied,
+                iouComparisons,
+                byClass);
+        }
+
+        public Dictionary<string, object> ToPayload() => new()
+        {
+            ["RawCandidateCount"] = RawCandidateCount,
+            ["NmsCandidateLimit"] = NmsCandidateLimit,
+            ["NmsPrefilteredCount"] = NmsPrefilteredCount,
+            ["DroppedBeforeNms"] = DroppedBeforeNms,
+            ["NmsApplied"] = NmsApplied,
+            ["NmsIoUComparisons"] = NmsIoUComparisons,
+            ["CandidatesByClass"] = CandidatesByClass
+        };
     }
 
     private readonly struct NmsBox

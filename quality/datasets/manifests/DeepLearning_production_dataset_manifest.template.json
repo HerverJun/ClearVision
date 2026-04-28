@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest-template",
+  "datasetId": "deep_learning_<project>_<model>_production_dataset_v1",
+  "operator": "DeepLearning",
+  "evidenceKind": "real-dataset",
+  "tier": "A",
+  "status": "draft",
+  "source": {
+    "kind": "licensed-or-customer-field-dataset",
+    "project": "<project-name>",
+    "modelId": "<model-id>",
+    "modelVersion": "<model-version>",
+    "name": "<dataset-name>",
+    "version": "v1",
+    "uri": "<internal-dataset-uri-or-ticket>",
+    "license": "<license-or-data-processing-basis>",
+    "deidentification": "<redaction-or-desensitization-notes>",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_PRODUCTION_DATASET_ROOT",
+    "relativePath": "<project>/<model>/v1",
+    "gitPolicy": "manifest-baseline-and-redacted-failure-boundaries-only"
+  },
+  "split": {
+    "strategy": "source-defined",
+    "seed": 0,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 0,
+    "caseListPath": "<case-list-or-index-path>"
+  },
+  "labels": {
+    "schema": "class-specific boxes with site-approved taxonomy",
+    "positiveClasses": [],
+    "negativeClasses": [],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "RecallAt50",
+    "secondary": ["PrecisionAt50", "AP50", "FalsePositiveRate", "FalseNegativeRate", "LatencyP95Ms", "DriftBucket"],
+    "thresholds": {
+      "RecallAt50": 0.0,
+      "PrecisionAt50": 0.0,
+      "LatencyP95Ms": 0.0
+    }
+  },
+  "runner": {
+    "project": "<runner-project-or-manual-protocol>",
+    "command": "<reproducible-command>",
+    "baselineJson": "quality/evals/reports/DeepLearning_<project>_<model>_production_dataset_baseline.json",
+    "reportMarkdown": "quality/evals/reports/DeepLearning_<project>_<model>_production_dataset_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["low_contrast", "occlusion", "crowded_objects", "class_confusion", "domain_shift", "false_positive", "false_negative"],
+    "minimumFailureCases": 1,
+    "fieldReplayPath": "quality/field_replay/<project>/<model>/"
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": true,
+    "redactionNotes": "<required-before-promotion>"
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": false,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true,
+    "requiresFieldReplayPlan": true
+  }
+}
