@@ -44,6 +44,55 @@ public class ImageStitchingOperatorTests
         Assert.NotNull(result.OutputData);
         Assert.True(Convert.ToDouble(result.OutputData!["OverlapRatio"]) > 0);
         Assert.True(Convert.ToInt32(result.OutputData["Width"]) > 120);
+        Assert.Equal("FeatherDistanceBlend", result.OutputData["BlendImplementation"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MultiBandMode_ShouldUseDifferentBlendImplementationThanLinear()
+    {
+        var sut = CreateSut();
+        using var linearImg1 = CreateTexturedExposureImage(leftImage: true);
+        using var linearImg2 = CreateTexturedExposureImage(leftImage: false);
+        var linearInputs = new Dictionary<string, object>
+        {
+            { "Image1", linearImg1 },
+            { "Image2", linearImg2 }
+        };
+
+        var linear = await sut.ExecuteAsync(CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "Manual" },
+            { "OverlapPercent", 50.0 },
+            { "BlendMode", "Linear" }
+        }), linearInputs);
+
+        using var multiBandImg1 = CreateTexturedExposureImage(leftImage: true);
+        using var multiBandImg2 = CreateTexturedExposureImage(leftImage: false);
+        var multiBandInputs = new Dictionary<string, object>
+        {
+            { "Image1", multiBandImg1 },
+            { "Image2", multiBandImg2 }
+        };
+
+        var multiBand = await sut.ExecuteAsync(CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "Manual" },
+            { "OverlapPercent", 50.0 },
+            { "BlendMode", "MultiBand" }
+        }), multiBandInputs);
+
+        Assert.True(linear.IsSuccess);
+        Assert.True(multiBand.IsSuccess);
+        Assert.Equal("FeatherDistanceBlend", linear.OutputData!["BlendImplementation"]);
+        Assert.Equal("LaplacianPyramidMultiBand", multiBand.OutputData!["BlendImplementation"]);
+
+        var linearImage = Assert.IsType<ImageWrapper>(linear.OutputData["Image"]);
+        var multiBandImage = Assert.IsType<ImageWrapper>(multiBand.OutputData["Image"]);
+        using var diff = new Mat();
+        Cv2.Absdiff(linearImage.GetMat(), multiBandImage.GetMat(), diff);
+        var meanDiff = Cv2.Mean(diff);
+        var totalMeanDiff = meanDiff.Val0 + meanDiff.Val1 + meanDiff.Val2;
+        Assert.True(totalMeanDiff > 0.1, $"Expected MultiBand output to differ from Linear/Feather output, got mean diff {totalMeanDiff:F4}.");
     }
 
     [Fact]
@@ -86,5 +135,22 @@ public class ImageStitchingOperatorTests
         Cv2.Rectangle(mat, new Rect(10, 20, 60, 30), Scalar.White, -1);
         return new ImageWrapper(mat);
     }
-}
 
+    private static ImageWrapper CreateTexturedExposureImage(bool leftImage)
+    {
+        var mat = new Mat(96, 96, MatType.CV_8UC3, Scalar.Black);
+        for (var y = 0; y < mat.Rows; y++)
+        {
+            for (var x = 0; x < mat.Cols; x++)
+            {
+                var checker = ((x / 6) + (y / 6)) % 2 == 0 ? 70 : 0;
+                var ramp = leftImage ? x : 95 - x;
+                var exposure = leftImage ? 80 : 130;
+                var value = (byte)Math.Clamp(exposure + checker + ramp, 0, 255);
+                mat.Set(y, x, new Vec3b(value, (byte)Math.Clamp(value * 0.8, 0, 255), (byte)Math.Clamp(value * 0.6, 0, 255)));
+            }
+        }
+
+        return new ImageWrapper(mat);
+    }
+}

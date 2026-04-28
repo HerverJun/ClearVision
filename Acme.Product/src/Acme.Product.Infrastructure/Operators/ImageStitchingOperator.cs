@@ -27,6 +27,9 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("BlendMode", "Blend Mode", "enum", DefaultValue = "Linear", Options = new[] { "Linear|Linear", "MultiBand|MultiBand" })]
 public class ImageStitchingOperator : OperatorBase
 {
+    private const string LinearBlendImplementation = "FeatherDistanceBlend";
+    private const string MultiBandBlendImplementation = "LaplacianPyramidMultiBand";
+
     public override OperatorType OperatorType => OperatorType.ImageStitching;
 
     public ImageStitchingOperator(ILogger<ImageStitchingOperator> logger) : base(logger)
@@ -72,6 +75,7 @@ public class ImageStitchingOperator : OperatorBase
         {
             { "OverlapRatio", overlapRatio },
             { "BlendModeApplied", blendMode },
+            { "BlendImplementation", ResolveBlendImplementation(blendMode) },
             { "MethodApplied", method }
         };
 
@@ -234,22 +238,29 @@ public class ImageStitchingOperator : OperatorBase
             src2.CopyTo(roi2);
         }
 
-        if (overlap > 0 && blendMode.Equals("Linear", StringComparison.OrdinalIgnoreCase))
+        if (overlap > 0)
         {
-            for (var y = 0; y < Math.Min(src1.Height, src2.Height); y++)
+            using var warped1 = new Mat(height, width, src1.Type(), Scalar.Black);
+            using var warped2 = new Mat(height, width, src1.Type(), Scalar.Black);
+            using var mask1 = new Mat(height, width, MatType.CV_8UC1, Scalar.Black);
+            using var mask2 = new Mat(height, width, MatType.CV_8UC1, Scalar.Black);
+
+            using (var roi1 = new Mat(warped1, new Rect(0, 0, src1.Width, src1.Height)))
+            using (var maskRoi1 = new Mat(mask1, new Rect(0, 0, src1.Width, src1.Height)))
             {
-                for (var x = 0; x < overlap; x++)
-                {
-                    var alpha = x / (double)Math.Max(1, overlap - 1);
-                    var p1 = src1.At<Vec3b>(y, src1.Width - overlap + x);
-                    var p2 = src2.At<Vec3b>(y, x);
-                    var blended = new Vec3b(
-                        (byte)Math.Clamp((1 - alpha) * p1.Item0 + alpha * p2.Item0, 0, 255),
-                        (byte)Math.Clamp((1 - alpha) * p1.Item1 + alpha * p2.Item1, 0, 255),
-                        (byte)Math.Clamp((1 - alpha) * p1.Item2 + alpha * p2.Item2, 0, 255));
-                    stitched.Set(y, src1.Width - overlap + x, blended);
-                }
+                src1.CopyTo(roi1);
+                maskRoi1.SetTo(Scalar.White);
             }
+
+            using (var roi2 = new Mat(warped2, new Rect(startX, 0, src2.Width, src2.Height)))
+            using (var maskRoi2 = new Mat(mask2, new Rect(startX, 0, src2.Width, src2.Height)))
+            {
+                src2.CopyTo(roi2);
+                maskRoi2.SetTo(Scalar.White);
+            }
+
+            stitched.Dispose();
+            stitched = BlendWarpedImages(warped1, warped2, mask1, mask2, blendMode);
         }
 
         overlapRatio = overlap / (double)Math.Max(1, Math.Min(src1.Width, src2.Width));
@@ -275,12 +286,19 @@ public class ImageStitchingOperator : OperatorBase
 
     private static Mat BlendWarpedImages(Mat first, Mat second, Mat firstMask, Mat secondMask, string blendMode)
     {
-        if (string.Equals(blendMode, "Linear", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(blendMode, "MultiBand", StringComparison.OrdinalIgnoreCase))
         {
-            return FeatherBlend(first, second, firstMask, secondMask);
+            return MultiBandBlend(first, second, firstMask, secondMask);
         }
 
         return FeatherBlend(first, second, firstMask, secondMask);
+    }
+
+    private static string ResolveBlendImplementation(string blendMode)
+    {
+        return string.Equals(blendMode, "MultiBand", StringComparison.OrdinalIgnoreCase)
+            ? MultiBandBlendImplementation
+            : LinearBlendImplementation;
     }
 
     private static Mat FeatherBlend(Mat first, Mat second, Mat firstMask, Mat secondMask)
@@ -332,6 +350,160 @@ public class ImageStitchingOperator : OperatorBase
 
         blendedFloat.ConvertTo(result, first.Type());
         return result;
+    }
+
+    private static Mat MultiBandBlend(Mat first, Mat second, Mat firstMask, Mat secondMask)
+    {
+        using var firstFloat = new Mat();
+        using var secondFloat = new Mat();
+        first.ConvertTo(firstFloat, MatType.MakeType(MatType.CV_32F, first.Channels()));
+        second.ConvertTo(secondFloat, MatType.MakeType(MatType.CV_32F, second.Channels()));
+
+        using var firstWeight = CreateFeatherWeight(firstMask, secondMask);
+        var levels = DeterminePyramidLevels(first.Size());
+        using var blendedFloat = BlendPyramid(firstFloat, secondFloat, firstWeight, levels);
+
+        var result = new Mat(first.Size(), first.Type(), Scalar.Black);
+        blendedFloat.ConvertTo(result, first.Type());
+        return result;
+    }
+
+    private static Mat CreateFeatherWeight(Mat firstMask, Mat secondMask)
+    {
+        using var firstDistance = new Mat();
+        using var secondDistance = new Mat();
+        Cv2.DistanceTransform(firstMask, firstDistance, DistanceTypes.L2, DistanceTransformMasks.Mask3);
+        Cv2.DistanceTransform(secondMask, secondDistance, DistanceTypes.L2, DistanceTransformMasks.Mask3);
+
+        var weight = new Mat(firstMask.Size(), MatType.CV_32FC1, Scalar.All(0));
+        for (var y = 0; y < firstMask.Rows; y++)
+        {
+            for (var x = 0; x < firstMask.Cols; x++)
+            {
+                var inFirst = firstMask.At<byte>(y, x) > 0;
+                var inSecond = secondMask.At<byte>(y, x) > 0;
+                if (inFirst && !inSecond)
+                {
+                    weight.Set(y, x, 1f);
+                    continue;
+                }
+
+                if (!inFirst || !inSecond)
+                {
+                    continue;
+                }
+
+                var firstWeight = firstDistance.At<float>(y, x);
+                var secondWeight = secondDistance.At<float>(y, x);
+                var sum = Math.Max(1e-6f, firstWeight + secondWeight);
+                weight.Set(y, x, firstWeight / sum);
+            }
+        }
+
+        return weight;
+    }
+
+    private static int DeterminePyramidLevels(Size size)
+    {
+        var minDimension = Math.Min(size.Width, size.Height);
+        var levels = 1;
+        while (levels < 5 && minDimension >= 32)
+        {
+            levels++;
+            minDimension /= 2;
+        }
+
+        return levels;
+    }
+
+    private static Mat BlendPyramid(Mat first, Mat second, Mat weight, int levels)
+    {
+        var firstGaussian = BuildGaussianPyramid(first, levels);
+        var secondGaussian = BuildGaussianPyramid(second, levels);
+        var weightGaussian = BuildGaussianPyramid(weight, levels);
+        var firstLaplacian = BuildLaplacianPyramid(firstGaussian);
+        var secondLaplacian = BuildLaplacianPyramid(secondGaussian);
+        var blendedLevels = new List<Mat>(levels);
+
+        try
+        {
+            for (var i = 0; i < levels; i++)
+            {
+                using var weightForChannels = ExpandWeightChannels(weightGaussian[i], first.Channels());
+                using var inverseWeight = new Mat();
+                Cv2.Subtract(Scalar.All(1.0), weightForChannels, inverseWeight);
+
+                using var weightedFirst = new Mat();
+                using var weightedSecond = new Mat();
+                Cv2.Multiply(firstLaplacian[i], weightForChannels, weightedFirst);
+                Cv2.Multiply(secondLaplacian[i], inverseWeight, weightedSecond);
+
+                var blended = new Mat();
+                Cv2.Add(weightedFirst, weightedSecond, blended);
+                blendedLevels.Add(blended);
+            }
+
+            var current = blendedLevels[^1].Clone();
+            for (var i = levels - 2; i >= 0; i--)
+            {
+                using var up = new Mat();
+                Cv2.PyrUp(current, up, blendedLevels[i].Size());
+                current.Dispose();
+                current = new Mat();
+                Cv2.Add(up, blendedLevels[i], current);
+            }
+
+            return current;
+        }
+        finally
+        {
+            foreach (var mat in firstGaussian.Concat(secondGaussian).Concat(weightGaussian).Concat(firstLaplacian).Concat(secondLaplacian).Concat(blendedLevels))
+            {
+                mat.Dispose();
+            }
+        }
+    }
+
+    private static List<Mat> BuildGaussianPyramid(Mat source, int levels)
+    {
+        var pyramid = new List<Mat>(levels) { source.Clone() };
+        for (var i = 1; i < levels; i++)
+        {
+            var down = new Mat();
+            Cv2.PyrDown(pyramid[i - 1], down);
+            pyramid.Add(down);
+        }
+
+        return pyramid;
+    }
+
+    private static List<Mat> BuildLaplacianPyramid(IReadOnlyList<Mat> gaussian)
+    {
+        var laplacian = new List<Mat>(gaussian.Count);
+        for (var i = 0; i < gaussian.Count - 1; i++)
+        {
+            using var up = new Mat();
+            Cv2.PyrUp(gaussian[i + 1], up, gaussian[i].Size());
+            var level = new Mat();
+            Cv2.Subtract(gaussian[i], up, level);
+            laplacian.Add(level);
+        }
+
+        laplacian.Add(gaussian[^1].Clone());
+        return laplacian;
+    }
+
+    private static Mat ExpandWeightChannels(Mat weight, int channels)
+    {
+        if (channels == 1)
+        {
+            return weight.Clone();
+        }
+
+        var weights = Enumerable.Repeat(weight, channels).ToArray();
+        var expanded = new Mat();
+        Cv2.Merge(weights, expanded);
+        return expanded;
     }
 
     private static float ResolveBlendValue(float firstValue, float secondValue, float firstWeight, float secondWeight, bool inFirst, bool inSecond)
