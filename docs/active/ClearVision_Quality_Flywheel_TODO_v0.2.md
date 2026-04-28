@@ -631,8 +631,8 @@ ShapeDescriptor mode 的 Position 更接近轮廓中心，但 synthetic 形状�
 1. [x] 缓存键已修复：BuildCacheKey 对输入模板使用 SHA256 hash，不同模板不再串用。
 2. [x] Position 输出已修复：运行时同时输出 Position 对象与 X/Y 字段。
 3. [x] 可视化框已修复：使用 lease.Entry.TemplateWidth/Height 的真实半宽/半高绘制。
-4. [ ] 只返回最佳匹配，不支持候选列表
-5. [ ] 模板有效特征点少于 10 会抛出异常导致算子失败
+4. [x] Matches 候选列表输出已修复：MatchTopK 支持 TopK=1/3/5/10，输出 Matches 列表带位置 NMS。
+5. [x] 低特征模板异常已修复：抛出 GradientShapeMatchException(FailureReason=InvalidTemplate)，算子捕获后输出结构化失败信息。
 ```
 
 #### TODO
@@ -714,12 +714,10 @@ P1-已完成:
 [x] 缓存键机制已修复（SHA256 hash）
 [x] Position 输出对象已补齐
 [x] 可视化框已改成模板真实尺寸
-
-P1-待做:
-[ ] 增加 Matches 候选列表输出，至少支持 TopK=1/3/5
+[x] Matches 候选列表输出已补齐：MatchTopK 支持 TopK=1/3/5/10，输出 Matches 列表带位置 NMS
 
 P2:
-[ ] 低特征模板（<10 特征点）返回明确错误码 NoFeature / InvalidTemplate，而非非结构化异常
+[x] 低特征模板（<10 特征点）返回明确错误码 InvalidTemplate，算子捕获后输出结构化失败信息
 
 P3:
 [ ] 增加金字塔 coarse-to-fine 搜索
@@ -1442,7 +1440,7 @@ TODO：
 [x] GradientShapeMatch 117 synthetic cases（9 个场景 × 13 cases）
 [x] 生成三份 baseline report（CaliperTool / TemplateMatching / GradientShapeMatch）
 [x] 生成三份 failure triage（CaliperTool / TemplateMatching / GradientShapeMatch）
-[ ] 不改算法，只出归因报告
+[x] 产出三份归因报告（CaliperTool / TemplateMatching / GradientShapeMatch）
 ```
 
 验收：
