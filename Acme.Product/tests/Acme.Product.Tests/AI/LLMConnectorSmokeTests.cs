@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.AI.Connectors;
@@ -80,6 +81,101 @@ public class LLMConnectorSmokeTests
         var act = () => connector.GenerateAsync("hello");
 
         await act.Should().ThrowAsync<LLMException>();
+    }
+
+    [Fact]
+    public async Task OpenAiConnector_Dispose_WithExternalHttpClient_ShouldLeaveClientUsable()
+    {
+        var handler = new CaptureHandler((_, _) => Task.FromResult(JsonResponse("""
+        {
+          "id": "chatcmpl-external",
+          "object": "chat.completion",
+          "created": 1710000000,
+          "model": "gpt-4o-mini",
+          "choices": [
+            {
+              "index": 0,
+              "message": { "role": "assistant", "content": "ok" },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": { "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2 }
+        }
+        """)));
+
+        using var httpClient = new HttpClient(handler);
+        var connector = new OpenAiConnector(
+            new OpenAiConfig { ApiKey = "test-key", BaseUrl = "https://api.openai.com/v1" },
+            httpClient,
+            NoRetryPolicy.Instance);
+
+        connector.Dispose();
+
+        var response = await httpClient.GetAsync("https://example.test/health");
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task OpenAiConnector_WithSharedHttpClient_ShouldKeepRequestConfigurationIsolated()
+    {
+        var capturedRequests = new List<(Uri? Uri, string? Authorization)>();
+        var handler = new CaptureHandler((request, _) =>
+        {
+            capturedRequests.Add((request.RequestUri, request.Headers.Authorization?.ToString()));
+            return Task.FromResult(JsonResponse("""
+            {
+              "id": "chatcmpl-shared",
+              "object": "chat.completion",
+              "created": 1710000000,
+              "model": "gpt-4o-mini",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": { "role": "assistant", "content": "ok" },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": { "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2 }
+            }
+            """));
+        });
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://shared-client.test/original/"),
+            Timeout = TimeSpan.FromSeconds(9)
+        };
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "shared-client-key");
+
+        using var first = new OpenAiConnector(
+            new OpenAiConfig
+            {
+                ApiKey = "first-key",
+                BaseUrl = "https://first.example/v1",
+                Timeout = TimeSpan.FromSeconds(3)
+            },
+            httpClient,
+            NoRetryPolicy.Instance);
+        using var second = new OpenAiConnector(
+            new OpenAiConfig
+            {
+                ApiKey = "second-key",
+                BaseUrl = "https://second.example/custom",
+                Timeout = TimeSpan.FromSeconds(7)
+            },
+            httpClient,
+            NoRetryPolicy.Instance);
+
+        await first.GenerateAsync("hello");
+        await second.GenerateAsync("hello");
+
+        httpClient.BaseAddress.Should().Be(new Uri("https://shared-client.test/original/"));
+        httpClient.Timeout.Should().Be(TimeSpan.FromSeconds(9));
+        httpClient.DefaultRequestHeaders.Authorization!.ToString().Should().Be("Bearer shared-client-key");
+        capturedRequests.Should().Equal(
+            (new Uri("https://first.example/v1/chat/completions"), "Bearer first-key"),
+            (new Uri("https://second.example/custom/chat/completions"), "Bearer second-key"));
     }
 
     [Fact]

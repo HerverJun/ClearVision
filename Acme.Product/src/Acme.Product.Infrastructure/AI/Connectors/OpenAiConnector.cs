@@ -3,6 +3,7 @@
 // 支持 GPT-4/GPT-3.5 API 调用
 // 作者：蘅芜君
 
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -19,17 +20,16 @@ public class OpenAiConnector : ILLMConnector, IDisposable
     private readonly HttpClient _httpClient;
     private readonly OpenAiConfig _config;
     private readonly IRetryPolicy _retryPolicy;
+    private readonly bool _ownsHttpClient;
+    private readonly Uri _baseUri;
 
     public OpenAiConnector(OpenAiConfig config, HttpClient? httpClient = null, IRetryPolicy? retryPolicy = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _httpClient = httpClient ?? new HttpClient();
         _retryPolicy = retryPolicy ?? new ExponentialBackoffRetryPolicy(3, TimeSpan.FromSeconds(1));
-        
-        // 配置 HttpClient
-        _httpClient.BaseAddress = new Uri(EnsureTrailingSlash(_config.BaseUrl));
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
-        _httpClient.Timeout = _config.Timeout;
+        _ownsHttpClient = httpClient is null;
+        _baseUri = new Uri(EnsureTrailingSlash(_config.BaseUrl), UriKind.Absolute);
     }
 
     /// <summary>
@@ -43,7 +43,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
             var json = JsonSerializer.Serialize(request, OpenAiJsonContext.Default.OpenAIChatCompletionRequest);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("chat/completions", content, ct);
+            var response = await SendAsync(HttpMethod.Post, "chat/completions", content, ct);
             
             if (!response.IsSuccessStatusCode)
             {
@@ -89,7 +89,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
         var json = JsonSerializer.Serialize(request, OpenAiJsonContext.Default.OpenAIChatCompletionRequest);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        using var response = await _httpClient.PostAsync("chat/completions", content, cancellationToken);
+        using var response = await SendAsync(HttpMethod.Post, "chat/completions", content, cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -176,7 +176,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
             var json = JsonSerializer.Serialize(request, OpenAiJsonContext.Default.OpenAIChatCompletionRequest);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("chat/completions", content, cancellationToken);
+            var response = await SendAsync(HttpMethod.Post, "chat/completions", content, cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -190,7 +190,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
     /// </summary>
     public async Task<List<string>> GetAvailableModelsAsync(CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync("models", cancellationToken);
+        var response = await SendAsync(HttpMethod.Get, "models", null, cancellationToken);
         
         if (!response.IsSuccessStatusCode)
         {
@@ -235,9 +235,33 @@ Your task is to convert natural language requirements into structured JSON flow 
 Always respond with valid JSON that matches the ClearVision flow schema.";
     }
 
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpMethod method,
+        string relativePath,
+        HttpContent? content,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (_config.Timeout != Timeout.InfiniteTimeSpan)
+        {
+            timeoutCts.CancelAfter(_config.Timeout);
+        }
+
+        using var request = new HttpRequestMessage(method, new Uri(_baseUri, relativePath))
+        {
+            Content = content
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+
+        return await _httpClient.SendAsync(request, timeoutCts.Token);
+    }
+
     public void Dispose()
     {
-        _httpClient?.Dispose();
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
     }
 
     private static string EnsureTrailingSlash(string baseUrl)
