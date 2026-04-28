@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-28T20:22:20.2561622+08:00",
+  "generatedAt": "2026-04-29T00:59:13.5713917+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -1717,7 +1717,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "ONNX Runtime YOLO inference with letterbox preprocessing, version-specific tensor parsing, same-class NMS, and detection/object output modes.",
+      "algorithm": "当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持：",
       "inputPorts": [
         {
           "name": "Image",
@@ -7079,7 +7079,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "Sorts and filters detections by single-row, row-cluster, or slot-assignment rules, then compares actual label order with the expected sequence.",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Detections",
@@ -9444,7 +9444,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "Fuses deep-learning and traditional inspection results using weighted, unanimous, majority, or priority strategies.",
+      "algorithm": "该算子把深度学习结果和传统规则结果融合成最终 OK/NG 判定。它不执行视觉推理，而…",
       "inputPorts": [
         {
           "name": "DLResult",
@@ -14160,7 +14160,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "Traditional surface defect screening through gradient magnitude, aligned reference difference, or local contrast response maps.",
+      "algorithm": null,
       "inputPorts": [
         {
           "name": "Image",
@@ -14408,7 +14408,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "Edge-pair spacing inspection: resolves two lines, samples width deviations, and counts tolerance-exceeding defect segments.",
+      "algorithm": "该算子检查一对边缘之间的间距是否偏离期望宽度。它可以直接使用上游传入的 Line1/…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17776,7 +17776,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "ONNX semantic segmentation with preprocessing, class-map argmax, colored map, per-class masks, and model provenance outputs.",
+      "algorithm": "该算子通过 ONNX Runtime 执行语义分割模型，将输入图像预处理为模型张量，…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17989,13 +17989,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
+        "totalScore": 100,
         "level": "A",
-        "documentationScore": 60,
+        "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/SemanticSegmentation.md"
     },
@@ -18014,7 +18014,7 @@
         "成熟度:稳定",
         "算法类型:基于OpenCV"
       ],
-      "algorithm": "SimplePatchCore-Lite anomaly baseline using lab/gradient patch statistics, feature-bank persistence, anomaly map, and mask outputs.",
+      "algorithm": "Simplified PatchCore",
       "inputPorts": [
         {
           "name": "Image",
