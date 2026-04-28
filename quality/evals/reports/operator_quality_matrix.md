@@ -1,6 +1,6 @@
 # Operator Quality Matrix
 
-GeneratedAtUtc: `2026-04-28T03:07:33+00:00`
+GeneratedAtUtc: `2026-04-28T04:44:58+00:00`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
 CardDirectory: `docs/算子资料/算子名片`
 GoldenEvidence: `quality/evals/reports/*_baseline.json`
@@ -27,7 +27,7 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 | TemplateMatching | 96 | A | 0 | 3 | Yes | 117 | Yes | P2 | Review QScore/Level from golden evidence |
 | AnomalyDetection | 100 | A | 0 | 3 | Yes | 120 | Yes | P2 | Review QScore/Level from golden evidence |
 | DeepLearning | 100 | A | 0 | 5 | Yes | 26 | Yes | P2 | Review QScore/Level from golden evidence |
-| GradientShapeMatch | 100 | A | 0 | 5 | Yes | 117 | Yes | P2 | Review QScore/Level from golden evidence |
+| GradientShapeMatch | 100 | A | 0 | 3 | Yes | 130 | Yes | P2 | Review QScore/Level from golden evidence |
 
 ## Full Matrix
 
@@ -53,7 +53,7 @@ GoldenEvidence: `quality/evals/reports/*_baseline.json`
 | OperatorType.DeepLearning | 深度学习 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 12 | 13 | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | 5 | 0 | Yes | 26 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.DetectionSequenceJudge | Detection Sequence Judge | AI Inspection | 100 | A | 1.0.0 | Experimental | 4 | 13 | 13 | - | 3 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
 | OperatorType.FisheyeCalibration | Fisheye Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 9 | - | 0 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |
-| OperatorType.GradientShapeMatch | 梯度形状匹配 | 匹配定位 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 5 | 11 | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | 5 | 0 | Yes | 117 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
+| OperatorType.GradientShapeMatch | 梯度形状匹配 | 匹配定位 | 100 | A | 1.1.0 | 稳定 Stable | 2 | 6 | 12 | Gradient Direction Template Match | 3 | 0 | Yes | 130 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.HandEyeCalibration | Hand-Eye Calibration | 标定 | 100 | A | 1.0.0 | - | 2 | 7 | 4 | OpenCV Hand-Eye Calibration | 0 | 0 | Yes | 24 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.HandEyeCalibrationValidator | Hand-Eye Calibration Validator | 标定 | 100 | A | 1.0.1 | 稳定 Stable | 3 | 8 | 1 | Hand-Eye Consistency Validation | 3 | 0 | Yes | 24 | No | No | Yes | P2 | Quality Flywheel Agent | Review QScore/Level from golden evidence |
 | OperatorType.LocalDeformableMatching | Local Deformable Matching | 匹配定位 | 100 | A | 1.1.1 | 稳定 Stable | 2 | 6 | 15 | Coarse-to-fine local deformable matching | 2 | 0 | No | 0 | No | No | No | P2 | Golden Dataset Agent | Add baseline evidence if operator stays in quality scope |

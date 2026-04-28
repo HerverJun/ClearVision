@@ -236,6 +236,8 @@ internal static class GoldenRunner
             ["NoMatchAllowed"] = false,
             ["AngleChecked"] = true,
             ["ScoreValue"] = 0.0,
+            ["FailureReasonCorrect"] = true,
+            ["MatchCountCorrect"] = true,
         };
 
         if (outputData is null || expectedNode is null)
@@ -254,6 +256,22 @@ internal static class GoldenRunner
         if (outputData.TryGetValue("Score", out var sc) && sc is IConvertible conv)
             metrics["ScoreValue"] = Convert.ToDouble(conv);
 
+        // FailureReason validation
+        if (expectedNode["failure_reason"] is JsonNode expectedFrNode)
+        {
+            var expectedFr = expectedFrNode.GetValue<string>();
+            var actualFr = outputData.TryGetValue("FailureReason", out var fr) ? fr?.ToString() ?? "" : "";
+            metrics["FailureReasonCorrect"] = actualFr == expectedFr;
+        }
+
+        // MatchCount validation for TopK scenarios
+        if (expectedNode["match_count_min"] is JsonNode expectedCountNode)
+        {
+            var matchCountMin = expectedCountNode.GetValue<int>();
+            var actualMatchCount = outputData.TryGetValue("MatchCount", out var mc) && mc is IConvertible mcc ? Convert.ToInt32(mcc) : 0;
+            metrics["MatchCountCorrect"] = actualMatchCount >= matchCountMin;
+        }
+
         if (expectedIsMatch && actualIsMatch)
         {
             var expPos = expectedNode["position"];
@@ -261,27 +279,69 @@ internal static class GoldenRunner
             var expY = expPos?["y"]?.GetValue<double>() ?? 0;
             var expAngle = expectedNode["angle"]?.GetValue<double>() ?? 0;
 
-            double actX = 0, actY = 0;
+            // For multi-match scenarios, check if ANY returned match is close to the expected position
+            var candidatePositions = new List<(double x, double y, double angle)>();
+
+            double bestX = 0, bestY = 0;
             if (outputData.TryGetValue("Position", out var posObj) && posObj is Position pos)
             {
-                actX = pos.X;
-                actY = pos.Y;
+                bestX = pos.X;
+                bestY = pos.Y;
             }
             else if (outputData.TryGetValue("X", out var xv) && outputData.TryGetValue("Y", out var yv))
             {
-                actX = Convert.ToDouble(xv);
-                actY = Convert.ToDouble(yv);
+                bestX = Convert.ToDouble(xv);
+                bestY = Convert.ToDouble(yv);
             }
 
-            metrics["PositionErrorPx"] = Math.Sqrt((expX - actX) * (expX - actX) + (expY - actY) * (expY - actY));
-
-            double actAngle = 0;
+            double bestAngle = 0;
             if (outputData.TryGetValue("Angle", out var av) && av is IConvertible ac)
-                actAngle = Convert.ToDouble(ac);
+                bestAngle = Convert.ToDouble(ac);
 
-            var angleDiff = Math.Abs(expAngle - actAngle);
-            while (angleDiff > 180) angleDiff = 360 - angleDiff;
-            metrics["AngleErrorDeg"] = angleDiff;
+            candidatePositions.Add((bestX, bestY, bestAngle));
+
+            if (outputData.TryGetValue("Matches", out var matchesObj) && matchesObj is System.Collections.IEnumerable matchesEnum)
+            {
+                foreach (var match in matchesEnum)
+                {
+                    if (match is Dictionary<string, object> matchDict)
+                    {
+                        double mx = 0, my = 0, ma = 0;
+                        if (matchDict.TryGetValue("Position", out var mp) && mp is Position mpv)
+                        {
+                            mx = mpv.X;
+                            my = mpv.Y;
+                        }
+                        else if (matchDict.TryGetValue("X", out var mxv) && matchDict.TryGetValue("Y", out var myv))
+                        {
+                            mx = Convert.ToDouble(mxv);
+                            my = Convert.ToDouble(myv);
+                        }
+
+                        if (matchDict.TryGetValue("Angle", out var mav) && mav is IConvertible mac)
+                            ma = Convert.ToDouble(mac);
+
+                        candidatePositions.Add((mx, my, ma));
+                    }
+                }
+            }
+
+            double minPosError = double.MaxValue;
+            double minAngleError = double.MaxValue;
+            foreach (var (cx, cy, ca) in candidatePositions)
+            {
+                var posError = Math.Sqrt((expX - cx) * (expX - cx) + (expY - cy) * (expY - cy));
+                if (posError < minPosError)
+                {
+                    minPosError = posError;
+                    var angleDiff = Math.Abs(expAngle - ca);
+                    while (angleDiff > 180) angleDiff = 360 - angleDiff;
+                    minAngleError = angleDiff;
+                }
+            }
+
+            metrics["PositionErrorPx"] = minPosError;
+            metrics["AngleErrorDeg"] = minAngleError;
         }
         else if (noMatchAccepted)
         {
@@ -304,6 +364,12 @@ internal static class GoldenRunner
         if (!isMatchCorrect)
             return false;
 
+        if (metrics.TryGetValue("FailureReasonCorrect", out var frc) && frc is bool frcBool && !frcBool)
+            return false;
+
+        if (metrics.TryGetValue("MatchCountCorrect", out var mcc) && mcc is bool mccBool && !mccBool)
+            return false;
+
         var positionError = Convert.ToDouble(metrics["PositionErrorPx"]);
         var angleError = Convert.ToDouble(metrics["AngleErrorDeg"]);
 
@@ -319,6 +385,7 @@ internal static class GoldenRunner
             "partial_occlusion" => (10.0, 30.0),
             "strong_background" => (5.0, 30.0),
             "low_feature" => (0.0, 0.0),
+            "topk_multi" => (5.0, 2.0),
             _ => (3.0, 5.0)
         };
 
