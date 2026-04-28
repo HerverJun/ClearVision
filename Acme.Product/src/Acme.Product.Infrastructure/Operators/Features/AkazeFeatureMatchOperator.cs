@@ -29,6 +29,33 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("OriginMode", "Origin Mode", "enum", DefaultValue = "Center", Options = new[] { "Center|Center", "TopLeft|TopLeft", "Custom|Custom" })]
 [OperatorParam("OriginX", "Origin X", "double", DefaultValue = 0.0)]
 [OperatorParam("OriginY", "Origin Y", "double", DefaultValue = 0.0)]
+[AlgorithmInfo(
+    Name = "AKAZE Homography Feature Match",
+    CoreApi = "OpenCvSharp.AKAZE + BFMatcher(Hamming) + FindHomography(RANSAC)",
+    ImplementationStrategy = "Extract AKAZE binary features from the scene and template, optionally apply bidirectional symmetry filtering, estimate a RANSAC homography, and report both the configured reference Position and representative MatchPoint.",
+    TimeComplexity = "O(P + T*S) where P is image pixels and T/S are retained template and scene descriptors",
+    TypicalLatency = "FeatureMatchContractRunner baseline: 22 cases passed, avg runtime about 11.7 ms on synthetic contract images.",
+    SpaceComplexity = "O(P + T + S) plus bounded static template cache entries for TemplatePath mode.",
+    SuitableUseCases = new[]
+    {
+        "Textured labels, PCB marks, printed features, and local parts with enough corners or blob-like texture.",
+        "Template localization where moderate rotation, scale, or perspective variation is expected.",
+        "Pipelines that need a business-level NG result image instead of a framework-level failure for no-match cases."
+    },
+    UnsuitableUseCases = new[]
+    {
+        "Weak-texture, pure-color, or strongly repetitive targets where homography inliers are ambiguous.",
+        "Subpixel metrology or robot-pick centers that require calibrated geometric center output.",
+        "Very high-texture full-frame scenes without ROI constraints, because scene descriptors are not globally capped."
+    },
+    KnownLimitations = new[]
+    {
+        "Score is a homography verification score based on inlier evidence, not a normalized template-correlation score.",
+        "Ratio-test and RANSAC thresholds remain fixed in code; only MinMatchCount and symmetry filtering are exposed.",
+        "TemplatePath mode uses a bounded in-process cache keyed by file fingerprint and detector configuration."
+    },
+    Dependencies = new[] { "OpenCvSharp" }
+)]
 public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
 {
     public override OperatorType OperatorType => OperatorType.AkazeFeatureMatch;

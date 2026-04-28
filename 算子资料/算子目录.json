@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-26T21:31:56.5042156+08:00",
+  "generatedAt": "2026-04-28T10:54:57.1979469+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -1918,6 +1918,17 @@
           "defaultValue": "true",
           "min": null,
           "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "NmsIouThreshold",
+          "displayName": "NMS IoU Threshold",
+          "dataType": "double",
+          "description": "内部 NMS 与预览 NMS 使用的 IoU 阈值。",
+          "defaultValue": "0.45",
+          "min": "0",
+          "max": "1",
           "isRequired": true,
           "options": null
         },
@@ -8594,9 +8605,9 @@
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": "该算子基于局部特征点匹配完成模板定位，核心流程是：",
+      "algorithm": "AKAZE Homography Feature Match",
       "inputPorts": [
         {
           "name": "Image",
@@ -8767,9 +8778,9 @@
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": "该算子与 AkazeFeatureMatchOperator 属于同一类局部特征匹配…",
+      "algorithm": "ORB Homography Feature Match",
       "inputPorts": [
         {
           "name": "Image",
@@ -9155,9 +9166,9 @@
       "tags": [
         "功能域:检测",
         "成熟度:稳定",
-        "算法类型:自研"
+        "算法类型:基于OpenCV"
       ],
-      "algorithm": "该算子围绕模板、特征或几何相似性执行定位匹配，用于判断目标是否存在以及位姿大致位置。",
+      "algorithm": "LINEMOD Pyramid Shape Matching",
       "inputPorts": [
         {
           "name": "Image",
