@@ -68,4 +68,5 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
+| 1.0.2 | 2026-04-28 | Backfilled HandEyeCalibrationValidatorContractRunner evidence (24/24 passed), pose bundle and failure contract notes |
 | 1.0.1 | 2026-04-28 | 自动生成文档骨架 / Generated skeleton |

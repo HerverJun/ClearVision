@@ -78,4 +78,5 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
+| 1.0.1 | 2026-04-28 | Backfilled PyramidShapeMatchContractRunner evidence (24/24 passed), Template/ShapeDescriptor modes and failure contract notes |
 | 1.0.0 | 2026-04-28 | 自动生成文档骨架 / Generated skeleton |

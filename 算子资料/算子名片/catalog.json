@@ -1717,7 +1717,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持：",
+      "algorithm": "ONNX Runtime YOLO inference with letterbox preprocessing, version-specific tensor parsing, same-class NMS, and detection/object output modes.",
       "inputPorts": [
         {
           "name": "Image",
@@ -7079,7 +7079,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Sorts and filters detections by single-row, row-cluster, or slot-assignment rules, then compares actual label order with the expected sequence.",
       "inputPorts": [
         {
           "name": "Detections",
@@ -9444,7 +9444,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。",
+      "algorithm": "Fuses deep-learning and traditional inspection results using weighted, unanimous, majority, or priority strategies.",
       "inputPorts": [
         {
           "name": "DLResult",
@@ -14160,7 +14160,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "Traditional surface defect screening through gradient magnitude, aligned reference difference, or local contrast response maps.",
       "inputPorts": [
         {
           "name": "Image",
@@ -14408,7 +14408,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "Edge-pair spacing inspection: resolves two lines, samples width deviations, and counts tolerance-exceeding defect segments.",
       "inputPorts": [
         {
           "name": "Image",
@@ -17776,7 +17776,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "ONNX semantic segmentation with preprocessing, class-map argmax, colored map, per-class masks, and model provenance outputs.",
       "inputPorts": [
         {
           "name": "Image",
@@ -18014,7 +18014,7 @@
         "成熟度:稳定",
         "算法类型:基于OpenCV"
       ],
-      "algorithm": "Simplified PatchCore",
+      "algorithm": "SimplePatchCore-Lite anomaly baseline using lab/gradient patch statistics, feature-bank persistence, anomaly map, and mask outputs.",
       "inputPorts": [
         {
           "name": "Image",

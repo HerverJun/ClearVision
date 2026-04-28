@@ -117,8 +117,14 @@
 | 指标 (Metric) | 值 (Value) |
 |------|------|
 | 时间复杂度 (Time Complexity) | 主要由模型推理复杂度主导，预处理和后处理成本次之。 |
-| 典型耗时 (Typical Latency) | 与模型大小、`InputSize`、CPU/GPU 环境、标签数和检测框数量强相关；命中模型缓存时会明显快于首次加载。 |
+| 典型耗时 (Typical Latency) | 与模型大小、`InputSize`、CPU/GPU 环境、标签数和检测框数量强相关；命中模型缓存时会明显快于首次加载。`DeepLearning_runtime_benchmark_baseline.md` 记录 20/20 passed，覆盖 1080p、4K、CPU fallback 和 1080p x4 batch 的预处理/YOLO 后处理路径。 |
 | 内存特征 (Memory Profile) | 除图像和输出图外，还包含输入张量、输出张量、静态模型缓存以及检测结果列表。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- Contract baseline：`quality/evals/reports/DeepLearning_contract_baseline.md`，26/26 passed，覆盖 YOLO 输出解析、版本识别、输出张量选择、坐标 clamp、同类别 NMS、目标类别解析、标签契约、预处理和输出文本契约。
+- Dataset baseline：`quality/evals/reports/DeepLearning_detection_dataset_baseline.md`，36/36 passed，AP50=1.0000，Precision@0.50=1.0000，Recall@0.50=1.0000；这是 COCO-style 半合成检测协议桥，不代表生产模型精度。
+- Runtime baseline：`quality/evals/reports/DeepLearning_runtime_benchmark_baseline.md`，20/20 passed，记录 provider 可用性、CPU fallback、1080p/4K 预处理后处理和 batch 压力路径。
+- 失败契约包括缺失模型、标签数量不匹配、缺失标签契约、无法选择有效输出张量、非法框、低置信候选、以及 provider 不可用时的 CPU 回退行为。
 
 ## 适用场景 / Use Cases
 - **适合 (Suitable)**：外观复杂、规则算法难以稳定覆盖的检测、识别和缺陷筛查任务。
@@ -138,6 +144,7 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
+| 1.0.3 | 2026-04-28 | 回写 26/26 contract、36/36 dataset protocol bridge、20/20 runtime benchmark 和失败契约说明 |
 | 1.0.2 | 2026-03-14 | 第二轮基于源码补充 YOLO 版本判别、模型缓存/GPU 隐含参数、输出模式切换与预处理细节 |
 | 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
 | 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
