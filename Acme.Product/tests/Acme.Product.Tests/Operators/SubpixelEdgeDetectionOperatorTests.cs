@@ -1,3 +1,4 @@
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Operators;
@@ -5,6 +6,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -53,6 +55,9 @@ public class SubpixelEdgeDetectionOperatorTests
         result.OutputData.Should().ContainKey("Edges");
         result.OutputData.Should().ContainKey("Method");
         result.OutputData!["Method"].Should().Be("GradientInterp");
+        result.OutputData["CapabilityLevel"].Should().Be("NonIndustrialReference");
+        result.OutputData["IndustrialGradeModel"].Should().Be(false);
+        result.OutputData["NotIndustrialMetrologyModel"].Should().Be(true);
     }
 
     [Fact]
@@ -75,5 +80,21 @@ public class SubpixelEdgeDetectionOperatorTests
         result.OutputData!["Method"].Should().Be("Steger");
         Convert.ToDouble(result.OutputData["SigmaUsed"]).Should().BeApproximately(2.0, 1e-9);
         ((IReadOnlyCollection<Dictionary<string, object>>)result.OutputData["Edges"]).Should().NotBeEmpty();
+        result.OutputData["CapabilityLevel"].Should().Be("NonIndustrialReference");
+        result.OutputData["IndustrialGradeModel"].Should().Be(false);
+        var diagnostics = ((IEnumerable<string>)result.OutputData["Diagnostics"]).ToArray();
+        diagnostics.Should().Contain(message => message.Contains("non-industrial reference", StringComparison.OrdinalIgnoreCase));
+        diagnostics.Should().Contain(message => message.Contains("must not be presented as a replacement", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void OperatorMetadata_ShouldDeclareNonIndustrialReferencePositioning()
+    {
+        var metadata = typeof(SubpixelEdgeDetectionOperator).GetCustomAttribute<OperatorMetaAttribute>();
+
+        metadata.Should().NotBeNull();
+        metadata!.Description.Should().Contain("Non-industrial reference");
+        metadata.Tags.Should().Contain("non-industrial-reference");
+        metadata.Tags.Should().NotContain("industrial-remediation");
     }
 }

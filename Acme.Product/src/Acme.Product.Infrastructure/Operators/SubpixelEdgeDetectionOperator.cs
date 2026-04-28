@@ -14,10 +14,10 @@ namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "Subpixel Edge Detection",
-    Description = "Extracts subpixel edges using Steger or lightweight gradient/interpolation refinements.",
+    Description = "Non-industrial reference subpixel edge extraction; requires application validation before metrology use.",
     Category = "Feature Extraction",
     IconName = "edge-subpixel",
-    Tags = new[] { "experimental", "industrial-remediation", "subpixel-edge" }
+    Tags = new[] { "experimental", "non-industrial-reference", "subpixel-edge" }
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]
@@ -117,18 +117,20 @@ public class SubpixelEdgeDetectionOperator : OperatorBase
                 { "SigmaUsed", sigma },
                 { "AlgorithmClass", isSteger ? "HessianRidgeSubpixel" : "GradientInterpolationRefinement" },
                 { "MethodDisclosure", isSteger ? "Steger Hessian-ridge detector" : "Gradient/interpolation refinement" },
+                { "CapabilityLevel", "NonIndustrialReference" },
                 { "IndustrialGradeModel", false },
+                { "NotIndustrialMetrologyModel", true },
                 { "RequiresApplicationValidation", true },
                 { "Diagnostics", isSteger
                     ? new[]
                     {
-                        "Steger mode follows a Hessian-ridge subpixel detector.",
-                        "Validate repeatability, calibration, and GR&R data before marketing it as a production metrology model."
+                        "Steger mode follows a Hessian-ridge subpixel detector but is shipped as a non-industrial reference implementation.",
+                        "It must not be presented as a replacement for a validated industrial subpixel metrology model without golden data, calibration, repeatability, and GR&R evidence."
                     }
                     : new[]
                     {
                         "GradientInterp/GaussianFit are lightweight gradient/interpolation refinements on top of binary edge candidates.",
-                        "They are not Zernike moments and should not be presented as a full industrial metrology edge model without application validation."
+                        "They are not Zernike moments and must not be presented as a replacement for a validated industrial subpixel metrology model."
                     } }
             };
 
