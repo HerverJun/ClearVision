@@ -1,12 +1,11 @@
 {
-  "EvidenceKind": "golden",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-25T14:30:39.3981847+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:26.1801208+00:00",
     "CasesRoot": "quality/synthetic/cases/template_matching",
     "CaseCount": 117,
     "Passed": 117,
     "Failed": 0,
-    "MemoryAllocationBytesAvgSum": 474764
+    "MemoryAllocationBytesAvgSum": 474777
   },
   "Operators": [
     {
@@ -14,10 +13,9 @@
       "CaseCount": 117,
       "Passed": 117,
       "Failed": 0,
-      "RuntimeMsAvg": 1.819,
-      "RuntimeMsMax": 30.242,
-      "MemoryAllocationBytesAvg": 474764,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 1.722,
+      "RuntimeMsMax": 31.011,
+      "MemoryAllocationBytesAvg": 474777
     }
   ],
   "Cases": [
@@ -27,7 +25,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 30.242,
+      "RuntimeMs": 31.011,
       "MemoryAllocationBytes": 34224,
       "ErrorMessage": null,
       "Metrics": {
@@ -58,7 +56,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.853,
+      "RuntimeMs": 2.071,
       "MemoryAllocationBytes": 18256,
       "ErrorMessage": null,
       "Metrics": {
@@ -89,8 +87,8 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.871,
-      "MemoryAllocationBytes": 18256,
+      "RuntimeMs": 1.816,
+      "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -120,7 +118,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.733,
+      "RuntimeMs": 1.543,
       "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
@@ -151,7 +149,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.322,
+      "RuntimeMs": 1.516,
       "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
@@ -182,7 +180,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.357,
+      "RuntimeMs": 1.525,
       "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
@@ -213,7 +211,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.347,
+      "RuntimeMs": 1.372,
       "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
@@ -244,7 +242,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.366,
+      "RuntimeMs": 1.53,
       "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
@@ -275,7 +273,7 @@
       "Scenario": "edge_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_edge_domain_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.528,
+      "RuntimeMs": 1.506,
       "MemoryAllocationBytes": 16128,
       "ErrorMessage": null,
       "Metrics": {
@@ -306,8 +304,8 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.375,
-      "MemoryAllocationBytes": 11896,
+      "RuntimeMs": 1.195,
+      "MemoryAllocationBytes": 13000,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": false,
@@ -337,7 +335,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.044,
+      "RuntimeMs": 0.959,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -368,7 +366,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.005,
+      "RuntimeMs": 0.994,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -399,7 +397,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.017,
+      "RuntimeMs": 1.021,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -430,7 +428,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.983,
+      "RuntimeMs": 1.004,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -461,7 +459,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.965,
+      "RuntimeMs": 0.938,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -492,7 +490,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.063,
+      "RuntimeMs": 0.918,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -523,7 +521,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.922,
+      "RuntimeMs": 0.986,
       "MemoryAllocationBytes": 11960,
       "ErrorMessage": null,
       "Metrics": {
@@ -554,7 +552,7 @@
       "Scenario": "fixed_scale_boundary",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_fixed_scale_boundary_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.014,
+      "RuntimeMs": 0.729,
       "MemoryAllocationBytes": 11896,
       "ErrorMessage": null,
       "Metrics": {
@@ -585,7 +583,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.828,
+      "RuntimeMs": 1.335,
       "MemoryAllocationBytes": 16920,
       "ErrorMessage": null,
       "Metrics": {
@@ -616,8 +614,8 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.211,
-      "MemoryAllocationBytes": 16752,
+      "RuntimeMs": 1.032,
+      "MemoryAllocationBytes": 17776,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -647,7 +645,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.109,
+      "RuntimeMs": 0.998,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -678,7 +676,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.144,
+      "RuntimeMs": 1.153,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -709,7 +707,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.116,
+      "RuntimeMs": 1.018,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -740,7 +738,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.222,
+      "RuntimeMs": 1.102,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -771,7 +769,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.029,
+      "RuntimeMs": 1.067,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -802,7 +800,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.829,
+      "RuntimeMs": 1.093,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -833,7 +831,7 @@
       "Scenario": "gradient_domain",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_gradient_domain_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.962,
+      "RuntimeMs": 1.085,
       "MemoryAllocationBytes": 16752,
       "ErrorMessage": null,
       "Metrics": {
@@ -864,7 +862,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.716,
+      "RuntimeMs": 0.938,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -895,7 +893,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.783,
+      "RuntimeMs": 1.001,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -926,7 +924,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.452,
+      "RuntimeMs": 0.914,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -957,7 +955,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.681,
+      "RuntimeMs": 0.91,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -988,7 +986,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.676,
+      "RuntimeMs": 0.913,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1019,7 +1017,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.831,
+      "RuntimeMs": 0.942,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1050,7 +1048,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.76,
+      "RuntimeMs": 0.832,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1081,7 +1079,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.766,
+      "RuntimeMs": 0.585,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1112,7 +1110,7 @@
       "Scenario": "illumination_shift",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_illumination_shift_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.682,
+      "RuntimeMs": 0.579,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1143,7 +1141,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.112,
+      "RuntimeMs": 0.066,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1174,7 +1172,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.102,
+      "RuntimeMs": 0.086,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1205,7 +1203,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.111,
+      "RuntimeMs": 0.075,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1236,7 +1234,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.106,
+      "RuntimeMs": 0.067,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1267,7 +1265,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.246,
+      "RuntimeMs": 0.063,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1298,7 +1296,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.104,
+      "RuntimeMs": 0.065,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1329,7 +1327,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.11,
+      "RuntimeMs": 0.064,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1360,7 +1358,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.115,
+      "RuntimeMs": 0.064,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1391,7 +1389,7 @@
       "Scenario": "low_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_low_texture_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.188,
+      "RuntimeMs": 0.061,
       "MemoryAllocationBytes": 9712,
       "ErrorMessage": null,
       "Metrics": {
@@ -1422,7 +1420,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 10.19,
+      "RuntimeMs": 8.873,
       "MemoryAllocationBytes": 5158624,
       "ErrorMessage": null,
       "Metrics": {
@@ -1453,8 +1451,8 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 9.826,
-      "MemoryAllocationBytes": 5157576,
+      "RuntimeMs": 9.399,
+      "MemoryAllocationBytes": 5158080,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -1484,7 +1482,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 7.37,
+      "RuntimeMs": 6.899,
       "MemoryAllocationBytes": 5157936,
       "ErrorMessage": null,
       "Metrics": {
@@ -1515,8 +1513,8 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 7.367,
-      "MemoryAllocationBytes": 5157968,
+      "RuntimeMs": 6.713,
+      "MemoryAllocationBytes": 5157520,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -1546,7 +1544,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 8.395,
+      "RuntimeMs": 7.276,
       "MemoryAllocationBytes": 5158688,
       "ErrorMessage": null,
       "Metrics": {
@@ -1577,7 +1575,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 7.172,
+      "RuntimeMs": 6.832,
       "MemoryAllocationBytes": 5157728,
       "ErrorMessage": null,
       "Metrics": {
@@ -1608,7 +1606,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 7.499,
+      "RuntimeMs": 7.008,
       "MemoryAllocationBytes": 5157520,
       "ErrorMessage": null,
       "Metrics": {
@@ -1639,7 +1637,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 10.093,
+      "RuntimeMs": 8.841,
       "MemoryAllocationBytes": 5158688,
       "ErrorMessage": null,
       "Metrics": {
@@ -1670,7 +1668,7 @@
       "Scenario": "mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_mask_constraint_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 7.484,
+      "RuntimeMs": 6.65,
       "MemoryAllocationBytes": 5157728,
       "ErrorMessage": null,
       "Metrics": {
@@ -1701,7 +1699,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.157,
+      "RuntimeMs": 1.126,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1732,7 +1730,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.796,
+      "RuntimeMs": 0.951,
       "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
@@ -1763,7 +1761,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.452,
+      "RuntimeMs": 1.349,
       "MemoryAllocationBytes": 15544,
       "ErrorMessage": null,
       "Metrics": {
@@ -1794,7 +1792,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.424,
+      "RuntimeMs": 1.467,
       "MemoryAllocationBytes": 27960,
       "ErrorMessage": null,
       "Metrics": {
@@ -1825,7 +1823,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.63,
+      "RuntimeMs": 1.045,
       "MemoryAllocationBytes": 14640,
       "ErrorMessage": null,
       "Metrics": {
@@ -1856,7 +1854,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.311,
+      "RuntimeMs": 1.142,
       "MemoryAllocationBytes": 28128,
       "ErrorMessage": null,
       "Metrics": {
@@ -1887,7 +1885,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.888,
+      "RuntimeMs": 1.121,
       "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
@@ -1918,7 +1916,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.927,
+      "RuntimeMs": 1.009,
       "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
@@ -1949,7 +1947,7 @@
       "Scenario": "method_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_method_contract_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.25,
+      "RuntimeMs": 1.029,
       "MemoryAllocationBytes": 15488,
       "ErrorMessage": null,
       "Metrics": {
@@ -1980,7 +1978,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.328,
+      "RuntimeMs": 1.011,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2011,7 +2009,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.158,
+      "RuntimeMs": 1.022,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2042,7 +2040,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.905,
+      "RuntimeMs": 1.169,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2073,7 +2071,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.359,
+      "RuntimeMs": 0.986,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2104,8 +2102,8 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.338,
-      "MemoryAllocationBytes": 17264,
+      "RuntimeMs": 1.038,
+      "MemoryAllocationBytes": 18472,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -2135,7 +2133,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.266,
+      "RuntimeMs": 1.244,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2166,7 +2164,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.252,
+      "RuntimeMs": 1.276,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2197,7 +2195,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.267,
+      "RuntimeMs": 1.093,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2228,7 +2226,7 @@
       "Scenario": "multi_match_nms",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_multi_match_nms_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.257,
+      "RuntimeMs": 1.208,
       "MemoryAllocationBytes": 17264,
       "ErrorMessage": null,
       "Metrics": {
@@ -2259,7 +2257,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.334,
+      "RuntimeMs": 1.204,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2290,7 +2288,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.396,
+      "RuntimeMs": 1.043,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2321,7 +2319,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.47,
+      "RuntimeMs": 1.086,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2352,7 +2350,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.412,
+      "RuntimeMs": 1.105,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2383,7 +2381,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.194,
+      "RuntimeMs": 1.097,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2414,7 +2412,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.776,
+      "RuntimeMs": 1.127,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2445,7 +2443,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.137,
+      "RuntimeMs": 1.473,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2476,7 +2474,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.258,
+      "RuntimeMs": 1.192,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2507,7 +2505,7 @@
       "Scenario": "repeated_texture",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_repeated_texture_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.307,
+      "RuntimeMs": 1.334,
       "MemoryAllocationBytes": 21512,
       "ErrorMessage": null,
       "Metrics": {
@@ -2538,7 +2536,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.801,
+      "RuntimeMs": 0.643,
       "MemoryAllocationBytes": 15496,
       "ErrorMessage": null,
       "Metrics": {
@@ -2569,7 +2567,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.24,
+      "RuntimeMs": 0.171,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2600,7 +2598,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.245,
+      "RuntimeMs": 0.168,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2631,7 +2629,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.238,
+      "RuntimeMs": 0.173,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2662,7 +2660,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.244,
+      "RuntimeMs": 0.163,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2693,7 +2691,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.238,
+      "RuntimeMs": 0.315,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2724,7 +2722,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.242,
+      "RuntimeMs": 0.176,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2755,7 +2753,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.236,
+      "RuntimeMs": 0.171,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2786,7 +2784,7 @@
       "Scenario": "roi_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_constraint_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.257,
+      "RuntimeMs": 0.164,
       "MemoryAllocationBytes": 15352,
       "ErrorMessage": null,
       "Metrics": {
@@ -2817,8 +2815,8 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.515,
-      "MemoryAllocationBytes": 839376,
+      "RuntimeMs": 1.205,
+      "MemoryAllocationBytes": 839888,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -2848,7 +2846,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.538,
+      "RuntimeMs": 1.732,
       "MemoryAllocationBytes": 839584,
       "ErrorMessage": null,
       "Metrics": {
@@ -2879,7 +2877,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.64,
+      "RuntimeMs": 1.143,
       "MemoryAllocationBytes": 839584,
       "ErrorMessage": null,
       "Metrics": {
@@ -2910,7 +2908,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.429,
+      "RuntimeMs": 1.119,
       "MemoryAllocationBytes": 839376,
       "ErrorMessage": null,
       "Metrics": {
@@ -2941,7 +2939,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.492,
+      "RuntimeMs": 1.343,
       "MemoryAllocationBytes": 839376,
       "ErrorMessage": null,
       "Metrics": {
@@ -2972,7 +2970,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.613,
+      "RuntimeMs": 1.14,
       "MemoryAllocationBytes": 839376,
       "ErrorMessage": null,
       "Metrics": {
@@ -3003,7 +3001,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.295,
+      "RuntimeMs": 1.143,
       "MemoryAllocationBytes": 839376,
       "ErrorMessage": null,
       "Metrics": {
@@ -3034,7 +3032,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.285,
+      "RuntimeMs": 1.194,
       "MemoryAllocationBytes": 839376,
       "ErrorMessage": null,
       "Metrics": {
@@ -3065,7 +3063,7 @@
       "Scenario": "roi_mask_constraint",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_roi_mask_constraint_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.29,
+      "RuntimeMs": 1.208,
       "MemoryAllocationBytes": 839376,
       "ErrorMessage": null,
       "Metrics": {
@@ -3096,7 +3094,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.895,
+      "RuntimeMs": 0.707,
       "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
@@ -3127,7 +3125,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.083,
+      "RuntimeMs": 1.152,
       "MemoryAllocationBytes": 15488,
       "ErrorMessage": null,
       "Metrics": {
@@ -3158,7 +3156,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.942,
+      "RuntimeMs": 0.829,
       "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
@@ -3189,7 +3187,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.115,
+      "RuntimeMs": 0.917,
       "MemoryAllocationBytes": 15488,
       "ErrorMessage": null,
       "Metrics": {
@@ -3220,7 +3218,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.894,
+      "RuntimeMs": 1.007,
       "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
@@ -3251,7 +3249,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.27,
+      "RuntimeMs": 1.255,
       "MemoryAllocationBytes": 15488,
       "ErrorMessage": null,
       "Metrics": {
@@ -3282,7 +3280,7 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.079,
+      "RuntimeMs": 1.144,
       "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
@@ -3313,8 +3311,8 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.205,
-      "MemoryAllocationBytes": 15512,
+      "RuntimeMs": 1.018,
+      "MemoryAllocationBytes": 15488,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3344,8 +3342,8 @@
       "Scenario": "sqdiff_contract",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_sqdiff_contract_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.616,
-      "MemoryAllocationBytes": 15192,
+      "RuntimeMs": 0.892,
+      "MemoryAllocationBytes": 15168,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3375,8 +3373,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.972,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 1.037,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3406,8 +3404,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.661,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 0.88,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3437,8 +3435,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.646,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 1.113,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3468,8 +3466,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.76,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 0.995,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3499,8 +3497,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.014,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 0.879,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3530,8 +3528,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.994,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 1.036,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3561,8 +3559,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.104,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 0.909,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3592,8 +3590,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.059,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 1.073,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -3623,8 +3621,8 @@
       "Scenario": "translation_gray",
       "InputPath": "quality\\synthetic\\cases\\template_matching\\TemplateMatching\\TemplateMatching_translation_gray_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.015,
-      "MemoryAllocationBytes": 15008,
+      "RuntimeMs": 1.069,
+      "MemoryAllocationBytes": 14984,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,

@@ -327,7 +327,16 @@ public class GradientShapeMatchOperator : OperatorBase
             return $"input:{hash}:{angleRange}:{angleStep}:{magnitudeThreshold}";
         }
 
-        return $"path:{templatePath}:{angleRange}:{angleStep}:{magnitudeThreshold}";
+        if (string.IsNullOrWhiteSpace(templatePath) || !File.Exists(templatePath))
+        {
+            return $"path:{templatePath}:missing:{angleRange}:{angleStep}:{magnitudeThreshold}";
+        }
+
+        var fullPath = Path.GetFullPath(templatePath);
+        var info = new FileInfo(fullPath);
+        using var stream = File.OpenRead(fullPath);
+        var fileHash = Convert.ToHexString(SHA256.HashData(stream));
+        return $"path:{fullPath}:{info.Length}:{info.LastWriteTimeUtc.Ticks}:{fileHash}:{angleRange}:{angleStep}:{magnitudeThreshold}";
     }
 
     private bool TryGetCachedMatcher(string cacheKey, out MatcherCacheEntry? entry)

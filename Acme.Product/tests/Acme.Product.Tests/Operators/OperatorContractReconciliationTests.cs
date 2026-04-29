@@ -376,6 +376,55 @@ public class OperatorContractReconciliationTests
     }
 
     [Fact]
+    public async Task GradientShapeMatch_ShouldRefreshCache_WhenTemplatePathFileChanges()
+    {
+        var sut = new GradientShapeMatchOperator(Substitute.For<ILogger<GradientShapeMatchOperator>>());
+        var tempDir = Path.Combine(Path.GetTempPath(), "clearvision-gradient-cache", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        var templatePath = Path.Combine(tempDir, "template.png");
+
+        try
+        {
+            using var templateA = CreatePatternTemplate();
+            Cv2.ImWrite(templatePath, templateA.MatReadOnly);
+            using var sceneA = templateA.MatReadOnly.Clone();
+
+            var op = new Operator("path_template", OperatorType.GradientShapeMatch, 0, 0);
+            op.AddParameter(TestHelpers.CreateParameter("TemplatePath", templatePath, "file"));
+            op.AddParameter(TestHelpers.CreateParameter("EnableCache", true, "bool"));
+            op.AddParameter(TestHelpers.CreateParameter("MinScore", 30.0, "double"));
+
+            var first = await sut.ExecuteAsync(op, new Dictionary<string, object>
+            {
+                ["Image"] = new ImageWrapper(sceneA)
+            });
+            first.IsSuccess.Should().BeTrue(first.ErrorMessage);
+
+            using var templateB = CreateVariantTemplate(7);
+            Cv2.ImWrite(templatePath, templateB.MatReadOnly);
+            using var sceneB = templateB.MatReadOnly.Clone();
+
+            var second = await sut.ExecuteAsync(op, new Dictionary<string, object>
+            {
+                ["Image"] = new ImageWrapper(sceneB)
+            });
+            second.IsSuccess.Should().BeTrue(second.ErrorMessage);
+
+            var cacheField = typeof(GradientShapeMatchOperator).GetField("_matcherCache", BindingFlags.Instance | BindingFlags.NonPublic);
+            cacheField.Should().NotBeNull();
+            var cache = cacheField!.GetValue(sut).Should().BeAssignableTo<System.Collections.IDictionary>().Subject;
+            cache.Count.Should().Be(2, "the cache key should include the template file fingerprint");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task GradientShapeMatch_LowFeatureTemplate_Should_Return_InvalidTemplate_Code()
     {
         var sut = new GradientShapeMatchOperator(Substitute.For<ILogger<GradientShapeMatchOperator>>());

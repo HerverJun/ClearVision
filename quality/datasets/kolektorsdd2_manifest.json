@@ -1,0 +1,37 @@
+{
+  "name": "KolektorSDD2",
+  "source_dataset": "Kolektor Surface-Defect Dataset 2",
+  "collected_at": "2026-04-29",
+  "source_pages": [
+    "https://www.vicos.si/resources/kolektorsdd2/",
+    "https://go.vicos.si/kolektorsdd2"
+  ],
+  "license": {
+    "name": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International; commercial use requires author permission",
+    "spdx_like": "CC-BY-NC-SA-4.0",
+    "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+  },
+  "local_root": "quality/public_datasets/kolektorsdd2",
+  "index_path": "quality/datasets/kolektorsdd2_index.json",
+  "git_policy": "The local_root is ignored by git; keep downloaded archives and extracted images local.",
+  "archive": {
+    "path": "quality/public_datasets/kolektorsdd2/_downloads/KolektorSDD2.zip",
+    "source_url": "https://go.vicos.si/kolektorsdd2",
+    "resolved_url": "https://data.vicos.si/datasets/KSDD/KolektorSDD2.zip",
+    "size_bytes": 853126555,
+    "sha256": "EDCDB486809B24F1D17B785E30C52FAFC5999554DD5FE18DDF77B61CEB6F36A8"
+  },
+  "extracted_path": "quality/public_datasets/kolektorsdd2/extracted",
+  "splits": {
+    "train": {
+      "images": 2331,
+      "positive": 246,
+      "negative": 2085
+    },
+    "test": {
+      "images": 1004,
+      "positive": 110,
+      "negative": 894
+    }
+  }
+}

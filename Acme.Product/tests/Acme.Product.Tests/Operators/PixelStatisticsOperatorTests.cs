@@ -115,6 +115,29 @@ public class PixelStatisticsOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithMask_ShouldNotDisposeBorrowedMaskImage()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object> { ["Channel"] = "Gray" });
+
+        var mat = new Mat(2, 2, MatType.CV_8UC1, new Scalar(10));
+        var maskMat = new Mat(2, 2, MatType.CV_8UC1, Scalar.White);
+        using var image = new ImageWrapper(mat);
+        using var mask = new ImageWrapper(maskMat);
+
+        var inputs = TestHelpers.CreateImageInputs(image.AddRef());
+        inputs["Mask"] = mask.AddRef();
+
+        var result = await sut.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var borrowedMask = mask.GetMat();
+        borrowedMask.IsDisposed.Should().BeFalse();
+        borrowedMask.Width.Should().Be(2);
+        borrowedMask.Height.Should().Be(2);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_RoiAndMismatchedMask_ShouldReturnFailure()
     {
         var sut = CreateSut();

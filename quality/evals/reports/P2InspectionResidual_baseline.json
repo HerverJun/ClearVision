@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "golden",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T16:46:16.0695106+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:53.064428+00:00",
     "CaseCount": 48,
     "Passed": 48,
     "Failed": 0,
-    "RuntimeMs": 807.853
+    "RuntimeMs": 109.411
   },
   "Operators": [
     {
@@ -13,18 +12,16 @@
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 32.114,
-      "MemoryAllocationBytesAvg": 51635,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 3.077,
+      "MemoryAllocationBytesAvg": 51811
     },
     {
       "Operator": "SurfaceDefectDetection",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 1.546,
-      "MemoryAllocationBytesAvg": 16118,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 1.482,
+      "MemoryAllocationBytesAvg": 16118
     }
   ],
   "Scenarios": [
@@ -33,98 +30,98 @@
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.126
+      "RuntimeMsAvg": 0.118
     },
     {
       "Scenario": "Expected order oracle",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 125.736
+      "RuntimeMsAvg": 9.58
     },
     {
       "Scenario": "Gradient scratch oracle",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 0.35
+      "RuntimeMsAvg": 0.346
     },
     {
       "Scenario": "Invalid slot points failure contract",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 1.198
+      "RuntimeMsAvg": 1.089
     },
     {
       "Scenario": "Local contrast defect oracle",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.599
+      "RuntimeMsAvg": 0.596
     },
     {
       "Scenario": "Missing detections failure contract",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 0.253
+      "RuntimeMsAvg": 0.239
     },
     {
       "Scenario": "Missing image failure contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.18
+      "RuntimeMsAvg": 0.181
     },
     {
       "Scenario": "Missing label contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.198
+      "RuntimeMsAvg": 0.175
     },
     {
       "Scenario": "Order mismatch contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.167
+      "RuntimeMsAvg": 0.158
     },
     {
       "Scenario": "Parameter validation contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.286
+      "RuntimeMsAvg": 0.283
     },
     {
       "Scenario": "Phase-correlation alignment oracle",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 1.993
+      "RuntimeMsAvg": 1.938
     },
     {
       "Scenario": "Reference diff defect oracle",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 3.952
+      "RuntimeMsAvg": 3.737
     },
     {
       "Scenario": "Row cluster ordering oracle",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 2.291
+      "RuntimeMsAvg": 2.279
     },
     {
       "Scenario": "Slot assignment oracle",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 4.166
+      "RuntimeMsAvg": 4.34
     }
   ],
   "Cases": [
@@ -133,8 +130,8 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Expected order oracle",
       "Passed": true,
-      "RuntimeMs": 753.869,
-      "MemoryAllocationBytes": 731784,
+      "RuntimeMs": 57.129,
+      "MemoryAllocationBytes": 785208,
       "ErrorMessage": null,
       "Observed": {
         "ActualOrder": "Wire_Brown,Wire_Black,Wire_Blue"
@@ -145,7 +142,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Expected order oracle",
       "Passed": true,
-      "RuntimeMs": 0.197,
+      "RuntimeMs": 0.192,
       "MemoryAllocationBytes": 19424,
       "ErrorMessage": null,
       "Observed": {
@@ -157,7 +154,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Expected order oracle",
       "Passed": true,
-      "RuntimeMs": 0.06,
+      "RuntimeMs": 0.044,
       "MemoryAllocationBytes": 19424,
       "ErrorMessage": null,
       "Observed": {
@@ -169,7 +166,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Expected order oracle",
       "Passed": true,
-      "RuntimeMs": 0.041,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 19424,
       "ErrorMessage": null,
       "Observed": {
@@ -181,7 +178,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Expected order oracle",
       "Passed": true,
-      "RuntimeMs": 0.194,
+      "RuntimeMs": 0.036,
       "MemoryAllocationBytes": 19424,
       "ErrorMessage": null,
       "Observed": {
@@ -193,7 +190,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Expected order oracle",
       "Passed": true,
-      "RuntimeMs": 0.052,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 19424,
       "ErrorMessage": null,
       "Observed": {
@@ -205,7 +202,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Order mismatch contract",
       "Passed": true,
-      "RuntimeMs": 0.517,
+      "RuntimeMs": 0.51,
       "MemoryAllocationBytes": 19248,
       "ErrorMessage": null,
       "Observed": {
@@ -217,7 +214,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Order mismatch contract",
       "Passed": true,
-      "RuntimeMs": 0.065,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 19248,
       "ErrorMessage": null,
       "Observed": {
@@ -229,7 +226,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Order mismatch contract",
       "Passed": true,
-      "RuntimeMs": 0.05,
+      "RuntimeMs": 0.036,
       "MemoryAllocationBytes": 19248,
       "ErrorMessage": null,
       "Observed": {
@@ -241,7 +238,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Order mismatch contract",
       "Passed": true,
-      "RuntimeMs": 0.037,
+      "RuntimeMs": 0.035,
       "MemoryAllocationBytes": 19248,
       "ErrorMessage": null,
       "Observed": {
@@ -253,7 +250,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Missing label contract",
       "Passed": true,
-      "RuntimeMs": 0.664,
+      "RuntimeMs": 0.577,
       "MemoryAllocationBytes": 19376,
       "ErrorMessage": null,
       "Observed": {
@@ -265,7 +262,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Missing label contract",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 19376,
       "ErrorMessage": null,
       "Observed": {
@@ -277,7 +274,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Missing label contract",
       "Passed": true,
-      "RuntimeMs": 0.039,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 19376,
       "ErrorMessage": null,
       "Observed": {
@@ -289,7 +286,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Missing label contract",
       "Passed": true,
-      "RuntimeMs": 0.033,
+      "RuntimeMs": 0.036,
       "MemoryAllocationBytes": 19376,
       "ErrorMessage": null,
       "Observed": {
@@ -301,7 +298,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Allow-missing subsequence contract",
       "Passed": true,
-      "RuntimeMs": 0.39,
+      "RuntimeMs": 0.375,
       "MemoryAllocationBytes": 19112,
       "ErrorMessage": null,
       "Observed": {
@@ -313,7 +310,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Allow-missing subsequence contract",
       "Passed": true,
-      "RuntimeMs": 0.048,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 18968,
       "ErrorMessage": null,
       "Observed": {
@@ -325,7 +322,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Allow-missing subsequence contract",
       "Passed": true,
-      "RuntimeMs": 0.034,
+      "RuntimeMs": 0.032,
       "MemoryAllocationBytes": 18968,
       "ErrorMessage": null,
       "Observed": {
@@ -337,7 +334,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Allow-missing subsequence contract",
       "Passed": true,
-      "RuntimeMs": 0.034,
+      "RuntimeMs": 0.029,
       "MemoryAllocationBytes": 18968,
       "ErrorMessage": null,
       "Observed": {
@@ -349,8 +346,8 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Row cluster ordering oracle",
       "Passed": true,
-      "RuntimeMs": 4.469,
-      "MemoryAllocationBytes": 73968,
+      "RuntimeMs": 4.413,
+      "MemoryAllocationBytes": 24768,
       "ErrorMessage": null,
       "Observed": {
         "GroupingMode": "RowCluster"
@@ -361,7 +358,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Row cluster ordering oracle",
       "Passed": true,
-      "RuntimeMs": 0.113,
+      "RuntimeMs": 0.145,
       "MemoryAllocationBytes": 24096,
       "ErrorMessage": null,
       "Observed": {
@@ -373,7 +370,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Slot assignment oracle",
       "Passed": true,
-      "RuntimeMs": 8.177,
+      "RuntimeMs": 8.535,
       "MemoryAllocationBytes": 32968,
       "ErrorMessage": null,
       "Observed": {
@@ -385,7 +382,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Slot assignment oracle",
       "Passed": true,
-      "RuntimeMs": 0.154,
+      "RuntimeMs": 0.145,
       "MemoryAllocationBytes": 32056,
       "ErrorMessage": null,
       "Observed": {
@@ -397,7 +394,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Invalid slot points failure contract",
       "Passed": true,
-      "RuntimeMs": 1.198,
+      "RuntimeMs": 1.089,
       "MemoryAllocationBytes": 12528,
       "ErrorMessage": null,
       "Observed": {
@@ -409,7 +406,7 @@
       "Operator": "DetectionSequenceJudge",
       "Scenario": "Missing detections failure contract",
       "Passed": true,
-      "RuntimeMs": 0.253,
+      "RuntimeMs": 0.239,
       "MemoryAllocationBytes": 4216,
       "ErrorMessage": null,
       "Observed": {
@@ -421,7 +418,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Reference diff defect oracle",
       "Passed": true,
-      "RuntimeMs": 19.634,
+      "RuntimeMs": 18.495,
       "MemoryAllocationBytes": 24056,
       "ErrorMessage": null,
       "Observed": {
@@ -434,7 +431,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Reference diff defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.917,
+      "RuntimeMs": 0.841,
       "MemoryAllocationBytes": 16792,
       "ErrorMessage": null,
       "Observed": {
@@ -447,7 +444,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Reference diff defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.916,
+      "RuntimeMs": 0.853,
       "MemoryAllocationBytes": 16792,
       "ErrorMessage": null,
       "Observed": {
@@ -460,7 +457,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Reference diff defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.822,
+      "RuntimeMs": 0.751,
       "MemoryAllocationBytes": 16792,
       "ErrorMessage": null,
       "Observed": {
@@ -473,7 +470,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Reference diff defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.688,
+      "RuntimeMs": 0.83,
       "MemoryAllocationBytes": 16792,
       "ErrorMessage": null,
       "Observed": {
@@ -486,7 +483,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Reference diff defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.737,
+      "RuntimeMs": 0.654,
       "MemoryAllocationBytes": 16792,
       "ErrorMessage": null,
       "Observed": {
@@ -499,7 +496,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Gradient scratch oracle",
       "Passed": true,
-      "RuntimeMs": 1.172,
+      "RuntimeMs": 1.174,
       "MemoryAllocationBytes": 22136,
       "ErrorMessage": null,
       "Observed": {
@@ -512,7 +509,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Gradient scratch oracle",
       "Passed": true,
-      "RuntimeMs": 0.22,
+      "RuntimeMs": 0.218,
       "MemoryAllocationBytes": 21200,
       "ErrorMessage": null,
       "Observed": {
@@ -525,7 +522,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Gradient scratch oracle",
       "Passed": true,
-      "RuntimeMs": 0.179,
+      "RuntimeMs": 0.18,
       "MemoryAllocationBytes": 21200,
       "ErrorMessage": null,
       "Observed": {
@@ -538,7 +535,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Gradient scratch oracle",
       "Passed": true,
-      "RuntimeMs": 0.174,
+      "RuntimeMs": 0.173,
       "MemoryAllocationBytes": 21200,
       "ErrorMessage": null,
       "Observed": {
@@ -551,7 +548,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Gradient scratch oracle",
       "Passed": true,
-      "RuntimeMs": 0.167,
+      "RuntimeMs": 0.161,
       "MemoryAllocationBytes": 21200,
       "ErrorMessage": null,
       "Observed": {
@@ -564,7 +561,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Gradient scratch oracle",
       "Passed": true,
-      "RuntimeMs": 0.185,
+      "RuntimeMs": 0.167,
       "MemoryAllocationBytes": 21200,
       "ErrorMessage": null,
       "Observed": {
@@ -577,7 +574,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Local contrast defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.899,
+      "RuntimeMs": 0.915,
       "MemoryAllocationBytes": 16640,
       "ErrorMessage": null,
       "Observed": {
@@ -590,7 +587,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Local contrast defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.536,
+      "RuntimeMs": 0.535,
       "MemoryAllocationBytes": 16640,
       "ErrorMessage": null,
       "Observed": {
@@ -603,7 +600,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Local contrast defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.509,
+      "RuntimeMs": 0.43,
       "MemoryAllocationBytes": 16640,
       "ErrorMessage": null,
       "Observed": {
@@ -616,7 +613,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Local contrast defect oracle",
       "Passed": true,
-      "RuntimeMs": 0.452,
+      "RuntimeMs": 0.504,
       "MemoryAllocationBytes": 16640,
       "ErrorMessage": null,
       "Observed": {
@@ -629,7 +626,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Phase-correlation alignment oracle",
       "Passed": true,
-      "RuntimeMs": 3.601,
+      "RuntimeMs": 3.521,
       "MemoryAllocationBytes": 19736,
       "ErrorMessage": null,
       "Observed": {
@@ -641,7 +638,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Phase-correlation alignment oracle",
       "Passed": true,
-      "RuntimeMs": 1.358,
+      "RuntimeMs": 1.372,
       "MemoryAllocationBytes": 18840,
       "ErrorMessage": null,
       "Observed": {
@@ -653,7 +650,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Phase-correlation alignment oracle",
       "Passed": true,
-      "RuntimeMs": 1.575,
+      "RuntimeMs": 1.467,
       "MemoryAllocationBytes": 18840,
       "ErrorMessage": null,
       "Observed": {
@@ -665,7 +662,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Phase-correlation alignment oracle",
       "Passed": true,
-      "RuntimeMs": 1.437,
+      "RuntimeMs": 1.394,
       "MemoryAllocationBytes": 18840,
       "ErrorMessage": null,
       "Observed": {
@@ -677,7 +674,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Missing image failure contract",
       "Passed": true,
-      "RuntimeMs": 0.356,
+      "RuntimeMs": 0.358,
       "MemoryAllocationBytes": 2296,
       "ErrorMessage": null,
       "Observed": {
@@ -701,7 +698,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.555,
+      "RuntimeMs": 0.552,
       "MemoryAllocationBytes": 1960,
       "ErrorMessage": null,
       "Observed": {
@@ -713,7 +710,7 @@
       "Operator": "SurfaceDefectDetection",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.016,
+      "RuntimeMs": 0.013,
       "MemoryAllocationBytes": 1960,
       "ErrorMessage": null,
       "Observed": {

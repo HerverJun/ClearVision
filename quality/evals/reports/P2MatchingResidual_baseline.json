@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "golden",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T16:41:58.7658772+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:51.0563385+00:00",
     "CaseCount": 72,
     "Passed": 72,
     "Failed": 0,
-    "RuntimeMs": 1932.475
+    "RuntimeMs": 1838.195
   },
   "Operators": [
     {
@@ -13,27 +12,24 @@
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 28.791,
-      "MemoryAllocationBytesAvg": 9876733,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 29.374,
+      "MemoryAllocationBytesAvg": 9876710
     },
     {
       "Operator": "PlanarMatching",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 30.356,
-      "MemoryAllocationBytesAvg": 285161,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 30.527,
+      "MemoryAllocationBytesAvg": 285681
     },
     {
       "Operator": "ShapeMatching",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 21.372,
-      "MemoryAllocationBytesAvg": 39562277,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 16.69,
+      "MemoryAllocationBytesAvg": 39562881
     }
   ],
   "Scenarios": [
@@ -42,77 +38,77 @@
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 26.923
+      "RuntimeMsAvg": 25.336
     },
     {
       "Scenario": "Blank scene rejection contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 5.045
+      "RuntimeMsAvg": 5.637
     },
     {
       "Scenario": "Direct pose oracle",
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 11.138
+      "RuntimeMsAvg": 11.08
     },
     {
       "Scenario": "Feature homography identity oracle",
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 70.254
+      "RuntimeMsAvg": 71.243
     },
     {
       "Scenario": "Local deformation oracle",
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 84.403
+      "RuntimeMsAvg": 86.096
     },
     {
       "Scenario": "Low-feature no-match contract",
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 1.732
+      "RuntimeMsAvg": 1.743
     },
     {
       "Scenario": "Missing input failure contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.154
+      "RuntimeMsAvg": 0.151
     },
     {
       "Scenario": "Missing template contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.412
+      "RuntimeMsAvg": 0.485
     },
     {
       "Scenario": "Parameter validation contract",
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 0.117
+      "RuntimeMsAvg": 0.125
     },
     {
       "Scenario": "Perspective homography oracle",
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 18.208
+      "RuntimeMsAvg": 17.438
     },
     {
       "Scenario": "Rotation-scale oracle",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 51.957
+      "RuntimeMsAvg": 27.153
     }
   ],
   "Cases": [
@@ -121,8 +117,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 71.729,
-      "MemoryAllocationBytes": 1447608,
+      "RuntimeMs": 71.492,
+      "MemoryAllocationBytes": 1437408,
       "ErrorMessage": null,
       "Observed": {
         "MatchCount": 1
@@ -133,8 +129,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 3.1,
-      "MemoryAllocationBytes": 761864,
+      "RuntimeMs": 3.017,
+      "MemoryAllocationBytes": 763808,
       "ErrorMessage": null,
       "Observed": {
         "MatchCount": 1
@@ -145,8 +141,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 2.424,
-      "MemoryAllocationBytes": 744616,
+      "RuntimeMs": 2.363,
+      "MemoryAllocationBytes": 761776,
       "ErrorMessage": null,
       "Observed": {
         "MatchCount": 1
@@ -157,7 +153,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 2.328,
+      "RuntimeMs": 2.233,
       "MemoryAllocationBytes": 744616,
       "ErrorMessage": null,
       "Observed": {
@@ -169,7 +165,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 2.346,
+      "RuntimeMs": 2.259,
       "MemoryAllocationBytes": 744616,
       "ErrorMessage": null,
       "Observed": {
@@ -181,7 +177,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 2.475,
+      "RuntimeMs": 2.462,
       "MemoryAllocationBytes": 744616,
       "ErrorMessage": null,
       "Observed": {
@@ -193,7 +189,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 2.268,
+      "RuntimeMs": 2.318,
       "MemoryAllocationBytes": 744616,
       "ErrorMessage": null,
       "Observed": {
@@ -205,8 +201,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Direct pose oracle",
       "Passed": true,
-      "RuntimeMs": 2.435,
-      "MemoryAllocationBytes": 746560,
+      "RuntimeMs": 2.5,
+      "MemoryAllocationBytes": 744616,
       "ErrorMessage": null,
       "Observed": {
         "MatchCount": 1
@@ -217,8 +213,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 31.999,
-      "MemoryAllocationBytes": 76683096,
+      "RuntimeMs": 31.029,
+      "MemoryAllocationBytes": 76664608,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -229,8 +225,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 26.625,
-      "MemoryAllocationBytes": 76672280,
+      "RuntimeMs": 25.072,
+      "MemoryAllocationBytes": 76688736,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -241,8 +237,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 25.263,
-      "MemoryAllocationBytes": 76671280,
+      "RuntimeMs": 25.607,
+      "MemoryAllocationBytes": 76668440,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -253,8 +249,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 25.018,
-      "MemoryAllocationBytes": 76669976,
+      "RuntimeMs": 24.112,
+      "MemoryAllocationBytes": 76671896,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -265,8 +261,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 25.859,
-      "MemoryAllocationBytes": 76669800,
+      "RuntimeMs": 24.834,
+      "MemoryAllocationBytes": 76669784,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -277,8 +273,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 23.817,
-      "MemoryAllocationBytes": 76671448,
+      "RuntimeMs": 24.305,
+      "MemoryAllocationBytes": 76669792,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -289,8 +285,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 24.694,
-      "MemoryAllocationBytes": 76668952,
+      "RuntimeMs": 24.437,
+      "MemoryAllocationBytes": 76670024,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -301,8 +297,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Blank scene no-match contract",
       "Passed": true,
-      "RuntimeMs": 32.11,
-      "MemoryAllocationBytes": 76669032,
+      "RuntimeMs": 23.292,
+      "MemoryAllocationBytes": 76669288,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "NoMatch"
@@ -313,8 +309,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Rotation-scale oracle",
       "Passed": true,
-      "RuntimeMs": 53.205,
-      "MemoryAllocationBytes": 77749104,
+      "RuntimeMs": 30.248,
+      "MemoryAllocationBytes": 77751128,
       "ErrorMessage": null,
       "Observed": {
         "ExpectedAngle": 20,
@@ -326,8 +322,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Rotation-scale oracle",
       "Passed": true,
-      "RuntimeMs": 48.333,
-      "MemoryAllocationBytes": 78654848,
+      "RuntimeMs": 25.38,
+      "MemoryAllocationBytes": 78658000,
       "ErrorMessage": null,
       "Observed": {
         "ExpectedAngle": 25,
@@ -339,8 +335,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Rotation-scale oracle",
       "Passed": true,
-      "RuntimeMs": 54.303,
-      "MemoryAllocationBytes": 86504240,
+      "RuntimeMs": 27.724,
+      "MemoryAllocationBytes": 86504064,
       "ErrorMessage": null,
       "Observed": {
         "ExpectedAngle": 30,
@@ -352,8 +348,8 @@
       "Operator": "ShapeMatching",
       "Scenario": "Rotation-scale oracle",
       "Passed": true,
-      "RuntimeMs": 51.988,
-      "MemoryAllocationBytes": 86511320,
+      "RuntimeMs": 25.259,
+      "MemoryAllocationBytes": 86517144,
       "ErrorMessage": null,
       "Observed": {
         "ExpectedAngle": 35,
@@ -365,7 +361,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Missing input failure contract",
       "Passed": true,
-      "RuntimeMs": 0.605,
+      "RuntimeMs": 0.596,
       "MemoryAllocationBytes": 14912,
       "ErrorMessage": null,
       "Observed": {
@@ -377,7 +373,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Missing input failure contract",
       "Passed": true,
-      "RuntimeMs": 0.008,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 1752,
       "ErrorMessage": null,
       "Observed": {
@@ -389,7 +385,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Missing input failure contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 1752,
       "ErrorMessage": null,
       "Observed": {
@@ -401,7 +397,7 @@
       "Operator": "ShapeMatching",
       "Scenario": "Missing input failure contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 1752,
       "ErrorMessage": null,
       "Observed": {
@@ -413,8 +409,8 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 139.226,
-      "MemoryAllocationBytes": 567576,
+      "RuntimeMs": 153.02,
+      "MemoryAllocationBytes": 580064,
       "ErrorMessage": null,
       "Observed": {
         "DetectorType": "ORB",
@@ -426,7 +422,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 77.52,
+      "RuntimeMs": 76.447,
       "MemoryAllocationBytes": 254760,
       "ErrorMessage": null,
       "Observed": {
@@ -439,7 +435,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 86.349,
+      "RuntimeMs": 82.473,
       "MemoryAllocationBytes": 290072,
       "ErrorMessage": null,
       "Observed": {
@@ -452,7 +448,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 13.999,
+      "RuntimeMs": 14.02,
       "MemoryAllocationBytes": 447568,
       "ErrorMessage": null,
       "Observed": {
@@ -465,7 +461,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 76.051,
+      "RuntimeMs": 71.159,
       "MemoryAllocationBytes": 254536,
       "ErrorMessage": null,
       "Observed": {
@@ -478,7 +474,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 84.654,
+      "RuntimeMs": 84.828,
       "MemoryAllocationBytes": 289904,
       "ErrorMessage": null,
       "Observed": {
@@ -491,7 +487,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 13.771,
+      "RuntimeMs": 14.468,
       "MemoryAllocationBytes": 447568,
       "ErrorMessage": null,
       "Observed": {
@@ -504,7 +500,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Feature homography identity oracle",
       "Passed": true,
-      "RuntimeMs": 70.461,
+      "RuntimeMs": 73.53,
       "MemoryAllocationBytes": 254536,
       "ErrorMessage": null,
       "Observed": {
@@ -517,7 +513,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 19.176,
+      "RuntimeMs": 19.72,
       "MemoryAllocationBytes": 491416,
       "ErrorMessage": null,
       "Observed": {
@@ -529,7 +525,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 16.959,
+      "RuntimeMs": 17.845,
       "MemoryAllocationBytes": 485584,
       "ErrorMessage": null,
       "Observed": {
@@ -541,7 +537,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 18.637,
+      "RuntimeMs": 16.98,
       "MemoryAllocationBytes": 489000,
       "ErrorMessage": null,
       "Observed": {
@@ -553,7 +549,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 17.585,
+      "RuntimeMs": 16.668,
       "MemoryAllocationBytes": 490248,
       "ErrorMessage": null,
       "Observed": {
@@ -565,7 +561,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 19.28,
+      "RuntimeMs": 16.965,
       "MemoryAllocationBytes": 486352,
       "ErrorMessage": null,
       "Observed": {
@@ -577,7 +573,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 20.864,
+      "RuntimeMs": 17.124,
       "MemoryAllocationBytes": 489168,
       "ErrorMessage": null,
       "Observed": {
@@ -589,7 +585,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 16.589,
+      "RuntimeMs": 17.187,
       "MemoryAllocationBytes": 491640,
       "ErrorMessage": null,
       "Observed": {
@@ -601,7 +597,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Perspective homography oracle",
       "Passed": true,
-      "RuntimeMs": 16.576,
+      "RuntimeMs": 17.017,
       "MemoryAllocationBytes": 494680,
       "ErrorMessage": null,
       "Observed": {
@@ -613,7 +609,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Blank scene rejection contract",
       "Passed": true,
-      "RuntimeMs": 5.85,
+      "RuntimeMs": 7.752,
       "MemoryAllocationBytes": 27960,
       "ErrorMessage": null,
       "Observed": {
@@ -625,7 +621,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Blank scene rejection contract",
       "Passed": true,
-      "RuntimeMs": 4.708,
+      "RuntimeMs": 5.065,
       "MemoryAllocationBytes": 27936,
       "ErrorMessage": null,
       "Observed": {
@@ -637,7 +633,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Blank scene rejection contract",
       "Passed": true,
-      "RuntimeMs": 4.64,
+      "RuntimeMs": 4.798,
       "MemoryAllocationBytes": 27936,
       "ErrorMessage": null,
       "Observed": {
@@ -649,7 +645,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Blank scene rejection contract",
       "Passed": true,
-      "RuntimeMs": 4.981,
+      "RuntimeMs": 4.932,
       "MemoryAllocationBytes": 27936,
       "ErrorMessage": null,
       "Observed": {
@@ -661,7 +657,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.646,
+      "RuntimeMs": 0.641,
       "MemoryAllocationBytes": 1872,
       "ErrorMessage": null,
       "Observed": {
@@ -673,7 +669,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.014,
       "MemoryAllocationBytes": 1872,
       "ErrorMessage": null,
       "Observed": {
@@ -685,7 +681,7 @@
       "Operator": "PlanarMatching",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1872,
       "ErrorMessage": null,
       "Observed": {
@@ -709,7 +705,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 95.484,
+      "RuntimeMs": 95.094,
       "MemoryAllocationBytes": 29440816,
       "ErrorMessage": null,
       "Observed": {
@@ -722,7 +718,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 85.181,
+      "RuntimeMs": 85.204,
       "MemoryAllocationBytes": 29361328,
       "ErrorMessage": null,
       "Observed": {
@@ -735,7 +731,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 82.561,
+      "RuntimeMs": 83.678,
       "MemoryAllocationBytes": 29370464,
       "ErrorMessage": null,
       "Observed": {
@@ -748,7 +744,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 86.14,
+      "RuntimeMs": 89.323,
       "MemoryAllocationBytes": 29236480,
       "ErrorMessage": null,
       "Observed": {
@@ -761,8 +757,8 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 81.966,
-      "MemoryAllocationBytes": 29226856,
+      "RuntimeMs": 88.476,
+      "MemoryAllocationBytes": 29226928,
       "ErrorMessage": null,
       "Observed": {
         "Method": "MLS_Deformable",
@@ -774,8 +770,8 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 82.999,
-      "MemoryAllocationBytes": 29873744,
+      "RuntimeMs": 82.075,
+      "MemoryAllocationBytes": 29873624,
       "ErrorMessage": null,
       "Observed": {
         "Method": "MLS_Deformable",
@@ -787,8 +783,8 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 79.835,
-      "MemoryAllocationBytes": 29618952,
+      "RuntimeMs": 81.182,
+      "MemoryAllocationBytes": 29618832,
       "ErrorMessage": null,
       "Observed": {
         "Method": "MLS_Deformable",
@@ -800,7 +796,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Local deformation oracle",
       "Passed": true,
-      "RuntimeMs": 81.06,
+      "RuntimeMs": 83.732,
       "MemoryAllocationBytes": 30728840,
       "ErrorMessage": null,
       "Observed": {
@@ -813,8 +809,8 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 3.974,
-      "MemoryAllocationBytes": 29152,
+      "RuntimeMs": 3.571,
+      "MemoryAllocationBytes": 28760,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "LowFeatureNoMatch"
@@ -825,7 +821,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.965,
+      "RuntimeMs": 1.698,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -837,7 +833,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.066,
+      "RuntimeMs": 1.423,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -849,7 +845,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.522,
+      "RuntimeMs": 1.427,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -861,7 +857,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.451,
+      "RuntimeMs": 1.681,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -873,7 +869,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.414,
+      "RuntimeMs": 1.5,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -885,7 +881,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.247,
+      "RuntimeMs": 1.325,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -897,7 +893,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Low-feature no-match contract",
       "Passed": true,
-      "RuntimeMs": 1.214,
+      "RuntimeMs": 1.321,
       "MemoryAllocationBytes": 16968,
       "ErrorMessage": null,
       "Observed": {
@@ -909,7 +905,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Missing template contract",
       "Passed": true,
-      "RuntimeMs": 0.703,
+      "RuntimeMs": 0.917,
       "MemoryAllocationBytes": 7872,
       "ErrorMessage": null,
       "Observed": {
@@ -921,7 +917,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Missing template contract",
       "Passed": true,
-      "RuntimeMs": 0.245,
+      "RuntimeMs": 0.518,
       "MemoryAllocationBytes": 6888,
       "ErrorMessage": null,
       "Observed": {
@@ -933,7 +929,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Missing template contract",
       "Passed": true,
-      "RuntimeMs": 0.337,
+      "RuntimeMs": 0.255,
       "MemoryAllocationBytes": 6888,
       "ErrorMessage": null,
       "Observed": {
@@ -945,7 +941,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Missing template contract",
       "Passed": true,
-      "RuntimeMs": 0.362,
+      "RuntimeMs": 0.251,
       "MemoryAllocationBytes": 6888,
       "ErrorMessage": null,
       "Observed": {
@@ -957,7 +953,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.255,
+      "RuntimeMs": 0.327,
       "MemoryAllocationBytes": 1912,
       "ErrorMessage": null,
       "Observed": {
@@ -969,7 +965,7 @@
       "Operator": "LocalDeformableMatching",
       "Scenario": "Parameter validation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 1912,
       "ErrorMessage": null,
       "Observed": {

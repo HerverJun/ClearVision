@@ -148,7 +148,9 @@ internal static class MvtecRunner
         var imageAuroc = ComputeAuroc(testResults.Select(item => new ScoredLabel(item.Score, item.IsAnomaly)));
         var pixelAuroc = ComputeAuroc(allPixelScores);
 
-        var failed = testResults.Count(item => item.Error is not null);
+        var errorCount = testResults.Count(item => item.Error is not null);
+        var metricFailures = EvaluateThresholds(imageAuroc, pixelAuroc, categoryResults, options);
+        var failed = errorCount + metricFailures.Count;
         return new BaselineResult(
             new BaselineSummary(
                 DateTimeOffset.UtcNow,
@@ -165,20 +167,25 @@ internal static class MvtecRunner
                 testResults.Count(item => !item.IsAnomaly),
                 Math.Round(imageAuroc, 6),
                 Math.Round(pixelAuroc, 6),
+                options.MinImageAuroc,
+                options.MinPixelAuroc,
+                options.MinCategoryImageAuroc,
+                options.MinCategoryPixelAuroc,
                 failed,
                 Math.Round(stopwatchAll.Elapsed.TotalMilliseconds, 3),
                 Math.Max(0, allocationAfterAll - allocationBeforeAll)),
             [
                 new OperatorSummary(
                     "AnomalyDetection",
-                    testResults.Count,
-                    testResults.Count - failed,
+                    testResults.Count + metricFailures.Count,
+                    testResults.Count - errorCount,
                     failed,
                     Math.Round(stopwatchAll.Elapsed.TotalMilliseconds / Math.Max(1, testResults.Count), 3),
                     Math.Max(0, allocationAfterAll - allocationBeforeAll),
                     true)
             ],
             categoryResults,
+            metricFailures,
             testResults);
     }
 
@@ -315,6 +322,33 @@ internal static class MvtecRunner
         var negativeCount = (double)negatives;
         return (rankSumPositive - positiveCount * (positiveCount + 1) / 2.0) / (positiveCount * negativeCount);
     }
+
+    private static List<MetricFailure> EvaluateThresholds(
+        double imageAuroc,
+        double pixelAuroc,
+        IReadOnlyList<CategoryResult> categoryResults,
+        RunnerOptions options)
+    {
+        var failures = new List<MetricFailure>();
+        AddIfBelow(failures, "overall", "ImageAuroc", imageAuroc, options.MinImageAuroc);
+        AddIfBelow(failures, "overall", "PixelAuroc", pixelAuroc, options.MinPixelAuroc);
+
+        foreach (var category in categoryResults)
+        {
+            AddIfBelow(failures, category.Category, "ImageAuroc", category.ImageAuroc, options.MinCategoryImageAuroc);
+            AddIfBelow(failures, category.Category, "PixelAuroc", category.PixelAuroc, options.MinCategoryPixelAuroc);
+        }
+
+        return failures;
+    }
+
+    private static void AddIfBelow(List<MetricFailure> failures, string scope, string metric, double value, double minimum)
+    {
+        if (double.IsNaN(value) || value < minimum)
+        {
+            failures.Add(new MetricFailure(scope, metric, Math.Round(value, 6), minimum));
+        }
+    }
 }
 
 internal sealed record RunnerOptions(
@@ -327,6 +361,10 @@ internal sealed record RunnerOptions(
     int PixelSampleStride,
     double CoresetRatio,
     double Threshold,
+    double MinImageAuroc,
+    double MinPixelAuroc,
+    double MinCategoryImageAuroc,
+    double MinCategoryPixelAuroc,
     bool ShowHelp,
     string? ParseError)
 {
@@ -342,6 +380,10 @@ internal sealed record RunnerOptions(
             PixelSampleStride: 2,
             CoresetRatio: 0.02,
             Threshold: 0.35,
+            MinImageAuroc: 0.5,
+            MinPixelAuroc: 0.5,
+            MinCategoryImageAuroc: 0.5,
+            MinCategoryPixelAuroc: 0.5,
             ShowHelp: false,
             ParseError: null);
 
@@ -376,6 +418,10 @@ internal sealed record RunnerOptions(
                     "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue()) },
                     "--coreset-ratio" => options with { CoresetRatio = double.Parse(NextValue()) },
                     "--threshold" => options with { Threshold = double.Parse(NextValue()) },
+                    "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue()) },
+                    "--min-pixel-auroc" => options with { MinPixelAuroc = double.Parse(NextValue()) },
+                    "--min-category-image-auroc" => options with { MinCategoryImageAuroc = double.Parse(NextValue()) },
+                    "--min-category-pixel-auroc" => options with { MinCategoryPixelAuroc = double.Parse(NextValue()) },
                     _ => options with { ParseError = $"Unknown argument: {arg}" }
                 };
             }
@@ -409,6 +455,14 @@ internal sealed record RunnerOptions(
                                   Pixel AUROC sampling stride. Default: 2.
           --coreset-ratio <float> Feature-bank coreset ratio. Default: 0.02.
           --threshold <float>     Inference threshold for IsAnomaly/mask. Default: 0.35.
+          --min-image-auroc <float>
+                                  Overall image AUROC release gate. Default: 0.5.
+          --min-pixel-auroc <float>
+                                  Overall pixel AUROC release gate. Default: 0.5.
+          --min-category-image-auroc <float>
+                                  Per-category image AUROC release gate. Default: 0.5.
+          --min-category-pixel-auroc <float>
+                                  Per-category pixel AUROC release gate. Default: 0.5.
         """);
     }
 }
@@ -434,6 +488,11 @@ internal static class MarkdownReport
             $"| Test good images | {result.Summary.TestGoodCount} |",
             $"| Image AUROC | {result.Summary.ImageAuroc:F4} |",
             $"| Pixel AUROC | {result.Summary.PixelAuroc:F4} |",
+            $"| Min image AUROC | {result.Summary.MinImageAuroc:F4} |",
+            $"| Min pixel AUROC | {result.Summary.MinPixelAuroc:F4} |",
+            $"| Min category image AUROC | {result.Summary.MinCategoryImageAuroc:F4} |",
+            $"| Min category pixel AUROC | {result.Summary.MinCategoryPixelAuroc:F4} |",
+            $"| Failed gates | {result.Summary.Failed} |",
             $"| Max side | {result.Summary.MaxSide} |",
             $"| Patch size / stride | {result.Summary.PatchSize} / {result.Summary.PatchStride} |",
             $"| Pixel sample stride | {result.Summary.PixelSampleStride} |",
@@ -452,6 +511,22 @@ internal static class MarkdownReport
                 $"| {category.Category} | {category.TrainCount} | {category.TestCount} | {category.TestAnomalyCount} | " +
                 $"{category.FeatureBankCount} | {category.TrainRuntimeMs:F3} | {category.InferenceRuntimeMs:F3} | " +
                 $"{category.ImageAuroc:F4} | {category.PixelAuroc:F4} |");
+        }
+
+        if (result.MetricFailures.Count > 0)
+        {
+            lines.AddRange([
+                "",
+                "## Metric Failures",
+                "",
+                "| Scope | Metric | Value | Minimum |",
+                "| --- | --- | ---: | ---: |"
+            ]);
+
+            foreach (var failure in result.MetricFailures)
+            {
+                lines.Add($"| {failure.Scope} | {failure.Metric} | {failure.Value:F4} | {failure.Minimum:F4} |");
+            }
         }
 
         lines.AddRange([
@@ -488,6 +563,7 @@ internal sealed record BaselineResult(
     BaselineSummary Summary,
     List<OperatorSummary> Operators,
     List<CategoryResult> Categories,
+    List<MetricFailure> MetricFailures,
     List<ImageResult> Images);
 
 internal sealed record BaselineSummary(
@@ -505,6 +581,10 @@ internal sealed record BaselineSummary(
     int TestGoodCount,
     double ImageAuroc,
     double PixelAuroc,
+    double MinImageAuroc,
+    double MinPixelAuroc,
+    double MinCategoryImageAuroc,
+    double MinCategoryPixelAuroc,
     int Failed,
     double RuntimeMs,
     long MemoryAllocationBytes);
@@ -528,6 +608,12 @@ internal sealed record CategoryResult(
     double InferenceRuntimeMs,
     double ImageAuroc,
     double PixelAuroc);
+
+internal sealed record MetricFailure(
+    string Scope,
+    string Metric,
+    double Value,
+    double Minimum);
 
 internal sealed record ImageResult(
     string Category,

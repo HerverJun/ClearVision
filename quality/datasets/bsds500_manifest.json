@@ -1,0 +1,29 @@
+{
+  "name": "BSDS500",
+  "source_dataset": "Berkeley Segmentation Dataset and Benchmark 500",
+  "collected_at": "2026-04-29",
+  "source_pages": [
+    "https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/bsds/",
+    "https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html"
+  ],
+  "license": {
+    "name": "Research-use dataset; explicit redistribution license not stated on the official page",
+    "spdx_like": "LicenseRef-BSDS500-Research-Verify",
+    "url": "https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/bsds/"
+  },
+  "local_root": "quality/public_datasets/bsds500",
+  "index_path": "quality/datasets/bsds500_index.json",
+  "git_policy": "The local_root is ignored by git; keep downloaded archives and extracted images local.",
+  "archive": {
+    "path": "quality/public_datasets/bsds500/_downloads/BSR_bsds500.tgz",
+    "source_url": "https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/BSR/BSR_bsds500.tgz",
+    "size_bytes": 70763455,
+    "sha256": "97E49D31764F3912F0C4122707D53062AC9E783BA0F095E447A4D53C1A41AF8E"
+  },
+  "extracted_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500",
+  "splits": {
+    "train": 200,
+    "val": 100,
+    "test": 200
+  }
+}

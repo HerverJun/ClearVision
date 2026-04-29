@@ -1,0 +1,18 @@
+{
+  "name": "HPatches",
+  "source_dataset": "HPatches benchmark",
+  "collected_at": "",
+  "source_pages": [
+    "https://github.com/hpatches/hpatches-dataset"
+  ],
+  "license": {
+    "name": "MIT for the HPatches dataset repository; original image sequence sources may require their own citation/license review",
+    "spdx_like": "MIT-plus-source-review",
+    "url": "https://github.com/hpatches/hpatches-dataset"
+  },
+  "local_root": "quality/public_datasets/hpatches",
+  "index_path": "quality/datasets/hpatches_index.json",
+  "git_policy": "Planned manifest only; keep downloaded archives and extracted images local.",
+  "status": "planned",
+  "notes": "Use for feature matching and homography quality gates after selecting a fixed smoke subset and full-sequence cache."
+}

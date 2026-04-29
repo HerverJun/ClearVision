@@ -42,6 +42,19 @@ return result.Summary.Failed == 0 ? 0 : 1;
 
 internal static class GoldenRunner
 {
+    private static readonly HashSet<string> SupportedOperators = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "RegionUnion",
+        "RegionIntersection",
+        "RegionDifference",
+        "RegionComplement",
+        "RegionErosion",
+        "RegionDilation",
+        "RegionOpening",
+        "RegionClosing",
+        "RegionSkeleton"
+    };
+
     public static async Task<BaselineResult> RunAsync(RunnerOptions options)
     {
         var inputFiles = Directory
@@ -56,6 +69,19 @@ internal static class GoldenRunner
                     $"{Path.DirectorySeparatorChar}{options.OperatorFilter}{Path.DirectorySeparatorChar}",
                     StringComparison.OrdinalIgnoreCase))
                 .ToList();
+        }
+        else
+        {
+            inputFiles = inputFiles
+                .Where(path => SupportedOperators.Contains(OperatorDirectoryName(path)))
+                .ToList();
+        }
+
+        if (inputFiles.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No region/morphology golden cases found under {options.CasesRoot}. " +
+                "Generate them with quality/synthetic/generators/region_generator.py and morphology_generator.py.");
         }
 
         var caseResults = new List<CaseResult>();
@@ -88,6 +114,13 @@ internal static class GoldenRunner
                 byOperator.Sum(item => item.MemoryAllocationBytesAvg)),
             byOperator,
             caseResults);
+    }
+
+    private static string OperatorDirectoryName(string inputPath)
+    {
+        var caseDirectory = Path.GetDirectoryName(inputPath);
+        var operatorDirectory = caseDirectory is null ? null : Directory.GetParent(caseDirectory);
+        return operatorDirectory?.Name ?? string.Empty;
     }
 
     private static async Task<CaseResult> RunCaseAsync(string inputPath, string expectedPath)

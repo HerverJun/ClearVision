@@ -1,6 +1,6 @@
 # GradientShapeMatch Golden Runner Report
 
-GeneratedAtUtc: 2026-04-28T11:38:26.8569409+00:00
+GeneratedAtUtc: 2026-04-29T03:29:39.2848564+00:00
 CasesRoot: `quality/synthetic/cases/gradient_shape_match`
 
 ## Summary
@@ -13,4 +13,4 @@ Failed: 0
 
 | Operator | Cases | Passed | Failed | Avg Runtime Ms | Max Runtime Ms | Avg Allocation Bytes |
 |---|---:|---:|---:|---:|---:|---:|
-| GradientShapeMatch | 117 | 117 | 0 | 98.807 | 632.409 | 637607 |
+| GradientShapeMatch | 117 | 117 | 0 | 95 | 609.183 | 637580 |

@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "contract",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T08:08:20.2827409+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:30:07.2993732+00:00",
     "CaseCount": 27,
     "Passed": 27,
     "Failed": 0,
-    "RuntimeMs": 134.264
+    "RuntimeMs": 199.814
   },
   "Operators": [
     {
@@ -13,9 +12,8 @@
       "CaseCount": 27,
       "Passed": 27,
       "Failed": 0,
-      "RuntimeMsAvg": 4.973,
-      "MemoryAllocationBytesAvg": 36766,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 7.401,
+      "MemoryAllocationBytesAvg": 39060
     }
   ],
   "Scenarios": [
@@ -24,49 +22,49 @@
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.806
+      "RuntimeMsAvg": 0.832
     },
     {
       "Scenario": "End-to-end identity model",
       "CaseCount": 5,
       "Passed": 5,
       "Failed": 0,
-      "RuntimeMsAvg": 23.541
+      "RuntimeMsAvg": 36.667
     },
     {
       "Scenario": "Failure contract",
       "CaseCount": 3,
       "Passed": 3,
       "Failed": 0,
-      "RuntimeMsAvg": 0.409
+      "RuntimeMsAvg": 0.419
     },
     {
       "Scenario": "Model catalog contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 4.269
+      "RuntimeMsAvg": 4.344
     },
     {
       "Scenario": "Parser contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.221
+      "RuntimeMsAvg": 0.167
     },
     {
       "Scenario": "Preprocess contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.48
+      "RuntimeMsAvg": 0.439
     },
     {
       "Scenario": "Validation contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.168
+      "RuntimeMsAvg": 0.173
     },
     {
       "Scenario": "Visualization contract",
@@ -81,15 +79,15 @@
       "Case": "identity_direct_class_map_exact",
       "Scenario": "End-to-end identity model",
       "Passed": true,
-      "RuntimeMs": 111.504,
-      "MemoryAllocationBytes": 486352,
+      "RuntimeMs": 175.353,
+      "MemoryAllocationBytes": 480168,
       "Failure": null
     },
     {
       "Case": "identity_output_types_and_size",
       "Scenario": "End-to-end identity model",
       "Passed": true,
-      "RuntimeMs": 1.944,
+      "RuntimeMs": 2.159,
       "MemoryAllocationBytes": 55928,
       "Failure": null
     },
@@ -97,39 +95,39 @@
       "Case": "identity_present_classes_and_count",
       "Scenario": "End-to-end identity model",
       "Passed": true,
-      "RuntimeMs": 1.288,
-      "MemoryAllocationBytes": 50080,
+      "RuntimeMs": 2.164,
+      "MemoryAllocationBytes": 52024,
       "Failure": null
     },
     {
       "Case": "identity_class_masks_exact",
       "Scenario": "End-to-end identity model",
       "Passed": true,
-      "RuntimeMs": 1.012,
-      "MemoryAllocationBytes": 33840,
+      "RuntimeMs": 1.349,
+      "MemoryAllocationBytes": 52152,
       "Failure": null
     },
     {
       "Case": "identity_colored_map_matches_palette",
       "Scenario": "End-to-end identity model",
       "Passed": true,
-      "RuntimeMs": 1.958,
-      "MemoryAllocationBytes": 56688,
+      "RuntimeMs": 2.309,
+      "MemoryAllocationBytes": 36432,
       "Failure": null
     },
     {
       "Case": "catalog_resolves_model_defaults",
       "Scenario": "Model catalog contract",
       "Passed": true,
-      "RuntimeMs": 7.793,
-      "MemoryAllocationBytes": 152136,
+      "RuntimeMs": 7.943,
+      "MemoryAllocationBytes": 171048,
       "Failure": null
     },
     {
       "Case": "validate_catalog_defaults_valid",
       "Scenario": "Model catalog contract",
       "Passed": true,
-      "RuntimeMs": 0.745,
+      "RuntimeMs": 0.744,
       "MemoryAllocationBytes": 27480,
       "Failure": null
     },
@@ -137,7 +135,7 @@
       "Case": "validate_missing_model_invalid",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.379,
+      "RuntimeMs": 0.368,
       "MemoryAllocationBytes": 8872,
       "Failure": null
     },
@@ -145,7 +143,7 @@
       "Case": "validate_bad_input_size_invalid",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.111,
+      "RuntimeMs": 0.118,
       "MemoryAllocationBytes": 9168,
       "Failure": null
     },
@@ -153,7 +151,7 @@
       "Case": "validate_zero_std_invalid",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.097,
+      "RuntimeMs": 0.11,
       "MemoryAllocationBytes": 11064,
       "Failure": null
     },
@@ -161,7 +159,7 @@
       "Case": "validate_bad_execution_provider_invalid",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.086,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 11608,
       "Failure": null
     },
@@ -169,7 +167,7 @@
       "Case": "execute_missing_image_fails",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.298,
+      "RuntimeMs": 0.306,
       "MemoryAllocationBytes": 10064,
       "Failure": null
     },
@@ -177,7 +175,7 @@
       "Case": "execute_missing_model_fails",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.518,
+      "RuntimeMs": 0.406,
       "MemoryAllocationBytes": 13088,
       "Failure": null
     },
@@ -185,7 +183,7 @@
       "Case": "execute_bad_mean_fails",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.411,
+      "RuntimeMs": 0.546,
       "MemoryAllocationBytes": 14520,
       "Failure": null
     },
@@ -193,7 +191,7 @@
       "Case": "parse_size_accepts_trimmed_pair",
       "Scenario": "Parser contract",
       "Passed": true,
-      "RuntimeMs": 0.231,
+      "RuntimeMs": 0.22,
       "MemoryAllocationBytes": 896,
       "Failure": null
     },
@@ -201,7 +199,7 @@
       "Case": "parse_size_rejects_zero",
       "Scenario": "Parser contract",
       "Passed": true,
-      "RuntimeMs": 0.156,
+      "RuntimeMs": 0.151,
       "MemoryAllocationBytes": 3048,
       "Failure": null
     },
@@ -209,7 +207,7 @@
       "Case": "parse_float_triplet_accepts_three_values",
       "Scenario": "Parser contract",
       "Passed": true,
-      "RuntimeMs": 0.406,
+      "RuntimeMs": 0.216,
       "MemoryAllocationBytes": 704,
       "Failure": null
     },
@@ -217,7 +215,7 @@
       "Case": "parse_float_triplet_rejects_two_values",
       "Scenario": "Parser contract",
       "Passed": true,
-      "RuntimeMs": 0.092,
+      "RuntimeMs": 0.081,
       "MemoryAllocationBytes": 2152,
       "Failure": null
     },
@@ -225,7 +223,7 @@
       "Case": "class_names_json_expands_missing",
       "Scenario": "Class-name contract",
       "Passed": true,
-      "RuntimeMs": 0.504,
+      "RuntimeMs": 0.563,
       "MemoryAllocationBytes": 1584,
       "Failure": null
     },
@@ -233,7 +231,7 @@
       "Case": "class_names_comma_truncates_extra",
       "Scenario": "Class-name contract",
       "Passed": true,
-      "RuntimeMs": 0.149,
+      "RuntimeMs": 0.268,
       "MemoryAllocationBytes": 2680,
       "Failure": null
     },
@@ -241,7 +239,7 @@
       "Case": "class_names_empty_fallback",
       "Scenario": "Class-name contract",
       "Passed": true,
-      "RuntimeMs": 0.075,
+      "RuntimeMs": 0.124,
       "MemoryAllocationBytes": 696,
       "Failure": null
     },
@@ -249,15 +247,15 @@
       "Case": "class_names_bad_json_fails",
       "Scenario": "Class-name contract",
       "Passed": true,
-      "RuntimeMs": 2.495,
-      "MemoryAllocationBytes": 28104,
+      "RuntimeMs": 2.373,
+      "MemoryAllocationBytes": 77304,
       "Failure": null
     },
     {
       "Case": "preprocess_rgb_channel_order",
       "Scenario": "Preprocess contract",
       "Passed": true,
-      "RuntimeMs": 1.195,
+      "RuntimeMs": 1.17,
       "MemoryAllocationBytes": 2096,
       "Failure": null
     },
@@ -265,7 +263,7 @@
       "Case": "preprocess_bgr_channel_order",
       "Scenario": "Preprocess contract",
       "Passed": true,
-      "RuntimeMs": 0.442,
+      "RuntimeMs": 0.306,
       "MemoryAllocationBytes": 5096,
       "Failure": null
     },
@@ -273,7 +271,7 @@
       "Case": "preprocess_unit_range_mean_std",
       "Scenario": "Preprocess contract",
       "Passed": true,
-      "RuntimeMs": 0.14,
+      "RuntimeMs": 0.136,
       "MemoryAllocationBytes": 1400,
       "Failure": null
     },
@@ -281,7 +279,7 @@
       "Case": "preprocess_grayscale_promotes_to_three_channels",
       "Scenario": "Preprocess contract",
       "Passed": true,
-      "RuntimeMs": 0.144,
+      "RuntimeMs": 0.143,
       "MemoryAllocationBytes": 1480,
       "Failure": null
     },

@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "golden",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T15:31:01.5032501+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:54.8132354+00:00",
     "CaseCount": 192,
     "Passed": 192,
     "Failed": 0,
-    "RuntimeMs": 4.651,
+    "RuntimeMs": 4.288,
     "MemoryAllocationBytes": 148760,
     "DatasetKind": "deterministic synthetic geometry round-trip"
   },
@@ -15,36 +14,33 @@
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 0.098,
+      "RuntimeMsAvg": 0.088,
       "MemoryAllocationBytesAvg": 750,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "CoordinateTransform",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 0.018,
+      "RuntimeMsAvg": 0.017,
       "MemoryAllocationBytesAvg": 576,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "FisheyeCalibration",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 0.017,
+      "RuntimeMsAvg": 0.016,
       "MemoryAllocationBytesAvg": 736,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "FisheyeUndistort",
@@ -55,20 +51,18 @@
       "MemoryAllocationBytesAvg": 736,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "HandEyeCalibration",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 0.035,
+      "RuntimeMsAvg": 0.032,
       "MemoryAllocationBytesAvg": 1672,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "PixelToWorldTransform",
@@ -79,8 +73,7 @@
       "MemoryAllocationBytesAvg": 576,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "StereoCalibration",
@@ -91,20 +84,18 @@
       "MemoryAllocationBytesAvg": 408,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     },
     {
       "Operator": "Undistort",
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 0.011,
+      "RuntimeMsAvg": 0.01,
       "MemoryAllocationBytesAvg": 744,
       "MeanRoundTripError": 0,
       "MaxRoundTripError": 0,
-      "HasSyntheticGeometry": true,
-      "EvidenceKind": "golden"
+      "HasSyntheticGeometry": true
     }
   ],
   "Scenarios": [
@@ -179,7 +170,7 @@
       "Operator": "CameraCalibration",
       "Scenario": "Camera intrinsics planar round-trip",
       "Passed": true,
-      "RuntimeMs": 2.293,
+      "RuntimeMs": 2.066,
       "MemoryAllocationBytes": 896,
       "ErrorValue": 0,
       "Tolerance": 0.001,
@@ -197,7 +188,7 @@
       "Operator": "Undistort",
       "Scenario": "Brown-Conrady undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.212,
+      "RuntimeMs": 0.195,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -215,14 +206,14 @@
       "Operator": "HandEyeCalibration",
       "Scenario": "AX=XB rigid transform round-trip",
       "Passed": true,
-      "RuntimeMs": 0.765,
+      "RuntimeMs": 0.677,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -230,10 +221,10 @@
       "Operator": "CoordinateTransform",
       "Scenario": "2D homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.371,
+      "RuntimeMs": 0.366,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -249,10 +240,10 @@
       "Operator": "PixelToWorldTransform",
       "Scenario": "Pixel/world homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.023,
+      "RuntimeMs": 0.02,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -268,10 +259,10 @@
       "Operator": "StereoCalibration",
       "Scenario": "Stereo disparity depth round-trip",
       "Passed": true,
-      "RuntimeMs": 0.16,
+      "RuntimeMs": 0.174,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -285,7 +276,7 @@
       "Operator": "FisheyeCalibration",
       "Scenario": "Kannala-Brandt fisheye round-trip",
       "Passed": true,
-      "RuntimeMs": 0.353,
+      "RuntimeMs": 0.343,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -303,7 +294,7 @@
       "Operator": "FisheyeUndistort",
       "Scenario": "Fisheye undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.021,
+      "RuntimeMs": 0.02,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -339,7 +330,7 @@
       "Operator": "Undistort",
       "Scenario": "Brown-Conrady undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -360,11 +351,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -375,7 +366,7 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -391,10 +382,10 @@
       "Operator": "PixelToWorldTransform",
       "Scenario": "Pixel/world homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -410,10 +401,10 @@
       "Operator": "StereoCalibration",
       "Scenario": "Stereo disparity depth round-trip",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -502,11 +493,11 @@
       "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -517,7 +508,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -536,7 +527,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -555,7 +546,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -569,7 +560,7 @@
       "Operator": "FisheyeCalibration",
       "Scenario": "Kannala-Brandt fisheye round-trip",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -644,11 +635,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -659,7 +650,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -678,7 +669,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -697,7 +688,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -729,7 +720,7 @@
       "Operator": "FisheyeUndistort",
       "Scenario": "Fisheye undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -786,11 +777,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -801,7 +792,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -820,7 +811,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -839,7 +830,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -871,7 +862,7 @@
       "Operator": "FisheyeUndistort",
       "Scenario": "Fisheye undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -889,7 +880,7 @@
       "Operator": "CameraCalibration",
       "Scenario": "Camera intrinsics planar round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.001,
@@ -928,11 +919,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -943,7 +934,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -962,7 +953,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -981,7 +972,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1031,7 +1022,7 @@
       "Operator": "CameraCalibration",
       "Scenario": "Camera intrinsics planar round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.001,
@@ -1049,7 +1040,7 @@
       "Operator": "Undistort",
       "Scenario": "Brown-Conrady undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -1070,11 +1061,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1085,7 +1076,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1104,7 +1095,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1123,7 +1114,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1191,7 +1182,7 @@
       "Operator": "Undistort",
       "Scenario": "Brown-Conrady undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -1209,14 +1200,14 @@
       "Operator": "HandEyeCalibration",
       "Scenario": "AX=XB rigid transform round-trip",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1227,7 +1218,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1246,7 +1237,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1265,7 +1256,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1354,11 +1345,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1369,7 +1360,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1388,7 +1379,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1407,7 +1398,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1493,14 +1484,14 @@
       "Operator": "HandEyeCalibration",
       "Scenario": "AX=XB rigid transform round-trip",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1508,10 +1499,10 @@
       "Operator": "CoordinateTransform",
       "Scenario": "2D homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1530,7 +1521,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1549,7 +1540,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1638,11 +1629,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1650,10 +1641,10 @@
       "Operator": "CoordinateTransform",
       "Scenario": "2D homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1669,10 +1660,10 @@
       "Operator": "PixelToWorldTransform",
       "Scenario": "Pixel/world homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1691,7 +1682,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1780,11 +1771,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1795,7 +1786,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1811,10 +1802,10 @@
       "Operator": "PixelToWorldTransform",
       "Scenario": "Pixel/world homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1830,10 +1821,10 @@
       "Operator": "StereoCalibration",
       "Scenario": "Stereo disparity depth round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1922,11 +1913,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -1937,7 +1928,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1956,7 +1947,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -1975,7 +1966,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -1989,7 +1980,7 @@
       "Operator": "FisheyeCalibration",
       "Scenario": "Kannala-Brandt fisheye round-trip",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -2064,11 +2055,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2079,7 +2070,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2098,7 +2089,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2117,7 +2108,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2149,7 +2140,7 @@
       "Operator": "FisheyeUndistort",
       "Scenario": "Fisheye undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -2206,11 +2197,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2221,7 +2212,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2240,7 +2231,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2259,7 +2250,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2291,7 +2282,7 @@
       "Operator": "FisheyeUndistort",
       "Scenario": "Fisheye undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 736,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -2309,7 +2300,7 @@
       "Operator": "CameraCalibration",
       "Scenario": "Camera intrinsics planar round-trip",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.001,
@@ -2345,14 +2336,14 @@
       "Operator": "HandEyeCalibration",
       "Scenario": "AX=XB rigid transform round-trip",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2363,7 +2354,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2382,7 +2373,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2401,7 +2392,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2469,7 +2460,7 @@
       "Operator": "Undistort",
       "Scenario": "Brown-Conrady undistort round-trip",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 744,
       "ErrorValue": 0,
       "Tolerance": 0.02,
@@ -2490,11 +2481,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2505,7 +2496,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2524,7 +2515,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2543,7 +2534,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2629,14 +2620,14 @@
       "Operator": "HandEyeCalibration",
       "Scenario": "AX=XB rigid transform round-trip",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2647,7 +2638,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2666,7 +2657,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2685,7 +2676,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2774,11 +2765,11 @@
       "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2789,7 +2780,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2808,7 +2799,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2827,7 +2818,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -2913,14 +2904,14 @@
       "Operator": "HandEyeCalibration",
       "Scenario": "AX=XB rigid transform round-trip",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -2928,10 +2919,10 @@
       "Operator": "CoordinateTransform",
       "Scenario": "2D homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2950,7 +2941,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -2969,7 +2960,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3058,11 +3049,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -3070,10 +3061,10 @@
       "Operator": "CoordinateTransform",
       "Scenario": "2D homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3089,10 +3080,10 @@
       "Operator": "PixelToWorldTransform",
       "Scenario": "Pixel/world homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3111,7 +3102,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3200,11 +3191,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -3215,7 +3206,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3231,10 +3222,10 @@
       "Operator": "PixelToWorldTransform",
       "Scenario": "Pixel/world homography round-trip",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3250,10 +3241,10 @@
       "Operator": "StereoCalibration",
       "Scenario": "Stereo disparity depth round-trip",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3342,11 +3333,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -3357,7 +3348,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3376,7 +3367,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3395,7 +3386,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {
@@ -3484,11 +3475,11 @@
       "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 1672,
       "ErrorValue": 0,
-      "Tolerance": 1e-09,
+      "Tolerance": 1E-09,
       "Unit": "matrix_abs",
       "Failure": null,
       "Metrics": {
-        "Residual": 1.4210854715202004e-14
+        "Residual": 1.4210854715202004E-14
       }
     },
     {
@@ -3499,7 +3490,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3518,7 +3509,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 576,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "px",
       "Failure": null,
       "Metrics": {
@@ -3537,7 +3528,7 @@
       "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 408,
       "ErrorValue": 0,
-      "Tolerance": 1e-06,
+      "Tolerance": 1E-06,
       "Unit": "mm",
       "Failure": null,
       "Metrics": {

@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "contract",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T12:52:32.2435434+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:30:15.4505885+00:00",
     "CaseCount": 24,
     "Passed": 24,
     "Failed": 0,
-    "RuntimeMs": 106.382
+    "RuntimeMs": 106.031
   },
   "Operators": [
     {
@@ -13,9 +12,8 @@
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 4.433,
-      "MemoryAllocationBytesAvg": 45643,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 4.418,
+      "MemoryAllocationBytesAvg": 47703
     }
   ],
   "Scenarios": [
@@ -24,35 +22,35 @@
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 1.952
+      "RuntimeMsAvg": 2.013
     },
     {
       "Scenario": "Input formats",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 6.422
+      "RuntimeMsAvg": 7.98
     },
     {
       "Scenario": "ShapeDescriptor mode",
       "CaseCount": 5,
       "Passed": 5,
       "Failed": 0,
-      "RuntimeMsAvg": 2.703
+      "RuntimeMsAvg": 2.674
     },
     {
       "Scenario": "Template mode",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 19.583
+      "RuntimeMsAvg": 19.054
     },
     {
       "Scenario": "Validation contract",
       "CaseCount": 10,
       "Passed": 10,
       "Failed": 0,
-      "RuntimeMsAvg": 0.031
+      "RuntimeMsAvg": 0.041
     }
   ],
   "Cases": [
@@ -61,8 +59,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Template mode",
       "Passed": true,
-      "RuntimeMs": 55.718,
-      "MemoryAllocationBytes": 192336,
+      "RuntimeMs": 54.384,
+      "MemoryAllocationBytes": 245568,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -90,8 +88,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Template mode",
       "Passed": true,
-      "RuntimeMs": 8.609,
-      "MemoryAllocationBytes": 142248,
+      "RuntimeMs": 7.802,
+      "MemoryAllocationBytes": 141056,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -119,8 +117,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Template mode",
       "Passed": true,
-      "RuntimeMs": 6.917,
-      "MemoryAllocationBytes": 141472,
+      "RuntimeMs": 7.356,
+      "MemoryAllocationBytes": 139056,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -148,8 +146,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Template mode",
       "Passed": true,
-      "RuntimeMs": 7.089,
-      "MemoryAllocationBytes": 139272,
+      "RuntimeMs": 6.674,
+      "MemoryAllocationBytes": 138144,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -177,8 +175,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Input formats",
       "Passed": true,
-      "RuntimeMs": 6.422,
-      "MemoryAllocationBytes": 142032,
+      "RuntimeMs": 7.98,
+      "MemoryAllocationBytes": 140112,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -206,8 +204,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 6.578,
-      "MemoryAllocationBytes": 132592,
+      "RuntimeMs": 6.596,
+      "MemoryAllocationBytes": 132832,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": false,
@@ -235,8 +233,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.629,
-      "MemoryAllocationBytes": 21376,
+      "RuntimeMs": 0.769,
+      "MemoryAllocationBytes": 23000,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": false,
@@ -263,8 +261,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.053,
-      "MemoryAllocationBytes": 8904,
+      "RuntimeMs": 0.061,
+      "MemoryAllocationBytes": 9088,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": false,
@@ -291,8 +289,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "ShapeDescriptor mode",
       "Passed": true,
-      "RuntimeMs": 10.169,
-      "MemoryAllocationBytes": 28832,
+      "RuntimeMs": 9.732,
+      "MemoryAllocationBytes": 29368,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -320,8 +318,8 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "ShapeDescriptor mode",
       "Passed": true,
-      "RuntimeMs": 1.117,
-      "MemoryAllocationBytes": 28200,
+      "RuntimeMs": 1.744,
+      "MemoryAllocationBytes": 28480,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -349,7 +347,7 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "ShapeDescriptor mode",
       "Passed": true,
-      "RuntimeMs": 0.821,
+      "RuntimeMs": 0.725,
       "MemoryAllocationBytes": 26032,
       "ErrorMessage": null,
       "Metrics": {
@@ -378,7 +376,7 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "ShapeDescriptor mode",
       "Passed": true,
-      "RuntimeMs": 0.743,
+      "RuntimeMs": 0.548,
       "MemoryAllocationBytes": 27136,
       "ErrorMessage": null,
       "Metrics": {
@@ -407,7 +405,7 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "ShapeDescriptor mode",
       "Passed": true,
-      "RuntimeMs": 0.664,
+      "RuntimeMs": 0.622,
       "MemoryAllocationBytes": 28024,
       "ErrorMessage": null,
       "Metrics": {
@@ -436,7 +434,7 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.546,
+      "RuntimeMs": 0.626,
       "MemoryAllocationBytes": 19704,
       "ErrorMessage": null,
       "Metrics": {
@@ -465,7 +463,7 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.201,
+      "RuntimeMs": 0.297,
       "MemoryAllocationBytes": 2944,
       "ErrorMessage": null,
       "Metrics": {
@@ -481,14 +479,14 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.06,
       "MemoryAllocationBytes": 632,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最小分数必须在 0-100 之间",
+        "ErrorMessage": "\u6700\u5C0F\u5206\u6570\u5FC5\u987B\u5728 0-100 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -504,7 +502,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最小分数必须在 0-100 之间",
+        "ErrorMessage": "\u6700\u5C0F\u5206\u6570\u5FC5\u987B\u5728 0-100 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -513,14 +511,14 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.008,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 1112,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "金字塔层数必须在 1-5 之间",
+        "ErrorMessage": "\u91D1\u5B57\u5854\u5C42\u6570\u5FC5\u987B\u5728 1-5 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -536,7 +534,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "金字塔层数必须在 1-5 之间",
+        "ErrorMessage": "\u91D1\u5B57\u5854\u5C42\u6570\u5FC5\u987B\u5728 1-5 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -545,14 +543,14 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 1592,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "特征点数量必须在 50-8191 之间",
+        "ErrorMessage": "\u7279\u5F81\u70B9\u6570\u91CF\u5FC5\u987B\u5728 50-8191 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -568,7 +566,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "特征点数量必须在 50-8191 之间",
+        "ErrorMessage": "\u7279\u5F81\u70B9\u6570\u91CF\u5FC5\u987B\u5728 50-8191 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -584,7 +582,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "SpreadT 必须在 1-16 之间",
+        "ErrorMessage": "SpreadT \u5FC5\u987B\u5728 1-16 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -593,14 +591,14 @@
       "Operator": "PyramidShapeMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.007,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 2552,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "角度范围必须在 0-180 之间",
+        "ErrorMessage": "\u89D2\u5EA6\u8303\u56F4\u5FC5\u987B\u5728 0-180 \u4E4B\u95F4",
         "Passed": true
       }
     },
@@ -616,7 +614,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "角度步长必须在 1-45 之间",
+        "ErrorMessage": "\u89D2\u5EA6\u6B65\u957F\u5FC5\u987B\u5728 1-45 \u4E4B\u95F4",
         "Passed": true
       }
     }

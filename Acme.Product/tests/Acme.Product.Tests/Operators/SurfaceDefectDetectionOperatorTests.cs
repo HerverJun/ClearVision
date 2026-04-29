@@ -51,6 +51,79 @@ public class SurfaceDefectDetectionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithBgraReferenceDiffInputs_ShouldDetectDefect()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "ReferenceDiff" },
+            { "Threshold", 10.0 },
+            { "MinArea", 20 },
+            { "MaxArea", 100000 },
+            { "MorphCleanSize", 1 },
+            { "ThresholdMode", "Auto" },
+            { "AlignmentMode", "None" }
+        });
+
+        using var source = CreateBgraSourceWithDefect();
+        using var reference = CreateBgraReferenceImage();
+        var inputs = TestHelpers.CreateImageInputs(source);
+        inputs["Reference"] = reference;
+
+        var result = await sut.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        Assert.True(Convert.ToInt32(result.OutputData!["DefectCount"]) >= 1);
+        var output = Assert.IsType<ImageWrapper>(result.OutputData["Image"]);
+        Assert.Equal(3, output.MatReadOnly.Channels());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRobustStatsAndCloseOnlyMorph_ShouldExposeMorphDiagnostics()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "GradientMagnitude" },
+            { "ThresholdMode", "ReferenceStats" },
+            { "RobustReferenceStats", true },
+            { "ResponseNormalizeMode", "PercentileClip" },
+            { "MorphMode", "CloseOnly" },
+            { "MorphCleanSize", 3 },
+            { "MinArea", 1 },
+            { "MaxArea", 100000 }
+        });
+
+        using var source = CreateSourceWithDefect();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(source));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        var diagnostics = Assert.IsType<Dictionary<string, object>>(result.OutputData!["Diagnostics"]);
+        Assert.Equal("PercentileClip", Convert.ToString(diagnostics["ResponseNormalizeMode"]));
+        Assert.Equal("CloseOnly", Convert.ToString(diagnostics["MorphMode"]));
+        Assert.True(Convert.ToBoolean(diagnostics["RobustReferenceStats"]));
+        Assert.True(Convert.ToInt32(diagnostics["CandidateAreaBeforeMorph"]) >= 0);
+        Assert.True(Convert.ToInt32(diagnostics["CandidateAreaAfterMorph"]) >= 0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithUnsupportedChannelCount_ShouldReturnClearFailure()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "GradientMagnitude" }
+        });
+
+        using var image = CreateTwoChannelImage();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Unsupported image channel count", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithShiftedReference_ShouldExposeAcceptedTranslationDiagnostics()
     {
         var sut = CreateSut();
@@ -179,6 +252,25 @@ public class SurfaceDefectDetectionOperatorTests
     private static ImageWrapper CreateReferenceImage()
     {
         var mat = new Mat(120, 120, MatType.CV_8UC3, Scalar.Black);
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateBgraSourceWithDefect()
+    {
+        var mat = new Mat(120, 120, MatType.CV_8UC4, new Scalar(0, 0, 0, 255));
+        Cv2.Rectangle(mat, new Rect(40, 40, 30, 30), new Scalar(255, 255, 255, 255), -1);
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateBgraReferenceImage()
+    {
+        var mat = new Mat(120, 120, MatType.CV_8UC4, new Scalar(0, 0, 0, 255));
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateTwoChannelImage()
+    {
+        var mat = new Mat(32, 32, MatType.CV_8UC2, Scalar.All(128));
         return new ImageWrapper(mat);
     }
 

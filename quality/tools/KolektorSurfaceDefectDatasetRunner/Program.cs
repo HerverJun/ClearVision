@@ -1,0 +1,873 @@
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.Operators;
+using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Operators;
+using Microsoft.Extensions.Logging.Abstractions;
+using OpenCvSharp;
+
+var options = RunnerOptions.Parse(args);
+if (options.ShowHelp)
+{
+    RunnerOptions.PrintHelp();
+    return options.ParseError is null ? 0 : 2;
+}
+
+if (options.ParseError is not null)
+{
+    Console.Error.WriteLine(options.ParseError);
+    RunnerOptions.PrintHelp();
+    return 2;
+}
+
+var result = await KolektorRunner.RunAsync(options);
+Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.OutputPath))!);
+await File.WriteAllTextAsync(options.OutputPath, JsonSerializer.Serialize(result, JsonSettings.Indented));
+
+if (!string.IsNullOrWhiteSpace(options.ReportPath))
+{
+    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.ReportPath))!);
+    await File.WriteAllTextAsync(options.ReportPath, MarkdownReport.Create(result));
+}
+
+Console.WriteLine(
+    $"KolektorSDD2 SurfaceDefectDetection baseline complete: " +
+    $"passed={result.Summary.Passed}/{result.Summary.CaseCount}, failed={result.Summary.Failed}, " +
+    $"pixel_f1={result.Summary.PixelF1:F4}, image_auroc={result.Summary.ImageAuroc:F4}, output={options.OutputPath}");
+
+return result.Summary.Failed == 0 ? 0 : 1;
+
+internal static class KolektorRunner
+{
+    private const string DatasetName = "KolektorSDD2";
+
+    public static async Task<BaselineResult> RunAsync(RunnerOptions options)
+    {
+        var index = LoadIndex(options.IndexPath);
+        var records = index.Records
+            .Where(item => item.Split.Equals(options.Split, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.Id, StringComparer.Ordinal)
+            .Take(options.Limit > 0 ? options.Limit : int.MaxValue)
+            .ToList();
+
+        if (records.Count == 0)
+        {
+            throw new InvalidOperationException($"No records found for split '{options.Split}' in {options.IndexPath}.");
+        }
+
+        var sut = new SurfaceDefectDetectionOperator(NullLogger<SurfaceDefectDetectionOperator>.Instance);
+        var operatorConfig = CreateOperator(options);
+        var results = new List<ImageResult>(records.Count);
+        var pixelScores = new List<ScoredLabel>(capacity: Math.Min(records.Count * 4096, 1_000_000));
+        var stopwatchAll = Stopwatch.StartNew();
+        var allocationBeforeAll = GC.GetTotalAllocatedBytes(precise: true);
+
+        foreach (var record in records)
+        {
+            results.Add(await RunRecordAsync(sut, operatorConfig, record, options, pixelScores));
+        }
+
+        stopwatchAll.Stop();
+        var allocationAfterAll = GC.GetTotalAllocatedBytes(precise: true);
+        var totals = PixelTotals.Combine(results.Select(item => item.PixelTotals));
+        var imageAuroc = FiniteOrZero(ComputeAuroc(results.Select(item => new ScoredLabel(item.Score, item.IsDefect))));
+        var pixelAuroc = FiniteOrZero(ComputeAuroc(pixelScores));
+        var falsePositivePerImage = results.Count(item => !item.IsDefect && item.PredictedDefect) /
+                                    (double)Math.Max(1, results.Count(item => !item.IsDefect));
+        var runtimeP95 = Percentile(results.Select(item => item.RuntimeMs), 0.95);
+        var errorCount = results.Count(item => item.Error is not null);
+        var metricFailures = EvaluateThresholds(totals, imageAuroc, errorCount, options);
+        var failedCaseCount = results.Count(item => !item.Passed);
+
+        return new BaselineResult(
+            "dataset",
+            new BaselineSummary(
+                DateTimeOffset.UtcNow,
+                DatasetName,
+                options.IndexPath,
+                options.Split,
+                options.MaxSide,
+                options.Method,
+                options.ThresholdMode,
+                options.Threshold,
+                options.MinArea,
+                records.Count,
+                results.Count(item => item.Passed),
+                metricFailures.Count,
+                results.Count(item => item.IsDefect),
+                results.Count(item => !item.IsDefect),
+                totals.TruePositive,
+                totals.FalsePositive,
+                totals.FalseNegative,
+                totals.TrueNegative,
+                Math.Round(totals.IoU, 6),
+                Math.Round(totals.Dice, 6),
+                Math.Round(totals.F1, 6),
+                Math.Round(imageAuroc, 6),
+                Math.Round(pixelAuroc, 6),
+                Math.Round(falsePositivePerImage, 6),
+                Math.Round(runtimeP95, 3),
+                options.MinImageAuroc,
+                options.MinPixelF1,
+                Math.Round(stopwatchAll.Elapsed.TotalMilliseconds, 3),
+                Math.Max(0, allocationAfterAll - allocationBeforeAll)),
+            [
+                new OperatorSummary(
+                    "SurfaceDefectDetection",
+                    records.Count,
+                    results.Count(item => item.Passed),
+                    failedCaseCount,
+                    Math.Round(results.Average(item => item.RuntimeMs), 3),
+                    Convert.ToInt64(Math.Round(results.Average(item => item.MemoryAllocationBytes))),
+                    true,
+                    "dataset",
+                    DatasetName)
+            ],
+            new ConfusionSummary(
+                results.Count(item => item.IsDefect && item.PredictedDefect),
+                results.Count(item => !item.IsDefect && item.PredictedDefect),
+                results.Count(item => item.IsDefect && !item.PredictedDefect),
+                results.Count(item => !item.IsDefect && !item.PredictedDefect)),
+            metricFailures,
+            results);
+    }
+
+    private static async Task<ImageResult> RunRecordAsync(
+        SurfaceDefectDetectionOperator sut,
+        Operator operatorConfig,
+        KolektorRecord record,
+        RunnerOptions options,
+        List<ScoredLabel> pixelScores)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var allocationBefore = GC.GetTotalAllocatedBytes(precise: true);
+        Dictionary<string, object>? outputData = null;
+
+        try
+        {
+            using var image = LoadImage(record.ImagePath, options.MaxSide, InterpolationFlags.Area);
+            using var groundTruthMask = LoadMask(record.MaskPath, image.Size(), options.MaxSide);
+            var inputWrapper = new ImageWrapper(image.Clone());
+            var output = await sut.ExecuteAsync(
+                operatorConfig,
+                new Dictionary<string, object> { ["Image"] = inputWrapper });
+
+            if (!output.IsSuccess)
+            {
+                throw new InvalidOperationException(output.ErrorMessage ?? "SurfaceDefectDetection returned failure.");
+            }
+
+            outputData = output.OutputData;
+            var defectMaskWrapper = GetImageWrapper(output, "DefectMask");
+            var responseWrapper = GetImageWrapper(output, "ResponseImage");
+            using var predictedMask = NormalizeMask(defectMaskWrapper.MatReadOnly, image.Size());
+            using var response = NormalizeResponse(responseWrapper.MatReadOnly, image.Size());
+
+            var totals = EvaluateMask(predictedMask, groundTruthMask);
+            CollectPixelScores(response, groundTruthMask, options.PixelSampleStride, pixelScores);
+            var score = ImageScore(response, predictedMask, output);
+            var predictedDefect = Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0) > 0.0 ||
+                                  Cv2.CountNonZero(predictedMask) > 0;
+            stopwatch.Stop();
+            var allocationAfter = GC.GetTotalAllocatedBytes(precise: true);
+
+            return new ImageResult(
+                record.Id,
+                record.ImagePath,
+                record.MaskPath,
+                record.IsDefect,
+                predictedDefect,
+                Math.Round(score, 6),
+                Convert.ToInt32(output.OutputData?["DefectCount"] ?? 0),
+                Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0),
+                totals,
+                true,
+                Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                Math.Max(0, allocationAfter - allocationBefore),
+                null);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            var allocationAfter = GC.GetTotalAllocatedBytes(precise: true);
+            return new ImageResult(
+                record.Id,
+                record.ImagePath,
+                record.MaskPath,
+                record.IsDefect,
+                false,
+                0,
+                0,
+                0,
+                PixelTotals.Empty,
+                false,
+                Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                Math.Max(0, allocationAfter - allocationBefore),
+                ex.GetBaseException().Message);
+        }
+        finally
+        {
+            ReleaseOutputImages(outputData);
+        }
+    }
+
+    private static KolektorIndex LoadIndex(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException($"KolektorSDD2 index not found: {fullPath}.");
+        }
+
+        return JsonSerializer.Deserialize<KolektorIndex>(File.ReadAllText(fullPath), JsonSettings.Default)
+               ?? throw new InvalidOperationException($"Failed to parse KolektorSDD2 index: {fullPath}");
+    }
+
+    private static Mat LoadImage(string relativePath, int maxSide, InterpolationFlags interpolation)
+    {
+        var path = Path.GetFullPath(relativePath);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException($"Image not found: {path}");
+        }
+
+        using var source = Cv2.ImRead(path, ImreadModes.Color);
+        if (source.Empty())
+        {
+            throw new InvalidOperationException($"Failed to load image: {path}");
+        }
+
+        return ResizeToMaxSide(source, maxSide, interpolation);
+    }
+
+    private static Mat LoadMask(string? relativePath, Size imageSize, int maxSide)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return new Mat(imageSize, MatType.CV_8UC1, Scalar.Black);
+        }
+
+        var path = Path.GetFullPath(relativePath);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException($"Mask not found: {path}");
+        }
+
+        using var source = Cv2.ImRead(path, ImreadModes.Grayscale);
+        if (source.Empty())
+        {
+            throw new InvalidOperationException($"Failed to load mask: {path}");
+        }
+
+        using var resizedToMax = ResizeToMaxSide(source, maxSide, InterpolationFlags.Nearest);
+        var resized = new Mat();
+        Cv2.Resize(resizedToMax, resized, imageSize, 0, 0, InterpolationFlags.Nearest);
+        Cv2.Threshold(resized, resized, 0, 255, ThresholdTypes.Binary);
+        return resized;
+    }
+
+    private static Mat ResizeToMaxSide(Mat source, int maxSide, InterpolationFlags interpolation)
+    {
+        if (maxSide <= 0 || Math.Max(source.Width, source.Height) <= maxSide)
+        {
+            return source.Clone();
+        }
+
+        var scale = maxSide / (double)Math.Max(source.Width, source.Height);
+        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+        var resized = new Mat();
+        Cv2.Resize(source, resized, new Size(width, height), 0, 0, interpolation);
+        return resized;
+    }
+
+    private static ImageWrapper GetImageWrapper(OperatorExecutionOutput output, string key)
+    {
+        if (output.OutputData is null || !output.OutputData.TryGetValue(key, out var value))
+        {
+            throw new InvalidOperationException($"Missing output key '{key}'.");
+        }
+
+        if (!ImageWrapper.TryGetFromObject(value, out var wrapper) || wrapper is null)
+        {
+            throw new InvalidOperationException($"Output key '{key}' is not an image.");
+        }
+
+        return wrapper;
+    }
+
+    private static void ReleaseOutputImages(Dictionary<string, object>? outputData)
+    {
+        if (outputData is null)
+        {
+            return;
+        }
+
+        var released = new HashSet<ImageWrapper>();
+        foreach (var value in outputData.Values)
+        {
+            if (value is ImageWrapper wrapper && wrapper.RefCount > 0 && released.Add(wrapper))
+            {
+                wrapper.Release();
+            }
+        }
+    }
+
+    private static Mat NormalizeMask(Mat source, Size imageSize)
+    {
+        using var gray = ToGray(source);
+        var resized = new Mat();
+        Cv2.Resize(gray, resized, imageSize, 0, 0, InterpolationFlags.Nearest);
+        Cv2.Threshold(resized, resized, 0, 255, ThresholdTypes.Binary);
+        return resized;
+    }
+
+    private static Mat NormalizeResponse(Mat source, Size imageSize)
+    {
+        using var gray = ToGray(source);
+        var resized = new Mat();
+        Cv2.Resize(gray, resized, imageSize, 0, 0, InterpolationFlags.Area);
+        return resized;
+    }
+
+    private static Mat ToGray(Mat source)
+    {
+        if (source.Channels() == 1)
+        {
+            return source.Clone();
+        }
+
+        var gray = new Mat();
+        Cv2.CvtColor(source, gray, ColorConversionCodes.BGR2GRAY);
+        return gray;
+    }
+
+    private static PixelTotals EvaluateMask(Mat predicted, Mat groundTruth)
+    {
+        long tp = 0;
+        long fp = 0;
+        long fn = 0;
+        long tn = 0;
+
+        for (var y = 0; y < groundTruth.Rows; y++)
+        {
+            for (var x = 0; x < groundTruth.Cols; x++)
+            {
+                var p = predicted.At<byte>(y, x) > 0;
+                var g = groundTruth.At<byte>(y, x) > 0;
+                if (p && g)
+                {
+                    tp++;
+                }
+                else if (p)
+                {
+                    fp++;
+                }
+                else if (g)
+                {
+                    fn++;
+                }
+                else
+                {
+                    tn++;
+                }
+            }
+        }
+
+        return new PixelTotals(tp, fp, fn, tn);
+    }
+
+    private static void CollectPixelScores(Mat response, Mat mask, int sampleStride, List<ScoredLabel> destination)
+    {
+        var stride = Math.Max(1, sampleStride);
+        for (var y = 0; y < response.Rows; y += stride)
+        {
+            for (var x = 0; x < response.Cols; x += stride)
+            {
+                destination.Add(new ScoredLabel(response.At<byte>(y, x), mask.At<byte>(y, x) > 0));
+            }
+        }
+    }
+
+    private static double ImageScore(Mat response, Mat predictedMask, OperatorExecutionOutput output)
+    {
+        Cv2.MinMaxLoc(response, out double _, out var maxValue);
+        var defectArea = Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0);
+        var maskArea = Cv2.CountNonZero(predictedMask);
+        return maxValue + Math.Log(1.0 + defectArea + maskArea);
+    }
+
+    private static Operator CreateOperator(RunnerOptions options)
+    {
+        return CreateOperator(
+            OperatorType.SurfaceDefectDetection,
+            ("Method", options.Method),
+            ("Threshold", options.Threshold),
+            ("ThresholdMode", options.ThresholdMode),
+            ("MinArea", options.MinArea),
+            ("MaxArea", options.MaxArea),
+            ("MorphCleanSize", options.MorphCleanSize),
+            ("NormalizationMode", options.NormalizationMode),
+            ("BackgroundKernelSize", options.BackgroundKernelSize));
+    }
+
+    private static Operator CreateOperator(OperatorType type, params (string Name, object Value)[] parameters)
+    {
+        var op = new Operator(type.ToString(), type, 0, 0);
+        foreach (var (name, value) in parameters)
+        {
+            op.AddParameter(new Parameter(Guid.NewGuid(), name, name, string.Empty, ParameterType(value), value));
+        }
+
+        return op;
+    }
+
+    private static string ParameterType(object value)
+    {
+        return value switch
+        {
+            bool => "bool",
+            int or long => "int",
+            float or double or decimal => "double",
+            _ => "string"
+        };
+    }
+
+    private static double ComputeAuroc(IEnumerable<ScoredLabel> values)
+    {
+        var items = values.ToList();
+        var positives = items.Count(item => item.Label);
+        var negatives = items.Count - positives;
+        if (positives == 0 || negatives == 0)
+        {
+            return double.NaN;
+        }
+
+        items.Sort((left, right) => left.Score.CompareTo(right.Score));
+        double rankSumPositive = 0;
+        var rank = 1;
+        var index = 0;
+        while (index < items.Count)
+        {
+            var end = index + 1;
+            while (end < items.Count && Math.Abs(items[end].Score - items[index].Score) <= 1e-12)
+            {
+                end++;
+            }
+
+            var averageRank = (rank + rank + (end - index) - 1) / 2.0;
+            for (var i = index; i < end; i++)
+            {
+                if (items[i].Label)
+                {
+                    rankSumPositive += averageRank;
+                }
+            }
+
+            rank += end - index;
+            index = end;
+        }
+
+        var positiveCount = (double)positives;
+        var negativeCount = (double)negatives;
+        return (rankSumPositive - positiveCount * (positiveCount + 1) / 2.0) / (positiveCount * negativeCount);
+    }
+
+    private static double Percentile(IEnumerable<double> values, double percentile)
+    {
+        var sorted = values.OrderBy(value => value).ToArray();
+        if (sorted.Length == 0)
+        {
+            return 0;
+        }
+
+        var index = Math.Clamp((int)Math.Ceiling(percentile * sorted.Length) - 1, 0, sorted.Length - 1);
+        return sorted[index];
+    }
+
+    private static double FiniteOrZero(double value)
+    {
+        return double.IsFinite(value) ? value : 0.0;
+    }
+
+    private static List<MetricFailure> EvaluateThresholds(PixelTotals totals, double imageAuroc, int errorCount, RunnerOptions options)
+    {
+        var failures = new List<MetricFailure>();
+        if (errorCount > options.MaxErrors)
+        {
+            failures.Add(new MetricFailure("overall", "Errors", errorCount, options.MaxErrors));
+        }
+
+        if (!double.IsNaN(imageAuroc) && imageAuroc < options.MinImageAuroc)
+        {
+            failures.Add(new MetricFailure("overall", "ImageAuroc", Math.Round(imageAuroc, 6), options.MinImageAuroc));
+        }
+
+        if (totals.F1 < options.MinPixelF1)
+        {
+            failures.Add(new MetricFailure("overall", "PixelF1", Math.Round(totals.F1, 6), options.MinPixelF1));
+        }
+
+        return failures;
+    }
+}
+
+internal sealed record RunnerOptions(
+    string IndexPath,
+    string OutputPath,
+    string ReportPath,
+    string Split,
+    int Limit,
+    int MaxSide,
+    string Method,
+    string ThresholdMode,
+    string NormalizationMode,
+    double Threshold,
+    int MinArea,
+    int MaxArea,
+    int MorphCleanSize,
+    int BackgroundKernelSize,
+    int PixelSampleStride,
+    int MaxErrors,
+    double MinImageAuroc,
+    double MinPixelF1,
+    bool ShowHelp,
+    string? ParseError)
+{
+    public static RunnerOptions Parse(string[] args)
+    {
+        var options = new RunnerOptions(
+            IndexPath: "quality/datasets/kolektorsdd2_index.json",
+            OutputPath: "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+            ReportPath: "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md",
+            Split: "test",
+            Limit: 0,
+            MaxSide: 256,
+            Method: "LocalContrast",
+            ThresholdMode: "Manual",
+            NormalizationMode: "LocalMean",
+            Threshold: 15.0,
+            MinArea: 4,
+            MaxArea: 1_000_000,
+            MorphCleanSize: 1,
+            BackgroundKernelSize: 31,
+            PixelSampleStride: 4,
+            MaxErrors: 0,
+            MinImageAuroc: 0.70,
+            MinPixelF1: 0.20,
+            ShowHelp: false,
+            ParseError: null);
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg is "-h" or "--help")
+            {
+                return options with { ShowHelp = true };
+            }
+
+            string NextValue()
+            {
+                if (i + 1 >= args.Length)
+                {
+                    throw new ArgumentException($"Missing value for {arg}");
+                }
+
+                return args[++i];
+            }
+
+            try
+            {
+                options = arg switch
+                {
+                    "--index" => options with { IndexPath = NextValue() },
+                    "--output" => options with { OutputPath = NextValue() },
+                    "--report" => options with { ReportPath = NextValue() },
+                    "--split" => options with { Split = NextValue() },
+                    "--limit" => options with { Limit = int.Parse(NextValue()) },
+                    "--max-side" => options with { MaxSide = int.Parse(NextValue()) },
+                    "--method" => options with { Method = NextValue() },
+                    "--threshold-mode" => options with { ThresholdMode = NextValue() },
+                    "--normalization-mode" => options with { NormalizationMode = NextValue() },
+                    "--threshold" => options with { Threshold = double.Parse(NextValue()) },
+                    "--min-area" => options with { MinArea = int.Parse(NextValue()) },
+                    "--max-area" => options with { MaxArea = int.Parse(NextValue()) },
+                    "--morph-clean-size" => options with { MorphCleanSize = int.Parse(NextValue()) },
+                    "--background-kernel-size" => options with { BackgroundKernelSize = int.Parse(NextValue()) },
+                    "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue()) },
+                    "--max-errors" => options with { MaxErrors = int.Parse(NextValue()) },
+                    "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue()) },
+                    "--min-pixel-f1" => options with { MinPixelF1 = double.Parse(NextValue()) },
+                    _ => options with { ParseError = $"Unknown argument: {arg}" }
+                };
+            }
+            catch (Exception ex)
+            {
+                return options with { ParseError = ex.Message };
+            }
+
+            if (options.ParseError is not null)
+            {
+                return options;
+            }
+        }
+
+        return options;
+    }
+
+    public static void PrintHelp()
+    {
+        Console.WriteLine("""
+        Usage: dotnet run --project quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj -- [options]
+
+        Options:
+          --index <path>                KolektorSDD2 JSON index.
+          --output <path>               Baseline JSON output path.
+          --report <path>               Baseline Markdown report path.
+          --split <name>                Dataset split to evaluate. Default: test.
+          --limit <int>                 Optional smoke subset size. Default: 0 (all records).
+          --max-side <int>              Resize long image side before evaluation. Default: 256.
+          --method <name>               Product operator method. Default: LocalContrast.
+          --threshold-mode <name>       Product operator threshold mode. Default: Manual.
+          --normalization-mode <name>   Product operator normalization mode. Default: LocalMean.
+          --threshold <float>           Manual/floor threshold. Default: 15.
+          --min-area <int>              Minimum accepted connected-component area. Default: 4.
+          --max-area <int>              Maximum accepted connected-component area. Default: 1000000.
+          --morph-clean-size <int>      Morphological cleanup kernel. Default: 1.
+          --background-kernel-size <int>
+                                      Local background kernel. Default: 31.
+          --pixel-sample-stride <int>   Pixel AUROC sampling stride. Default: 4.
+          --max-errors <int>            Crash/failure gate. Default: 0.
+          --min-image-auroc <float>     Optional image AUROC floor. Default: 0.70.
+          --min-pixel-f1 <float>        Optional pixel F1 floor. Default: 0.20.
+        """);
+    }
+}
+
+internal static class MarkdownReport
+{
+    public static string Create(BaselineResult result)
+    {
+        var lines = new List<string>
+        {
+            "# SurfaceDefectDetection KolektorSDD2 Baseline",
+            "",
+            $"GeneratedAtUtc: `{result.Summary.GeneratedAtUtc:O}`",
+            $"Index: `{result.Summary.IndexPath}`",
+            "",
+            "## Summary",
+            "",
+            "| Metric | Value |",
+            "| --- | ---: |",
+            $"| Cases | {result.Summary.CaseCount} |",
+            $"| Passed | {result.Summary.Passed} |",
+            $"| Failed gates | {result.Summary.Failed} |",
+            $"| Defect images | {result.Summary.DefectImageCount} |",
+            $"| Normal images | {result.Summary.NormalImageCount} |",
+            $"| Pixel IoU | {result.Summary.MaskIoU:F4} |",
+            $"| Dice | {result.Summary.Dice:F4} |",
+            $"| Pixel F1 | {result.Summary.PixelF1:F4} |",
+            $"| Image AUROC | {result.Summary.ImageAuroc:F4} |",
+            $"| Pixel AUROC | {result.Summary.PixelAuroc:F4} |",
+            $"| False positive per normal image | {result.Summary.FalsePositivePerImage:F4} |",
+            $"| Runtime p95 ms | {result.Summary.RuntimeMsP95:F3} |",
+            $"| Method | {result.Summary.Method} |",
+            $"| Threshold mode | {result.Summary.ThresholdMode} |",
+            $"| Max side | {result.Summary.MaxSide} |"
+        };
+
+        lines.AddRange([
+            "",
+            "## Image Confusion",
+            "",
+            "| TP | FP | FN | TN |",
+            "| ---: | ---: | ---: | ---: |",
+            $"| {result.ImageConfusion.TruePositive} | {result.ImageConfusion.FalsePositive} | {result.ImageConfusion.FalseNegative} | {result.ImageConfusion.TrueNegative} |"
+        ]);
+
+        if (result.MetricFailures.Count > 0)
+        {
+            lines.AddRange([
+                "",
+                "## Metric Failures",
+                "",
+                "| Scope | Metric | Value | Minimum |",
+                "| --- | --- | ---: | ---: |"
+            ]);
+
+            foreach (var failure in result.MetricFailures)
+            {
+                lines.Add($"| {failure.Scope} | {failure.Metric} | {failure.Value:F4} | {failure.Minimum:F4} |");
+            }
+        }
+
+        var failures = result.Images.Where(item => item.Error is not null).Take(10).ToList();
+        if (failures.Count > 0)
+        {
+            lines.AddRange([
+                "",
+                "## Execution Failures",
+                "",
+                "| Id | Image | Error |",
+                "| --- | --- | --- |"
+            ]);
+
+            foreach (var failure in failures)
+            {
+                lines.Add($"| {failure.Id} | `{failure.ImagePath}` | {failure.Error} |");
+            }
+        }
+
+        lines.AddRange([
+            "",
+            "## Notes",
+            "",
+            "- Runner calls the product `SurfaceDefectDetectionOperator` first and records its current real-dataset behavior.",
+            "- Gate is currently a robust smoke baseline: zero operator crashes by default, mask metrics, image confusion, image AUROC, and pixel AUROC are reported.",
+            "- KolektorSDD2 is public noncommercial data; keep this evidence separate from commercial release claims."
+        ]);
+
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
+    }
+}
+
+internal sealed record KolektorIndex(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("source_dataset")] string SourceDataset,
+    [property: JsonPropertyName("local_root")] string LocalRoot,
+    [property: JsonPropertyName("records")] List<KolektorRecord> Records);
+
+internal sealed record KolektorRecord(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("split")] string Split,
+    [property: JsonPropertyName("image_path")] string ImagePath,
+    [property: JsonPropertyName("mask_path")] string? MaskPath,
+    [property: JsonPropertyName("has_mask")] bool HasMask,
+    [property: JsonPropertyName("is_defect")] bool IsDefect);
+
+internal readonly record struct ScoredLabel(double Score, bool Label);
+
+internal sealed record BaselineResult(
+    string EvidenceKind,
+    BaselineSummary Summary,
+    List<OperatorSummary> Operators,
+    ConfusionSummary ImageConfusion,
+    List<MetricFailure> MetricFailures,
+    List<ImageResult> Images);
+
+internal sealed record BaselineSummary(
+    DateTimeOffset GeneratedAtUtc,
+    string Dataset,
+    string IndexPath,
+    string Split,
+    int MaxSide,
+    string Method,
+    string ThresholdMode,
+    double Threshold,
+    int MinArea,
+    int CaseCount,
+    int Passed,
+    int Failed,
+    int DefectImageCount,
+    int NormalImageCount,
+    long PixelTruePositive,
+    long PixelFalsePositive,
+    long PixelFalseNegative,
+    long PixelTrueNegative,
+    double MaskIoU,
+    double Dice,
+    double PixelF1,
+    double ImageAuroc,
+    double PixelAuroc,
+    double FalsePositivePerImage,
+    double RuntimeMsP95,
+    double MinImageAuroc,
+    double MinPixelF1,
+    double RuntimeMs,
+    long MemoryAllocationBytes);
+
+internal sealed record OperatorSummary(
+    string Operator,
+    int CaseCount,
+    int Passed,
+    int Failed,
+    double RuntimeMsAvg,
+    long MemoryAllocationBytesAvg,
+    bool HasPublicDataset,
+    string EvidenceKind,
+    string Dataset);
+
+internal sealed record ConfusionSummary(
+    int TruePositive,
+    int FalsePositive,
+    int FalseNegative,
+    int TrueNegative);
+
+internal sealed record MetricFailure(
+    string Scope,
+    string Metric,
+    double Value,
+    double Minimum);
+
+internal sealed record ImageResult(
+    string Id,
+    string ImagePath,
+    string? MaskPath,
+    bool IsDefect,
+    bool PredictedDefect,
+    double Score,
+    int DefectCount,
+    double DefectArea,
+    PixelTotals PixelTotals,
+    bool Passed,
+    double RuntimeMs,
+    long MemoryAllocationBytes,
+    string? Error);
+
+internal readonly record struct PixelTotals(long TruePositive, long FalsePositive, long FalseNegative, long TrueNegative)
+{
+    public static readonly PixelTotals Empty = new(0, 0, 0, 0);
+
+    public double IoU => TruePositive + FalsePositive + FalseNegative == 0
+        ? 1.0
+        : TruePositive / (double)(TruePositive + FalsePositive + FalseNegative);
+
+    public double Dice => (2 * TruePositive) + FalsePositive + FalseNegative == 0
+        ? 1.0
+        : (2 * TruePositive) / (double)((2 * TruePositive) + FalsePositive + FalseNegative);
+
+    public double F1 => Dice;
+
+    public static PixelTotals Combine(IEnumerable<PixelTotals> totals)
+    {
+        long tp = 0;
+        long fp = 0;
+        long fn = 0;
+        long tn = 0;
+        foreach (var item in totals)
+        {
+            tp += item.TruePositive;
+            fp += item.FalsePositive;
+            fn += item.FalseNegative;
+            tn += item.TrueNegative;
+        }
+
+        return new PixelTotals(tp, fp, fn, tn);
+    }
+}
+
+internal static class JsonSettings
+{
+    public static readonly JsonSerializerOptions Default = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    public static readonly JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true
+    };
+}

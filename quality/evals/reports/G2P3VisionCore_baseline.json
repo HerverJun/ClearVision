@@ -1,138 +1,138 @@
 {
   "EvidenceKind": "golden",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-27T09:25:55.3494725+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:57.3419805+00:00",
     "CaseCount": 280,
     "Passed": 280,
     "Failed": 0,
-    "RuntimeMs": 408.258
+    "RuntimeMs": 429.97
   },
   "Operators": [
     {
       "Operator": "AdaptiveThreshold",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.833,
-      "MemoryAllocationBytesAvg": 71807,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.797,
+      "MemoryAllocationBytesAvg": 75427
     },
     {
       "Operator": "AffineTransform",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.228,
-      "MemoryAllocationBytesAvg": 8394,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.221,
+      "MemoryAllocationBytesAvg": 8394
     },
     {
       "Operator": "BlobAnalysis",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 1.055,
-      "MemoryAllocationBytesAvg": 28675,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 1.07,
+      "MemoryAllocationBytesAvg": 26215
     },
     {
       "Operator": "BlobLabeling",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.448,
-      "MemoryAllocationBytesAvg": 15121,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.447,
+      "MemoryAllocationBytesAvg": 15121
     },
     {
       "Operator": "CircleMeasurement",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.346,
-      "MemoryAllocationBytesAvg": 10655,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.42,
+      "MemoryAllocationBytesAvg": 10655
     },
     {
       "Operator": "ContourDetection",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 4.791,
-      "MemoryAllocationBytesAvg": 14834,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 5.504,
+      "MemoryAllocationBytesAvg": 14834
     },
     {
       "Operator": "DistanceTransform",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.663,
-      "MemoryAllocationBytesAvg": 11744,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.628,
+      "MemoryAllocationBytesAvg": 11744
     },
     {
       "Operator": "EdgeDetection",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.44,
-      "MemoryAllocationBytesAvg": 9662,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.399,
+      "MemoryAllocationBytesAvg": 9662
     },
     {
       "Operator": "GeometricFitting",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 1.222,
-      "MemoryAllocationBytesAvg": 68641,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 1.218,
+      "MemoryAllocationBytesAvg": 68641
     },
     {
       "Operator": "ImageDiff",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 1.484,
-      "MemoryAllocationBytesAvg": 7455,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 1.425,
+      "MemoryAllocationBytesAvg": 7455
     },
     {
       "Operator": "ImageSubtract",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.921,
-      "MemoryAllocationBytesAvg": 11034,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.851,
+      "MemoryAllocationBytesAvg": 10536
     },
     {
       "Operator": "LineMeasurement",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 1.958,
-      "MemoryAllocationBytesAvg": 155806,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 2.38,
+      "MemoryAllocationBytesAvg": 155806
     },
     {
       "Operator": "PerspectiveTransform",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 0.394,
-      "MemoryAllocationBytesAvg": 10712,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 0.367,
+      "MemoryAllocationBytesAvg": 10712
     },
     {
       "Operator": "WidthMeasurement",
+      "EvidenceKind": "golden",
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 5.631,
-      "MemoryAllocationBytesAvg": 894005,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 5.771,
+      "MemoryAllocationBytesAvg": 894005
     }
   ],
   "Scenarios": [
@@ -148,133 +148,133 @@
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.337
+      "RuntimeMsAvg": 0.413
     },
     {
       "Scenario": "Circle fitting oracle",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 1.099
+      "RuntimeMsAvg": 1.078
     },
     {
       "Scenario": "Connected component oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.49
+      "RuntimeMsAvg": 0.549
     },
     {
       "Scenario": "Contour count oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 5.942
+      "RuntimeMsAvg": 6.839
     },
     {
       "Scenario": "Distance limit contract",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 1.095
+      "RuntimeMsAvg": 0.817
     },
     {
       "Scenario": "Ellipse fitting oracle",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 1.143
+      "RuntimeMsAvg": 1.132
     },
     {
       "Scenario": "Failure contract",
       "CaseCount": 27,
       "Passed": 27,
       "Failed": 0,
-      "RuntimeMsAvg": 0.751
+      "RuntimeMsAvg": 0.734
     },
     {
       "Scenario": "Line fitting oracle",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 2.05
+      "RuntimeMsAvg": 2.078
     },
     {
       "Scenario": "Line geometry oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 2.369
+      "RuntimeMsAvg": 2.896
     },
     {
       "Scenario": "Manual line width oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 6.975
+      "RuntimeMsAvg": 7.132
     },
     {
       "Scenario": "OpenCV Canny oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.506
+      "RuntimeMsAvg": 0.457
     },
     {
       "Scenario": "OpenCV adaptive threshold oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.996
+      "RuntimeMsAvg": 0.954
     },
     {
       "Scenario": "OpenCV distance transform oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.694
+      "RuntimeMsAvg": 0.681
     },
     {
       "Scenario": "Pixel difference oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 1.776
+      "RuntimeMsAvg": 1.708
     },
     {
       "Scenario": "Point set transform oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.434
+      "RuntimeMsAvg": 0.404
     },
     {
       "Scenario": "Provided blob label oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 0.512
+      "RuntimeMsAvg": 0.51
     },
     {
       "Scenario": "Subtraction statistics oracle",
       "CaseCount": 16,
       "Passed": 16,
       "Failed": 0,
-      "RuntimeMsAvg": 1.13
+      "RuntimeMsAvg": 1.043
     },
     {
       "Scenario": "Three-point transform oracle",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.356
+      "RuntimeMsAvg": 0.329
     },
     {
       "Scenario": "Validation contract",
       "CaseCount": 28,
       "Passed": 28,
       "Failed": 0,
-      "RuntimeMsAvg": 0.185
+      "RuntimeMsAvg": 0.177
     }
   ],
   "Cases": [
@@ -283,7 +283,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 28.24,
+      "RuntimeMs": 27.174,
       "MemoryAllocationBytes": 73976,
       "ErrorMessage": null,
       "Observed": {
@@ -296,7 +296,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.057,
+      "RuntimeMs": 0.046,
       "MemoryAllocationBytes": 4096,
       "ErrorMessage": null,
       "Observed": {
@@ -309,7 +309,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.014,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 4096,
       "ErrorMessage": null,
       "Observed": {
@@ -348,7 +348,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.008,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 4096,
       "ErrorMessage": null,
       "Observed": {
@@ -374,7 +374,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 4096,
       "ErrorMessage": null,
       "Observed": {
@@ -400,7 +400,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.008,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 4096,
       "ErrorMessage": null,
       "Observed": {
@@ -439,7 +439,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 4096,
       "ErrorMessage": null,
       "Observed": {
@@ -478,7 +478,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Pixel difference oracle",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 4632,
       "ErrorMessage": null,
       "Observed": {
@@ -491,7 +491,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 1.23,
+      "RuntimeMs": 1.149,
       "MemoryAllocationBytes": 5536,
       "ErrorMessage": null,
       "Observed": {
@@ -503,7 +503,7 @@
       "Operator": "ImageDiff",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.021,
+      "RuntimeMs": 0.017,
       "MemoryAllocationBytes": 2536,
       "ErrorMessage": null,
       "Observed": {
@@ -539,8 +539,8 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 17.853,
-      "MemoryAllocationBytes": 121720,
+      "RuntimeMs": 16.469,
+      "MemoryAllocationBytes": 111760,
       "ErrorMessage": null,
       "Observed": {
         "ExpectedDifference": 90,
@@ -552,7 +552,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.062,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -565,7 +565,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.016,
+      "RuntimeMs": 0.018,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -591,7 +591,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -617,7 +617,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.014,
       "MemoryAllocationBytes": 5992,
       "ErrorMessage": null,
       "Observed": {
@@ -630,7 +630,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -643,7 +643,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.019,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -669,7 +669,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -695,7 +695,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 5992,
       "ErrorMessage": null,
       "Observed": {
@@ -721,7 +721,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Subtraction statistics oracle",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 5792,
       "ErrorMessage": null,
       "Observed": {
@@ -747,7 +747,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.325,
+      "RuntimeMs": 0.318,
       "MemoryAllocationBytes": 3944,
       "ErrorMessage": null,
       "Observed": {
@@ -759,7 +759,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -771,7 +771,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -783,7 +783,7 @@
       "Operator": "ImageSubtract",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -795,8 +795,8 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 14.62,
-      "MemoryAllocationBytes": 588544,
+      "RuntimeMs": 13.88,
+      "MemoryAllocationBytes": 660944,
       "ErrorMessage": null,
       "Observed": {
         "Method": "Gaussian",
@@ -809,7 +809,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.168,
+      "RuntimeMs": 0.174,
       "MemoryAllocationBytes": 55888,
       "ErrorMessage": null,
       "Observed": {
@@ -823,7 +823,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.096,
+      "RuntimeMs": 0.106,
       "MemoryAllocationBytes": 55936,
       "ErrorMessage": null,
       "Observed": {
@@ -837,7 +837,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.081,
+      "RuntimeMs": 0.084,
       "MemoryAllocationBytes": 55936,
       "ErrorMessage": null,
       "Observed": {
@@ -851,7 +851,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.09,
+      "RuntimeMs": 0.092,
       "MemoryAllocationBytes": 55952,
       "ErrorMessage": null,
       "Observed": {
@@ -865,7 +865,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.077,
+      "RuntimeMs": 0.081,
       "MemoryAllocationBytes": 55888,
       "ErrorMessage": null,
       "Observed": {
@@ -879,7 +879,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.089,
+      "RuntimeMs": 0.082,
       "MemoryAllocationBytes": 55968,
       "ErrorMessage": null,
       "Observed": {
@@ -893,7 +893,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.083,
+      "RuntimeMs": 0.095,
       "MemoryAllocationBytes": 55888,
       "ErrorMessage": null,
       "Observed": {
@@ -907,7 +907,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.084,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 55952,
       "ErrorMessage": null,
       "Observed": {
@@ -921,7 +921,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.076,
+      "RuntimeMs": 0.078,
       "MemoryAllocationBytes": 55936,
       "ErrorMessage": null,
       "Observed": {
@@ -949,7 +949,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.077,
       "MemoryAllocationBytes": 55888,
       "ErrorMessage": null,
       "Observed": {
@@ -963,7 +963,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.079,
+      "RuntimeMs": 0.083,
       "MemoryAllocationBytes": 55968,
       "ErrorMessage": null,
       "Observed": {
@@ -977,7 +977,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.075,
+      "RuntimeMs": 0.084,
       "MemoryAllocationBytes": 55904,
       "ErrorMessage": null,
       "Observed": {
@@ -991,7 +991,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.083,
+      "RuntimeMs": 0.087,
       "MemoryAllocationBytes": 55952,
       "ErrorMessage": null,
       "Observed": {
@@ -1005,7 +1005,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "OpenCV adaptive threshold oracle",
       "Passed": true,
-      "RuntimeMs": 0.086,
+      "RuntimeMs": 0.085,
       "MemoryAllocationBytes": 55920,
       "ErrorMessage": null,
       "Observed": {
@@ -1019,7 +1019,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.394,
+      "RuntimeMs": 0.369,
       "MemoryAllocationBytes": 2176,
       "ErrorMessage": null,
       "Observed": {
@@ -1031,7 +1031,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.045,
+      "RuntimeMs": 0.042,
       "MemoryAllocationBytes": 2320,
       "ErrorMessage": null,
       "Observed": {
@@ -1043,7 +1043,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.042,
+      "RuntimeMs": 0.04,
       "MemoryAllocationBytes": 1848,
       "ErrorMessage": null,
       "Observed": {
@@ -1055,7 +1055,7 @@
       "Operator": "AdaptiveThreshold",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.236,
+      "RuntimeMs": 0.222,
       "MemoryAllocationBytes": 2336,
       "ErrorMessage": null,
       "Observed": {
@@ -1067,7 +1067,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 4.138,
+      "RuntimeMs": 4.259,
       "MemoryAllocationBytes": 13104,
       "ErrorMessage": null,
       "Observed": {
@@ -1079,7 +1079,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.534,
+      "RuntimeMs": 0.562,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1091,7 +1091,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.268,
+      "RuntimeMs": 0.255,
       "MemoryAllocationBytes": 11504,
       "ErrorMessage": null,
       "Observed": {
@@ -1103,7 +1103,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.215,
+      "RuntimeMs": 0.249,
       "MemoryAllocationBytes": 11512,
       "ErrorMessage": null,
       "Observed": {
@@ -1115,7 +1115,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.396,
+      "RuntimeMs": 0.208,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1127,7 +1127,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.253,
+      "RuntimeMs": 0.174,
       "MemoryAllocationBytes": 11488,
       "ErrorMessage": null,
       "Observed": {
@@ -1139,7 +1139,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.28,
+      "RuntimeMs": 0.197,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1151,7 +1151,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.206,
+      "RuntimeMs": 0.175,
       "MemoryAllocationBytes": 11504,
       "ErrorMessage": null,
       "Observed": {
@@ -1163,7 +1163,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.235,
+      "RuntimeMs": 0.141,
       "MemoryAllocationBytes": 11488,
       "ErrorMessage": null,
       "Observed": {
@@ -1175,7 +1175,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.18,
+      "RuntimeMs": 0.159,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1187,7 +1187,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.204,
+      "RuntimeMs": 0.142,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1199,7 +1199,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.337,
+      "RuntimeMs": 0.192,
       "MemoryAllocationBytes": 11504,
       "ErrorMessage": null,
       "Observed": {
@@ -1211,7 +1211,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.191,
+      "RuntimeMs": 0.127,
       "MemoryAllocationBytes": 11488,
       "ErrorMessage": null,
       "Observed": {
@@ -1223,7 +1223,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.208,
+      "RuntimeMs": 0.162,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1235,7 +1235,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.215,
+      "RuntimeMs": 0.16,
       "MemoryAllocationBytes": 11504,
       "ErrorMessage": null,
       "Observed": {
@@ -1247,7 +1247,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "OpenCV Canny oracle",
       "Passed": true,
-      "RuntimeMs": 0.243,
+      "RuntimeMs": 0.145,
       "MemoryAllocationBytes": 11496,
       "ErrorMessage": null,
       "Observed": {
@@ -1259,7 +1259,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.328,
+      "RuntimeMs": 0.206,
       "MemoryAllocationBytes": 2016,
       "ErrorMessage": null,
       "Observed": {
@@ -1283,7 +1283,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.044,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 1968,
       "ErrorMessage": null,
       "Observed": {
@@ -1295,7 +1295,7 @@
       "Operator": "EdgeDetection",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.255,
+      "RuntimeMs": 0.348,
       "MemoryAllocationBytes": 1696,
       "ErrorMessage": null,
       "Observed": {
@@ -1307,7 +1307,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 94.173,
+      "RuntimeMs": 108.534,
       "MemoryAllocationBytes": 18640,
       "ErrorMessage": null,
       "Observed": {
@@ -1319,7 +1319,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.221,
+      "RuntimeMs": 0.227,
       "MemoryAllocationBytes": 17888,
       "ErrorMessage": null,
       "Observed": {
@@ -1331,7 +1331,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.072,
+      "RuntimeMs": 0.075,
       "MemoryAllocationBytes": 21712,
       "ErrorMessage": null,
       "Observed": {
@@ -1355,7 +1355,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.046,
+      "RuntimeMs": 0.048,
       "MemoryAllocationBytes": 17888,
       "ErrorMessage": null,
       "Observed": {
@@ -1367,7 +1367,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.06,
+      "RuntimeMs": 0.054,
       "MemoryAllocationBytes": 21712,
       "ErrorMessage": null,
       "Observed": {
@@ -1379,7 +1379,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.032,
+      "RuntimeMs": 0.036,
       "MemoryAllocationBytes": 14248,
       "ErrorMessage": null,
       "Observed": {
@@ -1391,7 +1391,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.061,
+      "RuntimeMs": 0.046,
       "MemoryAllocationBytes": 17888,
       "ErrorMessage": null,
       "Observed": {
@@ -1403,7 +1403,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.059,
+      "RuntimeMs": 0.052,
       "MemoryAllocationBytes": 21712,
       "ErrorMessage": null,
       "Observed": {
@@ -1415,7 +1415,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.037,
+      "RuntimeMs": 0.033,
       "MemoryAllocationBytes": 14248,
       "ErrorMessage": null,
       "Observed": {
@@ -1427,7 +1427,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.046,
+      "RuntimeMs": 0.044,
       "MemoryAllocationBytes": 17888,
       "ErrorMessage": null,
       "Observed": {
@@ -1439,7 +1439,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.069,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 21712,
       "ErrorMessage": null,
       "Observed": {
@@ -1451,7 +1451,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.032,
+      "RuntimeMs": 0.04,
       "MemoryAllocationBytes": 14248,
       "ErrorMessage": null,
       "Observed": {
@@ -1463,7 +1463,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.044,
+      "RuntimeMs": 0.048,
       "MemoryAllocationBytes": 17888,
       "ErrorMessage": null,
       "Observed": {
@@ -1475,7 +1475,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.052,
+      "RuntimeMs": 0.048,
       "MemoryAllocationBytes": 21712,
       "ErrorMessage": null,
       "Observed": {
@@ -1487,7 +1487,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Contour count oracle",
       "Passed": true,
-      "RuntimeMs": 0.031,
+      "RuntimeMs": 0.033,
       "MemoryAllocationBytes": 14248,
       "ErrorMessage": null,
       "Observed": {
@@ -1499,7 +1499,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.281,
+      "RuntimeMs": 0.242,
       "MemoryAllocationBytes": 2432,
       "ErrorMessage": null,
       "Observed": {
@@ -1511,7 +1511,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.096,
+      "RuntimeMs": 0.089,
       "MemoryAllocationBytes": 2296,
       "ErrorMessage": null,
       "Observed": {
@@ -1523,7 +1523,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.084,
+      "RuntimeMs": 0.082,
       "MemoryAllocationBytes": 2328,
       "ErrorMessage": null,
       "Observed": {
@@ -1535,7 +1535,7 @@
       "Operator": "ContourDetection",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.28,
+      "RuntimeMs": 0.244,
       "MemoryAllocationBytes": 1744,
       "ErrorMessage": null,
       "Observed": {
@@ -1547,7 +1547,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 4.953,
+      "RuntimeMs": 5.027,
       "MemoryAllocationBytes": 17512,
       "ErrorMessage": null,
       "Observed": {
@@ -1559,7 +1559,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.326,
+      "RuntimeMs": 0.423,
       "MemoryAllocationBytes": 23640,
       "ErrorMessage": null,
       "Observed": {
@@ -1571,7 +1571,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.324,
+      "RuntimeMs": 0.3,
       "MemoryAllocationBytes": 31000,
       "ErrorMessage": null,
       "Observed": {
@@ -1583,7 +1583,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.154,
+      "RuntimeMs": 0.228,
       "MemoryAllocationBytes": 16280,
       "ErrorMessage": null,
       "Observed": {
@@ -1595,7 +1595,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.155,
+      "RuntimeMs": 0.237,
       "MemoryAllocationBytes": 23640,
       "ErrorMessage": null,
       "Observed": {
@@ -1607,7 +1607,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.193,
+      "RuntimeMs": 0.265,
       "MemoryAllocationBytes": 31000,
       "ErrorMessage": null,
       "Observed": {
@@ -1619,7 +1619,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.134,
+      "RuntimeMs": 0.169,
       "MemoryAllocationBytes": 16280,
       "ErrorMessage": null,
       "Observed": {
@@ -1631,7 +1631,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.149,
+      "RuntimeMs": 0.198,
       "MemoryAllocationBytes": 23640,
       "ErrorMessage": null,
       "Observed": {
@@ -1643,7 +1643,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.19,
+      "RuntimeMs": 0.244,
       "MemoryAllocationBytes": 31000,
       "ErrorMessage": null,
       "Observed": {
@@ -1655,7 +1655,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.152,
+      "RuntimeMs": 0.19,
       "MemoryAllocationBytes": 16280,
       "ErrorMessage": null,
       "Observed": {
@@ -1667,7 +1667,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.16,
+      "RuntimeMs": 0.212,
       "MemoryAllocationBytes": 23640,
       "ErrorMessage": null,
       "Observed": {
@@ -1679,7 +1679,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.194,
+      "RuntimeMs": 0.287,
       "MemoryAllocationBytes": 31000,
       "ErrorMessage": null,
       "Observed": {
@@ -1691,7 +1691,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.173,
+      "RuntimeMs": 0.204,
       "MemoryAllocationBytes": 16280,
       "ErrorMessage": null,
       "Observed": {
@@ -1703,7 +1703,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.177,
+      "RuntimeMs": 0.208,
       "MemoryAllocationBytes": 23640,
       "ErrorMessage": null,
       "Observed": {
@@ -1715,7 +1715,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.213,
+      "RuntimeMs": 0.338,
       "MemoryAllocationBytes": 31000,
       "ErrorMessage": null,
       "Observed": {
@@ -1727,7 +1727,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Connected component oracle",
       "Passed": true,
-      "RuntimeMs": 0.188,
+      "RuntimeMs": 0.255,
       "MemoryAllocationBytes": 16280,
       "ErrorMessage": null,
       "Observed": {
@@ -1739,7 +1739,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.377,
+      "RuntimeMs": 0.427,
       "MemoryAllocationBytes": 2424,
       "ErrorMessage": null,
       "Observed": {
@@ -1751,7 +1751,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.116,
+      "RuntimeMs": 0.117,
       "MemoryAllocationBytes": 2096,
       "ErrorMessage": null,
       "Observed": {
@@ -1763,8 +1763,8 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 12.463,
-      "MemoryAllocationBytes": 195176,
+      "RuntimeMs": 11.763,
+      "MemoryAllocationBytes": 145976,
       "ErrorMessage": null,
       "Observed": {
         "FailureReason": "InvalidFeatureFilter"
@@ -1775,7 +1775,7 @@
       "Operator": "BlobAnalysis",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.307,
+      "RuntimeMs": 0.3,
       "MemoryAllocationBytes": 1696,
       "ErrorMessage": null,
       "Observed": {
@@ -1787,7 +1787,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 7.248,
+      "RuntimeMs": 7.194,
       "MemoryAllocationBytes": 62160,
       "ErrorMessage": null,
       "Observed": {
@@ -1799,7 +1799,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.153,
+      "RuntimeMs": 0.146,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1811,7 +1811,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.065,
+      "RuntimeMs": 0.063,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1823,7 +1823,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.058,
+      "RuntimeMs": 0.054,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1835,7 +1835,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.057,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1847,7 +1847,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.059,
+      "RuntimeMs": 0.064,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1859,7 +1859,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.055,
+      "RuntimeMs": 0.064,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1871,7 +1871,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.057,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1883,7 +1883,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.058,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1895,7 +1895,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.057,
+      "RuntimeMs": 0.056,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1907,7 +1907,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.054,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1919,7 +1919,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.054,
+      "RuntimeMs": 0.057,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1931,7 +1931,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.054,
+      "RuntimeMs": 0.057,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1943,7 +1943,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.058,
+      "RuntimeMs": 0.065,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1955,7 +1955,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1967,7 +1967,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Provided blob label oracle",
       "Passed": true,
-      "RuntimeMs": 0.057,
+      "RuntimeMs": 0.063,
       "MemoryAllocationBytes": 15304,
       "ErrorMessage": null,
       "Observed": {
@@ -1979,7 +1979,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.178,
+      "RuntimeMs": 0.192,
       "MemoryAllocationBytes": 1856,
       "ErrorMessage": null,
       "Observed": {
@@ -1991,7 +1991,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 3752,
       "ErrorMessage": null,
       "Observed": {
@@ -2003,7 +2003,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.32,
+      "RuntimeMs": 0.331,
       "MemoryAllocationBytes": 3400,
       "ErrorMessage": null,
       "Observed": {
@@ -2015,7 +2015,7 @@
       "Operator": "BlobLabeling",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.221,
+      "RuntimeMs": 0.202,
       "MemoryAllocationBytes": 1696,
       "ErrorMessage": null,
       "Observed": {
@@ -2027,7 +2027,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 20.206,
+      "RuntimeMs": 25.857,
       "MemoryAllocationBytes": 257176,
       "ErrorMessage": null,
       "Observed": {
@@ -2040,7 +2040,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.256,
+      "RuntimeMs": 1.359,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2053,7 +2053,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.388,
+      "RuntimeMs": 1.842,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2066,7 +2066,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 0.836,
+      "RuntimeMs": 1.232,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2079,7 +2079,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.358,
+      "RuntimeMs": 1.982,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2092,7 +2092,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 0.752,
+      "RuntimeMs": 1.104,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2105,7 +2105,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.306,
+      "RuntimeMs": 1.817,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2118,7 +2118,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.07,
+      "RuntimeMs": 1.11,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2131,7 +2131,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.811,
+      "RuntimeMs": 1.506,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2144,7 +2144,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.058,
+      "RuntimeMs": 1.001,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2157,7 +2157,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.826,
+      "RuntimeMs": 1.512,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2170,7 +2170,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 0.964,
+      "RuntimeMs": 1.042,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2183,7 +2183,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.296,
+      "RuntimeMs": 1.845,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2196,7 +2196,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 0.761,
+      "RuntimeMs": 0.928,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2209,7 +2209,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 1.267,
+      "RuntimeMs": 1.352,
       "MemoryAllocationBytes": 255408,
       "ErrorMessage": null,
       "Observed": {
@@ -2222,7 +2222,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Line geometry oracle",
       "Passed": true,
-      "RuntimeMs": 0.755,
+      "RuntimeMs": 0.852,
       "MemoryAllocationBytes": 132656,
       "ErrorMessage": null,
       "Observed": {
@@ -2235,7 +2235,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.24,
+      "RuntimeMs": 0.252,
       "MemoryAllocationBytes": 2136,
       "ErrorMessage": null,
       "Observed": {
@@ -2247,7 +2247,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.059,
+      "RuntimeMs": 0.062,
       "MemoryAllocationBytes": 2096,
       "ErrorMessage": null,
       "Observed": {
@@ -2259,7 +2259,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.579,
+      "RuntimeMs": 0.577,
       "MemoryAllocationBytes": 3904,
       "ErrorMessage": null,
       "Observed": {
@@ -2271,7 +2271,7 @@
       "Operator": "LineMeasurement",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.369,
+      "RuntimeMs": 0.366,
       "MemoryAllocationBytes": 1696,
       "ErrorMessage": null,
       "Observed": {
@@ -2283,7 +2283,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 3.53,
+      "RuntimeMs": 3.918,
       "MemoryAllocationBytes": 13232,
       "ErrorMessage": null,
       "Observed": {
@@ -2296,7 +2296,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.193,
+      "RuntimeMs": 0.282,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -2309,7 +2309,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.154,
+      "RuntimeMs": 0.204,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2322,7 +2322,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.129,
+      "RuntimeMs": 0.178,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2335,7 +2335,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.11,
+      "RuntimeMs": 0.177,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2348,7 +2348,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.116,
+      "RuntimeMs": 0.152,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2361,7 +2361,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.102,
+      "RuntimeMs": 0.166,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2374,7 +2374,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.133,
+      "RuntimeMs": 0.169,
       "MemoryAllocationBytes": 13056,
       "ErrorMessage": null,
       "Observed": {
@@ -2387,7 +2387,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.118,
+      "RuntimeMs": 0.148,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -2400,7 +2400,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.104,
+      "RuntimeMs": 0.152,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -2413,7 +2413,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.141,
+      "RuntimeMs": 0.162,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2426,7 +2426,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.122,
+      "RuntimeMs": 0.157,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2439,7 +2439,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.12,
+      "RuntimeMs": 0.152,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2452,7 +2452,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.11,
+      "RuntimeMs": 0.163,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2465,7 +2465,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.108,
+      "RuntimeMs": 0.179,
       "MemoryAllocationBytes": 12544,
       "ErrorMessage": null,
       "Observed": {
@@ -2478,7 +2478,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Circle fit oracle",
       "Passed": true,
-      "RuntimeMs": 0.106,
+      "RuntimeMs": 0.247,
       "MemoryAllocationBytes": 13056,
       "ErrorMessage": null,
       "Observed": {
@@ -2491,7 +2491,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.338,
+      "RuntimeMs": 0.452,
       "MemoryAllocationBytes": 2400,
       "ErrorMessage": null,
       "Observed": {
@@ -2503,7 +2503,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.103,
+      "RuntimeMs": 0.232,
       "MemoryAllocationBytes": 2944,
       "ErrorMessage": null,
       "Observed": {
@@ -2515,7 +2515,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.769,
+      "RuntimeMs": 0.789,
       "MemoryAllocationBytes": 5168,
       "ErrorMessage": null,
       "Observed": {
@@ -2527,7 +2527,7 @@
       "Operator": "CircleMeasurement",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.316,
+      "RuntimeMs": 0.32,
       "MemoryAllocationBytes": 1704,
       "ErrorMessage": null,
       "Observed": {
@@ -2539,7 +2539,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 12.66,
+      "RuntimeMs": 12.943,
       "MemoryAllocationBytes": 1077152,
       "ErrorMessage": null,
       "Observed": {
@@ -2552,7 +2552,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 6.195,
+      "RuntimeMs": 6.43,
       "MemoryAllocationBytes": 1093616,
       "ErrorMessage": null,
       "Observed": {
@@ -2565,7 +2565,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 6.096,
+      "RuntimeMs": 7.157,
       "MemoryAllocationBytes": 1111536,
       "ErrorMessage": null,
       "Observed": {
@@ -2578,7 +2578,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 7.312,
+      "RuntimeMs": 7.778,
       "MemoryAllocationBytes": 1129456,
       "ErrorMessage": null,
       "Observed": {
@@ -2591,7 +2591,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 7.363,
+      "RuntimeMs": 7.362,
       "MemoryAllocationBytes": 1147376,
       "ErrorMessage": null,
       "Observed": {
@@ -2604,7 +2604,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 8.607,
+      "RuntimeMs": 8.635,
       "MemoryAllocationBytes": 1166432,
       "ErrorMessage": null,
       "Observed": {
@@ -2617,7 +2617,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 5.647,
+      "RuntimeMs": 5.762,
       "MemoryAllocationBytes": 1086680,
       "ErrorMessage": null,
       "Observed": {
@@ -2630,7 +2630,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 5.573,
+      "RuntimeMs": 5.667,
       "MemoryAllocationBytes": 1093616,
       "ErrorMessage": null,
       "Observed": {
@@ -2643,7 +2643,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 5.886,
+      "RuntimeMs": 5.84,
       "MemoryAllocationBytes": 1111536,
       "ErrorMessage": null,
       "Observed": {
@@ -2656,7 +2656,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 6.914,
+      "RuntimeMs": 7.243,
       "MemoryAllocationBytes": 1129456,
       "ErrorMessage": null,
       "Observed": {
@@ -2669,7 +2669,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 7.1,
+      "RuntimeMs": 7.048,
       "MemoryAllocationBytes": 1147376,
       "ErrorMessage": null,
       "Observed": {
@@ -2682,7 +2682,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 7.204,
+      "RuntimeMs": 7.232,
       "MemoryAllocationBytes": 1165296,
       "ErrorMessage": null,
       "Observed": {
@@ -2695,7 +2695,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 5.915,
+      "RuntimeMs": 5.862,
       "MemoryAllocationBytes": 1075696,
       "ErrorMessage": null,
       "Observed": {
@@ -2708,7 +2708,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 5.845,
+      "RuntimeMs": 6.062,
       "MemoryAllocationBytes": 1093616,
       "ErrorMessage": null,
       "Observed": {
@@ -2721,7 +2721,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 5.953,
+      "RuntimeMs": 6.014,
       "MemoryAllocationBytes": 1111536,
       "ErrorMessage": null,
       "Observed": {
@@ -2734,7 +2734,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Manual line width oracle",
       "Passed": true,
-      "RuntimeMs": 7.331,
+      "RuntimeMs": 7.071,
       "MemoryAllocationBytes": 1129456,
       "ErrorMessage": null,
       "Observed": {
@@ -2747,7 +2747,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.377,
+      "RuntimeMs": 0.344,
       "MemoryAllocationBytes": 1848,
       "ErrorMessage": null,
       "Observed": {
@@ -2759,7 +2759,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.082,
+      "RuntimeMs": 0.073,
       "MemoryAllocationBytes": 2488,
       "ErrorMessage": null,
       "Observed": {
@@ -2771,7 +2771,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.329,
+      "RuntimeMs": 0.312,
       "MemoryAllocationBytes": 4224,
       "ErrorMessage": null,
       "Observed": {
@@ -2783,7 +2783,7 @@
       "Operator": "WidthMeasurement",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.224,
+      "RuntimeMs": 0.593,
       "MemoryAllocationBytes": 1704,
       "ErrorMessage": null,
       "Observed": {
@@ -2795,7 +2795,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Line fitting oracle",
       "Passed": true,
-      "RuntimeMs": 7.708,
+      "RuntimeMs": 7.969,
       "MemoryAllocationBytes": 124256,
       "ErrorMessage": null,
       "Observed": {
@@ -2808,7 +2808,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Line fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.78,
+      "RuntimeMs": 0.797,
       "MemoryAllocationBytes": 88872,
       "ErrorMessage": null,
       "Observed": {
@@ -2821,7 +2821,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Line fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.703,
+      "RuntimeMs": 0.747,
       "MemoryAllocationBytes": 122264,
       "ErrorMessage": null,
       "Observed": {
@@ -2834,7 +2834,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Line fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.673,
+      "RuntimeMs": 0.676,
       "MemoryAllocationBytes": 88872,
       "ErrorMessage": null,
       "Observed": {
@@ -2847,7 +2847,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Line fitting oracle",
       "Passed": true,
-      "RuntimeMs": 1.612,
+      "RuntimeMs": 1.453,
       "MemoryAllocationBytes": 123272,
       "ErrorMessage": null,
       "Observed": {
@@ -2860,7 +2860,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Line fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.826,
+      "RuntimeMs": 0.823,
       "MemoryAllocationBytes": 99856,
       "ErrorMessage": null,
       "Observed": {
@@ -2873,7 +2873,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Circle fitting oracle",
       "Passed": true,
-      "RuntimeMs": 3.587,
+      "RuntimeMs": 3.532,
       "MemoryAllocationBytes": 65896,
       "ErrorMessage": null,
       "Observed": {
@@ -2886,7 +2886,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Circle fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.615,
+      "RuntimeMs": 0.607,
       "MemoryAllocationBytes": 66592,
       "ErrorMessage": null,
       "Observed": {
@@ -2899,7 +2899,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Circle fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.587,
+      "RuntimeMs": 0.586,
       "MemoryAllocationBytes": 68896,
       "ErrorMessage": null,
       "Observed": {
@@ -2912,7 +2912,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Circle fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.635,
+      "RuntimeMs": 0.589,
       "MemoryAllocationBytes": 70336,
       "ErrorMessage": null,
       "Observed": {
@@ -2925,7 +2925,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Circle fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.599,
+      "RuntimeMs": 0.582,
       "MemoryAllocationBytes": 65152,
       "ErrorMessage": null,
       "Observed": {
@@ -2938,7 +2938,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Circle fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.573,
+      "RuntimeMs": 0.572,
       "MemoryAllocationBytes": 66592,
       "ErrorMessage": null,
       "Observed": {
@@ -2951,7 +2951,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Ellipse fitting oracle",
       "Passed": true,
-      "RuntimeMs": 2.289,
+      "RuntimeMs": 2.273,
       "MemoryAllocationBytes": 75328,
       "ErrorMessage": null,
       "Observed": {
@@ -2964,7 +2964,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Ellipse fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.788,
+      "RuntimeMs": 0.778,
       "MemoryAllocationBytes": 77240,
       "ErrorMessage": null,
       "Observed": {
@@ -2977,7 +2977,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Ellipse fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.754,
+      "RuntimeMs": 0.737,
       "MemoryAllocationBytes": 79264,
       "ErrorMessage": null,
       "Observed": {
@@ -2990,7 +2990,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Ellipse fitting oracle",
       "Passed": true,
-      "RuntimeMs": 0.741,
+      "RuntimeMs": 0.74,
       "MemoryAllocationBytes": 79000,
       "ErrorMessage": null,
       "Observed": {
@@ -3003,7 +3003,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.344,
+      "RuntimeMs": 0.332,
       "MemoryAllocationBytes": 2424,
       "ErrorMessage": null,
       "Observed": {
@@ -3015,7 +3015,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.07,
+      "RuntimeMs": 0.065,
       "MemoryAllocationBytes": 1976,
       "ErrorMessage": null,
       "Observed": {
@@ -3027,7 +3027,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.044,
+      "RuntimeMs": 0.041,
       "MemoryAllocationBytes": 2824,
       "ErrorMessage": null,
       "Observed": {
@@ -3039,7 +3039,7 @@
       "Operator": "GeometricFitting",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.507,
+      "RuntimeMs": 0.467,
       "MemoryAllocationBytes": 3912,
       "ErrorMessage": null,
       "Observed": {
@@ -3051,7 +3051,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 4.842,
+      "RuntimeMs": 4.894,
       "MemoryAllocationBytes": 19440,
       "ErrorMessage": null,
       "Observed": {
@@ -3064,7 +3064,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.176,
+      "RuntimeMs": 0.16,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3077,7 +3077,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.114,
+      "RuntimeMs": 0.101,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3090,7 +3090,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.368,
+      "RuntimeMs": 0.098,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3103,7 +3103,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.266,
+      "RuntimeMs": 0.098,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3116,7 +3116,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.156,
+      "RuntimeMs": 0.094,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3129,7 +3129,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.119,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3142,7 +3142,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.1,
+      "RuntimeMs": 0.095,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3155,7 +3155,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.1,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3168,7 +3168,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.108,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3181,7 +3181,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.103,
+      "RuntimeMs": 0.095,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3194,7 +3194,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.099,
+      "RuntimeMs": 0.096,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3207,7 +3207,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.1,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3220,7 +3220,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.089,
+      "RuntimeMs": 0.125,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3233,7 +3233,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.096,
+      "RuntimeMs": 0.128,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3246,7 +3246,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Point set transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.11,
+      "RuntimeMs": 0.094,
       "MemoryAllocationBytes": 12032,
       "ErrorMessage": null,
       "Observed": {
@@ -3259,7 +3259,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.27,
+      "RuntimeMs": 0.228,
       "MemoryAllocationBytes": 1856,
       "ErrorMessage": null,
       "Observed": {
@@ -3271,7 +3271,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.051,
       "MemoryAllocationBytes": 2368,
       "ErrorMessage": null,
       "Observed": {
@@ -3283,7 +3283,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.36,
+      "RuntimeMs": 0.345,
       "MemoryAllocationBytes": 8384,
       "ErrorMessage": null,
       "Observed": {
@@ -3295,7 +3295,7 @@
       "Operator": "PerspectiveTransform",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.243,
+      "RuntimeMs": 0.241,
       "MemoryAllocationBytes": 1712,
       "ErrorMessage": null,
       "Observed": {
@@ -3307,7 +3307,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 1.432,
+      "RuntimeMs": 1.414,
       "MemoryAllocationBytes": 10624,
       "ErrorMessage": null,
       "Observed": {
@@ -3320,7 +3320,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.103,
+      "RuntimeMs": 0.106,
       "MemoryAllocationBytes": 9896,
       "ErrorMessage": null,
       "Observed": {
@@ -3333,7 +3333,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.068,
+      "RuntimeMs": 0.073,
       "MemoryAllocationBytes": 9896,
       "ErrorMessage": null,
       "Observed": {
@@ -3346,7 +3346,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.063,
+      "RuntimeMs": 0.077,
       "MemoryAllocationBytes": 9880,
       "ErrorMessage": null,
       "Observed": {
@@ -3359,7 +3359,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.061,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 9896,
       "ErrorMessage": null,
       "Observed": {
@@ -3372,7 +3372,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.061,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 9896,
       "ErrorMessage": null,
       "Observed": {
@@ -3385,7 +3385,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.066,
+      "RuntimeMs": 0.072,
       "MemoryAllocationBytes": 9896,
       "ErrorMessage": null,
       "Observed": {
@@ -3398,7 +3398,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.071,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 9880,
       "ErrorMessage": null,
       "Observed": {
@@ -3411,7 +3411,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.08,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 9912,
       "ErrorMessage": null,
       "Observed": {
@@ -3424,7 +3424,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.078,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 9912,
       "ErrorMessage": null,
       "Observed": {
@@ -3437,7 +3437,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Affine matrix oracle",
       "Passed": true,
-      "RuntimeMs": 0.078,
+      "RuntimeMs": 0.068,
       "MemoryAllocationBytes": 9912,
       "ErrorMessage": null,
       "Observed": {
@@ -3463,7 +3463,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Three-point transform oracle",
       "Passed": true,
-      "RuntimeMs": 1.18,
+      "RuntimeMs": 1.114,
       "MemoryAllocationBytes": 9288,
       "ErrorMessage": null,
       "Observed": {
@@ -3475,7 +3475,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Three-point transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.114,
+      "RuntimeMs": 0.086,
       "MemoryAllocationBytes": 9232,
       "ErrorMessage": null,
       "Observed": {
@@ -3487,7 +3487,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Three-point transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.068,
+      "RuntimeMs": 0.059,
       "MemoryAllocationBytes": 9232,
       "ErrorMessage": null,
       "Observed": {
@@ -3499,7 +3499,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Three-point transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.06,
+      "RuntimeMs": 0.057,
       "MemoryAllocationBytes": 9232,
       "ErrorMessage": null,
       "Observed": {
@@ -3511,7 +3511,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.265,
+      "RuntimeMs": 0.222,
       "MemoryAllocationBytes": 1888,
       "ErrorMessage": null,
       "Observed": {
@@ -3523,7 +3523,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.063,
+      "RuntimeMs": 0.054,
       "MemoryAllocationBytes": 1912,
       "ErrorMessage": null,
       "Observed": {
@@ -3535,7 +3535,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.351,
+      "RuntimeMs": 0.372,
       "MemoryAllocationBytes": 5912,
       "ErrorMessage": null,
       "Observed": {
@@ -3547,7 +3547,7 @@
       "Operator": "AffineTransform",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.229,
+      "RuntimeMs": 0.218,
       "MemoryAllocationBytes": 1696,
       "ErrorMessage": null,
       "Observed": {
@@ -3559,7 +3559,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 4.02,
+      "RuntimeMs": 3.913,
       "MemoryAllocationBytes": 14464,
       "ErrorMessage": null,
       "Observed": {
@@ -3572,7 +3572,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.412,
+      "RuntimeMs": 0.394,
       "MemoryAllocationBytes": 13560,
       "ErrorMessage": null,
       "Observed": {
@@ -3585,7 +3585,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.681,
+      "RuntimeMs": 0.459,
       "MemoryAllocationBytes": 13464,
       "ErrorMessage": null,
       "Observed": {
@@ -3598,7 +3598,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.438,
+      "RuntimeMs": 0.422,
       "MemoryAllocationBytes": 13528,
       "ErrorMessage": null,
       "Observed": {
@@ -3611,7 +3611,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.395,
+      "RuntimeMs": 0.48,
       "MemoryAllocationBytes": 13496,
       "ErrorMessage": null,
       "Observed": {
@@ -3624,7 +3624,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.394,
+      "RuntimeMs": 0.412,
       "MemoryAllocationBytes": 13544,
       "ErrorMessage": null,
       "Observed": {
@@ -3637,7 +3637,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.464,
+      "RuntimeMs": 0.397,
       "MemoryAllocationBytes": 13464,
       "ErrorMessage": null,
       "Observed": {
@@ -3650,7 +3650,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.551,
+      "RuntimeMs": 0.458,
       "MemoryAllocationBytes": 13560,
       "ErrorMessage": null,
       "Observed": {
@@ -3663,7 +3663,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.614,
+      "RuntimeMs": 0.452,
       "MemoryAllocationBytes": 13464,
       "ErrorMessage": null,
       "Observed": {
@@ -3676,7 +3676,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.491,
+      "RuntimeMs": 0.554,
       "MemoryAllocationBytes": 13528,
       "ErrorMessage": null,
       "Observed": {
@@ -3689,7 +3689,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.433,
+      "RuntimeMs": 0.564,
       "MemoryAllocationBytes": 13496,
       "ErrorMessage": null,
       "Observed": {
@@ -3702,7 +3702,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.456,
+      "RuntimeMs": 0.531,
       "MemoryAllocationBytes": 13544,
       "ErrorMessage": null,
       "Observed": {
@@ -3715,7 +3715,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.444,
+      "RuntimeMs": 0.443,
       "MemoryAllocationBytes": 13464,
       "ErrorMessage": null,
       "Observed": {
@@ -3728,7 +3728,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.394,
+      "RuntimeMs": 0.525,
       "MemoryAllocationBytes": 13560,
       "ErrorMessage": null,
       "Observed": {
@@ -3741,7 +3741,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.442,
+      "RuntimeMs": 0.486,
       "MemoryAllocationBytes": 13464,
       "ErrorMessage": null,
       "Observed": {
@@ -3754,7 +3754,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "OpenCV distance transform oracle",
       "Passed": true,
-      "RuntimeMs": 0.481,
+      "RuntimeMs": 0.403,
       "MemoryAllocationBytes": 13528,
       "ErrorMessage": null,
       "Observed": {
@@ -3767,7 +3767,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.603,
+      "RuntimeMs": 0.477,
       "MemoryAllocationBytes": 1752,
       "ErrorMessage": null,
       "Observed": {
@@ -3779,7 +3779,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.139,
+      "RuntimeMs": 0.076,
       "MemoryAllocationBytes": 1896,
       "ErrorMessage": null,
       "Observed": {
@@ -3791,7 +3791,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "Distance limit contract",
       "Passed": true,
-      "RuntimeMs": 1.095,
+      "RuntimeMs": 0.817,
       "MemoryAllocationBytes": 11736,
       "ErrorMessage": null,
       "Observed": {
@@ -3804,7 +3804,7 @@
       "Operator": "DistanceTransform",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.316,
+      "RuntimeMs": 0.3,
       "MemoryAllocationBytes": 2360,
       "ErrorMessage": null,
       "Observed": {

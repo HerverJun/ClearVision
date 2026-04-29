@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "contract",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T12:44:43.3566447+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:30:13.4568013+00:00",
     "CaseCount": 44,
     "Passed": 44,
     "Failed": 0,
-    "RuntimeMs": 423.143
+    "RuntimeMs": 419.719
   },
   "Operators": [
     {
@@ -13,18 +12,16 @@
       "CaseCount": 22,
       "Passed": 22,
       "Failed": 0,
-      "RuntimeMsAvg": 11.666,
-      "MemoryAllocationBytesAvg": 53554,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 11.6,
+      "MemoryAllocationBytesAvg": 53554
     },
     {
       "Operator": "OrbFeatureMatch",
       "CaseCount": 22,
       "Passed": 22,
       "Failed": 0,
-      "RuntimeMsAvg": 7.568,
-      "MemoryAllocationBytesAvg": 152028,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 7.478,
+      "MemoryAllocationBytesAvg": 152028
     }
   ],
   "Scenarios": [
@@ -33,56 +30,56 @@
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 4.754
+      "RuntimeMsAvg": 4.51
     },
     {
       "Scenario": "Input formats",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 8.82
+      "RuntimeMsAvg": 9.609
     },
     {
       "Scenario": "Matcher options",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 9.465
+      "RuntimeMsAvg": 9.246
     },
     {
       "Scenario": "Origin contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 9.748
+      "RuntimeMsAvg": 9.936
     },
     {
       "Scenario": "Positive localization",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 72.254
+      "RuntimeMsAvg": 68.472
     },
     {
       "Scenario": "Scale and rotation",
       "CaseCount": 6,
       "Passed": 6,
       "Failed": 0,
-      "RuntimeMsAvg": 9.429
+      "RuntimeMsAvg": 9.34
     },
     {
       "Scenario": "Template source",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 13.135
+      "RuntimeMsAvg": 14.138
     },
     {
       "Scenario": "Validation contract",
       "CaseCount": 10,
       "Passed": 10,
       "Failed": 0,
-      "RuntimeMsAvg": 0.043
+      "RuntimeMsAvg": 0.044
     }
   ],
   "Cases": [
@@ -91,8 +88,8 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Positive localization",
       "Passed": true,
-      "RuntimeMs": 41.51,
-      "MemoryAllocationBytes": 157416,
+      "RuntimeMs": 40.853,
+      "MemoryAllocationBytes": 108216,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -120,7 +117,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Origin contract",
       "Passed": true,
-      "RuntimeMs": 14.761,
+      "RuntimeMs": 15.583,
       "MemoryAllocationBytes": 81464,
       "ErrorMessage": null,
       "Metrics": {
@@ -135,7 +132,7 @@
         "ScoreInRange": true,
         "MinScoreSatisfied": true,
         "MinInliersSatisfied": true,
-        "PositionErrorPx": 1.1e-05,
+        "PositionErrorPx": 1.1E-05,
         "PositionCorrect": true,
         "ScoreDefinitionCorrect": true,
         "FailureReasonCorrect": true,
@@ -149,7 +146,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Origin contract",
       "Passed": true,
-      "RuntimeMs": 13.754,
+      "RuntimeMs": 14.104,
       "MemoryAllocationBytes": 79912,
       "ErrorMessage": null,
       "Metrics": {
@@ -178,8 +175,8 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Template source",
       "Passed": true,
-      "RuntimeMs": 25.431,
-      "MemoryAllocationBytes": 101584,
+      "RuntimeMs": 25.083,
+      "MemoryAllocationBytes": 150784,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedIsMatch": true,
@@ -207,7 +204,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Template source",
       "Passed": true,
-      "RuntimeMs": 14.778,
+      "RuntimeMs": 14.06,
       "MemoryAllocationBytes": 90032,
       "ErrorMessage": null,
       "Metrics": {
@@ -236,7 +233,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Matcher options",
       "Passed": true,
-      "RuntimeMs": 13.74,
+      "RuntimeMs": 13.62,
       "MemoryAllocationBytes": 44688,
       "ErrorMessage": null,
       "Metrics": {
@@ -265,7 +262,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Matcher options",
       "Passed": true,
-      "RuntimeMs": 13.971,
+      "RuntimeMs": 13.653,
       "MemoryAllocationBytes": 80440,
       "ErrorMessage": null,
       "Metrics": {
@@ -294,7 +291,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Matcher options",
       "Passed": true,
-      "RuntimeMs": 17.168,
+      "RuntimeMs": 16.784,
       "MemoryAllocationBytes": 96624,
       "ErrorMessage": null,
       "Metrics": {
@@ -323,7 +320,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Scale and rotation",
       "Passed": true,
-      "RuntimeMs": 15.283,
+      "RuntimeMs": 13.749,
       "MemoryAllocationBytes": 85056,
       "ErrorMessage": null,
       "Metrics": {
@@ -352,7 +349,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Scale and rotation",
       "Passed": true,
-      "RuntimeMs": 13.446,
+      "RuntimeMs": 13.62,
       "MemoryAllocationBytes": 69088,
       "ErrorMessage": null,
       "Metrics": {
@@ -381,7 +378,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Scale and rotation",
       "Passed": true,
-      "RuntimeMs": 13.138,
+      "RuntimeMs": 13.571,
       "MemoryAllocationBytes": 93096,
       "ErrorMessage": null,
       "Metrics": {
@@ -410,7 +407,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Input formats",
       "Passed": true,
-      "RuntimeMs": 12.861,
+      "RuntimeMs": 15.003,
       "MemoryAllocationBytes": 82128,
       "ErrorMessage": null,
       "Metrics": {
@@ -439,7 +436,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Input formats",
       "Passed": true,
-      "RuntimeMs": 12.803,
+      "RuntimeMs": 13.578,
       "MemoryAllocationBytes": 80416,
       "ErrorMessage": null,
       "Metrics": {
@@ -468,7 +465,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 10.809,
+      "RuntimeMs": 10.946,
       "MemoryAllocationBytes": 6400,
       "ErrorMessage": null,
       "Metrics": {
@@ -489,7 +486,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "场景特征点不足。"
+        "FailureReason": "\u573A\u666F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
       }
     },
     {
@@ -497,7 +494,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 10.295,
+      "RuntimeMs": 10.257,
       "MemoryAllocationBytes": 6400,
       "ErrorMessage": null,
       "Metrics": {
@@ -518,7 +515,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "场景特征点不足。"
+        "FailureReason": "\u573A\u666F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
       }
     },
     {
@@ -526,7 +523,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 12.509,
+      "RuntimeMs": 10.352,
       "MemoryAllocationBytes": 16240,
       "ErrorMessage": null,
       "Metrics": {
@@ -547,7 +544,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "模板特征点不足。"
+        "FailureReason": "\u6A21\u677F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
       }
     },
     {
@@ -555,7 +552,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.166,
+      "RuntimeMs": 0.159,
       "MemoryAllocationBytes": 2624,
       "ErrorMessage": null,
       "Metrics": {
@@ -583,7 +580,7 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.156,
+      "RuntimeMs": 0.152,
       "MemoryAllocationBytes": 1040,
       "ErrorMessage": null,
       "Metrics": {
@@ -606,7 +603,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
+        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -622,7 +619,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
+        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -638,7 +635,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "检测阈值必须在 0.0001-0.1 之间。",
+        "ErrorMessage": "\u68C0\u6D4B\u9608\u503C\u5FC5\u987B\u5728 0.0001-0.1 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -647,14 +644,14 @@
       "Operator": "AkazeFeatureMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 632,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "检测阈值必须在 0.0001-0.1 之间。",
+        "ErrorMessage": "\u68C0\u6D4B\u9608\u503C\u5FC5\u987B\u5728 0.0001-0.1 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -663,7 +660,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Positive localization",
       "Passed": true,
-      "RuntimeMs": 102.998,
+      "RuntimeMs": 96.091,
       "MemoryAllocationBytes": 284880,
       "ErrorMessage": null,
       "Metrics": {
@@ -692,7 +689,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Origin contract",
       "Passed": true,
-      "RuntimeMs": 5.407,
+      "RuntimeMs": 5.22,
       "MemoryAllocationBytes": 265288,
       "ErrorMessage": null,
       "Metrics": {
@@ -721,7 +718,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Origin contract",
       "Passed": true,
-      "RuntimeMs": 5.07,
+      "RuntimeMs": 4.838,
       "MemoryAllocationBytes": 266496,
       "ErrorMessage": null,
       "Metrics": {
@@ -750,7 +747,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Template source",
       "Passed": true,
-      "RuntimeMs": 6.156,
+      "RuntimeMs": 9.039,
       "MemoryAllocationBytes": 326728,
       "ErrorMessage": null,
       "Metrics": {
@@ -779,7 +776,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Template source",
       "Passed": true,
-      "RuntimeMs": 6.173,
+      "RuntimeMs": 8.371,
       "MemoryAllocationBytes": 326912,
       "ErrorMessage": null,
       "Metrics": {
@@ -808,7 +805,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Matcher options",
       "Passed": true,
-      "RuntimeMs": 4.346,
+      "RuntimeMs": 4.079,
       "MemoryAllocationBytes": 164376,
       "ErrorMessage": null,
       "Metrics": {
@@ -837,7 +834,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Matcher options",
       "Passed": true,
-      "RuntimeMs": 5.096,
+      "RuntimeMs": 4.811,
       "MemoryAllocationBytes": 284992,
       "ErrorMessage": null,
       "Metrics": {
@@ -866,7 +863,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Matcher options",
       "Passed": true,
-      "RuntimeMs": 2.468,
+      "RuntimeMs": 2.532,
       "MemoryAllocationBytes": 45656,
       "ErrorMessage": null,
       "Metrics": {
@@ -895,7 +892,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Scale and rotation",
       "Passed": true,
-      "RuntimeMs": 4.914,
+      "RuntimeMs": 5.062,
       "MemoryAllocationBytes": 242960,
       "ErrorMessage": null,
       "Metrics": {
@@ -924,7 +921,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Scale and rotation",
       "Passed": true,
-      "RuntimeMs": 4.86,
+      "RuntimeMs": 4.968,
       "MemoryAllocationBytes": 245752,
       "ErrorMessage": null,
       "Metrics": {
@@ -953,7 +950,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Scale and rotation",
       "Passed": true,
-      "RuntimeMs": 4.932,
+      "RuntimeMs": 5.07,
       "MemoryAllocationBytes": 259952,
       "ErrorMessage": null,
       "Metrics": {
@@ -982,7 +979,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Input formats",
       "Passed": true,
-      "RuntimeMs": 4.747,
+      "RuntimeMs": 4.835,
       "MemoryAllocationBytes": 285392,
       "ErrorMessage": null,
       "Metrics": {
@@ -1011,7 +1008,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Input formats",
       "Passed": true,
-      "RuntimeMs": 4.871,
+      "RuntimeMs": 5.019,
       "MemoryAllocationBytes": 285760,
       "ErrorMessage": null,
       "Metrics": {
@@ -1040,7 +1037,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.922,
+      "RuntimeMs": 1.012,
       "MemoryAllocationBytes": 7344,
       "ErrorMessage": null,
       "Metrics": {
@@ -1061,7 +1058,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "场景特征点不足。"
+        "FailureReason": "\u573A\u666F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
       }
     },
     {
@@ -1069,7 +1066,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 1.383,
+      "RuntimeMs": 1.406,
       "MemoryAllocationBytes": 12048,
       "ErrorMessage": null,
       "Metrics": {
@@ -1090,7 +1087,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "模板特征点不足。"
+        "FailureReason": "\u6A21\u677F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
       }
     },
     {
@@ -1098,7 +1095,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 1.938,
+      "RuntimeMs": 1.937,
       "MemoryAllocationBytes": 32696,
       "ErrorMessage": null,
       "Metrics": {
@@ -1119,7 +1116,7 @@
         "FailureReasonCorrect": true,
         "OutputImagePresent": true,
         "Passed": true,
-        "FailureReason": "模板特征点不足。"
+        "FailureReason": "\u6A21\u677F\u7279\u5F81\u70B9\u4E0D\u8DB3\u3002"
       }
     },
     {
@@ -1127,7 +1124,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.013,
       "MemoryAllocationBytes": 952,
       "ErrorMessage": null,
       "Metrics": {
@@ -1155,7 +1152,7 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.178,
+      "RuntimeMs": 0.192,
       "MemoryAllocationBytes": 1504,
       "ErrorMessage": null,
       "Metrics": {
@@ -1178,7 +1175,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
+        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -1187,14 +1184,14 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 1592,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最小匹配数必须在 3-100 之间。",
+        "ErrorMessage": "\u6700\u5C0F\u5339\u914D\u6570\u5FC5\u987B\u5728 3-100 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -1203,14 +1200,14 @@
       "Operator": "OrbFeatureMatch",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1112,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "尺度因子必须在 1.0-2.0 之间。",
+        "ErrorMessage": "\u5C3A\u5EA6\u56E0\u5B50\u5FC5\u987B\u5728 1.0-2.0 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     },
@@ -1226,7 +1223,7 @@
         "ExpectedValid": false,
         "ActualValid": false,
         "ValidationCorrect": true,
-        "ErrorMessage": "最大特征点必须在 100-2000 之间。",
+        "ErrorMessage": "\u6700\u5927\u7279\u5F81\u70B9\u5FC5\u987B\u5728 100-2000 \u4E4B\u95F4\u3002",
         "Passed": true
       }
     }

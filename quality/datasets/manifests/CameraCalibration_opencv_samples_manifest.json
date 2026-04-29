@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "2026-04-29.dataset-manifest",
+  "datasetId": "camera_calibration_opencv_samples_v1",
+  "operator": "CameraCalibration",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "public",
+    "name": "OpenCV calibration samples",
+    "version": "opencv/opencv 4.x samples/data",
+    "uri": "https://github.com/opencv/opencv/tree/4.x/samples/data",
+    "license": "Apache-2.0",
+    "citation": "OpenCV sample calibration images and calibration files from opencv/opencv samples/data",
+    "checksumSha256": "aggregate:f76fdc1e81f700c34c693b6ec431a446e0b8b0cfbedeee1fd3b84cfcaaee15fd"
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_DATASET_ROOT",
+    "relativePath": "quality/public_datasets/opencv_calibration_samples",
+    "gitPolicy": "manifest-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 0,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 13,
+    "caseListPath": "quality/datasets/opencv_calibration_samples_index.json"
+  },
+  "labels": {
+    "schema": "paired left/right chessboard calibration images plus OpenCV calibration yml/xml samples",
+    "positiveClasses": ["detected_chessboard", "accepted_calibration_bundle"],
+    "negativeClasses": ["corner_detection_failure", "rejected_calibration"],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "ReprojectionRmsPx",
+    "secondary": ["MaxReprojectionErrorPx", "Accepted", "AcceptedCaseCount", "DetectedImageCount", "FailureReasonCode", "RoundTripBundleValid", "StereoPairCount", "RuntimeMs"],
+    "thresholds": {
+      "Failed": 0,
+      "RequireAccepted": false,
+      "MinDetectedImageCount": 10,
+      "MaxReprojectionRmsPx": 1.0,
+      "MinStereoPairs": 10,
+      "MaxStereoReprojectionRmsPx": 1.0,
+      "MaxEpipolarErrorPx": 1.0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/OpenCvCalibrationDatasetRunner/OpenCvCalibrationDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/OpenCvCalibrationDatasetRunner/OpenCvCalibrationDatasetRunner.csproj -- --index quality/datasets/opencv_calibration_samples_index.json --output quality/evals/reports/CameraCalibration_opencv_samples_baseline.json --report quality/evals/reports/CameraCalibration_opencv_samples_baseline.md",
+    "baselineJson": "quality/evals/reports/CameraCalibration_opencv_samples_baseline.json",
+    "reportMarkdown": "quality/evals/reports/CameraCalibration_opencv_samples_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["corner_detection_failure", "stereo_pair_detection_failure", "stereo_metadata_failure", "high_reprojection_error", "high_stereo_reprojection_error", "high_epipolar_error", "invalid_calibration_bundle", "round_trip_serialization_failure", "output_write_failure", "undistort_regression"],
+    "minimumFailureCases": 3
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "OpenCV public sample data; raw files remain under ignored quality/public_datasets."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

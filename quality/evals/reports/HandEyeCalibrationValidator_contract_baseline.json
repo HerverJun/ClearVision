@@ -1,11 +1,10 @@
 {
-  "EvidenceKind": "contract",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T13:09:28.2840723+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:30:17.4269511+00:00",
     "CaseCount": 24,
     "Passed": 24,
     "Failed": 0,
-    "RuntimeMs": 42.986
+    "RuntimeMs": 40.995
   },
   "Operators": [
     {
@@ -13,9 +12,8 @@
       "CaseCount": 24,
       "Passed": 24,
       "Failed": 0,
-      "RuntimeMsAvg": 1.791,
-      "MemoryAllocationBytesAvg": 23921,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 1.708,
+      "MemoryAllocationBytesAvg": 21871
     }
   ],
   "Scenarios": [
@@ -24,63 +22,63 @@
       "CaseCount": 8,
       "Passed": 8,
       "Failed": 0,
-      "RuntimeMsAvg": 0.355
+      "RuntimeMsAvg": 0.363
     },
     {
       "Scenario": "Good validation",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 18.354
+      "RuntimeMsAvg": 17.512
     },
     {
       "Scenario": "Input parsing",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.71
+      "RuntimeMsAvg": 0.732
     },
     {
       "Scenario": "Output bundle contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.102
+      "RuntimeMsAvg": 0.096
     },
     {
       "Scenario": "Parameter parsing",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 1.02
+      "RuntimeMsAvg": 0.718
     },
     {
       "Scenario": "Perturbation contract",
       "CaseCount": 1,
       "Passed": 1,
       "Failed": 0,
-      "RuntimeMsAvg": 0.166
+      "RuntimeMsAvg": 0.096
     },
     {
       "Scenario": "Report contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.097
+      "RuntimeMsAvg": 0.1
     },
     {
       "Scenario": "Suggestion contract",
       "CaseCount": 2,
       "Passed": 2,
       "Failed": 0,
-      "RuntimeMsAvg": 0.116
+      "RuntimeMsAvg": 0.102
     },
     {
       "Scenario": "Validation contract",
       "CaseCount": 4,
       "Passed": 4,
       "Failed": 0,
-      "RuntimeMsAvg": 0.05
+      "RuntimeMsAvg": 0.049
     }
   ],
   "Cases": [
@@ -89,13 +87,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Good validation",
       "Passed": true,
-      "RuntimeMs": 36.209,
+      "RuntimeMs": 34.49,
       "MemoryAllocationBytes": 108728,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1e-07,
+        "MeanError": 1E-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -107,7 +105,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8e-07,
+        "MaxError": 1.8E-07,
         "MeanRotationError": 0
       }
     },
@@ -116,13 +114,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Good validation",
       "Passed": true,
-      "RuntimeMs": 0.499,
+      "RuntimeMs": 0.534,
       "MemoryAllocationBytes": 51016,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 8e-08,
+        "MeanError": 8E-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -134,7 +132,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.4e-07,
+        "MaxError": 1.4E-07,
         "MeanRotationError": 0
       }
     },
@@ -143,13 +141,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Input parsing",
       "Passed": true,
-      "RuntimeMs": 1.221,
+      "RuntimeMs": 1.264,
       "MemoryAllocationBytes": 56464,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1e-07,
+        "MeanError": 1E-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -161,7 +159,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8e-07,
+        "MaxError": 1.8E-07,
         "MeanRotationError": 0
       }
     },
@@ -170,13 +168,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Input parsing",
       "Passed": true,
-      "RuntimeMs": 0.2,
+      "RuntimeMs": 0.201,
       "MemoryAllocationBytes": 40392,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 8e-08,
+        "MeanError": 8E-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -188,7 +186,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.4e-07,
+        "MaxError": 1.4E-07,
         "MeanRotationError": 0
       }
     },
@@ -197,13 +195,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Output bundle contract",
       "Passed": true,
-      "RuntimeMs": 0.095,
-      "MemoryAllocationBytes": 27744,
+      "RuntimeMs": 0.099,
+      "MemoryAllocationBytes": 27736,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1e-07,
+        "MeanError": 1E-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -215,7 +213,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8e-07,
+        "MaxError": 1.8E-07,
         "MeanRotationError": 0
       }
     },
@@ -224,13 +222,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Report contract",
       "Passed": true,
-      "RuntimeMs": 0.101,
+      "RuntimeMs": 0.104,
       "MemoryAllocationBytes": 28112,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1e-07,
+        "MeanError": 1E-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -242,7 +240,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8e-07,
+        "MaxError": 1.8E-07,
         "MeanRotationError": 0
       }
     },
@@ -251,13 +249,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Report contract",
       "Passed": true,
-      "RuntimeMs": 0.093,
+      "RuntimeMs": 0.095,
       "MemoryAllocationBytes": 27688,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1e-07,
+        "MeanError": 1E-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -269,7 +267,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8e-07,
+        "MaxError": 1.8E-07,
         "MeanRotationError": 0
       }
     },
@@ -278,13 +276,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Suggestion contract",
       "Passed": true,
-      "RuntimeMs": 0.119,
+      "RuntimeMs": 0.104,
       "MemoryAllocationBytes": 27640,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 8e-08,
+        "MeanError": 8E-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -296,7 +294,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.4e-07,
+        "MaxError": 1.4E-07,
         "MeanRotationError": 0
       }
     },
@@ -305,13 +303,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Suggestion contract",
       "Passed": true,
-      "RuntimeMs": 0.113,
+      "RuntimeMs": 0.099,
       "MemoryAllocationBytes": 25880,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 9e-08,
+        "MeanError": 9E-08,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -323,7 +321,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.5e-07,
+        "MaxError": 1.5E-07,
         "MeanRotationError": 0
       }
     },
@@ -332,7 +330,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Perturbation contract",
       "Passed": true,
-      "RuntimeMs": 0.166,
+      "RuntimeMs": 0.096,
       "MemoryAllocationBytes": 27704,
       "ErrorMessage": null,
       "Metrics": {
@@ -359,7 +357,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Output bundle contract",
       "Passed": true,
-      "RuntimeMs": 0.108,
+      "RuntimeMs": 0.092,
       "MemoryAllocationBytes": 27704,
       "ErrorMessage": null,
       "Metrics": {
@@ -386,13 +384,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Parameter parsing",
       "Passed": true,
-      "RuntimeMs": 1.02,
+      "RuntimeMs": 0.718,
       "MemoryAllocationBytes": 27736,
       "ErrorMessage": null,
       "Metrics": {
         "ActualSuccess": true,
         "QualityCorrect": true,
-        "MeanError": 1e-07,
+        "MeanError": 1E-07,
         "MeanErrorCorrect": true,
         "MaxErrorFinite": true,
         "RotationErrorFinite": true,
@@ -404,7 +402,7 @@
         "FrameMetadataCorrect": true,
         "Passed": true,
         "Quality": "good",
-        "MaxError": 1.8e-07,
+        "MaxError": 1.8E-07,
         "MeanRotationError": 0
       }
     },
@@ -413,7 +411,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.106,
+      "RuntimeMs": 0.098,
       "MemoryAllocationBytes": 4232,
       "ErrorMessage": null,
       "Metrics": {
@@ -429,8 +427,8 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 2.333,
-      "MemoryAllocationBytes": 72296,
+      "RuntimeMs": 2.384,
+      "MemoryAllocationBytes": 23096,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedFailure": true,
@@ -445,7 +443,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.347,
+      "RuntimeMs": 0.36,
       "MemoryAllocationBytes": 4592,
       "ErrorMessage": null,
       "Metrics": {
@@ -461,7 +459,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.024,
+      "RuntimeMs": 0.027,
       "MemoryAllocationBytes": 3736,
       "ErrorMessage": null,
       "Metrics": {
@@ -477,7 +475,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.019,
+      "RuntimeMs": 0.021,
       "MemoryAllocationBytes": 4016,
       "ErrorMessage": null,
       "Metrics": {
@@ -493,7 +491,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 1176,
       "ErrorMessage": null,
       "Metrics": {
@@ -509,7 +507,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Failure contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 1840,
       "ErrorMessage": null,
       "Metrics": {
@@ -541,7 +539,7 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.118,
+      "RuntimeMs": 0.116,
       "MemoryAllocationBytes": 640,
       "ErrorMessage": null,
       "Metrics": {
@@ -571,13 +569,13 @@
       "Operator": "HandEyeCalibrationValidator",
       "Scenario": "Validation contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.069,
       "MemoryAllocationBytes": 1264,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedValid": false,
         "ActualValid": false,
-        "ErrorMessage": "CalibrationType must be 'eye_in_hand' or 'eye_to_hand'.",
+        "ErrorMessage": "CalibrationType must be \u0027eye_in_hand\u0027 or \u0027eye_to_hand\u0027.",
         "Passed": true
       }
     },

@@ -6,14 +6,52 @@ internal static class OperatorImageDepthHelper
 {
     public static Mat EnsureSingleChannelGray(Mat src)
     {
-        if (src.Channels() == 1)
+        var channels = src.Channels();
+        if (channels == 1)
         {
             return src.Clone();
         }
 
         var gray = new Mat();
-        Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-        return gray;
+        if (channels == 3)
+        {
+            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+            return gray;
+        }
+
+        if (channels == 4)
+        {
+            Cv2.CvtColor(src, gray, ColorConversionCodes.BGRA2GRAY);
+            return gray;
+        }
+
+        gray.Dispose();
+        throw new InvalidOperationException($"Unsupported image channel count: {channels}. Expected 1, 3, or 4 channels.");
+    }
+
+    public static Mat EnsureBgrColor(Mat src)
+    {
+        var channels = src.Channels();
+        if (channels == 3)
+        {
+            return src.Clone();
+        }
+
+        var color = new Mat();
+        if (channels == 1)
+        {
+            Cv2.CvtColor(src, color, ColorConversionCodes.GRAY2BGR);
+            return color;
+        }
+
+        if (channels == 4)
+        {
+            Cv2.CvtColor(src, color, ColorConversionCodes.BGRA2BGR);
+            return color;
+        }
+
+        color.Dispose();
+        throw new InvalidOperationException($"Unsupported image channel count: {channels}. Expected 1, 3, or 4 channels.");
     }
 
     public static Mat ConvertSingleChannelToByte(Mat src, out double minValue, out double maxValue)

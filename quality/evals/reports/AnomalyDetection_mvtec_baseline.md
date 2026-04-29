@@ -1,6 +1,6 @@
 # AnomalyDetection MVTec AD Lite Baseline
 
-GeneratedAtUtc: `2026-04-26T07:33:26.6807218+00:00`
+GeneratedAtUtc: `2026-04-29T03:29:10.1062841+00:00`
 Index: `quality/datasets/mvtec_ad_lite_index.json`
 
 ## Summary
@@ -13,18 +13,23 @@ Index: `quality/datasets/mvtec_ad_lite_index.json`
 | Test good images | 33 |
 | Image AUROC | 0.6609 |
 | Pixel AUROC | 0.6709 |
+| Min image AUROC | 0.5000 |
+| Min pixel AUROC | 0.5000 |
+| Min category image AUROC | 0.5000 |
+| Min category pixel AUROC | 0.5000 |
+| Failed gates | 0 |
 | Max side | 128 |
 | Patch size / stride | 16 / 16 |
 | Pixel sample stride | 2 |
 | Coreset ratio | 0.0200 |
-| Runtime ms | 5103.933 |
+| Runtime ms | 4897.301 |
 
 ## Categories
 
 | Category | Train | Test | Anomaly | Bank features | Train ms | Infer ms | Image AUROC | Pixel AUROC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| grid | 264 | 78 | 57 | 338 | 386.407 | 816.854 | 0.6140 | 0.5605 |
-| toothbrush | 60 | 42 | 30 | 77 | 21.978 | 742.390 | 0.7500 | 0.7630 |
+| grid | 264 | 78 | 57 | 338 | 374.791 | 772.996 | 0.6140 | 0.5605 |
+| toothbrush | 60 | 42 | 30 | 77 | 20.637 | 710.374 | 0.7500 | 0.7630 |
 
 ## Notes
 

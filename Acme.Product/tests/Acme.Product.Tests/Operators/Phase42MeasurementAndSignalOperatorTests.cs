@@ -285,6 +285,30 @@ public class Phase42MeasurementAndSignalOperatorTests
     }
 
     [Fact]
+    public async Task FrequencyFilter_WithUnknownFilterType_ShouldFailClosed()
+    {
+        var sut = new FrequencyFilterOperator(Substitute.For<ILogger<FrequencyFilterOperator>>());
+        var spectrum = new[]
+        {
+            Complex.One,
+            new Complex(0.5, -0.25),
+            Complex.Zero,
+            new Complex(-0.5, 0.25)
+        };
+
+        var result = await sut.ExecuteAsync(new Operator("FrequencyFilter", OperatorType.FrequencyFilter, 0, 0), new Dictionary<string, object>
+        {
+            ["Spectrum"] = spectrum,
+            ["FilterType"] = "identity-by-typo",
+            ["CutoffLow"] = 0.2,
+            ["CutoffHigh"] = 0.4
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("FilterType");
+    }
+
+    [Fact]
     public async Task FftAndInverseFft_ShouldReconstructBinAlignedSignalWithinTolerance()
     {
         var fft = new FFT1DOperator(Substitute.For<ILogger<FFT1DOperator>>());

@@ -1,0 +1,24 @@
+{
+  "name": "OpenCV calibration samples",
+  "source_dataset": "opencv/opencv samples/data",
+  "collected_at": "2026-04-29",
+  "source_pages": [
+    "https://github.com/opencv/opencv/tree/4.x/samples/data",
+    "https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html"
+  ],
+  "license": {
+    "name": "Apache License 2.0",
+    "spdx_like": "Apache-2.0",
+    "url": "https://github.com/opencv/opencv/blob/4.x/LICENSE"
+  },
+  "local_root": "quality/public_datasets/opencv_calibration_samples",
+  "index_path": "quality/datasets/opencv_calibration_samples_index.json",
+  "git_policy": "The local_root is ignored by git; keep downloaded images and calibration files local.",
+  "source_url_template": "https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/{file}",
+  "aggregate_sha256": "f76fdc1e81f700c34c693b6ec431a446e0b8b0cfbedeee1fd3b84cfcaaee15fd",
+  "files": {
+    "single_left_images": 13,
+    "stereo_pairs": 13,
+    "calibration_files": 3
+  }
+}

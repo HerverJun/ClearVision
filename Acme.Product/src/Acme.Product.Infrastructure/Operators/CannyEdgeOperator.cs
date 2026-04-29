@@ -25,6 +25,7 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("Threshold2", "High Threshold", "double", DefaultValue = 150.0, Min = 0.0, Max = 255.0)]
 [OperatorParam("AutoThreshold", "Auto Threshold", "bool", DefaultValue = false)]
 [OperatorParam("AutoThresholdSigma", "Auto Threshold Sigma", "double", DefaultValue = 0.33, Min = 0.01, Max = 1.0)]
+[OperatorParam("AutoThresholdStrategy", "Auto Threshold Strategy", "enum", DefaultValue = "MedianIntensity", Options = new[] { "MedianIntensity|Median Intensity", "GradientPercentile|Gradient Percentile" })]
 [OperatorParam("EnableGaussianBlur", "Enable Gaussian Blur", "bool", DefaultValue = true)]
 [OperatorParam("GaussianKernelSize", "Gaussian Kernel Size", "int", DefaultValue = 5, Min = 3, Max = 15)]
 [OperatorParam("ApertureSize", "Sobel Aperture Size", "enum", DefaultValue = "3", Options = new[] { "3|3", "5|5", "7|7" })]
@@ -51,6 +52,7 @@ public class CannyEdgeOperator : OperatorBase
         var threshold2 = GetDoubleParam(@operator, "Threshold2", 150.0, 0, 255);
         var autoThreshold = GetBoolParam(@operator, "AutoThreshold", false);
         var autoThresholdSigma = GetDoubleParam(@operator, "AutoThresholdSigma", 0.33, 0.01, 1.0);
+        var autoThresholdStrategy = GetStringParam(@operator, "AutoThresholdStrategy", "MedianIntensity");
         var enableGaussianBlur = GetBoolParam(@operator, "EnableGaussianBlur", true);
         var gaussianKernelSize = GetIntParam(@operator, "GaussianKernelSize", 5, 1, 31);
         var apertureSize = GetIntParam(@operator, "ApertureSize", 3, 3, 7);
@@ -82,9 +84,17 @@ public class CannyEdgeOperator : OperatorBase
 
         if (autoThreshold)
         {
-            var median = ComputeMedianIntensity(processedSrc);
-            threshold1 = Math.Clamp((1.0 - autoThresholdSigma) * median, 0.0, 255.0);
-            threshold2 = Math.Clamp((1.0 + autoThresholdSigma) * median, 0.0, 255.0);
+            if (autoThresholdStrategy.Equals("GradientPercentile", StringComparison.OrdinalIgnoreCase))
+            {
+                (threshold1, threshold2) = ComputeGradientPercentileThresholds(processedSrc);
+            }
+            else
+            {
+                var median = ComputeMedianIntensity(processedSrc);
+                threshold1 = Math.Clamp((1.0 - autoThresholdSigma) * median, 0.0, 255.0);
+                threshold2 = Math.Clamp((1.0 + autoThresholdSigma) * median, 0.0, 255.0);
+            }
+
             if (threshold2 <= threshold1)
             {
                 threshold2 = Math.Min(255.0, threshold1 + 1.0);
@@ -93,6 +103,9 @@ public class CannyEdgeOperator : OperatorBase
 
         var dst = new Mat();
         Cv2.Canny(processedSrc, dst, threshold1, threshold2, apertureSize, l2Gradient);
+        var edgePixelRatio = dst.Width > 0 && dst.Height > 0
+            ? (double)Cv2.CountNonZero(dst) / (dst.Width * dst.Height)
+            : 0.0;
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst, new Dictionary<string, object>
         {
@@ -100,6 +113,8 @@ public class CannyEdgeOperator : OperatorBase
             { "Threshold1Used", threshold1 },
             { "Threshold2Used", threshold2 },
             { "AutoThreshold", autoThreshold },
+            { "AutoThresholdStrategy", autoThresholdStrategy },
+            { "EdgePixelRatio", edgePixelRatio },
             { "InputBitDepth", gray.Depth().ToString() }
         })));
     }
@@ -125,7 +140,69 @@ public class CannyEdgeOperator : OperatorBase
             return ValidationResult.Invalid("AutoThresholdSigma must be in (0, 1].");
         }
 
+        var autoThresholdStrategy = GetStringParam(@operator, "AutoThresholdStrategy", "MedianIntensity");
+        var validAutoThresholdStrategies = new[] { "MedianIntensity", "GradientPercentile" };
+        if (!validAutoThresholdStrategies.Contains(autoThresholdStrategy, StringComparer.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("AutoThresholdStrategy must be MedianIntensity or GradientPercentile.");
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static (double Low, double High) ComputeGradientPercentileThresholds(Mat gray)
+    {
+        using var gradX = new Mat();
+        using var gradY = new Mat();
+        using var magnitude = new Mat();
+        Cv2.Sobel(gray, gradX, MatType.CV_32FC1, 1, 0, 3);
+        Cv2.Sobel(gray, gradY, MatType.CV_32FC1, 0, 1, 3);
+        Cv2.Magnitude(gradX, gradY, magnitude);
+
+        var low = EstimatePositivePercentile(magnitude, 0.70);
+        var high = EstimatePositivePercentile(magnitude, 0.90);
+        if (high <= 0.0)
+        {
+            var fallbackMedian = ComputeMedianIntensity(gray);
+            return (
+                Math.Clamp(fallbackMedian * 0.67, 0.0, 255.0),
+                Math.Clamp(Math.Max(fallbackMedian * 1.33, fallbackMedian + 1.0), 1.0, 255.0));
+        }
+
+        if (high <= low)
+        {
+            high = low * 1.5;
+        }
+
+        low = Math.Max(1.0, low);
+        high = Math.Max(low + 1.0, high);
+        return (low, high);
+    }
+
+    private static double EstimatePositivePercentile(Mat values32f, double percentile)
+    {
+        var values = new List<float>(Math.Min(values32f.Rows * values32f.Cols, 262_144));
+        var stride = Math.Max(1, (int)Math.Sqrt(Math.Max(1, values32f.Rows * values32f.Cols / 262_144.0)));
+        for (var y = 0; y < values32f.Rows; y += stride)
+        {
+            for (var x = 0; x < values32f.Cols; x += stride)
+            {
+                var value = values32f.At<float>(y, x);
+                if (float.IsFinite(value) && value > 1e-3f)
+                {
+                    values.Add(value);
+                }
+            }
+        }
+
+        if (values.Count == 0)
+        {
+            return 0.0;
+        }
+
+        values.Sort();
+        var index = (int)Math.Clamp(Math.Round((values.Count - 1) * percentile), 0, values.Count - 1);
+        return values[index];
     }
 
     private static double ComputeMedianIntensity(Mat gray)

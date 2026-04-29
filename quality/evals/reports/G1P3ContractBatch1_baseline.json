@@ -1,11 +1,11 @@
 {
   "EvidenceKind": "contract",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-27T09:56:28.3093358+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:30:21.8388576+00:00",
     "CaseCount": 840,
     "Passed": 840,
     "Failed": 0,
-    "RuntimeMs": 139.533
+    "RuntimeMs": 149.782
   },
   "Operators": [
     {
@@ -14,7 +14,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.035,
+      "RuntimeMsAvg": 0.036,
       "MemoryAllocationBytesAvg": 2074
     },
     {
@@ -23,8 +23,8 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 1.745,
-      "MemoryAllocationBytesAvg": 17766
+      "RuntimeMsAvg": 1.86,
+      "MemoryAllocationBytesAvg": 17776
     },
     {
       "Operator": "BoxFilter",
@@ -32,7 +32,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.083,
+      "RuntimeMsAvg": 0.115,
       "MemoryAllocationBytesAvg": 2158
     },
     {
@@ -41,7 +41,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.079,
+      "RuntimeMsAvg": 0.098,
       "MemoryAllocationBytesAvg": 2138
     },
     {
@@ -50,7 +50,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 3.103,
+      "RuntimeMsAvg": 3.434,
       "MemoryAllocationBytesAvg": 1890
     },
     {
@@ -59,7 +59,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.044,
+      "RuntimeMsAvg": 0.045,
       "MemoryAllocationBytesAvg": 1806
     },
     {
@@ -68,7 +68,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.049,
+      "RuntimeMsAvg": 0.05,
       "MemoryAllocationBytesAvg": 1372
     },
     {
@@ -77,7 +77,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.083,
+      "RuntimeMsAvg": 0.077,
       "MemoryAllocationBytesAvg": 2178
     },
     {
@@ -95,7 +95,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.047,
+      "RuntimeMsAvg": 0.046,
       "MemoryAllocationBytesAvg": 2146
     },
     {
@@ -113,7 +113,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.028,
+      "RuntimeMsAvg": 0.027,
       "MemoryAllocationBytesAvg": 1795
     },
     {
@@ -122,7 +122,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.143,
+      "RuntimeMsAvg": 0.126,
       "MemoryAllocationBytesAvg": 2929
     },
     {
@@ -131,7 +131,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.077,
+      "RuntimeMsAvg": 0.072,
       "MemoryAllocationBytesAvg": 2229
     },
     {
@@ -149,7 +149,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.051,
+      "RuntimeMsAvg": 0.041,
       "MemoryAllocationBytesAvg": 1408
     },
     {
@@ -167,7 +167,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.044,
+      "RuntimeMsAvg": 0.042,
       "MemoryAllocationBytesAvg": 1850
     },
     {
@@ -176,7 +176,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.034,
+      "RuntimeMsAvg": 0.035,
       "MemoryAllocationBytesAvg": 1799
     },
     {
@@ -185,7 +185,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.039,
+      "RuntimeMsAvg": 0.041,
       "MemoryAllocationBytesAvg": 1830
     },
     {
@@ -194,7 +194,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.033,
+      "RuntimeMsAvg": 0.034,
       "MemoryAllocationBytesAvg": 1777
     },
     {
@@ -203,7 +203,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.034,
+      "RuntimeMsAvg": 0.037,
       "MemoryAllocationBytesAvg": 1825
     },
     {
@@ -212,7 +212,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.03,
+      "RuntimeMsAvg": 0.031,
       "MemoryAllocationBytesAvg": 1790
     },
     {
@@ -221,7 +221,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.046,
+      "RuntimeMsAvg": 0.037,
       "MemoryAllocationBytesAvg": 1802
     },
     {
@@ -230,7 +230,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.032,
+      "RuntimeMsAvg": 0.03,
       "MemoryAllocationBytesAvg": 1853
     },
     {
@@ -257,7 +257,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.042,
+      "RuntimeMsAvg": 0.041,
       "MemoryAllocationBytesAvg": 1777
     },
     {
@@ -266,7 +266,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.028,
+      "RuntimeMsAvg": 0.027,
       "MemoryAllocationBytesAvg": 1776
     },
     {
@@ -284,7 +284,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.027,
+      "RuntimeMsAvg": 0.025,
       "MemoryAllocationBytesAvg": 1761
     },
     {
@@ -293,7 +293,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.038,
+      "RuntimeMsAvg": 0.039,
       "MemoryAllocationBytesAvg": 2176
     },
     {
@@ -311,7 +311,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.058,
+      "RuntimeMsAvg": 0.059,
       "MemoryAllocationBytesAvg": 2194
     },
     {
@@ -338,7 +338,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.059,
+      "RuntimeMsAvg": 0.06,
       "MemoryAllocationBytesAvg": 2181
     },
     {
@@ -347,7 +347,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.062,
+      "RuntimeMsAvg": 0.079,
       "MemoryAllocationBytesAvg": 2208
     },
     {
@@ -356,7 +356,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.037,
+      "RuntimeMsAvg": 0.047,
       "MemoryAllocationBytesAvg": 2207
     },
     {
@@ -365,7 +365,7 @@
       "CaseCount": 21,
       "Passed": 21,
       "Failed": 0,
-      "RuntimeMsAvg": 0.048,
+      "RuntimeMsAvg": 0.054,
       "MemoryAllocationBytesAvg": 1811
     }
   ],
@@ -375,28 +375,28 @@
       "CaseCount": 40,
       "Passed": 40,
       "Failed": 0,
-      "RuntimeMsAvg": 0.003
+      "RuntimeMsAvg": 0.004
     },
     {
       "Scenario": "Card contract",
       "CaseCount": 80,
       "Passed": 80,
       "Failed": 0,
-      "RuntimeMsAvg": 0.067
+      "RuntimeMsAvg": 0.065
     },
     {
       "Scenario": "DI construction contract",
       "CaseCount": 80,
       "Passed": 80,
       "Failed": 0,
-      "RuntimeMsAvg": 0.096
+      "RuntimeMsAvg": 0.094
     },
     {
       "Scenario": "Execution failure contract",
       "CaseCount": 40,
       "Passed": 40,
       "Failed": 0,
-      "RuntimeMsAvg": 0.631
+      "RuntimeMsAvg": 0.666
     },
     {
       "Scenario": "Implementation contract",
@@ -410,28 +410,28 @@
       "CaseCount": 120,
       "Passed": 120,
       "Failed": 0,
-      "RuntimeMsAvg": 0.007
+      "RuntimeMsAvg": 0.005
     },
     {
       "Scenario": "Operator entity contract",
       "CaseCount": 80,
       "Passed": 80,
       "Failed": 0,
-      "RuntimeMsAvg": 0.23
+      "RuntimeMsAvg": 0.24
     },
     {
       "Scenario": "OperatorType contract",
       "CaseCount": 80,
       "Passed": 80,
       "Failed": 0,
-      "RuntimeMsAvg": 0.042
+      "RuntimeMsAvg": 0.05
     },
     {
       "Scenario": "Parameter contract",
       "CaseCount": 40,
       "Passed": 40,
       "Failed": 0,
-      "RuntimeMsAvg": 1.928
+      "RuntimeMsAvg": 2.126
     }
   ],
   "Cases": [
@@ -440,7 +440,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 3.098,
+      "RuntimeMs": 3.743,
       "MemoryAllocationBytes": 448,
       "ErrorMessage": null,
       "Observed": {
@@ -452,7 +452,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.166,
+      "RuntimeMs": 0.171,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -464,7 +464,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.122,
+      "RuntimeMs": 0.128,
       "MemoryAllocationBytes": 640,
       "ErrorMessage": null,
       "Observed": {
@@ -476,7 +476,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.107,
+      "RuntimeMs": 0.115,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -488,7 +488,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.079,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -500,7 +500,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.088,
+      "RuntimeMs": 0.097,
       "MemoryAllocationBytes": 504,
       "ErrorMessage": null,
       "Observed": {
@@ -512,7 +512,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.049,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -524,7 +524,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.306,
+      "RuntimeMs": 0.304,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -536,7 +536,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.08,
+      "RuntimeMs": 0.084,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -548,7 +548,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 1.832,
+      "RuntimeMs": 1.821,
       "MemoryAllocationBytes": 1888,
       "ErrorMessage": null,
       "Observed": {
@@ -560,7 +560,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 1.38,
+      "RuntimeMs": 1.457,
       "MemoryAllocationBytes": 2744,
       "ErrorMessage": null,
       "Observed": {
@@ -572,7 +572,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 3.291,
+      "RuntimeMs": 3.711,
       "MemoryAllocationBytes": 6272,
       "ErrorMessage": null,
       "Observed": {
@@ -585,7 +585,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 7.097,
+      "RuntimeMs": 7.71,
       "MemoryAllocationBytes": 11032,
       "ErrorMessage": null,
       "Observed": {
@@ -598,11 +598,11 @@
       "Operator": "BilateralFilter",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.148,
+      "RuntimeMs": 0.147,
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "5cdf4055-343e-418a-8cef-e6b4619d21cf",
+        "OperatorId": "8bce73ca-2d5d-43be-a02c-5c58b3573365",
         "OperatorType": "BilateralFilter"
       }
     },
@@ -611,8 +611,8 @@
       "Operator": "BilateralFilter",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 17.526,
-      "MemoryAllocationBytes": 324664,
+      "RuntimeMs": 18.298,
+      "MemoryAllocationBytes": 300232,
       "ErrorMessage": null,
       "Observed": {
         "Parameter": "ContractProbe",
@@ -624,7 +624,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.261,
+      "RuntimeMs": 0.221,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -637,7 +637,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.31,
+      "RuntimeMs": 0.143,
       "MemoryAllocationBytes": 440,
       "ErrorMessage": null,
       "Observed": {
@@ -650,7 +650,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.146,
+      "RuntimeMs": 0.107,
       "MemoryAllocationBytes": 504,
       "ErrorMessage": null,
       "Observed": {
@@ -664,8 +664,8 @@
       "Operator": "BilateralFilter",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.16,
-      "MemoryAllocationBytes": 680,
+      "RuntimeMs": 0.142,
+      "MemoryAllocationBytes": 25304,
       "ErrorMessage": null,
       "Observed": {
         "Card": "docs/\u7B97\u5B50\u8D44\u6599/\u7B97\u5B50\u540D\u7247/BilateralFilter.md"
@@ -676,7 +676,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.3,
+      "RuntimeMs": 0.41,
       "MemoryAllocationBytes": 19240,
       "ErrorMessage": null,
       "Observed": {
@@ -688,7 +688,7 @@
       "Operator": "BilateralFilter",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0.099,
+      "RuntimeMs": 0.126,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -724,7 +724,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -736,7 +736,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -772,7 +772,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -784,7 +784,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.008,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -820,7 +820,7 @@
       "Operator": "BoxFilter",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.052,
+      "RuntimeMs": 0.059,
       "MemoryAllocationBytes": 2400,
       "ErrorMessage": null,
       "Observed": {
@@ -832,7 +832,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.548,
+      "RuntimeMs": 0.682,
       "MemoryAllocationBytes": 3880,
       "ErrorMessage": null,
       "Observed": {
@@ -845,7 +845,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.908,
+      "RuntimeMs": 1.37,
       "MemoryAllocationBytes": 2616,
       "ErrorMessage": null,
       "Observed": {
@@ -858,11 +858,11 @@
       "Operator": "BoxFilter",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "29ec57d9-89ad-4580-983f-30c301a54604",
+        "OperatorId": "0692a59d-5fb1-45c5-a5c5-c7395a061691",
         "OperatorType": "BoxFilter"
       }
     },
@@ -871,7 +871,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.037,
+      "RuntimeMs": 0.047,
       "MemoryAllocationBytes": 1432,
       "ErrorMessage": null,
       "Observed": {
@@ -884,7 +884,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -924,7 +924,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.046,
+      "RuntimeMs": 0.051,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -936,7 +936,7 @@
       "Operator": "BoxFilter",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.099,
+      "RuntimeMs": 0.135,
       "MemoryAllocationBytes": 26872,
       "ErrorMessage": null,
       "Observed": {
@@ -960,7 +960,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -972,7 +972,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -984,7 +984,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -1020,7 +1020,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -1044,7 +1044,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -1056,7 +1056,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -1068,7 +1068,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.016,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -1080,7 +1080,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.051,
+      "RuntimeMs": 0.059,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -1092,7 +1092,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.953,
+      "RuntimeMs": 1.26,
       "MemoryAllocationBytes": 4208,
       "ErrorMessage": null,
       "Observed": {
@@ -1105,7 +1105,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.493,
+      "RuntimeMs": 0.526,
       "MemoryAllocationBytes": 2616,
       "ErrorMessage": null,
       "Observed": {
@@ -1122,7 +1122,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "3e993ff3-0e93-4f87-ab3a-0cf528cc46e3",
+        "OperatorId": "6214cae3-edd9-44cb-8941-643a9debd9b7",
         "OperatorType": "ClaheEnhancement"
       }
     },
@@ -1131,7 +1131,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.019,
+      "RuntimeMs": 0.026,
       "MemoryAllocationBytes": 1448,
       "ErrorMessage": null,
       "Observed": {
@@ -1184,7 +1184,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.041,
+      "RuntimeMs": 0.044,
       "MemoryAllocationBytes": 696,
       "ErrorMessage": null,
       "Observed": {
@@ -1196,7 +1196,7 @@
       "Operator": "ClaheEnhancement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.087,
       "MemoryAllocationBytes": 26016,
       "ErrorMessage": null,
       "Observed": {
@@ -1220,7 +1220,7 @@
       "Operator": "ColorConversion",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -1232,7 +1232,7 @@
       "Operator": "ColorConversion",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -1244,7 +1244,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.007,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -1256,7 +1256,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -1268,7 +1268,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -1304,7 +1304,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -1328,7 +1328,7 @@
       "Operator": "ColorConversion",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -1340,7 +1340,7 @@
       "Operator": "ColorConversion",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.051,
+      "RuntimeMs": 0.054,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -1352,7 +1352,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 64.338,
+      "RuntimeMs": 71.27,
       "MemoryAllocationBytes": 5320,
       "ErrorMessage": null,
       "Observed": {
@@ -1365,7 +1365,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.529,
+      "RuntimeMs": 0.548,
       "MemoryAllocationBytes": 2608,
       "ErrorMessage": null,
       "Observed": {
@@ -1378,11 +1378,11 @@
       "Operator": "ColorConversion",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "07a451b2-57cf-4b1b-94c9-e852a3dde8bb",
+        "OperatorId": "b13d5ce9-39cb-4c74-b2bb-adef50256524",
         "OperatorType": "ColorConversion"
       }
     },
@@ -1391,7 +1391,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.034,
+      "RuntimeMs": 0.029,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -1404,7 +1404,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -1444,7 +1444,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.061,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -1456,7 +1456,7 @@
       "Operator": "ColorConversion",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.097,
+      "RuntimeMs": 0.101,
       "MemoryAllocationBytes": 19728,
       "ErrorMessage": null,
       "Observed": {
@@ -1504,7 +1504,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 536,
       "ErrorMessage": null,
       "Observed": {
@@ -1576,7 +1576,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -1600,7 +1600,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.06,
+      "RuntimeMs": 0.063,
       "MemoryAllocationBytes": 2408,
       "ErrorMessage": null,
       "Observed": {
@@ -1612,7 +1612,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.185,
+      "RuntimeMs": 0.195,
       "MemoryAllocationBytes": 3728,
       "ErrorMessage": null,
       "Observed": {
@@ -1625,7 +1625,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 1.156,
+      "RuntimeMs": 1.161,
       "MemoryAllocationBytes": 2632,
       "ErrorMessage": null,
       "Observed": {
@@ -1638,11 +1638,11 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "d0439f50-9a71-4def-b3b8-f94e24484c67",
+        "OperatorId": "90ac35de-2e5a-4b8f-a217-3fecb5f6debb",
         "OperatorType": "ContourMeasurement"
       }
     },
@@ -1704,7 +1704,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.045,
+      "RuntimeMs": 0.042,
       "MemoryAllocationBytes": 704,
       "ErrorMessage": null,
       "Observed": {
@@ -1716,7 +1716,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.223,
+      "RuntimeMs": 0.08,
       "MemoryAllocationBytes": 27272,
       "ErrorMessage": null,
       "Observed": {
@@ -1728,7 +1728,7 @@
       "Operator": "ContourMeasurement",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -1752,7 +1752,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -1776,7 +1776,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -1788,7 +1788,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -1824,7 +1824,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -1848,7 +1848,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -1872,7 +1872,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.508,
+      "RuntimeMs": 0.506,
       "MemoryAllocationBytes": 4112,
       "ErrorMessage": null,
       "Observed": {
@@ -1885,7 +1885,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.284,
+      "RuntimeMs": 0.287,
       "MemoryAllocationBytes": 2608,
       "ErrorMessage": null,
       "Observed": {
@@ -1902,7 +1902,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "66a8c836-db93-467f-a760-ca7e8f95e814",
+        "OperatorId": "78403fee-ede9-4abd-83f1-8bf825d6b9b6",
         "OperatorType": "CopyMakeBorder"
       }
     },
@@ -1911,7 +1911,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.018,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -1964,7 +1964,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.042,
+      "RuntimeMs": 0.04,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -1976,7 +1976,7 @@
       "Operator": "CopyMakeBorder",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.072,
+      "RuntimeMs": 0.071,
       "MemoryAllocationBytes": 19840,
       "ErrorMessage": null,
       "Observed": {
@@ -2024,7 +2024,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -2072,7 +2072,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -2084,7 +2084,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -2120,7 +2120,7 @@
       "Operator": "CornerDetection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.046,
+      "RuntimeMs": 0.047,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -2132,7 +2132,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.198,
+      "RuntimeMs": 0.194,
       "MemoryAllocationBytes": 3760,
       "ErrorMessage": null,
       "Observed": {
@@ -2145,7 +2145,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.584,
+      "RuntimeMs": 0.572,
       "MemoryAllocationBytes": 2608,
       "ErrorMessage": null,
       "Observed": {
@@ -2162,7 +2162,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "db17733f-882d-48d7-bea5-2bec3831732c",
+        "OperatorId": "15b306e6-1965-4570-b6b6-7baac6e187f7",
         "OperatorType": "CornerDetection"
       }
     },
@@ -2224,7 +2224,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.043,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -2236,7 +2236,7 @@
       "Operator": "CornerDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.069,
+      "RuntimeMs": 0.074,
       "MemoryAllocationBytes": 26680,
       "ErrorMessage": null,
       "Observed": {
@@ -2344,7 +2344,7 @@
       "Operator": "Filtering",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -2392,7 +2392,7 @@
       "Operator": "Filtering",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.133,
+      "RuntimeMs": 0.131,
       "MemoryAllocationBytes": 3472,
       "ErrorMessage": null,
       "Observed": {
@@ -2405,7 +2405,7 @@
       "Operator": "Filtering",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.24,
+      "RuntimeMs": 0.234,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -2418,11 +2418,11 @@
       "Operator": "Filtering",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "9176999b-003f-4421-a7bb-41380aaf7e51",
+        "OperatorId": "c52745ac-f846-49fb-bcdd-d7f538d8ea9a",
         "OperatorType": "Filtering"
       }
     },
@@ -2457,7 +2457,7 @@
       "Operator": "Filtering",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 424,
       "ErrorMessage": null,
       "Observed": {
@@ -2496,7 +2496,7 @@
       "Operator": "Filtering",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.074,
+      "RuntimeMs": 0.07,
       "MemoryAllocationBytes": 19720,
       "ErrorMessage": null,
       "Observed": {
@@ -2568,7 +2568,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -2616,7 +2616,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -2628,7 +2628,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.015,
       "MemoryAllocationBytes": 1576,
       "ErrorMessage": null,
       "Observed": {
@@ -2640,7 +2640,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 2.075,
+      "RuntimeMs": 1.75,
       "MemoryAllocationBytes": 15200,
       "ErrorMessage": null,
       "Observed": {
@@ -2652,7 +2652,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.239,
+      "RuntimeMs": 0.192,
       "MemoryAllocationBytes": 4872,
       "ErrorMessage": null,
       "Observed": {
@@ -2665,7 +2665,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.508,
+      "RuntimeMs": 0.511,
       "MemoryAllocationBytes": 3808,
       "ErrorMessage": null,
       "Observed": {
@@ -2682,7 +2682,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "45884ed7-395c-46b4-8593-c369260b6fa3",
+        "OperatorId": "41485a47-5feb-4f40-a43b-8c01cbc67925",
         "OperatorType": "FrameAveraging"
       }
     },
@@ -2691,7 +2691,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.02,
+      "RuntimeMs": 0.015,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -2744,7 +2744,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.051,
+      "RuntimeMs": 0.042,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -2756,7 +2756,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.084,
+      "RuntimeMs": 0.09,
       "MemoryAllocationBytes": 27832,
       "ErrorMessage": null,
       "Observed": {
@@ -2768,7 +2768,7 @@
       "Operator": "FrameAveraging",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -2828,7 +2828,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -2888,7 +2888,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -2925,7 +2925,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.589,
+      "RuntimeMs": 0.592,
       "MemoryAllocationBytes": 2624,
       "ErrorMessage": null,
       "Observed": {
@@ -2938,11 +2938,11 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "0c74ab25-48df-4b70-914c-6db5257ef159",
+        "OperatorId": "fad8c853-21d8-4d17-88c5-77252af1a3f7",
         "OperatorType": "HistogramAnalysis"
       }
     },
@@ -2951,7 +2951,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1448,
       "ErrorMessage": null,
       "Observed": {
@@ -2990,7 +2990,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 504,
       "ErrorMessage": null,
       "Observed": {
@@ -3016,7 +3016,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.079,
       "MemoryAllocationBytes": 27280,
       "ErrorMessage": null,
       "Observed": {
@@ -3028,7 +3028,7 @@
       "Operator": "HistogramAnalysis",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -3052,7 +3052,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -3064,7 +3064,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 536,
       "ErrorMessage": null,
       "Observed": {
@@ -3088,7 +3088,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -3148,7 +3148,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -3172,7 +3172,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.464,
+      "RuntimeMs": 0.436,
       "MemoryAllocationBytes": 3904,
       "ErrorMessage": null,
       "Observed": {
@@ -3185,7 +3185,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.246,
+      "RuntimeMs": 0.243,
       "MemoryAllocationBytes": 2648,
       "ErrorMessage": null,
       "Observed": {
@@ -3202,7 +3202,7 @@
       "MemoryAllocationBytes": 824,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "5c04b8bc-f9fa-409c-abab-40293f1ec664",
+        "OperatorId": "aba7b143-e54a-4c2b-bdd2-2dc7fd00140e",
         "OperatorType": "HistogramEqualization"
       }
     },
@@ -3211,7 +3211,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.016,
       "MemoryAllocationBytes": 1456,
       "ErrorMessage": null,
       "Observed": {
@@ -3250,7 +3250,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 512,
       "ErrorMessage": null,
       "Observed": {
@@ -3264,7 +3264,7 @@
       "Operator": "HistogramEqualization",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.04,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 728,
       "ErrorMessage": null,
       "Observed": {
@@ -3408,7 +3408,7 @@
       "Operator": "ImageBlend",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -3420,7 +3420,7 @@
       "Operator": "ImageBlend",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.049,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -3432,7 +3432,7 @@
       "Operator": "ImageBlend",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.154,
+      "RuntimeMs": 0.161,
       "MemoryAllocationBytes": 3560,
       "ErrorMessage": null,
       "Observed": {
@@ -3445,7 +3445,7 @@
       "Operator": "ImageBlend",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.348,
+      "RuntimeMs": 0.359,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -3462,7 +3462,7 @@
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "7d54f148-a2b8-4d67-9f48-ed797c210096",
+        "OperatorId": "8805ffa2-0b75-4a36-9249-963df2f3e24a",
         "OperatorType": "ImageBlend"
       }
     },
@@ -3536,7 +3536,7 @@
       "Operator": "ImageBlend",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.075,
       "MemoryAllocationBytes": 19688,
       "ErrorMessage": null,
       "Observed": {
@@ -3632,7 +3632,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -3656,7 +3656,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -3680,7 +3680,7 @@
       "Operator": "ImageCompose",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.048,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -3692,7 +3692,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.167,
+      "RuntimeMs": 0.171,
       "MemoryAllocationBytes": 3656,
       "ErrorMessage": null,
       "Observed": {
@@ -3705,7 +3705,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.351,
+      "RuntimeMs": 0.456,
       "MemoryAllocationBytes": 2592,
       "ErrorMessage": null,
       "Observed": {
@@ -3718,11 +3718,11 @@
       "Operator": "ImageCompose",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "ae1e4d3b-a6fd-4081-a46d-656256278ef8",
+        "OperatorId": "1017a868-f257-44b9-aa57-76d1663de66f",
         "OperatorType": "ImageCompose"
       }
     },
@@ -3731,7 +3731,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.016,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -3784,7 +3784,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.039,
+      "RuntimeMs": 0.047,
       "MemoryAllocationBytes": 672,
       "ErrorMessage": null,
       "Observed": {
@@ -3796,7 +3796,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.173,
+      "RuntimeMs": 0.084,
       "MemoryAllocationBytes": 20216,
       "ErrorMessage": null,
       "Observed": {
@@ -3808,7 +3808,7 @@
       "Operator": "ImageCompose",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -3832,7 +3832,7 @@
       "Operator": "ImageCrop",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -3844,7 +3844,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 512,
       "ErrorMessage": null,
       "Observed": {
@@ -3856,7 +3856,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -3904,7 +3904,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.008,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -3928,7 +3928,7 @@
       "Operator": "ImageCrop",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.013,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -3940,7 +3940,7 @@
       "Operator": "ImageCrop",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.048,
+      "RuntimeMs": 0.062,
       "MemoryAllocationBytes": 2368,
       "ErrorMessage": null,
       "Observed": {
@@ -3952,7 +3952,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.153,
+      "RuntimeMs": 0.176,
       "MemoryAllocationBytes": 3728,
       "ErrorMessage": null,
       "Observed": {
@@ -3965,7 +3965,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.322,
+      "RuntimeMs": 0.302,
       "MemoryAllocationBytes": 2576,
       "ErrorMessage": null,
       "Observed": {
@@ -3978,11 +3978,11 @@
       "Operator": "ImageCrop",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "5b5c84a2-d705-4430-93c6-44c43185a4bd",
+        "OperatorId": "bd1a30cc-8e6d-4b64-af01-f1926cb00af4",
         "OperatorType": "ImageCrop"
       }
     },
@@ -4044,7 +4044,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.043,
+      "RuntimeMs": 0.044,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -4056,7 +4056,7 @@
       "Operator": "ImageCrop",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.078,
+      "RuntimeMs": 0.079,
       "MemoryAllocationBytes": 19104,
       "ErrorMessage": null,
       "Observed": {
@@ -4080,7 +4080,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -4104,7 +4104,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -4116,7 +4116,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -4164,7 +4164,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -4188,7 +4188,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.013,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -4200,7 +4200,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.054,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -4212,7 +4212,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.162,
+      "RuntimeMs": 0.184,
       "MemoryAllocationBytes": 3752,
       "ErrorMessage": null,
       "Observed": {
@@ -4225,7 +4225,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.344,
+      "RuntimeMs": 0.374,
       "MemoryAllocationBytes": 2648,
       "ErrorMessage": null,
       "Observed": {
@@ -4238,11 +4238,11 @@
       "Operator": "ImageNormalize",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "3ea31874-8121-4f44-9d08-ba820c9e3b09",
+        "OperatorId": "2c5c42aa-c1e7-4692-8152-d43b403c1821",
         "OperatorType": "ImageNormalize"
       }
     },
@@ -4316,7 +4316,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.072,
+      "RuntimeMs": 0.076,
       "MemoryAllocationBytes": 19896,
       "ErrorMessage": null,
       "Observed": {
@@ -4328,7 +4328,7 @@
       "Operator": "ImageNormalize",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -4424,7 +4424,7 @@
       "Operator": "ImageResize",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -4448,7 +4448,7 @@
       "Operator": "ImageResize",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -4460,7 +4460,7 @@
       "Operator": "ImageResize",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.056,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -4472,7 +4472,7 @@
       "Operator": "ImageResize",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.17,
+      "RuntimeMs": 0.174,
       "MemoryAllocationBytes": 3648,
       "ErrorMessage": null,
       "Observed": {
@@ -4485,7 +4485,7 @@
       "Operator": "ImageResize",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.26,
+      "RuntimeMs": 0.272,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -4498,11 +4498,11 @@
       "Operator": "ImageResize",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "9111679e-7189-4b81-963d-d788580c3800",
+        "OperatorId": "19e5f915-bafc-43c2-bb1b-cc5b4320b302",
         "OperatorType": "ImageResize"
       }
     },
@@ -4564,7 +4564,7 @@
       "Operator": "ImageResize",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.037,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -4576,7 +4576,7 @@
       "Operator": "ImageResize",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.066,
+      "RuntimeMs": 0.071,
       "MemoryAllocationBytes": 19424,
       "ErrorMessage": null,
       "Observed": {
@@ -4648,7 +4648,7 @@
       "Operator": "ImageRotate",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -4696,7 +4696,7 @@
       "Operator": "ImageRotate",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -4720,7 +4720,7 @@
       "Operator": "ImageRotate",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.049,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -4732,7 +4732,7 @@
       "Operator": "ImageRotate",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.145,
+      "RuntimeMs": 0.153,
       "MemoryAllocationBytes": 3560,
       "ErrorMessage": null,
       "Observed": {
@@ -4745,7 +4745,7 @@
       "Operator": "ImageRotate",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.612,
+      "RuntimeMs": 0.41,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -4758,11 +4758,11 @@
       "Operator": "ImageRotate",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "06ce56f9-3b7c-490c-ad96-1c85490cfa44",
+        "OperatorId": "50140777-ca46-4473-b269-a697bbaefe00",
         "OperatorType": "ImageRotate"
       }
     },
@@ -4836,7 +4836,7 @@
       "Operator": "ImageRotate",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.072,
+      "RuntimeMs": 0.079,
       "MemoryAllocationBytes": 19744,
       "ErrorMessage": null,
       "Observed": {
@@ -4848,7 +4848,7 @@
       "Operator": "ImageRotate",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -4920,7 +4920,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.034,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -4932,7 +4932,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -4956,7 +4956,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -4980,7 +4980,7 @@
       "Operator": "ImageStitching",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.05,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -4992,7 +4992,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.179,
+      "RuntimeMs": 0.178,
       "MemoryAllocationBytes": 3672,
       "ErrorMessage": null,
       "Observed": {
@@ -5005,7 +5005,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.241,
+      "RuntimeMs": 0.246,
       "MemoryAllocationBytes": 2608,
       "ErrorMessage": null,
       "Observed": {
@@ -5022,7 +5022,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "54b0e587-8796-4477-ae69-b9fe98edbb5d",
+        "OperatorId": "031a994b-fc50-4801-b18c-cd3c3f5081b0",
         "OperatorType": "ImageStitching"
       }
     },
@@ -5070,7 +5070,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 504,
       "ErrorMessage": null,
       "Observed": {
@@ -5084,7 +5084,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.039,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -5096,7 +5096,7 @@
       "Operator": "ImageStitching",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.081,
+      "RuntimeMs": 0.073,
       "MemoryAllocationBytes": 20600,
       "ErrorMessage": null,
       "Observed": {
@@ -5228,7 +5228,7 @@
       "Operator": "ImageTiling",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -5240,7 +5240,7 @@
       "Operator": "ImageTiling",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.049,
+      "RuntimeMs": 0.052,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -5265,7 +5265,7 @@
       "Operator": "ImageTiling",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.367,
+      "RuntimeMs": 0.373,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -5282,7 +5282,7 @@
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "3b808c83-d222-4d42-9d73-f10a4cfe6800",
+        "OperatorId": "8d0bbf2d-f55e-4cee-9e4a-fa20414e0361",
         "OperatorType": "ImageTiling"
       }
     },
@@ -5304,7 +5304,7 @@
       "Operator": "ImageTiling",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -5330,7 +5330,7 @@
       "Operator": "ImageTiling",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 496,
       "ErrorMessage": null,
       "Observed": {
@@ -5356,7 +5356,7 @@
       "Operator": "ImageTiling",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.072,
+      "RuntimeMs": 0.076,
       "MemoryAllocationBytes": 20008,
       "ErrorMessage": null,
       "Observed": {
@@ -5500,7 +5500,7 @@
       "Operator": "LaplacianSharpen",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.048,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -5512,7 +5512,7 @@
       "Operator": "LaplacianSharpen",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.168,
+      "RuntimeMs": 0.173,
       "MemoryAllocationBytes": 3696,
       "ErrorMessage": null,
       "Observed": {
@@ -5525,7 +5525,7 @@
       "Operator": "LaplacianSharpen",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.373,
+      "RuntimeMs": 0.381,
       "MemoryAllocationBytes": 2616,
       "ErrorMessage": null,
       "Observed": {
@@ -5542,7 +5542,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "6851eedb-6b90-4214-8dc1-212172912665",
+        "OperatorId": "3764dbf8-78f1-4e1c-a745-224700eb6b09",
         "OperatorType": "LaplacianSharpen"
       }
     },
@@ -5616,7 +5616,7 @@
       "Operator": "LaplacianSharpen",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.09,
+      "RuntimeMs": 0.074,
       "MemoryAllocationBytes": 19992,
       "ErrorMessage": null,
       "Observed": {
@@ -5628,7 +5628,7 @@
       "Operator": "LaplacianSharpen",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -5640,7 +5640,7 @@
       "Operator": "MeanFilter",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -5676,7 +5676,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -5712,7 +5712,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -5724,7 +5724,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -5760,7 +5760,7 @@
       "Operator": "MeanFilter",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.055,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -5785,7 +5785,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.227,
+      "RuntimeMs": 0.218,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -5798,11 +5798,11 @@
       "Operator": "MeanFilter",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "a4103bf3-5f13-4264-8366-40ebb528c190",
+        "OperatorId": "a4ccfaa6-1523-48fa-84b5-c9a486ac933d",
         "OperatorType": "MeanFilter"
       }
     },
@@ -5811,7 +5811,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1432,
       "ErrorMessage": null,
       "Observed": {
@@ -5864,7 +5864,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.044,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -5876,7 +5876,7 @@
       "Operator": "MeanFilter",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.071,
       "MemoryAllocationBytes": 19304,
       "ErrorMessage": null,
       "Observed": {
@@ -5924,7 +5924,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 520,
       "ErrorMessage": null,
       "Observed": {
@@ -5984,7 +5984,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -6008,7 +6008,7 @@
       "Operator": "MedianBlur",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -6020,7 +6020,7 @@
       "Operator": "MedianBlur",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.051,
+      "RuntimeMs": 0.053,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -6032,7 +6032,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.13,
+      "RuntimeMs": 0.133,
       "MemoryAllocationBytes": 3472,
       "ErrorMessage": null,
       "Observed": {
@@ -6045,7 +6045,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.222,
+      "RuntimeMs": 0.196,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -6058,11 +6058,11 @@
       "Operator": "MedianBlur",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "7dab7187-ca93-44fb-a122-29e0443a8eff",
+        "OperatorId": "ddc82011-fcd3-431d-8269-60b79b13f8d8",
         "OperatorType": "MedianBlur"
       }
     },
@@ -6124,7 +6124,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.043,
+      "RuntimeMs": 0.037,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -6136,7 +6136,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.074,
+      "RuntimeMs": 0.071,
       "MemoryAllocationBytes": 18984,
       "ErrorMessage": null,
       "Observed": {
@@ -6148,7 +6148,7 @@
       "Operator": "MedianBlur",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -6160,7 +6160,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -6184,7 +6184,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 544,
       "ErrorMessage": null,
       "Observed": {
@@ -6208,7 +6208,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -6292,7 +6292,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.325,
+      "RuntimeMs": 0.337,
       "MemoryAllocationBytes": 4184,
       "ErrorMessage": null,
       "Observed": {
@@ -6305,7 +6305,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.259,
+      "RuntimeMs": 0.262,
       "MemoryAllocationBytes": 2656,
       "ErrorMessage": null,
       "Observed": {
@@ -6322,7 +6322,7 @@
       "MemoryAllocationBytes": 824,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "e03f93da-9102-4076-9e7c-3920ced61d92",
+        "OperatorId": "a4a3da75-52e6-4434-b293-b290cfed6581",
         "OperatorType": "MorphologicalOperation"
       }
     },
@@ -6370,7 +6370,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 520,
       "ErrorMessage": null,
       "Observed": {
@@ -6384,7 +6384,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.041,
+      "RuntimeMs": 0.04,
       "MemoryAllocationBytes": 728,
       "ErrorMessage": null,
       "Observed": {
@@ -6396,7 +6396,7 @@
       "Operator": "MorphologicalOperation",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.072,
+      "RuntimeMs": 0.076,
       "MemoryAllocationBytes": 26672,
       "ErrorMessage": null,
       "Observed": {
@@ -6444,7 +6444,7 @@
       "Operator": "Morphology",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.007,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 520,
       "ErrorMessage": null,
       "Observed": {
@@ -6468,7 +6468,7 @@
       "Operator": "Morphology",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -6504,7 +6504,7 @@
       "Operator": "Morphology",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -6528,7 +6528,7 @@
       "Operator": "Morphology",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -6540,7 +6540,7 @@
       "Operator": "Morphology",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.047,
+      "RuntimeMs": 0.048,
       "MemoryAllocationBytes": 2376,
       "ErrorMessage": null,
       "Observed": {
@@ -6552,7 +6552,7 @@
       "Operator": "Morphology",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.182,
+      "RuntimeMs": 0.175,
       "MemoryAllocationBytes": 3800,
       "ErrorMessage": null,
       "Observed": {
@@ -6565,7 +6565,7 @@
       "Operator": "Morphology",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.24,
+      "RuntimeMs": 0.254,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -6582,7 +6582,7 @@
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "a85739de-5a98-4b45-9278-5b991401b048",
+        "OperatorId": "57ea5cbe-72a4-4d8b-b585-93185ab7998f",
         "OperatorType": "Morphology"
       }
     },
@@ -6591,7 +6591,7 @@
       "Operator": "Morphology",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.016,
       "MemoryAllocationBytes": 1432,
       "ErrorMessage": null,
       "Observed": {
@@ -6644,7 +6644,7 @@
       "Operator": "Morphology",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.039,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -6656,7 +6656,7 @@
       "Operator": "Morphology",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.069,
+      "RuntimeMs": 0.074,
       "MemoryAllocationBytes": 26008,
       "ErrorMessage": null,
       "Observed": {
@@ -6704,7 +6704,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -6728,7 +6728,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -6788,7 +6788,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -6800,7 +6800,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.049,
+      "RuntimeMs": 0.047,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -6812,7 +6812,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.175,
+      "RuntimeMs": 0.176,
       "MemoryAllocationBytes": 3696,
       "ErrorMessage": null,
       "Observed": {
@@ -6825,7 +6825,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.815,
+      "RuntimeMs": 0.84,
       "MemoryAllocationBytes": 2640,
       "ErrorMessage": null,
       "Observed": {
@@ -6842,7 +6842,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "86587aa6-b03d-4005-9423-c56e158f2486",
+        "OperatorId": "a41cd56a-eb5e-4d61-8803-3d982c804805",
         "OperatorType": "ParallelLineFind"
       }
     },
@@ -6864,7 +6864,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -6904,7 +6904,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.041,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 696,
       "ErrorMessage": null,
       "Observed": {
@@ -6916,7 +6916,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.084,
+      "RuntimeMs": 0.086,
       "MemoryAllocationBytes": 27680,
       "ErrorMessage": null,
       "Observed": {
@@ -6928,7 +6928,7 @@
       "Operator": "ParallelLineFind",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -6952,7 +6952,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -7048,7 +7048,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.016,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -7060,7 +7060,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.049,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 2408,
       "ErrorMessage": null,
       "Observed": {
@@ -7072,7 +7072,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.147,
+      "RuntimeMs": 0.152,
       "MemoryAllocationBytes": 3624,
       "ErrorMessage": null,
       "Observed": {
@@ -7085,7 +7085,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.357,
+      "RuntimeMs": 0.361,
       "MemoryAllocationBytes": 2576,
       "ErrorMessage": null,
       "Observed": {
@@ -7102,7 +7102,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "66ad2693-aa96-4434-a1b3-551e808b9500",
+        "OperatorId": "57222596-35fd-4e38-8cc6-46b4eef46039",
         "OperatorType": "PositionCorrection"
       }
     },
@@ -7164,7 +7164,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.04,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 704,
       "ErrorMessage": null,
       "Observed": {
@@ -7176,7 +7176,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.069,
+      "RuntimeMs": 0.067,
       "MemoryAllocationBytes": 20280,
       "ErrorMessage": null,
       "Observed": {
@@ -7188,7 +7188,7 @@
       "Operator": "PositionCorrection",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -7224,7 +7224,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -7248,7 +7248,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -7284,7 +7284,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.007,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -7308,7 +7308,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.013,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -7320,7 +7320,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.05,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 2400,
       "ErrorMessage": null,
       "Observed": {
@@ -7332,7 +7332,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.14,
+      "RuntimeMs": 0.138,
       "MemoryAllocationBytes": 3632,
       "ErrorMessage": null,
       "Observed": {
@@ -7345,7 +7345,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.891,
+      "RuntimeMs": 0.905,
       "MemoryAllocationBytes": 2624,
       "ErrorMessage": null,
       "Observed": {
@@ -7362,7 +7362,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "60eaba03-e6d9-4852-87b0-69f22c773ada",
+        "OperatorId": "095b3419-147c-4dfe-aa25-52e8eda571c8",
         "OperatorType": "QuadrilateralFind"
       }
     },
@@ -7424,7 +7424,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.04,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 704,
       "ErrorMessage": null,
       "Observed": {
@@ -7436,7 +7436,7 @@
       "Operator": "QuadrilateralFind",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.078,
+      "RuntimeMs": 0.077,
       "MemoryAllocationBytes": 27464,
       "ErrorMessage": null,
       "Observed": {
@@ -7472,7 +7472,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -7508,7 +7508,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -7532,7 +7532,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -7556,7 +7556,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -7580,7 +7580,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.052,
+      "RuntimeMs": 0.066,
       "MemoryAllocationBytes": 2408,
       "ErrorMessage": null,
       "Observed": {
@@ -7592,7 +7592,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.167,
+      "RuntimeMs": 0.229,
       "MemoryAllocationBytes": 3728,
       "ErrorMessage": null,
       "Observed": {
@@ -7605,7 +7605,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.91,
+      "RuntimeMs": 1.146,
       "MemoryAllocationBytes": 2632,
       "ErrorMessage": null,
       "Observed": {
@@ -7618,11 +7618,11 @@
       "Operator": "RectangleDetection",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "54e0a833-f9b9-4480-9c9c-481642c3b5da",
+        "OperatorId": "25b2bf4d-a7f7-45be-a895-d84dc8a8f449",
         "OperatorType": "RectangleDetection"
       }
     },
@@ -7631,7 +7631,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.015,
+      "RuntimeMs": 0.028,
       "MemoryAllocationBytes": 1448,
       "ErrorMessage": null,
       "Observed": {
@@ -7644,7 +7644,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -7684,7 +7684,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.045,
+      "RuntimeMs": 0.06,
       "MemoryAllocationBytes": 704,
       "ErrorMessage": null,
       "Observed": {
@@ -7696,7 +7696,7 @@
       "Operator": "RectangleDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.081,
+      "RuntimeMs": 0.096,
       "MemoryAllocationBytes": 27912,
       "ErrorMessage": null,
       "Observed": {
@@ -7720,7 +7720,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -7732,7 +7732,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -7744,7 +7744,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 536,
       "ErrorMessage": null,
       "Observed": {
@@ -7768,7 +7768,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -7780,7 +7780,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -7792,7 +7792,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -7804,7 +7804,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -7816,7 +7816,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -7828,7 +7828,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.02,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -7840,7 +7840,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.057,
+      "RuntimeMs": 0.098,
       "MemoryAllocationBytes": 2416,
       "ErrorMessage": null,
       "Observed": {
@@ -7852,7 +7852,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.26,
+      "RuntimeMs": 0.36,
       "MemoryAllocationBytes": 4016,
       "ErrorMessage": null,
       "Observed": {
@@ -7865,7 +7865,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.286,
+      "RuntimeMs": 0.324,
       "MemoryAllocationBytes": 2720,
       "ErrorMessage": null,
       "Observed": {
@@ -7882,7 +7882,7 @@
       "MemoryAllocationBytes": 824,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "edc3eb88-f593-4f2f-b47e-07465f995630",
+        "OperatorId": "3ab95f7c-3323-4554-8078-76241f010c49",
         "OperatorType": "SubpixelEdgeDetection"
       }
     },
@@ -7917,7 +7917,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 448,
       "ErrorMessage": null,
       "Observed": {
@@ -7944,7 +7944,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.042,
+      "RuntimeMs": 0.046,
       "MemoryAllocationBytes": 728,
       "ErrorMessage": null,
       "Observed": {
@@ -7956,7 +7956,7 @@
       "Operator": "SubpixelEdgeDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.077,
+      "RuntimeMs": 0.081,
       "MemoryAllocationBytes": 27464,
       "ErrorMessage": null,
       "Observed": {
@@ -7992,7 +7992,7 @@
       "Operator": "Thresholding",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -8004,7 +8004,7 @@
       "Operator": "Thresholding",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 512,
       "ErrorMessage": null,
       "Observed": {
@@ -8040,7 +8040,7 @@
       "Operator": "Thresholding",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -8088,7 +8088,7 @@
       "Operator": "Thresholding",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -8100,7 +8100,7 @@
       "Operator": "Thresholding",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.052,
+      "RuntimeMs": 0.051,
       "MemoryAllocationBytes": 2368,
       "ErrorMessage": null,
       "Observed": {
@@ -8112,7 +8112,7 @@
       "Operator": "Thresholding",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.497,
+      "RuntimeMs": 0.588,
       "MemoryAllocationBytes": 3736,
       "ErrorMessage": null,
       "Observed": {
@@ -8125,7 +8125,7 @@
       "Operator": "Thresholding",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.304,
+      "RuntimeMs": 0.325,
       "MemoryAllocationBytes": 2584,
       "ErrorMessage": null,
       "Observed": {
@@ -8138,11 +8138,11 @@
       "Operator": "Thresholding",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "f0846ebe-da1e-4eac-bc17-afb08153018a",
+        "OperatorId": "3e424e83-5286-40b3-b977-53f9f8d8e936",
         "OperatorType": "Thresholding"
       }
     },
@@ -8151,7 +8151,7 @@
       "Operator": "Thresholding",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.016,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -8204,7 +8204,7 @@
       "Operator": "Thresholding",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.043,
+      "RuntimeMs": 0.04,
       "MemoryAllocationBytes": 672,
       "ErrorMessage": null,
       "Observed": {
@@ -8216,7 +8216,7 @@
       "Operator": "Thresholding",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.071,
+      "RuntimeMs": 0.076,
       "MemoryAllocationBytes": 19752,
       "ErrorMessage": null,
       "Observed": {
@@ -8264,7 +8264,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -8324,7 +8324,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.006,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -8348,7 +8348,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -8360,7 +8360,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.048,
+      "RuntimeMs": 0.051,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -8372,7 +8372,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.131,
+      "RuntimeMs": 0.129,
       "MemoryAllocationBytes": 3520,
       "ErrorMessage": null,
       "Observed": {
@@ -8385,7 +8385,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.391,
+      "RuntimeMs": 0.404,
       "MemoryAllocationBytes": 2616,
       "ErrorMessage": null,
       "Observed": {
@@ -8402,7 +8402,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "4c0105d6-fc4f-4658-b5ef-ed3b53781fc4",
+        "OperatorId": "50c67194-d447-431e-8f9a-79d3e60e48c7",
         "OperatorType": "AngleMeasurement"
       }
     },
@@ -8437,7 +8437,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 440,
       "ErrorMessage": null,
       "Observed": {
@@ -8464,7 +8464,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.044,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 696,
       "ErrorMessage": null,
       "Observed": {
@@ -8476,7 +8476,7 @@
       "Operator": "AngleMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.07,
+      "RuntimeMs": 0.073,
       "MemoryAllocationBytes": 25368,
       "ErrorMessage": null,
       "Observed": {
@@ -8524,7 +8524,7 @@
       "Operator": "ColorDetection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -8608,7 +8608,7 @@
       "Operator": "ColorDetection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -8620,7 +8620,7 @@
       "Operator": "ColorDetection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.046,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -8632,7 +8632,7 @@
       "Operator": "ColorDetection",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.392,
+      "RuntimeMs": 0.407,
       "MemoryAllocationBytes": 4104,
       "ErrorMessage": null,
       "Observed": {
@@ -8645,7 +8645,7 @@
       "Operator": "ColorDetection",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.329,
+      "RuntimeMs": 0.339,
       "MemoryAllocationBytes": 2608,
       "ErrorMessage": null,
       "Observed": {
@@ -8662,7 +8662,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "06b1796e-9c14-4118-9cff-0eae8d6be829",
+        "OperatorId": "d51152d7-2a5f-474b-8b32-af3ba5111c16",
         "OperatorType": "ColorDetection"
       }
     },
@@ -8671,7 +8671,7 @@
       "Operator": "ColorDetection",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -8684,7 +8684,7 @@
       "Operator": "ColorDetection",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -8724,7 +8724,7 @@
       "Operator": "ColorDetection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.039,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -8760,7 +8760,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -8808,7 +8808,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -8868,7 +8868,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.009,
+      "RuntimeMs": 0.011,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -8880,7 +8880,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.054,
+      "RuntimeMs": 0.051,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -8892,7 +8892,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.396,
+      "RuntimeMs": 0.41,
       "MemoryAllocationBytes": 3944,
       "ErrorMessage": null,
       "Observed": {
@@ -8905,7 +8905,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.427,
+      "RuntimeMs": 0.439,
       "MemoryAllocationBytes": 2616,
       "ErrorMessage": null,
       "Observed": {
@@ -8918,11 +8918,11 @@
       "Operator": "ColorMeasurement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "9a52d181-4ccf-4673-ad79-b5f2bd543188",
+        "OperatorId": "135d7d0e-27c4-4089-808a-2b000390b0e3",
         "OperatorType": "ColorMeasurement"
       }
     },
@@ -8996,7 +8996,7 @@
       "Operator": "ColorMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.058,
+      "RuntimeMs": 0.067,
       "MemoryAllocationBytes": 10200,
       "ErrorMessage": null,
       "Observed": {
@@ -9068,7 +9068,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -9128,7 +9128,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.014,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -9140,7 +9140,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.05,
+      "RuntimeMs": 0.058,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -9152,7 +9152,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.127,
+      "RuntimeMs": 0.135,
       "MemoryAllocationBytes": 3520,
       "ErrorMessage": null,
       "Observed": {
@@ -9165,7 +9165,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.398,
+      "RuntimeMs": 0.405,
       "MemoryAllocationBytes": 2560,
       "ErrorMessage": null,
       "Observed": {
@@ -9178,11 +9178,11 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "324281ac-1874-4ca3-8191-ce18a8e29c5b",
+        "OperatorId": "b8065032-6855-4fd1-a64a-b857b6fd975c",
         "OperatorType": "EdgeIntersection"
       }
     },
@@ -9244,7 +9244,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.039,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 696,
       "ErrorMessage": null,
       "Observed": {
@@ -9256,7 +9256,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.102,
+      "RuntimeMs": 0.073,
       "MemoryAllocationBytes": 18792,
       "ErrorMessage": null,
       "Observed": {
@@ -9268,7 +9268,7 @@
       "Operator": "EdgeIntersection",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -9304,7 +9304,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.003,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -9316,7 +9316,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
@@ -9388,7 +9388,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -9400,7 +9400,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.051,
+      "RuntimeMs": 0.052,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -9412,7 +9412,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.277,
+      "RuntimeMs": 0.245,
       "MemoryAllocationBytes": 4032,
       "ErrorMessage": null,
       "Observed": {
@@ -9425,7 +9425,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 1.09,
+      "RuntimeMs": 1.059,
       "MemoryAllocationBytes": 3400,
       "ErrorMessage": null,
       "Observed": {
@@ -9442,7 +9442,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "f9351706-1ad2-4d0a-be0e-7fe71950b6c4",
+        "OperatorId": "d7e2c926-44f8-4b6a-a930-d764bf1c5ad5",
         "OperatorType": "GapMeasurement"
       }
     },
@@ -9451,7 +9451,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.019,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -9490,7 +9490,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 504,
       "ErrorMessage": null,
       "Observed": {
@@ -9504,7 +9504,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -9516,7 +9516,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.087,
+      "RuntimeMs": 0.077,
       "MemoryAllocationBytes": 27352,
       "ErrorMessage": null,
       "Observed": {
@@ -9528,7 +9528,7 @@
       "Operator": "GapMeasurement",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -9552,7 +9552,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -9564,7 +9564,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -9588,7 +9588,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -9624,7 +9624,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.005,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -9636,7 +9636,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.007,
+      "RuntimeMs": 0.002,
       "MemoryAllocationBytes": 488,
       "ErrorMessage": null,
       "Observed": {
@@ -9648,7 +9648,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.01,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -9660,7 +9660,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.048,
+      "RuntimeMs": 0.046,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -9672,7 +9672,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.257,
+      "RuntimeMs": 0.254,
       "MemoryAllocationBytes": 3808,
       "ErrorMessage": null,
       "Observed": {
@@ -9685,7 +9685,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.342,
+      "RuntimeMs": 0.352,
       "MemoryAllocationBytes": 2552,
       "ErrorMessage": null,
       "Observed": {
@@ -9702,7 +9702,7 @@
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "74f64a36-45f0-4f53-a0eb-e479389dd4f9",
+        "OperatorId": "881056f7-54ef-4007-b90e-8b5416d8a317",
         "OperatorType": "GeoMeasurement"
       }
     },
@@ -9711,7 +9711,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -9764,7 +9764,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.04,
+      "RuntimeMs": 0.042,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -9776,7 +9776,7 @@
       "Operator": "GeoMeasurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.071,
+      "RuntimeMs": 0.069,
       "MemoryAllocationBytes": 19248,
       "ErrorMessage": null,
       "Observed": {
@@ -9920,7 +9920,7 @@
       "Operator": "GeometricTolerance",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.047,
+      "RuntimeMs": 0.05,
       "MemoryAllocationBytes": 2408,
       "ErrorMessage": null,
       "Observed": {
@@ -9932,7 +9932,7 @@
       "Operator": "GeometricTolerance",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.363,
+      "RuntimeMs": 0.202,
       "MemoryAllocationBytes": 3896,
       "ErrorMessage": null,
       "Observed": {
@@ -9945,7 +9945,7 @@
       "Operator": "GeometricTolerance",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.488,
+      "RuntimeMs": 0.454,
       "MemoryAllocationBytes": 2576,
       "ErrorMessage": null,
       "Observed": {
@@ -9962,7 +9962,7 @@
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "095f6f00-4c2e-4098-8db8-1a1d09f5cb65",
+        "OperatorId": "36d1fd94-6d9f-4861-ac5e-87d5c11df610",
         "OperatorType": "GeometricTolerance"
       }
     },
@@ -9971,7 +9971,7 @@
       "Operator": "GeometricTolerance",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.014,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1448,
       "ErrorMessage": null,
       "Observed": {
@@ -10024,7 +10024,7 @@
       "Operator": "GeometricTolerance",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.047,
+      "RuntimeMs": 0.04,
       "MemoryAllocationBytes": 704,
       "ErrorMessage": null,
       "Observed": {
@@ -10036,7 +10036,7 @@
       "Operator": "GeometricTolerance",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.069,
+      "RuntimeMs": 0.062,
       "MemoryAllocationBytes": 11000,
       "ErrorMessage": null,
       "Observed": {
@@ -10060,7 +10060,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -10072,7 +10072,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "OperatorType contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 416,
       "ErrorMessage": null,
       "Observed": {
@@ -10084,7 +10084,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -10108,7 +10108,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -10168,7 +10168,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.011,
+      "RuntimeMs": 0.009,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -10180,7 +10180,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.058,
+      "RuntimeMs": 0.049,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -10192,7 +10192,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.242,
+      "RuntimeMs": 0.232,
       "MemoryAllocationBytes": 3696,
       "ErrorMessage": null,
       "Observed": {
@@ -10205,7 +10205,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.425,
+      "RuntimeMs": 0.433,
       "MemoryAllocationBytes": 2560,
       "ErrorMessage": null,
       "Observed": {
@@ -10218,11 +10218,11 @@
       "Operator": "LineLineDistance",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.007,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 816,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "48b07ee5-079a-494d-8d43-bd0c900df69e",
+        "OperatorId": "22583739-57a9-4620-a79a-783975de2e37",
         "OperatorType": "LineLineDistance"
       }
     },
@@ -10231,7 +10231,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.012,
       "MemoryAllocationBytes": 1448,
       "ErrorMessage": null,
       "Observed": {
@@ -10284,7 +10284,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.042,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 696,
       "ErrorMessage": null,
       "Observed": {
@@ -10296,7 +10296,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.073,
+      "RuntimeMs": 0.068,
       "MemoryAllocationBytes": 19008,
       "ErrorMessage": null,
       "Observed": {
@@ -10308,7 +10308,7 @@
       "Operator": "LineLineDistance",
       "Scenario": "Batch selection contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 296,
       "ErrorMessage": null,
       "Observed": {
@@ -10368,7 +10368,7 @@
       "Operator": "Measurement",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -10428,7 +10428,7 @@
       "Operator": "Measurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.01,
       "MemoryAllocationBytes": 1408,
       "ErrorMessage": null,
       "Observed": {
@@ -10440,7 +10440,7 @@
       "Operator": "Measurement",
       "Scenario": "DI construction contract",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 2392,
       "ErrorMessage": null,
       "Observed": {
@@ -10452,7 +10452,7 @@
       "Operator": "Measurement",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.152,
+      "RuntimeMs": 0.15,
       "MemoryAllocationBytes": 3584,
       "ErrorMessage": null,
       "Observed": {
@@ -10465,7 +10465,7 @@
       "Operator": "Measurement",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.358,
+      "RuntimeMs": 0.355,
       "MemoryAllocationBytes": 2736,
       "ErrorMessage": null,
       "Observed": {
@@ -10478,11 +10478,11 @@
       "Operator": "Measurement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.002,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 800,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "bd71dd5e-c63b-49c2-b762-dcb44f7f82e6",
+        "OperatorId": "d456de9a-1049-4050-bf15-46724f1d642f",
         "OperatorType": "Measurement"
       }
     },
@@ -10491,7 +10491,7 @@
       "Operator": "Measurement",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.012,
+      "RuntimeMs": 0.014,
       "MemoryAllocationBytes": 1432,
       "ErrorMessage": null,
       "Observed": {
@@ -10544,7 +10544,7 @@
       "Operator": "Measurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.04,
+      "RuntimeMs": 0.039,
       "MemoryAllocationBytes": 656,
       "ErrorMessage": null,
       "Observed": {
@@ -10556,7 +10556,7 @@
       "Operator": "Measurement",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.077,
+      "RuntimeMs": 0.082,
       "MemoryAllocationBytes": 26352,
       "ErrorMessage": null,
       "Observed": {
@@ -10604,7 +10604,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.006,
+      "RuntimeMs": 0.003,
       "MemoryAllocationBytes": 528,
       "ErrorMessage": null,
       "Observed": {
@@ -10652,7 +10652,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.001,
+      "RuntimeMs": 0,
       "MemoryAllocationBytes": 320,
       "ErrorMessage": null,
       "Observed": {
@@ -10664,7 +10664,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Implementation contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.007,
       "MemoryAllocationBytes": 688,
       "ErrorMessage": null,
       "Observed": {
@@ -10712,7 +10712,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Parameter contract",
       "Passed": true,
-      "RuntimeMs": 0.156,
+      "RuntimeMs": 0.164,
       "MemoryAllocationBytes": 3608,
       "ErrorMessage": null,
       "Observed": {
@@ -10725,7 +10725,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Execution failure contract",
       "Passed": true,
-      "RuntimeMs": 0.638,
+      "RuntimeMs": 0.626,
       "MemoryAllocationBytes": 2608,
       "ErrorMessage": null,
       "Observed": {
@@ -10738,11 +10738,11 @@
       "Operator": "PixelStatistics",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.005,
+      "RuntimeMs": 0.004,
       "MemoryAllocationBytes": 808,
       "ErrorMessage": null,
       "Observed": {
-        "OperatorId": "0ef8c670-7dd5-446d-8fea-b269f12d8e08",
+        "OperatorId": "a54fffa0-a5a7-496b-81c6-dae1c632e81d",
         "OperatorType": "PixelStatistics"
       }
     },
@@ -10751,7 +10751,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Operator entity contract",
       "Passed": true,
-      "RuntimeMs": 0.013,
+      "RuntimeMs": 0.014,
       "MemoryAllocationBytes": 1440,
       "ErrorMessage": null,
       "Observed": {
@@ -10764,7 +10764,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Matrix registry contract",
       "Passed": true,
-      "RuntimeMs": 0.004,
+      "RuntimeMs": 0.001,
       "MemoryAllocationBytes": 312,
       "ErrorMessage": null,
       "Observed": {
@@ -10804,7 +10804,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.042,
+      "RuntimeMs": 0.044,
       "MemoryAllocationBytes": 680,
       "ErrorMessage": null,
       "Observed": {
@@ -10816,7 +10816,7 @@
       "Operator": "PixelStatistics",
       "Scenario": "Card contract",
       "Passed": true,
-      "RuntimeMs": 0.068,
+      "RuntimeMs": 0.08,
       "MemoryAllocationBytes": 19872,
       "ErrorMessage": null,
       "Observed": {

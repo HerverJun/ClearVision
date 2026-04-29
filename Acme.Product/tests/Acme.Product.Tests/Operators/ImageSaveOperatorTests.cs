@@ -199,6 +199,55 @@ public class ImageSaveOperatorTests
         }
     }
 
+    [Fact]
+    public void ValidateParameters_WithPathTraversalFileName_ShouldBeInvalid()
+    {
+        var outputDir = CreateOutputDirectory();
+        var op = new Operator("test", OperatorType.ImageSave, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Directory", outputDir, "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FileNameTemplate", "..\\escape.png", "string"));
+
+        var validation = _operator.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().Contain(error => error.Contains("FileName", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPathTraversalFileName_ShouldFailWithoutWritingOutsideDirectory()
+    {
+        var outputDir = CreateOutputDirectory();
+        var parentDir = Directory.GetParent(outputDir)!.FullName;
+        var escapedPath = Path.Combine(parentDir, "escape.png");
+        var image = TestHelpers.CreateTestImage();
+
+        try
+        {
+            var op = new Operator("test", OperatorType.ImageSave, 0, 0);
+            op.AddParameter(TestHelpers.CreateParameter("Directory", outputDir, "string"));
+            op.AddParameter(TestHelpers.CreateParameter("FileNameTemplate", "..\\escape.png", "string"));
+
+            var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+            result.IsSuccess.Should().BeFalse();
+            File.Exists(escapedPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (image.RefCount > 0)
+            {
+                image.Release();
+            }
+
+            if (File.Exists(escapedPath))
+            {
+                File.Delete(escapedPath);
+            }
+
+            SafeDeleteDirectory(outputDir);
+        }
+    }
+
     private static string CreateOutputDirectory()
     {
         return Path.GetFullPath(Path.Combine(

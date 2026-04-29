@@ -1,6 +1,6 @@
 # Operator Quality Matrix
 
-GeneratedAtUtc: `2026-04-28T17:29:26+00:00`
+GeneratedAtUtc: `2026-04-29T05:01:39+00:00`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
 CardDirectory: `docs/算子资料/算子名片`
 EvidenceSources: `quality/evals/reports/*_baseline.json`
@@ -11,9 +11,9 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 - Level counts: A=155
 - Priority counts: P2=32, P3=123
 - Any evidence signal: Yes=155
-- Contract evidence status: Yes=108, No=47
-- Golden test status: Yes=52, No=103
-- Dataset evidence status: Yes=20, No=135
+- Contract evidence status: Yes=116, No=39
+- Golden test status: Yes=46, No=109
+- Dataset evidence status: Yes=20, Partial=1, No=134
 - Field replay status: Yes=5, No=150
 - Cards with TODO: 0
 - P0 without evidence signal: 0
@@ -50,25 +50,25 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 | OperatorType.FisheyeUndistort | Fisheye Undistort | 标定 | 96 | A | 1.0.0 | - | 2 | 2 | 4 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.TemplateMatching | 模板匹配 | 匹配定位 | 96 | A | 1.2.0 | 稳定 Stable | 3 | 8 | 12 | 该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NM… | 3 | 0 | No | 0 | Yes | 117 | Yes | 48 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.AnomalyDetection | 异常检测 | AI检测 | 100 | A | 1.0.0 | Experimental | 2 | 8 | 13 | Simplified PatchCore | 4 | 0 | No | 0 | No | 0 | Yes | 240 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.CalibrationLoader | Calibration Loader | 标定 | 100 | A | 1.0.0 | - | 0 | 3 | 1 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.CameraCalibration | Camera Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 7 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.CalibrationLoader | Calibration Loader | 标定 | 100 | A | 1.0.0 | - | 0 | 3 | 1 | - | 0 | 0 | Yes | 24 | Yes | 24 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.CameraCalibration | Camera Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 7 | - | 0 | 0 | No | 0 | Yes | 48 | Partial | 2 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.CoordinateTransform | Coordinate Transform | 标定 | 100 | A | 1.0.0 | - | 4 | 3 | 2 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.DeepLearning | 深度学习 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 12 | 13 | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | 5 | 0 | Yes | 50 | No | 0 | Yes | 72 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.DetectionSequenceJudge | Detection Sequence Judge | AI Inspection | 100 | A | 1.0.0 | Experimental | 4 | 13 | 13 | - | 3 | 0 | No | 0 | Yes | 24 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.DetectionSequenceJudge | Detection Sequence Judge | AI Inspection | 100 | A | 1.0.0 | Experimental | 4 | 13 | 13 | - | 3 | 0 | Yes | 24 | No | 0 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.FisheyeCalibration | Fisheye Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 9 | - | 0 | 0 | No | 0 | Yes | 24 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.GradientShapeMatch | 梯度形状匹配 | 匹配定位 | 100 | A | 1.1.0 | 稳定 Stable | 2 | 6 | 12 | Gradient Direction Template Match | 5 | 0 | No | 0 | Yes | 117 | Yes | 117 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.HandEyeCalibration | Hand-Eye Calibration | 标定 | 100 | A | 1.0.0 | - | 2 | 7 | 4 | OpenCV Hand-Eye Calibration | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.HandEyeCalibrationValidator | Hand-Eye Calibration Validator | 标定 | 100 | A | 1.0.1 | 稳定 Stable | 3 | 8 | 1 | Hand-Eye Consistency Validation | 3 | 0 | Yes | 24 | No | 0 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.LocalDeformableMatching | Local Deformable Matching | 匹配定位 | 100 | A | 1.1.1 | 稳定 Stable | 2 | 6 | 15 | Coarse-to-fine local deformable matching | 2 | 0 | No | 0 | Yes | 24 | Yes | 24 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.NPointCalibration | N Point Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 3 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.LocalDeformableMatching | Local Deformable Matching | 匹配定位 | 100 | A | 1.1.1 | 稳定 Stable | 2 | 6 | 15 | Coarse-to-fine local deformable matching | 2 | 0 | Yes | 24 | No | 0 | Yes | 24 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.NPointCalibration | N Point Calibration | 标定 | 100 | A | 1.0.0 | - | 1 | 2 | 3 | - | 0 | 0 | Yes | 24 | Yes | 24 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.PixelToWorldTransform | Pixel To World Transform | 标定 | 100 | A | 1.0.0 | - | 3 | 3 | 7 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.PlanarMatching | Planar Matching | 匹配定位 | 100 | A | 1.1.2 | 稳定 Stable | 2 | 13 | 19 | Feature homography planar matching | 2 | 0 | No | 0 | Yes | 24 | Yes | 24 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.PlanarMatching | Planar Matching | 匹配定位 | 100 | A | 1.1.2 | 稳定 Stable | 2 | 13 | 19 | Feature homography planar matching | 2 | 0 | Yes | 24 | No | 0 | Yes | 24 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.PyramidShapeMatch | 金字塔形状匹配 | 匹配定位 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 5 | 15 | LINEMOD Pyramid Shape Matching | 3 | 0 | Yes | 24 | No | 0 | Yes | 24 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.SemanticSegmentation | 语义分割 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 10 | 11 | 该算子通过 ONNX Runtime 执行语义分割模型，将输入图像预处理为模型张量，… | 3 | 0 | Yes | 27 | No | 0 | Yes | 72 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.ShapeMatching | 旋转尺度模板匹配 | 匹配定位 | 100 | A | 1.2.0 | 稳定 Stable | 2 | 2 | 13 | 虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子… | 3 | 0 | No | 0 | Yes | 24 | Yes | 72 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.ShapeMatching | 旋转尺度模板匹配 | 匹配定位 | 100 | A | 1.2.0 | 稳定 Stable | 2 | 2 | 13 | 虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子… | 3 | 0 | Yes | 24 | No | 0 | Yes | 72 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.StereoCalibration | Stereo Calibration | 标定 | 100 | A | 1.0.0 | - | 2 | 6 | 11 | - | 0 | 0 | No | 0 | Yes | 48 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.SurfaceDefectDetection | 表面缺陷检测 | AI检测 | 100 | A | 2.0.0 | Experimental | 2 | 8 | 10 | - | 3 | 0 | No | 0 | Yes | 24 | Yes | 24 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.TranslationRotationCalibration | 平移旋转标定 | 标定 | 100 | A | 1.0.0 | - | 1 | 3 | 3 | - | 0 | 0 | No | 0 | Yes | 24 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.SurfaceDefectDetection | 表面缺陷检测 | AI检测 | 100 | A | 2.0.0 | Experimental | 2 | 8 | 10 | - | 3 | 0 | Yes | 24 | No | 0 | Yes | 1028 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.TranslationRotationCalibration | 平移旋转标定 | 标定 | 100 | A | 1.0.0 | - | 1 | 3 | 3 | - | 0 | 0 | Yes | 24 | No | 0 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.RegionComplement | Region Complement | Region | 85 | A | 1.0.1 | 稳定 Stable | 4 | 3 | 0 | Bounded run-length complement | 2 | 0 | No | 0 | Yes | 100 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.Comparator | 数值比较 | 流程控制 | 89 | A | 1.0.0 | 稳定 Stable | 2 | 2 | 5 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | Yes | 22 | No | 0 | No | 0 | No | 0 | Yes | P3 | Contract Test Agent | Maintain regression baseline |
 | OperatorType.ContourExtrema | Contour Extrema | 检测 | 89 | A | 1.0.1 | 稳定 Stable | 3 | 6 | 0 | Directional contour extrema scan | 2 | 0 | Yes | 22 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
@@ -105,7 +105,7 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 | OperatorType.CopyMakeBorder | 边界填充 | 图像处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 6 | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | 1 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.CornerDetection | 角点检测 | 定位 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 5 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 2 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.Delay | 延时 | 流程控制 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 1 | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | 1 | 0 | Yes | 20 | No | 0 | No | 0 | No | 0 | Yes | P3 | Contract Test Agent | Maintain regression baseline |
-| OperatorType.EdgeDetection | Edge Detection | 特征提取 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 8 | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | 2 | 0 | No | 0 | Yes | 20 | Yes | 72 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.EdgeDetection | Edge Detection | 特征提取 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 8 | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | 2 | 0 | No | 0 | Yes | 20 | Yes | 272 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.Filtering | Gaussian Blur | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 4 | Gaussian Blur (OpenCV) | 1 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.FrameAveraging | 帧平均 | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 2 | 该算子做的是时间域融合，不是空间域滤波。它会保留最近 N 帧图像，在时间轴上对同一像… | 6 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.HistogramAnalysis | 直方图分析 | 检测 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 11 | 6 | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | 2 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |

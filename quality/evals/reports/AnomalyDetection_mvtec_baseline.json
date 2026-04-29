@@ -1,7 +1,6 @@
 {
-  "EvidenceKind": "dataset",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-26T07:33:26.6807218+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:10.1062841+00:00",
     "IndexPath": "quality/datasets/mvtec_ad_lite_index.json",
     "MaxSide": 128,
     "PatchSize": 16,
@@ -15,9 +14,13 @@
     "TestGoodCount": 33,
     "ImageAuroc": 0.66092,
     "PixelAuroc": 0.670852,
+    "MinImageAuroc": 0.5,
+    "MinPixelAuroc": 0.5,
+    "MinCategoryImageAuroc": 0.5,
+    "MinCategoryPixelAuroc": 0.5,
     "Failed": 0,
-    "RuntimeMs": 5103.933,
-    "MemoryAllocationBytes": 55230928
+    "RuntimeMs": 4897.301,
+    "MemoryAllocationBytes": 55230256
   },
   "Operators": [
     {
@@ -25,10 +28,9 @@
       "CaseCount": 120,
       "Passed": 120,
       "Failed": 0,
-      "RuntimeMsAvg": 42.533,
-      "MemoryAllocationBytesAvg": 55230928,
-      "HasPublicDataset": true,
-      "EvidenceKind": "dataset"
+      "RuntimeMsAvg": 40.811,
+      "MemoryAllocationBytesAvg": 55230256,
+      "HasPublicDataset": true
     }
   ],
   "Categories": [
@@ -38,8 +40,8 @@
       "TestCount": 78,
       "TestAnomalyCount": 57,
       "FeatureBankCount": 338,
-      "TrainRuntimeMs": 386.407,
-      "InferenceRuntimeMs": 816.854,
+      "TrainRuntimeMs": 374.791,
+      "InferenceRuntimeMs": 772.996,
       "ImageAuroc": 0.614035,
       "PixelAuroc": 0.560461
     },
@@ -49,12 +51,13 @@
       "TestCount": 42,
       "TestAnomalyCount": 30,
       "FeatureBankCount": 77,
-      "TrainRuntimeMs": 21.978,
-      "InferenceRuntimeMs": 742.39,
+      "TrainRuntimeMs": 20.637,
+      "InferenceRuntimeMs": 710.374,
       "ImageAuroc": 0.75,
       "PixelAuroc": 0.763036
     }
   ],
+  "MetricFailures": [],
   "Images": [
     {
       "Category": "grid",

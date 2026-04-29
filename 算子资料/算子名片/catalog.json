@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T10:56:41.0664908+08:00",
+  "generatedAt": "2026-04-29T13:56:16.3361485+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -21179,13 +21179,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
+        "totalScore": 91,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "errorHandlingScore": 85,
+        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/FrequencyFilter.md"
     },

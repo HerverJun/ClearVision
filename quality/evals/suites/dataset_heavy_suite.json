@@ -134,6 +134,58 @@
       ]
     },
     {
+      "id": "public-dataset-next-runners",
+      "entries": [
+        {
+          "id": "edge_detection_bsds500",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["EdgeDetection"],
+          "datasetManifest": "quality/datasets/manifests/EdgeDetection_bsds500_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/BsdsEdgeContourDatasetRunner/BsdsEdgeContourDatasetRunner.csproj", "--", "--index", "quality/datasets/bsds500_index.json", "--split", "test", "--output", "quality/evals/reports/EdgeDetection_bsds500_baseline.json", "--report", "quality/evals/reports/EdgeDetection_bsds500_baseline.md"],
+          "baselineJson": "quality/evals/reports/EdgeDetection_bsds500_baseline.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_bsds500_baseline.md",
+          "estimatedSeconds": 600,
+          "notes": "Real BSDS500 test-split boundary evidence using product EdgeDetection/Canny and a local MATLAB v5 annotation reader."
+        },
+        {
+          "id": "camera_calibration_opencv_samples",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["CameraCalibration"],
+          "datasetManifest": "quality/datasets/manifests/CameraCalibration_opencv_samples_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/OpenCvCalibrationDatasetRunner/OpenCvCalibrationDatasetRunner.csproj", "--", "--index", "quality/datasets/opencv_calibration_samples_index.json", "--output", "quality/evals/reports/CameraCalibration_opencv_samples_baseline.json", "--report", "quality/evals/reports/CameraCalibration_opencv_samples_baseline.md"],
+          "baselineJson": "quality/evals/reports/CameraCalibration_opencv_samples_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CameraCalibration_opencv_samples_baseline.md",
+          "estimatedSeconds": 180,
+          "notes": "Small Apache-2.0 OpenCV calibration sample gate over left/right camera folders plus stereo-pair metadata sanity."
+        },
+        {
+          "id": "surface_defect_detection_kolektorsdd2",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["SurfaceDefectDetection"],
+          "datasetManifest": "quality/datasets/manifests/SurfaceDefectDetection_kolektorsdd2_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj", "--", "--index", "quality/datasets/kolektorsdd2_index.json", "--output", "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json", "--report", "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md"],
+          "baselineJson": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md",
+          "estimatedSeconds": 1200,
+          "notes": "Public noncommercial industrial defect smoke gate over the current product SurfaceDefectDetectionOperator; keep separate from commercial release evidence."
+        },
+        {
+          "id": "planar_matching_hpatches",
+          "status": "planned",
+          "evidenceKind": "dataset",
+          "operators": ["PlanarMatching", "AkazeFeatureMatch", "OrbFeatureMatch", "LocalDeformableMatching", "PerspectiveTransform"],
+          "datasetManifest": "quality/datasets/manifests/PlanarMatching_hpatches_manifest.json",
+          "baselineJson": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
+          "reportMarkdown": "quality/evals/reports/PlanarMatching_hpatches_baseline.md",
+          "estimatedSeconds": 900,
+          "notes": "Real homography evidence; planned until fixed HPatches smoke subset is downloaded and indexed."
+        }
+      ]
+    },
+    {
       "id": "g3-next-five",
       "entries": [
         {

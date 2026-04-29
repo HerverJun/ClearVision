@@ -195,7 +195,7 @@ public class PixelStatisticsOperator : OperatorBase
             return new Mat();
         }
 
-        using var maskSrc = maskWrapper.GetMat();
+        var maskSrc = maskWrapper.GetMat();
         if (maskSrc.Empty())
         {
             return new Mat();

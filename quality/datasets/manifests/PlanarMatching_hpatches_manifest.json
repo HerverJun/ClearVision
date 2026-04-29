@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "2026-04-29.dataset-manifest",
+  "datasetId": "planar_matching_hpatches_v1",
+  "operator": "PlanarMatching",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "planned",
+  "source": {
+    "kind": "public",
+    "name": "HPatches",
+    "version": "official GitHub/HuggingFace release",
+    "uri": "https://github.com/hpatches/hpatches-dataset",
+    "license": "MIT; cite HPatches and original sequence sources where applicable",
+    "citation": "Balntas et al., HPatches: A benchmark and evaluation of handcrafted and learned local descriptors, CVPR 2017",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_DATASET_ROOT",
+    "relativePath": "quality/public_datasets/hpatches",
+    "gitPolicy": "manifest-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 20260429,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 0,
+    "caseListPath": "quality/datasets/hpatches_index.json"
+  },
+  "labels": {
+    "schema": "reference image, target images, and H_1_i ground-truth homography files per HPatches sequence",
+    "positiveClasses": ["homography_match"],
+    "negativeClasses": ["homography_rejected", "low_feature_scene"],
+    "ignoreRules": ["planned until a fixed smoke subset is downloaded and indexed"]
+  },
+  "metrics": {
+    "primary": "CornerErrorPx",
+    "secondary": ["MMA1Px", "MMA3Px", "MMA5Px", "InlierRatio", "RansacSuccessRate", "RuntimeMsP95"],
+    "thresholds": {
+      "Failed": 0,
+      "SuccessAt5PxMinimum": 0.5,
+      "MMA3PxRegressionTolerance": 0.02
+    }
+  },
+  "runner": {
+    "project": "quality/tools/HpatchesHomographyDatasetRunner/HpatchesHomographyDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/HpatchesHomographyDatasetRunner/HpatchesHomographyDatasetRunner.csproj -- --index quality/datasets/hpatches_index.json --output quality/evals/reports/PlanarMatching_hpatches_baseline.json --report quality/evals/reports/PlanarMatching_hpatches_baseline.md",
+    "baselineJson": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
+    "reportMarkdown": "quality/evals/reports/PlanarMatching_hpatches_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["homography_pose_drift", "illumination_shift", "viewpoint_extreme", "low_feature_scene", "repetitive_texture_false_match"],
+    "minimumFailureCases": 5
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Public dataset planned; raw files must remain under ignored quality/public_datasets."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

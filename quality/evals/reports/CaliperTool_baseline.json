@@ -1,12 +1,11 @@
 {
-  "EvidenceKind": "golden",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-25T14:18:21.5533177+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:23.9363357+00:00",
     "CasesRoot": "quality/synthetic/cases/caliper_tool",
     "CaseCount": 117,
     "Passed": 117,
     "Failed": 0,
-    "MemoryAllocationBytesAvgSum": 142414
+    "MemoryAllocationBytesAvgSum": 142426
   },
   "Operators": [
     {
@@ -14,10 +13,9 @@
       "CaseCount": 117,
       "Passed": 117,
       "Failed": 0,
-      "RuntimeMsAvg": 2.058,
-      "RuntimeMsMax": 34.086,
-      "MemoryAllocationBytesAvg": 142414,
-      "EvidenceKind": "golden"
+      "RuntimeMsAvg": 2.063,
+      "RuntimeMsMax": 34.518,
+      "MemoryAllocationBytesAvg": 142426
     }
   ],
   "Cases": [
@@ -27,8 +25,8 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 34.086,
-      "MemoryAllocationBytes": 108216,
+      "RuntimeMs": 34.518,
+      "MemoryAllocationBytes": 120552,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -57,8 +55,8 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 7.197,
-      "MemoryAllocationBytes": 232528,
+      "RuntimeMs": 7.703,
+      "MemoryAllocationBytes": 220192,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -87,7 +85,7 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.244,
+      "RuntimeMs": 1.248,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -117,7 +115,7 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.851,
+      "RuntimeMs": 3.001,
       "MemoryAllocationBytes": 203528,
       "ErrorMessage": null,
       "Metrics": {
@@ -147,8 +145,8 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.3,
-      "MemoryAllocationBytes": 93792,
+      "RuntimeMs": 1.221,
+      "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -177,7 +175,7 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.504,
+      "RuntimeMs": 2.734,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -207,7 +205,7 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.325,
+      "RuntimeMs": 1.209,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -237,7 +235,7 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.488,
+      "RuntimeMs": 2.539,
       "MemoryAllocationBytes": 203528,
       "ErrorMessage": null,
       "Metrics": {
@@ -267,7 +265,7 @@
       "Scenario": "blurred_edge",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_blurred_edge_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.349,
+      "RuntimeMs": 1.198,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -297,7 +295,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.212,
+      "RuntimeMs": 1.504,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -327,7 +325,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 3.137,
+      "RuntimeMs": 3.099,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -357,7 +355,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.237,
+      "RuntimeMs": 1.457,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -387,7 +385,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.424,
+      "RuntimeMs": 2.487,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -417,8 +415,8 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.206,
-      "MemoryAllocationBytes": 91944,
+      "RuntimeMs": 1.305,
+      "MemoryAllocationBytes": 93792,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -447,7 +445,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.458,
+      "RuntimeMs": 2.662,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -477,7 +475,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.301,
+      "RuntimeMs": 1.221,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -507,7 +505,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.496,
+      "RuntimeMs": 2.475,
       "MemoryAllocationBytes": 202632,
       "ErrorMessage": null,
       "Metrics": {
@@ -537,7 +535,7 @@
       "Scenario": "close_edges",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_close_edges_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.039,
+      "RuntimeMs": 1.04,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -567,7 +565,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.324,
+      "RuntimeMs": 1.363,
       "MemoryAllocationBytes": 112976,
       "ErrorMessage": null,
       "Metrics": {
@@ -597,7 +595,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 3.355,
+      "RuntimeMs": 3.375,
       "MemoryAllocationBytes": 253216,
       "ErrorMessage": null,
       "Metrics": {
@@ -627,7 +625,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.446,
+      "RuntimeMs": 1.526,
       "MemoryAllocationBytes": 112976,
       "ErrorMessage": null,
       "Metrics": {
@@ -657,7 +655,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.923,
+      "RuntimeMs": 2.867,
       "MemoryAllocationBytes": 253168,
       "ErrorMessage": null,
       "Metrics": {
@@ -687,7 +685,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.354,
+      "RuntimeMs": 1.431,
       "MemoryAllocationBytes": 112976,
       "ErrorMessage": null,
       "Metrics": {
@@ -717,7 +715,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.928,
+      "RuntimeMs": 2.894,
       "MemoryAllocationBytes": 253216,
       "ErrorMessage": null,
       "Metrics": {
@@ -747,7 +745,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.308,
+      "RuntimeMs": 1.337,
       "MemoryAllocationBytes": 112976,
       "ErrorMessage": null,
       "Metrics": {
@@ -777,7 +775,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.878,
+      "RuntimeMs": 2.897,
       "MemoryAllocationBytes": 254128,
       "ErrorMessage": null,
       "Metrics": {
@@ -807,7 +805,7 @@
       "Scenario": "custom_angle_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_custom_angle_bar_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.344,
+      "RuntimeMs": 1.337,
       "MemoryAllocationBytes": 112976,
       "ErrorMessage": null,
       "Metrics": {
@@ -837,7 +835,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.09,
+      "RuntimeMs": 1.048,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -867,7 +865,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.277,
+      "RuntimeMs": 2.256,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -897,7 +895,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.123,
+      "RuntimeMs": 1.05,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -927,7 +925,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.281,
+      "RuntimeMs": 2.275,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -957,7 +955,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.076,
+      "RuntimeMs": 1.097,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -987,7 +985,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.35,
+      "RuntimeMs": 2.283,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -1017,7 +1015,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.086,
+      "RuntimeMs": 1.062,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1047,7 +1045,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.394,
+      "RuntimeMs": 2.253,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -1077,7 +1075,7 @@
       "Scenario": "dark_bar_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_dark_bar_polarity_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.056,
+      "RuntimeMs": 1.076,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1107,7 +1105,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.244,
+      "RuntimeMs": 1.239,
       "MemoryAllocationBytes": 90768,
       "ErrorMessage": null,
       "Metrics": {
@@ -1130,7 +1128,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 3.088,
+      "RuntimeMs": 3.144,
       "MemoryAllocationBytes": 202112,
       "ErrorMessage": null,
       "Metrics": {
@@ -1153,7 +1151,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.257,
+      "RuntimeMs": 1.224,
       "MemoryAllocationBytes": 88640,
       "ErrorMessage": null,
       "Metrics": {
@@ -1176,7 +1174,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.538,
+      "RuntimeMs": 2.431,
       "MemoryAllocationBytes": 202064,
       "ErrorMessage": null,
       "Metrics": {
@@ -1199,7 +1197,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.233,
+      "RuntimeMs": 1.188,
       "MemoryAllocationBytes": 89096,
       "ErrorMessage": null,
       "Metrics": {
@@ -1222,7 +1220,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.392,
+      "RuntimeMs": 2.674,
       "MemoryAllocationBytes": 202112,
       "ErrorMessage": null,
       "Metrics": {
@@ -1245,7 +1243,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.22,
+      "RuntimeMs": 1.206,
       "MemoryAllocationBytes": 89096,
       "ErrorMessage": null,
       "Metrics": {
@@ -1268,7 +1266,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.467,
+      "RuntimeMs": 2.556,
       "MemoryAllocationBytes": 202064,
       "ErrorMessage": null,
       "Metrics": {
@@ -1291,7 +1289,7 @@
       "Scenario": "expected_count_failure",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_expected_count_failure_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.332,
+      "RuntimeMs": 1.344,
       "MemoryAllocationBytes": 88640,
       "ErrorMessage": null,
       "Metrics": {
@@ -1314,7 +1312,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.332,
+      "RuntimeMs": 1.235,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1344,7 +1342,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.56,
+      "RuntimeMs": 2.463,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -1374,7 +1372,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.064,
+      "RuntimeMs": 1.252,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1404,7 +1402,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.273,
+      "RuntimeMs": 2.308,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -1464,7 +1462,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.438,
+      "RuntimeMs": 2.331,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -1494,7 +1492,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.053,
+      "RuntimeMs": 1.061,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1524,7 +1522,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.611,
+      "RuntimeMs": 2.287,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -1554,7 +1552,7 @@
       "Scenario": "horizontal_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_horizontal_bright_bar_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.079,
+      "RuntimeMs": 1.07,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1584,7 +1582,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.248,
+      "RuntimeMs": 1.101,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1614,7 +1612,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.378,
+      "RuntimeMs": 2.358,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -1644,7 +1642,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.602,
+      "RuntimeMs": 1.115,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1674,7 +1672,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.4,
+      "RuntimeMs": 2.361,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -1704,7 +1702,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.098,
+      "RuntimeMs": 1.156,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1734,7 +1732,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.378,
+      "RuntimeMs": 2.363,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -1764,7 +1762,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.125,
+      "RuntimeMs": 1.113,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1794,7 +1792,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.491,
+      "RuntimeMs": 2.373,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -1824,7 +1822,7 @@
       "Scenario": "light_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_light_noise_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.087,
+      "RuntimeMs": 1.077,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1854,7 +1852,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.052,
+      "RuntimeMs": 1.053,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1884,7 +1882,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.349,
+      "RuntimeMs": 2.71,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -1914,7 +1912,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.051,
+      "RuntimeMs": 1.083,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -1944,7 +1942,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.255,
+      "RuntimeMs": 2.413,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -1974,7 +1972,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.177,
+      "RuntimeMs": 1.087,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -2004,7 +2002,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.278,
+      "RuntimeMs": 2.261,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -2034,7 +2032,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.011,
+      "RuntimeMs": 2.149,
       "MemoryAllocationBytes": 92000,
       "ErrorMessage": null,
       "Metrics": {
@@ -2064,7 +2062,7 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.412,
+      "RuntimeMs": 2.397,
       "MemoryAllocationBytes": 202776,
       "ErrorMessage": null,
       "Metrics": {
@@ -2094,8 +2092,8 @@
       "Scenario": "low_contrast",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_low_contrast_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.042,
-      "MemoryAllocationBytes": 91944,
+      "RuntimeMs": 1.046,
+      "MemoryAllocationBytes": 93304,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -2124,7 +2122,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.315,
+      "RuntimeMs": 1.309,
       "MemoryAllocationBytes": 115104,
       "ErrorMessage": null,
       "Metrics": {
@@ -2154,7 +2152,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.961,
+      "RuntimeMs": 2.841,
       "MemoryAllocationBytes": 258096,
       "ErrorMessage": null,
       "Metrics": {
@@ -2184,7 +2182,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.328,
+      "RuntimeMs": 1.474,
       "MemoryAllocationBytes": 115104,
       "ErrorMessage": null,
       "Metrics": {
@@ -2214,7 +2212,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 3.026,
+      "RuntimeMs": 2.853,
       "MemoryAllocationBytes": 258048,
       "ErrorMessage": null,
       "Metrics": {
@@ -2244,7 +2242,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.397,
+      "RuntimeMs": 1.322,
       "MemoryAllocationBytes": 115104,
       "ErrorMessage": null,
       "Metrics": {
@@ -2274,7 +2272,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.888,
+      "RuntimeMs": 2.817,
       "MemoryAllocationBytes": 258096,
       "ErrorMessage": null,
       "Metrics": {
@@ -2304,7 +2302,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.52,
+      "RuntimeMs": 1.381,
       "MemoryAllocationBytes": 115104,
       "ErrorMessage": null,
       "Metrics": {
@@ -2334,7 +2332,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.873,
+      "RuntimeMs": 2.809,
       "MemoryAllocationBytes": 258048,
       "ErrorMessage": null,
       "Metrics": {
@@ -2364,7 +2362,7 @@
       "Scenario": "multi_edge_roi",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_multi_edge_roi_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.317,
+      "RuntimeMs": 1.272,
       "MemoryAllocationBytes": 115104,
       "ErrorMessage": null,
       "Metrics": {
@@ -2394,7 +2392,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.665,
+      "RuntimeMs": 0.883,
       "MemoryAllocationBytes": 57032,
       "ErrorMessage": null,
       "Metrics": {
@@ -2424,7 +2422,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.36,
+      "RuntimeMs": 1.352,
       "MemoryAllocationBytes": 120480,
       "ErrorMessage": null,
       "Metrics": {
@@ -2454,7 +2452,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.65,
+      "RuntimeMs": 0.661,
       "MemoryAllocationBytes": 57032,
       "ErrorMessage": null,
       "Metrics": {
@@ -2514,7 +2512,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.67,
+      "RuntimeMs": 0.655,
       "MemoryAllocationBytes": 57032,
       "ErrorMessage": null,
       "Metrics": {
@@ -2544,7 +2542,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.402,
+      "RuntimeMs": 1.348,
       "MemoryAllocationBytes": 120480,
       "ErrorMessage": null,
       "Metrics": {
@@ -2574,7 +2572,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.654,
+      "RuntimeMs": 0.655,
       "MemoryAllocationBytes": 57032,
       "ErrorMessage": null,
       "Metrics": {
@@ -2604,7 +2602,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.584,
+      "RuntimeMs": 1.34,
       "MemoryAllocationBytes": 120432,
       "ErrorMessage": null,
       "Metrics": {
@@ -2634,7 +2632,7 @@
       "Scenario": "roi_boundary",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_roi_boundary_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 0.668,
+      "RuntimeMs": 0.658,
       "MemoryAllocationBytes": 57032,
       "ErrorMessage": null,
       "Metrics": {
@@ -2664,7 +2662,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.098,
+      "RuntimeMs": 1.033,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -2694,7 +2692,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.359,
+      "RuntimeMs": 2.966,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -2724,7 +2722,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.069,
+      "RuntimeMs": 1.064,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -2754,7 +2752,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.472,
+      "RuntimeMs": 2.369,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -2784,7 +2782,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.204,
+      "RuntimeMs": 1.089,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -2814,7 +2812,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.308,
+      "RuntimeMs": 2.448,
       "MemoryAllocationBytes": 202616,
       "ErrorMessage": null,
       "Metrics": {
@@ -2844,7 +2842,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.06,
+      "RuntimeMs": 1.055,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -2874,7 +2872,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.431,
+      "RuntimeMs": 2.298,
       "MemoryAllocationBytes": 202568,
       "ErrorMessage": null,
       "Metrics": {
@@ -2904,7 +2902,7 @@
       "Scenario": "strong_noise",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_strong_noise_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.074,
+      "RuntimeMs": 1.043,
       "MemoryAllocationBytes": 91944,
       "ErrorMessage": null,
       "Metrics": {
@@ -2934,7 +2932,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.084,
+      "RuntimeMs": 1.12,
       "MemoryAllocationBytes": 91936,
       "ErrorMessage": null,
       "Metrics": {
@@ -2964,7 +2962,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.234,
+      "RuntimeMs": 2.198,
       "MemoryAllocationBytes": 202608,
       "ErrorMessage": null,
       "Metrics": {
@@ -2994,7 +2992,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.036,
+      "RuntimeMs": 1.017,
       "MemoryAllocationBytes": 91936,
       "ErrorMessage": null,
       "Metrics": {
@@ -3024,7 +3022,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.191,
+      "RuntimeMs": 2.236,
       "MemoryAllocationBytes": 202560,
       "ErrorMessage": null,
       "Metrics": {
@@ -3054,7 +3052,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.072,
+      "RuntimeMs": 1.022,
       "MemoryAllocationBytes": 91936,
       "ErrorMessage": null,
       "Metrics": {
@@ -3084,7 +3082,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.392,
+      "RuntimeMs": 2.182,
       "MemoryAllocationBytes": 202608,
       "ErrorMessage": null,
       "Metrics": {
@@ -3114,7 +3112,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.04,
+      "RuntimeMs": 1.023,
       "MemoryAllocationBytes": 91936,
       "ErrorMessage": null,
       "Metrics": {
@@ -3144,7 +3142,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.489,
+      "RuntimeMs": 2.176,
       "MemoryAllocationBytes": 202560,
       "ErrorMessage": null,
       "Metrics": {
@@ -3174,7 +3172,7 @@
       "Scenario": "vertical_bright_bar",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_vertical_bright_bar_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.229,
+      "RuntimeMs": 1.236,
       "MemoryAllocationBytes": 91936,
       "ErrorMessage": null,
       "Metrics": {
@@ -3204,7 +3202,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0000\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.003,
+      "RuntimeMs": 1.018,
       "MemoryAllocationBytes": 89208,
       "ErrorMessage": null,
       "Metrics": {
@@ -3227,7 +3225,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0001\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.434,
+      "RuntimeMs": 2.76,
       "MemoryAllocationBytes": 199400,
       "ErrorMessage": null,
       "Metrics": {
@@ -3250,7 +3248,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0002\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.161,
+      "RuntimeMs": 1.158,
       "MemoryAllocationBytes": 89208,
       "ErrorMessage": null,
       "Metrics": {
@@ -3273,7 +3271,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0003\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.343,
+      "RuntimeMs": 2.344,
       "MemoryAllocationBytes": 199352,
       "ErrorMessage": null,
       "Metrics": {
@@ -3296,7 +3294,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0004\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.161,
+      "RuntimeMs": 1.153,
       "MemoryAllocationBytes": 89208,
       "ErrorMessage": null,
       "Metrics": {
@@ -3319,7 +3317,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0005\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.324,
+      "RuntimeMs": 2.341,
       "MemoryAllocationBytes": 199400,
       "ErrorMessage": null,
       "Metrics": {
@@ -3342,7 +3340,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0006\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.194,
+      "RuntimeMs": 1.156,
       "MemoryAllocationBytes": 89208,
       "ErrorMessage": null,
       "Metrics": {
@@ -3365,7 +3363,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0007\\input.json",
       "Passed": true,
-      "RuntimeMs": 2.379,
+      "RuntimeMs": 2.367,
       "MemoryAllocationBytes": 199352,
       "ErrorMessage": null,
       "Metrics": {
@@ -3388,7 +3386,7 @@
       "Scenario": "wrong_polarity",
       "InputPath": "quality\\synthetic\\cases\\caliper_tool\\CaliperTool\\CaliperTool_wrong_polarity_0008\\input.json",
       "Passed": true,
-      "RuntimeMs": 1.142,
+      "RuntimeMs": 1.153,
       "MemoryAllocationBytes": 89208,
       "ErrorMessage": null,
       "Metrics": {

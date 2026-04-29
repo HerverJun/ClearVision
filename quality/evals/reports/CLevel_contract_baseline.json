@@ -1,12 +1,11 @@
 {
-  "EvidenceKind": "contract",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-24T15:14:34.6234679+00:00",
+    "GeneratedAtUtc": "2026-04-29T03:29:19.6514604+00:00",
     "CasesRoot": "embedded synthetic C-level cases",
     "CaseCount": 66,
     "Passed": 66,
     "Failed": 0,
-    "MemoryAllocationBytesAvgSum": 323964
+    "MemoryAllocationBytesAvgSum": 323938
   },
   "Operators": [
     {
@@ -14,30 +13,27 @@
       "CaseCount": 22,
       "Passed": 22,
       "Failed": 0,
-      "RuntimeMsAvg": 1.176,
-      "RuntimeMsMax": 21.034,
-      "MemoryAllocationBytesAvg": 35571,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 1.001,
+      "RuntimeMsMax": 17.433,
+      "MemoryAllocationBytesAvg": 35545
     },
     {
       "Operator": "ContourExtrema",
       "CaseCount": 22,
       "Passed": 22,
       "Failed": 0,
-      "RuntimeMsAvg": 0.244,
-      "RuntimeMsMax": 1.171,
-      "MemoryAllocationBytesAvg": 8815,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 0.253,
+      "RuntimeMsMax": 1.196,
+      "MemoryAllocationBytesAvg": 8815
     },
     {
       "Operator": "PhaseClosure",
       "CaseCount": 22,
       "Passed": 22,
       "Failed": 0,
-      "RuntimeMsAvg": 1.429,
-      "RuntimeMsMax": 4.59,
-      "MemoryAllocationBytesAvg": 279578,
-      "EvidenceKind": "contract"
+      "RuntimeMsAvg": 1.433,
+      "RuntimeMsMax": 4.545,
+      "MemoryAllocationBytesAvg": 279578
     }
   ],
   "Cases": [
@@ -46,7 +42,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "quad_horizontal",
       "Passed": true,
-      "RuntimeMs": 0.198,
+      "RuntimeMs": 0.19,
       "MemoryAllocationBytes": 9344,
       "ErrorMessage": null,
       "Metrics": {
@@ -69,7 +65,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "quad_vertical",
       "Passed": true,
-      "RuntimeMs": 0.273,
+      "RuntimeMs": 0.243,
       "MemoryAllocationBytes": 10112,
       "ErrorMessage": null,
       "Metrics": {
@@ -92,7 +88,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "quad_distance",
       "Passed": true,
-      "RuntimeMs": 0.312,
+      "RuntimeMs": 0.257,
       "MemoryAllocationBytes": 10112,
       "ErrorMessage": null,
       "Metrics": {
@@ -115,7 +111,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "negative_horizontal",
       "Passed": true,
-      "RuntimeMs": 0.137,
+      "RuntimeMs": 0.124,
       "MemoryAllocationBytes": 9344,
       "ErrorMessage": null,
       "Metrics": {
@@ -138,7 +134,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "negative_vertical",
       "Passed": true,
-      "RuntimeMs": 0.122,
+      "RuntimeMs": 0.118,
       "MemoryAllocationBytes": 9344,
       "ErrorMessage": null,
       "Metrics": {
@@ -161,7 +157,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "negative_distance",
       "Passed": true,
-      "RuntimeMs": 0.119,
+      "RuntimeMs": 0.123,
       "MemoryAllocationBytes": 9344,
       "ErrorMessage": null,
       "Metrics": {
@@ -184,7 +180,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "collinear_horizontal",
       "Passed": true,
-      "RuntimeMs": 0.115,
+      "RuntimeMs": 0.111,
       "MemoryAllocationBytes": 9240,
       "ErrorMessage": null,
       "Metrics": {
@@ -207,7 +203,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "collinear_vertical",
       "Passed": true,
-      "RuntimeMs": 1.026,
+      "RuntimeMs": 1.196,
       "MemoryAllocationBytes": 9240,
       "ErrorMessage": null,
       "Metrics": {
@@ -230,7 +226,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "collinear_distance",
       "Passed": true,
-      "RuntimeMs": 0.135,
+      "RuntimeMs": 0.131,
       "MemoryAllocationBytes": 9240,
       "ErrorMessage": null,
       "Metrics": {
@@ -253,7 +249,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "duplicate_extreme_horizontal",
       "Passed": true,
-      "RuntimeMs": 0.13,
+      "RuntimeMs": 0.119,
       "MemoryAllocationBytes": 9448,
       "ErrorMessage": null,
       "Metrics": {
@@ -276,7 +272,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "duplicate_extreme_vertical",
       "Passed": true,
-      "RuntimeMs": 0.128,
+      "RuntimeMs": 0.114,
       "MemoryAllocationBytes": 9448,
       "ErrorMessage": null,
       "Metrics": {
@@ -299,7 +295,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "duplicate_extreme_distance",
       "Passed": true,
-      "RuntimeMs": 0.137,
+      "RuntimeMs": 0.114,
       "MemoryAllocationBytes": 9448,
       "ErrorMessage": null,
       "Metrics": {
@@ -322,7 +318,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "slanted_horizontal",
       "Passed": true,
-      "RuntimeMs": 0.12,
+      "RuntimeMs": 0.127,
       "MemoryAllocationBytes": 9448,
       "ErrorMessage": null,
       "Metrics": {
@@ -345,7 +341,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "slanted_vertical",
       "Passed": true,
-      "RuntimeMs": 0.114,
+      "RuntimeMs": 0.152,
       "MemoryAllocationBytes": 9448,
       "ErrorMessage": null,
       "Metrics": {
@@ -368,7 +364,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "slanted_distance",
       "Passed": true,
-      "RuntimeMs": 0.116,
+      "RuntimeMs": 0.184,
       "MemoryAllocationBytes": 9448,
       "ErrorMessage": null,
       "Metrics": {
@@ -391,7 +387,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "single_point_horizontal",
       "Passed": true,
-      "RuntimeMs": 0.239,
+      "RuntimeMs": 0.283,
       "MemoryAllocationBytes": 8640,
       "ErrorMessage": null,
       "Metrics": {
@@ -414,7 +410,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "single_point_vertical",
       "Passed": true,
-      "RuntimeMs": 0.118,
+      "RuntimeMs": 0.158,
       "MemoryAllocationBytes": 8640,
       "ErrorMessage": null,
       "Metrics": {
@@ -437,7 +433,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "single_point_distance",
       "Passed": true,
-      "RuntimeMs": 0.11,
+      "RuntimeMs": 0.137,
       "MemoryAllocationBytes": 8640,
       "ErrorMessage": null,
       "Metrics": {
@@ -460,7 +456,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "point_array_horizontal",
       "Passed": true,
-      "RuntimeMs": 1.171,
+      "RuntimeMs": 1.108,
       "MemoryAllocationBytes": 9688,
       "ErrorMessage": null,
       "Metrics": {
@@ -483,7 +479,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "unknown_direction_fallback",
       "Passed": true,
-      "RuntimeMs": 0.221,
+      "RuntimeMs": 0.245,
       "MemoryAllocationBytes": 9496,
       "ErrorMessage": null,
       "Metrics": {
@@ -506,7 +502,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "empty_contour",
       "Passed": true,
-      "RuntimeMs": 0.283,
+      "RuntimeMs": 0.281,
       "MemoryAllocationBytes": 4224,
       "ErrorMessage": null,
       "Metrics": {
@@ -522,7 +518,7 @@
       "Operator": "ContourExtrema",
       "Scenario": "distance_missing_reference",
       "Passed": true,
-      "RuntimeMs": 0.053,
+      "RuntimeMs": 0.055,
       "MemoryAllocationBytes": 2600,
       "ErrorMessage": null,
       "Metrics": {
@@ -530,7 +526,7 @@
         "ActualSuccess": false,
         "Direction": "distance",
         "PayloadKind": "Point2fArray",
-        "ErrorMessage": "ReferencePoint is required when Direction is 'distance'."
+        "ErrorMessage": "ReferencePoint is required when Direction is \u0027distance\u0027."
       }
     },
     {
@@ -538,7 +534,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_32",
       "Passed": true,
-      "RuntimeMs": 0.858,
+      "RuntimeMs": 0.852,
       "MemoryAllocationBytes": 106144,
       "ErrorMessage": null,
       "Metrics": {
@@ -558,7 +554,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_48",
       "Passed": true,
-      "RuntimeMs": 1.303,
+      "RuntimeMs": 1.29,
       "MemoryAllocationBytes": 193768,
       "ErrorMessage": null,
       "Metrics": {
@@ -570,7 +566,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.878136,
-        "Mae": 1e-06
+        "Mae": 1E-06
       }
     },
     {
@@ -598,7 +594,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_tall",
       "Passed": true,
-      "RuntimeMs": 1.394,
+      "RuntimeMs": 1.479,
       "MemoryAllocationBytes": 230776,
       "ErrorMessage": null,
       "Metrics": {
@@ -618,7 +614,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_gentle",
       "Passed": true,
-      "RuntimeMs": 1.629,
+      "RuntimeMs": 1.636,
       "MemoryAllocationBytes": 310168,
       "ErrorMessage": null,
       "Metrics": {
@@ -638,7 +634,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_x_only",
       "Passed": true,
-      "RuntimeMs": 1.02,
+      "RuntimeMs": 1.11,
       "MemoryAllocationBytes": 171520,
       "ErrorMessage": null,
       "Metrics": {
@@ -650,7 +646,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.794604,
-        "Mae": 1e-06
+        "Mae": 1E-06
       }
     },
     {
@@ -658,7 +654,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_y_only",
       "Passed": true,
-      "RuntimeMs": 1.127,
+      "RuntimeMs": 1.214,
       "MemoryAllocationBytes": 180424,
       "ErrorMessage": null,
       "Metrics": {
@@ -678,7 +674,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "ramp_offset",
       "Passed": true,
-      "RuntimeMs": 1.113,
+      "RuntimeMs": 1.102,
       "MemoryAllocationBytes": 163096,
       "ErrorMessage": null,
       "Metrics": {
@@ -698,7 +694,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "quality_centered",
       "Passed": true,
-      "RuntimeMs": 4.59,
+      "RuntimeMs": 4.545,
       "MemoryAllocationBytes": 611480,
       "ErrorMessage": null,
       "Metrics": {
@@ -710,7 +706,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.903419,
-        "Mae": 1e-06
+        "Mae": 1E-06
       }
     },
     {
@@ -718,7 +714,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "quality_rect",
       "Passed": true,
-      "RuntimeMs": 2.377,
+      "RuntimeMs": 2.357,
       "MemoryAllocationBytes": 549736,
       "ErrorMessage": null,
       "Metrics": {
@@ -730,7 +726,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.891591,
-        "Mae": 2e-06
+        "Mae": 2E-06
       }
     },
     {
@@ -738,7 +734,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "quality_gentle",
       "Passed": true,
-      "RuntimeMs": 1.44,
+      "RuntimeMs": 1.406,
       "MemoryAllocationBytes": 349064,
       "ErrorMessage": null,
       "Metrics": {
@@ -758,7 +754,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "quality_x_only",
       "Passed": true,
-      "RuntimeMs": 1.367,
+      "RuntimeMs": 1.342,
       "MemoryAllocationBytes": 331800,
       "ErrorMessage": null,
       "Metrics": {
@@ -778,7 +774,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "floodfill_centered",
       "Passed": true,
-      "RuntimeMs": 2.117,
+      "RuntimeMs": 2.183,
       "MemoryAllocationBytes": 415688,
       "ErrorMessage": null,
       "Metrics": {
@@ -798,7 +794,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "floodfill_offset",
       "Passed": true,
-      "RuntimeMs": 1.338,
+      "RuntimeMs": 1.342,
       "MemoryAllocationBytes": 415472,
       "ErrorMessage": null,
       "Metrics": {
@@ -810,7 +806,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.890819,
-        "Mae": 1e-06
+        "Mae": 1E-06
       }
     },
     {
@@ -818,7 +814,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "floodfill_discontinuity",
       "Passed": true,
-      "RuntimeMs": 1.625,
+      "RuntimeMs": 1.622,
       "MemoryAllocationBytes": 613448,
       "ErrorMessage": null,
       "Metrics": {
@@ -838,7 +834,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "itoh_discontinuity",
       "Passed": true,
-      "RuntimeMs": 1.182,
+      "RuntimeMs": 1.159,
       "MemoryAllocationBytes": 229744,
       "ErrorMessage": null,
       "Metrics": {
@@ -858,7 +854,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "uniform_zero",
       "Passed": true,
-      "RuntimeMs": 0.647,
+      "RuntimeMs": 0.689,
       "MemoryAllocationBytes": 106144,
       "ErrorMessage": null,
       "Metrics": {
@@ -878,7 +874,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "uniform_positive",
       "Passed": true,
-      "RuntimeMs": 1.759,
+      "RuntimeMs": 1.659,
       "MemoryAllocationBytes": 424528,
       "ErrorMessage": null,
       "Metrics": {
@@ -898,7 +894,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "uniform_negative",
       "Passed": true,
-      "RuntimeMs": 1.104,
+      "RuntimeMs": 1.085,
       "MemoryAllocationBytes": 344688,
       "ErrorMessage": null,
       "Metrics": {
@@ -918,7 +914,7 @@
       "Operator": "PhaseClosure",
       "Scenario": "wavelength_scaled",
       "Passed": true,
-      "RuntimeMs": 0.923,
+      "RuntimeMs": 0.944,
       "MemoryAllocationBytes": 106232,
       "ErrorMessage": null,
       "Metrics": {
@@ -930,7 +926,7 @@
         "NonFinitePixels": 0,
         "DiscontinuityCount": 0,
         "Quality": 0.912073,
-        "Mae": 1.2e-05
+        "Mae": 1.2E-05
       }
     },
     {
@@ -970,7 +966,7 @@
       "Operator": "Comment",
       "Scenario": "missing_input_default_text",
       "Passed": true,
-      "RuntimeMs": 0.016,
+      "RuntimeMs": 0.015,
       "MemoryAllocationBytes": 3360,
       "ErrorMessage": null,
       "Metrics": {
@@ -990,8 +986,8 @@
       "Operator": "Comment",
       "Scenario": "string_payload",
       "Passed": true,
-      "RuntimeMs": 21.034,
-      "MemoryAllocationBytes": 126656,
+      "RuntimeMs": 17.433,
+      "MemoryAllocationBytes": 129160,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -1010,7 +1006,7 @@
       "Operator": "Comment",
       "Scenario": "int_payload",
       "Passed": true,
-      "RuntimeMs": 0.061,
+      "RuntimeMs": 0.06,
       "MemoryAllocationBytes": 5344,
       "ErrorMessage": null,
       "Metrics": {
@@ -1030,7 +1026,7 @@
       "Operator": "Comment",
       "Scenario": "double_payload",
       "Passed": true,
-      "RuntimeMs": 0.03,
+      "RuntimeMs": 0.026,
       "MemoryAllocationBytes": 5456,
       "ErrorMessage": null,
       "Metrics": {
@@ -1070,7 +1066,7 @@
       "Operator": "Comment",
       "Scenario": "dictionary_payload",
       "Passed": true,
-      "RuntimeMs": 0.038,
+      "RuntimeMs": 0.034,
       "MemoryAllocationBytes": 5680,
       "ErrorMessage": null,
       "Metrics": {
@@ -1081,7 +1077,7 @@
         "ErrorMessage": null,
         "ExpectedMessageLength": 4,
         "ActualMessageLength": 4,
-        "OutputType": "Dictionary`2",
+        "OutputType": "Dictionary\u00602",
         "ReferencePreserved": true
       }
     },
@@ -1090,7 +1086,7 @@
       "Operator": "Comment",
       "Scenario": "list_payload",
       "Passed": true,
-      "RuntimeMs": 0.04,
+      "RuntimeMs": 0.038,
       "MemoryAllocationBytes": 5528,
       "ErrorMessage": null,
       "Metrics": {
@@ -1101,7 +1097,7 @@
         "ErrorMessage": null,
         "ExpectedMessageLength": 4,
         "ActualMessageLength": 4,
-        "OutputType": "List`1",
+        "OutputType": "List\u00601",
         "ReferencePreserved": true
       }
     },
@@ -1110,7 +1106,7 @@
       "Operator": "Comment",
       "Scenario": "byte_array_payload",
       "Passed": true,
-      "RuntimeMs": 0.098,
+      "RuntimeMs": 0.088,
       "MemoryAllocationBytes": 5552,
       "ErrorMessage": null,
       "Metrics": {
@@ -1130,7 +1126,7 @@
       "Operator": "Comment",
       "Scenario": "empty_text",
       "Passed": true,
-      "RuntimeMs": 0.027,
+      "RuntimeMs": 0.02,
       "MemoryAllocationBytes": 5072,
       "ErrorMessage": null,
       "Metrics": {
@@ -1150,7 +1146,7 @@
       "Operator": "Comment",
       "Scenario": "long_valid_text",
       "Passed": true,
-      "RuntimeMs": 0.353,
+      "RuntimeMs": 0.344,
       "MemoryAllocationBytes": 95256,
       "ErrorMessage": null,
       "Metrics": {
@@ -1170,8 +1166,8 @@
       "Operator": "Comment",
       "Scenario": "numeric_text_param",
       "Passed": true,
-      "RuntimeMs": 2.168,
-      "MemoryAllocationBytes": 210816,
+      "RuntimeMs": 1.911,
+      "MemoryAllocationBytes": 207736,
       "ErrorMessage": null,
       "Metrics": {
         "ExpectedSuccess": true,
@@ -1190,7 +1186,7 @@
       "Operator": "Comment",
       "Scenario": "bool_text_param",
       "Passed": true,
-      "RuntimeMs": 0.743,
+      "RuntimeMs": 0.708,
       "MemoryAllocationBytes": 19896,
       "ErrorMessage": null,
       "Metrics": {
@@ -1210,7 +1206,7 @@
       "Operator": "Comment",
       "Scenario": "image_payload_small",
       "Passed": true,
-      "RuntimeMs": 0.144,
+      "RuntimeMs": 0.143,
       "MemoryAllocationBytes": 6376,
       "ErrorMessage": null,
       "Metrics": {
@@ -1230,7 +1226,7 @@
       "Operator": "Comment",
       "Scenario": "image_payload_gray",
       "Passed": true,
-      "RuntimeMs": 0.063,
+      "RuntimeMs": 0.06,
       "MemoryAllocationBytes": 6488,
       "ErrorMessage": null,
       "Metrics": {
@@ -1250,7 +1246,7 @@
       "Operator": "Comment",
       "Scenario": "large_scalar_payload",
       "Passed": true,
-      "RuntimeMs": 0.03,
+      "RuntimeMs": 0.029,
       "MemoryAllocationBytes": 5768,
       "ErrorMessage": null,
       "Metrics": {
@@ -1270,7 +1266,7 @@
       "Operator": "Comment",
       "Scenario": "zero_payload",
       "Passed": true,
-      "RuntimeMs": 0.026,
+      "RuntimeMs": 0.025,
       "MemoryAllocationBytes": 5256,
       "ErrorMessage": null,
       "Metrics": {
@@ -1290,7 +1286,7 @@
       "Operator": "Comment",
       "Scenario": "negative_payload",
       "Passed": true,
-      "RuntimeMs": 0.022,
+      "RuntimeMs": 0.024,
       "MemoryAllocationBytes": 5344,
       "ErrorMessage": null,
       "Metrics": {
@@ -1310,7 +1306,7 @@
       "Operator": "Comment",
       "Scenario": "decimal_payload",
       "Passed": true,
-      "RuntimeMs": 0.056,
+      "RuntimeMs": 0.057,
       "MemoryAllocationBytes": 5536,
       "ErrorMessage": null,
       "Metrics": {
@@ -1330,7 +1326,7 @@
       "Operator": "Comment",
       "Scenario": "object_payload",
       "Passed": true,
-      "RuntimeMs": 0.066,
+      "RuntimeMs": 0.065,
       "MemoryAllocationBytes": 5512,
       "ErrorMessage": null,
       "Metrics": {
@@ -1350,7 +1346,7 @@
       "Operator": "Comment",
       "Scenario": "max_minus_one_text",
       "Passed": true,
-      "RuntimeMs": 0.204,
+      "RuntimeMs": 0.261,
       "MemoryAllocationBytes": 95240,
       "ErrorMessage": null,
       "Metrics": {
@@ -1370,7 +1366,7 @@
       "Operator": "Comment",
       "Scenario": "too_long_text",
       "Passed": true,
-      "RuntimeMs": 0.458,
+      "RuntimeMs": 0.503,
       "MemoryAllocationBytes": 69256,
       "ErrorMessage": null,
       "Metrics": {

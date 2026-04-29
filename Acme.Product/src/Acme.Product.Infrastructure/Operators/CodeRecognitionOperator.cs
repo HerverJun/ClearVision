@@ -64,11 +64,14 @@ public class CodeRecognitionOperator : OperatorBase
         }
 
         // 转换为灰度图以提高识别率
-        using var gray = new Mat();
-        Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+        using var gray = ConvertToGray(src, out var conversionError);
+        if (conversionError != null)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(conversionError));
+        }
 
         // 创建结果图像副本用于绘制标记
-        var resultImage = src.Clone();
+        var resultImage = CreateResultImage(src);
 
         int width = gray.Width;
         int height = gray.Height;
@@ -174,6 +177,47 @@ public class CodeRecognitionOperator : OperatorBase
             return ValidationResult.Invalid("最大结果数必须在 1-100 之间");
         }
         return ValidationResult.Valid();
+    }
+
+    private static Mat ConvertToGray(Mat src, out string? error)
+    {
+        error = null;
+        var gray = new Mat();
+        switch (src.Channels())
+        {
+            case 1:
+                src.CopyTo(gray);
+                return gray;
+            case 3:
+                Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+                return gray;
+            case 4:
+                Cv2.CvtColor(src, gray, ColorConversionCodes.BGRA2GRAY);
+                return gray;
+            default:
+                gray.Dispose();
+                error = $"Unsupported image channel count for barcode recognition: {src.Channels()}.";
+                return new Mat();
+        }
+    }
+
+    private static Mat CreateResultImage(Mat src)
+    {
+        if (src.Channels() == 1)
+        {
+            var bgr = new Mat();
+            Cv2.CvtColor(src, bgr, ColorConversionCodes.GRAY2BGR);
+            return bgr;
+        }
+
+        if (src.Channels() == 4)
+        {
+            var bgr = new Mat();
+            Cv2.CvtColor(src, bgr, ColorConversionCodes.BGRA2BGR);
+            return bgr;
+        }
+
+        return src.Clone();
     }
 
     private List<BarcodeFormat> GetBarcodeFormats(string codeType)

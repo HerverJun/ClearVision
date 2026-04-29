@@ -75,12 +75,12 @@
           "id": "frequency_family_golden",
           "status": "active",
           "evidenceKind": "golden",
-          "operators": ["FFT1D", "InverseFFT1D", "FrequencyFilter"],
+          "operators": ["FFT1D"],
           "command": ["dotnet", "run", "--project", "quality/tools/FFT1DGoldenRunner/FFT1DGoldenRunner.csproj", "--", "--output", "quality/evals/reports/FFT1D_baseline.json", "--report", "quality/evals/reports/FFT1D_baseline.md"],
           "baselineJson": "quality/evals/reports/FFT1D_baseline.json",
           "reportMarkdown": "quality/evals/reports/FFT1D_baseline.md",
           "estimatedSeconds": 60,
-          "notes": "Use individual entries below when re-running only IFFT or FrequencyFilter."
+          "notes": "FFT1D runner includes round-trip checks, but IFFT and FrequencyFilter are gated by their dedicated entries below."
         },
         {
           "id": "inverse_fft_golden",

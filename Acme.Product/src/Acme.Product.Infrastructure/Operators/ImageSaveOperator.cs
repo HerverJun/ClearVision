@@ -93,6 +93,11 @@ public class ImageSaveOperator : OperatorBase
                 actualFileName = Path.ChangeExtension(actualFileName, extension);
             }
 
+            if (!TryValidateFileName(actualFileName, out var fileNameError))
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(fileNameError));
+            }
+
             var fullPath = Path.Combine(folderPath, actualFileName);
 
             // 检查文件是否已存在
@@ -196,7 +201,41 @@ public class ImageSaveOperator : OperatorBase
             return ValidationResult.Invalid("JpegQuality 必须在 1-100 之间");
         }
 
+        if (!TryValidateFileName(ResolveFileNameTemplate(@operator), out var fileNameError))
+        {
+            return ValidationResult.Invalid(fileNameError);
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static bool TryValidateFileName(string fileName, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            error = "FileNameTemplate/FileName 不能为空";
+            return false;
+        }
+
+        if (Path.IsPathRooted(fileName) ||
+            fileName.Contains(Path.DirectorySeparatorChar) ||
+            fileName.Contains(Path.AltDirectorySeparatorChar) ||
+            fileName.Contains(Path.VolumeSeparatorChar) ||
+            !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal))
+        {
+            error = "FileNameTemplate/FileName 只允许文件名，不能包含绝对路径、目录分隔符或 .. 路径";
+            return false;
+        }
+
+        if (fileName is "." or ".." ||
+            fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            error = "FileNameTemplate/FileName 包含非法文件名字符";
+            return false;
+        }
+
+        return true;
     }
 
     private string ResolveDirectory(Operator @operator)

@@ -31,11 +31,14 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MinArea", "Min Area", "int", DefaultValue = 20, Min = 0, Max = 10000000)]
 [OperatorParam("MaxArea", "Max Area", "int", DefaultValue = 1000000, Min = 0, Max = 10000000)]
 [OperatorParam("MorphCleanSize", "Morph Clean Size", "int", DefaultValue = 3, Min = 1, Max = 301)]
+[OperatorParam("MorphMode", "Morph Mode", "enum", DefaultValue = "OpenClose", Options = new[] { "None|None", "OpenClose|Open then close", "CloseOpen|Close then open", "CloseOnly|Close only" })]
 [OperatorParam("AlignmentMode", "Alignment Mode", "enum", DefaultValue = "PhaseCorrelation", Options = new[] { "None|None", "PhaseCorrelation|PhaseCorrelation" })]
 [OperatorParam("NormalizationMode", "Normalization Mode", "enum", DefaultValue = "LocalMean", Options = new[] { "None|None", "LocalMean|LocalMean" })]
 [OperatorParam("ThresholdMode", "Threshold Mode", "enum", DefaultValue = "Auto", Options = new[] { "Auto|Auto", "Manual|Manual", "Otsu|Otsu", "ReferenceStats|ReferenceStats" })]
 [OperatorParam("BackgroundKernelSize", "Background Kernel Size", "int", DefaultValue = 31, Min = 3, Max = 301)]
 [OperatorParam("ReferenceStatsSigma", "Reference Stats Sigma", "double", DefaultValue = 2.5, Min = 0.1, Max = 10.0)]
+[OperatorParam("RobustReferenceStats", "Robust Reference Stats", "bool", DefaultValue = false)]
+[OperatorParam("ResponseNormalizeMode", "Response Normalize Mode", "enum", DefaultValue = "RawClamp", Options = new[] { "RawClamp|Raw clamp", "MinMax|Min/max", "PercentileClip|Percentile clip" })]
 public class SurfaceDefectDetectionOperator : OperatorBase
 {
     private const double MinAcceptedPhaseCorrelationResponse = 0.02;
@@ -69,21 +72,16 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         var minArea = GetIntParam(@operator, "MinArea", 20, 0, 10_000_000);
         var maxArea = GetIntParam(@operator, "MaxArea", 1_000_000, 0, 10_000_000);
         var cleanSize = GetIntParam(@operator, "MorphCleanSize", 3, 1, 301);
+        var morphMode = GetStringParam(@operator, "MorphMode", "OpenClose");
         var alignmentMode = GetStringParam(@operator, "AlignmentMode", "PhaseCorrelation");
         var normalizationMode = GetStringParam(@operator, "NormalizationMode", "LocalMean");
         var thresholdMode = GetStringParam(@operator, "ThresholdMode", "Auto");
         var backgroundKernelSize = GetIntParam(@operator, "BackgroundKernelSize", 31, 3, 301);
         var referenceStatsSigma = GetDoubleParam(@operator, "ReferenceStatsSigma", 2.5, 0.1, 10.0);
+        var robustReferenceStats = GetBoolParam(@operator, "RobustReferenceStats", false);
+        var responseNormalizeMode = GetStringParam(@operator, "ResponseNormalizeMode", "RawClamp");
 
-        using var gray = new Mat();
-        if (src.Channels() == 1)
-        {
-            src.CopyTo(gray);
-        }
-        else
-        {
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-        }
+        using var gray = OperatorImageDepthHelper.EnsureSingleChannelGray(src);
 
         using var response = BuildResponseMap(
             method,
@@ -91,6 +89,7 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             inputs,
             alignmentMode,
             normalizationMode,
+            responseNormalizeMode,
             backgroundKernelSize,
             out var alignmentScore,
             out var alignmentShift,
@@ -108,19 +107,21 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         }
 
         using var binary = new Mat();
-        var appliedThreshold = ApplyThreshold(response, binary, method, thresholdMode, manualThreshold, referenceStatsSigma);
+        var appliedThreshold = ApplyThreshold(response, binary, method, thresholdMode, manualThreshold, referenceStatsSigma, robustReferenceStats);
+        var candidateAreaBeforeMorph = Cv2.CountNonZero(binary);
 
         var oddKernel = cleanSize % 2 == 0 ? cleanSize + 1 : cleanSize;
-        if (oddKernel > 1)
+        if (oddKernel > 1 && !morphMode.Equals("None", StringComparison.OrdinalIgnoreCase))
         {
             using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(oddKernel, oddKernel));
-            Cv2.MorphologyEx(binary, binary, MorphTypes.Open, kernel);
-            Cv2.MorphologyEx(binary, binary, MorphTypes.Close, kernel);
+            ApplyMorphology(binary, kernel, morphMode);
         }
+
+        var candidateAreaAfterMorph = Cv2.CountNonZero(binary);
 
         Cv2.FindContours(binary, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
-        var resultImage = src.Clone();
+        var resultImage = OperatorImageDepthHelper.EnsureBgrColor(src);
         var defectMask = new Mat(binary.Size(), MatType.CV_8UC1, Scalar.Black);
         var responseImage = response.Clone();
 
@@ -152,8 +153,13 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             { "Method", method },
             { "AlignmentMode", alignmentMode },
             { "NormalizationMode", normalizationMode },
+            { "ResponseNormalizeMode", responseNormalizeMode },
             { "ThresholdMode", ResolveThresholdMode(method, thresholdMode) },
             { "AppliedThreshold", appliedThreshold },
+            { "RobustReferenceStats", robustReferenceStats },
+            { "MorphMode", morphMode },
+            { "CandidateAreaBeforeMorph", candidateAreaBeforeMorph },
+            { "CandidateAreaAfterMorph", candidateAreaAfterMorph },
             { "AlignmentScore", alignmentScore },
             { "AlignmentShiftX", alignmentShift.X },
             { "AlignmentShiftY", alignmentShift.Y },
@@ -215,6 +221,20 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             return ValidationResult.Invalid("ThresholdMode must be Auto, Manual, Otsu or ReferenceStats");
         }
 
+        var morphMode = GetStringParam(@operator, "MorphMode", "OpenClose");
+        var validMorphModes = new[] { "None", "OpenClose", "CloseOpen", "CloseOnly" };
+        if (!validMorphModes.Contains(morphMode, StringComparer.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("MorphMode must be None, OpenClose, CloseOpen or CloseOnly");
+        }
+
+        var responseNormalizeMode = GetStringParam(@operator, "ResponseNormalizeMode", "RawClamp");
+        var validResponseNormalizeModes = new[] { "RawClamp", "MinMax", "PercentileClip" };
+        if (!validResponseNormalizeModes.Contains(responseNormalizeMode, StringComparer.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("ResponseNormalizeMode must be RawClamp, MinMax or PercentileClip");
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -224,6 +244,7 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         Dictionary<string, object>? inputs,
         string alignmentMode,
         string normalizationMode,
+        string responseNormalizeMode,
         int backgroundKernelSize,
         out double alignmentScore,
         out Point2d alignmentShift,
@@ -244,9 +265,7 @@ public class SurfaceDefectDetectionOperator : OperatorBase
                 Cv2.Sobel(normalized, gradX, MatType.CV_32FC1, 1, 0, 3);
                 Cv2.Sobel(normalized, gradY, MatType.CV_32FC1, 0, 1, 3);
                 Cv2.Magnitude(gradX, gradY, magnitude);
-                var result = new Mat();
-                magnitude.ConvertTo(result, MatType.CV_8UC1);
-                return result;
+                return NormalizeResponseToByte(magnitude, responseNormalizeMode);
             }
 
             case "referencediff":
@@ -262,15 +281,7 @@ public class SurfaceDefectDetectionOperator : OperatorBase
                     throw new InvalidOperationException("Reference image is invalid");
                 }
 
-                using var referenceGray = new Mat();
-                if (reference.Channels() == 1)
-                {
-                    reference.CopyTo(referenceGray);
-                }
-                else
-                {
-                    Cv2.CvtColor(reference, referenceGray, ColorConversionCodes.BGR2GRAY);
-                }
+                using var referenceGray = OperatorImageDepthHelper.EnsureSingleChannelGray(reference);
 
                 using var resized = EnsureSize(referenceGray, gray.Size());
                 using var aligned = AlignReferenceToSource(gray, resized, alignmentMode, out alignmentScore, out alignmentShift, out rejectedReason);
@@ -302,6 +313,88 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         var resized = new Mat();
         Cv2.Resize(source, resized, size);
         return resized;
+    }
+
+    private static void ApplyMorphology(Mat binary, Mat kernel, string morphMode)
+    {
+        if (morphMode.Equals("CloseOnly", StringComparison.OrdinalIgnoreCase))
+        {
+            Cv2.MorphologyEx(binary, binary, MorphTypes.Close, kernel);
+            return;
+        }
+
+        if (morphMode.Equals("CloseOpen", StringComparison.OrdinalIgnoreCase))
+        {
+            Cv2.MorphologyEx(binary, binary, MorphTypes.Close, kernel);
+            Cv2.MorphologyEx(binary, binary, MorphTypes.Open, kernel);
+            return;
+        }
+
+        Cv2.MorphologyEx(binary, binary, MorphTypes.Open, kernel);
+        Cv2.MorphologyEx(binary, binary, MorphTypes.Close, kernel);
+    }
+
+    private static Mat NormalizeResponseToByte(Mat response32, string responseNormalizeMode)
+    {
+        var result = new Mat();
+        if (responseNormalizeMode.Equals("RawClamp", StringComparison.OrdinalIgnoreCase))
+        {
+            response32.ConvertTo(result, MatType.CV_8UC1);
+            return result;
+        }
+
+        if (responseNormalizeMode.Equals("MinMax", StringComparison.OrdinalIgnoreCase))
+        {
+            using var normalized = new Mat();
+            Cv2.Normalize(response32, normalized, 0, 255, NormTypes.MinMax);
+            normalized.ConvertTo(result, MatType.CV_8UC1);
+            return result;
+        }
+
+        var (low, high) = EstimateFloatPercentiles(response32, 0.01, 0.99);
+        if (!double.IsFinite(low) || !double.IsFinite(high) || high <= low)
+        {
+            using var normalized = new Mat();
+            Cv2.Normalize(response32, normalized, 0, 255, NormTypes.MinMax);
+            normalized.ConvertTo(result, MatType.CV_8UC1);
+            return result;
+        }
+
+        var scale = 255.0 / (high - low);
+        response32.ConvertTo(result, MatType.CV_8UC1, scale, -low * scale);
+        return result;
+    }
+
+    private static (double Low, double High) EstimateFloatPercentiles(Mat values32f, double lowPercentile, double highPercentile)
+    {
+        var values = new List<float>(Math.Min(values32f.Rows * values32f.Cols, 262_144));
+        var stride = Math.Max(1, (int)Math.Sqrt(Math.Max(1, values32f.Rows * values32f.Cols / 262_144.0)));
+        for (var y = 0; y < values32f.Rows; y += stride)
+        {
+            for (var x = 0; x < values32f.Cols; x += stride)
+            {
+                var value = values32f.At<float>(y, x);
+                if (float.IsFinite(value))
+                {
+                    values.Add(value);
+                }
+            }
+        }
+
+        if (values.Count == 0)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        values.Sort();
+        return (
+            values[PercentileIndex(values.Count, lowPercentile)],
+            values[PercentileIndex(values.Count, highPercentile)]);
+    }
+
+    private static int PercentileIndex(int count, double percentile)
+    {
+        return (int)Math.Clamp(Math.Round((count - 1) * percentile), 0, count - 1);
     }
 
     private static Mat NormalizeForComparison(Mat gray, string normalizationMode, int backgroundKernelSize)
@@ -419,7 +512,8 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         string method,
         string thresholdMode,
         double manualThreshold,
-        double referenceStatsSigma)
+        double referenceStatsSigma,
+        bool robustReferenceStats)
     {
         var resolvedMode = ResolveThresholdMode(method, thresholdMode);
         switch (resolvedMode.ToLowerInvariant())
@@ -430,7 +524,9 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             case "otsu":
                 return Cv2.Threshold(response, binary, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
             case "referencestats":
-                var computed = ComputeReferenceStatsThreshold(response, manualThreshold, referenceStatsSigma);
+                var computed = robustReferenceStats
+                    ? ComputeRobustReferenceStatsThreshold(response, manualThreshold, referenceStatsSigma)
+                    : ComputeReferenceStatsThreshold(response, manualThreshold, referenceStatsSigma);
                 Cv2.Threshold(response, binary, computed, 255, ThresholdTypes.Binary);
                 return computed;
             default:
@@ -456,5 +552,75 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         Cv2.MeanStdDev(response, out var mean, out var stddev);
         var computed = mean.Val0 + (stddev.Val0 * sigma);
         return Math.Clamp(Math.Max(manualFloor, computed), 0.0, 255.0);
+    }
+
+    private static double ComputeRobustReferenceStatsThreshold(Mat response, double manualFloor, double sigma)
+    {
+        using var responseByte = response.Depth() == MatType.CV_8U
+            ? response.Clone()
+            : OperatorImageDepthHelper.ConvertSingleChannelToByte(response, out _, out _);
+
+        var histogram = BuildByteHistogram(responseByte);
+        var median = HistogramPercentile(histogram, 0.50);
+        var mad = HistogramMedianAbsoluteDeviation(histogram, median);
+        var robustSigma = 1.4826 * mad;
+        var computedByte = Math.Clamp(Math.Max(manualFloor, median + (sigma * robustSigma)), 0.0, 255.0);
+
+        return response.Depth() == MatType.CV_8U
+            ? computedByte
+            : OperatorImageDepthHelper.ResolveThresholdToNativeRange(response, computedByte);
+    }
+
+    private static int[] BuildByteHistogram(Mat image)
+    {
+        if (image.Type() != MatType.CV_8UC1)
+        {
+            throw new ArgumentException("Expected a single-channel 8-bit image.", nameof(image));
+        }
+
+        var histogram = new int[256];
+        for (var y = 0; y < image.Rows; y++)
+        {
+            for (var x = 0; x < image.Cols; x++)
+            {
+                histogram[image.At<byte>(y, x)]++;
+            }
+        }
+
+        return histogram;
+    }
+
+    private static double HistogramPercentile(IReadOnlyList<int> histogram, double percentile)
+    {
+        var total = histogram.Sum();
+        if (total <= 0)
+        {
+            return 0.0;
+        }
+
+        var target = Math.Max(1, (int)Math.Ceiling(total * percentile));
+        var cumulative = 0;
+        for (var i = 0; i < histogram.Count; i++)
+        {
+            cumulative += histogram[i];
+            if (cumulative >= target)
+            {
+                return i;
+            }
+        }
+
+        return histogram.Count - 1;
+    }
+
+    private static double HistogramMedianAbsoluteDeviation(IReadOnlyList<int> histogram, double median)
+    {
+        var deviationHistogram = new int[256];
+        for (var i = 0; i < histogram.Count; i++)
+        {
+            var deviation = (int)Math.Clamp(Math.Round(Math.Abs(i - median)), 0, 255);
+            deviationHistogram[deviation] += histogram[i];
+        }
+
+        return HistogramPercentile(deviationHistogram, 0.50);
     }
 }
