@@ -277,7 +277,7 @@ finally {
 $global:LASTEXITCODE = $exitCode
 
 if ($ReturnExitCode) {
-    return $exitCode
+    return
 }
 
 exit $exitCode
