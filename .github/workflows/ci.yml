@@ -24,7 +24,14 @@ on:
 env:
   SOLUTION_PATH: Acme.Product/Acme.Product.sln
   DESKTOP_PROJECT: Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj
+  PRODUCT_TEST_PROJECT: Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj
+  DESKTOP_TEST_PROJECT: Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj
+  OPERATOR_PROJECT: Acme.OperatorLibrary/Acme.OperatorLibrary.csproj
+  OPERATOR_SMOKE_TEST_PROJECT: Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj
+  OPERATOR_BENCHMARK_PROJECT: quality/tools/OperatorPerformanceBenchmarkRunner/OperatorPerformanceBenchmarkRunner.csproj
+  OPERATOR_PACKAGE_DIR: Acme.OperatorLibrary/nupkg
   PUBLISH_DIR: ./publish
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
   build-and-test:
@@ -37,13 +44,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Secret Scan
+        shell: pwsh
+        run: '& "./scripts/scan-secrets.ps1"'
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore Dependencies
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        shell: pwsh
+        run: |
+          dotnet restore $env:SOLUTION_PATH
+          dotnet restore $env:PRODUCT_TEST_PROJECT
+          dotnet restore $env:DESKTOP_TEST_PROJECT
 
       - name: Generate Operator Catalog
         run: dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
@@ -54,14 +77,31 @@ jobs:
         with:
           name: operator-catalog
           path: |
-            算子资料/算子目录.json
-            算子资料/算子目录.md
+            ./算子资料/算子目录.json
+            ./算子资料/算子目录.md
 
       - name: Build (Debug)
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
 
-      - name: Run Unit Tests
-        run: dotnet test ${{ env.SOLUTION_PATH }} --configuration Debug --no-build --verbosity normal --logger trx
+      - name: Run Product Tests with Coverage
+        run: >
+          dotnet test ${{ env.PRODUCT_TEST_PROJECT }}
+          --configuration Debug
+          --no-restore
+          --verbosity normal
+          --logger trx
+          --results-directory TestResults/product
+          --collect:"XPlat Code Coverage"
+
+      - name: Run Desktop Tests with Coverage
+        run: >
+          dotnet test ${{ env.DESKTOP_TEST_PROJECT }}
+          --configuration Debug
+          --no-restore
+          --verbosity normal
+          --logger trx
+          --results-directory TestResults/desktop
+          --collect:"XPlat Code Coverage"
 
       - name: Run Detection Regression Gate
         shell: pwsh
@@ -122,12 +162,81 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: "**/*.trx"
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml
+
+      - name: Restore OperatorLibrary Package Project
+        run: dotnet restore ${{ env.OPERATOR_PROJECT }}
+
+      - name: Build OperatorLibrary Package Project
+        run: dotnet build ${{ env.OPERATOR_PROJECT }} --configuration Release --no-restore
+
+      - name: Pack OperatorLibrary
+        shell: pwsh
+        run: |
+          $versionPrefix = (dotnet msbuild ${{ env.OPERATOR_PROJECT }} -getProperty:VersionPrefix | Select-Object -Last 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($versionPrefix)) {
+            throw "Could not determine OperatorLibrary VersionPrefix."
+          }
+          $env:OPERATOR_PACKAGE_VERSION = "$versionPrefix-ci.${{ github.run_number }}.${{ github.run_attempt }}"
+          dotnet pack ${{ env.OPERATOR_PROJECT }} `
+            --configuration Release `
+            --no-build `
+            --output "${{ env.OPERATOR_PACKAGE_DIR }}" `
+            -p:PackageVersion=$env:OPERATOR_PACKAGE_VERSION
+          "OPERATOR_PACKAGE_VERSION=$env:OPERATOR_PACKAGE_VERSION" >> $env:GITHUB_ENV
+
+      - name: Smoke Test OperatorLibrary Package with Coverage
+        shell: pwsh
+        run: |
+          dotnet restore ${{ env.OPERATOR_SMOKE_TEST_PROJECT }} `
+            --configfile Acme.OperatorLibrary/nuget.config `
+            --source "${{ env.OPERATOR_PACKAGE_DIR }}" `
+            --source "https://api.nuget.org/v3/index.json" `
+            -p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
+          dotnet test ${{ env.OPERATOR_SMOKE_TEST_PROJECT }} `
+            --configuration Release `
+            --no-restore `
+            --verbosity normal `
+            --logger trx `
+            --results-directory TestResults/operator-library `
+            --collect "Code Coverage" `
+            -p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
+
+      - name: Upload OperatorLibrary Package Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-library-package
+          path: |
+            ${{ env.OPERATOR_PACKAGE_DIR }}/Acme.OperatorLibrary.*.nupkg
+            ${{ env.OPERATOR_PACKAGE_DIR }}/Acme.OperatorLibrary.*.snupkg
+            TestResults/operator-library/**/*.trx
+            TestResults/operator-library/**/*.coverage
+
+      - name: Run Operator Performance Benchmark Smoke
+        run: >
+          dotnet run --project ${{ env.OPERATOR_BENCHMARK_PROJECT }} --configuration Release --
+          --mode smoke
+          --output artifacts/operator-performance-benchmark.json
+          --report artifacts/operator-performance-benchmark.md
+
+      - name: Upload Operator Performance Benchmark
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-performance-benchmark
+          path: |
+            artifacts/operator-performance-benchmark.json
+            artifacts/operator-performance-benchmark.md
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: Acme.Product/tests/Acme.Product.UI.Tests/package-lock.json
 
       - name: Install UI Test Dependencies
         working-directory: Acme.Product/tests/Acme.Product.UI.Tests
@@ -161,7 +270,15 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore Dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }}
@@ -235,7 +352,7 @@ jobs:
 
   code-quality:
     name: Code Quality
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     if: github.event_name == 'pull_request'
 
     steps:
@@ -245,7 +362,15 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore Dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }}
@@ -253,10 +378,9 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore
 
-      - name: Check Code Format
-        run: |
-          dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity diagnostic || true
+      - name: Check Code Format (Report Only)
+        continue-on-error: true
+        run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity diagnostic
 
       - name: Run Static Analysis
-        run: |
-          dotnet build ${{ env.SOLUTION_PATH }} -p:TreatWarningsAsErrors=false -warnaserror || true
+        run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -warnaserror

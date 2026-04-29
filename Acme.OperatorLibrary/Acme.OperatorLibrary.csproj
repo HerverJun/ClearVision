@@ -64,14 +64,20 @@
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Calibration\**\*.cs"
              Exclude="..\Acme.Product\src\Acme.Product.Infrastructure\Calibration\bin\**;..\Acme.Product\src\Acme.Product.Infrastructure\Calibration\obj\**;..\Acme.Product\src\Acme.Product.Infrastructure\Calibration\artifacts\**"
              Link="Calibration\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Cameras\NoOpCameraFrameStreamCoordinator.cs"
+             Link="Cameras\NoOpCameraFrameStreamCoordinator.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\AI\Anomaly\SimplePatchCoreDetector.cs"
              Link="AI\Anomaly\SimplePatchCoreDetector.cs" />
+    <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\AI\Anomaly\OnnxPatchEmbeddingExtractor.cs"
+             Link="AI\Anomaly\OnnxPatchEmbeddingExtractor.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\AI\Runtime\ModelCatalog.cs"
              Link="AI\Runtime\ModelCatalog.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Memory\MatPool.cs"
              Link="Memory\MatPool.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Services\DetectionOutputInspector.cs"
              Link="Services\DetectionOutputInspector.cs" />
+    <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Services\DeepLearningLabelResolver.cs"
+             Link="Services\DeepLearningLabelResolver.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Services\OcrEngineProvider.cs"
              Link="Services\OcrEngineProvider.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Services\GpuAvailabilityChecker.cs"
@@ -80,10 +86,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.0" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.17.0" />
+    <PackageReference Include="MySqlConnector" Version="2.3.7" />
     <PackageReference Include="NModbus" Version="3.0.81" />
     <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />

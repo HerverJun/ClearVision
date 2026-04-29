@@ -269,10 +269,12 @@ public static class DependencyInjection
 
         // ==================== Sprint 5: AI 编排接入 ====================
         services.AddScoped<Acme.Product.Infrastructure.AI.PromptBuilder>();
+#pragma warning disable CS0618 // Keep legacy AI compatibility services registered until the migration window closes.
         services.AddScoped<Acme.Product.Infrastructure.AI.AIGeneratedFlowParser>();
         services.AddSingleton<Acme.Product.Infrastructure.AI.DryRun.DryRunStubRegistry>();
         services.AddSingleton<Acme.Product.Infrastructure.AI.DryRun.StubRegistryBuilder>();
         services.AddScoped<Acme.Product.Infrastructure.AI.AIWorkflowService>();
+#pragma warning restore CS0618
 
         // 应用服务 - Sprint 4新增
         services.AddScoped<IOperatorService, OperatorService>();

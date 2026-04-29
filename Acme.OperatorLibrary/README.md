@@ -36,6 +36,46 @@ Industrial Vision Operator Library for ClearVision.
 <PackageReference Include="Acme.OperatorLibrary" Version="1.0.2" />
 ```
 
+5. Inspect a module index from package code:
+
+```csharp
+using Acme.OperatorLibrary.Modules;
+using Acme.Product.Core.Enums;
+
+var imageOperators = Acme.OperatorLibrary.ImageProcessing.Operators.Types;
+var module = OperatorModuleCatalog.GetModule(OperatorType.MeanFilter);
+
+Console.WriteLine($"{imageOperators.Count} image operators, MeanFilter module = {module}");
+```
+
+6. Run a representative operator directly:
+
+```csharp
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Operators;
+using Microsoft.Extensions.Logging.Abstractions;
+using OpenCvSharp;
+
+using var source = new Mat(64, 64, MatType.CV_8UC1, Scalar.Black);
+using var inputImage = new ImageWrapper(source.Clone());
+
+var op = new Operator("mean-filter-demo", OperatorType.MeanFilter, 0, 0);
+op.AddParameter(new Parameter(Guid.NewGuid(), "KernelSize", "KernelSize", "", "int", 5));
+op.AddParameter(new Parameter(Guid.NewGuid(), "BorderType", "BorderType", "", "int", 4));
+
+var executor = new MeanFilterOperator(NullLogger<MeanFilterOperator>.Instance);
+var result = await executor.ExecuteAsync(op, new Dictionary<string, object>
+{
+    ["Image"] = inputImage
+});
+
+Console.WriteLine(result.IsSuccess);
+```
+
+See also: `docs/参考资料/指南/Acme.OperatorLibrary-快速开始与质量验证.md`.
+
 ## Industrial Acceptance Scope
 
 Package acceptance tests are not limited to smoke instantiation. The baseline now includes representative operators across all major modules:
@@ -70,6 +110,52 @@ The package no longer uses the fixed `*-local` version strategy.
 ```
 
 It also reads common CI environment variables (`ACME_OPERATORLIB_PACKAGE_VERSION`, `GITHUB_SHA`, `GITHUB_REF_NAME`, `BUILD_SOURCEVERSION`, `BUILD_SOURCEBRANCHNAME`) when parameters are omitted.
+
+## Tests, CI, and Benchmark Notes
+
+Toolchain policy:
+
+- Build with .NET SDK `10.0.101` from the repository `global.json`.
+- Target framework remains `net8.0`.
+- Direct `Microsoft.Extensions.*` dependencies are aligned to `10.0.0` to match the main product dependency lane.
+- Consumers should validate OpenCvSharp, ONNX Runtime, PaddleOCRSharp, database, serial-port, and PLC dependencies in their deployment profile before treating the package as a thin abstractions-only dependency.
+
+Use the package smoke/acceptance tests when validating NuGet packaging:
+
+```powershell
+./pack.ps1 -RunSmokeTest
+```
+
+For direct test execution, run the smoke test project serially from the repository root:
+
+```powershell
+& "./scripts/run-dotnet-test-serial.ps1" `
+  -Project "Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj"
+```
+
+Quality flywheel suites are described by manifests under `quality/evals/suites/` and executed serially by `quality/tools/run_quality_suite.py`:
+
+```powershell
+python quality/tools/run_quality_suite.py --suite quick_contract_suite --list
+python quality/tools/run_quality_suite.py --suite quick_contract_suite --validate-only
+python quality/tools/run_quality_suite.py --suite quick_contract_suite --dry-run
+```
+
+Benchmark evidence currently lives in two lanes:
+
+- focused runner reports under `quality/evals/reports/*_baseline.json` and `*_baseline.md`
+- product benchmark reports under `Acme.Product/test_results/*benchmark_report.md`
+
+For ad hoc baseline performance checks:
+
+```powershell
+dotnet run --project scripts/BaselineBenchmark/BaselineBenchmark.csproj -- `
+  --iterations 8 `
+  --warmup 1 `
+  --output docs/审计资料/报告/baseline_performance.json
+```
+
+Do not treat a single local benchmark run as a release gate by itself. Prefer comparing the generated report with the checked-in baseline evidence and the current `quality/evals/reports/operator_quality_matrix.md`.
 
 ## Notes
 
