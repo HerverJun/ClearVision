@@ -271,16 +271,25 @@ public class MindVisionCamera : ICameraProvider
                 {
                     try
                     { _cam.IMV_StopGrabbing(); }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MindVisionCamera] StopGrabbing cleanup failed: {ex.Message}");
+                    }
                     _isGrabbing = false;
                 }
 
                 try
                 { _cam.IMV_Close(); }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MindVisionCamera] Close cleanup failed: {ex.Message}");
+                }
                 try
                 { _cam.IMV_DestroyHandle(); }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MindVisionCamera] DestroyHandle cleanup failed: {ex.Message}");
+                }
                 _cam = null;
             }
 
@@ -451,7 +460,11 @@ public class MindVisionCamera : ICameraProvider
             int res = _cam.IMV_SetDoubleFeatureValue("ExposureTime", microseconds);
             return res == IMVDefine.IMV_OK;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetExposure failed: {ex.Message}");
+            return false;
+        }
     }
 
     public bool SetGain(double value)
@@ -464,7 +477,11 @@ public class MindVisionCamera : ICameraProvider
             int res = _cam.IMV_SetDoubleFeatureValue("GainRaw", value);
             return res == IMVDefine.IMV_OK;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetGain failed: {ex.Message}");
+            return false;
+        }
     }
 
     public bool SetTriggerMode(CameraTriggerMode mode)
@@ -490,7 +507,11 @@ public class MindVisionCamera : ICameraProvider
             int continuousRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "Off");
             return continuousRes == IMVDefine.IMV_OK;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetTriggerMode failed: {ex.Message}");
+            return false;
+        }
     }
 
     public bool ExecuteSoftwareTrigger()
@@ -503,7 +524,11 @@ public class MindVisionCamera : ICameraProvider
             int res = _cam.IMV_ExecuteCommandFeature("TriggerSoftware");
             return res == IMVDefine.IMV_OK;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] ExecuteSoftwareTrigger failed: {ex.Message}");
+            return false;
+        }
     }
 
     public void Dispose()

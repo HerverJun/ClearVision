@@ -151,7 +151,7 @@ public class ResultOutputOperator : OperatorBase
             }
         }
 
-        var exportPayload = new Dictionary<string, object>();
+        var exportPayload = new Dictionary<string, object?>();
         foreach (var (key, value) in output)
         {
             if (key.Equals("Image", StringComparison.OrdinalIgnoreCase)
@@ -208,7 +208,7 @@ public class ResultOutputOperator : OperatorBase
         };
     }
 
-    private static string BuildCsv(Dictionary<string, object> exportPayload)
+    private static string BuildCsv(Dictionary<string, object?> exportPayload)
     {
         var lines = new List<string> { "Key,Value" };
         foreach (var (key, value) in exportPayload)

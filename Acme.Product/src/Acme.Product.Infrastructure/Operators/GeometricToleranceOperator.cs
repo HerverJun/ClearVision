@@ -365,7 +365,7 @@ public class GeometricToleranceOperator : OperatorBase
         out Position normalized,
         out string? error)
     {
-        normalized = default;
+        normalized = new Position(0, 0);
         var norm = Math.Sqrt((vector.X * vector.X) + (vector.Y * vector.Y));
         if (norm < 1e-9)
         {

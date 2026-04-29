@@ -174,4 +174,43 @@ public class ResultOutputOperatorTests
         sortedDetection.GetProperty("Label").GetString().Should().Be("Wire_Brown");
         sortedDetection.GetProperty("CenterX").GetSingle().Should().BeGreaterThan(0);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNullValues_ShouldPreserveNullInJsonOutput()
+    {
+        var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Format", "JSON", "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Result"] = null!,
+            ["Data"] = new Dictionary<string, object>
+            {
+                ["NullableValue"] = null!
+            }
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        using var document = JsonDocument.Parse(result.OutputData!["Output"].Should().BeOfType<string>().Subject);
+        document.RootElement.GetProperty("Result").ValueKind.Should().Be(JsonValueKind.Null);
+        document.RootElement.GetProperty("Data").GetProperty("NullableValue").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Theory]
+    [InlineData("CSV", "Result,")]
+    [InlineData("Text", "Result: ")]
+    public async Task ExecuteAsync_WithNullValues_ShouldKeepCsvAndTextOutputUsable(string format, string expectedFragment)
+    {
+        var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Format", format, "string"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Result"] = null!,
+            ["Data"] = "ok"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["Output"].Should().BeOfType<string>().Subject.Should().Contain(expectedFragment);
+    }
 }

@@ -123,9 +123,17 @@ public class ModbusCommunicationOperator : OperatorBase
                 }
                 
                 // 清理旧连接
-                try { existingClient.Close(); } catch { }
+                try { existingClient.Close(); }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug(ex, "Modbus 旧 TcpClient 关闭失败: {Key}", key);
+                }
                 _connectionPool.TryRemove(key, out _);
-                try { existingMaster.Dispose(); } catch { }
+                try { existingMaster.Dispose(); }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug(ex, "Modbus 旧 master 释放失败: {Key}", key);
+                }
                 _masterPool.TryRemove(key, out _);
             }
             

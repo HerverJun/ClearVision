@@ -887,35 +887,6 @@ public class FlowDataDto
     public OperatorFlow ToEntity()
     {
         return FlowEntityMapper.ToEntity(this);
-
-        var flow = new OperatorFlow("AutoTuneFlow");
-
-        // 创建算子
-        foreach (var nodeDto in Nodes)
-        {
-            var op = new Operator(nodeDto.Type.ToString(), nodeDto.Type, nodeDto.Position.X, nodeDto.Position.Y);
-            // 添加参数
-            foreach (var param in nodeDto.Parameters)
-            {
-                op.Parameters.Add(new Parameter(
-                    Guid.NewGuid(),
-                    param.Key,
-                    param.Key,
-                    string.Empty,
-                    "string",
-                    param.Value,
-                    null, null, false, null));
-            }
-            flow.Operators.Add(op);
-        }
-
-        // 创建连接
-        foreach (var conn in Connections)
-        {
-            flow.Connections.Add(new OperatorConnection(conn.SourceId, Guid.Empty, conn.TargetId, Guid.Empty));
-        }
-
-        return flow;
     }
 }
 

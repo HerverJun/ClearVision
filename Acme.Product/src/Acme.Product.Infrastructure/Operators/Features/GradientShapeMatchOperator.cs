@@ -59,7 +59,7 @@ namespace Acme.Product.Infrastructure.Operators;
     {
         "Score is a directional agreement ratio (matching features / total template features) x 100, not a correlation coefficient.",
         "Template cache is bounded to 8 entries with LRU eviction.",
-        "Low-feature templates (< 10 valid gradient features) return structured FailureReason=InvalidTemplate."
+        "Low-feature templates (< 10 valid gradient features) fail with InvalidTemplate."
     },
     Dependencies = new[] { "OpenCvSharp" }
 )]
@@ -203,30 +203,7 @@ public class GradientShapeMatchOperator : OperatorBase
         }
         catch (GradientShapeMatchException ex) when (ex.FailureReason == "InvalidTemplate")
         {
-            var resultImage = srcImage.Clone();
-            Cv2.PutText(resultImage, "NG: InvalidTemplate", new Point(10, 30), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
-
-            var output = new Dictionary<string, object>
-            {
-                ["IsMatch"] = false,
-                ["Score"] = 0.0,
-                ["Position"] = new Position(0, 0),
-                ["X"] = 0,
-                ["Y"] = 0,
-                ["Angle"] = 0.0,
-                ["FailureReason"] = ex.FailureReason,
-                ["Message"] = ex.Message,
-                ["MatchCount"] = 0,
-                ["Matches"] = Array.Empty<object>(),
-                ["TemplateWidth"] = 0,
-                ["TemplateHeight"] = 0,
-                ["DisplayWidth"] = 0,
-                ["DisplayHeight"] = 0,
-                ["CacheEnabled"] = enableCache,
-                ["TopK"] = topK
-            };
-
-            return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, output)));
+            return Task.FromResult(OperatorExecutionOutput.Failure(ex.Message));
         }
         catch (Exception ex)
         {

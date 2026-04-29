@@ -1,4 +1,5 @@
 using System.Reflection;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -393,6 +394,18 @@ public class OperatorContractReconciliationTests
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorMessage.Should().Contain("[InvalidTemplate]");
+    }
+
+    [Fact]
+    public void GradientShapeMatch_Metadata_ShouldDescribeInvalidTemplateAsHardFailure()
+    {
+        var algorithmInfo = typeof(GradientShapeMatchOperator).GetCustomAttribute<AlgorithmInfoAttribute>();
+
+        algorithmInfo.Should().NotBeNull();
+        algorithmInfo!.KnownLimitations.Should().Contain(item => item.Contains("InvalidTemplate", StringComparison.Ordinal));
+        algorithmInfo.KnownLimitations.Should().NotContain(item =>
+            item.Contains("structured", StringComparison.OrdinalIgnoreCase) ||
+            item.Contains("FailureReason=InvalidTemplate", StringComparison.Ordinal));
     }
 
     [Fact]

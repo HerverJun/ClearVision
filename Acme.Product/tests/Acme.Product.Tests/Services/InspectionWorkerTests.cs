@@ -81,6 +81,74 @@ public class InspectionWorkerTests
     }
 
     [Fact]
+    public async Task StopAsync_WhenStoppedEventSubscriberThrows_ShouldStillReleaseRunState()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => WaitForCancellationAsync(callInfo.ArgAt<CancellationToken>(3)));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var lifetime = Substitute.For<IHostApplicationLifetime>();
+        lifetime.ApplicationStopping.Returns(CancellationToken.None);
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            resultRepository,
+            projectRepository);
+
+        var store = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
+        var bus = new InMemoryInspectionEventBus(NullLogger<InMemoryInspectionEventBus>.Instance, store);
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            coordinator,
+            bus,
+            NullLogger<InspectionWorker>.Instance,
+            lifetime,
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        var stateChanges = new ConcurrentQueue<InspectionStateChangedEvent>();
+        using var captureSubscription = bus.Subscribe<InspectionStateChangedEvent>((evt, _) =>
+        {
+            stateChanges.Enqueue(evt);
+            return Task.CompletedTask;
+        });
+        using var throwingSubscription = bus.Subscribe<InspectionStateChangedEvent>((evt, _) =>
+            evt.NewState == "Stopped"
+                ? Task.FromException(new InvalidOperationException("subscriber failed"))
+                : Task.CompletedTask);
+
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        (await coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None)).Should().Be(StartResult.Success);
+        (await worker.TryStartRunAsync(projectId, sessionId, new OperatorFlow("Test"), null)).Should().BeTrue();
+
+        await WaitUntilAsync(
+            () => stateChanges.Any(evt => evt.NewState == "Running"),
+            TimeSpan.FromSeconds(2));
+
+        await worker.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
+
+        (await worker.WaitForRunExitAsync(projectId, sessionId, TimeSpan.FromSeconds(2))).Should().BeTrue();
+        coordinator.GetState(projectId)?.Status.Should().Be(RuntimeStatus.Stopped);
+        await WaitUntilAsync(
+            () => coordinator.GetState(projectId) == null,
+            TimeSpan.FromSeconds(2));
+        stateChanges.Should().Contain(evt => evt.NewState == "Stopped");
+    }
+
+    [Fact]
     public async Task WaitForRunExitAsync_WhenProjectHasReplacementSession_TreatsOriginalSessionAsExited()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();

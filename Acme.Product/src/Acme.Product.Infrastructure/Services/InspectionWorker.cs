@@ -180,7 +180,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         var task = Task.Run(async () =>
         {
             await RunWithTripleExceptionProtectionAsync(projectId, sessionId, flow, cameraId, cts.Token);
-        }, cts.Token);
+        }, CancellationToken.None);
 
         var taskEntry = new RunningTaskEntry
         {
@@ -287,19 +287,12 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
 
             await RunWithScopeAsync(projectId, sessionId, flow, cameraId, ct);
-            EnsureStoppedState(projectId, sessionId);
+            await EnsureStoppedStateAsync(projectId, sessionId);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             _logger.LogInformation("[InspectionWorker] 任务正常取消: {ProjectId}", projectId);
-            await _eventBus.PublishAsync(new InspectionStateChangedEvent
-            {
-                ProjectId = projectId,
-                SessionId = sessionId,
-                OldState = "Running",
-                NewState = "Stopped"
-            }, CancellationToken.None);
-            _coordinator.MarkAsStopped(projectId, sessionId);
+            await EnsureStoppedStateAsync(projectId, sessionId);
         }
         catch (Exception ex)
         {
@@ -344,7 +337,6 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var imageAcquisition = scope.ServiceProvider.GetRequiredService<IImageAcquisitionService>();
             var resultChannelWriter = scope.ServiceProvider.GetRequiredService<IInspectionResultChannelWriter>();
             var projectRepository = scope.ServiceProvider.GetRequiredService<IProjectRepository>();
-            var cameraManager = scope.ServiceProvider.GetRequiredService<ICameraManager>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<InspectionWorker>>();
 
             // 创建日志上下文
@@ -371,22 +363,13 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     sessionId,
                     flow,
                     cameraId,
-                    IsFrameDrivenExecution(flow, cameraId, cameraManager),
+                    IsFrameDrivenExecution(flow, cameraId, scope.ServiceProvider),
                     flowExecution,
                     imageAcquisition,
                     resultChannelWriter,
                     ct);
 
                 logger.LogInformation("[InspectionWorker] 检测循环结束");
-
-                // 发布状态变更事件：Stopped
-                await _eventBus.PublishAsync(new InspectionStateChangedEvent
-                {
-                    ProjectId = projectId,
-                    SessionId = sessionId,
-                    OldState = "Running",
-                    NewState = "Stopped"
-                }, ct);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -543,8 +526,19 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     /// <summary>
     /// 执行单轮检测
     /// </summary>
-    private static bool IsFrameDrivenExecution(OperatorFlow flow, string? cameraId, ICameraManager cameraManager)
+    private static bool IsFrameDrivenExecution(OperatorFlow flow, string? cameraId, IServiceProvider serviceProvider)
     {
+        if (string.IsNullOrWhiteSpace(cameraId) && flow.Operators.All(item => item.Type != OperatorType.ImageAcquisition))
+        {
+            return false;
+        }
+
+        var cameraManager = serviceProvider.GetService<ICameraManager>();
+        if (cameraManager == null)
+        {
+            return false;
+        }
+
         if (IsFrameDrivenBinding(cameraManager, cameraId))
         {
             return true;
@@ -1028,12 +1022,40 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             if (activeTasks.Count > 0)
             {
                 var tasks = activeTasks.Select(e => e.Task).ToArray();
+                var tasksCompleted = false;
                 try
                 {
                     await Task.WhenAll(tasks).WaitAsync(timeoutCts.Token);
-                    _logger.LogInformation("[InspectionWorker] 所有任务已正常完成");
+                    tasksCompleted = true;
+                }
+                catch (OperationCanceledException) when (tasks.All(task => task.IsCompleted) && !timeoutCts.IsCancellationRequested)
+                {
+                    tasksCompleted = true;
+                }
+                catch (Exception ex) when (tasks.All(task => task.IsCompleted) && !timeoutCts.IsCancellationRequested)
+                {
+                    _logger.LogWarning(ex, "[InspectionWorker] 任务完成时存在异常，继续执行停止态兜底清理");
+                    tasksCompleted = true;
                 }
                 catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[InspectionWorker] 等待任务完成时异常");
+                }
+
+                if (tasksCompleted)
+                {
+                    foreach (var entry in activeTasks)
+                    {
+                        await EnsureStoppedStateAsync(entry.ProjectId, entry.SessionId);
+                    }
+
+                    await Task.WhenAll(activeTasks.Select(e => e.ExitCompletion.Task)).WaitAsync(timeoutCts.Token);
+                    _logger.LogInformation("[InspectionWorker] 所有任务已正常完成");
+                }
+                else
                 {
                     _logger.LogWarning("[InspectionWorker] 优雅关机超时，强制退出");
                 }
@@ -1059,7 +1081,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     private async Task CleanupTaskAsync(Guid projectId, RunningTaskEntry entry)
     {
         var removed = _runningTasks.TryRemove(projectId, out _);
-        EnsureStoppedState(projectId, entry.SessionId);
+        await EnsureStoppedStateAsync(projectId, entry.SessionId);
         
         try
         {
@@ -1080,7 +1102,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         entry.ExitCompletion.TrySetResult(true);
     }
 
-    private void EnsureStoppedState(Guid projectId, Guid sessionId)
+    private async Task EnsureStoppedStateAsync(Guid projectId, Guid sessionId)
     {
         var state = _coordinator.GetState(projectId);
         if (state == null)
@@ -1095,6 +1117,21 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
         if (state.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping)
         {
+            try
+            {
+                await _eventBus.PublishAsync(new InspectionStateChangedEvent
+                {
+                    ProjectId = projectId,
+                    SessionId = sessionId,
+                    OldState = state.Status.ToString(),
+                    NewState = RuntimeStatus.Stopped.ToString()
+                }, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[InspectionWorker] 发布停止状态事件失败，继续释放运行态: {ProjectId}", projectId);
+            }
+
             _coordinator.MarkAsStopped(projectId, sessionId);
         }
     }
