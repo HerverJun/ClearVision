@@ -1,0 +1,807 @@
+{
+  "schemaVersion": "2026-04-29.quality-suite.v1",
+  "suiteId": "core20_proof_suite",
+  "description": "Proof-grade Core20 data loop. Blocked field dataset entries are explicit and must not be treated as passing proof.",
+  "ciBudgetMinutes": 180,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "core20-proof-governance",
+      "entries": [
+        {
+          "id": "core20_proof_validate",
+          "status": "active",
+          "evidenceKind": "proof-registry",
+          "operators": [
+            "TemplateMatching",
+            "AnomalyDetection",
+            "DeepLearning",
+            "SemanticSegmentation",
+            "EdgeDetection",
+            "ShapeMatching",
+            "GradientShapeMatch",
+            "PyramidShapeMatch",
+            "AkazeFeatureMatch",
+            "OrbFeatureMatch",
+            "PlanarMatching",
+            "LocalDeformableMatching",
+            "CaliperTool",
+            "ArcCaliper",
+            "ContourDetection",
+            "BlobAnalysis",
+            "LineMeasurement",
+            "CircleMeasurement",
+            "GeometricFitting",
+            "SurfaceDefectDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/build_core20_proof_assets.py",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.md",
+          "estimatedSeconds": 30
+        }
+      ]
+    },
+    {
+      "id": "core20-representative-field-ingest",
+      "entries": [
+        {
+          "id": "core20_representative_ingest_config_validate",
+          "status": "active",
+          "evidenceKind": "field-data-ingest-config",
+          "operators": [
+            "SurfaceDefectDetection",
+            "DeepLearning",
+            "CaliperTool",
+            "TemplateMatching",
+            "EdgeDetection",
+            "SemanticSegmentation",
+            "ShapeMatching",
+            "AnomalyDetection",
+            "GradientShapeMatch",
+            "PyramidShapeMatch",
+            "AkazeFeatureMatch",
+            "OrbFeatureMatch",
+            "PlanarMatching",
+            "LocalDeformableMatching",
+            "ArcCaliper",
+            "ContourDetection",
+            "BlobAnalysis",
+            "LineMeasurement",
+            "CircleMeasurement",
+            "GeometricFitting"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--validate-config-only",
+            "--operators",
+            "SurfaceDefectDetection",
+            "DeepLearning",
+            "CaliperTool",
+            "TemplateMatching",
+            "EdgeDetection",
+            "SemanticSegmentation",
+            "ShapeMatching",
+            "AnomalyDetection",
+            "GradientShapeMatch",
+            "PyramidShapeMatch",
+            "AkazeFeatureMatch",
+            "OrbFeatureMatch",
+            "PlanarMatching",
+            "LocalDeformableMatching",
+            "ArcCaliper",
+            "ContourDetection",
+            "BlobAnalysis",
+            "LineMeasurement",
+            "CircleMeasurement",
+            "GeometricFitting"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.md",
+          "estimatedSeconds": 15
+        },
+        {
+          "id": "SurfaceDefectDetection_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "SurfaceDefectDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "SurfaceDefectDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/SurfaceDefectDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/SurfaceDefectDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "DeepLearning_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "DeepLearning"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "DeepLearning"
+          ],
+          "datasetManifest": "quality/datasets/manifests/DeepLearning_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/DeepLearning_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "CaliperTool_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "CaliperTool"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "CaliperTool"
+          ],
+          "datasetManifest": "quality/datasets/manifests/CaliperTool_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/CaliperTool_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CaliperTool_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "TemplateMatching_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "TemplateMatching"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "TemplateMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/TemplateMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/TemplateMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/TemplateMatching_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "EdgeDetection_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "EdgeDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "EdgeDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/EdgeDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/EdgeDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "SemanticSegmentation_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "SemanticSegmentation"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "SemanticSegmentation"
+          ],
+          "datasetManifest": "quality/datasets/manifests/SemanticSegmentation_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/SemanticSegmentation_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SemanticSegmentation_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "ShapeMatching_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "ShapeMatching"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "ShapeMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/ShapeMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/ShapeMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ShapeMatching_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "AnomalyDetection_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "AnomalyDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "AnomalyDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/AnomalyDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/AnomalyDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "GradientShapeMatch_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "GradientShapeMatch"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "GradientShapeMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/GradientShapeMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/GradientShapeMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/GradientShapeMatch_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "PyramidShapeMatch_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "PyramidShapeMatch"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "PyramidShapeMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/PyramidShapeMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/PyramidShapeMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/PyramidShapeMatch_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "AkazeFeatureMatch_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "AkazeFeatureMatch"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "AkazeFeatureMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/AkazeFeatureMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/AkazeFeatureMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/AkazeFeatureMatch_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "OrbFeatureMatch_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "OrbFeatureMatch"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "OrbFeatureMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/OrbFeatureMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/OrbFeatureMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/OrbFeatureMatch_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "PlanarMatching_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "PlanarMatching"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "PlanarMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/PlanarMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/PlanarMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/PlanarMatching_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "LocalDeformableMatching_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "LocalDeformableMatching"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "LocalDeformableMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/LocalDeformableMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/LocalDeformableMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/LocalDeformableMatching_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "ArcCaliper_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "ArcCaliper"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "ArcCaliper"
+          ],
+          "datasetManifest": "quality/datasets/manifests/ArcCaliper_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/ArcCaliper_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ArcCaliper_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "ContourDetection_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "ContourDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "ContourDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/ContourDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/ContourDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ContourDetection_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "BlobAnalysis_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "BlobAnalysis"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "BlobAnalysis"
+          ],
+          "datasetManifest": "quality/datasets/manifests/BlobAnalysis_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/BlobAnalysis_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/BlobAnalysis_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "LineMeasurement_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "LineMeasurement"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "LineMeasurement"
+          ],
+          "datasetManifest": "quality/datasets/manifests/LineMeasurement_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/LineMeasurement_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/LineMeasurement_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "CircleMeasurement_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "CircleMeasurement"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "CircleMeasurement"
+          ],
+          "datasetManifest": "quality/datasets/manifests/CircleMeasurement_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/CircleMeasurement_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CircleMeasurement_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        },
+        {
+          "id": "GeometricFitting_field_ingest",
+          "status": "manual",
+          "evidenceKind": "field-data-ingest",
+          "operators": [
+            "GeometricFitting"
+          ],
+          "command": [
+            "python",
+            "quality/tools/ingest_core20_field_dataset.py",
+            "--operator",
+            "GeometricFitting"
+          ],
+          "datasetManifest": "quality/datasets/manifests/GeometricFitting_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/GeometricFitting_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/GeometricFitting_field_v1_proof_baseline.md",
+          "estimatedSeconds": 120,
+          "notes": "Reads CLEARVISION_PRODUCTION_DATASET_ROOT/core20/<Operator>/field_v1/cases.json or cases.jsonl, validates labels/privacy, updates split and proof baseline."
+        }
+      ]
+    },
+    {
+      "id": "core20-field-datasets",
+      "entries": [
+        {
+          "id": "TemplateMatching_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "TemplateMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/TemplateMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/TemplateMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/TemplateMatching_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "AnomalyDetection_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "AnomalyDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/AnomalyDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/AnomalyDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "DeepLearning_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "DeepLearning"
+          ],
+          "datasetManifest": "quality/datasets/manifests/DeepLearning_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/DeepLearning_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "SemanticSegmentation_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "SemanticSegmentation"
+          ],
+          "datasetManifest": "quality/datasets/manifests/SemanticSegmentation_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/SemanticSegmentation_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SemanticSegmentation_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "EdgeDetection_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "EdgeDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/EdgeDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/EdgeDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "ShapeMatching_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "ShapeMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/ShapeMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/ShapeMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ShapeMatching_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "GradientShapeMatch_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "GradientShapeMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/GradientShapeMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/GradientShapeMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/GradientShapeMatch_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "PyramidShapeMatch_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "PyramidShapeMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/PyramidShapeMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/PyramidShapeMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/PyramidShapeMatch_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "AkazeFeatureMatch_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "AkazeFeatureMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/AkazeFeatureMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/AkazeFeatureMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/AkazeFeatureMatch_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "OrbFeatureMatch_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "OrbFeatureMatch"
+          ],
+          "datasetManifest": "quality/datasets/manifests/OrbFeatureMatch_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/OrbFeatureMatch_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/OrbFeatureMatch_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "PlanarMatching_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "PlanarMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/PlanarMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/PlanarMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/PlanarMatching_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "LocalDeformableMatching_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "LocalDeformableMatching"
+          ],
+          "datasetManifest": "quality/datasets/manifests/LocalDeformableMatching_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/LocalDeformableMatching_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/LocalDeformableMatching_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "CaliperTool_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "CaliperTool"
+          ],
+          "datasetManifest": "quality/datasets/manifests/CaliperTool_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/CaliperTool_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CaliperTool_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "ArcCaliper_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "ArcCaliper"
+          ],
+          "datasetManifest": "quality/datasets/manifests/ArcCaliper_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/ArcCaliper_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ArcCaliper_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "ContourDetection_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "ContourDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/ContourDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/ContourDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/ContourDetection_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "BlobAnalysis_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "BlobAnalysis"
+          ],
+          "datasetManifest": "quality/datasets/manifests/BlobAnalysis_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/BlobAnalysis_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/BlobAnalysis_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "LineMeasurement_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "LineMeasurement"
+          ],
+          "datasetManifest": "quality/datasets/manifests/LineMeasurement_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/LineMeasurement_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/LineMeasurement_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "CircleMeasurement_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "CircleMeasurement"
+          ],
+          "datasetManifest": "quality/datasets/manifests/CircleMeasurement_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/CircleMeasurement_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CircleMeasurement_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "GeometricFitting_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "GeometricFitting"
+          ],
+          "datasetManifest": "quality/datasets/manifests/GeometricFitting_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/GeometricFitting_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/GeometricFitting_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        },
+        {
+          "id": "SurfaceDefectDetection_field_v1",
+          "status": "blocked-missing-field-data",
+          "evidenceKind": "real-dataset",
+          "operators": [
+            "SurfaceDefectDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/SurfaceDefectDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/SurfaceDefectDetection_field_v1_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_field_v1_proof_baseline.md",
+          "blockReason": "Awaiting approved de-identified production field samples under CLEARVISION_PRODUCTION_DATASET_ROOT.",
+          "estimatedSeconds": 1800
+        }
+      ]
+    },
+    {
+      "id": "core20-field-replay",
+      "entries": [
+        {
+          "id": "core20_field_replay",
+          "status": "active",
+          "evidenceKind": "field-replay",
+          "operators": [
+            "TemplateMatching",
+            "AnomalyDetection",
+            "DeepLearning",
+            "SemanticSegmentation",
+            "EdgeDetection",
+            "ShapeMatching",
+            "GradientShapeMatch",
+            "PyramidShapeMatch",
+            "AkazeFeatureMatch",
+            "OrbFeatureMatch",
+            "PlanarMatching",
+            "LocalDeformableMatching",
+            "CaliperTool",
+            "ArcCaliper",
+            "ContourDetection",
+            "BlobAnalysis",
+            "LineMeasurement",
+            "CircleMeasurement",
+            "GeometricFitting",
+            "SurfaceDefectDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_field_replay.py",
+            "--manifest",
+            "quality/field_replay/manifests/core20_field_replay_manifest.json",
+            "--drill-id",
+            "2026-04-core20-proof-v1",
+            "--output",
+            "quality/evals/reports/QualityFlywheel_core20_field_replay_baseline.json",
+            "--report",
+            "quality/evals/reports/QualityFlywheel_core20_field_replay_baseline.md",
+            "--baseline-output",
+            "quality/evals/reports/QualityFlywheel_core20_field_replay_baseline.json"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_core20_field_replay_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_core20_field_replay_baseline.md",
+          "estimatedSeconds": 60
+        }
+      ]
+    }
+  ]
+}

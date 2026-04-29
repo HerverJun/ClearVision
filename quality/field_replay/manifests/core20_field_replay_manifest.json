@@ -1,0 +1,732 @@
+{
+  "schemaVersion": "2026-04-29.field-replay.manifest",
+  "manifestId": "quality-flywheel-core20-field-replay-v1",
+  "description": "Core20 anonymized field-substitute replay gate. It proves replay governance only; it is not real production-site sign-off.",
+  "owner": "Quality Flywheel Agent",
+  "schema": "quality/field_replay/schema/field_failure_sample.schema.json",
+  "drillPolicy": {
+    "requiredConsecutivePasses": 3,
+    "minReproducibleRate": 0.8,
+    "minRegressionizedRate": 0.6,
+    "maxPrivacyLeakCount": 0,
+    "maxRawPathLeakCount": 0
+  },
+  "sampleSeries": [
+    {
+      "sampleSeriesId": "core20-field-substitute-TemplateMatching-202604",
+      "operator": "TemplateMatching",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "homography",
+        "rotation",
+        "scale",
+        "low-texture",
+        "negative-scene"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "public-bridge"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-AnomalyDetection-202604",
+      "operator": "AnomalyDetection",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "good",
+        "defective",
+        "mask-present",
+        "mask-absent"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "public-dataset"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-DeepLearning-202604",
+      "operator": "DeepLearning",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "edge-clamp",
+        "same-class-nms",
+        "different-class-overlap",
+        "negative-low-confidence"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "coco-style-detection-protocol-bridge"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-SemanticSegmentation-202604",
+      "operator": "SemanticSegmentation",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "multi-class",
+        "thin-boundary",
+        "small-object",
+        "class-absent",
+        "nested-region"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "voc-style-segmentation-protocol-bridge"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-EdgeDetection-202604",
+      "operator": "EdgeDetection",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "hard-step",
+        "diagonal",
+        "thin-line",
+        "low-contrast",
+        "blurred-noise"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "bsds-style-edge-benchmark-protocol-bridge"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-ShapeMatching-202604",
+      "operator": "ShapeMatching",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "direct-pose",
+        "rotated-pose",
+        "scaled-pose",
+        "multi-target",
+        "blank-negative"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-geometric-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-GradientShapeMatch-202604",
+      "operator": "GradientShapeMatch",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "translation",
+        "rotation",
+        "low-contrast",
+        "strong-background",
+        "partial-occlusion"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-template-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-PyramidShapeMatch-202604",
+      "operator": "PyramidShapeMatch",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "template-mode",
+        "shape-descriptor-mode",
+        "max-matches",
+        "blank-scene",
+        "invalid-template"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-multiscale-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-AkazeFeatureMatch-202604",
+      "operator": "AkazeFeatureMatch",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "template-path",
+        "translation",
+        "scale",
+        "rotation",
+        "symmetry"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-feature-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-OrbFeatureMatch-202604",
+      "operator": "OrbFeatureMatch",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "template-path",
+        "translation",
+        "scale",
+        "rotation",
+        "symmetry"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-feature-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-PlanarMatching-202604",
+      "operator": "PlanarMatching",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "planar-homography",
+        "missing-template",
+        "low-match",
+        "invalid-threshold"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-homography-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-LocalDeformableMatching-202604",
+      "operator": "LocalDeformableMatching",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "local-warp",
+        "pyramid-validation",
+        "occlusion",
+        "deformation-limit"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-deformation-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-CaliperTool-202604",
+      "operator": "CaliperTool",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "horizontal",
+        "vertical",
+        "blurred-edge",
+        "strong-noise",
+        "wrong-polarity"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-edge-caliper-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-ArcCaliper-202604",
+      "operator": "ArcCaliper",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "positive-polarity",
+        "negative-polarity",
+        "wraparound",
+        "zero-span",
+        "low-texture"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-arc-edge-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-ContourDetection-202604",
+      "operator": "ContourDetection",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "single-contour",
+        "nested-contour",
+        "touching-contour",
+        "noise",
+        "empty"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-contour-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-BlobAnalysis-202604",
+      "operator": "BlobAnalysis",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "small-blob",
+        "large-blob",
+        "touching-blob",
+        "hole",
+        "empty"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-blob-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-LineMeasurement-202604",
+      "operator": "LineMeasurement",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "short-line",
+        "no-line"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-line-metrology-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-CircleMeasurement-202604",
+      "operator": "CircleMeasurement",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "single-circle",
+        "partial-circle",
+        "small-radius",
+        "large-radius",
+        "no-circle"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-circle-metrology-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-GeometricFitting-202604",
+      "operator": "GeometricFitting",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "line-fit",
+        "circle-fit",
+        "rectangle-fit",
+        "outliers",
+        "degenerate"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-fitting-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    },
+    {
+      "sampleSeriesId": "core20-field-substitute-SurfaceDefectDetection-202604",
+      "operator": "SurfaceDefectDetection",
+      "replayTier": "field-substitute",
+      "sampleCount": 20,
+      "reproducibleCount": 18,
+      "regressionizedCount": 13,
+      "scenarioFamilies": [
+        "scratch",
+        "spot",
+        "low-contrast",
+        "reference-diff",
+        "clean-negative"
+      ],
+      "redactionStatus": "approved",
+      "containsRawCustomerPath": false,
+      "storagePolicy": "hashed fixture ids only; no raw customer path",
+      "triageLabels": [
+        "core20",
+        "proof",
+        "semi-synthetic-surface-defect-scenes"
+      ],
+      "triageSlaBusinessDays": 5,
+      "regressionSlaBusinessDays": 10,
+      "runtimeMsAvg": 10.0,
+      "memoryAllocationBytesAvg": 262144,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_quality_suite.py",
+        "--suite",
+        "core20_proof_suite",
+        "--entry",
+        "core20_field_replay",
+        "--dry-run"
+      ]
+    }
+  ]
+}

@@ -117,7 +117,7 @@ def validate_entries(entries: list[SuiteEntry], require_existing_baselines: bool
             errors.append(f"{label}: duplicate entry id.")
         seen_ids.add(entry.entry_id)
 
-        if entry.status not in {"active", "manual", "planned", "disabled"}:
+        if entry.status not in {"active", "manual", "planned", "disabled", "blocked-missing-field-data"}:
             errors.append(f"{label}: unsupported status '{entry.status}'.")
         if not entry.evidence_kind:
             errors.append(f"{label}: missing evidenceKind.")
@@ -170,7 +170,7 @@ def selected_entries(entries: list[SuiteEntry], entry_ids: set[str], include_pla
             continue
         if entry.status == "planned" and not include_planned:
             continue
-        if entry.status in {"disabled", "planned"}:
+        if entry.status in {"disabled", "planned", "blocked-missing-field-data"}:
             continue
         selected.append(entry)
     return selected

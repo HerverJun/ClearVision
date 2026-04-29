@@ -56,6 +56,17 @@ EvidenceDefinitions: `docs/operator-quality/operator_quality_evidence_manifest.m
 | DeepLearning | 100 | A | 0 | 5 | Contract evidenced (50 cases) | Not yet evidenced | Dataset evidenced (72 cases) | Field replay evidenced (20 cases) | Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced | Field replay substitute evidenced (20 cases); 功能可用但未完成现场工业验证 | 142 | Yes | P2 | Maintain regression baseline |
 | GradientShapeMatch | 100 | A | 0 | 5 | Not yet evidenced | Golden evidenced (117 cases) | Dataset evidenced (117 cases) | Not yet evidenced | Dataset precision claim supported by 117 dataset cases; field replay not yet evidenced | 功能可用但未完成现场工业验证 | 234 | Yes | P2 | Maintain regression baseline |
 
+<!-- CORE20_PROOF_SUMMARY_START -->
+## Core20 Proof Summary
+
+- Core20 proof registry: `quality/evals/reports/QualityFlywheel_core20_proof_registry.json`
+- Frozen core operators: 20
+- Legacy evidence marked as `legacy-baseline`: 20
+- Field dataset proof status: `blocked-missing-field-data` = 20
+- Field replay substitute evidence: 20 operators / 400 samples
+- Industrial status: real industrial validation complete = 0; field-substitute replay is not site/line sign-off.
+
+<!-- CORE20_PROOF_SUMMARY_END -->
 ## Full Matrix
 
 | OperatorType | DisplayName | Category | QScore | Level | Version | Maturity | Inputs | Outputs | Params | AlgorithmSummary | KnownLimitationsCount | CardTodoCount | HasContractTest | ContractCases | ContractEvidence | HasGoldenTest | GoldenCases | GoldenEvidence | HasDatasetEvidence | DatasetCases | DatasetEvidence | HasFieldReplay | FieldReplayCases | FieldReplayEvidence | PrecisionClaim | IndustrialStatus | HasBenchmark | Priority | OwnerAgent | NextAction |

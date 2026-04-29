@@ -1,0 +1,1166 @@
+{
+  "EvidenceKind": "core20-proof",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T00:00:00Z",
+    "OperatorCount": 20,
+    "Accepted": 0,
+    "BlockedMissingFieldData": 20,
+    "LegacyBaselineCount": 20,
+    "FieldReplayOperatorCount": 20,
+    "FieldReplaySampleCount": 400,
+    "PrivacyLeakCount": 0,
+    "RawPathLeakCount": 0,
+    "RealIndustrialValidationComplete": 0,
+    "ProofGatePassed": false,
+    "ProofGateInterpretation": "Governance assets are complete, but real field dataset proof is blocked until approved de-identified field samples are registered."
+  },
+  "Operators": [
+    {
+      "Operator": "TemplateMatching",
+      "datasetId": "TemplateMatching_field_v1",
+      "manifest": "quality/datasets/manifests/TemplateMatching_field_v1_manifest.json",
+      "manifestSha256": "420a09c98c96fd87c7f1822316ebb45d9755c85602989ca8d0e0efa41c852be9",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/TemplateMatching_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json",
+        "manifest": "TemplateMatching_public_bridge_manifest.json",
+        "caseCount": 24
+      },
+      "metrics": {
+        "primary": "HomographyPassRate",
+        "secondary": [
+          "PassRate",
+          "P95PositionErrorPx",
+          "MeanScore",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "HomographyPassRate": 1.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "HomographyPassRate": 1.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "homography",
+        "rotation",
+        "scale",
+        "low-texture",
+        "negative-scene"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "AnomalyDetection",
+      "datasetId": "AnomalyDetection_field_v1",
+      "manifest": "quality/datasets/manifests/AnomalyDetection_field_v1_manifest.json",
+      "manifestSha256": "5db152405e5570b2b7fc301bd5c34192f6ab48e0283412fe78efe1d7a3baa33e",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/AnomalyDetection_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+        "manifest": "AnomalyDetection_mvtec_lite_manifest.json",
+        "caseCount": 120
+      },
+      "metrics": {
+        "primary": "ImageAuroc",
+        "secondary": [
+          "ImageAuroc",
+          "PixelAuroc",
+          "FalsePositiveRate",
+          "FalseNegativeRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "ImageAuroc": 0.647702,
+          "LegacyCurrentImageAuroc": 0.66092,
+          "ImageAurocMin": 0.5
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "ImageAuroc": 0.647702,
+        "LegacyCurrentImageAuroc": 0.66092,
+        "ImageAurocMin": 0.5
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "good",
+        "defective",
+        "mask-present",
+        "mask-absent"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "DeepLearning",
+      "datasetId": "DeepLearning_field_v1",
+      "manifest": "quality/datasets/manifests/DeepLearning_field_v1_manifest.json",
+      "manifestSha256": "992052fb7b7b6e004b3b99d5f97c532505bb44e1872d8161b863ef27f84476c0",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/DeepLearning_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json",
+        "manifest": "DeepLearning_detection_dataset_manifest.json",
+        "caseCount": 36
+      },
+      "metrics": {
+        "primary": "AP50",
+        "secondary": [
+          "PrecisionAt50",
+          "RecallAt50",
+          "AP50",
+          "FalsePositiveRate",
+          "FalseNegativeRate",
+          "LatencyP95Ms"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "AP50": 0.98,
+          "LegacyCurrentAP50": 1.0,
+          "PrecisionAt50": 0.999,
+          "RecallAt50": 0.999
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "AP50": 0.98,
+        "LegacyCurrentAP50": 1.0,
+        "PrecisionAt50": 0.999,
+        "RecallAt50": 0.999
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "edge-clamp",
+        "same-class-nms",
+        "different-class-overlap",
+        "negative-low-confidence"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "SemanticSegmentation",
+      "datasetId": "SemanticSegmentation_field_v1",
+      "manifest": "quality/datasets/manifests/SemanticSegmentation_field_v1_manifest.json",
+      "manifestSha256": "f6bc6125bae07d0b12f7054c568de029d6162db1f5ca485b7706f3c3ede04e53",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/SemanticSegmentation_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
+        "manifest": "SemanticSegmentation_dataset_manifest.json",
+        "caseCount": 36
+      },
+      "metrics": {
+        "primary": "MeanIoU",
+        "secondary": [
+          "MeanIoU",
+          "Dice",
+          "PixelF1",
+          "ClassAbsentPassRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "MeanIoU": 0.98,
+          "LegacyCurrentMeanIoU": 1.0,
+          "MeanDice": 0.999
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "MeanIoU": 0.98,
+        "LegacyCurrentMeanIoU": 1.0,
+        "MeanDice": 0.999
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "multi-class",
+        "thin-boundary",
+        "small-object",
+        "class-absent",
+        "nested-region"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "EdgeDetection",
+      "datasetId": "EdgeDetection_field_v1",
+      "manifest": "quality/datasets/manifests/EdgeDetection_field_v1_manifest.json",
+      "manifestSha256": "ef8cd80b2e2347f2f10c3c968961fc089154d1a0224d75b0025169fb97d6de73",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/EdgeDetection_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/EdgeDetection_dataset_baseline.json",
+        "manifest": "EdgeDetection_dataset_manifest.json",
+        "caseCount": 36
+      },
+      "metrics": {
+        "primary": "BoundaryF1",
+        "secondary": [
+          "BoundaryF1",
+          "ConsensusBoundaryF1",
+          "Precision",
+          "Recall",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "BoundaryF1": 0.98,
+          "LegacyCurrentBoundaryF1": 1.0,
+          "F1": 0.999,
+          "MeanBoundaryF1": 0.999
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "BoundaryF1": 0.98,
+        "LegacyCurrentBoundaryF1": 1.0,
+        "F1": 0.999,
+        "MeanBoundaryF1": 0.999
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "hard-step",
+        "diagonal",
+        "thin-line",
+        "low-contrast",
+        "blurred-noise",
+        "color-input"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "ShapeMatching",
+      "datasetId": "ShapeMatching_field_v1",
+      "manifest": "quality/datasets/manifests/ShapeMatching_field_v1_manifest.json",
+      "manifestSha256": "e6684bd32a21f2ae4b227fb8c68594498501349bf9b4ee59f18949e39626b81d",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/ShapeMatching_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/ShapeMatching_dataset_baseline.json",
+        "manifest": "ShapeMatching_dataset_manifest.json",
+        "caseCount": 36
+      },
+      "metrics": {
+        "primary": "F1",
+        "secondary": [
+          "F1",
+          "MeanPositionErrorPx",
+          "MeanAngleErrorDeg",
+          "MeanScore",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "F1": 0.98,
+          "LegacyCurrentF1": 1.0,
+          "MeanPositionErrorPx": 8.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "F1": 0.98,
+        "LegacyCurrentF1": 1.0,
+        "MeanPositionErrorPx": 8.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "direct-pose",
+        "rotated-pose",
+        "scaled-pose",
+        "multi-target",
+        "blank-negative"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "GradientShapeMatch",
+      "datasetId": "GradientShapeMatch_field_v1",
+      "manifest": "quality/datasets/manifests/GradientShapeMatch_field_v1_manifest.json",
+      "manifestSha256": "c4d2c11b332acd63a4b829bb298a0faad97663f4d2e9754906d1404778c65ca3",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/GradientShapeMatch_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/GradientShapeMatch_baseline.json",
+        "manifest": "GradientShapeMatch_dataset_manifest.json",
+        "caseCount": 117
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "PositionErrorPx",
+          "AngleErrorDeg",
+          "LowContrastPassRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "PositionTolerancePx": 5.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "PositionTolerancePx": 5.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "translation",
+        "rotation",
+        "low-contrast",
+        "strong-background",
+        "partial-occlusion"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "PyramidShapeMatch",
+      "datasetId": "PyramidShapeMatch_field_v1",
+      "manifest": "quality/datasets/manifests/PyramidShapeMatch_field_v1_manifest.json",
+      "manifestSha256": "20ec10256e25a196dcf40d5d5b4f7886cbb775d64fa0a753d2f08814e29ab038",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/PyramidShapeMatch_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json",
+        "manifest": "PyramidShapeMatch_dataset_manifest.json",
+        "caseCount": 24
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "PositionErrorPx",
+          "ScaleError",
+          "MaxMatchesPassRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "PositionTolerancePx": 12.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "PositionTolerancePx": 12.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "template-mode",
+        "shape-descriptor-mode",
+        "max-matches",
+        "blank-scene",
+        "invalid-template"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "AkazeFeatureMatch",
+      "datasetId": "AkazeFeatureMatch_field_v1",
+      "manifest": "quality/datasets/manifests/AkazeFeatureMatch_field_v1_manifest.json",
+      "manifestSha256": "8659c3518ac5d11c3d8aa53c815dad10e2bb04e22a64254637d1e14b2f3a9892",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/AkazeFeatureMatch_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+        "manifest": "AkazeFeatureMatch_dataset_manifest.json",
+        "caseCount": 22
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "HomographyErrorPx",
+          "AcceptedMatches",
+          "LowFeatureRejectionRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "MinAcceptedMatches": 8
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "MinAcceptedMatches": 8
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "template-path",
+        "translation",
+        "scale",
+        "rotation",
+        "symmetry",
+        "low-feature"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "OrbFeatureMatch",
+      "datasetId": "OrbFeatureMatch_field_v1",
+      "manifest": "quality/datasets/manifests/OrbFeatureMatch_field_v1_manifest.json",
+      "manifestSha256": "0fa13b9cd731077229a92996c36d2571ddf391404f504e9ac9d167943062ab9d",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/OrbFeatureMatch_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+        "manifest": "OrbFeatureMatch_dataset_manifest.json",
+        "caseCount": 22
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "HomographyErrorPx",
+          "AcceptedMatches",
+          "LowFeatureRejectionRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "MinAcceptedMatches": 8
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "MinAcceptedMatches": 8
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "template-path",
+        "translation",
+        "scale",
+        "rotation",
+        "symmetry",
+        "low-feature"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "PlanarMatching",
+      "datasetId": "PlanarMatching_field_v1",
+      "manifest": "quality/datasets/manifests/PlanarMatching_field_v1_manifest.json",
+      "manifestSha256": "d9d50bdd658f51803f3bf641d367d24d554f2f0504a2e485ebfe584cd5f2ac35",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/PlanarMatching_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/P2MatchingResidual_baseline.json",
+        "manifest": "PlanarMatching_dataset_manifest.json",
+        "caseCount": 24
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "CornerErrorPx",
+          "HomographyErrorPx",
+          "LowMatchRejectionRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "HomographyErrorPx": 5.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "HomographyErrorPx": 5.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "planar-homography",
+        "missing-template",
+        "low-match",
+        "invalid-threshold"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "LocalDeformableMatching",
+      "datasetId": "LocalDeformableMatching_field_v1",
+      "manifest": "quality/datasets/manifests/LocalDeformableMatching_field_v1_manifest.json",
+      "manifestSha256": "60ed205253ed11956c64f28d79fc940b07f31465ec4a1e44daef8592ca41702b",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/LocalDeformableMatching_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/P2MatchingResidual_baseline.json",
+        "manifest": "LocalDeformableMatching_dataset_manifest.json",
+        "caseCount": 24
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "DeformationErrorPx",
+          "OcclusionPassRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "DeformationErrorPx": 8.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "DeformationErrorPx": 8.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "local-warp",
+        "pyramid-validation",
+        "occlusion",
+        "deformation-limit"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "CaliperTool",
+      "datasetId": "CaliperTool_field_v1",
+      "manifest": "quality/datasets/manifests/CaliperTool_field_v1_manifest.json",
+      "manifestSha256": "61ec2ae6820b3b30b4394ad2c2d33555f5bf34d04c593882ee156618988a70ac",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/CaliperTool_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/CaliperTool_baseline.json",
+        "manifest": "CaliperTool_dataset_manifest.json",
+        "caseCount": 117
+      },
+      "metrics": {
+        "primary": "WidthErrorPx",
+        "secondary": [
+          "WidthErrorPx",
+          "EdgePairRecall",
+          "PolarityPassRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "WidthErrorPx": 1.0,
+          "PairCountAccuracy": 1.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "WidthErrorPx": 1.0,
+        "PairCountAccuracy": 1.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "horizontal",
+        "vertical",
+        "blurred-edge",
+        "strong-noise",
+        "wrong-polarity"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "ArcCaliper",
+      "datasetId": "ArcCaliper_field_v1",
+      "manifest": "quality/datasets/manifests/ArcCaliper_field_v1_manifest.json",
+      "manifestSha256": "eb747d66aa875ecc948cb362caa2159ec3d4f97011847dace3350b9859c709bd",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/ArcCaliper_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/ArcCaliper_baseline.json",
+        "manifest": "ArcCaliper_dataset_manifest.json",
+        "caseCount": 31
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "RadiusErrorPx",
+          "AngularSpanErrorDeg",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "RadiusErrorPx": 2.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "RadiusErrorPx": 2.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "positive-polarity",
+        "negative-polarity",
+        "wraparound",
+        "zero-span",
+        "low-texture"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "ContourDetection",
+      "datasetId": "ContourDetection_field_v1",
+      "manifest": "quality/datasets/manifests/ContourDetection_field_v1_manifest.json",
+      "manifestSha256": "4e3d80d65d6cf6806ce2e37a0e71e3e710ddb23582c094e3c9c1b2658a6e436f",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/ContourDetection_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+        "manifest": "ContourDetection_dataset_manifest.json",
+        "caseCount": 20
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "ContourCountError",
+          "IoU",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "ContourCountError": 0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "ContourCountError": 0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "single-contour",
+        "nested-contour",
+        "touching-contour",
+        "noise",
+        "empty"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "BlobAnalysis",
+      "datasetId": "BlobAnalysis_field_v1",
+      "manifest": "quality/datasets/manifests/BlobAnalysis_field_v1_manifest.json",
+      "manifestSha256": "3c788919891ec8c49e8fbc680e18ca8c2cd02d3efbe1e6fbcdcc69f988e0ecf9",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/BlobAnalysis_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+        "manifest": "BlobAnalysis_dataset_manifest.json",
+        "caseCount": 20
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "BlobCountError",
+          "AreaErrorRate",
+          "CentroidErrorPx",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "BlobCountError": 0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "BlobCountError": 0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "small-blob",
+        "large-blob",
+        "touching-blob",
+        "hole",
+        "empty"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "LineMeasurement",
+      "datasetId": "LineMeasurement_field_v1",
+      "manifest": "quality/datasets/manifests/LineMeasurement_field_v1_manifest.json",
+      "manifestSha256": "019b505c26ec769504d188ed3cdc61a7da181baf7332286063814ec64255eaa4",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/LineMeasurement_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+        "manifest": "LineMeasurement_dataset_manifest.json",
+        "caseCount": 20
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "LineErrorPx",
+          "AngleErrorDeg",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "LineErrorPx": 2.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "LineErrorPx": 2.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "short-line",
+        "no-line"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "CircleMeasurement",
+      "datasetId": "CircleMeasurement_field_v1",
+      "manifest": "quality/datasets/manifests/CircleMeasurement_field_v1_manifest.json",
+      "manifestSha256": "6db877d8ca746b7525dbef520f206d878e2a9592a217f8ad2c603bdfe557a88e",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/CircleMeasurement_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+        "manifest": "CircleMeasurement_dataset_manifest.json",
+        "caseCount": 20
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "RadiusErrorPx",
+          "CenterErrorPx",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "RadiusErrorPx": 2.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "RadiusErrorPx": 2.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "single-circle",
+        "partial-circle",
+        "small-radius",
+        "large-radius",
+        "no-circle"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "GeometricFitting",
+      "datasetId": "GeometricFitting_field_v1",
+      "manifest": "quality/datasets/manifests/GeometricFitting_field_v1_manifest.json",
+      "manifestSha256": "17e45bf66cf1e6678e76658079aa2cc20b968379f31c775b74303829dbeb1f35",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/GeometricFitting_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+        "manifest": "GeometricFitting_dataset_manifest.json",
+        "caseCount": 20
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PassRate",
+          "FitResidualPx",
+          "OutlierRobustness",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "FitResidualPx": 2.0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "FitResidualPx": 2.0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "line-fit",
+        "circle-fit",
+        "rectangle-fit",
+        "outliers",
+        "degenerate"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    },
+    {
+      "Operator": "SurfaceDefectDetection",
+      "datasetId": "SurfaceDefectDetection_field_v1",
+      "manifest": "quality/datasets/manifests/SurfaceDefectDetection_field_v1_manifest.json",
+      "manifestSha256": "008410612416c414b856a822bcae6ab8c3f08f2620834671092b8eb99b19f477",
+      "splitSummary": {
+        "strategy": "hashed-case-id-60-20-20",
+        "seed": 20260429,
+        "trainCount": 0,
+        "validationCount": 0,
+        "testCount": 0,
+        "noOverlap": true,
+        "caseListPath": "quality/datasets/splits/core20/SurfaceDefectDetection_field_v1_split.json"
+      },
+      "legacyEvidence": {
+        "status": "legacy-baseline",
+        "baselineJson": "quality/evals/reports/P2InspectionResidual_baseline.json",
+        "manifest": "SurfaceDefectDetection_dataset_manifest.json",
+        "caseCount": 24
+      },
+      "metrics": {
+        "primary": "PassRate",
+        "secondary": [
+          "PixelF1",
+          "ImageAuroc",
+          "PixelAuroc",
+          "FalsePositiveRate",
+          "FalseNegativeRate",
+          "RuntimeMsP95"
+        ],
+        "thresholds": {
+          "Failed": 0,
+          "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+          "PassRate": 1.0,
+          "FalsePositiveCount": 0
+        }
+      },
+      "thresholds": {
+        "Failed": 0,
+        "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+        "PassRate": 1.0,
+        "FalsePositiveCount": 0
+      },
+      "perCaseResults": [],
+      "failureTaxonomy": [
+        "scratch",
+        "spot",
+        "low-contrast",
+        "reference-diff",
+        "clean-negative"
+      ],
+      "privacyLeakCount": 0,
+      "rawPathLeakCount": 0,
+      "accepted": false,
+      "proofLevel": "field-proof-blocked",
+      "proofStatus": "blocked-missing-field-data",
+      "industrialStatus": "field proof pending; real industrial validation is not complete"
+    }
+  ]
+}
