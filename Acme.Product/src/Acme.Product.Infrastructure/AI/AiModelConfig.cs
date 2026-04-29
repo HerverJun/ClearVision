@@ -21,7 +21,7 @@ public class AiModelConfig
     public const string AuthModeNone = "none";
 
     /// <summary>唯一标识</summary>
-    public string Id { get; set; } = $"model_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+    public string Id { get; set; } = $"model_{Guid.NewGuid():N}";
 
     /// <summary>显示名称（如"DeepSeek"、"Kimi"）</summary>
     public string Name { get; set; } = "新建模型";

@@ -160,6 +160,51 @@ public class AuthEndpointsTests
         GetProperty(document.RootElement, "ErrorCode").GetString().Should().Be("PASSWORD_REUSE");
     }
 
+    [Fact]
+    public async Task ProtectedAuthEndpoints_ShouldAcceptXAuthTokenThroughRealMiddleware()
+    {
+        await using var host = await AuthPipelineTestHost.CreateAsync();
+        host.AuthService.GetSessionAsync("token-x").Returns(Task.FromResult<UserSession?>(new UserSession
+        {
+            UserId = "user-1",
+            Username = "tester",
+            Role = "Engineer",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+        host.AuthService.ChangePasswordAsync("user-1", "OldPwd1", "NewPwd123")
+            .Returns(new AuthResult { Success = true });
+
+        using var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        meRequest.Headers.Add("X-Auth-Token", "token-x");
+
+        using var meResponse = await host.Client.SendAsync(meRequest);
+
+        meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var meDocument = JsonDocument.Parse(await meResponse.Content.ReadAsStringAsync());
+        GetProperty(meDocument.RootElement, "Username").GetString().Should().Be("tester");
+
+        using var changePasswordRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/change-password");
+        changePasswordRequest.Headers.Add("X-Auth-Token", "token-x");
+        changePasswordRequest.Content = JsonContent.Create(new ChangePasswordRequest
+        {
+            OldPassword = "OldPwd1",
+            NewPassword = "NewPwd123"
+        });
+
+        using var changePasswordResponse = await host.Client.SendAsync(changePasswordRequest);
+
+        changePasswordResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.AuthService.Received(1).ChangePasswordAsync("user-1", "OldPwd1", "NewPwd123");
+
+        using var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+        logoutRequest.Headers.Add("X-Auth-Token", "token-x");
+
+        using var logoutResponse = await host.Client.SendAsync(logoutRequest);
+
+        logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.AuthService.Received(1).LogoutAsync("token-x");
+    }
+
     private static JsonElement GetProperty(JsonElement element, string propertyName)
     {
         foreach (var property in element.EnumerateObject())
@@ -214,6 +259,59 @@ public class AuthEndpointsTests
             app.MapAuthEndpoints();
             await app.StartAsync();
             return new AuthEndpointsTestHost(app, authService);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Client.Dispose();
+            await _app.StopAsync();
+            await _app.DisposeAsync();
+        }
+    }
+
+    private sealed class AuthPipelineTestHost : IAsyncDisposable
+    {
+        private readonly WebApplication _app;
+
+        private AuthPipelineTestHost(WebApplication app, IAuthService authService)
+        {
+            _app = app;
+            AuthService = authService;
+            Client = app.GetTestClient();
+        }
+
+        public HttpClient Client { get; }
+
+        public IAuthService AuthService { get; }
+
+        public static async Task<AuthPipelineTestHost> CreateAsync()
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = Environments.Development
+            });
+
+            builder.WebHost.UseTestServer();
+
+            var authService = Substitute.For<IAuthService>();
+            var configService = Substitute.For<IConfigurationService>();
+            configService.GetCurrent().Returns(new AppConfig
+            {
+                Security = new SecurityConfig
+                {
+                    PasswordMinLength = 8
+                }
+            });
+
+            builder.Services.AddLogging();
+            builder.Services.AddSingleton(authService);
+            builder.Services.AddSingleton(configService);
+
+            var app = builder.Build();
+            app.UseMiddleware<Acme.Product.Desktop.Middleware.AuthMiddleware>();
+            app.MapAuthEndpoints();
+            await app.StartAsync();
+            return new AuthPipelineTestHost(app, authService);
         }
 
         public async ValueTask DisposeAsync()

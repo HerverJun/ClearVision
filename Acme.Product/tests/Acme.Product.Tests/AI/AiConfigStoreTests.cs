@@ -5,6 +5,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Acme.Product.Infrastructure.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -92,6 +93,59 @@ public class AiConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_ShouldNotPersistApiKeyInAiModelsJson()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "secret-model",
+            Name = "Secret Model",
+            Provider = "OpenAI Compatible",
+            ApiKey = "SecretKeyForDisk",
+            Model = "gpt-4o-mini"
+        });
+
+        var persistedJson = File.ReadAllText(_testModelsFile);
+        Assert.DoesNotContain("SecretKeyForDisk", persistedJson);
+        Assert.Contains("\"apiKey\": \"\"", persistedJson);
+        Assert.Equal("SecretKeyForDisk", store.GetById("secret-model")!.ApiKey);
+
+        var reloaded = CreateStore();
+        Assert.Equal("SecretKeyForDisk", reloaded.GetById("secret-model")!.ApiKey);
+    }
+
+    [Fact]
+    public void Constructor_WhenAiModelsJsonHasInlineApiKey_MigratesItToSecretStore()
+    {
+        var legacyModel = new AiModelConfig
+        {
+            Id = "legacy-inline",
+            Name = "Legacy Inline",
+            Provider = "OpenAI Compatible",
+            ApiKey = "LegacyInlineKey",
+            Model = "gpt-4o-mini",
+            IsActive = true
+        };
+        File.WriteAllText(
+            _testModelsFile,
+            JsonSerializer.Serialize(new[] { legacyModel }, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            }));
+
+        var store = CreateStore();
+
+        Assert.Equal("LegacyInlineKey", store.GetById("legacy-inline")!.ApiKey);
+        var persistedJson = File.ReadAllText(_testModelsFile);
+        Assert.DoesNotContain("LegacyInlineKey", persistedJson);
+        Assert.Contains("\"apiKey\": \"\"", persistedJson);
+
+        var reloaded = CreateStore();
+        Assert.Equal("LegacyInlineKey", reloaded.GetById("legacy-inline")!.ApiKey);
+    }
+
+    [Fact]
     public void Add_Model_Then_GetAll_ReturnsIt()
     {
         var store = CreateStore();
@@ -103,6 +157,20 @@ public class AiConfigStoreTests : IDisposable
         var all = store.GetAll();
         Assert.Equal(2, all.Count);
         Assert.Contains(all, m => m.Id == "test1");
+    }
+
+    [Fact]
+    public void Add_DuplicateId_ShouldReject()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig { Id = "duplicate-model", Name = "First", ApiKey = "FirstKey" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            store.Add(new AiModelConfig { Id = "duplicate-model", Name = "Second", ApiKey = "SecondKey" }));
+
+        Assert.Contains("duplicate-model", ex.Message);
+        Assert.Single(store.GetAll().Where(model => model.Id == "duplicate-model"));
+        Assert.Equal("FirstKey", store.GetById("duplicate-model")!.ApiKey);
     }
 
     [Fact]
@@ -134,6 +202,43 @@ public class AiConfigStoreTests : IDisposable
         Assert.Single(remaining);
         Assert.Equal("test2", remaining[0].Id);
         Assert.True(remaining[0].IsActive);
+    }
+
+    [Fact]
+    public void Delete_ModelWithApiKey_ShouldPruneSecretForFutureReloads()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "delete-secret",
+            Name = "Delete Secret",
+            Provider = "OpenAI Compatible",
+            ApiKey = "DeletedSecretKey",
+            Model = "gpt-4o-mini"
+        });
+
+        store.Delete("delete-secret");
+
+        var resurrectedModel = new AiModelConfig
+        {
+            Id = "delete-secret",
+            Name = "Resurrected",
+            Provider = "OpenAI Compatible",
+            ApiKey = string.Empty,
+            Model = "gpt-4o-mini",
+            IsActive = true
+        };
+        File.WriteAllText(
+            _testModelsFile,
+            JsonSerializer.Serialize(new[] { resurrectedModel }, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            }));
+
+        var reloaded = CreateStore();
+
+        Assert.Equal(string.Empty, reloaded.GetById("delete-secret")!.ApiKey);
     }
 
     [Fact]
@@ -228,6 +333,8 @@ public class AiConfigStoreTests : IDisposable
         Assert.NotNull(migrated.Reasoning);
         Assert.Equal(AiReasoningModes.Auto, migrated.Reasoning!.Mode);
         Assert.Equal(AiReasoningEfforts.Medium, migrated.Reasoning.Effort);
+        Assert.False(File.Exists(_testLegacyFile));
+        Assert.DoesNotContain("LegacyKey", File.ReadAllText(_testModelsFile));
     }
 
     [Fact]
@@ -410,5 +517,8 @@ public class AiConfigStoreTests : IDisposable
         Assert.Equal("TestModel", defaultModel.Model);
         Assert.True(defaultModel.IsActive);
         Assert.False(File.Exists(_testLegacyFile));
+        var persistedJson = File.ReadAllText(_testModelsFile);
+        Assert.DoesNotContain("TestKey", persistedJson);
+        Assert.DoesNotContain("custom-key", persistedJson);
     }
 }

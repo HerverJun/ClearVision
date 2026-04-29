@@ -80,12 +80,43 @@ public class InspectionEventEndpointsTests
 
         var replayChunk = await ReadUntilContainsAsync(stream, "event: progressChanged", TimeSpan.FromSeconds(2));
         replayChunk.Should().Contain($"id: {secondSequence}");
+        replayChunk.Should().NotContain($"id: {firstSequence}\n");
         replayChunk.Should().Contain("event: progressChanged");
         replayChunk.Should().Contain("\"processedCount\":2");
     }
 
     [Fact]
-    public async Task EventsEndpoint_AllowsAuthenticatedSseRequests_UsingQueryToken()
+    public async Task EventsEndpoint_DoesNotDropLiveEventsPublishedWhileReplayCompletes()
+    {
+        var projectId = Guid.NewGuid();
+        var eventStore = new PublishOnReplayCompletedEventStore();
+        var firstSequence = eventStore.Append(projectId, new InspectionProgressEvent
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            ProcessedCount = 1
+        });
+
+        await using var host = await InspectionEventTestHost.CreateAsync(eventStore: eventStore);
+        eventStore.PublishWhenReplayEnumerationCompletes = () => host.EventBus.PublishAsync(new InspectionProgressEvent
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            ProcessedCount = 2
+        });
+
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/realtime/{projectId}/events");
+        request.Headers.Add("Last-Event-ID", firstSequence.ToString());
+
+        using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+
+        var liveChunk = await ReadUntilContainsAsync(stream, "event: progressChanged", TimeSpan.FromSeconds(2));
+        liveChunk.Should().Contain("\"processedCount\":2");
+    }
+
+    [Fact]
+    public async Task EventsEndpoint_AllowsAuthenticatedSseRequests_UsingAuthorizationHeader()
     {
         await using var host = await InspectionEventTestHost.CreateAsync(requireAuth: true);
         var projectId = Guid.NewGuid();
@@ -94,16 +125,29 @@ public class InspectionEventEndpointsTests
         await host.Coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
         host.Coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
 
-        using var response = await host.Client.SendAsync(
-            new HttpRequestMessage(
-                HttpMethod.Get,
-                $"/api/inspection/realtime/{projectId}/events?token=test-token"),
-            HttpCompletionOption.ResponseHeadersRead);
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/realtime/{projectId}/events");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "test-token");
+
+        using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync();
         var chunk = await ReadUntilContainsAsync(stream, "event: stateChanged", TimeSpan.FromSeconds(2));
         chunk.Should().Contain("\"newState\":\"Running\"");
+    }
+
+    [Fact]
+    public async Task EventsEndpoint_RejectsQueryToken_WhenAuthIsRequired()
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync(requireAuth: true);
+        var projectId = Guid.NewGuid();
+
+        using var response = await host.Client.SendAsync(
+            new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/api/inspection/realtime/{projectId}/events?token=test-token"));
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Unauthorized);
     }
 
     private static async Task<string> ReadUntilContainsAsync(Stream stream, string marker, TimeSpan timeout)
@@ -144,7 +188,9 @@ public class InspectionEventEndpointsTests
         public IEventStore EventStore { get; }
         public IInspectionRuntimeCoordinator Coordinator { get; }
 
-        public static async Task<InspectionEventTestHost> CreateAsync(bool requireAuth = false)
+        public static async Task<InspectionEventTestHost> CreateAsync(
+            bool requireAuth = false,
+            IEventStore? eventStore = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -153,7 +199,7 @@ public class InspectionEventEndpointsTests
 
             builder.WebHost.UseTestServer();
 
-            var eventStore = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
+            eventStore ??= new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
             var eventBus = new InMemoryInspectionEventBus(
                 NullLogger<InMemoryInspectionEventBus>.Instance,
                 eventStore);
@@ -193,6 +239,74 @@ public class InspectionEventEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+        }
+    }
+
+    private sealed class PublishOnReplayCompletedEventStore : IEventStore
+    {
+        private readonly List<StoredInspectionEvent> _events = new();
+        private long _nextSequenceId;
+        private bool _published;
+
+        public Func<Task>? PublishWhenReplayEnumerationCompletes { get; set; }
+
+        public long Append(Guid projectId, IInspectionEvent evt)
+        {
+            var sequenceId = Interlocked.Increment(ref _nextSequenceId);
+            _events.Add(new StoredInspectionEvent(sequenceId, evt, DateTime.UtcNow));
+            return sequenceId;
+        }
+
+        public IReadOnlyList<StoredInspectionEvent> GetEventsAfter(Guid projectId, long sequenceId)
+        {
+            var replayEvents = _events
+                .Where(item => item.Event.ProjectId == projectId && item.SequenceId > sequenceId)
+                .OrderBy(item => item.SequenceId)
+                .ToList();
+
+            return new ReplayList(replayEvents, () =>
+            {
+                if (_published || PublishWhenReplayEnumerationCompletes == null)
+                {
+                    return;
+                }
+
+                _published = true;
+                PublishWhenReplayEnumerationCompletes().GetAwaiter().GetResult();
+            });
+        }
+
+        public void Cleanup(Guid projectId)
+        {
+            _events.RemoveAll(item => item.Event.ProjectId == projectId);
+        }
+
+        private sealed class ReplayList : IReadOnlyList<StoredInspectionEvent>
+        {
+            private readonly IReadOnlyList<StoredInspectionEvent> _inner;
+            private readonly Action _onEnumerationCompleted;
+
+            public ReplayList(IReadOnlyList<StoredInspectionEvent> inner, Action onEnumerationCompleted)
+            {
+                _inner = inner;
+                _onEnumerationCompleted = onEnumerationCompleted;
+            }
+
+            public int Count => _inner.Count;
+
+            public StoredInspectionEvent this[int index] => _inner[index];
+
+            public IEnumerator<StoredInspectionEvent> GetEnumerator()
+            {
+                foreach (var item in _inner)
+                {
+                    yield return item;
+                }
+
+                _onEnumerationCompleted();
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
         }
     }
 }

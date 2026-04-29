@@ -107,6 +107,33 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_ShouldIssueHighEntropyBase64UrlToken()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2);
+        var user = CreateUser("token-user", "hash");
+
+        repository.GetByUsernameAsync("token-user", Arg.Any<CancellationToken>()).Returns(user);
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var tokens = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var i = 0; i < 20; i++)
+        {
+            var result = await service.LoginAsync("token-user", "correct-password");
+
+            result.Success.Should().BeTrue();
+            result.Token.Should().NotBeNullOrWhiteSpace();
+            var token = result.Token!;
+            token.Should().MatchRegex("^[A-Za-z0-9_-]{43}$");
+            token.Should().NotMatchRegex("^[0-9a-f]{32}$");
+            tokens.Add(token).Should().BeTrue();
+        }
+    }
+
+    [Fact]
     public async Task LogoutAsync_ShouldInvalidateExistingSession()
     {
         var repository = Substitute.For<IUserRepository>();
