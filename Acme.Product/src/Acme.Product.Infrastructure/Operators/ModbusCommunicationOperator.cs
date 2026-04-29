@@ -1,66 +1,59 @@
-// ModbusCommunicationOperator.cs
-// 异步执行TCP Modbus通信（带连接池）
-// 作者：蘅芜君
-
 using System.Collections.Concurrent;
+using System.IO;
+using System.Net.Sockets;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using NModbus;
-using System.Net.Sockets;
 
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
-/// <summary>
-/// Modbus通信算子 - 支持TCP和RTU协议（带连接池）
-/// </summary>
 [OperatorMeta(
-    DisplayName = "Modbus通信",
-    Description = "工业设备Modbus RTU/TCP通信",
-    Category = "通信",
+    DisplayName = "Modbus Communication",
+    Description = "Industrial Modbus TCP communication. RTU is declared but not packaged in this operator.",
+    Category = "Communication",
     IconName = "modbus",
-    Keywords = new[] { "Modbus", "PLC", "通信", "寄存器", "RTU", "TCP", "工业", "Communication" }
+    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial" }
 )]
-[InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]
-[OutputPort("Response", "响应", PortDataType.String)]
-[OutputPort("Status", "状态", PortDataType.Boolean)]
-[OperatorParam("Protocol", "协议", "enum", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
-[OperatorParam("IpAddress", "IP地址", "string", DefaultValue = "192.168.1.1")]
-[OperatorParam("Port", "端口", "int", DefaultValue = 502, Min = 1, Max = 65535)]
-[OperatorParam("SlaveId", "从机ID", "int", DefaultValue = 1, Min = 1, Max = 247)]
-[OperatorParam("RegisterAddress", "寄存器地址", "int", DefaultValue = 0)]
-[OperatorParam("RegisterCount", "寄存器数量", "int", DefaultValue = 1, Min = 1, Max = 125)]
-[OperatorParam("FunctionCode", "功能码", "enum", DefaultValue = "ReadHolding", Options = new[] { "ReadCoils|读线圈", "ReadHolding|读保持寄存器", "WriteSingle|写单寄存器", "WriteMultiple|写多寄存器" })]
-[OperatorParam("WriteValue", "写入值", "string", DefaultValue = "")]
+[InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
+[OutputPort("Response", "Response", PortDataType.String)]
+[OutputPort("Status", "Status", PortDataType.Boolean)]
+[OperatorParam("Protocol", "Protocol", "enum", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
+[OperatorParam("IpAddress", "IP Address", "string", DefaultValue = "192.168.1.1")]
+[OperatorParam("Port", "Port", "int", DefaultValue = 502, Min = 1, Max = 65535)]
+[OperatorParam("SlaveId", "Slave ID", "int", DefaultValue = 1, Min = 1, Max = 247)]
+[OperatorParam("RegisterAddress", "Register Address", "int", DefaultValue = 0)]
+[OperatorParam("RegisterCount", "Register Count", "int", DefaultValue = 1, Min = 1, Max = 125)]
+[OperatorParam("FunctionCode", "Function Code", "enum", DefaultValue = "ReadHolding", Options = new[] { "ReadCoils|Read Coils", "ReadHolding|Read Holding Registers", "WriteSingle|Write Single Register", "WriteMultiple|Write Multiple Registers" })]
+[OperatorParam("WriteValue", "Write Value", "string", DefaultValue = "")]
+[OperatorParam("TimeoutMs", "Timeout (ms)", "int", DefaultValue = 5000, Min = 100, Max = 60000)]
 public class ModbusCommunicationOperator : OperatorBase
 {
+    private const int DefaultOperationTimeoutMs = 5000;
+    private const int MaxPooledConnections = 32;
+    private static readonly TimeSpan MaxIdleConnectionAge = TimeSpan.FromMinutes(10);
+
+    private static readonly ConcurrentDictionary<string, TcpClient> ConnectionPool = new();
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> ConnectionLocks = new();
+    private static readonly ConcurrentDictionary<string, RefCountedSemaphore> OperationLocks = new();
+    private static readonly ConcurrentDictionary<string, IModbusMaster> MasterPool = new();
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> ConnectionLastUsed = new();
+    private static readonly ConcurrentDictionary<string, int> ActiveOperations = new();
+    private static readonly IModbusFactory ModbusFactory = new ModbusFactory();
+
+    public ModbusCommunicationOperator(ILogger<ModbusCommunicationOperator> logger) : base(logger)
+    {
+    }
+
     public override OperatorType OperatorType => OperatorType.ModbusCommunication;
-
-    public ModbusCommunicationOperator(ILogger<ModbusCommunicationOperator> logger) : base(logger) { }
-
-    // 连接池 - 静态缓存（Singleton 算子可安全使用）
-    private static readonly ConcurrentDictionary<string, TcpClient> _connectionPool = new();
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _connectionLocks = new();
-    private static readonly ConcurrentDictionary<string, IModbusMaster> _masterPool = new();
-    
-    // Modbus 工厂
-    private static readonly IModbusFactory _modbusFactory = new ModbusFactory();
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取输入数据（可选）
-        object? inputData = null;
-        if (inputs != null && inputs.TryGetValue("Data", out var data))
-        {
-            inputData = data;
-        }
-
-        // 获取参数
         var protocol = GetStringParam(@operator, "Protocol", "TCP");
         var ipAddress = GetStringParam(@operator, "IpAddress", "192.168.1.1");
         var port = GetIntParam(@operator, "Port", 502, 1, 65535);
@@ -68,22 +61,24 @@ public class ModbusCommunicationOperator : OperatorBase
         var registerAddress = GetIntParam(@operator, "RegisterAddress", 0);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1, 1, 125);
         var functionCode = GetStringParam(@operator, "FunctionCode", "ReadHolding");
-        var writeValue = GetStringParam(@operator, "WriteValue", "");
+        var writeValue = GetStringParam(@operator, "WriteValue", string.Empty);
+        var timeoutMs = GetIntParam(@operator, "TimeoutMs", DefaultOperationTimeoutMs, 100, 60000);
 
-        string response = "";
-        bool status = false;
+        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorExecutionOutput.Failure("Modbus RTU requires serial-port lifecycle configuration and is not supported by this package operator.");
+        }
 
-        if (protocol == "TCP")
-        {
-            (response, status) = await ExecuteTcpModbusAsync(
-                ipAddress, port, slaveId, functionCode, registerAddress, registerCount, writeValue, cancellationToken);
-        }
-        else
-        {
-            // RTU协议需要串口，这里返回提示
-            response = "RTU协议需要串口配置，当前版本暂不支持";
-            status = false;
-        }
+        var (response, status) = await ExecuteTcpModbusAsync(
+            ipAddress,
+            port,
+            slaveId,
+            functionCode,
+            registerAddress,
+            registerCount,
+            writeValue,
+            timeoutMs,
+            cancellationToken);
 
         if (!status)
         {
@@ -92,158 +87,12 @@ public class ModbusCommunicationOperator : OperatorBase
 
         return OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
-            { "Response", response },
-            { "Status", status },
-            { "Protocol", protocol },
-            { "FunctionCode", functionCode },
-            { "SlaveId", slaveId }
+            ["Response"] = response,
+            ["Status"] = status,
+            ["Protocol"] = protocol,
+            ["FunctionCode"] = functionCode,
+            ["SlaveId"] = slaveId
         });
-    }
-
-    /// <summary>
-    /// 从连接池获取或创建连接
-    /// </summary>
-    private async Task<IModbusMaster> GetOrCreateConnectionAsync(
-        string ipAddress, int port, int timeoutMs, CancellationToken ct)
-    {
-        var key = $"{ipAddress}:{port}";
-        var lockObj = _connectionLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-        
-        await lockObj.WaitAsync(ct);
-        try
-        {
-            // 检查现有连接是否有效
-            if (_masterPool.TryGetValue(key, out var existingMaster) && 
-                _connectionPool.TryGetValue(key, out var existingClient))
-            {
-                if (IsConnectionAlive(existingClient))
-                {
-                    Logger.LogDebug("Modbus 连接复用: {Key}", key);
-                    return existingMaster;
-                }
-                
-                // 清理旧连接
-                try { existingClient.Close(); }
-                catch (Exception ex)
-                {
-                    Logger.LogDebug(ex, "Modbus 旧 TcpClient 关闭失败: {Key}", key);
-                }
-                _connectionPool.TryRemove(key, out _);
-                try { existingMaster.Dispose(); }
-                catch (Exception ex)
-                {
-                    Logger.LogDebug(ex, "Modbus 旧 master 释放失败: {Key}", key);
-                }
-                _masterPool.TryRemove(key, out _);
-            }
-            
-            // 建立新连接
-            var client = new TcpClient();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(timeoutMs);
-            
-            await client.ConnectAsync(ipAddress, port, cts.Token);
-            
-            // 使用 NModbus 工厂创建 master
-            var master = _modbusFactory.CreateMaster(client);
-            
-            _connectionPool[key] = client;
-            _masterPool[key] = master;
-            
-            Logger.LogInformation("Modbus 连接已建立: {Key}", key);
-            return master;
-        }
-        finally
-        {
-            lockObj.Release();
-        }
-    }
-
-    /// <summary>
-    /// 检测连接是否存活
-    /// </summary>
-    private bool IsConnectionAlive(TcpClient client)
-    {
-        try
-        {
-            if (!client.Connected) return false;
-            // 通过 Poll 检测连接状态
-            return !(client.Client.Poll(1, SelectMode.SelectRead) && client.Client.Available == 0);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 异步执行TCP Modbus通信（带连接池）
-    /// </summary>
-    private async Task<(string response, bool status)> ExecuteTcpModbusAsync(
-        string ipAddress, int port, int slaveId, string functionCode, int registerAddress, int registerCount, string writeValue, CancellationToken cancellationToken)
-    {
-        try
-        {
-            // 从连接池获取连接
-            var master = await GetOrCreateConnectionAsync(ipAddress, port, 5000, cancellationToken);
-
-            string response = "";
-            bool status = false;
-
-            switch (functionCode)
-            {
-                case "ReadCoils":
-                    var coils = master.ReadCoils((byte)slaveId, (ushort)registerAddress, (ushort)registerCount);
-                    response = string.Join(", ", coils);
-                    status = true;
-                    break;
-
-                case "ReadHolding":
-                    var registers = master.ReadHoldingRegisters((byte)slaveId, (ushort)registerAddress, (ushort)registerCount);
-                    response = string.Join(", ", registers);
-                    status = true;
-                    break;
-
-                case "WriteSingle":
-                    if (ushort.TryParse(writeValue, out var singleValue))
-                    {
-                        master.WriteSingleRegister((byte)slaveId, (ushort)registerAddress, singleValue);
-                        response = $"写入成功: {singleValue}";
-                        status = true;
-                    }
-                    else
-                    {
-                        response = "写入值格式无效";
-                    }
-                    break;
-
-                case "WriteMultiple":
-                    var values = writeValue.Split(',').Select(v => ushort.TryParse(v.Trim(), out var val) ? val : (ushort)0).ToArray();
-                    master.WriteMultipleRegisters((byte)slaveId, (ushort)registerAddress, values);
-                    response = $"写入成功: {values.Length}个寄存器";
-                    status = true;
-                    break;
-
-                default:
-                    response = $"未知功能码: {functionCode}";
-                    break;
-            }
-
-            return (response, status);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return ("通信被取消", false);
-        }
-        catch (OperationCanceledException)
-        {
-            return ("连接超时", false);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Modbus 通信错误: {IpAddress}:{Port}", ipAddress, port);
-            return ($"通信错误: {ex.Message}", false);
-        }
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -252,24 +101,451 @@ public class ModbusCommunicationOperator : OperatorBase
         var slaveId = GetIntParam(@operator, "SlaveId", 1);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1);
         var protocol = GetStringParam(@operator, "Protocol", "TCP");
+        var timeoutMs = GetIntParam(@operator, "TimeoutMs", DefaultOperationTimeoutMs);
 
         if (port < 1 || port > 65535)
         {
-            return ValidationResult.Invalid("端口号必须在 1-65535 之间");
+            return ValidationResult.Invalid("Port must be between 1 and 65535.");
         }
+
         if (slaveId < 1 || slaveId > 247)
         {
-            return ValidationResult.Invalid("从机ID必须在 1-247 之间");
+            return ValidationResult.Invalid("SlaveId must be between 1 and 247.");
         }
+
         if (registerCount < 1 || registerCount > 125)
         {
-            return ValidationResult.Invalid("寄存器数量必须在 1-125 之间");
+            return ValidationResult.Invalid("RegisterCount must be between 1 and 125.");
         }
-        if (protocol != "TCP" && protocol != "RTU")
+
+        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase) &&
+            !protocol.Equals("RTU", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("协议必须是 TCP 或 RTU");
+            return ValidationResult.Invalid("Protocol must be TCP or RTU.");
+        }
+
+        if (timeoutMs < 100 || timeoutMs > 60000)
+        {
+            return ValidationResult.Invalid("TimeoutMs must be between 100 and 60000.");
         }
 
         return ValidationResult.Valid();
+    }
+
+    private async Task<IModbusMaster> GetOrCreateConnectionAsync(
+        string ipAddress,
+        int port,
+        int timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        var key = BuildConnectionKey(ipAddress, port);
+        var connectionLock = AcquireRefCountedSemaphore(ConnectionLocks, key);
+        var lockAcquired = false;
+
+        try
+        {
+            await connectionLock.Semaphore.WaitAsync(cancellationToken);
+            lockAcquired = true;
+
+            CleanupIdleConnections(DateTimeOffset.UtcNow);
+
+            if (MasterPool.TryGetValue(key, out var existingMaster) &&
+                ConnectionPool.TryGetValue(key, out var existingClient))
+            {
+                if (IsConnectionAlive(existingClient))
+                {
+                    ApplyClientTimeouts(existingClient, timeoutMs);
+                    TouchConnection(key);
+                    Logger.LogDebug("Reusing Modbus connection: {Key}", key);
+                    return existingMaster;
+                }
+
+                PurgeConnection(key, force: true);
+            }
+
+            var client = new TcpClient
+            {
+                NoDelay = true,
+                ReceiveTimeout = timeoutMs,
+                SendTimeout = timeoutMs
+            };
+
+            using var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            connectTimeout.CancelAfter(timeoutMs);
+
+            try
+            {
+                await client.ConnectAsync(ipAddress, port, connectTimeout.Token);
+
+                var master = ModbusFactory.CreateMaster(client);
+                ConnectionPool[key] = client;
+                MasterPool[key] = master;
+                TouchConnection(key);
+                TrimConnectionPoolIfNeeded(key);
+
+                Logger.LogInformation("Modbus connection established: {Key}", key);
+                return master;
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
+        }
+        finally
+        {
+            if (lockAcquired)
+            {
+                connectionLock.Semaphore.Release();
+            }
+
+            ReleaseRefCountedSemaphore(ConnectionLocks, key, connectionLock);
+        }
+    }
+
+    private static bool IsConnectionAlive(TcpClient client)
+    {
+        try
+        {
+            return client.Connected &&
+                   !(client.Client.Poll(1, SelectMode.SelectRead) && client.Client.Available == 0);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void ApplyClientTimeouts(TcpClient client, int timeoutMs)
+    {
+        client.ReceiveTimeout = timeoutMs;
+        client.SendTimeout = timeoutMs;
+    }
+
+    private async Task<(string response, bool status)> ExecuteTcpModbusAsync(
+        string ipAddress,
+        int port,
+        int slaveId,
+        string functionCode,
+        int registerAddress,
+        int registerCount,
+        string writeValue,
+        int timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        var key = BuildConnectionKey(ipAddress, port);
+        var operationLock = AcquireRefCountedSemaphore(OperationLocks, key);
+        using var operationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        operationTimeout.CancelAfter(timeoutMs);
+        var lockAcquired = false;
+        var operationTracked = false;
+
+        try
+        {
+            await operationLock.Semaphore.WaitAsync(operationTimeout.Token);
+            lockAcquired = true;
+            IncrementActiveOperations(key);
+            operationTracked = true;
+
+            var master = await GetOrCreateConnectionAsync(ipAddress, port, timeoutMs, operationTimeout.Token);
+            return ExecuteModbusFunction(master, slaveId, functionCode, registerAddress, registerCount, writeValue);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return ("Communication was cancelled.", false);
+        }
+        catch (OperationCanceledException)
+        {
+            if (lockAcquired)
+            {
+                PurgeConnection(key, force: true);
+            }
+
+            return ("Communication timed out.", false);
+        }
+        catch (IOException ex)
+        {
+            PurgeConnection(key, force: true);
+            Logger.LogError(ex, "Modbus IO communication failed: {Key}", key);
+            return ($"Communication failed: {ex.Message}", false);
+        }
+        catch (SocketException ex)
+        {
+            PurgeConnection(key, force: true);
+            Logger.LogError(ex, "Modbus socket communication failed: {Key}", key);
+            return ($"Communication failed: {ex.Message}", false);
+        }
+        catch (TimeoutException ex)
+        {
+            PurgeConnection(key, force: true);
+            Logger.LogError(ex, "Modbus communication timed out: {Key}", key);
+            return ($"Communication timed out: {ex.Message}", false);
+        }
+        catch (Exception ex)
+        {
+            PurgeConnection(key, force: true);
+            Logger.LogError(ex, "Modbus communication failed: {Key}", key);
+            return ($"Communication failed: {ex.Message}", false);
+        }
+        finally
+        {
+            if (operationTracked)
+            {
+                if (ConnectionPool.ContainsKey(key))
+                {
+                    TouchConnection(key);
+                }
+                else
+                {
+                    ConnectionLastUsed.TryRemove(key, out _);
+                }
+
+                DecrementActiveOperations(key);
+            }
+
+            if (lockAcquired)
+            {
+                operationLock.Semaphore.Release();
+            }
+
+            ReleaseRefCountedSemaphore(OperationLocks, key, operationLock);
+        }
+    }
+
+    private static (string response, bool status) ExecuteModbusFunction(
+        IModbusMaster master,
+        int slaveId,
+        string functionCode,
+        int registerAddress,
+        int registerCount,
+        string writeValue)
+    {
+        switch (functionCode)
+        {
+            case "ReadCoils":
+                var coils = master.ReadCoils((byte)slaveId, (ushort)registerAddress, (ushort)registerCount);
+                return (string.Join(", ", coils), true);
+
+            case "ReadHolding":
+                var registers = master.ReadHoldingRegisters((byte)slaveId, (ushort)registerAddress, (ushort)registerCount);
+                return (string.Join(", ", registers), true);
+
+            case "WriteSingle":
+                if (!ushort.TryParse(writeValue, out var singleValue))
+                {
+                    return ("WriteValue must be a valid unsigned 16-bit integer.", false);
+                }
+
+                master.WriteSingleRegister((byte)slaveId, (ushort)registerAddress, singleValue);
+                return ($"Write succeeded: {singleValue}", true);
+
+            case "WriteMultiple":
+                if (!TryParseRegisterValues(writeValue, out var values))
+                {
+                    return ("WriteValue must be a comma-separated list of unsigned 16-bit integers.", false);
+                }
+
+                master.WriteMultipleRegisters((byte)slaveId, (ushort)registerAddress, values);
+                return ($"Write succeeded: {values.Length} registers", true);
+
+            default:
+                return ($"Unknown function code: {functionCode}", false);
+        }
+    }
+
+    private static bool TryParseRegisterValues(string writeValue, out ushort[] values)
+    {
+        var parsed = new List<ushort>();
+        foreach (var part in writeValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!ushort.TryParse(part, out var value))
+            {
+                values = [];
+                return false;
+            }
+
+            parsed.Add(value);
+        }
+
+        values = parsed.ToArray();
+        return values.Length > 0;
+    }
+
+    private void PurgeConnection(string key, bool force)
+    {
+        if (!force && ActiveOperations.TryGetValue(key, out var activeCount) && activeCount > 0)
+        {
+            return;
+        }
+
+        if (MasterPool.TryRemove(key, out var master))
+        {
+            try { master.Dispose(); }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Modbus master release failed: {Key}", key);
+            }
+        }
+
+        if (ConnectionPool.TryRemove(key, out var client))
+        {
+            try
+            {
+                client.Close();
+                client.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Modbus TcpClient release failed: {Key}", key);
+            }
+        }
+
+        ConnectionLastUsed.TryRemove(key, out _);
+    }
+
+    private static string BuildConnectionKey(string ipAddress, int port)
+    {
+        return $"{ipAddress}:{port}";
+    }
+
+    private static void TouchConnection(string key)
+    {
+        ConnectionLastUsed[key] = DateTimeOffset.UtcNow;
+    }
+
+    private void CleanupIdleConnections(DateTimeOffset now)
+    {
+        foreach (var entry in ConnectionLastUsed)
+        {
+            if (now - entry.Value > MaxIdleConnectionAge)
+            {
+                PurgeConnection(entry.Key, force: false);
+            }
+        }
+    }
+
+    private void TrimConnectionPoolIfNeeded(string protectedKey)
+    {
+        if (ConnectionPool.Count <= MaxPooledConnections)
+        {
+            return;
+        }
+
+        foreach (var candidate in ConnectionLastUsed.OrderBy(entry => entry.Value))
+        {
+            if (ConnectionPool.Count <= MaxPooledConnections)
+            {
+                break;
+            }
+
+            if (candidate.Key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            PurgeConnection(candidate.Key, force: false);
+        }
+    }
+
+    private static void IncrementActiveOperations(string key)
+    {
+        ActiveOperations.AddOrUpdate(key, 1, static (_, count) => count + 1);
+    }
+
+    private static void DecrementActiveOperations(string key)
+    {
+        ActiveOperations.AddOrUpdate(
+            key,
+            0,
+            static (_, count) => Math.Max(0, count - 1));
+
+        if (ActiveOperations.TryGetValue(key, out var count) && count == 0)
+        {
+            ActiveOperations.TryRemove(new KeyValuePair<string, int>(key, 0));
+        }
+    }
+
+    private sealed class RefCountedSemaphore : IDisposable
+    {
+        private readonly object _sync = new();
+        private int _refCount;
+        private bool _removed;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public bool TryAddRef()
+        {
+            lock (_sync)
+            {
+                if (_removed)
+                {
+                    return false;
+                }
+
+                _refCount++;
+                return true;
+            }
+        }
+
+        public bool ReleaseRefAndMarkRemovedIfUnused()
+        {
+            lock (_sync)
+            {
+                _refCount--;
+                if (_refCount != 0)
+                {
+                    return false;
+                }
+
+                _removed = true;
+                return true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Semaphore.Dispose();
+        }
+    }
+
+    private static RefCountedSemaphore AcquireRefCountedSemaphore(
+        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
+        string key)
+    {
+        while (true)
+        {
+            var entry = dictionary.GetOrAdd(key, static _ => new RefCountedSemaphore());
+            if (!entry.TryAddRef())
+            {
+                dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+                continue;
+            }
+
+            if (dictionary.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
+            {
+                return entry;
+            }
+
+            if (entry.ReleaseRefAndMarkRemovedIfUnused())
+            {
+                entry.Dispose();
+            }
+        }
+    }
+
+    private static void ReleaseRefCountedSemaphore(
+        ConcurrentDictionary<string, RefCountedSemaphore> dictionary,
+        string key,
+        RefCountedSemaphore entry)
+    {
+        if (!entry.ReleaseRefAndMarkRemovedIfUnused())
+        {
+            return;
+        }
+
+        if (dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry)))
+        {
+            entry.Dispose();
+        }
     }
 }

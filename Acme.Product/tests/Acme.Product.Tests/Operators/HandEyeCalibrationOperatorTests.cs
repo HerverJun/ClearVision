@@ -7,6 +7,7 @@ using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenCvSharp;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -54,6 +55,37 @@ public sealed class HandEyeCalibrationOperatorTests
         RotationErrorDegrees(estimated, expectedCameraToBase).Should().BeLessThan(0.5);
         result.OutputData["MatrixConvention"].Should().Be("CameraToBaseMatrix");
         result.OutputData["CalibrationQuality"].Should().Be("good");
+    }
+
+    [Fact]
+    public void Solver_WithSyntheticTruthSamples_ShouldKeepDocumentedMatrixConventions()
+    {
+        var (eyeInHandRobotPoses, eyeInHandBoardPoses, expectedCameraToTool) = CreateSyntheticEyeInHandDataset();
+        var eyeInHand = HandEyeCalibrationSolver.Solve(
+            eyeInHandRobotPoses,
+            eyeInHandBoardPoses,
+            RobotHandEyeCalibrationType.EyeInHand,
+            HandEyeCalibrationMethod.TSAI);
+
+        eyeInHand.Success.Should().BeTrue(eyeInHand.ErrorMessage);
+        eyeInHand.MatrixConvention.Should().Be(HandEyeCalibrationSolver.EyeInHandMatrixConvention);
+        HandEyeCalibrationSolver.MatrixStorageConvention.Should().Contain("p_target = p_source * matrix");
+        TranslationError(eyeInHand.HandEyeMatrix, expectedCameraToTool).Should().BeLessThan(0.005);
+        RotationErrorDegrees(eyeInHand.HandEyeMatrix, expectedCameraToTool).Should().BeLessThan(0.5);
+        TranslationError(eyeInHand.InverseHandEyeMatrix, Invert(expectedCameraToTool)).Should().BeLessThan(0.005);
+
+        var (eyeToHandRobotPoses, eyeToHandBoardPoses, expectedCameraToBase) = CreateSyntheticEyeToHandDataset();
+        var eyeToHand = HandEyeCalibrationSolver.Solve(
+            eyeToHandRobotPoses,
+            eyeToHandBoardPoses,
+            RobotHandEyeCalibrationType.EyeToHand,
+            HandEyeCalibrationMethod.TSAI);
+
+        eyeToHand.Success.Should().BeTrue(eyeToHand.ErrorMessage);
+        eyeToHand.MatrixConvention.Should().Be(HandEyeCalibrationSolver.EyeToHandMatrixConvention);
+        TranslationError(eyeToHand.HandEyeMatrix, expectedCameraToBase).Should().BeLessThan(0.005);
+        RotationErrorDegrees(eyeToHand.HandEyeMatrix, expectedCameraToBase).Should().BeLessThan(0.5);
+        TranslationError(eyeToHand.InverseHandEyeMatrix, Invert(expectedCameraToBase)).Should().BeLessThan(0.005);
     }
 
     [Fact]

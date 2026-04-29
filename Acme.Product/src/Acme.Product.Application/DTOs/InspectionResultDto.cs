@@ -123,6 +123,8 @@ public class AnalysisFieldDto
 
     public string? DisplayHint { get; set; }
 
+    public string? DataType { get; set; }
+
     public string? Status { get; set; }
 }
 

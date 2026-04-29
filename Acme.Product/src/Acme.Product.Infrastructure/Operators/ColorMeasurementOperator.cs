@@ -4,6 +4,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Infrastructure.ImageProcessing;
+using Acme.Product.Infrastructure.Memory;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -40,6 +41,8 @@ public class ColorMeasurementOperator : OperatorBase
 {
     private const double MinHueSaturation = 12.0;
     private const double MinHueValue = 12.0;
+    private const int MaxDeltaEStatisticsSamples = 4096;
+    private static readonly MatPool PassthroughImagePool = new(maxPerBucket: 0, maxTotalGb: 0.0);
 
     public override OperatorType OperatorType => OperatorType.ColorMeasurement;
 
@@ -69,44 +72,23 @@ public class ColorMeasurementOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("MeasurementMode must be LabDeltaE or HsvStats"));
         }
 
-        using var colorSource = EnsureColorImage(src);
-        var roi = MeasurementRoiHelper.ResolveRoi(@operator, colorSource.Width, colorSource.Height);
+        var roi = MeasurementRoiHelper.ResolveRoi(@operator, src.Width, src.Height);
         if (roi.Width <= 0 || roi.Height <= 0)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("ROI is invalid"));
         }
 
-        using var roiMat = new Mat(colorSource, roi);
-        var resultImage = colorSource.Clone();
-        Cv2.Rectangle(resultImage, roi, new Scalar(0, 255, 255), 2);
+        using var roiSource = new Mat(src, roi);
+        using var roiMat = EnsureColorImage(roiSource);
 
         Dictionary<string, object> output;
         if (measurementMode == "LabDeltaE")
         {
             output = MeasureLabDeltaE(@operator, inputs, roiMat);
-            Cv2.PutText(
-                resultImage,
-                $"DeltaE:{Convert.ToDouble(output["DeltaE"]):F2}",
-                new Point(roi.X, Math.Max(20, roi.Y - 5)),
-                HersheyFonts.HersheySimplex,
-                0.6,
-                new Scalar(0, 255, 255),
-                2);
         }
         else
         {
             output = MeasureHsvStats(roiMat);
-            var hueLabel = Convert.ToBoolean(output["HueValid"])
-                ? $"H:{Convert.ToDouble(output["HueMean"]):F1}deg"
-                : "H:invalid";
-            Cv2.PutText(
-                resultImage,
-                hueLabel,
-                new Point(roi.X, Math.Max(20, roi.Y - 5)),
-                HersheyFonts.HersheySimplex,
-                0.6,
-                new Scalar(0, 255, 255),
-                2);
         }
 
         output["MeasurementMode"] = measurementMode;
@@ -116,7 +98,7 @@ public class ColorMeasurementOperator : OperatorBase
         output["Confidence"] = MeasurementStatisticsHelper.ComputeConfidenceFromUncertainty(measurementUncertainty);
         output["UncertaintyPx"] = measurementUncertainty;
 
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, output)));
+        return Task.FromResult(OperatorExecutionOutput.Success(CreateSharedImageOutput(src, output)));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -177,12 +159,40 @@ public class ColorMeasurementOperator : OperatorBase
     {
         if (src.Channels() == 3)
         {
-            return src.Clone();
+            return CreateSharedImageHeader(src);
         }
 
         var color = new Mat();
-        Cv2.CvtColor(src, color, ColorConversionCodes.GRAY2BGR);
+        var conversion = src.Channels() == 4
+            ? ColorConversionCodes.BGRA2BGR
+            : ColorConversionCodes.GRAY2BGR;
+        Cv2.CvtColor(src, color, conversion);
         return color;
+    }
+
+    private static Mat CreateSharedImageHeader(Mat src)
+    {
+        return new Mat(src, new Rect(0, 0, src.Width, src.Height));
+    }
+
+    private static Dictionary<string, object> CreateSharedImageOutput(Mat src, Dictionary<string, object> additionalData)
+    {
+        var output = new Dictionary<string, object>
+        {
+            { "Image", new ImageWrapper(CreateSharedImageHeader(src), PassthroughImagePool) },
+            { "Width", src.Width },
+            { "Height", src.Height }
+        };
+
+        foreach (var kvp in additionalData)
+        {
+            if (!output.ContainsKey(kvp.Key))
+            {
+                output[kvp.Key] = kvp.Value;
+            }
+        }
+
+        return output;
     }
 
     private Dictionary<string, object> MeasureLabDeltaE(Operator @operator, Dictionary<string, object>? inputs, Mat roiMat)
@@ -206,12 +216,9 @@ public class ColorMeasurementOperator : OperatorBase
         var deltaE = deltaEMethod.Equals("CIE76", StringComparison.OrdinalIgnoreCase)
             ? ColorDifference.DeltaE76(labValue, referenceValue)
             : ColorDifference.DeltaE00(labValue, referenceValue);
-        var deltaESamples = ComputeDeltaESamples(roiMat, referenceValue, deltaEMethod);
-        var deltaEMean = deltaESamples.Count > 0 ? deltaESamples.Average() : deltaE;
-        var deltaEStdDev = deltaESamples.Count > 0
-            ? MeasurementStatisticsHelper.ComputePopulationStdDev(deltaESamples, deltaEMean)
-            : 0.0;
-        var deltaEStdError = MeasurementStatisticsHelper.ComputeStandardError(deltaEStdDev, deltaESamples.Count);
+        var deltaEStats = ComputeDeltaEStatistics(roiMat, referenceValue, deltaEMethod);
+        var deltaEStdDev = deltaEStats.SampleCount > 0 ? deltaEStats.StdDev : 0.0;
+        var deltaEStdError = deltaEStats.SampleCount > 0 ? deltaEStats.StdError : 0.0;
 
         return new Dictionary<string, object>
         {
@@ -222,6 +229,7 @@ public class ColorMeasurementOperator : OperatorBase
             { "DeltaEStdDev", deltaEStdDev },
             { "DeltaEStdError", deltaEStdError },
             { "SampleCount", labStats.SampleCount },
+            { "DeltaESampleCount", deltaEStats.SampleCount },
             { "HueMean", double.NaN },
             { "SaturationMean", double.NaN },
             { "ValueMean", double.NaN },
@@ -235,26 +243,38 @@ public class ColorMeasurementOperator : OperatorBase
         using var hsv = new Mat();
         Cv2.CvtColor(roiMat, hsv, ColorConversionCodes.BGR2HSV);
 
-        var mean = Cv2.Mean(hsv);
-        var saturationMean = mean.Val1 * (100.0 / 255.0);
-        var valueMean = mean.Val2 * (100.0 / 255.0);
+        var indexer = hsv.GetGenericIndexer<Vec3b>();
+        var totalPixels = hsv.Rows * hsv.Cols;
+        var saturationSum = 0.0;
+        var valueSum = 0.0;
+        var sinSum = 0.0;
+        var cosSum = 0.0;
+        var validHueCount = 0;
 
-        var hueAnglesDegrees = new List<double>(hsv.Rows * hsv.Cols);
         for (var y = 0; y < hsv.Rows; y++)
         {
             for (var x = 0; x < hsv.Cols; x++)
             {
-                var pixel = hsv.At<Vec3b>(y, x);
+                var pixel = indexer[y, x];
+                saturationSum += pixel.Item1;
+                valueSum += pixel.Item2;
+
                 if (pixel.Item1 < MinHueSaturation || pixel.Item2 < MinHueValue)
                 {
                     continue;
                 }
 
-                hueAnglesDegrees.Add(pixel.Item0 * 2.0);
+                var radians = pixel.Item0 * (Math.PI / 90.0);
+                sinSum += Math.Sin(radians);
+                cosSum += Math.Cos(radians);
+                validHueCount++;
             }
         }
 
-        if (hueAnglesDegrees.Count == 0)
+        var saturationMean = totalPixels > 0 ? saturationSum / totalPixels * (100.0 / 255.0) : 0.0;
+        var valueMean = totalPixels > 0 ? valueSum / totalPixels * (100.0 / 255.0) : 0.0;
+
+        if (validHueCount == 0)
         {
             return new Dictionary<string, object>
             {
@@ -272,8 +292,19 @@ public class ColorMeasurementOperator : OperatorBase
             };
         }
 
-        var (hueMean, hueStdDev) = MeasurementStatisticsHelper.ComputeCircularStatisticsDegrees(hueAnglesDegrees);
-        var hueStdError = MeasurementStatisticsHelper.ComputeStandardError(hueStdDev, hueAnglesDegrees.Count);
+        var sinMean = sinSum / validHueCount;
+        var cosMean = cosSum / validHueCount;
+        var meanAngle = Math.Atan2(sinMean, cosMean);
+        if (meanAngle < 0.0)
+        {
+            meanAngle += 2.0 * Math.PI;
+        }
+
+        var meanResultantLength = Math.Sqrt((sinMean * sinMean) + (cosMean * cosMean));
+        meanResultantLength = Math.Clamp(meanResultantLength, 1e-12, 1.0);
+        var hueMean = meanAngle * 180.0 / Math.PI;
+        var hueStdDev = Math.Sqrt(Math.Max(0.0, -2.0 * Math.Log(meanResultantLength))) * 180.0 / Math.PI;
+        var hueStdError = MeasurementStatisticsHelper.ComputeStandardError(hueStdDev, validHueCount);
 
         return new Dictionary<string, object>
         {
@@ -286,7 +317,7 @@ public class ColorMeasurementOperator : OperatorBase
             { "SaturationMean", saturationMean },
             { "ValueMean", valueMean },
             { "HueValid", true },
-            { "SampleCount", hueAnglesDegrees.Count },
+            { "SampleCount", validHueCount },
             { "MeasurementUncertainty", hueStdError }
         };
     }
@@ -376,9 +407,13 @@ public class ColorMeasurementOperator : OperatorBase
     private static LabStatistics ComputeLabStatistics(Mat roiMat)
     {
         var indexer = roiMat.GetGenericIndexer<Vec3b>();
-        var lValues = new List<double>(roiMat.Rows * roiMat.Cols);
-        var aValues = new List<double>(roiMat.Rows * roiMat.Cols);
-        var bValues = new List<double>(roiMat.Rows * roiMat.Cols);
+        var count = 0;
+        var sumL = 0.0;
+        var sumA = 0.0;
+        var sumB = 0.0;
+        var sumL2 = 0.0;
+        var sumA2 = 0.0;
+        var sumB2 = 0.0;
 
         for (var y = 0; y < roiMat.Rows; y++)
         {
@@ -386,44 +421,82 @@ public class ColorMeasurementOperator : OperatorBase
             {
                 var pixel = indexer[y, x];
                 var lab = CieLabConverter.BgrToLab(pixel.Item0, pixel.Item1, pixel.Item2);
-                lValues.Add(lab.L);
-                aValues.Add(lab.A);
-                bValues.Add(lab.B);
+                count++;
+                sumL += lab.L;
+                sumA += lab.A;
+                sumB += lab.B;
+                sumL2 += lab.L * lab.L;
+                sumA2 += lab.A * lab.A;
+                sumB2 += lab.B * lab.B;
             }
+        }
+
+        if (count == 0)
+        {
+            return new LabStatistics(new CieLab(0.0, 0.0, 0.0), new CieLab(0.0, 0.0, 0.0), 0);
         }
 
         var mean = new CieLab(
-            lValues.Count > 0 ? lValues.Average() : 0.0,
-            aValues.Count > 0 ? aValues.Average() : 0.0,
-            bValues.Count > 0 ? bValues.Average() : 0.0);
+            sumL / count,
+            sumA / count,
+            sumB / count);
         var stdDev = new CieLab(
-            MeasurementStatisticsHelper.ComputePopulationStdDev(lValues, mean.L),
-            MeasurementStatisticsHelper.ComputePopulationStdDev(aValues, mean.A),
-            MeasurementStatisticsHelper.ComputePopulationStdDev(bValues, mean.B));
+            Math.Sqrt(Math.Max(0.0, (sumL2 / count) - (mean.L * mean.L))),
+            Math.Sqrt(Math.Max(0.0, (sumA2 / count) - (mean.A * mean.A))),
+            Math.Sqrt(Math.Max(0.0, (sumB2 / count) - (mean.B * mean.B))));
 
-        return new LabStatistics(mean, stdDev, lValues.Count);
+        return new LabStatistics(mean, stdDev, count);
     }
 
-    private static List<double> ComputeDeltaESamples(Mat roiMat, CieLab reference, string deltaEMethod)
+    private static DeltaEStatistics ComputeDeltaEStatistics(Mat roiMat, CieLab reference, string deltaEMethod)
     {
-        var deltaESamples = new List<double>(roiMat.Rows * roiMat.Cols);
+        var totalPixels = roiMat.Rows * roiMat.Cols;
+        var stride = Math.Max(1, totalPixels / MaxDeltaEStatisticsSamples);
         var indexer = roiMat.GetGenericIndexer<Vec3b>();
         var useCie76 = deltaEMethod.Equals("CIE76", StringComparison.OrdinalIgnoreCase);
+        var ordinal = 0;
+        var nextSampleOrdinal = 0;
+        var sampleCount = 0;
+        var mean = 0.0;
+        var m2 = 0.0;
 
         for (var y = 0; y < roiMat.Rows; y++)
         {
             for (var x = 0; x < roiMat.Cols; x++)
             {
+                if (ordinal++ != nextSampleOrdinal)
+                {
+                    continue;
+                }
+
+                nextSampleOrdinal += stride;
                 var pixel = indexer[y, x];
                 var lab = CieLabConverter.BgrToLab(pixel.Item0, pixel.Item1, pixel.Item2);
-                deltaESamples.Add(useCie76
+                var deltaE = useCie76
                     ? ColorDifference.DeltaE76(lab, reference)
-                    : ColorDifference.DeltaE00(lab, reference));
+                    : ColorDifference.DeltaE00(lab, reference);
+                sampleCount++;
+                var delta = deltaE - mean;
+                mean += delta / sampleCount;
+                m2 += delta * (deltaE - mean);
             }
         }
 
-        return deltaESamples;
+        if (sampleCount == 0)
+        {
+            return new DeltaEStatistics(0, 0.0, 0.0, 0.0);
+        }
+
+        var variance = Math.Max(0.0, m2 / sampleCount);
+        var stdDev = Math.Sqrt(variance);
+        return new DeltaEStatistics(
+            sampleCount,
+            mean,
+            stdDev,
+            MeasurementStatisticsHelper.ComputeStandardError(stdDev, sampleCount));
     }
 
     private readonly record struct LabStatistics(CieLab Mean, CieLab StdDev, int SampleCount);
+
+    private readonly record struct DeltaEStatistics(int SampleCount, double Mean, double StdDev, double StdError);
 }

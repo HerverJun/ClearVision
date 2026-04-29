@@ -96,7 +96,9 @@ The package no longer uses the fixed `*-local` version strategy.
 - Default local version: `VersionPrefix` (`1.0.2` currently)
 - CI version injection: pass `PackageVersion` (for example `1.0.2-ci.20260419.1`)
 - Reproducibility metadata: `SourceRevisionId`, `RepositoryCommit`, `RepositoryBranch`, `PublishRepositoryUrl`, deterministic/CI build flags
+- NuGet lock-file mode: the project sets `RestorePackagesWithLockFile=true`; generate/review `packages.lock.json` with restore before enforcing locked mode in CI.
 - Symbols: `.snupkg` is still generated for debugging compatibility
+- Release package evidence: root package files include `THIRD-PARTY-NOTICES.md` and `SBOM.md`; release checklist and native runtime matrix live in `docs/operator-library/release-package-industrialization.md`.
 
 `pack.ps1` supports explicit metadata injection:
 
@@ -110,6 +112,16 @@ The package no longer uses the fixed `*-local` version strategy.
 ```
 
 It also reads common CI environment variables (`ACME_OPERATORLIB_PACKAGE_VERSION`, `GITHUB_SHA`, `GITHUB_REF_NAME`, `BUILD_SOURCEVERSION`, `BUILD_SOURCEBRANCHNAME`) when parameters are omitted.
+
+NuGet restore reproducibility workflow:
+
+```powershell
+dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --use-lock-file
+git diff -- Acme.OperatorLibrary/packages.lock.json
+dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
+```
+
+Do not use `--locked-mode` until `packages.lock.json` has been generated, reviewed, and checked in. This local documentation step intentionally does not generate or modify the lock file.
 
 ## Tests, CI, and Benchmark Notes
 

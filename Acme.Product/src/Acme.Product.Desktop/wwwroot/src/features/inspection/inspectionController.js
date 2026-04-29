@@ -26,6 +26,8 @@ class InspectionController {
         this.projectId = null;
         this.cameraId = null;
         this.abortController = null;
+        this.flowProvider = null;
+        this.imageSinks = [];
         
         // 【架构修复 v2】SSE 相关
         this.eventSource = null;
@@ -59,12 +61,44 @@ class InspectionController {
         this.cameraId = cameraId;
     }
 
+    setFlowProvider(provider) {
+        this.flowProvider = typeof provider === 'function' ? provider : null;
+    }
+
+    setImageSinks(sinks) {
+        this.imageSinks = Array.isArray(sinks)
+            ? sinks.filter(sink => typeof sink === 'function')
+            : [];
+    }
+
     getCurrentFlowData() {
-        if (window.flowCanvas && typeof window.flowCanvas.serialize === 'function') {
-            return window.flowCanvas.serialize();
+        if (this.flowProvider) {
+            return this.flowProvider();
         }
 
         return null;
+    }
+
+    publishImageData(imageData) {
+        if (!imageData) {
+            return;
+        }
+
+        this.imageSinks.forEach((sink) => {
+            try {
+                sink(imageData);
+            } catch (error) {
+                console.error('[InspectionController] Image sink failed:', error);
+            }
+        });
+    }
+
+    publishBase64Image(imageBase64) {
+        if (!imageBase64) {
+            return;
+        }
+
+        this.publishImageData(`data:image/png;base64,${imageBase64}`);
     }
 
     /**
@@ -397,13 +431,7 @@ class InspectionController {
 
         // 如果有输出图像，显示它
         if (result.outputImageBase64) {
-            const imageData = `data:image/png;base64,${result.outputImageBase64}`;
-            if (window.inspectionImageViewer) {
-                window.inspectionImageViewer.loadImage(imageData);
-            }
-            if (window.imageViewer) {
-                window.imageViewer.loadImage(imageData);
-            }
+            this.publishBase64Image(result.outputImageBase64);
         }
 
         this.notifyInspectionCompleted(result);
@@ -591,13 +619,7 @@ class InspectionController {
 
             // 显示预览结果
             if (result.outputImageBase64) {
-                const imageData = `data:image/png;base64,${result.outputImageBase64}`;
-                if (window.inspectionImageViewer) {
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-                if (window.imageViewer) {
-                    window.imageViewer.loadImage(imageData);
-                }
+                this.publishBase64Image(result.outputImageBase64);
             }
 
             return result;
@@ -624,13 +646,7 @@ class InspectionController {
             });
 
             if (result?.previewImageBase64) {
-                const imageData = `data:image/png;base64,${result.previewImageBase64}`;
-                if (window.inspectionImageViewer) {
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-                if (window.imageViewer) {
-                    window.imageViewer.loadImage(imageData);
-                }
+                this.publishBase64Image(result.previewImageBase64);
             }
 
             return result;
@@ -657,13 +673,7 @@ class InspectionController {
 
             const finalPreview = result?.finalPreview || null;
             if (finalPreview?.previewImageBase64) {
-                const imageData = `data:image/png;base64,${finalPreview.previewImageBase64}`;
-                if (window.inspectionImageViewer) {
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-                if (window.imageViewer) {
-                    window.imageViewer.loadImage(imageData);
-                }
+                this.publishBase64Image(finalPreview.previewImageBase64);
             }
 
             return result;
@@ -703,15 +713,7 @@ class InspectionController {
             || normalizedResult.resultImageBase64
             || normalizedResult.outputImageBase64;
         if (outputImage) {
-            const imageData = `data:image/png;base64,${outputImage}`;
-
-            if (window.inspectionImageViewer) {
-                window.inspectionImageViewer.loadImage(imageData);
-            }
-
-            if (window.imageViewer) {
-                window.imageViewer.loadImage(imageData);
-            }
+            this.publishBase64Image(outputImage);
         }
 
         this.notifyInspectionCompleted(normalizedResult);

@@ -212,7 +212,7 @@ public sealed class DetectionPerformanceBudgetAcceptanceTests
             {
                 var inputs = new Dictionary<string, object>
                 {
-                    ["Image"] = CreateCaliperImage(512, 512),
+                    ["Image"] = CreateWidthImage(512, 512),
                     ["Line1"] = new LineData(180, 120, 180, 390),
                     ["Line2"] = new LineData(300, 120, 300, 390)
                 };
@@ -348,8 +348,7 @@ public sealed class DetectionPerformanceBudgetAcceptanceTests
         double budgetScale,
         string gateProfile)
     {
-        var repoRoot = ResolveAcmeProductRoot();
-        var reportDir = Path.Combine(repoRoot, "test_results");
+        var reportDir = ResolvePerformanceReportDirectory("CV_DETECTION_PERF_REPORT_DIR");
         Directory.CreateDirectory(reportDir);
 
         var reportPath = Path.Combine(reportDir, $"{ReportFileStem}.md");
@@ -387,6 +386,23 @@ public sealed class DetectionPerformanceBudgetAcceptanceTests
             new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(jsonPath, json);
         return new PerformanceReportArtifacts(reportDir, reportPath, jsonPath, generatedAtUtc);
+    }
+
+    private static string ResolvePerformanceReportDirectory(string reportDirectoryEnvName)
+    {
+        var configured = GetEnvString(reportDirectoryEnvName, string.Empty);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = GetEnvString("CV_PERF_REPORT_DIR", string.Empty);
+        }
+
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return Path.GetFullPath(configured);
+        }
+
+        var repoRoot = ResolveAcmeProductRoot();
+        return Path.Combine(repoRoot, "test_results");
     }
 
     private static string ArchiveFailureReport(
@@ -604,6 +620,13 @@ public sealed class DetectionPerformanceBudgetAcceptanceTests
     {
         var mat = new Mat(height, width, MatType.CV_8UC1, Scalar.Black);
         Cv2.Rectangle(mat, new Rect(width / 2 - 60, height / 4, 120, height / 2), Scalar.White, thickness: -1);
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateWidthImage(int width, int height)
+    {
+        var mat = new Mat(height, width, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(mat, new Rect(190, 110, 100, 290), Scalar.White, thickness: -1);
         return new ImageWrapper(mat);
     }
 

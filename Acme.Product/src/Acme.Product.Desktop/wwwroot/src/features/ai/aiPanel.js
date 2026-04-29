@@ -8,9 +8,10 @@ import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist
  * 负责管理 AI 交互界面、发送生成请求、显示思考链和结果
  */
 export class AiPanel {
-    constructor(containerId, flowCanvas) {
+    constructor(containerId, flowCanvas, options = {}) {
         this.containerId = containerId;
         this.flowCanvas = flowCanvas;
+        this.options = options || {};
         this.container = document.getElementById(containerId);
         this.sessionStorageKey = 'cv_ai_session_id';
         
@@ -1765,7 +1766,7 @@ export class AiPanel {
             return this.operatorMetadataCache.get(normalizedType);
         }
 
-        const libraryOperators = window.operatorLibraryPanel?.getOperators?.() || [];
+        const libraryOperators = this.options.getOperators?.() || [];
         const matched = libraryOperators.find(operator =>
             String(operator?.type || '').trim().toLowerCase() === normalizedType
         ) || null;
@@ -2508,7 +2509,8 @@ export class AiPanel {
             this._syncPendingParameterDrafts(this.currentResult, this.currentResult?.flow, { force: true });
             this._renderFollowupChecklist(this.currentResult, this.currentResult?.flow);
             this._renderParameterDraftEditor(this.currentResult, this.currentResult?.flow);
-            if (window.showToast) window.showToast('方案已应用到画布', 'success');
+        this.options.onApplied?.(flow);
+        this.options.showToast?.('方案已应用到画布', 'success');
         } catch (err) {
             console.error('应用流程失败:', err);
             alert('应用流程失败: ' + err.message);

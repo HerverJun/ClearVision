@@ -17,6 +17,7 @@
 *.suo
 *.userprefs
 *.lock.json
+!**/packages.lock.json
 
 # Architecture-specific output
 x64/

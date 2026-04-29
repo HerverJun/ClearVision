@@ -11,7 +11,17 @@ param(
 
     [switch]$NoBuild,
 
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    [string]$ResultsDirectory,
+
+    [string]$LogFileName,
+
+    [int]$MinimumTotalTests = 0,
+
+    [string]$ReportDirectory,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -100,14 +110,24 @@ if ([string]::IsNullOrWhiteSpace($env:CV_DETECTION_PERF_MEASURE_ITERS)) {
 
 $env:CV_DETECTION_PERF_GATE_PROFILE = $effectiveGateProfile
 
+if (-not [string]::IsNullOrWhiteSpace($ReportDirectory)) {
+    $env:CV_DETECTION_PERF_REPORT_DIR = $ReportDirectory
+}
+
 if ([string]::IsNullOrWhiteSpace($env:CV_DETECTION_PERF_FAILURE_ARCHIVE_DIR)) {
-    $env:CV_DETECTION_PERF_FAILURE_ARCHIVE_DIR = Join-Path $repoRoot "Acme.Product\test_results\archive\detection_performance_failures"
+    $env:CV_DETECTION_PERF_FAILURE_ARCHIVE_DIR = if (-not [string]::IsNullOrWhiteSpace($ReportDirectory)) {
+        Join-Path $ReportDirectory "archive\detection_performance_failures"
+    }
+    else {
+        Join-Path $repoRoot "Acme.Product\test_results\archive\detection_performance_failures"
+    }
 }
 
 Write-Host "[detection-perf] GateProfile=$effectiveGateProfile (reason: $($resolvedProfile.Reason))"
 Write-Host "[detection-perf] CV_DETECTION_PERF_BUDGET_SCALE=$($env:CV_DETECTION_PERF_BUDGET_SCALE)"
 Write-Host "[detection-perf] CV_DETECTION_PERF_WARMUP_ITERS=$($env:CV_DETECTION_PERF_WARMUP_ITERS)"
 Write-Host "[detection-perf] CV_DETECTION_PERF_MEASURE_ITERS=$($env:CV_DETECTION_PERF_MEASURE_ITERS)"
+Write-Host "[detection-perf] CV_DETECTION_PERF_REPORT_DIR=$($env:CV_DETECTION_PERF_REPORT_DIR)"
 Write-Host "[detection-perf] CV_DETECTION_PERF_FAILURE_ARCHIVE_DIR=$($env:CV_DETECTION_PERF_FAILURE_ARCHIVE_DIR)"
 
 $parameters = @{
@@ -116,6 +136,18 @@ $parameters = @{
         "DetectionPerformanceBudgetAcceptanceTests"
     )
     Verbosity = $Verbosity
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
+    $parameters.ResultsDirectory = $ResultsDirectory
+}
+
+if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
+    $parameters.LogFileName = $LogFileName
+}
+
+if ($MinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $MinimumTotalTests
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
@@ -130,4 +162,12 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
+if ($ReturnExitCode) {
+    $parameters.ReturnExitCode = $true
+}
+
 & $runner @parameters
+
+if ($ReturnExitCode) {
+    return
+}

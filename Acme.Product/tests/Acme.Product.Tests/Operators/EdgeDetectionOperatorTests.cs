@@ -88,6 +88,26 @@ public class EdgeDetectionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithLowContrastNoisyRectangle_ShouldKeepSparseUsableEdges()
+    {
+        var op = CreateOperator();
+        op.AddParameter(TestHelpers.CreateParameter("Threshold1", 6.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("Threshold2", 12.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EnableGaussianBlur", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("GaussianKernelSize", 7, "int"));
+
+        using var image = CreateLowContrastNoisyRectangleImage();
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var edgeDensity = Convert.ToDouble(result.OutputData!["EdgePixelRatio"]);
+        edgeDensity.Should().BeGreaterThan(0.003);
+        edgeDensity.Should().BeLessThan(0.08);
+        Convert.ToDouble(result.OutputData["Threshold2Used"])
+            .Should().BeGreaterThan(Convert.ToDouble(result.OutputData["Threshold1Used"]));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithoutImage_ShouldReturnFailure()
     {
         var result = await _operator.ExecuteAsync(CreateOperator(), new Dictionary<string, object>());
@@ -112,6 +132,25 @@ public class EdgeDetectionOperatorTests
     private static ImageWrapper CreateTwoChannelImage()
     {
         var mat = new Mat(32, 32, MatType.CV_8UC2, Scalar.All(128));
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateLowContrastNoisyRectangleImage()
+    {
+        var mat = new Mat(120, 180, MatType.CV_8UC1, Scalar.All(96));
+        Cv2.Rectangle(mat, new Rect(45, 30, 90, 55), Scalar.All(112), -1);
+
+        var rng = new Random(223);
+        for (var y = 0; y < mat.Rows; y++)
+        {
+            for (var x = 0; x < mat.Cols; x++)
+            {
+                var noise = rng.Next(-2, 3);
+                var value = Math.Clamp(mat.At<byte>(y, x) + noise, 0, 255);
+                mat.Set(y, x, (byte)value);
+            }
+        }
+
         return new ImageWrapper(mat);
     }
 }

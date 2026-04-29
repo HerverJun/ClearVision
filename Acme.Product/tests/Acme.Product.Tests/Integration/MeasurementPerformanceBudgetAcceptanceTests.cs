@@ -318,8 +318,7 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         double budgetScale,
         string gateProfile)
     {
-        var repoRoot = ResolveAcmeProductRoot();
-        var reportDir = Path.Combine(repoRoot, "test_results");
+        var reportDir = ResolvePerformanceReportDirectory("CV_MEASUREMENT_PERF_REPORT_DIR");
         Directory.CreateDirectory(reportDir);
 
         var reportPath = Path.Combine(reportDir, $"{ReportFileStem}.md");
@@ -358,6 +357,23 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
                 },
                 new JsonSerializerOptions { WriteIndented = true }));
         return new PerformanceReportArtifacts(reportDir, reportPath, jsonPath, generatedAtUtc);
+    }
+
+    private static string ResolvePerformanceReportDirectory(string reportDirectoryEnvName)
+    {
+        var configured = GetEnvString(reportDirectoryEnvName, string.Empty);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = GetEnvString("CV_PERF_REPORT_DIR", string.Empty);
+        }
+
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return Path.GetFullPath(configured);
+        }
+
+        var repoRoot = ResolveAcmeProductRoot();
+        return Path.Combine(repoRoot, "test_results");
     }
 
     private static string ResolveAcmeProductRoot()

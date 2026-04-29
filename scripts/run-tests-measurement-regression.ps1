@@ -6,7 +6,15 @@ param(
 
     [switch]$NoBuild,
 
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    [string]$ResultsDirectory,
+
+    [string]$LogFileName,
+
+    [int]$MinimumTotalTests = 0,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,6 +54,18 @@ $parameters = @{
     Verbosity = $Verbosity
 }
 
+if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
+    $parameters.ResultsDirectory = $ResultsDirectory
+}
+
+if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
+    $parameters.LogFileName = $LogFileName
+}
+
+if ($MinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $MinimumTotalTests
+}
+
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
     $parameters.Configuration = $Configuration
 }
@@ -58,4 +78,12 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
+if ($ReturnExitCode) {
+    $parameters.ReturnExitCode = $true
+}
+
 & $runner @parameters
+
+if ($ReturnExitCode) {
+    return
+}

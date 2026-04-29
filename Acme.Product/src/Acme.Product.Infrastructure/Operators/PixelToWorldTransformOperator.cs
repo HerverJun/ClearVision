@@ -387,7 +387,7 @@ public class PixelToWorldTransformOperator : OperatorBase
             }
             else
             {
-                if (!runtime.TryApplyInverse(outputPoints[i].X, outputPoints[i].Y, out var worldXmm, out var worldYmm, out _))
+                if (!runtime.TryApplyForward(outputPoints[i].X, outputPoints[i].Y, out var worldXmm, out var worldYmm, out _))
                 {
                     continue;
                 }

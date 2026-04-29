@@ -30,6 +30,10 @@ public sealed class RobotHandEyeCalibrationResult
 
 public static class HandEyeCalibrationSolver
 {
+    public const string EyeInHandMatrixConvention = "CameraToToolMatrix";
+    public const string EyeToHandMatrixConvention = "CameraToBaseMatrix";
+    public const string MatrixStorageConvention = "System.Numerics.Matrix4x4 row-vector transform: p_target = p_source * matrix.";
+
     public static RobotHandEyeCalibrationResult Solve(
         IReadOnlyList<Matrix4x4> baseToToolPoses,
         IReadOnlyList<Matrix4x4> cameraToTargetPoses,
@@ -144,7 +148,7 @@ public static class HandEyeCalibrationSolver
                 Method = method.ToString(),
                 HandEyeMatrix = handEyeMatrix,
                 InverseHandEyeMatrix = Invert(handEyeMatrix),
-                MatrixConvention = "CameraToToolMatrix",
+                MatrixConvention = EyeInHandMatrixConvention,
                 Validation = validation
             };
         }
@@ -204,7 +208,7 @@ public static class HandEyeCalibrationSolver
                 Method = method.ToString(),
                 HandEyeMatrix = handEyeMatrix,
                 InverseHandEyeMatrix = Invert(handEyeMatrix),
-                MatrixConvention = "CameraToBaseMatrix",
+                MatrixConvention = EyeToHandMatrixConvention,
                 Validation = validation
             };
         }
