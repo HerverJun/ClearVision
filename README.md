@@ -10,7 +10,8 @@ ClearVision 是一个面向工业视觉检测的 .NET 8 项目，核心由桌面
 - 算子库：`Acme.OperatorLibrary`，以 NuGet 包形态封装共享算子实现，当前包版本前缀为 `1.0.2`，包元数据使用 MIT license expression。
 - 算子规模：正式口径为 **155 个算子**；运行时兼容元数据包含 4 个 legacy alias，因此运行时可见口径为 159。
 - 文档口径：当前活跃算子文档位于 [`docs/算子资料/`](./docs/算子资料/)，仓库根 [`算子资料/`](./算子资料/) 是兼容镜像。
-- 质量治理：`docs/active/ClearVision_Quality_Flywheel_TODO_v0.2.md` 已记录 C 级清零、核心 golden/contract baseline 扩展、Calibration synthetic baseline 等阶段性进展；`quality/evals/reports/operator_quality_matrix.md` 是质量矩阵入口。
+- 质量治理：当前整改主线见 [`docs/进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md`](./docs/进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md)；`quality/evals/reports/operator_quality_matrix.md` 是质量矩阵入口。
+- 工具链：`.NET SDK 10.0.101` 由 [`global.json`](./global.json) 固定，详情见 [`ClearVision-SDK与依赖版本口径`](./docs/参考资料/指南/ClearVision-SDK与依赖版本口径.md)。
 
 ## 阅读入口
 
@@ -25,8 +26,10 @@ ClearVision 是一个面向工业视觉检测的 .NET 8 项目，核心由桌面
 ## 常用命令
 
 ```powershell
+dotnet --info
 dotnet restore Acme.Product/Acme.Product.sln
 dotnet build Acme.Product/Acme.Product.sln --configuration Debug
+dotnet build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release
 dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
 ```
 
