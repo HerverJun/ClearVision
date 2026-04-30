@@ -133,7 +133,7 @@
       "Operator": "DeepLearning",
       "datasetId": "DeepLearning_field_v1",
       "manifest": "quality/datasets/manifests/DeepLearning_field_v1_manifest.json",
-      "manifestSha256": "992052fb7b7b6e004b3b99d5f97c532505bb44e1872d8161b863ef27f84476c0",
+      "manifestSha256": "47b674458d1d00037e02c807624d1e50012f6211f689fc45376d112a045a5491",
       "splitSummary": {
         "strategy": "hashed-case-id-60-20-20",
         "seed": 20260429,
@@ -715,7 +715,7 @@
       "Operator": "CaliperTool",
       "datasetId": "CaliperTool_field_v1",
       "manifest": "quality/datasets/manifests/CaliperTool_field_v1_manifest.json",
-      "manifestSha256": "61ec2ae6820b3b30b4394ad2c2d33555f5bf34d04c593882ee156618988a70ac",
+      "manifestSha256": "e45fe5e67b80336378b6439039e67147666cae1650c58c62ff38b32e9456051b",
       "splitSummary": {
         "strategy": "hashed-case-id-60-20-20",
         "seed": 20260429,
@@ -1108,7 +1108,7 @@
       "Operator": "SurfaceDefectDetection",
       "datasetId": "SurfaceDefectDetection_field_v1",
       "manifest": "quality/datasets/manifests/SurfaceDefectDetection_field_v1_manifest.json",
-      "manifestSha256": "008410612416c414b856a822bcae6ab8c3f08f2620834671092b8eb99b19f477",
+      "manifestSha256": "36b5d74e57f3a36d0a0000cb588ade07f1a09e816ade8eba4cab6e0541fd22c5",
       "splitSummary": {
         "strategy": "hashed-case-id-60-20-20",
         "seed": 20260429,

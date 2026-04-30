@@ -45,6 +45,18 @@
           "estimatedSeconds": 120
         },
         {
+          "id": "deep_learning_coco_image_inference",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["DeepLearning"],
+          "datasetManifest": "quality/datasets/coco2017_index.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoImageInferenceRunner/DeepLearningCocoImageInferenceRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--output", "quality/evals/reports/DeepLearning_coco_image_inference_baseline.json", "--report", "quality/evals/reports/DeepLearning_coco_image_inference_baseline.md", "--max-cases", "120"],
+          "baselineJson": "quality/evals/reports/DeepLearning_coco_image_inference_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_image_inference_baseline.md",
+          "estimatedSeconds": 180,
+          "notes": "Real COCO 2017 validation images through product DeepLearning preprocessing and YOLO postprocessing; tensor candidates are annotation-seeded until a trained COCO model is supplied."
+        },
+        {
           "id": "semantic_segmentation_dataset",
           "status": "active",
           "evidenceKind": "dataset",
@@ -173,15 +185,28 @@
           "notes": "Public noncommercial industrial defect smoke gate over the current product SurfaceDefectDetectionOperator; keep separate from commercial release evidence."
         },
         {
-          "id": "planar_matching_hpatches",
-          "status": "planned",
+          "id": "akaze_feature_match_hpatches",
+          "status": "active",
           "evidenceKind": "dataset",
-          "operators": ["PlanarMatching", "AkazeFeatureMatch", "OrbFeatureMatch", "LocalDeformableMatching", "PerspectiveTransform"],
-          "datasetManifest": "quality/datasets/manifests/PlanarMatching_hpatches_manifest.json",
-          "baselineJson": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
-          "reportMarkdown": "quality/evals/reports/PlanarMatching_hpatches_baseline.md",
+          "operators": ["AkazeFeatureMatch"],
+          "datasetManifest": "quality/datasets/hpatches_index.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/HPatchesFeatureMatchDatasetRunner/HPatchesFeatureMatchDatasetRunner.csproj", "--", "--operator", "AkazeFeatureMatch", "--index", "quality/datasets/hpatches_index.json", "--output", "quality/evals/reports/AkazeFeatureMatch_hpatches_baseline.json", "--report", "quality/evals/reports/AkazeFeatureMatch_hpatches_baseline.md", "--max-sequences", "80", "--pair-index", "2", "--min-pass-rate", "0.6", "--max-p95-position-error-px", "500"],
+          "baselineJson": "quality/evals/reports/AkazeFeatureMatch_hpatches_baseline.json",
+          "reportMarkdown": "quality/evals/reports/AkazeFeatureMatch_hpatches_baseline.md",
           "estimatedSeconds": 900,
-          "notes": "Real homography evidence; planned until fixed HPatches smoke subset is downloaded and indexed."
+          "notes": "Real HPatches homography evidence over image 1 to image 2 pairs using product AkazeFeatureMatch."
+        },
+        {
+          "id": "orb_feature_match_hpatches",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["OrbFeatureMatch"],
+          "datasetManifest": "quality/datasets/hpatches_index.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/HPatchesFeatureMatchDatasetRunner/HPatchesFeatureMatchDatasetRunner.csproj", "--", "--operator", "OrbFeatureMatch", "--index", "quality/datasets/hpatches_index.json", "--output", "quality/evals/reports/OrbFeatureMatch_hpatches_baseline.json", "--report", "quality/evals/reports/OrbFeatureMatch_hpatches_baseline.md", "--max-sequences", "80", "--pair-index", "2", "--min-pass-rate", "0.25", "--max-p95-position-error-px", "700"],
+          "baselineJson": "quality/evals/reports/OrbFeatureMatch_hpatches_baseline.json",
+          "reportMarkdown": "quality/evals/reports/OrbFeatureMatch_hpatches_baseline.md",
+          "estimatedSeconds": 900,
+          "notes": "Real HPatches homography evidence over image 1 to image 2 pairs using product OrbFeatureMatch."
         }
       ]
     },

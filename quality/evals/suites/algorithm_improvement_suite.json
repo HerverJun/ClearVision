@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "2026-04-29.quality-suite.v1",
+  "suiteId": "algorithm_improvement_suite",
+  "description": "Failure-taxonomy-driven algorithm improvement work queue; entries are manual until A/B runners exist.",
+  "ciBudgetMinutes": 60,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "algorithm-improvement-governance",
+      "entries": [
+        {
+          "id": "algorithm_improvement_registry_validate",
+          "status": "active",
+          "evidenceKind": "algorithm-improvement-registry",
+          "command": [
+            "python",
+            "quality/tools/build_quasi_industrial_proof_assets.py",
+            "--validate-only",
+            "--focus",
+            "algorithms"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_algorithm_improvement_plan.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_algorithm_improvement_plan.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "algorithm_ab_replay_execute",
+          "status": "active",
+          "evidenceKind": "algorithm-ab-replay",
+          "command": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-candidates"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.md",
+          "estimatedSeconds": 180
+        }
+      ]
+    },
+    {
+      "id": "algorithm-improvement-work-queue",
+      "entries": [
+        {
+          "id": "improve_anomaly_surface_defect",
+          "status": "manual",
+          "evidenceKind": "algorithm-improvement",
+          "operators": [
+            "AnomalyDetection",
+            "SurfaceDefectDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "dataset_heavy_suite",
+            "--dry-run"
+          ],
+          "estimatedSeconds": 900,
+          "notes": "Use failed public/semisynthetic cases to drive A/B algorithm improvements; do not retune against frozen test results."
+        },
+        {
+          "id": "improve_deep_learning_detection",
+          "status": "manual",
+          "evidenceKind": "algorithm-improvement",
+          "operators": [
+            "DeepLearning"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "dataset_heavy_suite",
+            "--dry-run"
+          ],
+          "estimatedSeconds": 900,
+          "notes": "Attach COCO public proof, compare old/new postprocess and NMS behavior, then freeze validation thresholds."
+        },
+        {
+          "id": "improve_matching_family",
+          "status": "manual",
+          "evidenceKind": "algorithm-improvement",
+          "operators": [
+            "TemplateMatching",
+            "AkazeFeatureMatch",
+            "OrbFeatureMatch",
+            "PlanarMatching"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "dataset_heavy_suite",
+            "--dry-run"
+          ],
+          "estimatedSeconds": 900,
+          "notes": "Use HPatches/semisynthetic homography failures for evidence-driven matching improvements."
+        },
+        {
+          "id": "improve_caliper_geometry_family",
+          "status": "manual",
+          "evidenceKind": "algorithm-improvement",
+          "operators": [
+            "CaliperTool",
+            "ArcCaliper",
+            "LineMeasurement",
+            "CircleMeasurement",
+            "GeometricFitting"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "dataset_heavy_suite",
+            "--dry-run"
+          ],
+          "estimatedSeconds": 900,
+          "notes": "Use geometry oracle failures, noise, blur, polarity, and partial-shape cases for A/B improvement."
+        }
+      ]
+    }
+  ]
+}

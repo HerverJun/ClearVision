@@ -1,7 +1,7 @@
 # Quality Flywheel Field Replay Drill
 
 DrillId: `2026-04-core20-proof-v1`
-GeneratedAtUtc: `2026-04-29T11:23:40+00:00`
+GeneratedAtUtc: `2026-04-29T16:45:56+00:00`
 Manifest: `quality/field_replay/manifests/core20_field_replay_manifest.json`
 
 ## Summary

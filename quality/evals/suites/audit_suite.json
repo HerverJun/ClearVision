@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "2026-04-29.quality-suite.v1",
+  "suiteId": "audit_suite",
+  "description": "Quasi-industrial audit gate for license, privacy, split, reproducibility, and claim boundaries.",
+  "ciBudgetMinutes": 15,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "quasi-industrial-audit",
+      "entries": [
+        {
+          "id": "quasi_industrial_claim_audit",
+          "status": "active",
+          "evidenceKind": "quasi-industrial-audit",
+          "command": [
+            "python",
+            "quality/tools/audit_quasi_industrial_proof.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_audit.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_audit.md",
+          "estimatedSeconds": 30
+        }
+      ]
+    }
+  ]
+}

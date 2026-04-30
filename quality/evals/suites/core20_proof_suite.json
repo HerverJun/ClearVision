@@ -490,6 +490,90 @@
       ]
     },
     {
+      "id": "core20-pilot-field-algorithm-proof",
+      "entries": [
+        {
+          "id": "core20_pilot_field_proof_config_validate",
+          "status": "active",
+          "evidenceKind": "field-algorithm-proof-config",
+          "operators": [
+            "SurfaceDefectDetection",
+            "DeepLearning",
+            "CaliperTool"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_core20_field_proof.py",
+            "--validate-config-only",
+            "--operators",
+            "SurfaceDefectDetection",
+            "DeepLearning",
+            "CaliperTool"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.md",
+          "estimatedSeconds": 15
+        },
+        {
+          "id": "SurfaceDefectDetection_field_algorithm_proof",
+          "status": "manual",
+          "evidenceKind": "field-algorithm-proof",
+          "operators": [
+            "SurfaceDefectDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_core20_field_proof.py",
+            "--operator",
+            "SurfaceDefectDetection"
+          ],
+          "datasetManifest": "quality/datasets/manifests/SurfaceDefectDetection_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/SurfaceDefectDetection_field_v1_algorithm_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_field_v1_algorithm_proof_baseline.md",
+          "estimatedSeconds": 300,
+          "notes": "Consumes fixed test split and field_v1/proof_results.json or algorithm_results.json; writes per-case algorithm proof metrics and gates."
+        },
+        {
+          "id": "DeepLearning_field_algorithm_proof",
+          "status": "manual",
+          "evidenceKind": "field-algorithm-proof",
+          "operators": [
+            "DeepLearning"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_core20_field_proof.py",
+            "--operator",
+            "DeepLearning"
+          ],
+          "datasetManifest": "quality/datasets/manifests/DeepLearning_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/DeepLearning_field_v1_algorithm_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_field_v1_algorithm_proof_baseline.md",
+          "estimatedSeconds": 300,
+          "notes": "Consumes fixed test split and field_v1/proof_results.json or algorithm_results.json; writes per-case algorithm proof metrics and gates."
+        },
+        {
+          "id": "CaliperTool_field_algorithm_proof",
+          "status": "manual",
+          "evidenceKind": "field-algorithm-proof",
+          "operators": [
+            "CaliperTool"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_core20_field_proof.py",
+            "--operator",
+            "CaliperTool"
+          ],
+          "datasetManifest": "quality/datasets/manifests/CaliperTool_field_v1_manifest.json",
+          "baselineJson": "quality/evals/reports/CaliperTool_field_v1_algorithm_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/CaliperTool_field_v1_algorithm_proof_baseline.md",
+          "estimatedSeconds": 300,
+          "notes": "Consumes fixed test split and field_v1/proof_results.json or algorithm_results.json; writes per-case algorithm proof metrics and gates."
+        }
+      ]
+    },
+    {
       "id": "core20-field-datasets",
       "entries": [
         {
