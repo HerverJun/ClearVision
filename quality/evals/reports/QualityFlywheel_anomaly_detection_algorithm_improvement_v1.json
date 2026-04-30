@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "2026-04-29.anomaly-detection-improvement.v1",
+  "generatedAtUtc": "2026-04-29T16:13:54+00:00",
+  "accepted": true,
+  "sourceBaseline": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+  "sourceCandidate": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v1.json",
+  "sourceSweep": "quality/evals/reports/AnomalyDetection_mvtec_sweep_v1.json",
+  "sourceAbReplay": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
+  "selectedProfile": "max192_dense_stride8",
+  "summary": {
+    "imageAurocOld": 0.66092,
+    "imageAurocNew": 0.917799,
+    "imageAurocDelta": 0.256879,
+    "pixelAurocOld": 0.670852,
+    "pixelAurocNew": 0.869249,
+    "pixelAurocDelta": 0.198397,
+    "imageF1Old": 0.087912,
+    "imageF1New": 0.774648,
+    "imageF1Delta": 0.686736,
+    "abReplayExecutedCandidateCases": 80,
+    "abReplayAnomalyCases": 20,
+    "abReplayAnomalyImproved": 14,
+    "abReplayAnomalyDetected": 5,
+    "abReplayAnomalyImageCorrect": 5,
+    "abReplayAnomalyRegressed": 0
+  },
+  "claimBoundary": "MVTec AD Lite is public benchmark evidence for quasi-industrial tuning, not real production line sign-off."
+}

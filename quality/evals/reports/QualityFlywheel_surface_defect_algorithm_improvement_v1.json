@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "2026-04-29.surface-defect-algorithm-improvement.v1",
+  "generatedAtUtc": "2026-04-29T15:39:12+00:00",
+  "accepted": true,
+  "claimBoundary": "准工业公开/替代证明；不声明真实产线工业验证完成。",
+  "sourceReports": [
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v1.json",
+    "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json"
+  ],
+  "baseline": {
+    "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+    "profile": "baseline_default",
+    "caseCount": 1004,
+    "pixelF1": 0.269226,
+    "imageAuroc": 0.772432,
+    "pixelAuroc": 0.659955,
+    "imageF1": 0.5670731707317073,
+    "falsePositivePerImage": 0.139821,
+    "runtimeMsP95": 4.891,
+    "score": 1.55227585,
+    "parameters": {
+      "Method": "LocalContrast",
+      "ThresholdMode": "Manual",
+      "Threshold": 15,
+      "MinArea": 4,
+      "MorphCleanSize": null,
+      "MorphMode": null,
+      "BackgroundKernelSize": null,
+      "ResponseNormalizeMode": null
+    }
+  },
+  "candidate": {
+    "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
+    "profile": "balanced_floor_14_area7",
+    "caseCount": 1004,
+    "pixelF1": 0.282934,
+    "imageAuroc": 0.772834,
+    "pixelAuroc": 0.659955,
+    "imageF1": 0.7,
+    "falsePositivePerImage": 0.051454,
+    "runtimeMsP95": 6.295,
+    "score": 2.32624015,
+    "parameters": {
+      "Method": "LocalContrast",
+      "ThresholdMode": "Manual",
+      "Threshold": 14,
+      "MinArea": 7,
+      "MorphCleanSize": 1,
+      "MorphMode": "OpenClose",
+      "BackgroundKernelSize": 31,
+      "ResponseNormalizeMode": "RawClamp"
+    }
+  },
+  "sweep": {
+    "profileCount": 12,
+    "validationCaseCount": 480,
+    "selectedProfile": "balanced_floor_14_area7",
+    "selectedValidationScore": 2.537046,
+    "selectionPolicy": "Prefer validation profiles that improve PixelF1 without increasing false positives per normal image, then rank by composite score.",
+    "candidatePixelF1": 0.282934,
+    "candidateImageAuroc": 0.772834,
+    "candidateImageF1": 0.7
+  },
+  "taxonomySummary": {
+    "caseCount": 110,
+    "taxonomyCounts": {
+      "texture_noise_false_positive": 45,
+      "oversegmentation_false_positive": 1,
+      "low_contrast_defect_miss": 19,
+      "undersegmentation_false_negative": 37,
+      "small_defect_miss": 7,
+      "mask_overgrowth_false_positive": 1
+    }
+  },
+  "abReplay": {
+    "status": "candidate-executed",
+    "replayCaseCount": 20,
+    "improvedMetricCaseCount": 10,
+    "regressedCaseCount": 0,
+    "worseMetricCaseCount": 8,
+    "candidateBaseline": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_replay_v1.json"
+  },
+  "nextActions": [
+    "Keep v1 profile as the replay-gated SurfaceDefectDetection candidate.",
+    "Next tuning should target residual low-contrast misses and undersegmentation before lowering global thresholds further.",
+    "Move AnomalyDetection into candidate execution after this SurfaceDefectDetection evidence chain stays green."
+  ]
+}
