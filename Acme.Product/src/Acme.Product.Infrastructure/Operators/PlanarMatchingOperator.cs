@@ -49,6 +49,12 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("CandidateScore", "Candidate Score", PortDataType.Float)]
 [OutputPort("InlierCount", "Inlier Count", PortDataType.Integer)]
 [OutputPort("InlierRatio", "Inlier Ratio", PortDataType.Float)]
+[OutputPort("MeanReprojectionError", "Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("MaxReprojectionError", "Max Reprojection Error", PortDataType.Float)]
+[OutputPort("AreaRatio", "Area Ratio", PortDataType.Float)]
+[OutputPort("CornersInsideCount", "Corners Inside Count", PortDataType.Integer)]
+[OutputPort("ProjectedCenterInside", "Projected Center Inside", PortDataType.Boolean)]
+[OutputPort("HomographyFailureReason", "Homography Failure Reason", PortDataType.String)]
 [OutputPort("VerificationPassed", "Verification Passed", PortDataType.Boolean)]
 [OutputPort("MatchResult", "Match Result", PortDataType.Any)]
 [OutputPort("Homography", "Homography Matrix", PortDataType.Any)]
@@ -370,7 +376,10 @@ public class PlanarMatchingOperator : OperatorBase
             VerificationScore = verificationScore,
             Score = finalScore,
             MeanReprojectionError = verificationMetrics.MeanReprojectionError,
+            MaxReprojectionError = verificationMetrics.MaxReprojectionError,
             AreaRatio = verificationMetrics.AreaRatio,
+            CornersInsideCount = verificationMetrics.CornersInsideCount,
+            ProjectedCenterInside = verificationMetrics.ProjectedCenterInside,
             FailureReason = verificationMetrics.FailureReason,
             TemplateFeatures = templateFeatures.KeyPoints.Length,
             SearchFeatures = searchFeatures.KeyPoints.Length
@@ -702,7 +711,11 @@ public class PlanarMatchingOperator : OperatorBase
             { "TemplateFeatures", match.TemplateFeatures },
             { "SearchFeatures", match.SearchFeatures },
             { "MeanReprojectionError", match.MeanReprojectionError },
+            { "MaxReprojectionError", match.MaxReprojectionError },
             { "AreaRatio", match.AreaRatio },
+            { "CornersInsideCount", match.CornersInsideCount },
+            { "ProjectedCenterInside", match.ProjectedCenterInside },
+            { "HomographyFailureReason", string.Empty },
             { "ProcessingTimeMs", processingTime },
             { "Center", match.Center },
             { "Corners", corners.Select(c => new Position(c.X, c.Y)).ToList() },
@@ -752,7 +765,11 @@ public class PlanarMatchingOperator : OperatorBase
             { "TemplateFeatures", 0 },
             { "SearchFeatures", 0 },
             { "MeanReprojectionError", double.PositiveInfinity },
+            { "MaxReprojectionError", double.PositiveInfinity },
             { "AreaRatio", 0.0 },
+            { "CornersInsideCount", 0 },
+            { "ProjectedCenterInside", false },
+            { "HomographyFailureReason", reason },
             { "DetectorParameterDiagnostics", new Dictionary<string, object>(detectorDiagnostics) },
             { "MatchResult", new Dictionary<string, object>
                 {
@@ -804,7 +821,11 @@ public class PlanarMatchingOperator : OperatorBase
             { "FeatureMatchCount", match?.FeatureMatchCount ?? 0 },
             { "Score", match?.Score ?? 0.0 },
             { "MeanReprojectionError", match?.MeanReprojectionError ?? double.PositiveInfinity },
+            { "MaxReprojectionError", match?.MaxReprojectionError ?? double.PositiveInfinity },
             { "AreaRatio", match?.AreaRatio ?? 0.0 },
+            { "CornersInsideCount", match?.CornersInsideCount ?? 0 },
+            { "ProjectedCenterInside", match?.ProjectedCenterInside ?? false },
+            { "HomographyFailureReason", reason },
             { "DetectorParameterDiagnostics", new Dictionary<string, object>(detectorDiagnostics) },
             { "MatchResult", new Dictionary<string, object>
                 {
@@ -820,6 +841,13 @@ public class PlanarMatchingOperator : OperatorBase
             },
             { "Message", reason }
         };
+
+        if (match?.Corners.Length == 4)
+        {
+            resultData["Center"] = match.Center;
+            resultData["Corners"] = match.Corners.Select(c => new Position(c.X, c.Y)).ToList();
+            resultData["Homography"] = match.Homography.Empty() ? new Mat() : match.Homography.Clone();
+        }
 
         return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, resultData));
     }
@@ -942,7 +970,10 @@ public class PlanarMatchingOperator : OperatorBase
         public double VerificationScore { get; set; }
         public double Score { get; set; }
         public double MeanReprojectionError { get; set; }
+        public double MaxReprojectionError { get; set; }
         public double AreaRatio { get; set; }
+        public int CornersInsideCount { get; set; }
+        public bool ProjectedCenterInside { get; set; }
         public int TemplateFeatures { get; set; }
         public int SearchFeatures { get; set; }
 

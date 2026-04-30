@@ -28,6 +28,17 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("EdgeThreshold", "边缘阈值", "int", DefaultValue = 31, Min = 3, Max = 100)]
 [OperatorParam("EnableSymmetryTest", "对称测试", "bool", DefaultValue = true)]
 [OperatorParam("MinMatchCount", "最小匹配数", "int", DefaultValue = 10, Min = 3, Max = 100)]
+[OutputPort("InlierRatio", "Inlier Ratio", PortDataType.Float)]
+[OutputPort("MeanReprojectionError", "Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("MaxReprojectionError", "Max Reprojection Error", PortDataType.Float)]
+[OutputPort("AreaRatio", "Projected Area Ratio", PortDataType.Float)]
+[OutputPort("CornersInsideCount", "Projected Corners Inside", PortDataType.Integer)]
+[OutputPort("ProjectedCenterInside", "Projected Center Inside", PortDataType.Boolean)]
+[OutputPort("HomographyFailureReason", "Homography Failure Reason", PortDataType.String)]
+[OperatorParam("MatchRatio", "Match Ratio (Lowe's)", "double", DefaultValue = 0.75, Min = 0.5, Max = 0.95)]
+[OperatorParam("RansacThreshold", "RANSAC Threshold (px)", "double", DefaultValue = 5.0, Min = 0.5, Max = 10.0)]
+[OperatorParam("MinInlierRatio", "Min Inlier Ratio", "double", DefaultValue = 0.25, Min = 0.1, Max = 1.0)]
+[OperatorParam("FastThreshold", "ORB FAST Threshold", "int", DefaultValue = 20, Min = 1, Max = 100)]
 [OperatorParam("OriginMode", "Origin Mode", "enum", DefaultValue = "Center", Options = new[] { "Center|Center", "TopLeft|TopLeft", "Custom|Custom" })]
 [OperatorParam("OriginX", "Origin X", "double", DefaultValue = 0.0)]
 [OperatorParam("OriginY", "Origin Y", "double", DefaultValue = 0.0)]
@@ -53,7 +64,7 @@ namespace Acme.Product.Infrastructure.Operators;
     KnownLimitations = new[]
     {
         "Score is a homography verification score based on inlier evidence, not a descriptor distance.",
-        "The inlier-ratio gate is fixed in code, while MinMatchCount and ORB detector settings are configurable.",
+        "MatchRatio, RANSAC threshold, MinMatchCount, MinInlierRatio, and ORB FAST threshold are configurable and should be validated with replay evidence.",
         "TemplatePath mode uses a bounded in-process cache keyed by file fingerprint and detector configuration."
     },
     Dependencies = new[] { "OpenCvSharp" }
@@ -83,10 +94,14 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
         var edgeThreshold = GetIntParam(@operator, "EdgeThreshold", 31, min: 3, max: 100);
         var enableSymmetryTest = GetBoolParam(@operator, "EnableSymmetryTest", true);
         var minMatchCount = GetIntParam(@operator, "MinMatchCount", 10, min: 3, max: 100);
+        var matchRatio = GetDoubleParam(@operator, "MatchRatio", 0.75, min: 0.5, max: 0.95);
+        var ransacThreshold = GetDoubleParam(@operator, "RansacThreshold", 5.0, min: 0.5, max: 10.0);
+        var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25, min: 0.1, max: 1.0);
+        var fastThreshold = GetIntParam(@operator, "FastThreshold", 20, min: 1, max: 100);
 
         var srcImage = imageWrapper.GetMat();
         using var srcGray = ToGray(srcImage);
-        using var orb = ORB.Create(maxFeatures, (float)scaleFactor, nLevels, edgeThreshold);
+        using var orb = ORB.Create(maxFeatures, (float)scaleFactor, nLevels, edgeThreshold, 0, 2, ORBScoreType.Harris, 31, fastThreshold);
 
         var srcDescriptors = new Mat();
         orb.DetectAndCompute(srcGray, null, out KeyPoint[] srcKeyPoints, srcDescriptors);
@@ -114,7 +129,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             {
                 var cached = GetOrLoadTemplate(
                     templatePath,
-                    $"ORB:{maxFeatures}:{scaleFactor:F3}:{nLevels}:{edgeThreshold}",
+                    $"ORB:{maxFeatures}:{scaleFactor:F3}:{nLevels}:{edgeThreshold}:{fastThreshold}",
                     templateGray =>
                     {
                         var descriptors = new Mat();
@@ -142,7 +157,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             List<DMatch> goodMatches;
             if (enableSymmetryTest)
             {
-                goodMatches = MatchWithSymmetryTest(templateDescriptors, srcDescriptors);
+                goodMatches = MatchWithSymmetryTest(templateDescriptors, srcDescriptors, matchRatio);
             }
             else
             {
@@ -151,7 +166,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
                 goodMatches = new List<DMatch>();
                 foreach (var match in matches)
                 {
-                    if (match.Length >= 2 && match[0].Distance < 0.75 * match[1].Distance)
+                    if (match.Length >= 2 && match[0].Distance < matchRatio * match[1].Distance)
                     {
                         goodMatches.Add(match[0]);
                     }
@@ -164,13 +179,13 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
                 goodMatches,
                 new Size(templateImage.Width, templateImage.Height),
                 srcImage.Size(),
-                ransacThreshold: 5.0,
+                ransacThreshold,
                 minMatchCount,
                 minInliers: minMatchCount,
-                minInlierRatio: 0.25);
+                minInlierRatio);
             var origin = ResolveReferenceOrigin(@operator, templateImage.Size());
 
-            var verificationScore = HomographyVerificationHelper.ComputeVerificationScore(metrics, 5.0);
+            var verificationScore = HomographyVerificationHelper.ComputeVerificationScore(metrics, ransacThreshold);
             var isMatch = metrics.VerificationPassed;
             var resultImage = srcImage.Clone();
             var boxColor = isMatch ? new Scalar(0, 255, 0) : new Scalar(0, 0, 255);
@@ -223,14 +238,19 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
                 { "Score", verificationScore },
                 { "Inliers", metrics.InlierCount },
                 { "TotalMatches", metrics.MatchCount },
+                { "InlierRatio", metrics.InlierRatio },
                 { "Position", position },
                 { "MatchPoint", new Position(representativePoint.X, representativePoint.Y) },
                 { "X", position.X },
                 { "Y", position.Y },
                 { "ScoreDefinition", "HomographyVerificationScore" },
                 { "FailureReason", metrics.FailureReason },
+                { "HomographyFailureReason", metrics.FailureReason },
                 { "MeanReprojectionError", metrics.MeanReprojectionError },
                 { "MaxReprojectionError", metrics.MaxReprojectionError },
+                { "AreaRatio", metrics.AreaRatio },
+                { "CornersInsideCount", metrics.CornersInsideCount },
+                { "ProjectedCenterInside", metrics.ProjectedCenterInside },
                 { "OriginMode", GetStringParam(@operator, "OriginMode", "Center") }
             })));
         }
@@ -265,6 +285,30 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             return ValidationResult.Invalid("最小匹配数必须在 3-100 之间。");
         }
 
+        var matchRatio = GetDoubleParam(@operator, "MatchRatio", 0.75);
+        if (matchRatio < 0.5 || matchRatio > 0.95)
+        {
+            return ValidationResult.Invalid("MatchRatio must be between 0.5 and 0.95.");
+        }
+
+        var ransacThreshold = GetDoubleParam(@operator, "RansacThreshold", 5.0);
+        if (ransacThreshold < 0.5 || ransacThreshold > 10.0)
+        {
+            return ValidationResult.Invalid("RansacThreshold must be between 0.5 and 10.0.");
+        }
+
+        var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25);
+        if (minInlierRatio < 0.1 || minInlierRatio > 1.0)
+        {
+            return ValidationResult.Invalid("MinInlierRatio must be between 0.1 and 1.0.");
+        }
+
+        var fastThreshold = GetIntParam(@operator, "FastThreshold", 20);
+        if (fastThreshold < 1 || fastThreshold > 100)
+        {
+            return ValidationResult.Invalid("FastThreshold must be between 1 and 100.");
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -292,13 +336,20 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             { "Score", 0.0 },
             { "Inliers", inliers },
             { "TotalMatches", totalMatches },
+            { "InlierRatio", 0.0 },
             { "Message", reason },
             { "FailureReason", reason },
+            { "HomographyFailureReason", reason },
             { "Position", new Position(0, 0) },
             { "MatchPoint", new Position(0, 0) },
             { "X", 0 },
             { "Y", 0 },
-            { "ScoreDefinition", "HomographyVerificationScore" }
+            { "ScoreDefinition", "HomographyVerificationScore" },
+            { "MeanReprojectionError", double.PositiveInfinity },
+            { "MaxReprojectionError", double.PositiveInfinity },
+            { "AreaRatio", 0.0 },
+            { "CornersInsideCount", 0 },
+            { "ProjectedCenterInside", false }
         }));
     }
 

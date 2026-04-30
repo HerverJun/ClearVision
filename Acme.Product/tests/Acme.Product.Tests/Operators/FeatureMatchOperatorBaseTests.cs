@@ -60,4 +60,56 @@ public class FeatureMatchOperatorBaseTests
         homography.Should().BeNull();
         corners.Should().BeEmpty();
     }
+
+    [Fact]
+    public void EstimateAndVerifyHomography_WhenPlaneIsPartiallyCroppedButCenterVisible_ShouldPass()
+    {
+        var sut = new AkazeFeatureMatchOperator(Substitute.For<ILogger<AkazeFeatureMatchOperator>>());
+        var method = typeof(AkazeFeatureMatchOperator).BaseType!.GetMethod(
+            "EstimateAndVerifyHomography",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+
+        var templateKeyPoints = new[]
+        {
+            new KeyPoint(0, 0, 1),
+            new KeyPoint(100, 0, 1),
+            new KeyPoint(100, 100, 1),
+            new KeyPoint(0, 100, 1)
+        };
+        var searchKeyPoints = new[]
+        {
+            new KeyPoint(-40, 0, 1),
+            new KeyPoint(60, 0, 1),
+            new KeyPoint(60, 100, 1),
+            new KeyPoint(-40, 100, 1)
+        };
+        var matches = Enumerable.Range(0, templateKeyPoints.Length)
+            .Select(index => new DMatch(index, index, 0))
+            .ToList();
+
+        var result = method!.Invoke(sut, new object[]
+        {
+            templateKeyPoints,
+            searchKeyPoints,
+            matches,
+            new Size(100, 100),
+            new Size(100, 100),
+            5.0,
+            4,
+            4,
+            0.25
+        });
+
+        result.Should().NotBeNull();
+        var tupleType = result!.GetType();
+        using var homography = (Mat?)tupleType.GetField("Item1")!.GetValue(result);
+        var corners = (Point2f[])tupleType.GetField("Item2")!.GetValue(result)!;
+        var metrics = tupleType.GetField("Item3")!.GetValue(result)!;
+        var verificationPassed = (bool)metrics.GetType().GetProperty("VerificationPassed")!.GetValue(metrics)!;
+
+        verificationPassed.Should().BeTrue();
+        homography.Should().NotBeNull();
+        corners.Should().HaveCount(4);
+    }
 }

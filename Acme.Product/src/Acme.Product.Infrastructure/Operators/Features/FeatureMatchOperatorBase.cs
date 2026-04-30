@@ -26,7 +26,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
 
     /// <summary>
     /// 浣跨敤瀵圭О娴嬭瘯鍖归厤鎻忚堪绗?    /// </summary>
-    protected List<DMatch> MatchWithSymmetryTest(Mat templateDesc, Mat sceneDesc)
+    protected List<DMatch> MatchWithSymmetryTest(Mat templateDesc, Mat sceneDesc, double matchRatio = 0.75)
     {
         using var matcher = new BFMatcher(NormTypes.Hamming, crossCheck: false);
 
@@ -39,7 +39,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         var backwardBest = new Dictionary<int, int>();
         foreach (var m in backwardMatches)
         {
-            if (m.Length >= 2 && m[0].Distance < 0.75 * m[1].Distance)
+            if (m.Length >= 2 && m[0].Distance < matchRatio * m[1].Distance)
             {
                 backwardBest[m[0].QueryIdx] = m[0].TrainIdx;
             }
@@ -54,7 +54,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         foreach (var m in forwardMatches)
         {
             if (m.Length < 2) continue;
-            if (m[0].Distance >= 0.75 * m[1].Distance) continue;
+            if (m[0].Distance >= matchRatio * m[1].Distance) continue;
 
             if (backwardBest.TryGetValue(m[0].TrainIdx, out var reverseTemplateIdx) && reverseTemplateIdx == m[0].QueryIdx)
             {
@@ -113,6 +113,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
                 MaxReprojectionError: double.PositiveInfinity,
                 AreaRatio: 0,
                 CornersValid: false,
+                CornersInsideCount: 0,
+                ProjectedCenterInside: false,
                 FailureReason: "At least four point correspondences are required."));
         }
 
