@@ -10,11 +10,12 @@ closed_at: "2026-04-30"
 
 # 2026-04-30 当前计划闭环归档
 
-本目录归档 2026-04-30 已完成阶段收口的当前计划主线。归档文件保留 `closing` 状态，用于表示本轮目标已收口，但部分 release 级证据刷新与剩余 control case 已转入下一计划继续推进。
+本目录归档 2026-04-30 已完成阶段收口的当前计划主线。归档文件保留 `closed` 或 `closing` 状态；若仍有后续动作，仅作为新计划或外部 artifact 接入项继续推进。
 
 ## 归档清单
 
 - [ClearVision 准工业算法调优 TODO](./ClearVision-准工业算法调优TODO-2026-04-29.md)
+- [ClearVision 算子精度提高下一步计划](./ClearVision-算子精度提高下一步计划-2026-04-30.md)
 
 ## 收口摘要
 
@@ -23,8 +24,11 @@ closed_at: "2026-04-30"
 - EdgeDetection、SemanticSegmentation、TemplateMatching、ShapeMatching 均已接入 20-case candidate replay。
 - Measurement geometry oracle 已达到 `1500/1500` passed。
 - Audit suite 已通过：quasi-industrial audit `44/44` passed。
+- CameraCalibration 已完成 OpenCV/sample bridge：`3/3` candidate-executed，`0` regressed。
+- DeepLearning 已完成 ONNX Runtime real-model dry-run：`20/20` candidate-executed，`AnnotationSeeded=false`，外部 ONNX artifact 待接入。
+- 本轮最终 A/B replay：`executedCandidateCaseCount=183`、`controlCaseCount=0`、`regressedCaseCount=0`。
+- 最新 audit suite 已通过：quasi-industrial audit `57/57` checks passed。
 
 ## 转入下一计划
 
-- `CameraCalibration`：剩余 `3` 个 control cases，转入 OpenCV calibration sample bridge。
-- `DeepLearning`：剩余 `20` 个 control cases，转入 real-model artifact/manifest 接入，不声明训练收益。
+- `DeepLearning`：外部真实 ONNX artifact/manifest 待接入；当前 dry-run 结果只证明真实推理链路和后处理口径，不声明模型训练收益或真实产线工业验证完成。
