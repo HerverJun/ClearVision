@@ -646,7 +646,7 @@ def build_algorithm_improvement_suite() -> dict[str, Any]:
             "operators": ["DeepLearning"],
             "command": ["python", "quality/tools/run_quality_suite.py", "--suite", "dataset_heavy_suite", "--dry-run"],
             "estimatedSeconds": 900,
-            "notes": "Attach COCO public proof, compare old/new postprocess and NMS behavior, then freeze validation thresholds.",
+            "notes": "Use DeepLearningCocoRealModelRunner with an external ONNX artifact and manifest; keep annotation-seeded COCO proof separate from real-model AP/precision/recall.",
         },
         {
             "id": "improve_matching_family",

@@ -1,0 +1,956 @@
+{
+  "SchemaVersion": "2026-04-30.deep-learning-coco-real-model.v1",
+  "EvidenceKind": "public-benchmark-real-model",
+  "Accepted": true,
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-30T01:18:46.1320609+00:00",
+    "DatasetName": "COCO 2017 real validation images",
+    "DatasetKind": "COCO real-image inference with ONNX Runtime model outputs; annotation-seeded tensors are not used.",
+    "IndexPath": "quality/datasets/coco2017_index.json",
+    "AnnotationPath": "quality/public_datasets/coco2017/extracted/annotations/instances_val2017.json",
+    "CaseCount": 20,
+    "ProcessedCaseCount": 20,
+    "ProcessingFailedCaseCount": 0,
+    "Passed": 0,
+    "Failed": 20,
+    "CategoryCount": 3,
+    "GroundTruthCount": 90,
+    "TruePositiveCount": 0,
+    "FalsePositiveCount": 20,
+    "FalseNegativeCount": 90,
+    "PrecisionAt50": 0,
+    "RecallAt50": 0,
+    "AP50": 0,
+    "MeanMatchedIoU": 0,
+    "ConfidenceThreshold": 0.25,
+    "NmsIouThreshold": 0.45,
+    "MatchIouThreshold": 0.5,
+    "RuntimeMs": 425.982,
+    "MemoryAllocationBytes": 360912368,
+    "SessionCreateMs": 9.63,
+    "InferenceProvider": "CPUExecutionProvider",
+    "RealOnnxInference": true,
+    "AnnotationSeeded": false,
+    "ModelId": "clearvision_yolov8_constant_smoke",
+    "ModelSha256": "4c80a803ef8e2a3b931dfcfe77b0ef91a7f95b1735680e5a700b52cc488f3cbd",
+    "ExpectedModelSha256": "",
+    "ModelSha256Matched": false,
+    "ModelArtifactRef": "generated-smoke-fixture",
+    "ModelManifestPath": "generated-smoke-fixture",
+    "CandidateVersion": "v2",
+    "Profile": "real_model_smoke_hard_nms_045"
+  },
+  "ModelProvenance": {
+    "ModelId": "clearvision_yolov8_constant_smoke",
+    "ExpectedModelSha256": "",
+    "ActualModelSha256": "4c80a803ef8e2a3b931dfcfe77b0ef91a7f95b1735680e5a700b52cc488f3cbd",
+    "ModelSha256Matched": false,
+    "Source": "generated-smoke-fixture",
+    "License": "internal-test-fixture",
+    "ClassCount": 3,
+    "InputShape": [
+      1,
+      3,
+      640,
+      640
+    ],
+    "Preprocess": {
+      "Resize": "letterbox",
+      "ColorOrder": "RGB",
+      "Normalization": "float32_0_1",
+      "PadValue": 114
+    },
+    "Postprocess": {
+      "YoloVersion": "yolov8",
+      "ConfidenceThreshold": 0.25,
+      "NmsIouThreshold": 0.45,
+      "ClassAwareNms": true
+    }
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 20,
+      "Passed": 0,
+      "Failed": 20,
+      "RuntimeMsAvg": 21.299,
+      "MemoryAllocationBytesAvg": 18045618,
+      "HasPublicDataset": true,
+      "EvidenceKind": "public-benchmark-real-model",
+      "DatasetName": "COCO 2017 real validation images"
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "car",
+      "CaseCount": 2,
+      "Passed": 0,
+      "Failed": 2,
+      "GroundTruthCount": 8,
+      "DetectionCount": 2,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 2,
+      "FalseNegativeCount": 8,
+      "RuntimeMsAvg": 20.468
+    },
+    {
+      "Scenario": "person",
+      "CaseCount": 18,
+      "Passed": 0,
+      "Failed": 18,
+      "GroundTruthCount": 82,
+      "DetectionCount": 18,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 18,
+      "FalseNegativeCount": 82,
+      "RuntimeMsAvg": 21.391
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "coco2017_val_139",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 63.602,
+      "MemoryAllocationBytes": 18067296,
+      "Width": 640,
+      "Height": 426,
+      "GroundTruthCount": 2,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 2,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 133,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=2, detections=1, gt=2"
+    },
+    {
+      "CaseId": "coco2017_val_724",
+      "CategorySet": "car",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 22.981,
+      "MemoryAllocationBytes": 18053232,
+      "Width": 375,
+      "Height": 500,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 1,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 117.1875,
+          "Y": 187.5,
+          "Width": 140.625,
+          "Height": 125,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=1, detections=1, gt=1"
+    },
+    {
+      "CaseId": "coco2017_val_785",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 19.4,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 425,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 1,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 132.5,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=1, detections=1, gt=1"
+    },
+    {
+      "CaseId": "coco2017_val_872",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 24.912,
+      "MemoryAllocationBytes": 18044024,
+      "Width": 621,
+      "Height": 640,
+      "GroundTruthCount": 2,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 2,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 220.5,
+          "Y": 240,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=2, detections=1, gt=2"
+    },
+    {
+      "CaseId": "coco2017_val_885",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 26.022,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 427,
+      "GroundTruthCount": 8,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 8,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 133.5,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=8, detections=1, gt=8"
+    },
+    {
+      "CaseId": "coco2017_val_1000",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 26.267,
+      "MemoryAllocationBytes": 18043944,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 12,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 12,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 160,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=12, detections=1, gt=12"
+    },
+    {
+      "CaseId": "coco2017_val_1268",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 25.27,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 427,
+      "GroundTruthCount": 4,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 4,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 133.5,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=4, detections=1, gt=4"
+    },
+    {
+      "CaseId": "coco2017_val_1296",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 21.674,
+      "MemoryAllocationBytes": 18044816,
+      "Width": 427,
+      "Height": 640,
+      "GroundTruthCount": 2,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 2,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 123.5,
+          "Y": 240,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=2, detections=1, gt=2"
+    },
+    {
+      "CaseId": "coco2017_val_1353",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 18.094,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 375,
+      "Height": 500,
+      "GroundTruthCount": 6,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 6,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 117.1875,
+          "Y": 187.5,
+          "Width": 140.625,
+          "Height": 125,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=6, detections=1, gt=6"
+    },
+    {
+      "CaseId": "coco2017_val_1490",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 16.85,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 315,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 1,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 77.5,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=1, detections=1, gt=1"
+    },
+    {
+      "CaseId": "coco2017_val_1532",
+      "CategorySet": "car",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 17.955,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 7,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 7,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 160,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=7, detections=1, gt=7"
+    },
+    {
+      "CaseId": "coco2017_val_1584",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 18.47,
+      "MemoryAllocationBytes": 18043944,
+      "Width": 612,
+      "Height": 612,
+      "GroundTruthCount": 11,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 11,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 219.93752,
+          "Y": 229.50002,
+          "Width": 172.12498,
+          "Height": 152.99998,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=11, detections=1, gt=11"
+    },
+    {
+      "CaseId": "coco2017_val_1761",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 18.713,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 427,
+      "Height": 640,
+      "GroundTruthCount": 5,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 5,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 123.5,
+          "Y": 240,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=5, detections=1, gt=5"
+    },
+    {
+      "CaseId": "coco2017_val_2006",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 18.394,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 3,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 3,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 160,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=3, detections=1, gt=3"
+    },
+    {
+      "CaseId": "coco2017_val_2153",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 17.219,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 4,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 4,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 160,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=4, detections=1, gt=4"
+    },
+    {
+      "CaseId": "coco2017_val_2261",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 20.459,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 427,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 1,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 133.5,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=1, detections=1, gt=1"
+    },
+    {
+      "CaseId": "coco2017_val_2299",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 11.129,
+      "MemoryAllocationBytes": 18043944,
+      "Width": 500,
+      "Height": 302,
+      "GroundTruthCount": 13,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 13,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 179.6875,
+          "Y": 88.5,
+          "Width": 140.625,
+          "Height": 125,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=13, detections=1, gt=13"
+    },
+    {
+      "CaseId": "coco2017_val_2431",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 12.163,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 457,
+      "Height": 640,
+      "GroundTruthCount": 2,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 2,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 138.5,
+          "Y": 240,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=2, detections=1, gt=2"
+    },
+    {
+      "CaseId": "coco2017_val_2473",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 12.556,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 640,
+      "Height": 427,
+      "GroundTruthCount": 4,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 4,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230,
+          "Y": 133.5,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=4, detections=1, gt=4"
+    },
+    {
+      "CaseId": "coco2017_val_2532",
+      "CategorySet": "person",
+      "Passed": false,
+      "ProcessingError": false,
+      "RuntimeMs": 13.852,
+      "MemoryAllocationBytes": 18043936,
+      "Width": 480,
+      "Height": 640,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 1,
+      "FalseNegativeCount": 1,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": false
+        }
+      ],
+      "Detections": [
+        {
+          "X": 150,
+          "Y": 240,
+          "Width": 180,
+          "Height": 160,
+          "Confidence": 0.9,
+          "ClassId": 0
+        }
+      ],
+      "OutputTensorName": "output0",
+      "OutputTensorShape": [
+        1,
+        7,
+        32
+      ],
+      "OutputSelectionRule": "KnownLabelFeature\u002B4",
+      "YoloVersion": "YOLOv8",
+      "Failure": "FP=1, FN=1, detections=1, gt=1"
+    }
+  ],
+  "ClaimBoundary": {
+    "RealModelRule": "This report uses real ONNX Runtime model outputs. Annotation-seeded tensors are not used.",
+    "FieldSignoffRule": "COCO public benchmark evidence is not real production-site validation or sign-off.",
+    "AccuracyComparisonRule": "AP50/precision/recall are frozen from the supplied model artifact and must not be compared to annotation-seeded proof as model accuracy."
+  }
+}

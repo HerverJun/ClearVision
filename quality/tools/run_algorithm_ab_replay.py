@@ -19,13 +19,16 @@ OUTPUT_MD = REPORT_DIR / "QualityFlywheel_algorithm_ab_replay_report.md"
 HPATCHES_PROJECT = "quality/tools/HPatchesFeatureMatchDatasetRunner/HPatchesFeatureMatchDatasetRunner.csproj"
 SURFACE_DEFECT_PROJECT = "quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj"
 ANOMALY_DETECTION_PROJECT = "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj"
+DEEP_LEARNING_PROJECT = "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
 MATCHING_OPERATORS = {"AkazeFeatureMatch", "OrbFeatureMatch"}
 SURFACE_DEFECT_OPERATORS = {"SurfaceDefectDetection"}
 ANOMALY_DETECTION_OPERATORS = {"AnomalyDetection"}
+DEEP_LEARNING_OPERATORS = {"DeepLearning"}
 DEFAULT_MATCHING_CANDIDATE_VERSION = "v4"
 DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION = "v1"
 DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION = "v1"
+DEFAULT_DEEP_LEARNING_CANDIDATE_VERSION = "v2"
 LOWER_BETTER_METRICS = {
     "PositionErrorPx",
     "P95PositionErrorPx",
@@ -70,6 +73,13 @@ ANOMALY_DETECTION_DIAGNOSTIC_FIELDS = (
     "ImageCorrect",
     "IsAnomaly",
     "PredictedAnomaly",
+)
+DEEP_LEARNING_DIAGNOSTIC_FIELDS = (
+    "ProcessingError",
+    "OutputTensorName",
+    "OutputTensorShape",
+    "OutputSelectionRule",
+    "YoloVersion",
 )
 
 
@@ -135,7 +145,7 @@ def normalize_case_result(case: dict[str, Any]) -> dict[str, Any]:
         passed = bool(case.get("Passed") or case.get("Accepted") or case.get("accepted"))
     diagnostics = {
         key: case.get(key)
-        for key in (*HPATCHES_DIAGNOSTIC_FIELDS, *SURFACE_DEFECT_DIAGNOSTIC_FIELDS, *ANOMALY_DETECTION_DIAGNOSTIC_FIELDS)
+        for key in (*HPATCHES_DIAGNOSTIC_FIELDS, *SURFACE_DEFECT_DIAGNOSTIC_FIELDS, *ANOMALY_DETECTION_DIAGNOSTIC_FIELDS, *DEEP_LEARNING_DIAGNOSTIC_FIELDS)
         if key in case
     }
     return {
@@ -185,6 +195,16 @@ def read_anomaly_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
     return {
         normalized["caseId"]: normalized
         for normalized in (normalize_case_result(case) for case in document.get("Images", []))
+    }
+
+
+def read_deep_learning_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    document = read_json(path)
+    return {
+        normalized["caseId"]: normalized
+        for normalized in (normalize_case_result(case) for case in document.get("Cases", []))
     }
 
 
@@ -289,6 +309,14 @@ def anomaly_candidate_path(candidate_version: str) -> Path:
 
 def anomaly_candidate_report_path(candidate_version: str) -> Path:
     return REPORT_DIR / f"AnomalyDetection_mvtec_candidate_replay_{candidate_version}.md"
+
+
+def deep_learning_candidate_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"DeepLearning_coco_real_model_candidate_{candidate_version}.json"
+
+
+def deep_learning_candidate_report_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"DeepLearning_coco_real_model_candidate_{candidate_version}.md"
 
 
 def matching_candidate_parameters(operator: str, candidate_version: str) -> dict[str, Any]:
@@ -547,13 +575,68 @@ def execute_anomaly_candidate(case_ids: list[str], candidate_version: str) -> tu
     return output, parameters
 
 
+def execute_deep_learning_candidate(
+    case_ids: list[str],
+    candidate_version: str,
+    model_manifest: str,
+    model_path: str | None,
+) -> tuple[Path, dict[str, Any]]:
+    output = deep_learning_candidate_path(candidate_version)
+    report = deep_learning_candidate_report_path(candidate_version)
+    parameters: dict[str, Any] = {
+        "CandidateVersion": candidate_version,
+        "ModelManifest": model_manifest,
+        "ModelPathProvided": bool(model_path),
+        "Confidence": 0.25,
+        "NmsIou": 0.45,
+    }
+    command = [
+        "dotnet",
+        "run",
+        "--project",
+        DEEP_LEARNING_PROJECT,
+        "--",
+        "--index",
+        "quality/datasets/coco2017_index.json",
+        "--output",
+        repo(output),
+        "--report",
+        repo(report),
+        "--candidate-version",
+        candidate_version,
+        "--profile",
+        "real_model_hard_nms_045",
+        "--model-manifest",
+        model_manifest,
+        "--case-ids",
+        ",".join(case_ids),
+        "--confidence",
+        str(parameters["Confidence"]),
+        "--nms-iou",
+        str(parameters["NmsIou"]),
+    ]
+    if model_path:
+        command.extend(["--model", model_path])
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(
+            "error: DeepLearning real-model candidate replay failed\n"
+            f"{completed.stdout}\n{completed.stderr}".strip()
+        )
+    return output, parameters
+
+
 def build_report(
     execute_matching: bool,
     execute_surface_defect: bool,
     execute_anomaly_detection: bool,
+    execute_deep_learning: bool,
     matching_candidate_version: str,
     surface_defect_candidate_version: str,
     anomaly_detection_candidate_version: str,
+    deep_learning_candidate_version: str,
+    deep_learning_model_manifest: str,
+    deep_learning_model_path: str | None,
 ) -> dict[str, Any]:
     proof = read_json(PROOF_JSON)
     replay = read_json(REPLAY_JSON)
@@ -566,6 +649,7 @@ def build_report(
     matching_candidate_cases: dict[str, dict[str, dict[str, Any]]] = {}
     surface_candidate_cases: dict[str, dict[str, Any]] = {}
     anomaly_candidate_cases: dict[str, dict[str, Any]] = {}
+    deep_learning_candidate_cases: dict[str, dict[str, Any]] = {}
     execution_log: list[dict[str, Any]] = []
     for operator in sorted(MATCHING_OPERATORS):
         ids = replay_case_ids(replay, operator)
@@ -616,6 +700,27 @@ def build_report(
         )
     anomaly_candidate_cases = read_anomaly_candidate_cases(anomaly_candidate_path(anomaly_detection_candidate_version))
 
+    deep_learning_ids = replay_case_ids(replay, "DeepLearning")
+    if execute_deep_learning and deep_learning_ids:
+        path, parameters = execute_deep_learning_candidate(
+            deep_learning_ids,
+            deep_learning_candidate_version,
+            deep_learning_model_manifest,
+            deep_learning_model_path)
+        execution_log.append(
+            {
+                "operator": "DeepLearning",
+                "command": "dotnet run --project quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj",
+                "caseCount": len(deep_learning_ids),
+                "candidateVersion": deep_learning_candidate_version,
+                "sourceCandidate": deep_learning_model_manifest,
+                "parameters": parameters,
+                "candidateBaseline": repo(path),
+            }
+        )
+    if execute_deep_learning:
+        deep_learning_candidate_cases = read_deep_learning_candidate_cases(deep_learning_candidate_path(deep_learning_candidate_version))
+
     rows = []
     comparisons = []
     for operator, replay_cases in sorted(replay_by_operator.items()):
@@ -631,6 +736,9 @@ def build_report(
             execution_mode = "candidate-executed"
         elif operator in ANOMALY_DETECTION_OPERATORS:
             candidate_baseline = repo(anomaly_candidate_path(anomaly_detection_candidate_version))
+            execution_mode = "candidate-executed"
+        elif operator in DEEP_LEARNING_OPERATORS and deep_learning_candidate_cases:
+            candidate_baseline = repo(deep_learning_candidate_path(deep_learning_candidate_version))
             execution_mode = "candidate-executed"
 
         for replay_case in replay_cases:
@@ -651,6 +759,10 @@ def build_report(
                 new_case = anomaly_candidate_cases.get(case_id)
                 if new_case is None:
                     raise SystemExit(f"error: missing AnomalyDetection candidate case result for {case_id}")
+            elif operator in DEEP_LEARNING_OPERATORS and deep_learning_candidate_cases:
+                new_case = deep_learning_candidate_cases.get(case_id)
+                if new_case is None:
+                    raise SystemExit(f"error: missing DeepLearning real-model candidate case result for {case_id}")
             else:
                 new_case = old_case
 
@@ -705,6 +817,10 @@ def build_report(
         item for item in comparisons
         if item["operator"] in ANOMALY_DETECTION_OPERATORS
     ]
+    deep_learning = [
+        item for item in comparisons
+        if item["operator"] in DEEP_LEARNING_OPERATORS
+    ]
     accepted = bool(comparisons) and all(item.get("new") for item in comparisons)
     return {
         "schemaVersion": "2026-04-29.algorithm-ab-replay.v2",
@@ -741,11 +857,16 @@ def build_report(
                 if item["new"].get("diagnostics", {}).get("IsAnomaly") is True
                 and item["new"].get("diagnostics", {}).get("PredictedAnomaly") is True
             ),
+            "deepLearningCaseCount": len(deep_learning),
+            "deepLearningRealModelCaseCount": sum(1 for item in deep_learning if item["executionMode"] == "candidate-executed"),
+            "deepLearningRegressedCaseCount": sum(1 for item in deep_learning if item["status"] == "regressed"),
+            "deepLearningProcessingErrorCaseCount": sum(1 for item in deep_learning if item["new"].get("diagnostics", {}).get("ProcessingError") is True),
         },
         "policy": {
             "purpose": "Execute old/new replay comparisons for every public benchmark replay seed.",
-            "candidateRule": f"Matching-family HPatches replay uses candidate_{matching_candidate_version}; SurfaceDefectDetection KolektorSDD2 replay uses candidate_{surface_defect_candidate_version}; AnomalyDetection MVTec replay uses candidate_{anomaly_detection_candidate_version}; other rows remain unchanged controls until their algorithm PRs supply executable candidates.",
+            "candidateRule": f"Matching-family HPatches replay uses candidate_{matching_candidate_version}; SurfaceDefectDetection KolektorSDD2 replay uses candidate_{surface_defect_candidate_version}; AnomalyDetection MVTec replay uses candidate_{anomaly_detection_candidate_version}; DeepLearning can use real-model candidate_{deep_learning_candidate_version} when explicitly executed with a model manifest/artifact; other rows remain unchanged controls until their algorithm PRs supply executable candidates.",
             "claimBoundary": "This report is algorithm A/B evidence over public and semisynthetic replay seeds, not real field sign-off.",
+            "deepLearningBoundary": "DeepLearning real-model candidates are ONNX Runtime outputs with AnnotationSeeded=false; do not compare annotation-seeded proof as model accuracy.",
         },
         "executionLog": execution_log,
         "operators": rows,
@@ -808,6 +929,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Anomaly detection worse metric cases: {report['summary'].get('anomalyDetectionWorseMetricCaseCount', 0)}",
         f"- Anomaly detection image-correct cases: {report['summary'].get('anomalyDetectionImageCorrectCaseCount', 0)}",
         f"- Anomaly detection detected anomaly cases: {report['summary'].get('anomalyDetectionDetectedAnomalyCaseCount', 0)}",
+        f"- DeepLearning replay cases: {report['summary'].get('deepLearningCaseCount', 0)}",
+        f"- DeepLearning real-model candidate cases: {report['summary'].get('deepLearningRealModelCaseCount', 0)}",
+        f"- DeepLearning processing-error cases: {report['summary'].get('deepLearningProcessingErrorCaseCount', 0)}",
         "",
         "## Operators",
         "",
@@ -932,7 +1056,38 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{format_cell(old_metrics.get('Score'))} | {format_cell(new_metrics.get('Score'))} | "
             f"{diagnostics.get('ImageCorrect', '-')} | {taxonomy_text} |"
         )
+    lines.extend(
+        [
+            "",
+            "## DeepLearning Real Model Focus",
+            "",
+            "| Case | Status | Execution | Old pass | New pass | New detections | TP | FP | FN | Processing error | Output shape |",
+            "|---|---|---|---|---|---:|---:|---:|---:|---|---|",
+        ]
+    )
+    deep_rows: list[dict[str, Any]] = []
+    for row in report["operators"]:
+        if row["operator"] != "DeepLearning":
+            continue
+        deep_rows.extend(row["replayCases"])
+    for case in deep_rows:
+        new_metrics = case["new"].get("metrics", {})
+        diagnostics = case["new"].get("diagnostics", {})
+        shape = diagnostics.get("OutputTensorShape")
+        if isinstance(shape, list):
+            shape_text = "x".join(str(item) for item in shape)
+        else:
+            shape_text = str(shape or "-")
+        lines.append(
+            f"| {case['caseId']} | {case['status']} | {case['executionMode']} | "
+            f"{case['old'].get('passed')} | {case['new'].get('passed')} | "
+            f"{format_cell(new_metrics.get('DetectionCount'))} | {format_cell(new_metrics.get('TruePositiveCount'))} | "
+            f"{format_cell(new_metrics.get('FalsePositiveCount'))} | {format_cell(new_metrics.get('FalseNegativeCount'))} | "
+            f"{diagnostics.get('ProcessingError', '-')} | {shape_text} |"
+        )
     lines.extend(["", "## Policy", "", report["policy"]["claimBoundary"], ""])
+    if report.get("policy", {}).get("deepLearningBoundary"):
+        lines.extend([report["policy"]["deepLearningBoundary"], ""])
     return "\n".join(lines)
 
 
@@ -946,17 +1101,25 @@ def generate(
     execute_matching: bool,
     execute_surface_defect: bool,
     execute_anomaly_detection: bool,
+    execute_deep_learning: bool,
     matching_candidate_version: str,
     surface_defect_candidate_version: str,
     anomaly_detection_candidate_version: str,
+    deep_learning_candidate_version: str,
+    deep_learning_model_manifest: str,
+    deep_learning_model_path: str | None,
 ) -> dict[str, Any]:
     report = build_report(
         execute_matching,
         execute_surface_defect,
         execute_anomaly_detection,
+        execute_deep_learning,
         matching_candidate_version,
         surface_defect_candidate_version,
         anomaly_detection_candidate_version,
+        deep_learning_candidate_version,
+        deep_learning_model_manifest,
+        deep_learning_model_path,
     )
     errors = validate(report)
     if errors:
@@ -971,23 +1134,32 @@ def main() -> int:
     parser.add_argument("--execute-matching", action="store_true", help="Run HPatches matching-family candidate replay before building the report.")
     parser.add_argument("--execute-surface-defect", action="store_true", help="Run KolektorSDD2 SurfaceDefectDetection candidate replay before building the report.")
     parser.add_argument("--execute-anomaly-detection", action="store_true", help="Run MVTec AnomalyDetection candidate replay before building the report.")
+    parser.add_argument("--execute-deep-learning", action="store_true", help="Run DeepLearning COCO real-model candidate replay. Requires a real ONNX model artifact.")
     parser.add_argument("--execute-candidates", action="store_true", help="Run every currently wired executable candidate family.")
     parser.add_argument("--candidate-version", default=DEFAULT_MATCHING_CANDIDATE_VERSION, help="HPatches matching candidate version to execute.")
     parser.add_argument("--surface-defect-candidate-version", default=DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION, help="KolektorSDD2 SurfaceDefectDetection candidate version to execute.")
     parser.add_argument("--anomaly-detection-candidate-version", default=DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION, help="MVTec AnomalyDetection candidate version to execute.")
+    parser.add_argument("--deep-learning-candidate-version", default=DEFAULT_DEEP_LEARNING_CANDIDATE_VERSION, help="DeepLearning real-model candidate version to execute.")
+    parser.add_argument("--deep-learning-model-manifest", default="models/object_detection/coco_yolo_real_model_manifest.template.json", help="DeepLearning real-model manifest path.")
+    parser.add_argument("--deep-learning-model", default=None, help="Optional DeepLearning ONNX model artifact path. Model files must not be committed.")
     parser.add_argument("--validate-only", action="store_true", help="Validate the existing generated A/B replay report.")
     args = parser.parse_args()
 
     execute_matching = args.execute_matching or args.execute_candidates
     execute_surface_defect = args.execute_surface_defect or args.execute_candidates
     execute_anomaly_detection = args.execute_anomaly_detection or args.execute_candidates
+    execute_deep_learning = args.execute_deep_learning
     report = read_json(OUTPUT_JSON) if args.validate_only else generate(
         execute_matching,
         execute_surface_defect,
         execute_anomaly_detection,
+        execute_deep_learning,
         args.candidate_version,
         args.surface_defect_candidate_version,
         args.anomaly_detection_candidate_version,
+        args.deep_learning_candidate_version,
+        args.deep_learning_model_manifest,
+        args.deep_learning_model,
     )
     errors = validate(report)
     if errors:
@@ -1003,6 +1175,7 @@ def main() -> int:
         f"surfaceImproved={report['summary'].get('surfaceDefectImprovedCaseCount', 0)} "
         f"anomalyImproved={report['summary'].get('anomalyDetectionImprovedCaseCount', 0)} "
         f"anomalyDetected={report['summary'].get('anomalyDetectionDetectedAnomalyCaseCount', 0)} "
+        f"deepLearningRealModel={report['summary'].get('deepLearningRealModelCaseCount', 0)} "
         f"generatedAt={utc_now()}"
     )
     return 0

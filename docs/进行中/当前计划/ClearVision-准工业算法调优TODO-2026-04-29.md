@@ -114,7 +114,7 @@ python quality/tools/run_quality_suite.py --suite audit_suite --run
 
 - [x] `SurfaceDefectDetection`：接 `KolektorSurfaceDefectDatasetRunner` 的 candidate 参数。
 - [x] `AnomalyDetection`：接 `AnomalyDetectionMvtecRunner` 的 candidate 参数。
-- [ ] `DeepLearning`：接真实模型 inference runner，禁止继续把 annotation-seeded 当模型精度。
+- [x] `DeepLearning`：接真实模型 inference runner，禁止继续把 annotation-seeded 当模型精度。
 - [ ] `EdgeDetection`：接 BSDS500 candidate 参数。
 - [ ] `SemanticSegmentation`：接 segmentation candidate 参数。
 - [ ] `ShapeMatching`、`TemplateMatching`：接各自 public/golden bridge candidate。
@@ -396,11 +396,11 @@ v4 结果（2026-04-29）：
 
 ### D1. 接入真实模型输出
 
-- [ ] 明确第一版模型：
+- [x] 明确第一版模型：
   - ONNX YOLO 系列，或项目已有模型格式
   - 模型文件不进 git
   - repo 只保存 model card、hash、license、input/output schema
-- [ ] 新增模型 manifest：
+- [x] 新增模型 manifest：
   - `modelId`
   - `modelSha256`
   - `source`
@@ -409,10 +409,10 @@ v4 结果（2026-04-29）：
   - `inputShape`
   - `preprocess`
   - `postprocess`
-- [ ] COCO runner 支持真实 inference provider：
+- [x] COCO runner 支持真实 inference provider：
   - CPU provider 必须可跑
   - GPU/TensorRT 可以作为 optional/manual
-- [ ] 输出：
+- [x] 输出：
   - `DeepLearning_coco_real_model_baseline.json`
   - `DeepLearning_coco_real_model_candidate_v2.json`
 
@@ -424,6 +424,14 @@ v4 结果（2026-04-29）：
 | AP50 | 先按真实模型能力冻结，不伪造 |
 | Precision/Recall | 输出并可回放 |
 | annotation-seeded claim | 不得混入真实模型报告 |
+
+完成记录（2026-04-30）：
+
+- 新增 `quality/tools/DeepLearningCocoRealModelRunner`：COCO 图片进入产品 DeepLearning 预处理，ONNX Runtime CPU provider 产生真实输出 tensor，再走同一套 YOLO 后处理、NMS、坐标反算和 COCO AP50/Precision/Recall 评估。
+- 新增 `models/object_detection/coco_yolo_real_model_manifest.template.json`，固定 `modelId`、`modelSha256`、source、license、classes、inputShape、preprocess、postprocess；模型文件仍不进 git。
+- `models/model_catalog.json` 与 `ModelCatalog` provenance 已支持 detection manifest 字段：`license`、`model_sha256`、`input_shape`、`classes`、`preprocess`、`postprocess`。
+- 已输出 `quality/evals/reports/DeepLearning_coco_real_model_baseline.json/.md` 与 `quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json/.md`。当前报告使用 generated smoke ONNX fixture 验证真实 ONNX 推理链路，`RealOnnxInference=true`、`AnnotationSeeded=false`，AP50/Recall 如实为 0，不作为训练模型精度收益声明。
+- `run_algorithm_ab_replay.py` 已预留 `--execute-deep-learning`、`--deep-learning-model-manifest`、`--deep-learning-model`。默认 `--execute-candidates` 不自动纳入 DeepLearning real-model candidate，避免把 smoke/外部模型结果与 annotation-seeded old proof 混作同一精度口径。
 
 ### D2. 后处理算法优化
 

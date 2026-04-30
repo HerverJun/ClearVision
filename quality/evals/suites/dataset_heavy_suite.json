@@ -57,6 +57,32 @@
           "notes": "Real COCO 2017 validation images through product DeepLearning preprocessing and YOLO postprocessing; tensor candidates are annotation-seeded until a trained COCO model is supplied."
         },
         {
+          "id": "deep_learning_coco_real_model_baseline",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-real-model",
+          "operators": ["DeepLearning"],
+          "datasetManifest": "quality/datasets/coco2017_index.json",
+          "modelManifest": "models/object_detection/coco_yolo_real_model_manifest.template.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_baseline.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_baseline.md", "--max-cases", "120"],
+          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_baseline.md",
+          "estimatedSeconds": 600,
+          "notes": "Real ONNX Runtime model outputs on COCO public images. The model artifact stays outside git; reports must keep AnnotationSeeded=false and must not claim field sign-off."
+        },
+        {
+          "id": "deep_learning_coco_real_model_candidate_v2",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-real-model-candidate",
+          "operators": ["DeepLearning"],
+          "datasetManifest": "quality/datasets/coco2017_index.json",
+          "modelManifest": "models/object_detection/coco_yolo_real_model_manifest.template.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.md", "--candidate-version", "v2", "--profile", "real_model_hard_nms_045", "--max-cases", "120"],
+          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.md",
+          "estimatedSeconds": 600,
+          "notes": "Candidate lane for real-model postprocess/NMS A/B. AP deltas are valid only between real-model outputs, never against annotation-seeded reports."
+        },
+        {
           "id": "semantic_segmentation_dataset",
           "status": "active",
           "evidenceKind": "dataset",

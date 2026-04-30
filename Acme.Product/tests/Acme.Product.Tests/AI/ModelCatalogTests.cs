@@ -13,6 +13,7 @@ public sealed class ModelCatalogTests
         catalog.Models.Should().NotBeEmpty();
         catalog.Models.Should().Contain(x => x.Id == "semantic_identity_2x2");
         catalog.Models.Should().Contain(x => x.Id == "anomaly_embedding_identity_2x2");
+        catalog.Models.Should().Contain(x => x.Id == "coco_yolo_external_onnx");
     }
 
     [Fact]
@@ -63,5 +64,29 @@ public sealed class ModelCatalogTests
         provenance["ResolutionSource"].Should().Be("ModelCatalog");
         provenance["ModelType"].Should().Be("segmentation");
         provenance["ModelVersion"].Should().Be("1.0.0");
+    }
+
+    [Fact]
+    public void Load_WithObjectDetectionManifestFields_ShouldPreserveProvenance()
+    {
+        var catalog = ModelCatalog.Load();
+        var entry = catalog.Models.Single(x => x.Id == "coco_yolo_external_onnx");
+
+        entry.Type.Should().Be("object_detection");
+        entry.InputShape.Should().Equal(1, 3, 640, 640);
+        entry.ResolvedClassNames.Should().HaveCount(80);
+        entry.Preprocess.Should().ContainKey("resize");
+        entry.Postprocess.Should().ContainKey("yoloVersion");
+
+        var resolved = ModelCatalog.ResolveExplicitOrCatalog(
+            explicitPath: null,
+            modelId: "coco_yolo_external_onnx",
+            catalogPath: null,
+            expectedTypes: ["object_detection"]);
+
+        var provenance = resolved.ToProvenancePayload();
+        provenance["ModelType"].Should().Be("object_detection");
+        provenance["ClassNames"].Should().BeEquivalentTo(entry.ResolvedClassNames);
+        provenance["InputShape"].Should().BeEquivalentTo(new[] { 1, 3, 640, 640 });
     }
 }
