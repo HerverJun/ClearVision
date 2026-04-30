@@ -50,7 +50,9 @@ internal static class ShapeMatchingGeometricDatasetRunner
 
     public static BaselineResult Run(RunnerOptions options)
     {
-        var specs = BuildCases().ToList();
+        var specs = BuildCases()
+            .Where(options.IncludesCase)
+            .ToList();
         var results = new List<CaseResult>(specs.Count);
         foreach (var spec in specs)
         {
@@ -95,7 +97,9 @@ internal static class ShapeMatchingGeometricDatasetRunner
                 AngleToleranceDeg,
                 ScaleTolerance,
                 runtimeMs,
-                memoryBytes),
+                memoryBytes,
+                options.CandidateVersion,
+                options.Profile),
             [
                 new OperatorSummary(
                     "ShapeMatching",
@@ -840,7 +844,9 @@ internal sealed record DatasetSummary(
     double AngleToleranceDeg,
     double ScaleTolerance,
     double RuntimeMs,
-    long MemoryAllocationBytes);
+    long MemoryAllocationBytes,
+    string CandidateVersion,
+    string Profile);
 
 internal sealed record OperatorSummary(
     string Operator,
@@ -902,6 +908,8 @@ internal static class MarkdownReport
             $"GeneratedAtUtc: `{result.Summary.GeneratedAtUtc:O}`",
             $"Dataset: `{result.Summary.DatasetName}`",
             $"DatasetKind: `{result.Summary.DatasetKind}`",
+            $"CandidateVersion: `{result.Summary.CandidateVersion}`",
+            $"Profile: `{result.Summary.Profile}`",
             "",
             "## Summary",
             "",
@@ -964,13 +972,25 @@ internal static class MarkdownReport
     }
 }
 
-internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool ShowHelp, string? ParseError)
+internal sealed record RunnerOptions(
+    string OutputPath,
+    string ReportPath,
+    string CandidateVersion,
+    string Profile,
+    IReadOnlySet<string> CaseIds,
+    bool ShowHelp,
+    string? ParseError)
 {
+    public bool IncludesCase(ShapeCaseSpec spec) => CaseIds.Count == 0 || CaseIds.Contains(spec.CaseId);
+
     public static RunnerOptions Parse(string[] args)
     {
         var options = new RunnerOptions(
             "quality/evals/reports/ShapeMatching_dataset_baseline.json",
             "quality/evals/reports/ShapeMatching_dataset_baseline.md",
+            "control",
+            "baseline_geometric_dataset",
+            new HashSet<string>(StringComparer.Ordinal),
             false,
             null);
 
@@ -992,6 +1012,9 @@ internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool 
             {
                 "--output" => options with { OutputPath = value },
                 "--report" => options with { ReportPath = value },
+                "--candidate-version" => options with { CandidateVersion = value },
+                "--profile" => options with { Profile = value },
+                "--case-ids" => options with { CaseIds = SplitCaseIds(value) },
                 _ => options with { ParseError = $"Unknown argument: {arg}" }
             };
 
@@ -1012,8 +1035,15 @@ internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool 
         Options:
           --output <path>   Baseline JSON output path.
           --report <path>   Baseline Markdown report path.
+          --candidate-version <id>  Candidate version label to record.
+          --profile <name>          Candidate profile label to record.
+          --case-ids <ids>          Comma-separated case ids to execute.
         """);
     }
+
+    private static IReadOnlySet<string> SplitCaseIds(string raw) =>
+        raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
 }
 
 internal static class JsonSettings

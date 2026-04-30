@@ -52,6 +52,7 @@ internal static class BsdsEdgeContourDatasetRunner
         var records = index.Records
             .Where(item => item.HasGroundTruth)
             .Where(item => options.Split.Equals("all", StringComparison.OrdinalIgnoreCase) || item.Split.Equals(options.Split, StringComparison.OrdinalIgnoreCase))
+            .Where(item => options.CaseIds.Count == 0 || options.CaseIds.Contains(item.Id))
             .OrderBy(item => item.Split, StringComparer.Ordinal)
             .ThenBy(item => item.Id, StringComparer.Ordinal)
             .ToList();
@@ -63,7 +64,7 @@ internal static class BsdsEdgeContourDatasetRunner
 
         if (records.Count == 0)
         {
-            throw new InvalidOperationException($"No BSDS500 records selected from {options.IndexPath} with split '{options.Split}'.");
+            throw new InvalidOperationException($"No BSDS500 records selected from {options.IndexPath} with split '{options.Split}' and case filter '{string.Join(",", options.CaseIds)}'.");
         }
 
         var cases = new List<CaseResult>(records.Count);
@@ -88,6 +89,8 @@ internal static class BsdsEdgeContourDatasetRunner
                 "public BSDS500 real-image contour/boundary gate using MATLAB v5 human annotations",
                 options.IndexPath,
                 options.Split,
+                options.CandidateVersion,
+                options.Profile,
                 cases.Count,
                 cases.Count - failed,
                 failed,
@@ -852,6 +855,8 @@ internal sealed record DatasetSummary(
     string DatasetKind,
     string IndexPath,
     string Split,
+    string CandidateVersion,
+    string Profile,
     int CaseCount,
     int Passed,
     int Failed,
@@ -936,6 +941,8 @@ internal static class MarkdownReport
             $"Dataset: `{result.Summary.DatasetName}`",
             $"Index: `{result.Summary.IndexPath}`",
             $"Split: `{result.Summary.Split}`",
+            $"CandidateVersion: `{result.Summary.CandidateVersion}`",
+            $"Profile: `{result.Summary.Profile}`",
             "",
             "## Summary",
             "",
@@ -1009,6 +1016,9 @@ internal sealed record RunnerOptions(
     int GaussianKernelSize,
     int ApertureSize,
     bool L2Gradient,
+    string CandidateVersion,
+    string Profile,
+    IReadOnlySet<string> CaseIds,
     bool ShowHelp,
     string? ParseError)
 {
@@ -1029,6 +1039,9 @@ internal sealed record RunnerOptions(
             5,
             3,
             false,
+            "baseline",
+            "fixed_canny_50_150",
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             false,
             null);
 
@@ -1062,6 +1075,9 @@ internal sealed record RunnerOptions(
                 "--gaussian-kernel-size" => options with { GaussianKernelSize = int.Parse(value, CultureInfo.InvariantCulture) },
                 "--aperture-size" => options with { ApertureSize = int.Parse(value, CultureInfo.InvariantCulture) },
                 "--l2-gradient" => options with { L2Gradient = bool.Parse(value) },
+                "--candidate-version" => options with { CandidateVersion = value },
+                "--profile" => options with { Profile = value },
+                "--case-ids" => options with { CaseIds = ParseCaseIds(value) },
                 _ => options with { ParseError = $"Unknown argument: {arg}" }
             };
 
@@ -1074,6 +1090,10 @@ internal sealed record RunnerOptions(
         return options;
     }
 
+    private static HashSet<string> ParseCaseIds(string value) =>
+        value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     public static void PrintHelp()
     {
         Console.WriteLine("""
@@ -1085,10 +1105,13 @@ internal sealed record RunnerOptions(
           --report <path>                 Baseline Markdown report path.
           --split <train|val|test|all>    Source split to run. Default: test.
           --max-cases <n>                 Optional smoke subset; 0 means all selected cases.
+          --case-ids <id,id>              Optional comma-separated case id filter.
           --threshold1 <number>           Canny low threshold. Default: 50.
           --threshold2 <number>           Canny high threshold. Default: 150.
           --auto-threshold <bool>         Use product auto-thresholding. Default: false.
           --auto-threshold-strategy <s>   MedianIntensity or GradientPercentile. Default: MedianIntensity.
+          --candidate-version <version>   Candidate version label written to the report.
+          --profile <name>                Candidate profile label written to the report.
         """);
     }
 }

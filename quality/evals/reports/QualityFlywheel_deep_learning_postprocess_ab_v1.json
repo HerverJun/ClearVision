@@ -1,0 +1,423 @@
+{
+  "SchemaVersion": "2026-04-30.deep-learning-postprocess-ab.v1",
+  "GeneratedAtUtc": "2026-04-30T01:51:40.2173745+00:00",
+  "Accepted": true,
+  "Summary": {
+    "CaseCount": 6,
+    "ComparisonCount": 28,
+    "AcceptedCaseCount": 6,
+    "FailedCaseCount": 0,
+    "NmsComparisonCount": 24,
+    "LetterboxComparisonCount": 2,
+    "ClampComparisonCount": 2
+  },
+  "ClaimBoundary": {
+    "PostprocessOnlyRule": "This report evaluates DeepLearning postprocess behavior only: NMS, letterbox coordinate inversion, and clamp policy.",
+    "NoModelAccuracyRule": "It does not claim model-training, model-weight, AP, precision, or recall improvement.",
+    "OfflineVariantRule": "Offline variants are candidate evidence and are not production behavior unless promoted in a later algorithm change."
+  },
+  "Cases": [
+    {
+      "CaseId": "nms_same_class_overlap",
+      "Topic": "nms",
+      "Accepted": true,
+      "RuntimeMs": 19.302,
+      "ExpectedBaselineDetections": 2,
+      "ActualBaselineDetections": 2,
+      "BaselineCoordinateErrorPx": 0,
+      "Comparisons": [
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "no_nms_candidate",
+          "Topic": "nms",
+          "BaselineValue": 2,
+          "CandidateValue": 3,
+          "Delta": 1,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "hard_nms_075_candidate",
+          "Topic": "nms",
+          "BaselineValue": 2,
+          "CandidateValue": 3,
+          "Delta": 1,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "soft_nms_linear_offline",
+          "Topic": "nms",
+          "BaselineValue": 2,
+          "CandidateValue": 2,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "class_agnostic_hard_nms_offline",
+          "Topic": "nms",
+          "BaselineValue": 2,
+          "CandidateValue": 2,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        }
+      ]
+    },
+    {
+      "CaseId": "nms_cross_class_overlap",
+      "Topic": "nms",
+      "Accepted": true,
+      "RuntimeMs": 0.058,
+      "ExpectedBaselineDetections": 3,
+      "ActualBaselineDetections": 3,
+      "BaselineCoordinateErrorPx": 0,
+      "Comparisons": [
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "no_nms_candidate",
+          "Topic": "nms",
+          "BaselineValue": 3,
+          "CandidateValue": 3,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "hard_nms_075_candidate",
+          "Topic": "nms",
+          "BaselineValue": 3,
+          "CandidateValue": 3,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "soft_nms_linear_offline",
+          "Topic": "nms",
+          "BaselineValue": 3,
+          "CandidateValue": 3,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "class_agnostic_hard_nms_offline",
+          "Topic": "nms",
+          "BaselineValue": 3,
+          "CandidateValue": 2,
+          "Delta": -1,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        }
+      ]
+    },
+    {
+      "CaseId": "letterbox_wide_image",
+      "Topic": "letterbox",
+      "Accepted": true,
+      "RuntimeMs": 0.166,
+      "ExpectedBaselineDetections": 1,
+      "ActualBaselineDetections": 1,
+      "BaselineCoordinateErrorPx": 0,
+      "Comparisons": [
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "no_nms_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "hard_nms_075_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "soft_nms_linear_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "class_agnostic_hard_nms_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "letterbox_inverse_baseline",
+          "Candidate": "naive_no_letterbox_inverse_offline",
+          "Topic": "letterbox",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 122.5,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 122.5,
+          "Accepted": true,
+          "Note": "Positive delta means the candidate has larger coordinate error than the product letterbox inverse."
+        }
+      ]
+    },
+    {
+      "CaseId": "letterbox_tall_image",
+      "Topic": "letterbox",
+      "Accepted": true,
+      "RuntimeMs": 0.022,
+      "ExpectedBaselineDetections": 1,
+      "ActualBaselineDetections": 1,
+      "BaselineCoordinateErrorPx": 0,
+      "Comparisons": [
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "no_nms_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "hard_nms_075_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "soft_nms_linear_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "class_agnostic_hard_nms_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "letterbox_inverse_baseline",
+          "Candidate": "naive_no_letterbox_inverse_offline",
+          "Topic": "letterbox",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 118.125,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 118.125,
+          "Accepted": true,
+          "Note": "Positive delta means the candidate has larger coordinate error than the product letterbox inverse."
+        }
+      ]
+    },
+    {
+      "CaseId": "clamp_top_left_overflow",
+      "Topic": "clamp",
+      "Accepted": true,
+      "RuntimeMs": 0.124,
+      "ExpectedBaselineDetections": 1,
+      "ActualBaselineDetections": 1,
+      "BaselineCoordinateErrorPx": 0,
+      "Comparisons": [
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "no_nms_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "hard_nms_075_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "soft_nms_linear_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "class_agnostic_hard_nms_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "product_clamp_baseline",
+          "Candidate": "no_clamp_offline",
+          "Topic": "clamp",
+          "BaselineValue": 0,
+          "CandidateValue": 1,
+          "Delta": 1,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 1,
+          "Accepted": true,
+          "Note": "Positive delta means clamp removed invalid coordinates."
+        }
+      ]
+    },
+    {
+      "CaseId": "clamp_bottom_right_overflow",
+      "Topic": "clamp",
+      "Accepted": true,
+      "RuntimeMs": 0.022,
+      "ExpectedBaselineDetections": 1,
+      "ActualBaselineDetections": 1,
+      "BaselineCoordinateErrorPx": 0,
+      "Comparisons": [
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "no_nms_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "hard_nms_075_candidate",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "soft_nms_linear_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "hard_nms_045_baseline",
+          "Candidate": "class_agnostic_hard_nms_offline",
+          "Topic": "nms",
+          "BaselineValue": 1,
+          "CandidateValue": 1,
+          "Delta": 0,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 0,
+          "Accepted": true,
+          "Note": "Detection-count delta only; AP/precision/recall are out of scope for this postprocess runner."
+        },
+        {
+          "Baseline": "product_clamp_baseline",
+          "Candidate": "no_clamp_offline",
+          "Topic": "clamp",
+          "BaselineValue": 0,
+          "CandidateValue": 1,
+          "Delta": 1,
+          "BaselineCoordinateErrorPx": 0,
+          "CandidateCoordinateErrorPx": 1,
+          "Accepted": true,
+          "Note": "Positive delta means clamp removed invalid coordinates."
+        }
+      ]
+    }
+  ]
+}

@@ -20,15 +20,31 @@ HPATCHES_PROJECT = "quality/tools/HPatchesFeatureMatchDatasetRunner/HPatchesFeat
 SURFACE_DEFECT_PROJECT = "quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj"
 ANOMALY_DETECTION_PROJECT = "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj"
 DEEP_LEARNING_PROJECT = "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj"
+EDGE_DETECTION_PROJECT = "quality/tools/BsdsEdgeContourDatasetRunner/BsdsEdgeContourDatasetRunner.csproj"
+SEMANTIC_SEGMENTATION_PROJECT = "quality/tools/SemanticSegmentationDatasetRunner/SemanticSegmentationDatasetRunner.csproj"
+TEMPLATE_MATCHING_PROJECT = "quality/tools/TemplateMatchingHomographyBridgeRunner/TemplateMatchingHomographyBridgeRunner.csproj"
+SHAPE_MATCHING_PROJECT = "quality/tools/ShapeMatchingGeometricDatasetRunner/ShapeMatchingGeometricDatasetRunner.csproj"
+CAMERA_CALIBRATION_PROJECT = "quality/tools/OpenCvCalibrationDatasetRunner/OpenCvCalibrationDatasetRunner.csproj"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
 MATCHING_OPERATORS = {"AkazeFeatureMatch", "OrbFeatureMatch"}
 SURFACE_DEFECT_OPERATORS = {"SurfaceDefectDetection"}
 ANOMALY_DETECTION_OPERATORS = {"AnomalyDetection"}
 DEEP_LEARNING_OPERATORS = {"DeepLearning"}
+EDGE_DETECTION_OPERATORS = {"EdgeDetection"}
+SEMANTIC_SEGMENTATION_OPERATORS = {"SemanticSegmentation"}
+TEMPLATE_MATCHING_OPERATORS = {"TemplateMatching"}
+SHAPE_MATCHING_OPERATORS = {"ShapeMatching"}
+CAMERA_CALIBRATION_OPERATORS = {"CameraCalibration"}
 DEFAULT_MATCHING_CANDIDATE_VERSION = "v4"
 DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION = "v1"
 DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION = "v1"
 DEFAULT_DEEP_LEARNING_CANDIDATE_VERSION = "v2"
+DEFAULT_EDGE_DETECTION_CANDIDATE_VERSION = "v1"
+DEFAULT_SEMANTIC_SEGMENTATION_CANDIDATE_VERSION = "v1"
+DEFAULT_TEMPLATE_MATCHING_CANDIDATE_VERSION = "v1"
+DEFAULT_SHAPE_MATCHING_CANDIDATE_VERSION = "v1"
+DEFAULT_CAMERA_CALIBRATION_CANDIDATE_VERSION = "v1"
+DEFAULT_CAMERA_CALIBRATION_CANDIDATE_PROFILE = "camera_calibration"
 LOWER_BETTER_METRICS = {
     "PositionErrorPx",
     "P95PositionErrorPx",
@@ -43,6 +59,10 @@ LOWER_BETTER_METRICS = {
     "FalsePositivePerImage",
 }
 IMPROVEMENT_METRIC_ORDER = (
+    "ReprojectionRmsPx",
+    "MaxReprojectionErrorPx",
+    "DetectedImageCount",
+    "TotalImages",
     "PositionErrorPx",
     "PixelTotals.F1",
     "PixelTotals.IoU",
@@ -50,6 +70,10 @@ IMPROVEMENT_METRIC_ORDER = (
     "PixelF1",
     "Dice",
     "MaskIoU",
+    "BoundaryF1",
+    "ConsensusBoundaryF1",
+    "BoundaryRecall",
+    "ConsensusBoundaryRecall",
 )
 HPATCHES_DIAGNOSTIC_FIELDS = (
     "InlierRatio",
@@ -80,6 +104,53 @@ DEEP_LEARNING_DIAGNOSTIC_FIELDS = (
     "OutputTensorShape",
     "OutputSelectionRule",
     "YoloVersion",
+)
+EDGE_DETECTION_DIAGNOSTIC_FIELDS = (
+    "Threshold1Used",
+    "Threshold2Used",
+    "PredictedEdgePixels",
+    "UnionBoundaryPixels",
+    "ConsensusBoundaryPixels",
+    "BoundaryPrecision",
+    "BoundaryRecall",
+    "BoundaryF1",
+    "ConsensusBoundaryPrecision",
+    "ConsensusBoundaryRecall",
+    "ConsensusBoundaryF1",
+)
+SEMANTIC_SEGMENTATION_DIAGNOSTIC_FIELDS = (
+    "Scenario",
+    "InputSize",
+    "ChannelOrder",
+    "PresentClasses",
+)
+TEMPLATE_MATCHING_DIAGNOSTIC_FIELDS = (
+    "Sequence",
+    "TemplateSource",
+    "ExpectedX",
+    "ExpectedY",
+    "ActualX",
+    "ActualY",
+    "Score",
+    "NormalizedScore",
+)
+SHAPE_MATCHING_DIAGNOSTIC_FIELDS = (
+    "Scenario",
+    "Width",
+    "Height",
+    "GroundTruthCount",
+    "PredictedCount",
+    "TruePositiveCount",
+    "FalsePositiveCount",
+    "FalseNegativeCount",
+)
+CAMERA_CALIBRATION_DIAGNOSTIC_FIELDS = (
+    "RejectedDetectionCount",
+    "RejectedOutlierCount",
+    "BundleRoundTripValid",
+    "OutputFileWritten",
+    "FailureReasonCode",
+    "Error",
 )
 
 
@@ -143,15 +214,31 @@ def normalize_case_result(case: dict[str, Any]) -> dict[str, Any]:
     passed = case.get("passed")
     if not isinstance(passed, bool):
         passed = bool(case.get("Passed") or case.get("Accepted") or case.get("accepted"))
-    diagnostics = {
-        key: case.get(key)
-        for key in (*HPATCHES_DIAGNOSTIC_FIELDS, *SURFACE_DEFECT_DIAGNOSTIC_FIELDS, *ANOMALY_DETECTION_DIAGNOSTIC_FIELDS, *DEEP_LEARNING_DIAGNOSTIC_FIELDS)
-        if key in case
-    }
+    accepted = case.get("accepted")
+    if not isinstance(accepted, bool):
+        accepted = bool(case.get("Accepted") or case.get("accepted"))
+        if not accepted and isinstance(case.get("Accepted"), bool):
+            accepted = bool(case.get("Accepted"))
+    diagnostic_fields = (
+        *CAMERA_CALIBRATION_DIAGNOSTIC_FIELDS,
+        *HPATCHES_DIAGNOSTIC_FIELDS,
+        *SURFACE_DEFECT_DIAGNOSTIC_FIELDS,
+        *ANOMALY_DETECTION_DIAGNOSTIC_FIELDS,
+        *DEEP_LEARNING_DIAGNOSTIC_FIELDS,
+        *EDGE_DETECTION_DIAGNOSTIC_FIELDS,
+        *SEMANTIC_SEGMENTATION_DIAGNOSTIC_FIELDS,
+        *TEMPLATE_MATCHING_DIAGNOSTIC_FIELDS,
+        *SHAPE_MATCHING_DIAGNOSTIC_FIELDS,
+    )
+    diagnostics = {key: case.get(key) for key in diagnostic_fields if key in case}
+    if isinstance(case.get("metrics"), dict):
+        metric_payload = case["metrics"]
+        diagnostics.update({key: metric_payload.get(key) for key in diagnostic_fields if key in metric_payload})
     return {
         "caseId": case_id,
         "split": str(case.get("split") or case.get("Split") or "test"),
         "passed": passed,
+        "accepted": accepted,
         "metrics": metrics,
         "diagnostics": diagnostics,
         "failureTaxonomy": case.get("failureTaxonomy") or case.get("FailureTaxonomy") or case.get("HomographyFailureReason") or case.get("Failure") or case.get("FailureReason") or [],
@@ -199,6 +286,56 @@ def read_anomaly_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def read_deep_learning_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    document = read_json(path)
+    return {
+        normalized["caseId"]: normalized
+        for normalized in (normalize_case_result(case) for case in document.get("Cases", []))
+    }
+
+
+def read_edge_detection_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    document = read_json(path)
+    return {
+        normalized["caseId"]: normalized
+        for normalized in (normalize_case_result(case) for case in document.get("Cases", []))
+    }
+
+
+def read_semantic_segmentation_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    document = read_json(path)
+    return {
+        normalized["caseId"]: normalized
+        for normalized in (normalize_case_result(case) for case in document.get("Cases", []))
+    }
+
+
+def read_template_matching_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    document = read_json(path)
+    return {
+        normalized["caseId"]: normalized
+        for normalized in (normalize_case_result(case) for case in document.get("Cases", []))
+    }
+
+
+def read_shape_matching_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    document = read_json(path)
+    return {
+        normalized["caseId"]: normalized
+        for normalized in (normalize_case_result(case) for case in document.get("Cases", []))
+    }
+
+
+def read_camera_calibration_candidate_cases(path: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     document = read_json(path)
@@ -267,6 +404,40 @@ def case_status(old_case: dict[str, Any], new_case: dict[str, Any], operator: st
     return "unchanged"
 
 
+def edge_detection_taxonomy(old_case: dict[str, Any], new_case: dict[str, Any], status: str) -> list[str]:
+    if status != "worse-metric":
+        return []
+
+    old_metrics = old_case.get("metrics", {})
+    new_metrics = new_case.get("metrics", {})
+    old_f1 = numeric(old_metrics.get("BoundaryF1"))
+    new_f1 = numeric(new_metrics.get("BoundaryF1"))
+    old_recall = numeric(old_metrics.get("BoundaryRecall"))
+    new_recall = numeric(new_metrics.get("BoundaryRecall"))
+    old_precision = numeric(old_metrics.get("BoundaryPrecision"))
+    new_precision = numeric(new_metrics.get("BoundaryPrecision"))
+    old_pixels = numeric(old_metrics.get("PredictedEdgePixels"))
+    new_pixels = numeric(new_metrics.get("PredictedEdgePixels"))
+
+    labels: list[str] = []
+    if old_pixels is not None and new_pixels is not None and new_pixels < old_pixels:
+        labels.append("reduced_edge_density")
+    if old_recall is not None and new_recall is not None and new_recall < old_recall:
+        labels.append("boundary_recall_drop")
+        if old_recall - new_recall >= 0.05:
+            labels.append("large_recall_drop")
+    if old_precision is not None and new_precision is not None and new_precision > old_precision:
+        labels.append("precision_gain_recall_tradeoff")
+    elif old_precision is not None and new_precision is not None and new_precision < old_precision:
+        labels.append("precision_drop")
+    if old_f1 is not None and new_f1 is not None:
+        labels.append("boundary_f1_drop_gt_0_01" if old_f1 - new_f1 >= 0.01 else "minor_boundary_f1_drop")
+    if new_recall is not None and new_recall < 0.5:
+        labels.append("low_absolute_recall")
+
+    return labels or ["unclassified_worse_metric"]
+
+
 def replay_case_ids(replay: dict[str, Any], operator: str) -> list[str]:
     return [
         str(case.get("caseId"))
@@ -317,6 +488,46 @@ def deep_learning_candidate_path(candidate_version: str) -> Path:
 
 def deep_learning_candidate_report_path(candidate_version: str) -> Path:
     return REPORT_DIR / f"DeepLearning_coco_real_model_candidate_{candidate_version}.md"
+
+
+def edge_detection_candidate_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"EdgeDetection_bsds500_candidate_replay_{candidate_version}.json"
+
+
+def edge_detection_candidate_report_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"EdgeDetection_bsds500_candidate_replay_{candidate_version}.md"
+
+
+def semantic_segmentation_candidate_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"SemanticSegmentation_dataset_candidate_replay_{candidate_version}.json"
+
+
+def semantic_segmentation_candidate_report_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"SemanticSegmentation_dataset_candidate_replay_{candidate_version}.md"
+
+
+def template_matching_candidate_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"TemplateMatching_public_bridge_candidate_replay_{candidate_version}.json"
+
+
+def template_matching_candidate_report_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"TemplateMatching_public_bridge_candidate_replay_{candidate_version}.md"
+
+
+def shape_matching_candidate_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"ShapeMatching_geometric_dataset_candidate_replay_{candidate_version}.json"
+
+
+def shape_matching_candidate_report_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"ShapeMatching_geometric_dataset_candidate_replay_{candidate_version}.md"
+
+
+def camera_calibration_candidate_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"CameraCalibration_opencv_samples_candidate_replay_{candidate_version}.json"
+
+
+def camera_calibration_candidate_report_path(candidate_version: str) -> Path:
+    return REPORT_DIR / f"CameraCalibration_opencv_samples_candidate_replay_{candidate_version}.md"
 
 
 def matching_candidate_parameters(operator: str, candidate_version: str) -> dict[str, Any]:
@@ -401,6 +612,50 @@ def anomaly_candidate_parameters(candidate_version: str) -> dict[str, Any]:
     }
     result["ProfileName"] = summary.get("ProfileName") or summary.get("Profile") or result["ProfileName"]
     return result
+
+
+def edge_detection_candidate_parameters(candidate_version: str) -> dict[str, Any]:
+    return {
+        "CandidateVersion": candidate_version,
+        "ProfileName": "fixed_50_150_l2",
+        "Threshold1": 50,
+        "Threshold2": 150,
+        "AutoThreshold": False,
+        "AutoThresholdSigma": 0.33,
+        "AutoThresholdStrategy": "MedianIntensity",
+        "EnableGaussianBlur": True,
+        "GaussianKernelSize": 5,
+        "ApertureSize": 3,
+        "L2Gradient": True,
+    }
+
+
+def semantic_segmentation_candidate_parameters(candidate_version: str) -> dict[str, Any]:
+    return {
+        "CandidateVersion": candidate_version,
+        "ProfileName": "protocol_bridge_exact_map_v1",
+    }
+
+
+def template_matching_candidate_parameters(candidate_version: str) -> dict[str, Any]:
+    return {
+        "CandidateVersion": candidate_version,
+        "ProfileName": "homography_bridge_ncc_v1",
+    }
+
+
+def shape_matching_candidate_parameters(candidate_version: str) -> dict[str, Any]:
+    return {
+        "CandidateVersion": candidate_version,
+        "ProfileName": "geometric_dataset_bridge_v1",
+    }
+
+
+def camera_calibration_candidate_parameters(candidate_version: str, profile: str) -> dict[str, Any]:
+    return {
+        "CandidateVersion": candidate_version,
+        "ProfileName": profile or "default",
+    }
 
 
 def execute_matching_candidate(operator: str, case_ids: list[str], candidate_version: str) -> tuple[Path, dict[str, Any]]:
@@ -583,10 +838,12 @@ def execute_deep_learning_candidate(
 ) -> tuple[Path, dict[str, Any]]:
     output = deep_learning_candidate_path(candidate_version)
     report = deep_learning_candidate_report_path(candidate_version)
+    model_manifest_ref = model_manifest if model_path else "generated-smoke-fixture"
     parameters: dict[str, Any] = {
         "CandidateVersion": candidate_version,
-        "ModelManifest": model_manifest,
+        "ModelManifest": model_manifest_ref,
         "ModelPathProvided": bool(model_path),
+        "GeneratedSmokeModel": not bool(model_path),
         "Confidence": 0.25,
         "NmsIou": 0.45,
     }
@@ -606,8 +863,6 @@ def execute_deep_learning_candidate(
         candidate_version,
         "--profile",
         "real_model_hard_nms_045",
-        "--model-manifest",
-        model_manifest,
         "--case-ids",
         ",".join(case_ids),
         "--confidence",
@@ -616,7 +871,9 @@ def execute_deep_learning_candidate(
         str(parameters["NmsIou"]),
     ]
     if model_path:
-        command.extend(["--model", model_path])
+        command.extend(["--model-manifest", model_manifest, "--model", model_path])
+    else:
+        command.append("--generate-smoke-model")
     completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
     if completed.returncode != 0:
         raise SystemExit(
@@ -626,15 +883,204 @@ def execute_deep_learning_candidate(
     return output, parameters
 
 
+def execute_edge_detection_candidate(case_ids: list[str], candidate_version: str) -> tuple[Path, dict[str, Any]]:
+    output = edge_detection_candidate_path(candidate_version)
+    report = edge_detection_candidate_report_path(candidate_version)
+    parameters = edge_detection_candidate_parameters(candidate_version)
+    command = [
+        "dotnet",
+        "run",
+        "--project",
+        EDGE_DETECTION_PROJECT,
+        "--",
+        "--index",
+        "quality/datasets/bsds500_index.json",
+        "--output",
+        repo(output),
+        "--report",
+        repo(report),
+        "--split",
+        "test",
+        "--case-ids",
+        ",".join(case_ids),
+        "--candidate-version",
+        candidate_version,
+        "--profile",
+        str(parameters["ProfileName"]),
+        "--threshold1",
+        str(parameters["Threshold1"]),
+        "--threshold2",
+        str(parameters["Threshold2"]),
+        "--auto-threshold",
+        str(parameters["AutoThreshold"]).lower(),
+        "--auto-threshold-sigma",
+        str(parameters["AutoThresholdSigma"]),
+        "--auto-threshold-strategy",
+        str(parameters["AutoThresholdStrategy"]),
+        "--enable-gaussian-blur",
+        str(parameters["EnableGaussianBlur"]).lower(),
+        "--gaussian-kernel-size",
+        str(parameters["GaussianKernelSize"]),
+        "--aperture-size",
+        str(parameters["ApertureSize"]),
+        "--l2-gradient",
+        str(parameters["L2Gradient"]).lower(),
+    ]
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(
+            "error: EdgeDetection candidate replay failed\n"
+            f"{completed.stdout}\n{completed.stderr}".strip()
+        )
+    return output, parameters
+
+
+def execute_semantic_segmentation_candidate(case_ids: list[str], candidate_version: str) -> tuple[Path, dict[str, Any]]:
+    output = semantic_segmentation_candidate_path(candidate_version)
+    report = semantic_segmentation_candidate_report_path(candidate_version)
+    parameters = semantic_segmentation_candidate_parameters(candidate_version)
+    command = [
+        "dotnet",
+        "run",
+        "--project",
+        SEMANTIC_SEGMENTATION_PROJECT,
+        "--",
+        "--output",
+        repo(output),
+        "--report",
+        repo(report),
+        "--case-ids",
+        ",".join(case_ids),
+        "--candidate-version",
+        candidate_version,
+        "--profile",
+        str(parameters["ProfileName"]),
+    ]
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(
+            "error: SemanticSegmentation candidate replay failed\n"
+            f"{completed.stdout}\n{completed.stderr}".strip()
+        )
+    return output, parameters
+
+
+def execute_template_matching_candidate(case_ids: list[str], candidate_version: str) -> tuple[Path, dict[str, Any]]:
+    output = template_matching_candidate_path(candidate_version)
+    report = template_matching_candidate_report_path(candidate_version)
+    parameters = template_matching_candidate_parameters(candidate_version)
+    command = [
+        "dotnet",
+        "run",
+        "--project",
+        TEMPLATE_MATCHING_PROJECT,
+        "--",
+        "--output",
+        repo(output),
+        "--report",
+        repo(report),
+        "--case-ids",
+        ",".join(case_ids),
+        "--candidate-version",
+        candidate_version,
+        "--profile",
+        str(parameters["ProfileName"]),
+    ]
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(
+            "error: TemplateMatching candidate replay failed\n"
+            f"{completed.stdout}\n{completed.stderr}".strip()
+        )
+    return output, parameters
+
+
+def execute_shape_matching_candidate(case_ids: list[str], candidate_version: str) -> tuple[Path, dict[str, Any]]:
+    output = shape_matching_candidate_path(candidate_version)
+    report = shape_matching_candidate_report_path(candidate_version)
+    parameters = shape_matching_candidate_parameters(candidate_version)
+    command = [
+        "dotnet",
+        "run",
+        "--project",
+        SHAPE_MATCHING_PROJECT,
+        "--",
+        "--output",
+        repo(output),
+        "--report",
+        repo(report),
+        "--case-ids",
+        ",".join(case_ids),
+        "--candidate-version",
+        candidate_version,
+        "--profile",
+        str(parameters["ProfileName"]),
+    ]
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(
+            "error: ShapeMatching candidate replay failed\n"
+            f"{completed.stdout}\n{completed.stderr}".strip()
+        )
+    return output, parameters
+
+
+def execute_camera_calibration_candidate(
+    case_ids: list[str],
+    candidate_version: str,
+    candidate_profile: str,
+) -> tuple[Path, dict[str, Any]]:
+    output = camera_calibration_candidate_path(candidate_version)
+    report = camera_calibration_candidate_report_path(candidate_version)
+    parameters = camera_calibration_candidate_parameters(candidate_version, candidate_profile)
+    command = [
+        "dotnet",
+        "run",
+        "--project",
+        CAMERA_CALIBRATION_PROJECT,
+        "--",
+        "--index",
+        "quality/datasets/opencv_calibration_samples_index.json",
+        "--output",
+        repo(output),
+        "--report",
+        repo(report),
+        "--case-ids",
+        ",".join(case_ids),
+        "--candidate-version",
+        candidate_version,
+        "--profile",
+        str(parameters["ProfileName"]),
+    ]
+    completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(
+            "error: CameraCalibration candidate replay failed\n"
+            f"{completed.stdout}\n{completed.stderr}".strip()
+        )
+    return output, parameters
+
+
 def build_report(
     execute_matching: bool,
     execute_surface_defect: bool,
     execute_anomaly_detection: bool,
+    execute_edge_detection: bool,
+    execute_semantic_segmentation: bool,
+    execute_template_matching: bool,
+    execute_shape_matching: bool,
     execute_deep_learning: bool,
+    execute_camera_calibration: bool,
     matching_candidate_version: str,
     surface_defect_candidate_version: str,
     anomaly_detection_candidate_version: str,
+    edge_detection_candidate_version: str,
+    semantic_segmentation_candidate_version: str,
+    template_matching_candidate_version: str,
+    shape_matching_candidate_version: str,
     deep_learning_candidate_version: str,
+    camera_calibration_candidate_version: str,
+    camera_calibration_candidate_profile: str,
     deep_learning_model_manifest: str,
     deep_learning_model_path: str | None,
 ) -> dict[str, Any]:
@@ -649,7 +1095,12 @@ def build_report(
     matching_candidate_cases: dict[str, dict[str, dict[str, Any]]] = {}
     surface_candidate_cases: dict[str, dict[str, Any]] = {}
     anomaly_candidate_cases: dict[str, dict[str, Any]] = {}
+    edge_detection_candidate_cases: dict[str, dict[str, Any]] = {}
+    semantic_segmentation_candidate_cases: dict[str, dict[str, Any]] = {}
+    template_matching_candidate_cases: dict[str, dict[str, Any]] = {}
+    shape_matching_candidate_cases: dict[str, dict[str, Any]] = {}
     deep_learning_candidate_cases: dict[str, dict[str, Any]] = {}
+    camera_calibration_candidate_cases: dict[str, dict[str, Any]] = {}
     execution_log: list[dict[str, Any]] = []
     for operator in sorted(MATCHING_OPERATORS):
         ids = replay_case_ids(replay, operator)
@@ -700,6 +1151,70 @@ def build_report(
         )
     anomaly_candidate_cases = read_anomaly_candidate_cases(anomaly_candidate_path(anomaly_detection_candidate_version))
 
+    edge_ids = replay_case_ids(replay, "EdgeDetection")
+    if execute_edge_detection and edge_ids:
+        path, parameters = execute_edge_detection_candidate(edge_ids, edge_detection_candidate_version)
+        execution_log.append(
+            {
+                "operator": "EdgeDetection",
+                "command": "dotnet run --project quality/tools/BsdsEdgeContourDatasetRunner/BsdsEdgeContourDatasetRunner.csproj",
+                "caseCount": len(edge_ids),
+                "candidateVersion": edge_detection_candidate_version,
+                "sourceCandidate": "quality/evals/reports/EdgeDetection_bsds500_baseline.json",
+                "parameters": parameters,
+                "candidateBaseline": repo(path),
+            }
+        )
+    edge_detection_candidate_cases = read_edge_detection_candidate_cases(edge_detection_candidate_path(edge_detection_candidate_version))
+
+    semantic_ids = replay_case_ids(replay, "SemanticSegmentation")
+    if execute_semantic_segmentation and semantic_ids:
+        path, parameters = execute_semantic_segmentation_candidate(semantic_ids, semantic_segmentation_candidate_version)
+        execution_log.append(
+            {
+                "operator": "SemanticSegmentation",
+                "command": "dotnet run --project quality/tools/SemanticSegmentationDatasetRunner/SemanticSegmentationDatasetRunner.csproj",
+                "caseCount": len(semantic_ids),
+                "candidateVersion": semantic_segmentation_candidate_version,
+                "sourceCandidate": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
+                "parameters": parameters,
+                "candidateBaseline": repo(path),
+            }
+        )
+    semantic_segmentation_candidate_cases = read_semantic_segmentation_candidate_cases(semantic_segmentation_candidate_path(semantic_segmentation_candidate_version))
+
+    template_ids = replay_case_ids(replay, "TemplateMatching")
+    if execute_template_matching and template_ids:
+        path, parameters = execute_template_matching_candidate(template_ids, template_matching_candidate_version)
+        execution_log.append(
+            {
+                "operator": "TemplateMatching",
+                "command": "dotnet run --project quality/tools/TemplateMatchingHomographyBridgeRunner/TemplateMatchingHomographyBridgeRunner.csproj",
+                "caseCount": len(template_ids),
+                "candidateVersion": template_matching_candidate_version,
+                "sourceCandidate": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json",
+                "parameters": parameters,
+                "candidateBaseline": repo(path),
+            }
+        )
+    template_matching_candidate_cases = read_template_matching_candidate_cases(template_matching_candidate_path(template_matching_candidate_version))
+
+    shape_ids = replay_case_ids(replay, "ShapeMatching")
+    if execute_shape_matching and shape_ids:
+        path, parameters = execute_shape_matching_candidate(shape_ids, shape_matching_candidate_version)
+        execution_log.append(
+            {
+                "operator": "ShapeMatching",
+                "command": "dotnet run --project quality/tools/ShapeMatchingGeometricDatasetRunner/ShapeMatchingGeometricDatasetRunner.csproj",
+                "caseCount": len(shape_ids),
+                "candidateVersion": shape_matching_candidate_version,
+                "sourceCandidate": "quality/evals/reports/ShapeMatching_dataset_baseline.json",
+                "parameters": parameters,
+                "candidateBaseline": repo(path),
+            }
+        )
+    shape_matching_candidate_cases = read_shape_matching_candidate_cases(shape_matching_candidate_path(shape_matching_candidate_version))
+
     deep_learning_ids = replay_case_ids(replay, "DeepLearning")
     if execute_deep_learning and deep_learning_ids:
         path, parameters = execute_deep_learning_candidate(
@@ -721,6 +1236,27 @@ def build_report(
     if execute_deep_learning:
         deep_learning_candidate_cases = read_deep_learning_candidate_cases(deep_learning_candidate_path(deep_learning_candidate_version))
 
+    camera_ids = replay_case_ids(replay, "CameraCalibration")
+    if execute_camera_calibration and camera_ids:
+        path, parameters = execute_camera_calibration_candidate(
+            camera_ids,
+            camera_calibration_candidate_version,
+            camera_calibration_candidate_profile,
+        )
+        execution_log.append(
+            {
+                "operator": "CameraCalibration",
+                "command": "dotnet run --project quality/tools/OpenCvCalibrationDatasetRunner/OpenCvCalibrationDatasetRunner.csproj",
+                "caseCount": len(camera_ids),
+                "candidateVersion": camera_calibration_candidate_version,
+                "sourceCandidate": "quality/evals/reports/CameraCalibration_opencv_samples_baseline.json",
+                "parameters": parameters,
+                "candidateBaseline": repo(camera_calibration_candidate_path(camera_calibration_candidate_version)),
+            }
+        )
+    if execute_camera_calibration:
+        camera_calibration_candidate_cases = read_camera_calibration_candidate_cases(camera_calibration_candidate_path(camera_calibration_candidate_version))
+
     rows = []
     comparisons = []
     for operator, replay_cases in sorted(replay_by_operator.items()):
@@ -736,6 +1272,21 @@ def build_report(
             execution_mode = "candidate-executed"
         elif operator in ANOMALY_DETECTION_OPERATORS:
             candidate_baseline = repo(anomaly_candidate_path(anomaly_detection_candidate_version))
+            execution_mode = "candidate-executed"
+        elif operator in EDGE_DETECTION_OPERATORS:
+            candidate_baseline = repo(edge_detection_candidate_path(edge_detection_candidate_version))
+            execution_mode = "candidate-executed"
+        elif operator in SEMANTIC_SEGMENTATION_OPERATORS:
+            candidate_baseline = repo(semantic_segmentation_candidate_path(semantic_segmentation_candidate_version))
+            execution_mode = "candidate-executed"
+        elif operator in TEMPLATE_MATCHING_OPERATORS:
+            candidate_baseline = repo(template_matching_candidate_path(template_matching_candidate_version))
+            execution_mode = "candidate-executed"
+        elif operator in SHAPE_MATCHING_OPERATORS:
+            candidate_baseline = repo(shape_matching_candidate_path(shape_matching_candidate_version))
+            execution_mode = "candidate-executed"
+        elif operator in CAMERA_CALIBRATION_OPERATORS and execute_camera_calibration and camera_calibration_candidate_cases:
+            candidate_baseline = repo(camera_calibration_candidate_path(camera_calibration_candidate_version))
             execution_mode = "candidate-executed"
         elif operator in DEEP_LEARNING_OPERATORS and deep_learning_candidate_cases:
             candidate_baseline = repo(deep_learning_candidate_path(deep_learning_candidate_version))
@@ -759,6 +1310,28 @@ def build_report(
                 new_case = anomaly_candidate_cases.get(case_id)
                 if new_case is None:
                     raise SystemExit(f"error: missing AnomalyDetection candidate case result for {case_id}")
+            elif operator in EDGE_DETECTION_OPERATORS:
+                new_case = edge_detection_candidate_cases.get(case_id)
+                if new_case is None:
+                    raise SystemExit(f"error: missing EdgeDetection candidate case result for {case_id}")
+            elif operator in SEMANTIC_SEGMENTATION_OPERATORS:
+                new_case = semantic_segmentation_candidate_cases.get(case_id)
+                if new_case is None:
+                    raise SystemExit(f"error: missing SemanticSegmentation candidate case result for {case_id}")
+            elif operator in TEMPLATE_MATCHING_OPERATORS:
+                new_case = template_matching_candidate_cases.get(case_id)
+                if new_case is None:
+                    raise SystemExit(f"error: missing TemplateMatching candidate case result for {case_id}")
+            elif operator in SHAPE_MATCHING_OPERATORS:
+                new_case = shape_matching_candidate_cases.get(case_id)
+                if new_case is None:
+                    raise SystemExit(f"error: missing ShapeMatching candidate case result for {case_id}")
+            elif operator in CAMERA_CALIBRATION_OPERATORS and execute_camera_calibration:
+                if not camera_calibration_candidate_cases:
+                    raise SystemExit(f"error: missing CameraCalibration candidate execution result for {operator} {case_id}")
+                new_case = camera_calibration_candidate_cases.get(case_id)
+                if new_case is None:
+                    raise SystemExit(f"error: missing CameraCalibration candidate case result for {case_id}")
             elif operator in DEEP_LEARNING_OPERATORS and deep_learning_candidate_cases:
                 new_case = deep_learning_candidate_cases.get(case_id)
                 if new_case is None:
@@ -780,6 +1353,8 @@ def build_report(
                 "status": status,
                 "executionMode": execution_mode,
             }
+            if operator in EDGE_DETECTION_OPERATORS:
+                comparison["edgeTaxonomy"] = edge_detection_taxonomy(old_case, new_case, status)
             comparisons.append(comparison)
             operator_comparisons.append(comparison)
 
@@ -821,6 +1396,26 @@ def build_report(
         item for item in comparisons
         if item["operator"] in DEEP_LEARNING_OPERATORS
     ]
+    camera_calibration = [
+        item for item in comparisons
+        if item["operator"] in CAMERA_CALIBRATION_OPERATORS
+    ]
+    edge_detection = [
+        item for item in comparisons
+        if item["operator"] in EDGE_DETECTION_OPERATORS
+    ]
+    semantic_segmentation = [
+        item for item in comparisons
+        if item["operator"] in SEMANTIC_SEGMENTATION_OPERATORS
+    ]
+    template_matching = [
+        item for item in comparisons
+        if item["operator"] in TEMPLATE_MATCHING_OPERATORS
+    ]
+    shape_matching = [
+        item for item in comparisons
+        if item["operator"] in SHAPE_MATCHING_OPERATORS
+    ]
     accepted = bool(comparisons) and all(item.get("new") for item in comparisons)
     return {
         "schemaVersion": "2026-04-29.algorithm-ab-replay.v2",
@@ -857,6 +1452,32 @@ def build_report(
                 if item["new"].get("diagnostics", {}).get("IsAnomaly") is True
                 and item["new"].get("diagnostics", {}).get("PredictedAnomaly") is True
             ),
+            "edgeDetectionCaseCount": len(edge_detection),
+            "edgeDetectionImprovedCaseCount": sum(1 for item in edge_detection if item["status"] in {"fixed", "improved"}),
+            "edgeDetectionRegressedCaseCount": sum(1 for item in edge_detection if item["status"] == "regressed"),
+            "edgeDetectionWorseMetricCaseCount": sum(1 for item in edge_detection if item["status"] == "worse-metric"),
+            "edgeDetectionWorseMetricTaxonomy": dict(sorted(Counter(
+                label
+                for item in edge_detection
+                if item["status"] == "worse-metric"
+                for label in item.get("edgeTaxonomy", [])
+            ).items())),
+            "semanticSegmentationCaseCount": len(semantic_segmentation),
+            "semanticSegmentationImprovedCaseCount": sum(1 for item in semantic_segmentation if item["status"] in {"fixed", "improved"}),
+            "semanticSegmentationRegressedCaseCount": sum(1 for item in semantic_segmentation if item["status"] == "regressed"),
+            "semanticSegmentationWorseMetricCaseCount": sum(1 for item in semantic_segmentation if item["status"] == "worse-metric"),
+            "templateMatchingCaseCount": len(template_matching),
+            "templateMatchingImprovedCaseCount": sum(1 for item in template_matching if item["status"] in {"fixed", "improved"}),
+            "templateMatchingRegressedCaseCount": sum(1 for item in template_matching if item["status"] == "regressed"),
+            "templateMatchingWorseMetricCaseCount": sum(1 for item in template_matching if item["status"] == "worse-metric"),
+            "shapeMatchingCaseCount": len(shape_matching),
+            "shapeMatchingImprovedCaseCount": sum(1 for item in shape_matching if item["status"] in {"fixed", "improved"}),
+            "shapeMatchingRegressedCaseCount": sum(1 for item in shape_matching if item["status"] == "regressed"),
+            "shapeMatchingWorseMetricCaseCount": sum(1 for item in shape_matching if item["status"] == "worse-metric"),
+            "cameraCalibrationCaseCount": len(camera_calibration),
+            "cameraCalibrationExecutedCaseCount": sum(1 for item in camera_calibration if item["executionMode"] == "candidate-executed"),
+            "cameraCalibrationRegressedCaseCount": sum(1 for item in camera_calibration if item["status"] == "regressed"),
+            "cameraCalibrationWorseMetricCaseCount": sum(1 for item in camera_calibration if item["status"] == "worse-metric"),
             "deepLearningCaseCount": len(deep_learning),
             "deepLearningRealModelCaseCount": sum(1 for item in deep_learning if item["executionMode"] == "candidate-executed"),
             "deepLearningRegressedCaseCount": sum(1 for item in deep_learning if item["status"] == "regressed"),
@@ -864,7 +1485,7 @@ def build_report(
         },
         "policy": {
             "purpose": "Execute old/new replay comparisons for every public benchmark replay seed.",
-            "candidateRule": f"Matching-family HPatches replay uses candidate_{matching_candidate_version}; SurfaceDefectDetection KolektorSDD2 replay uses candidate_{surface_defect_candidate_version}; AnomalyDetection MVTec replay uses candidate_{anomaly_detection_candidate_version}; DeepLearning can use real-model candidate_{deep_learning_candidate_version} when explicitly executed with a model manifest/artifact; other rows remain unchanged controls until their algorithm PRs supply executable candidates.",
+            "candidateRule": f"Matching-family HPatches replay uses candidate_{matching_candidate_version}; TemplateMatching homography bridge replay uses candidate_{template_matching_candidate_version}; ShapeMatching geometric dataset replay uses candidate_{shape_matching_candidate_version}; SurfaceDefectDetection KolektorSDD2 replay uses candidate_{surface_defect_candidate_version}; AnomalyDetection MVTec replay uses candidate_{anomaly_detection_candidate_version}; EdgeDetection BSDS500 replay uses candidate_{edge_detection_candidate_version}; SemanticSegmentation dataset replay uses candidate_{semantic_segmentation_candidate_version}; CameraCalibration OpenCV sample replay uses candidate_{camera_calibration_candidate_version}; DeepLearning real-model replay uses candidate_{deep_learning_candidate_version} with the supplied external model or the generated smoke fixture; other rows remain unchanged controls until their algorithm PRs supply executable candidates.",
             "claimBoundary": "This report is algorithm A/B evidence over public and semisynthetic replay seeds, not real field sign-off.",
             "deepLearningBoundary": "DeepLearning real-model candidates are ONNX Runtime outputs with AnnotationSeeded=false; do not compare annotation-seeded proof as model accuracy.",
         },
@@ -887,11 +1508,35 @@ def validate(report: dict[str, Any]) -> list[str]:
         errors.append("A/B replay report must compare every replay case")
     if summary.get("replayCaseCount", 0) < 100:
         errors.append("A/B replay report must include the full replay set")
+    if summary.get("executedCandidateCaseCount", 0) < 183:
+        errors.append("A/B replay report must execute at least 183 candidate cases")
+    if summary.get("deepLearningRealModelCaseCount", 0) < 20:
+        errors.append("A/B replay report must execute at least 20 DeepLearning real-model cases")
+    if summary.get("deepLearningProcessingErrorCaseCount", 0) != 0:
+        errors.append("A/B replay report must have zero DeepLearning processing-error cases")
     for row in rows:
         operator = row.get("operator")
         cases = row.get("replayCases", [])
         if row.get("replayCaseCount", 0) <= 0 or not cases:
             errors.append(f"{operator} missing replay comparisons")
+        if operator == "DeepLearning":
+            if row.get("comparisonStatus") != "candidate-executed":
+                errors.append("DeepLearning row must be candidate-executed")
+            candidate_baseline = row.get("candidateBaseline")
+            if not candidate_baseline:
+                errors.append("DeepLearning row missing candidate baseline path")
+            else:
+                candidate_path = REPO_ROOT / str(candidate_baseline)
+                if not candidate_path.exists():
+                    errors.append(f"DeepLearning candidate baseline missing: {candidate_baseline}")
+                else:
+                    candidate_summary = read_json(candidate_path).get("Summary", {})
+                    if candidate_summary.get("Profile") != "real_model_hard_nms_045":
+                        errors.append("DeepLearning candidate profile must be real_model_hard_nms_045")
+                    if candidate_summary.get("AnnotationSeeded") is not False:
+                        errors.append("DeepLearning candidate must have AnnotationSeeded=false")
+                    if str(candidate_summary.get("ModelArtifactRef", "")).strip() == "":
+                        errors.append("DeepLearning candidate must include a model artifact reference")
         if row.get("comparisonStatus") == "candidate-pending":
             errors.append(f"{operator} still candidate-pending")
         for case in cases:
@@ -929,6 +1574,27 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Anomaly detection worse metric cases: {report['summary'].get('anomalyDetectionWorseMetricCaseCount', 0)}",
         f"- Anomaly detection image-correct cases: {report['summary'].get('anomalyDetectionImageCorrectCaseCount', 0)}",
         f"- Anomaly detection detected anomaly cases: {report['summary'].get('anomalyDetectionDetectedAnomalyCaseCount', 0)}",
+        f"- EdgeDetection replay cases: {report['summary'].get('edgeDetectionCaseCount', 0)}",
+        f"- EdgeDetection improved cases: {report['summary'].get('edgeDetectionImprovedCaseCount', 0)}",
+        f"- EdgeDetection regressed cases: {report['summary'].get('edgeDetectionRegressedCaseCount', 0)}",
+        f"- EdgeDetection worse metric cases: {report['summary'].get('edgeDetectionWorseMetricCaseCount', 0)}",
+        f"- EdgeDetection worse taxonomy: {report['summary'].get('edgeDetectionWorseMetricTaxonomy', {})}",
+        f"- SemanticSegmentation replay cases: {report['summary'].get('semanticSegmentationCaseCount', 0)}",
+        f"- SemanticSegmentation improved cases: {report['summary'].get('semanticSegmentationImprovedCaseCount', 0)}",
+        f"- SemanticSegmentation regressed cases: {report['summary'].get('semanticSegmentationRegressedCaseCount', 0)}",
+        f"- SemanticSegmentation worse metric cases: {report['summary'].get('semanticSegmentationWorseMetricCaseCount', 0)}",
+        f"- CameraCalibration replay cases: {report['summary'].get('cameraCalibrationCaseCount', 0)}",
+        f"- CameraCalibration executed cases: {report['summary'].get('cameraCalibrationExecutedCaseCount', 0)}",
+        f"- CameraCalibration regressed cases: {report['summary'].get('cameraCalibrationRegressedCaseCount', 0)}",
+        f"- CameraCalibration worse metric cases: {report['summary'].get('cameraCalibrationWorseMetricCaseCount', 0)}",
+        f"- TemplateMatching replay cases: {report['summary'].get('templateMatchingCaseCount', 0)}",
+        f"- TemplateMatching improved cases: {report['summary'].get('templateMatchingImprovedCaseCount', 0)}",
+        f"- TemplateMatching regressed cases: {report['summary'].get('templateMatchingRegressedCaseCount', 0)}",
+        f"- TemplateMatching worse metric cases: {report['summary'].get('templateMatchingWorseMetricCaseCount', 0)}",
+        f"- ShapeMatching replay cases: {report['summary'].get('shapeMatchingCaseCount', 0)}",
+        f"- ShapeMatching improved cases: {report['summary'].get('shapeMatchingImprovedCaseCount', 0)}",
+        f"- ShapeMatching regressed cases: {report['summary'].get('shapeMatchingRegressedCaseCount', 0)}",
+        f"- ShapeMatching worse metric cases: {report['summary'].get('shapeMatchingWorseMetricCaseCount', 0)}",
         f"- DeepLearning replay cases: {report['summary'].get('deepLearningCaseCount', 0)}",
         f"- DeepLearning real-model candidate cases: {report['summary'].get('deepLearningRealModelCaseCount', 0)}",
         f"- DeepLearning processing-error cases: {report['summary'].get('deepLearningProcessingErrorCaseCount', 0)}",
@@ -1059,6 +1725,146 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "## EdgeDetection BSDS500 Focus",
+            "",
+            "| Case | Status | Old F1 | New F1 | Old recall | New recall | Old precision | New precision | Thresholds | Predicted px | Taxonomy |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---|---:|---|",
+        ]
+    )
+    edge_rows: list[dict[str, Any]] = []
+    for row in report["operators"]:
+        if row["operator"] != "EdgeDetection":
+            continue
+        edge_rows.extend(row["replayCases"])
+    edge_rows.sort(
+        key=lambda case: (
+            0 if case["status"] in {"regressed", "worse-metric"} else 1,
+            str(case["caseId"]),
+        )
+    )
+    for case in edge_rows:
+        old_metrics = case["old"].get("metrics", {})
+        new_metrics = case["new"].get("metrics", {})
+        diagnostics = case["new"].get("diagnostics", {})
+        thresholds = f"{format_cell(diagnostics.get('Threshold1Used'))}/{format_cell(diagnostics.get('Threshold2Used'))}"
+        lines.append(
+            f"| {case['caseId']} | {case['status']} | "
+            f"{format_cell(old_metrics.get('BoundaryF1'))} | {format_cell(new_metrics.get('BoundaryF1'))} | "
+            f"{format_cell(old_metrics.get('BoundaryRecall'))} | {format_cell(new_metrics.get('BoundaryRecall'))} | "
+            f"{format_cell(old_metrics.get('BoundaryPrecision'))} | {format_cell(new_metrics.get('BoundaryPrecision'))} | "
+            f"{thresholds} | {format_cell(new_metrics.get('PredictedEdgePixels'))} | "
+            f"{', '.join(case.get('edgeTaxonomy', [])) or '-'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## SemanticSegmentation Focus",
+            "",
+            "| Case | Status | Old mIoU | New mIoU | Old boundary IoU | New boundary IoU | Input | Classes |",
+            "|---|---|---:|---:|---:|---:|---|---|",
+        ]
+    )
+    semantic_rows: list[dict[str, Any]] = []
+    for row in report["operators"]:
+        if row["operator"] != "SemanticSegmentation":
+            continue
+        semantic_rows.extend(row["replayCases"])
+    semantic_rows.sort(key=lambda case: (str(case["status"]), str(case["caseId"])))
+    for case in semantic_rows:
+        old_metrics = case["old"].get("metrics", {})
+        new_metrics = case["new"].get("metrics", {})
+        diagnostics = case["new"].get("diagnostics", {})
+        classes = diagnostics.get("PresentClasses")
+        classes_text = ", ".join(str(item) for item in classes) if isinstance(classes, list) else str(classes or "-")
+        lines.append(
+            f"| {case['caseId']} | {case['status']} | "
+            f"{format_cell(old_metrics.get('MeanIoU'))} | {format_cell(new_metrics.get('MeanIoU'))} | "
+            f"{format_cell(old_metrics.get('BoundaryIoU'))} | {format_cell(new_metrics.get('BoundaryIoU'))} | "
+            f"{diagnostics.get('InputSize', '-')} / {diagnostics.get('ChannelOrder', '-')} | {classes_text} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## TemplateMatching Homography Bridge Focus",
+            "",
+            "| Case | Status | Sequence | Template | Old error | New error | Old norm score | New norm score |",
+            "|---|---|---|---|---:|---:|---:|---:|",
+        ]
+    )
+    template_rows: list[dict[str, Any]] = []
+    for row in report["operators"]:
+        if row["operator"] != "TemplateMatching":
+            continue
+        template_rows.extend(row["replayCases"])
+    template_rows.sort(key=lambda case: (str(case["status"]), str(case["caseId"])))
+    for case in template_rows:
+        old_metrics = case["old"].get("metrics", {})
+        new_metrics = case["new"].get("metrics", {})
+        diagnostics = case["new"].get("diagnostics", {})
+        lines.append(
+            f"| {case['caseId']} | {case['status']} | {diagnostics.get('Sequence', '-')} | "
+            f"{diagnostics.get('TemplateSource', '-')} | "
+            f"{format_cell(old_metrics.get('PositionErrorPx'))} | {format_cell(new_metrics.get('PositionErrorPx'))} | "
+            f"{format_cell(old_metrics.get('NormalizedScore'))} | {format_cell(new_metrics.get('NormalizedScore'))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## ShapeMatching Geometric Dataset Focus",
+            "",
+            "| Case | Status | Scenario | Old F1 | New F1 | Old pos err | New pos err | GT | Pred | FP | FN |",
+            "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    shape_rows: list[dict[str, Any]] = []
+    for row in report["operators"]:
+        if row["operator"] != "ShapeMatching":
+            continue
+        shape_rows.extend(row["replayCases"])
+    shape_rows.sort(key=lambda case: (str(case["status"]), str(case["caseId"])))
+    for case in shape_rows:
+        old_metrics = case["old"].get("metrics", {})
+        new_metrics = case["new"].get("metrics", {})
+        diagnostics = case["new"].get("diagnostics", {})
+        lines.append(
+            f"| {case['caseId']} | {case['status']} | {diagnostics.get('Scenario', '-')} | "
+            f"{format_cell(old_metrics.get('F1'))} | {format_cell(new_metrics.get('F1'))} | "
+            f"{format_cell(old_metrics.get('MeanPositionErrorPx'))} | {format_cell(new_metrics.get('MeanPositionErrorPx'))} | "
+            f"{format_cell(diagnostics.get('GroundTruthCount'))} | {format_cell(diagnostics.get('PredictedCount'))} | "
+            f"{format_cell(diagnostics.get('FalsePositiveCount'))} | {format_cell(diagnostics.get('FalseNegativeCount'))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## CameraCalibration Focus",
+            "",
+            "| Case | Status | New pass | Accepted | Old RMS | New RMS | Old max error | New max error | Old detected | New detected | Total | Failure reason |",
+            "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    camera_rows: list[dict[str, Any]] = []
+    for row in report["operators"]:
+        if row["operator"] == "CameraCalibration":
+            camera_rows.extend(row["replayCases"])
+    camera_rows.sort(key=lambda case: (str(case["status"]), str(case["caseId"])))
+    for case in camera_rows:
+        old_metrics = case["old"].get("metrics", {})
+        new_metrics = case["new"].get("metrics", {})
+        taxonomy = case["new"].get("failureTaxonomy")
+        if isinstance(taxonomy, list):
+            taxonomy_text = ", ".join(str(item) for item in taxonomy) or "-"
+        else:
+            taxonomy_text = str(taxonomy or "-")
+        lines.append(
+            f"| {case['caseId']} | {case['status']} | {case['new']['passed']} | {case['new'].get('accepted')} | "
+            f"{format_cell(old_metrics.get('ReprojectionRmsPx'))} | {format_cell(new_metrics.get('ReprojectionRmsPx'))} | "
+            f"{format_cell(old_metrics.get('MaxReprojectionErrorPx'))} | {format_cell(new_metrics.get('MaxReprojectionErrorPx'))} | "
+            f"{format_cell(old_metrics.get('DetectedImageCount'))} | {format_cell(new_metrics.get('DetectedImageCount'))} | "
+            f"{format_cell(new_metrics.get('TotalImages'))} | {taxonomy_text} |"
+        )
+    lines.extend(
+        [
+            "",
             "## DeepLearning Real Model Focus",
             "",
             "| Case | Status | Execution | Old pass | New pass | New detections | TP | FP | FN | Processing error | Output shape |",
@@ -1101,11 +1907,22 @@ def generate(
     execute_matching: bool,
     execute_surface_defect: bool,
     execute_anomaly_detection: bool,
+    execute_edge_detection: bool,
+    execute_semantic_segmentation: bool,
+    execute_template_matching: bool,
+    execute_shape_matching: bool,
     execute_deep_learning: bool,
+    execute_camera_calibration: bool,
     matching_candidate_version: str,
     surface_defect_candidate_version: str,
     anomaly_detection_candidate_version: str,
+    edge_detection_candidate_version: str,
+    semantic_segmentation_candidate_version: str,
+    template_matching_candidate_version: str,
+    shape_matching_candidate_version: str,
     deep_learning_candidate_version: str,
+    camera_calibration_candidate_version: str,
+    camera_calibration_candidate_profile: str,
     deep_learning_model_manifest: str,
     deep_learning_model_path: str | None,
 ) -> dict[str, Any]:
@@ -1113,11 +1930,22 @@ def generate(
         execute_matching,
         execute_surface_defect,
         execute_anomaly_detection,
+        execute_edge_detection,
+        execute_semantic_segmentation,
+        execute_template_matching,
+        execute_shape_matching,
         execute_deep_learning,
+        execute_camera_calibration,
         matching_candidate_version,
         surface_defect_candidate_version,
         anomaly_detection_candidate_version,
+        edge_detection_candidate_version,
+        semantic_segmentation_candidate_version,
+        template_matching_candidate_version,
+        shape_matching_candidate_version,
         deep_learning_candidate_version,
+        camera_calibration_candidate_version,
+        camera_calibration_candidate_profile,
         deep_learning_model_manifest,
         deep_learning_model_path,
     )
@@ -1134,12 +1962,23 @@ def main() -> int:
     parser.add_argument("--execute-matching", action="store_true", help="Run HPatches matching-family candidate replay before building the report.")
     parser.add_argument("--execute-surface-defect", action="store_true", help="Run KolektorSDD2 SurfaceDefectDetection candidate replay before building the report.")
     parser.add_argument("--execute-anomaly-detection", action="store_true", help="Run MVTec AnomalyDetection candidate replay before building the report.")
-    parser.add_argument("--execute-deep-learning", action="store_true", help="Run DeepLearning COCO real-model candidate replay. Requires a real ONNX model artifact.")
+    parser.add_argument("--execute-edge-detection", action="store_true", help="Run BSDS500 EdgeDetection candidate replay before building the report.")
+    parser.add_argument("--execute-semantic-segmentation", action="store_true", help="Run SemanticSegmentation dataset candidate replay before building the report.")
+    parser.add_argument("--execute-template-matching", action="store_true", help="Run TemplateMatching homography bridge candidate replay before building the report.")
+    parser.add_argument("--execute-shape-matching", action="store_true", help="Run ShapeMatching geometric dataset candidate replay before building the report.")
+    parser.add_argument("--execute-deep-learning", action="store_true", help="Run DeepLearning COCO real-model candidate replay; uses a generated smoke model unless --deep-learning-model is provided.")
+    parser.add_argument("--execute-camera-calibration", action="store_true", help="Run CameraCalibration OpenCV calibration sample candidate replay before building the report.")
     parser.add_argument("--execute-candidates", action="store_true", help="Run every currently wired executable candidate family.")
     parser.add_argument("--candidate-version", default=DEFAULT_MATCHING_CANDIDATE_VERSION, help="HPatches matching candidate version to execute.")
     parser.add_argument("--surface-defect-candidate-version", default=DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION, help="KolektorSDD2 SurfaceDefectDetection candidate version to execute.")
     parser.add_argument("--anomaly-detection-candidate-version", default=DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION, help="MVTec AnomalyDetection candidate version to execute.")
+    parser.add_argument("--edge-detection-candidate-version", default=DEFAULT_EDGE_DETECTION_CANDIDATE_VERSION, help="BSDS500 EdgeDetection candidate version to execute.")
+    parser.add_argument("--semantic-segmentation-candidate-version", default=DEFAULT_SEMANTIC_SEGMENTATION_CANDIDATE_VERSION, help="SemanticSegmentation dataset candidate version to execute.")
+    parser.add_argument("--template-matching-candidate-version", default=DEFAULT_TEMPLATE_MATCHING_CANDIDATE_VERSION, help="TemplateMatching homography bridge candidate version to execute.")
+    parser.add_argument("--shape-matching-candidate-version", default=DEFAULT_SHAPE_MATCHING_CANDIDATE_VERSION, help="ShapeMatching geometric dataset candidate version to execute.")
     parser.add_argument("--deep-learning-candidate-version", default=DEFAULT_DEEP_LEARNING_CANDIDATE_VERSION, help="DeepLearning real-model candidate version to execute.")
+    parser.add_argument("--camera-calibration-candidate-version", default=DEFAULT_CAMERA_CALIBRATION_CANDIDATE_VERSION, help="CameraCalibration OpenCV sample candidate version to execute.")
+    parser.add_argument("--camera-calibration-candidate-profile", default=DEFAULT_CAMERA_CALIBRATION_CANDIDATE_PROFILE, help="CameraCalibration OpenCV sample candidate profile.")
     parser.add_argument("--deep-learning-model-manifest", default="models/object_detection/coco_yolo_real_model_manifest.template.json", help="DeepLearning real-model manifest path.")
     parser.add_argument("--deep-learning-model", default=None, help="Optional DeepLearning ONNX model artifact path. Model files must not be committed.")
     parser.add_argument("--validate-only", action="store_true", help="Validate the existing generated A/B replay report.")
@@ -1148,16 +1987,32 @@ def main() -> int:
     execute_matching = args.execute_matching or args.execute_candidates
     execute_surface_defect = args.execute_surface_defect or args.execute_candidates
     execute_anomaly_detection = args.execute_anomaly_detection or args.execute_candidates
-    execute_deep_learning = args.execute_deep_learning
+    execute_edge_detection = args.execute_edge_detection or args.execute_candidates
+    execute_semantic_segmentation = args.execute_semantic_segmentation or args.execute_candidates
+    execute_template_matching = args.execute_template_matching or args.execute_candidates
+    execute_shape_matching = args.execute_shape_matching or args.execute_candidates
+    execute_deep_learning = args.execute_deep_learning or args.execute_candidates
+    execute_camera_calibration = args.execute_camera_calibration or args.execute_candidates
     report = read_json(OUTPUT_JSON) if args.validate_only else generate(
         execute_matching,
         execute_surface_defect,
         execute_anomaly_detection,
+        execute_edge_detection,
+        execute_semantic_segmentation,
+        execute_template_matching,
+        execute_shape_matching,
         execute_deep_learning,
+        execute_camera_calibration,
         args.candidate_version,
         args.surface_defect_candidate_version,
         args.anomaly_detection_candidate_version,
+        args.edge_detection_candidate_version,
+        args.semantic_segmentation_candidate_version,
+        args.template_matching_candidate_version,
+        args.shape_matching_candidate_version,
         args.deep_learning_candidate_version,
+        args.camera_calibration_candidate_version,
+        args.camera_calibration_candidate_profile,
         args.deep_learning_model_manifest,
         args.deep_learning_model,
     )
@@ -1175,6 +2030,12 @@ def main() -> int:
         f"surfaceImproved={report['summary'].get('surfaceDefectImprovedCaseCount', 0)} "
         f"anomalyImproved={report['summary'].get('anomalyDetectionImprovedCaseCount', 0)} "
         f"anomalyDetected={report['summary'].get('anomalyDetectionDetectedAnomalyCaseCount', 0)} "
+        f"edgeImproved={report['summary'].get('edgeDetectionImprovedCaseCount', 0)} "
+        f"semanticCases={report['summary'].get('semanticSegmentationCaseCount', 0)} "
+        f"templateCases={report['summary'].get('templateMatchingCaseCount', 0)} "
+        f"shapeCases={report['summary'].get('shapeMatchingCaseCount', 0)} "
+        f"cameraCases={report['summary'].get('cameraCalibrationCaseCount', 0)} "
+        f"cameraExecuted={report['summary'].get('cameraCalibrationExecutedCaseCount', 0)} "
         f"deepLearningRealModel={report['summary'].get('deepLearningRealModelCaseCount', 0)} "
         f"generatedAt={utc_now()}"
     )

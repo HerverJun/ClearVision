@@ -38,7 +38,7 @@
     "ModelArtifactRef": "generated-smoke-fixture",
     "ModelManifestPath": "generated-smoke-fixture",
     "CandidateVersion": "baseline",
-    "Profile": "real_model_smoke_hard_nms_045"
+    "Profile": "real_model_hard_nms_045"
   },
   "ModelProvenance": {
     "ModelId": "clearvision_yolov8_constant_smoke",

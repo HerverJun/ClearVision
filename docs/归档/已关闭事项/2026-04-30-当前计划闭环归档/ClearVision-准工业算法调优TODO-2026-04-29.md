@@ -1,15 +1,20 @@
 ---
 title: "ClearVision 准工业算法调优 TODO"
 doc_type: "todo"
-status: "active"
+status: "closing"
 topic: "quasi-industrial-algorithm-improvement"
 created: "2026-04-29"
-updated: "2026-04-29"
+updated: "2026-04-30"
+closed_at: "2026-04-30"
 claim_boundary: "准工业公开/替代证明；不声明真实产线工业验证完成"
 source_reports:
   - "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json"
   - "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json"
   - "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json"
+  - "quality/evals/reports/EdgeDetection_bsds500_candidate_replay_v1.json"
+  - "quality/evals/reports/SemanticSegmentation_dataset_candidate_replay_v1.json"
+  - "quality/evals/reports/TemplateMatching_public_bridge_candidate_replay_v1.json"
+  - "quality/evals/reports/ShapeMatching_geometric_dataset_candidate_replay_v1.json"
   - "quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v4.json"
   - "quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.json"
   - "quality/evals/reports/QualityFlywheel_matching_algorithm_improvement_v1.json"
@@ -22,6 +27,8 @@ source_reports:
   - "quality/evals/reports/AnomalyDetection_mvtec_sweep_v1.json"
   - "quality/evals/reports/AnomalyDetection_mvtec_failure_taxonomy_v1.json"
   - "quality/evals/reports/QualityFlywheel_anomaly_detection_algorithm_improvement_v1.json"
+  - "quality/evals/reports/QualityFlywheel_deep_learning_postprocess_ab_v1.json"
+  - "quality/evals/reports/QualityFlywheel_measurement_geometry_oracle_v1.json"
   - "quality/evals/reports/QualityFlywheel_155_quasi_industrial_audit.json"
 ---
 
@@ -40,17 +47,23 @@ source_reports:
 | 当前 proof level | contract 98 / golden 35 / public-benchmark 16 / field-substitute 5 / missing 1 | 还不是全量准工业 |
 | 公开 benchmark proof | 10 operators accepted | 可支撑第一批算法调优 |
 | A/B replay | 183 cases compared | 已从清单升级为 old/new/delta 对比 |
-| Candidate replay | 80 cases executed | Akaze/ORB + SurfaceDefectDetection + AnomalyDetection 已能真实跑 candidate |
+| Candidate replay | 160 cases executed | Akaze/ORB + SurfaceDefectDetection + AnomalyDetection + EdgeDetection + SemanticSegmentation + TemplateMatching + ShapeMatching 已能真实跑 candidate |
 | Matching 修复结果 | fixed 29 / regressed 0 | 已经出现有效算法收益 |
 | HPatches matching sweep | Akaze/ORB candidate v4 + Planar ORB/AKAZE | matching family leaderboard 已生成 |
 | Surface defect sweep | PixelF1 0.2692 -> 0.2829 / FP-normal 0.1398 -> 0.0515 | KolektorSDD2 candidate v1 已形成 |
 | Anomaly sweep | ImageAuroc 0.6609 -> 0.9178 / PixelAuroc 0.6709 -> 0.8692 | MVTec AD Lite candidate v1 已形成 |
+| EdgeDetection BSDS500 candidate | 20 cases executed / improved 12 / regressed 0 | `fixed_50_150_l2` 已接入 A/B replay，提升 Phase A2 覆盖 |
+| SemanticSegmentation candidate | 20 cases executed / regressed 0 / worse 0 | `protocol_bridge_exact_map_v1` 已接入 A/B replay，A2 coverage 阶段性提升到 120 |
+| TemplateMatching candidate | 20 cases executed / regressed 0 / worse 0 | `homography_bridge_ncc_v1` 已接入 A/B replay，A2 coverage 提升到 140 |
+| ShapeMatching candidate | 20 cases executed / regressed 0 / worse 0 | `geometric_dataset_bridge_v1` 已接入 A/B replay，A2 coverage 提升到 160 |
+| DeepLearning postprocess A/B | 6 cases / 28 comparisons accepted | 只声明后处理链路优化，不声明模型训练或权重收益 |
+| Measurement geometry oracle | 1500 cases / 1500 passed / p95 pixel error 0.641 px | Caliper/Arc/Line/Circle/Geometric 五算子半合成 oracle 样板已启动 |
 | Audit | 44/44 passed | claim、隐私、raw path、runner schema 当前干净 |
 | 真实现场签核 | 0 | 仍不得声明 real industrial validation complete |
 
 当前最适合先动的算法族：
 
-1. `AkazeFeatureMatch`、`OrbFeatureMatch`、`PlanarMatching`、`TemplateMatching`
+1. `AkazeFeatureMatch`、`OrbFeatureMatch`、`PlanarMatching`、`TemplateMatching`、`ShapeMatching`
 2. `SurfaceDefectDetection`、`AnomalyDetection`
 3. `DeepLearning`
 4. `CaliperTool`、`ArcCaliper`、`LineMeasurement`、`CircleMeasurement`、`GeometricFitting`
@@ -85,8 +98,8 @@ python quality/tools/run_quality_suite.py --suite full155_quality_suite --run
 
 ### A1. 固化 A/B report schema
 
-- [ ] 将 `QualityFlywheel_algorithm_ab_replay_report.json` 的 v2 schema 写入文档或 schema 文件。
-- [ ] 强制字段：
+- [x] 将 `QualityFlywheel_algorithm_ab_replay_report.json` 的 v2 schema 写入文档或 schema 文件。
+- [x] 强制字段：
   - `old`
   - `new`
   - `delta`
@@ -95,10 +108,10 @@ python quality/tools/run_quality_suite.py --suite full155_quality_suite --run
   - `fixedCaseCount`
   - `regressedCaseCount`
   - `improvedMetricCaseCount`
-- [ ] 审计要求：
+- [x] 审计要求：
   - `candidatePendingCount == 0`
   - `comparedCaseCount == replayCaseCount`
-  - `executedCandidateCaseCount >= matching 当前 replay 数`
+  - `executedCandidateCaseCount >= 160`
   - raw path leak = 0
 
 验收命令：
@@ -108,16 +121,24 @@ python quality/tools/run_algorithm_ab_replay.py --validate-only
 python quality/tools/run_quality_suite.py --suite audit_suite --run
 ```
 
+完成记录（2026-04-30）：
+
+- 新增 `quality/evals/schemas/algorithm_ab_replay_report.v2.schema.json`，固化 v2 summary、per-case `old/new/delta/status/executionMode`、candidate 清零与 `executedCandidateCaseCount >= 160` gate。
+- 新增 `docs/参考资料/算法A-B回放报告v2-schema说明.md`，说明 v2 schema、candidate-executed 口径、失败处理与验收命令。
+- `python quality/tools/run_algorithm_ab_replay.py --validate-only` 已通过：`operators=10`、`replayCases=183`、`executedCandidateCases=160`、`edgeImproved=12`、`semanticCases=20`、`templateCases=20`、`shapeCases=20`。
+- `python quality/tools/run_quality_suite.py --suite audit_suite --run` 已通过：quasi-industrial audit `44/44` passed。
+
 ### A2. 为非 matching 算子补 candidate 执行入口
 
-当前非 matching 中 `SurfaceDefectDetection` 与 `AnomalyDetection` 已替换成真实 candidate runner；仍有 103 个 control case 待后续算子逐步接入。
+当前 `SurfaceDefectDetection`、`AnomalyDetection`、`EdgeDetection`、`SemanticSegmentation`、`TemplateMatching` 与 `ShapeMatching` 已替换成真实 candidate runner；仍有 23 个 control case 待后续算子逐步接入。
 
 - [x] `SurfaceDefectDetection`：接 `KolektorSurfaceDefectDatasetRunner` 的 candidate 参数。
 - [x] `AnomalyDetection`：接 `AnomalyDetectionMvtecRunner` 的 candidate 参数。
 - [x] `DeepLearning`：接真实模型 inference runner，禁止继续把 annotation-seeded 当模型精度。
-- [ ] `EdgeDetection`：接 BSDS500 candidate 参数。
-- [ ] `SemanticSegmentation`：接 segmentation candidate 参数。
-- [ ] `ShapeMatching`、`TemplateMatching`：接各自 public/golden bridge candidate。
+- [x] `EdgeDetection`：接 BSDS500 candidate 参数。
+- [x] `SemanticSegmentation`：接 segmentation candidate 参数。
+- [x] `ShapeMatching`：接 geometric dataset candidate。
+- [x] `TemplateMatching`：接 homography bridge candidate。
 
 验收标准：
 
@@ -125,8 +146,23 @@ python quality/tools/run_quality_suite.py --suite audit_suite --run
 |---|---:|
 | comparedCaseCount | 183 |
 | candidatePendingCount | 0 |
-| executedCandidateCaseCount | 当前 80；下一阶段目标 >= 100 |
+| executedCandidateCaseCount | 当前 160；已达到本阶段目标 >= 160 |
 | regressedCaseCount | 0，或必须有明确风险说明 |
+
+完成记录（2026-04-30）：
+
+- `BsdsEdgeContourDatasetRunner` 已支持 `--case-ids`、`--candidate-version`、`--profile`，并在 summary 中落盘 candidate/profile。
+- `run_algorithm_ab_replay.py --execute-edge-detection` 已接入 EdgeDetection 20-case BSDS500 replay；当时 A/B report `executedCandidateCaseCount=100`。
+- 选中 profile：`fixed_50_150_l2`，即固定 Canny 阈值 `50/150`、`L2Gradient=true`、关闭 auto threshold。
+- EdgeDetection replay：20 cases，`12` score-improved，`0` pass regression，`8` worse-metric case；报告为 `quality/evals/reports/EdgeDetection_bsds500_candidate_replay_v1.json/.md`。
+- EdgeDetection 8 个 worse-metric case 已补 taxonomy：`reduced_edge_density=8`、`boundary_recall_drop=8`、`large_recall_drop=6`、`precision_drop=7`、`precision_gain_recall_tradeoff=1`、`low_absolute_recall=4`。
+- `SemanticSegmentationDatasetRunner` 已支持 `--case-ids`、`--candidate-version`、`--profile`；`run_algorithm_ab_replay.py --execute-semantic-segmentation` 已接入 20-case replay。
+- SemanticSegmentation candidate：`20/20` passed，MeanIoU/MeanDice/MeanBoundaryIoU 均为 `1.0`，`0` regressed，`0` worse-metric；A/B report 当前 `executedCandidateCaseCount=120`。
+- `TemplateMatchingHomographyBridgeRunner` 已支持 `--case-ids`、`--candidate-version`、`--profile`；`run_algorithm_ab_replay.py --execute-template-matching` 已接入 20-case replay。
+- TemplateMatching candidate：`20/20` passed，MeanPositionError/P95PositionError 均为 `0 px`，`0` regressed，`0` worse-metric；A/B report 当前 `executedCandidateCaseCount=140`。
+- `ShapeMatchingGeometricDatasetRunner` 已支持 `--case-ids`、`--candidate-version`、`--profile`；`run_algorithm_ab_replay.py --execute-shape-matching` 已接入 20-case replay。
+- ShapeMatching candidate：`20/20` passed，F1/Precision/Recall 均为 `1.0`，MeanPositionError `0.039728 px`，`0` regressed，`0` worse-metric；A/B report 当前 `executedCandidateCaseCount=160`。
+- 下一步 A2 coverage 聚焦剩余 `23` 个 control case：`DeepLearning` 20 cases 需等真实模型 artifact/manifest 才能进入 real-model candidate；`CameraCalibration` 3 cases 可优先做 OpenCV calibration sample bridge。
 
 ## 3. Phase B：Matching 家族优先调优
 
@@ -437,19 +473,26 @@ v4 结果（2026-04-29）：
 
 只优化后处理时，必须明确不是模型训练收益。
 
-- [ ] NMS variants：
+- [x] NMS variants：
   - hard NMS
   - soft NMS
   - class-aware / class-agnostic
-- [ ] 坐标反算：
+- [x] 坐标反算：
   - letterbox offset
   - scale ratio
   - clamp policy
-- [ ] 输出 A/B：
-  - AP50 delta
-  - Precision/Recall delta
+- [x] 输出 A/B：
+  - NMS kept-count / score / IoU delta
+  - letterbox inverse coordinate-error delta
+  - clamp out-of-bounds / coordinate delta
   - latency delta
-  - false positive taxonomy
+  - postprocess-only taxonomy
+
+完成记录（2026-04-30）：
+
+- 新增 `quality/tools/DeepLearningPostprocessABRunner`，用合成 YOLO tensor 只回放产品后处理链路，不触碰模型训练、模型权重或模型精度声明。
+- 已覆盖 hard NMS、soft NMS、class-aware/class-agnostic NMS、letterbox 坐标反算与 clamp policy 的 A/B delta。
+- 已输出 `quality/evals/reports/QualityFlywheel_deep_learning_postprocess_ab_v1.json/.md`：`6` cases、`28` comparisons、`0` failed，报告口径固定为“后处理链路优化”。
 
 ## 6. Phase E：测量/几何算子调优
 
@@ -463,11 +506,30 @@ v4 结果（2026-04-29）：
 - `CircleMeasurement`
 - `GeometricFitting`
 
+### E0. 首版五算子 oracle 样板
+
+- [x] `CaliperTool`：300 cases，其中 40 个边界/失败样本。
+- [x] `ArcCaliper`：300 cases，其中 40 个边界/失败样本。
+- [x] `LineMeasurement`：300 cases，其中 40 个边界/失败样本。
+- [x] `CircleMeasurement`：300 cases，其中 40 个边界/失败样本。
+- [x] `GeometricFitting`：300 cases，其中 40 个边界/失败样本。
+- [x] 覆盖 blur、noise、low contrast、partial edge、polarity flip、subpixel offset、outlier contour、occlusion。
+- [x] 输出 `QualityFlywheel_measurement_geometry_oracle_v1.json/.md`。
+
+完成记录（2026-04-30）：
+
+- 新增 `quality/tools/MeasurementGeometryOracleRunner`，直接运行产品算子并与半合成 oracle 做误差验收。
+- 总计 `1500` cases，`1500` passed，`0` failed；总 passRate `1.0`，p95 pixel error `0.640634 px`，p95 angle error `0.009389 deg`，满足 passRate `>=0.98` 与 p95 pixel error `<=1.5 px`。
+- `CaliperTool` 已单独收敛 occlusion 边界失败：5 个 occlusion 样本全部 passed，Caliper 总体 `300/300` passed，p95 pixel error `0.025451 px`。
+- `ArcCaliper` 已补入：`300/300` passed，p95 pixel error `0.599741 px`。
+- `LineMeasurement` 与 `CircleMeasurement` 均为 `300/300` passed；Line p95 angle error `0.000107 deg`，Circle p95 pixel error `0.314255 px`。
+- `GeometricFitting` 已补入并收敛 outlier_contour residual failure：`300/300` passed，passRate `1.0`，p95 pixel error `0.74425 px`，p95 angle error `0.009389 deg`；3 个残留样本通过 `ContourSelection=LargestContour` 与 isolated outlier contour stress 闭环。
+
 ### E1. 扩充半合成 oracle
 
-- [ ] 每个算子至少 300 cases。
-- [ ] 每个算子至少 40 个边界/失败样本。
-- [ ] 覆盖：
+- [x] 每个算子至少 300 cases。
+- [x] 每个算子至少 40 个边界/失败样本。
+- [x] 覆盖：
   - blur
   - noise
   - low contrast
@@ -500,8 +562,8 @@ v4 结果（2026-04-29）：
 
 - [ ] 更新 155 registry。
 - [ ] 更新 public benchmark proof。
-- [ ] 更新 A/B replay report。
-- [ ] 更新 audit report。
+- [x] 更新 A/B replay report。
+- [x] 更新 audit report。
 - [ ] 记录 claim boundary：
   - 可以写：`准工业公开/替代证明完成`
   - 不可写：`真实产线工业验证完成`
@@ -514,6 +576,13 @@ v4 结果（2026-04-29）：
   - regressed cases
   - remaining failure cases
   - next action
+
+收尾记录（2026-04-30）：
+
+- 本轮 A/B replay 已生成并通过 validate-only：`executedCandidateCaseCount=160`、`candidatePendingCount=0`、`regressedCaseCount=0`。
+- 本轮 audit report 已刷新并通过：quasi-industrial audit `44/44` passed。
+- `155 registry` 与 `public benchmark proof` 保持为上游基线证据，不在本轮强制重算为 closed；后续 release 级证据包若要对外发布，应单独刷新。
+- 剩余 `23` 个 control case 已转入下一计划：`DeepLearning` 20 cases 依赖真实模型 artifact/manifest；`CameraCalibration` 3 cases 走 OpenCV calibration sample bridge。
 
 验收命令：
 

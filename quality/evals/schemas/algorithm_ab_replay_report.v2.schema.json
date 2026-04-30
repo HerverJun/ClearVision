@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clearvision.local/schemas/algorithm_ab_replay_report.v2.schema.json",
+  "title": "QualityFlywheel Algorithm A/B Replay Report v2",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "accepted",
+    "sourceProofBaseline",
+    "sourceReplayManifest",
+    "summary",
+    "policy",
+    "executionLog",
+    "operators"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2026-04-29.algorithm-ab-replay.v2"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "accepted": {
+      "type": "boolean",
+      "const": true
+    },
+    "sourceProofBaseline": {
+      "type": "string"
+    },
+    "sourceReplayManifest": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "operatorCount",
+        "replayCaseCount",
+        "comparedCaseCount",
+        "candidatePendingCount",
+        "executedCandidateCaseCount",
+        "controlCaseCount",
+        "fixedCaseCount",
+        "regressedCaseCount",
+        "improvedMetricCaseCount",
+        "readyForABCount"
+      ],
+      "properties": {
+        "operatorCount": { "type": "integer", "minimum": 1 },
+        "replayCaseCount": { "type": "integer", "minimum": 1 },
+        "comparedCaseCount": { "type": "integer", "minimum": 1 },
+        "candidatePendingCount": { "type": "integer", "const": 0 },
+        "executedCandidateCaseCount": { "type": "integer", "minimum": 163 },
+        "cameraCalibrationCaseCount": { "type": "integer", "minimum": 0 },
+        "cameraCalibrationExecutedCaseCount": { "type": "integer", "minimum": 0 },
+        "cameraCalibrationRegressedCaseCount": { "type": "integer", "minimum": 0 },
+        "cameraCalibrationWorseMetricCaseCount": { "type": "integer", "minimum": 0 },
+        "controlCaseCount": { "type": "integer", "minimum": 0 },
+        "fixedCaseCount": { "type": "integer", "minimum": 0 },
+        "regressedCaseCount": { "type": "integer", "minimum": 0 },
+        "improvedMetricCaseCount": { "type": "integer", "minimum": 0 },
+        "readyForABCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "purpose",
+        "candidateRule",
+        "claimBoundary"
+      ],
+      "properties": {
+        "purpose": { "type": "string" },
+        "candidateRule": { "type": "string" },
+        "claimBoundary": { "type": "string" }
+      }
+    },
+    "executionLog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "operator",
+          "command",
+          "caseCount",
+          "candidateVersion",
+          "parameters",
+          "candidateBaseline"
+        ],
+        "properties": {
+          "operator": { "type": "string" },
+          "command": { "type": "string" },
+          "caseCount": { "type": "integer", "minimum": 1 },
+          "candidateVersion": { "type": "string" },
+          "parameters": { "type": "object" },
+          "candidateBaseline": { "type": "string" }
+        }
+      }
+    },
+    "operators": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "operator",
+          "datasetId",
+          "proofLevel",
+          "oldBaseline",
+          "oldMetrics",
+          "candidateBaseline",
+          "candidateMetrics",
+          "delta",
+          "comparisonStatus",
+          "replayCaseCount",
+          "fixedCaseCount",
+          "regressedCaseCount",
+          "improvedMetricCaseCount",
+          "replayCases"
+        ],
+        "properties": {
+          "operator": { "type": "string" },
+          "datasetId": { "type": ["string", "null"] },
+          "proofLevel": { "type": ["string", "null"] },
+          "oldBaseline": { "type": ["string", "null"] },
+          "oldMetrics": { "type": "object" },
+          "candidateBaseline": { "type": "string" },
+          "candidateMetrics": { "type": "object" },
+          "delta": { "type": "object" },
+          "comparisonStatus": {
+            "type": "string",
+            "enum": [
+              "candidate-executed",
+              "unchanged-baseline-control"
+            ]
+          },
+          "replayCaseCount": { "type": "integer", "minimum": 1 },
+          "fixedCaseCount": { "type": "integer", "minimum": 0 },
+          "regressedCaseCount": { "type": "integer", "minimum": 0 },
+          "improvedMetricCaseCount": { "type": "integer", "minimum": 0 },
+          "replayCases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "operator",
+                "datasetId",
+                "caseId",
+                "old",
+                "new",
+                "delta",
+                "status",
+                "executionMode"
+              ],
+              "properties": {
+                "operator": { "type": "string" },
+                "datasetId": { "type": ["string", "null"] },
+                "caseId": { "type": "string" },
+                "old": { "type": "object" },
+                "new": { "type": "object" },
+                "delta": { "type": "object" },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "fixed",
+                    "regressed",
+                    "improved",
+                    "worse-metric",
+                    "unchanged"
+                  ]
+                },
+                "executionMode": {
+                  "type": "string",
+                  "enum": [
+                    "candidate-executed",
+                    "unchanged-baseline-control"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

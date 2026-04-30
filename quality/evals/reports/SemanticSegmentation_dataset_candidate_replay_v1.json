@@ -1,0 +1,1413 @@
+{
+  "EvidenceKind": "dataset",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-30T02:07:37.9060079+00:00",
+    "DatasetName": "VOC-style semi-synthetic semantic segmentation protocol bridge",
+    "DatasetKind": "Tier A protocol bridge for public/VOC-style semantic segmentation metrics; no external image pixels are stored.",
+    "CaseCount": 20,
+    "Passed": 20,
+    "Failed": 0,
+    "TotalPixels": 41856,
+    "CorrectPixels": 41856,
+    "PixelAccuracy": 1,
+    "MeanIoU": 1,
+    "MeanDice": 1,
+    "MeanBoundaryIoU": 1,
+    "RuntimeMs": 419.654,
+    "MemoryAllocationBytes": 37376936,
+    "CandidateVersion": "v1",
+    "Profile": "protocol_bridge_exact_map_v1"
+  },
+  "Operators": [
+    {
+      "Operator": "SemanticSegmentation",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 20.983,
+      "MemoryAllocationBytesAvg": 1868847,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetName": "VOC-style semi-synthetic semantic segmentation protocol bridge"
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "class_absent",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "TotalPixels": 5376,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "RuntimeMsAvg": 3.159
+    },
+    {
+      "Scenario": "multi_class_regions",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "TotalPixels": 10176,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "RuntimeMsAvg": 4.864
+    },
+    {
+      "Scenario": "nested_regions",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "TotalPixels": 5376,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "RuntimeMsAvg": 3.661
+    },
+    {
+      "Scenario": "single_region",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "TotalPixels": 10176,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "RuntimeMsAvg": 88.424
+    },
+    {
+      "Scenario": "small_object",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "TotalPixels": 5376,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "RuntimeMsAvg": 5.165
+    },
+    {
+      "Scenario": "thin_boundary",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "TotalPixels": 5376,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "RuntimeMsAvg": 3.516
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "SemanticSegmentation_single_region_0000",
+      "Scenario": "single_region",
+      "Passed": true,
+      "RuntimeMs": 338.543,
+      "MemoryAllocationBytes": 960096,
+      "Width": 32,
+      "Height": 24,
+      "InputSize": "64x48",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 768,
+      "CorrectPixels": 768,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 576,
+          "PredictedPixels": 576,
+          "Intersection": 576,
+          "Union": 576,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 192,
+          "PredictedPixels": 192,
+          "Intersection": 192,
+          "Union": 192,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_multi_class_regions_0000",
+      "Scenario": "multi_class_regions",
+      "Passed": true,
+      "RuntimeMs": 2.443,
+      "MemoryAllocationBytes": 957192,
+      "Width": 32,
+      "Height": 24,
+      "InputSize": "64x48",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 768,
+      "CorrectPixels": 768,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 593,
+          "PredictedPixels": 593,
+          "Intersection": 593,
+          "Union": 593,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 80,
+          "PredictedPixels": 80,
+          "Intersection": 80,
+          "Union": 80,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 60,
+          "PredictedPixels": 60,
+          "Intersection": 60,
+          "Union": 60,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 35,
+          "PredictedPixels": 35,
+          "Intersection": 35,
+          "Union": 35,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_thin_boundary_0000",
+      "Scenario": "thin_boundary",
+      "Passed": true,
+      "RuntimeMs": 1.83,
+      "MemoryAllocationBytes": 938240,
+      "Width": 32,
+      "Height": 24,
+      "InputSize": "64x48",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 768,
+      "CorrectPixels": 768,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 450,
+          "PredictedPixels": 450,
+          "Intersection": 450,
+          "Union": 450,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 186,
+          "PredictedPixels": 186,
+          "Intersection": 186,
+          "Union": 186,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 88,
+          "PredictedPixels": 88,
+          "Intersection": 88,
+          "Union": 88,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 44,
+          "PredictedPixels": 44,
+          "Intersection": 44,
+          "Union": 44,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_small_object_0000",
+      "Scenario": "small_object",
+      "Passed": true,
+      "RuntimeMs": 1.811,
+      "MemoryAllocationBytes": 923600,
+      "Width": 32,
+      "Height": 24,
+      "InputSize": "64x48",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 768,
+      "CorrectPixels": 768,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 416,
+          "PredictedPixels": 416,
+          "Intersection": 416,
+          "Union": 416,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 336,
+          "PredictedPixels": 336,
+          "Intersection": 336,
+          "Union": 336,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 16,
+          "PredictedPixels": 16,
+          "Intersection": 16,
+          "Union": 16,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_class_absent_0000",
+      "Scenario": "class_absent",
+      "Passed": true,
+      "RuntimeMs": 2.032,
+      "MemoryAllocationBytes": 896256,
+      "Width": 32,
+      "Height": 24,
+      "InputSize": "64x48",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 768,
+      "CorrectPixels": 768,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 576,
+          "PredictedPixels": 576,
+          "Intersection": 576,
+          "Union": 576,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 192,
+          "PredictedPixels": 192,
+          "Intersection": 192,
+          "Union": 192,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_nested_regions_0000",
+      "Scenario": "nested_regions",
+      "Passed": true,
+      "RuntimeMs": 1.827,
+      "MemoryAllocationBytes": 949160,
+      "Width": 32,
+      "Height": 24,
+      "InputSize": "64x48",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 768,
+      "CorrectPixels": 768,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 336,
+          "PredictedPixels": 336,
+          "Intersection": 336,
+          "Union": 336,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 352,
+          "PredictedPixels": 352,
+          "Intersection": 352,
+          "Union": 352,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 61,
+          "PredictedPixels": 61,
+          "Intersection": 61,
+          "Union": 61,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 19,
+          "PredictedPixels": 19,
+          "Intersection": 19,
+          "Union": 19,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_single_region_0001",
+      "Scenario": "single_region",
+      "Passed": true,
+      "RuntimeMs": 3.45,
+      "MemoryAllocationBytes": 1788696,
+      "Width": 48,
+      "Height": 32,
+      "InputSize": "96x64",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 1536,
+      "CorrectPixels": 1536,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 1152,
+          "PredictedPixels": 1152,
+          "Intersection": 1152,
+          "Union": 1152,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 384,
+          "PredictedPixels": 384,
+          "Intersection": 384,
+          "Union": 384,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_multi_class_regions_0001",
+      "Scenario": "multi_class_regions",
+      "Passed": true,
+      "RuntimeMs": 3.831,
+      "MemoryAllocationBytes": 1890272,
+      "Width": 48,
+      "Height": 32,
+      "InputSize": "96x64",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 1536,
+      "CorrectPixels": 1536,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 1175,
+          "PredictedPixels": 1175,
+          "Intersection": 1175,
+          "Union": 1175,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 160,
+          "PredictedPixels": 160,
+          "Intersection": 160,
+          "Union": 160,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 128,
+          "PredictedPixels": 128,
+          "Intersection": 128,
+          "Union": 128,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 73,
+          "PredictedPixels": 73,
+          "Intersection": 73,
+          "Union": 73,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_thin_boundary_0001",
+      "Scenario": "thin_boundary",
+      "Passed": true,
+      "RuntimeMs": 3.56,
+      "MemoryAllocationBytes": 1866656,
+      "Width": 48,
+      "Height": 32,
+      "InputSize": "96x64",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 1536,
+      "CorrectPixels": 1536,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 886,
+          "PredictedPixels": 886,
+          "Intersection": 886,
+          "Union": 886,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 368,
+          "PredictedPixels": 368,
+          "Intersection": 368,
+          "Union": 368,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 222,
+          "PredictedPixels": 222,
+          "Intersection": 222,
+          "Union": 222,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 60,
+          "PredictedPixels": 60,
+          "Intersection": 60,
+          "Union": 60,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_small_object_0001",
+      "Scenario": "small_object",
+      "Passed": true,
+      "RuntimeMs": 5.83,
+      "MemoryAllocationBytes": 1840488,
+      "Width": 48,
+      "Height": 32,
+      "InputSize": "96x64",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 1536,
+      "CorrectPixels": 1536,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 822,
+          "PredictedPixels": 822,
+          "Intersection": 822,
+          "Union": 822,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 689,
+          "PredictedPixels": 689,
+          "Intersection": 689,
+          "Union": 689,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 25,
+          "PredictedPixels": 25,
+          "Intersection": 25,
+          "Union": 25,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_class_absent_0001",
+      "Scenario": "class_absent",
+      "Passed": true,
+      "RuntimeMs": 2.886,
+      "MemoryAllocationBytes": 1787008,
+      "Width": 48,
+      "Height": 32,
+      "InputSize": "96x64",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 1536,
+      "CorrectPixels": 1536,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 1152,
+          "PredictedPixels": 1152,
+          "Intersection": 1152,
+          "Union": 1152,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 384,
+          "PredictedPixels": 384,
+          "Intersection": 384,
+          "Union": 384,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_nested_regions_0001",
+      "Scenario": "nested_regions",
+      "Passed": true,
+      "RuntimeMs": 3.188,
+      "MemoryAllocationBytes": 1887656,
+      "Width": 48,
+      "Height": 32,
+      "InputSize": "96x64",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 1536,
+      "CorrectPixels": 1536,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 672,
+          "PredictedPixels": 672,
+          "Intersection": 672,
+          "Union": 672,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 704,
+          "PredictedPixels": 704,
+          "Intersection": 704,
+          "Union": 704,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 125,
+          "PredictedPixels": 125,
+          "Intersection": 125,
+          "Union": 125,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 35,
+          "PredictedPixels": 35,
+          "Intersection": 35,
+          "Union": 35,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_single_region_0002",
+      "Scenario": "single_region",
+      "Passed": true,
+      "RuntimeMs": 4.646,
+      "MemoryAllocationBytes": 2227040,
+      "Width": 64,
+      "Height": 48,
+      "InputSize": "64x64",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 3072,
+      "CorrectPixels": 3072,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 2304,
+          "PredictedPixels": 2304,
+          "Intersection": 2304,
+          "Union": 2304,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 768,
+          "PredictedPixels": 768,
+          "Intersection": 768,
+          "Union": 768,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_multi_class_regions_0002",
+      "Scenario": "multi_class_regions",
+      "Passed": true,
+      "RuntimeMs": 5.21,
+      "MemoryAllocationBytes": 2427712,
+      "Width": 64,
+      "Height": 48,
+      "InputSize": "64x64",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 3072,
+      "CorrectPixels": 3072,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 2321,
+          "PredictedPixels": 2321,
+          "Intersection": 2321,
+          "Union": 2321,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 336,
+          "PredictedPixels": 336,
+          "Intersection": 336,
+          "Union": 336,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 252,
+          "PredictedPixels": 252,
+          "Intersection": 252,
+          "Union": 252,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 163,
+          "PredictedPixels": 163,
+          "Intersection": 163,
+          "Union": 163,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_thin_boundary_0002",
+      "Scenario": "thin_boundary",
+      "Passed": true,
+      "RuntimeMs": 5.158,
+      "MemoryAllocationBytes": 2379256,
+      "Width": 64,
+      "Height": 48,
+      "InputSize": "64x64",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 3072,
+      "CorrectPixels": 3072,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 1926,
+          "PredictedPixels": 1926,
+          "Intersection": 1926,
+          "Union": 1926,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 870,
+          "PredictedPixels": 870,
+          "Intersection": 870,
+          "Union": 870,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 184,
+          "PredictedPixels": 184,
+          "Intersection": 184,
+          "Union": 184,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 92,
+          "PredictedPixels": 92,
+          "Intersection": 92,
+          "Union": 92,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_small_object_0002",
+      "Scenario": "small_object",
+      "Passed": true,
+      "RuntimeMs": 7.855,
+      "MemoryAllocationBytes": 2330808,
+      "Width": 64,
+      "Height": 48,
+      "InputSize": "64x64",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 3072,
+      "CorrectPixels": 3072,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 1632,
+          "PredictedPixels": 1632,
+          "Intersection": 1632,
+          "Union": 1632,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 1404,
+          "PredictedPixels": 1404,
+          "Intersection": 1404,
+          "Union": 1404,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 36,
+          "PredictedPixels": 36,
+          "Intersection": 36,
+          "Union": 36,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_class_absent_0002",
+      "Scenario": "class_absent",
+      "Passed": true,
+      "RuntimeMs": 4.559,
+      "MemoryAllocationBytes": 2223072,
+      "Width": 64,
+      "Height": 48,
+      "InputSize": "64x64",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 3072,
+      "CorrectPixels": 3072,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 2304,
+          "PredictedPixels": 2304,
+          "Intersection": 2304,
+          "Union": 2304,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 768,
+          "PredictedPixels": 768,
+          "Intersection": 768,
+          "Union": 768,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_nested_regions_0002",
+      "Scenario": "nested_regions",
+      "Passed": true,
+      "RuntimeMs": 5.969,
+      "MemoryAllocationBytes": 2424208,
+      "Width": 64,
+      "Height": 48,
+      "InputSize": "64x64",
+      "ChannelOrder": "RGB",
+      "TotalPixels": 3072,
+      "CorrectPixels": 3072,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 1344,
+          "PredictedPixels": 1344,
+          "Intersection": 1344,
+          "Union": 1344,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 1392,
+          "PredictedPixels": 1392,
+          "Intersection": 1392,
+          "Union": 1392,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 263,
+          "PredictedPixels": 263,
+          "Intersection": 263,
+          "Union": 263,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 73,
+          "PredictedPixels": 73,
+          "Intersection": 73,
+          "Union": 73,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_single_region_0003",
+      "Scenario": "single_region",
+      "Passed": true,
+      "RuntimeMs": 7.056,
+      "MemoryAllocationBytes": 3182016,
+      "Width": 80,
+      "Height": 60,
+      "InputSize": "96x48",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 4800,
+      "CorrectPixels": 4800,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 3600,
+          "PredictedPixels": 3600,
+          "Intersection": 3600,
+          "Union": 3600,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 1200,
+          "PredictedPixels": 1200,
+          "Intersection": 1200,
+          "Union": 1200,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 0,
+          "PredictedPixels": 0,
+          "Intersection": 0,
+          "Union": 0,
+          "IoU": null,
+          "Dice": null
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "SemanticSegmentation_multi_class_regions_0003",
+      "Scenario": "multi_class_regions",
+      "Passed": true,
+      "RuntimeMs": 7.97,
+      "MemoryAllocationBytes": 3497504,
+      "Width": 80,
+      "Height": 60,
+      "InputSize": "96x48",
+      "ChannelOrder": "BGR",
+      "TotalPixels": 4800,
+      "CorrectPixels": 4800,
+      "PixelAccuracy": 1,
+      "MeanIoU": 1,
+      "MeanDice": 1,
+      "BoundaryIoU": 1,
+      "PresentClasses": [
+        "background",
+        "surface",
+        "scratch",
+        "contaminant"
+      ],
+      "Classes": [
+        {
+          "ClassId": 0,
+          "ClassName": "background",
+          "GroundTruthPixels": 3653,
+          "PredictedPixels": 3653,
+          "Intersection": 3653,
+          "Union": 3653,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 1,
+          "ClassName": "surface",
+          "GroundTruthPixels": 520,
+          "PredictedPixels": 520,
+          "Intersection": 520,
+          "Union": 520,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 2,
+          "ClassName": "scratch",
+          "GroundTruthPixels": 390,
+          "PredictedPixels": 390,
+          "Intersection": 390,
+          "Union": 390,
+          "IoU": 1,
+          "Dice": 1
+        },
+        {
+          "ClassId": 3,
+          "ClassName": "contaminant",
+          "GroundTruthPixels": 237,
+          "PredictedPixels": 237,
+          "Intersection": 237,
+          "Union": 237,
+          "IoU": 1,
+          "Dice": 1
+        }
+      ],
+      "Failure": null
+    }
+  ]
+}

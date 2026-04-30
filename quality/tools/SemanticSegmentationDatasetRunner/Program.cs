@@ -32,7 +32,8 @@ if (!string.IsNullOrWhiteSpace(options.ReportPath))
 
 Console.WriteLine(
     $"SemanticSegmentation dataset complete: {result.Summary.Passed}/{result.Summary.CaseCount} passed, " +
-    $"mIoU={result.Summary.MeanIoU:F4}, pixelAccuracy={result.Summary.PixelAccuracy:F4}, output={options.OutputPath}");
+    $"mIoU={result.Summary.MeanIoU:F4}, pixelAccuracy={result.Summary.PixelAccuracy:F4}, " +
+    $"candidate={result.Summary.CandidateVersion}, profile={result.Summary.Profile}, output={options.OutputPath}");
 
 return result.Summary.Failed == 0 ? 0 : 1;
 
@@ -55,7 +56,9 @@ internal static class SemanticSegmentationDatasetRunner
 
     public static BaselineResult Run(RunnerOptions options)
     {
-        var specs = BuildCases().ToList();
+        var specs = BuildCases()
+            .Where(options.IncludesCase)
+            .ToList();
         var results = new List<CaseResult>(specs.Count);
         foreach (var spec in specs)
         {
@@ -84,7 +87,9 @@ internal static class SemanticSegmentationDatasetRunner
                 Math.Round(results.Average(item => item.MeanDice), 6),
                 Math.Round(results.Average(item => item.BoundaryIoU), 6),
                 runtimeMs,
-                memoryBytes),
+                memoryBytes,
+                options.CandidateVersion,
+                options.Profile),
             [
                 new OperatorSummary(
                     "SemanticSegmentation",
@@ -719,7 +724,9 @@ internal sealed record DatasetSummary(
     double MeanDice,
     double MeanBoundaryIoU,
     double RuntimeMs,
-    long MemoryAllocationBytes);
+    long MemoryAllocationBytes,
+    string CandidateVersion,
+    string Profile);
 
 internal sealed record OperatorSummary(
     string Operator,
@@ -791,6 +798,8 @@ internal static class MarkdownReport
             $"| Mean Dice | {result.Summary.MeanDice:0.####} |",
             $"| Mean boundary IoU | {result.Summary.MeanBoundaryIoU:0.####} |",
             $"| Runtime ms | {result.Summary.RuntimeMs:0.###} |",
+            $"| Candidate version | {result.Summary.CandidateVersion} |",
+            $"| Profile | {result.Summary.Profile} |",
             "",
             "## Scenarios",
             "",
@@ -828,13 +837,25 @@ internal static class MarkdownReport
     }
 }
 
-internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool ShowHelp, string? ParseError)
+internal sealed record RunnerOptions(
+    string OutputPath,
+    string ReportPath,
+    string CandidateVersion,
+    string Profile,
+    IReadOnlySet<string> CaseIds,
+    bool ShowHelp,
+    string? ParseError)
 {
+    public bool IncludesCase(SegmentationCaseSpec spec) => CaseIds.Count == 0 || CaseIds.Contains(spec.CaseId);
+
     public static RunnerOptions Parse(string[] args)
     {
         var options = new RunnerOptions(
             "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
             "quality/evals/reports/SemanticSegmentation_dataset_baseline.md",
+            "control",
+            "baseline_protocol_bridge",
+            new HashSet<string>(StringComparer.Ordinal),
             false,
             null);
 
@@ -856,6 +877,9 @@ internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool 
             {
                 "--output" => options with { OutputPath = value },
                 "--report" => options with { ReportPath = value },
+                "--candidate-version" => options with { CandidateVersion = value },
+                "--profile" => options with { Profile = value },
+                "--case-ids" => options with { CaseIds = SplitCaseIds(value) },
                 _ => options with { ParseError = $"Unknown argument: {arg}" }
             };
 
@@ -876,8 +900,15 @@ internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool 
         Options:
           --output <path>   Baseline JSON output path.
           --report <path>   Baseline Markdown report path.
+          --candidate-version <id>  Candidate version label to record.
+          --profile <name>          Candidate profile label to record.
+          --case-ids <ids>          Comma-separated case ids to execute.
         """);
     }
+
+    private static IReadOnlySet<string> SplitCaseIds(string raw) =>
+        raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
 }
 
 internal static class JsonSettings

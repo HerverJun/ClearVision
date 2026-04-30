@@ -158,6 +158,23 @@ def inspect_public_benchmark_proof(checks: list[dict[str, Any]]) -> None:
         RAW_PATH_RE.search(json.dumps(proof, ensure_ascii=False)) is None,
         "public benchmark proof raw path scan",
     )
+    deep_learning_rows = [row for row in operators if row.get("operator") == "DeepLearning"]
+    deep_learning_row = next(iter(deep_learning_rows), None)
+    if deep_learning_row is None:
+        add_check(checks, "public_benchmark_proof_deeplearning_baseline", False, "DeepLearning row missing")
+    else:
+        add_check(
+            checks,
+            "public_benchmark_proof_deeplearning_baseline",
+            deep_learning_row.get("sourceBaseline") == "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
+            str(deep_learning_row.get("sourceBaseline")),
+        )
+        add_check(
+            checks,
+            "public_benchmark_proof_deeplearning_no_annotation_seeded_claim",
+            "annotation-seeded" not in str(deep_learning_row.get("evidenceClaim", "")).lower(),
+            str(deep_learning_row.get("evidenceClaim")),
+        )
 
     replay_path = REPORT_DIR / "QualityFlywheel_public_benchmark_replay_manifest.json"
     if not replay_path.exists():
@@ -224,9 +241,86 @@ def inspect_algorithm_ab_report(checks: list[dict[str, Any]]) -> None:
     )
     add_check(
         checks,
-        "algorithm_ab_replay_report_matching_candidate_executed",
-        report.get("summary", {}).get("executedCandidateCaseCount", 0) >= 40,
+        "algorithm_ab_replay_report_candidate_executed_ge_183",
+        report.get("summary", {}).get("executedCandidateCaseCount", 0) >= 183,
         str(report.get("summary", {}).get("executedCandidateCaseCount")),
+    )
+    deep_learning_rows = [row for row in rows if row.get("operator") == "DeepLearning"]
+    if not deep_learning_rows:
+        add_check(checks, "algorithm_ab_replay_report_deeplearning_row_present", False, "DeepLearning row missing")
+    else:
+        deep_learning_row = deep_learning_rows[0]
+        add_check(
+            checks,
+            "algorithm_ab_replay_report_deeplearning_candidate_executed",
+            deep_learning_row.get("comparisonStatus") == "candidate-executed",
+            str(deep_learning_row.get("comparisonStatus")),
+        )
+        add_check(
+            checks,
+            "algorithm_ab_replay_report_deeplearning_real_model_cases_ge_20",
+            report.get("summary", {}).get("deepLearningRealModelCaseCount", 0) >= 20,
+            str(report.get("summary", {}).get("deepLearningRealModelCaseCount")),
+        )
+        add_check(
+            checks,
+            "algorithm_ab_replay_report_deeplearning_processing_errors_zero",
+            report.get("summary", {}).get("deepLearningProcessingErrorCaseCount", 0) == 0,
+            str(report.get("summary", {}).get("deepLearningProcessingErrorCaseCount")),
+        )
+        add_check(
+            checks,
+            "algorithm_ab_replay_report_deeplearning_candidate_summary_accessible",
+            bool(deep_learning_row.get("candidateBaseline")),
+            str(deep_learning_row.get("candidateBaseline")),
+        )
+        if deep_learning_row.get("candidateBaseline"):
+            candidate_summary_path = REPO_ROOT / str(deep_learning_row.get("candidateBaseline"))
+            candidate_report_available = candidate_summary_path.exists()
+            add_check(
+                checks,
+                "algorithm_ab_replay_report_deeplearning_candidate_summary_exists",
+                candidate_report_available,
+                str(deep_learning_row.get("candidateBaseline")),
+            )
+            if candidate_report_available:
+                candidate_report = read_json(candidate_summary_path)
+                candidate_summary = candidate_report.get("Summary", {})
+                add_check(
+                    checks,
+                    "algorithm_ab_replay_report_deeplearning_candidate_profile",
+                    candidate_summary.get("Profile") == "real_model_hard_nms_045",
+                    str(candidate_summary.get("Profile")),
+                )
+                add_check(
+                    checks,
+                    "algorithm_ab_replay_report_deeplearning_candidate_annotation_seeded_false",
+                    candidate_summary.get("AnnotationSeeded") is False,
+                    str(candidate_summary.get("AnnotationSeeded")),
+                )
+                add_check(
+                    checks,
+                    "algorithm_ab_replay_report_deeplearning_candidate_artifact_present",
+                    str(candidate_summary.get("ModelArtifactRef", "")).strip() != "",
+                    str(candidate_summary.get("ModelArtifactRef")),
+                )
+    add_check(
+        checks,
+        "algorithm_ab_replay_report_candidate_camera_cases_executed_ge_3",
+        report.get("summary", {}).get("cameraCalibrationExecutedCaseCount", 0) >= 3,
+        str(report.get("summary", {}).get("cameraCalibrationExecutedCaseCount")),
+    )
+    add_check(
+        checks,
+        "algorithm_ab_replay_report_camera_regressed_zero",
+        report.get("summary", {}).get("cameraCalibrationRegressedCaseCount", 0) == 0,
+        str(report.get("summary", {}).get("cameraCalibrationRegressedCaseCount")),
+    )
+    add_check(
+        checks,
+        "algorithm_ab_replay_report_camera_worse_metric_zero",
+        report.get("summary", {}).get("cameraCalibrationWorseMetricCaseCount", 0) == 0,
+        str(report.get("summary", {}).get("cameraCalibrationWorseMetricCaseCount")),
     )
     missing_replay = [row.get("operator") for row in rows if row.get("replayCaseCount", 0) <= 0]
     add_check(checks, "algorithm_ab_replay_report_all_ops_wired", not missing_replay, ", ".join(map(str, missing_replay[:10])))

@@ -1,0 +1,1239 @@
+{
+  "EvidenceKind": "dataset",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-30T02:39:47.4970051+00:00",
+    "DatasetName": "Semi-synthetic geometric shape matching scene protocol",
+    "DatasetKind": "Tier B semi-synthetic geometric scenes with fixed seed, pose labels, multi-target labels, and no-match negatives.",
+    "CaseCount": 20,
+    "Passed": 20,
+    "Failed": 0,
+    "GroundTruthCount": 23,
+    "PredictedCount": 23,
+    "TruePositiveCount": 23,
+    "FalsePositiveCount": 0,
+    "FalseNegativeCount": 0,
+    "Precision": 1,
+    "Recall": 1,
+    "F1": 1,
+    "MeanPositionErrorPx": 0.039728,
+    "MeanAngleErrorDeg": 0.086957,
+    "MeanScaleError": 0,
+    "MinScore": 0.951032,
+    "MeanScore": 0.996739,
+    "PositionTolerancePx": 8,
+    "AngleToleranceDeg": 6,
+    "ScaleTolerance": 0.16,
+    "RuntimeMs": 1056.649,
+    "MemoryAllocationBytes": 2068871064,
+    "CandidateVersion": "v1",
+    "Profile": "geometric_dataset_bridge_v1"
+  },
+  "Operators": [
+    {
+      "Operator": "ShapeMatching",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 52.832,
+      "MemoryAllocationBytesAvg": 103443553,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetName": "Semi-synthetic geometric shape matching scene protocol"
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "direct_pose",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "GroundTruthCount": 4,
+      "PredictedCount": 4,
+      "TruePositiveCount": 4,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.000901,
+      "RuntimeMsAvg": 17.19
+    },
+    {
+      "Scenario": "multi_target",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "GroundTruthCount": 6,
+      "PredictedCount": 6,
+      "TruePositiveCount": 6,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.001302,
+      "RuntimeMsAvg": 3.267
+    },
+    {
+      "Scenario": "rotated_pose",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "GroundTruthCount": 5,
+      "PredictedCount": 5,
+      "TruePositiveCount": 5,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.001231,
+      "RuntimeMsAvg": 26.74
+    },
+    {
+      "Scenario": "scaled_pose",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "GroundTruthCount": 5,
+      "PredictedCount": 5,
+      "TruePositiveCount": 5,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.178794,
+      "RuntimeMsAvg": 167.272
+    },
+    {
+      "Scenario": "top_left_origin",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "GroundTruthCount": 3,
+      "PredictedCount": 3,
+      "TruePositiveCount": 3,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.000736,
+      "RuntimeMsAvg": 2.677
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "ShapeMatching_direct_pose_0000",
+      "Scenario": "direct_pose",
+      "Passed": true,
+      "RuntimeMs": 62.336,
+      "MemoryAllocationBytes": 1551680,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.000101,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 56.00010080877499,
+          "Y": 71.99999996442583,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 56,
+            "Y": 72,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 56.00010080877499,
+            "Y": 71.99999996442583,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.00010080878126492529,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_scaled_pose_0000",
+      "Scenario": "scaled_pose",
+      "Passed": true,
+      "RuntimeMs": 449.348,
+      "MemoryAllocationBytes": 304577376,
+      "Width": 300,
+      "Height": 280,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.219968,
+      "MeanAngleErrorDeg": 2,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 80.36697700232872,
+          "Y": 90.32481150195329,
+          "AngleDeg": 2,
+          "Scale": 0.85,
+          "Score": 0.9510320686814459
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 80.5,
+            "Y": 90.5,
+            "AngleDeg": 0,
+            "Scale": 0.85
+          },
+          "Prediction": {
+            "X": 80.36697700232872,
+            "Y": 90.32481150195329,
+            "AngleDeg": 2,
+            "Scale": 0.85,
+            "Score": 0.9510320686814459
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.2199684699162899,
+          "AngleErrorDeg": 2,
+          "ScaleError": 0,
+          "Score": 0.9510320686814459
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_multi_target_0000",
+      "Scenario": "multi_target",
+      "Passed": true,
+      "RuntimeMs": 3.573,
+      "MemoryAllocationBytes": 1071768,
+      "Width": 260,
+      "Height": 250,
+      "GroundTruthCount": 2,
+      "PredictedCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.001406,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 184.00006908703205,
+          "Y": 171.9971881438817,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 1
+        },
+        {
+          "X": 47.99999996837652,
+          "Y": 57.99999996047889,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 184,
+            "Y": 172,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 184.00006908703205,
+            "Y": 171.9971881438817,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.0028127047210992043,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        },
+        {
+          "GroundTruth": {
+            "X": 48,
+            "Y": 58,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 47.99999996837652,
+            "Y": 57.99999996047889,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 5.0615834399904035E-08,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_direct_pose_0001",
+      "Scenario": "direct_pose",
+      "Passed": true,
+      "RuntimeMs": 2.213,
+      "MemoryAllocationBytes": 830376,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 6.1E-05,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 67.00000002767204,
+          "Y": 79.00006078843892,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 67,
+            "Y": 79,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 67.00000002767204,
+            "Y": 79.00006078843892,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 6.07884452138558E-05,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_pose_0001",
+      "Scenario": "rotated_pose",
+      "Passed": true,
+      "RuntimeMs": 30.881,
+      "MemoryAllocationBytes": 80517280,
+      "Width": 280,
+      "Height": 260,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.002829,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 97.0028071829679,
+          "Y": 87.00035364969789,
+          "AngleDeg": 20,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 97,
+            "Y": 87,
+            "AngleDeg": 20,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 97.0028071829679,
+            "Y": 87.00035364969789,
+            "AngleDeg": 20,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.002829371718964863,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_scaled_pose_0001",
+      "Scenario": "scaled_pose",
+      "Passed": true,
+      "RuntimeMs": 64.763,
+      "MemoryAllocationBytes": 206717544,
+      "Width": 300,
+      "Height": 280,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.171097,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 95.84981038865524,
+          "Y": 103.91804139496074,
+          "AngleDeg": 18,
+          "Scale": 0.95,
+          "Score": 0.9914037599661256
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 96,
+            "Y": 104,
+            "AngleDeg": 18,
+            "Scale": 0.95
+          },
+          "Prediction": {
+            "X": 95.84981038865524,
+            "Y": 103.91804139496074,
+            "AngleDeg": 18,
+            "Scale": 0.95,
+            "Score": 0.9914037599661256
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.17109685063107058,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9914037599661256
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_multi_target_0001",
+      "Scenario": "multi_target",
+      "Passed": true,
+      "RuntimeMs": 3.095,
+      "MemoryAllocationBytes": 1070960,
+      "Width": 260,
+      "Height": 250,
+      "GroundTruthCount": 2,
+      "PredictedCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.00108,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 48.9999998972328,
+          "Y": 58.99795081210251,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 1
+        },
+        {
+          "X": 183.00007348387965,
+          "Y": 172.9999163849157,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 49,
+            "Y": 59,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 48.9999998972328,
+            "Y": 58.99795081210251,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.0020491879000677656,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        },
+        {
+          "GroundTruth": {
+            "X": 183,
+            "Y": 173,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 183.00007348387965,
+            "Y": 172.9999163849157,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.00011131649872840935,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_pose_0002",
+      "Scenario": "rotated_pose",
+      "Passed": true,
+      "RuntimeMs": 28.303,
+      "MemoryAllocationBytes": 87162720,
+      "Width": 280,
+      "Height": 260,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.000562,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 106.49944958520712,
+          "Y": 94.50011202690565,
+          "AngleDeg": 28,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 106.5,
+            "Y": 94.5,
+            "AngleDeg": 28,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 106.49944958520712,
+            "Y": 94.50011202690565,
+            "AngleDeg": 28,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.0005616996277505688,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_scaled_pose_0002",
+      "Scenario": "scaled_pose",
+      "Passed": true,
+      "RuntimeMs": 74.348,
+      "MemoryAllocationBytes": 261712464,
+      "Width": 300,
+      "Height": 280,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.256371,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 99.18129456499044,
+          "Y": 105.1812682235929,
+          "AngleDeg": 0,
+          "Scale": 1.05,
+          "Score": 0.9999998658895493
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 99,
+            "Y": 105,
+            "AngleDeg": 0,
+            "Scale": 1.05
+          },
+          "Prediction": {
+            "X": 99.18129456499044,
+            "Y": 105.1812682235929,
+            "AngleDeg": 0,
+            "Scale": 1.05,
+            "Score": 0.9999998658895493
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.2563706070898061,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999998658895493
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_multi_target_0002",
+      "Scenario": "multi_target",
+      "Passed": true,
+      "RuntimeMs": 3.132,
+      "MemoryAllocationBytes": 1070960,
+      "Width": 260,
+      "Height": 250,
+      "GroundTruthCount": 2,
+      "PredictedCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.00142,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 182.00000015809195,
+          "Y": 173.99993913612732,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 1
+        },
+        {
+          "X": 50.000000091003116,
+          "Y": 59.99722028416529,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 182,
+            "Y": 174,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 182.00000015809195,
+            "Y": 173.99993913612732,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 6.0864077995038805E-05,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        },
+        {
+          "GroundTruth": {
+            "X": 50,
+            "Y": 60,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 50.000000091003116,
+            "Y": 59.99722028416529,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.0027797158362023464,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_top_left_origin_0002",
+      "Scenario": "top_left_origin",
+      "Passed": true,
+      "RuntimeMs": 3.03,
+      "MemoryAllocationBytes": 830408,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.002074,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 64.00008239769701,
+          "Y": 58.00207270963652,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 64,
+            "Y": 58,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 64.00008239769701,
+            "Y": 58.00207270963652,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.002074346793042238,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_direct_pose_0003",
+      "Scenario": "direct_pose",
+      "Passed": true,
+      "RuntimeMs": 2.242,
+      "MemoryAllocationBytes": 830584,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.003382,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 89.00338179803614,
+          "Y": 92.99999985363806,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 89,
+            "Y": 93,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 89.00338179803614,
+            "Y": 92.99999985363806,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.003381798039312024,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_pose_0003",
+      "Scenario": "rotated_pose",
+      "Passed": true,
+      "RuntimeMs": 24.531,
+      "MemoryAllocationBytes": 71791104,
+      "Width": 280,
+      "Height": 260,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.000207,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 115.99979308657174,
+          "Y": 102.00001242904209,
+          "AngleDeg": 36,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 116,
+            "Y": 102,
+            "AngleDeg": 36,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 115.99979308657174,
+            "Y": 102.00001242904209,
+            "AngleDeg": 36,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.00020728639096819325,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_scaled_pose_0003",
+      "Scenario": "scaled_pose",
+      "Passed": true,
+      "RuntimeMs": 99.54,
+      "MemoryAllocationBytes": 346662856,
+      "Width": 300,
+      "Height": 280,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.147647,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 116.13878605086131,
+          "Y": 120.05037786557276,
+          "AngleDeg": 18,
+          "Scale": 1.15,
+          "Score": 0.9954962889292729
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 116,
+            "Y": 120,
+            "AngleDeg": 18,
+            "Scale": 1.15
+          },
+          "Prediction": {
+            "X": 116.13878605086131,
+            "Y": 120.05037786557276,
+            "AngleDeg": 18,
+            "Scale": 1.15,
+            "Score": 0.9954962889292729
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.14764652807751905,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9954962889292729
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_top_left_origin_0003",
+      "Scenario": "top_left_origin",
+      "Passed": true,
+      "RuntimeMs": 2.521,
+      "MemoryAllocationBytes": 830824,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 6.1E-05,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 72.99999990513537,
+          "Y": 65.99993907315933,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 73,
+            "Y": 66,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 72.99999990513537,
+            "Y": 65.99993907315933,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999999552965164
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 6.0926914528094766E-05,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999999552965164
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_pose_0004",
+      "Scenario": "rotated_pose",
+      "Passed": true,
+      "RuntimeMs": 25.317,
+      "MemoryAllocationBytes": 71842032,
+      "Width": 280,
+      "Height": 260,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.00094,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 123.9990620283785,
+          "Y": 108.00006018288693,
+          "AngleDeg": 44,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 124,
+            "Y": 108,
+            "AngleDeg": 44,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 123.9990620283785,
+            "Y": 108.00006018288693,
+            "AngleDeg": 44,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.0009399003897284454,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_top_left_origin_0004",
+      "Scenario": "top_left_origin",
+      "Passed": true,
+      "RuntimeMs": 2.479,
+      "MemoryAllocationBytes": 830824,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 7.3E-05,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 81.99992659396636,
+          "Y": 73.99999999605197,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 82,
+            "Y": 74,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 81.99992659396636,
+            "Y": 73.99999999605197,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 7.340603374176181E-05,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_direct_pose_0005",
+      "Scenario": "direct_pose",
+      "Passed": true,
+      "RuntimeMs": 1.968,
+      "MemoryAllocationBytes": 830376,
+      "Width": 240,
+      "Height": 220,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 6.1E-05,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 111.00000037942667,
+          "Y": 107.00006073347791,
+          "AngleDeg": 0,
+          "Scale": 1,
+          "Score": 0.9999998956918716
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 111,
+            "Y": 107,
+            "AngleDeg": 0,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 111.00000037942667,
+            "Y": 107.00006073347791,
+            "AngleDeg": 0,
+            "Scale": 1,
+            "Score": 0.9999998956918716
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 6.073466311358766E-05,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9999998956918716
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_pose_0005",
+      "Scenario": "rotated_pose",
+      "Passed": true,
+      "RuntimeMs": 24.667,
+      "MemoryAllocationBytes": 71833424,
+      "Width": 280,
+      "Height": 260,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.001617,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 132.0015945427079,
+          "Y": 113.9997324881033,
+          "AngleDeg": 52,
+          "Scale": 1,
+          "Score": 1
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 132,
+            "Y": 114,
+            "AngleDeg": 52,
+            "Scale": 1
+          },
+          "Prediction": {
+            "X": 132.0015945427079,
+            "Y": 113.9997324881033,
+            "AngleDeg": 52,
+            "Scale": 1,
+            "Score": 1
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.001616826849778381,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "ShapeMatching_scaled_pose_0005",
+      "Scenario": "scaled_pose",
+      "Passed": true,
+      "RuntimeMs": 148.362,
+      "MemoryAllocationBytes": 556305504,
+      "Width": 300,
+      "Height": 280,
+      "GroundTruthCount": 1,
+      "PredictedCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "Precision": 1,
+      "Recall": 1,
+      "F1": 1,
+      "MeanPositionErrorPx": 0.098888,
+      "MeanAngleErrorDeg": 0,
+      "MeanScaleError": 0,
+      "Predictions": [
+        {
+          "X": 135.9866622488823,
+          "Y": 135.90201590365245,
+          "AngleDeg": 18,
+          "Scale": 1.35,
+          "Score": 0.9870587449574193
+        }
+      ],
+      "Matches": [
+        {
+          "GroundTruth": {
+            "X": 136,
+            "Y": 136,
+            "AngleDeg": 18,
+            "Scale": 1.35
+          },
+          "Prediction": {
+            "X": 135.9866622488823,
+            "Y": 135.90201590365245,
+            "AngleDeg": 18,
+            "Scale": 1.35,
+            "Score": 0.9870587449574193
+          },
+          "IsTruePositive": true,
+          "PositionErrorPx": 0.09888770773924563,
+          "AngleErrorDeg": 0,
+          "ScaleError": 0,
+          "Score": 0.9870587449574193
+        }
+      ],
+      "Failure": null
+    }
+  ]
+}

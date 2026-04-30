@@ -34,7 +34,7 @@ if (!string.IsNullOrWhiteSpace(options.ReportPath))
 
 Console.WriteLine(
     $"TemplateMatching homography bridge complete: {result.Summary.Passed}/{result.Summary.CaseCount} passed, " +
-    $"failed={result.Summary.Failed}, output={options.OutputPath}");
+    $"failed={result.Summary.Failed}, candidate={result.Summary.CandidateVersion}, profile={result.Summary.Profile}, output={options.OutputPath}");
 
 return result.Summary.Failed == 0 ? 0 : 1;
 
@@ -48,7 +48,9 @@ internal static class HomographyBridgeRunner
 
     public static async Task<BridgeResult> RunAsync(RunnerOptions options)
     {
-        var specs = BuildCases().ToList();
+        var specs = BuildCases()
+            .Where(options.IncludesCase)
+            .ToList();
         var results = new List<BridgeCaseResult>(specs.Count);
         foreach (var spec in specs)
         {
@@ -68,7 +70,9 @@ internal static class HomographyBridgeRunner
             PositionTolerancePx,
             Math.Round(errors.Length == 0 ? 0 : errors.Average(), 4),
             Math.Round(Percentile(errors, 0.95), 4),
-            Math.Round(results.Sum(item => item.RuntimeMs), 3));
+            Math.Round(results.Sum(item => item.RuntimeMs), 3),
+            options.CandidateVersion,
+            options.Profile);
 
         var operators = new[]
         {
@@ -416,7 +420,9 @@ internal sealed record BridgeSummary(
     double PositionTolerancePx,
     double MeanPositionErrorPx,
     double P95PositionErrorPx,
-    double RuntimeMs);
+    double RuntimeMs,
+    string CandidateVersion,
+    string Profile);
 
 internal sealed record OperatorEvidence(
     string Operator,
@@ -469,6 +475,8 @@ internal static class MarkdownReport
             $"| Mean position error px | {result.Summary.MeanPositionErrorPx:0.####} |",
             $"| P95 position error px | {result.Summary.P95PositionErrorPx:0.####} |",
             $"| Runtime ms | {result.Summary.RuntimeMs:0.###} |",
+            $"| Candidate version | {result.Summary.CandidateVersion} |",
+            $"| Profile | {result.Summary.Profile} |",
             string.Empty,
             "## Operators",
             string.Empty,
@@ -499,13 +507,21 @@ internal static class MarkdownReport
 internal sealed record RunnerOptions(
     string OutputPath,
     string? ReportPath,
+    string CandidateVersion,
+    string Profile,
+    IReadOnlySet<string> CaseIds,
     bool ShowHelp,
     string? ParseError)
 {
+    public bool IncludesCase(BridgeCaseSpec spec) => CaseIds.Count == 0 || CaseIds.Contains(spec.CaseId);
+
     public static RunnerOptions Parse(string[] args)
     {
         var output = "quality/evals/reports/TemplateMatching_public_bridge_baseline.json";
         string? report = "quality/evals/reports/TemplateMatching_public_bridge_baseline.md";
+        var candidateVersion = "control";
+        var profile = "baseline_homography_bridge";
+        IReadOnlySet<string> caseIds = new HashSet<string>(StringComparer.Ordinal);
         var showHelp = false;
         string? parseError = null;
 
@@ -523,13 +539,22 @@ internal sealed record RunnerOptions(
                 case "--report":
                     report = NextValue(args, ref i, "--report", ref parseError);
                     break;
+                case "--candidate-version":
+                    candidateVersion = NextValue(args, ref i, "--candidate-version", ref parseError);
+                    break;
+                case "--profile":
+                    profile = NextValue(args, ref i, "--profile", ref parseError);
+                    break;
+                case "--case-ids":
+                    caseIds = SplitCaseIds(NextValue(args, ref i, "--case-ids", ref parseError));
+                    break;
                 default:
                     parseError = $"Unknown argument: {args[i]}";
                     break;
             }
         }
 
-        return new RunnerOptions(output, report, showHelp, parseError);
+        return new RunnerOptions(output, report, candidateVersion, profile, caseIds, showHelp, parseError);
     }
 
     public static void PrintHelp()
@@ -541,6 +566,9 @@ internal sealed record RunnerOptions(
             Options:
               --output <path>  Baseline JSON output path.
               --report <path>  Markdown report output path.
+              --candidate-version <id>  Candidate version label to record.
+              --profile <name>          Candidate profile label to record.
+              --case-ids <ids>          Comma-separated case ids to execute.
               --help           Show help.
             """);
     }
@@ -556,6 +584,10 @@ internal sealed record RunnerOptions(
         index++;
         return args[index];
     }
+
+    private static IReadOnlySet<string> SplitCaseIds(string raw) =>
+        raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
 }
 
 internal static class JsonSettings

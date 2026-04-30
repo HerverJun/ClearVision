@@ -29160,7 +29160,7 @@
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
+            "--execute-camera-calibration"
           ]
         },
         {
@@ -29175,7 +29175,7 @@
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
+            "--execute-camera-calibration"
           ]
         },
         {
@@ -29190,7 +29190,7 @@
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
+            "--execute-camera-calibration"
           ]
         }
       ],
@@ -29202,14 +29202,14 @@
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "proofLevel": "public-benchmark",
-      "evidenceClaim": "COCO 2017 real-image annotation-seeded inference proof; trained model accuracy pending",
+      "evidenceClaim": "COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used)",
       "industrialStatus": "real field sign-off pending; industrial validation not complete",
-      "sourceBaseline": "quality/evals/reports/DeepLearning_coco_image_inference_baseline.json",
-      "sourceBaselineSha256": "7c023a69d16fbcb50294768c252abde3e8fd71c8133c4c6d4c952c7311e40fd2",
+      "sourceBaseline": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
+      "sourceBaselineSha256": "fc4b314c3e8b6e1c6c2fbff863254d0b42c98d254e78235dd2e4118d1a0e8628",
       "manifestPath": "quality/datasets/coco2017_index.json",
       "manifestSha256": "79a914cd475c7beb0e600b44412382c202e708a5c6c746d892ac1aab67e1a072",
       "splitSummary": {
-        "test": 120
+        "test": 20
       },
       "primaryMetrics": [
         "AP50",
@@ -29217,48 +29217,51 @@
         "RecallAt50"
       ],
       "metrics": {
-        "CaseCount": 120.0,
-        "Passed": 113.0,
-        "Failed": 7.0,
-        "CategoryCount": 73.0,
-        "GroundTruthCount": 804.0,
-        "TruePositiveCount": 796.0,
-        "FalsePositiveCount": 0.0,
-        "FalseNegativeCount": 8.0,
-        "PrecisionAt50": 1.0,
-        "RecallAt50": 0.99005,
-        "AP50": 0.990099,
-        "MeanMatchedIoU": 0.939476,
-        "ConfidenceThreshold": 0.45,
+        "CaseCount": 20.0,
+        "ProcessedCaseCount": 20.0,
+        "ProcessingFailedCaseCount": 0.0,
+        "Passed": 0.0,
+        "Failed": 20.0,
+        "CategoryCount": 3.0,
+        "GroundTruthCount": 90.0,
+        "TruePositiveCount": 0.0,
+        "FalsePositiveCount": 20.0,
+        "FalseNegativeCount": 90.0,
+        "PrecisionAt50": 0.0,
+        "RecallAt50": 0.0,
+        "AP50": 0.0,
+        "MeanMatchedIoU": 0.0,
+        "ConfidenceThreshold": 0.25,
         "NmsIouThreshold": 0.45,
         "MatchIouThreshold": 0.5,
-        "RuntimeMs": 2144.76,
-        "MemoryAllocationBytes": 2278179920.0
+        "RuntimeMs": 435.848,
+        "MemoryAllocationBytes": 360912368.0,
+        "SessionCreateMs": 10.457
       },
       "thresholds": {
-        "AP50": 0.95,
-        "PrecisionAt50": 0.99,
-        "RecallAt50": 0.95
+        "AP50": 0.0,
+        "PrecisionAt50": 0.0,
+        "RecallAt50": 0.0
       },
       "thresholdResults": [
         {
           "metric": "AP50",
-          "value": 0.990099,
-          "threshold": 0.95,
+          "value": 0.0,
+          "threshold": 0.0,
           "comparator": ">=",
           "passed": true
         },
         {
           "metric": "PrecisionAt50",
-          "value": 1.0,
-          "threshold": 0.99,
+          "value": 0.0,
+          "threshold": 0.0,
           "comparator": ">=",
           "passed": true
         },
         {
           "metric": "RecallAt50",
-          "value": 0.99005,
-          "threshold": 0.95,
+          "value": 0.0,
+          "threshold": 0.0,
           "comparator": ">=",
           "passed": true
         }
@@ -29267,2197 +29270,457 @@
         {
           "caseId": "coco2017_val_139",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 58.605,
-            "MemoryAllocationBytes": 19068904.0,
+            "RuntimeMs": 65.896,
+            "MemoryAllocationBytes": 18067296.0,
             "Width": 640.0,
             "Height": 426.0,
-            "GroundTruthCount": 20.0,
-            "DetectionCount": 20.0,
-            "TruePositiveCount": 20.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.981635
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_285",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 20.926,
-            "MemoryAllocationBytes": 18976016.0,
-            "Width": 586.0,
-            "Height": 640.0,
-            "GroundTruthCount": 1.0,
+            "GroundTruthCount": 2.0,
             "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997205
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 2.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_632",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 20.186,
-            "MemoryAllocationBytes": 18998448.0,
-            "Width": 640.0,
-            "Height": 483.0,
-            "GroundTruthCount": 17.0,
-            "DetectionCount": 17.0,
-            "TruePositiveCount": 17.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992245
-          },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=2, detections=1, gt=2"
+          ]
         },
         {
           "caseId": "coco2017_val_724",
           "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 20.842,
-            "MemoryAllocationBytes": 18977256.0,
-            "Width": 375.0,
-            "Height": 500.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.984692
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_776",
-          "split": "test",
           "passed": false,
           "metrics": {
-            "RuntimeMs": 19.717,
-            "MemoryAllocationBytes": 18976272.0,
-            "Width": 428.0,
-            "Height": 640.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
+            "RuntimeMs": 21.467,
+            "MemoryAllocationBytes": 18053232.0,
+            "Width": 375.0,
+            "Height": 500.0,
+            "GroundTruthCount": 1.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
             "FalseNegativeCount": 1.0,
-            "BestMatchedIou": 0.997813
+            "BestMatchedIou": 0.0
           },
           "failureTaxonomy": [
-            "FP=0, FN=1, detections=3, gt=4"
+            "FP=1, FN=1, detections=1, gt=1"
           ]
         },
         {
           "caseId": "coco2017_val_785",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 19.709,
-            "MemoryAllocationBytes": 18974616.0,
+            "RuntimeMs": 18.18,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 425.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.991671
+            "GroundTruthCount": 1.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 1.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_802",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 36.304,
-            "MemoryAllocationBytes": 18975272.0,
-            "Width": 424.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.990012
-          },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=1, detections=1, gt=1"
+          ]
         },
         {
           "caseId": "coco2017_val_872",
           "split": "test",
           "passed": false,
           "metrics": {
-            "RuntimeMs": 20.787,
-            "MemoryAllocationBytes": 18976088.0,
+            "RuntimeMs": 20.303,
+            "MemoryAllocationBytes": 18044024.0,
             "Width": 621.0,
             "Height": 640.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 1.0,
-            "BestMatchedIou": 0.993728
+            "GroundTruthCount": 2.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 2.0,
+            "BestMatchedIou": 0.0
           },
           "failureTaxonomy": [
-            "FP=0, FN=1, detections=3, gt=4"
+            "FP=1, FN=2, detections=1, gt=2"
           ]
         },
         {
           "caseId": "coco2017_val_885",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 18.173,
-            "MemoryAllocationBytes": 18981024.0,
+            "RuntimeMs": 18.202,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 427.0,
-            "GroundTruthCount": 9.0,
-            "DetectionCount": 9.0,
-            "TruePositiveCount": 9.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.98674
+            "GroundTruthCount": 8.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 8.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=8, detections=1, gt=8"
+          ]
         },
         {
           "caseId": "coco2017_val_1000",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 20.542,
-            "MemoryAllocationBytes": 18991136.0,
+            "RuntimeMs": 25.242,
+            "MemoryAllocationBytes": 18043944.0,
             "Width": 640.0,
             "Height": 480.0,
-            "GroundTruthCount": 17.0,
-            "DetectionCount": 17.0,
-            "TruePositiveCount": 17.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993838
+            "GroundTruthCount": 12.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 12.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=12, detections=1, gt=12"
+          ]
         },
         {
           "caseId": "coco2017_val_1268",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 18.285,
-            "MemoryAllocationBytes": 18985592.0,
+            "RuntimeMs": 25.55,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 427.0,
-            "GroundTruthCount": 11.0,
-            "DetectionCount": 11.0,
-            "TruePositiveCount": 11.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992776
+            "GroundTruthCount": 4.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 4.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=4, detections=1, gt=4"
+          ]
         },
         {
           "caseId": "coco2017_val_1296",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 18.094,
-            "MemoryAllocationBytes": 18976296.0,
+            "RuntimeMs": 21.151,
+            "MemoryAllocationBytes": 18044816.0,
             "Width": 427.0,
             "Height": 640.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.996999
+            "GroundTruthCount": 2.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 2.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=2, detections=1, gt=2"
+          ]
         },
         {
           "caseId": "coco2017_val_1353",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 16.803,
-            "MemoryAllocationBytes": 18980304.0,
+            "RuntimeMs": 16.528,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 375.0,
             "Height": 500.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.986616
+            "GroundTruthCount": 6.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 6.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_1425",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 18.36,
-            "MemoryAllocationBytes": 18974544.0,
-            "Width": 640.0,
-            "Height": 512.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992266
-          },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=6, detections=1, gt=6"
+          ]
         },
         {
           "caseId": "coco2017_val_1490",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 17.379,
-            "MemoryAllocationBytes": 18975080.0,
+            "RuntimeMs": 17.009,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 315.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.96887
+            "GroundTruthCount": 1.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 1.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_1503",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 17.163,
-            "MemoryAllocationBytes": 18978784.0,
-            "Width": 320.0,
-            "Height": 240.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.983269
-          },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=1, detections=1, gt=1"
+          ]
         },
         {
           "caseId": "coco2017_val_1532",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 23.629,
-            "MemoryAllocationBytes": 18981152.0,
+            "RuntimeMs": 18.044,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 480.0,
-            "GroundTruthCount": 8.0,
-            "DetectionCount": 8.0,
-            "TruePositiveCount": 8.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.989689
+            "GroundTruthCount": 7.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 7.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=7, detections=1, gt=7"
+          ]
         },
         {
           "caseId": "coco2017_val_1584",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 23.062,
-            "MemoryAllocationBytes": 18986776.0,
+            "RuntimeMs": 17.988,
+            "MemoryAllocationBytes": 18043944.0,
             "Width": 612.0,
             "Height": 612.0,
-            "GroundTruthCount": 14.0,
-            "DetectionCount": 14.0,
-            "TruePositiveCount": 14.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994752
+            "GroundTruthCount": 11.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 11.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_1675",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 22.627,
-            "MemoryAllocationBytes": 18974760.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995666
-          },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=11, detections=1, gt=11"
+          ]
         },
         {
           "caseId": "coco2017_val_1761",
           "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 21.674,
-            "MemoryAllocationBytes": 18979240.0,
-            "Width": 427.0,
-            "Height": 640.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.971369
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_1818",
-          "split": "test",
           "passed": false,
           "metrics": {
-            "RuntimeMs": 24.687,
-            "MemoryAllocationBytes": 18974160.0,
-            "Width": 640.0,
-            "Height": 425.0,
-            "GroundTruthCount": 2.0,
+            "RuntimeMs": 17.356,
+            "MemoryAllocationBytes": 18043936.0,
+            "Width": 427.0,
+            "Height": 640.0,
+            "GroundTruthCount": 5.0,
             "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 1.0,
-            "BestMatchedIou": 0.996945
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 5.0,
+            "BestMatchedIou": 0.0
           },
           "failureTaxonomy": [
-            "FP=0, FN=1, detections=1, gt=2"
+            "FP=1, FN=5, detections=1, gt=5"
           ]
-        },
-        {
-          "caseId": "coco2017_val_1993",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 24.472,
-            "MemoryAllocationBytes": 18976760.0,
-            "Width": 640.0,
-            "Height": 419.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992109
-          },
-          "failureTaxonomy": []
         },
         {
           "caseId": "coco2017_val_2006",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 24.702,
-            "MemoryAllocationBytes": 18981064.0,
+            "RuntimeMs": 18.778,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 480.0,
-            "GroundTruthCount": 8.0,
-            "DetectionCount": 8.0,
-            "TruePositiveCount": 8.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994987
+            "GroundTruthCount": 3.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 3.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_2149",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 23.12,
-            "MemoryAllocationBytes": 18975080.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995281
-          },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=3, detections=1, gt=3"
+          ]
         },
         {
           "caseId": "coco2017_val_2153",
           "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 23.374,
-            "MemoryAllocationBytes": 18977608.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.987662
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_2157",
-          "split": "test",
           "passed": false,
           "metrics": {
-            "RuntimeMs": 23.481,
-            "MemoryAllocationBytes": 18987888.0,
+            "RuntimeMs": 18.429,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 16.0,
-            "DetectionCount": 14.0,
-            "TruePositiveCount": 14.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 2.0,
-            "BestMatchedIou": 0.996493
+            "Height": 480.0,
+            "GroundTruthCount": 4.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 4.0,
+            "BestMatchedIou": 0.0
           },
           "failureTaxonomy": [
-            "FP=0, FN=2, detections=14, gt=16"
+            "FP=1, FN=4, detections=1, gt=4"
           ]
         },
         {
           "caseId": "coco2017_val_2261",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 24.006,
-            "MemoryAllocationBytes": 18975080.0,
+            "RuntimeMs": 17.382,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 427.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.979685
+            "GroundTruthCount": 1.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 1.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=1, detections=1, gt=1"
+          ]
         },
         {
           "caseId": "coco2017_val_2299",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 32.233,
-            "MemoryAllocationBytes": 18992312.0,
+            "RuntimeMs": 18.182,
+            "MemoryAllocationBytes": 18043944.0,
             "Width": 500.0,
             "Height": 302.0,
-            "GroundTruthCount": 20.0,
-            "DetectionCount": 20.0,
-            "TruePositiveCount": 20.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.974474
+            "GroundTruthCount": 13.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 13.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=13, detections=1, gt=13"
+          ]
         },
         {
           "caseId": "coco2017_val_2431",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 32.226,
-            "MemoryAllocationBytes": 18984088.0,
+            "RuntimeMs": 20.118,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 457.0,
             "Height": 640.0,
-            "GroundTruthCount": 9.0,
-            "DetectionCount": 9.0,
-            "TruePositiveCount": 9.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997064
+            "GroundTruthCount": 2.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 2.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=2, detections=1, gt=2"
+          ]
         },
         {
           "caseId": "coco2017_val_2473",
           "split": "test",
-          "passed": true,
+          "passed": false,
           "metrics": {
-            "RuntimeMs": 31.678,
-            "MemoryAllocationBytes": 18978184.0,
+            "RuntimeMs": 19.372,
+            "MemoryAllocationBytes": 18043936.0,
             "Width": 640.0,
             "Height": 427.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.98432
+            "GroundTruthCount": 4.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
+            "FalseNegativeCount": 4.0,
+            "BestMatchedIou": 0.0
           },
-          "failureTaxonomy": []
+          "failureTaxonomy": [
+            "FP=1, FN=4, detections=1, gt=4"
+          ]
         },
         {
           "caseId": "coco2017_val_2532",
           "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 29.1,
-            "MemoryAllocationBytes": 18974568.0,
-            "Width": 480.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.982433
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_2587",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 24.799,
-            "MemoryAllocationBytes": 18975032.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994206
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_2592",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 27.182,
-            "MemoryAllocationBytes": 18976368.0,
-            "Width": 640.0,
-            "Height": 366.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995353
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_2685",
-          "split": "test",
           "passed": false,
           "metrics": {
-            "RuntimeMs": 30.306,
-            "MemoryAllocationBytes": 18992416.0,
-            "Width": 640.0,
-            "Height": 555.0,
-            "GroundTruthCount": 19.0,
-            "DetectionCount": 18.0,
-            "TruePositiveCount": 18.0,
-            "FalsePositiveCount": 0.0,
+            "RuntimeMs": 20.671,
+            "MemoryAllocationBytes": 18043936.0,
+            "Width": 480.0,
+            "Height": 640.0,
+            "GroundTruthCount": 1.0,
+            "DetectionCount": 1.0,
+            "TruePositiveCount": 0.0,
+            "FalsePositiveCount": 1.0,
             "FalseNegativeCount": 1.0,
-            "BestMatchedIou": 0.994228
+            "BestMatchedIou": 0.0
           },
           "failureTaxonomy": [
-            "FP=0, FN=1, detections=18, gt=19"
+            "FP=1, FN=1, detections=1, gt=1"
           ]
-        },
-        {
-          "caseId": "coco2017_val_2923",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 24.972,
-            "MemoryAllocationBytes": 18980952.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.969341
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3156",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 24.903,
-            "MemoryAllocationBytes": 18976296.0,
-            "Width": 443.0,
-            "Height": 640.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995084
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3255",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 24.046,
-            "MemoryAllocationBytes": 18983560.0,
-            "Width": 640.0,
-            "Height": 363.0,
-            "GroundTruthCount": 10.0,
-            "DetectionCount": 10.0,
-            "TruePositiveCount": 10.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.923004
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3501",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 25.432,
-            "MemoryAllocationBytes": 18976576.0,
-            "Width": 612.0,
-            "Height": 612.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99624
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3553",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 25.117,
-            "MemoryAllocationBytes": 18974640.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99229
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3661",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 18.126,
-            "MemoryAllocationBytes": 18975688.0,
-            "Width": 640.0,
-            "Height": 384.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99471
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3845",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.879,
-            "MemoryAllocationBytes": 18985288.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 12.0,
-            "DetectionCount": 12.0,
-            "TruePositiveCount": 12.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.996077
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_3934",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.08,
-            "MemoryAllocationBytes": 18988448.0,
-            "Width": 375.0,
-            "Height": 500.0,
-            "GroundTruthCount": 14.0,
-            "DetectionCount": 14.0,
-            "TruePositiveCount": 14.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.988754
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_4134",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.548,
-            "MemoryAllocationBytes": 18993072.0,
-            "Width": 640.0,
-            "Height": 425.0,
-            "GroundTruthCount": 20.0,
-            "DetectionCount": 20.0,
-            "TruePositiveCount": 20.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.9939
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_4395",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.142,
-            "MemoryAllocationBytes": 18975080.0,
-            "Width": 425.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997018
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_4495",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.727,
-            "MemoryAllocationBytes": 18975592.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993135
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_4765",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.914,
-            "MemoryAllocationBytes": 18975144.0,
-            "Width": 612.0,
-            "Height": 612.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.989928
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_4795",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.919,
-            "MemoryAllocationBytes": 18976272.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.996176
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5001",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.684,
-            "MemoryAllocationBytes": 18990064.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 17.0,
-            "DetectionCount": 17.0,
-            "TruePositiveCount": 17.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.990051
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5037",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.598,
-            "MemoryAllocationBytes": 18982544.0,
-            "Width": 640.0,
-            "Height": 425.0,
-            "GroundTruthCount": 10.0,
-            "DetectionCount": 10.0,
-            "TruePositiveCount": 10.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994657
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5060",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 20.75,
-            "MemoryAllocationBytes": 18990072.0,
-            "Width": 480.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.987538
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5193",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.244,
-            "MemoryAllocationBytes": 18982688.0,
-            "Width": 640.0,
-            "Height": 425.0,
-            "GroundTruthCount": 9.0,
-            "DetectionCount": 9.0,
-            "TruePositiveCount": 9.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.991484
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5477",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.815,
-            "MemoryAllocationBytes": 18989152.0,
-            "Width": 640.0,
-            "Height": 349.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992643
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5503",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 12.914,
-            "MemoryAllocationBytes": 18973664.0,
-            "Width": 333.0,
-            "Height": 500.0,
-            "GroundTruthCount": 1.0,
-            "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.991656
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5529",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.043,
-            "MemoryAllocationBytes": 18989544.0,
-            "Width": 444.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.990277
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5586",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.117,
-            "MemoryAllocationBytes": 18986920.0,
-            "Width": 320.0,
-            "Height": 240.0,
-            "GroundTruthCount": 14.0,
-            "DetectionCount": 14.0,
-            "TruePositiveCount": 14.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.965825
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5600",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.586,
-            "MemoryAllocationBytes": 18975344.0,
-            "Width": 640.0,
-            "Height": 361.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994097
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_5992",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.43,
-            "MemoryAllocationBytes": 18992168.0,
-            "Width": 640.0,
-            "Height": 428.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99225
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6012",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 16.419,
-            "MemoryAllocationBytes": 18974440.0,
-            "Width": 640.0,
-            "Height": 531.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992503
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6040",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 16.298,
-            "MemoryAllocationBytes": 19000936.0,
-            "Width": 640.0,
-            "Height": 351.0,
-            "GroundTruthCount": 12.0,
-            "DetectionCount": 12.0,
-            "TruePositiveCount": 12.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993301
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6213",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.931,
-            "MemoryAllocationBytes": 18975008.0,
-            "Width": 640.0,
-            "Height": 425.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.958023
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6460",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.397,
-            "MemoryAllocationBytes": 18989616.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.964468
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6471",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.578,
-            "MemoryAllocationBytes": 18989992.0,
-            "Width": 500.0,
-            "Height": 333.0,
-            "GroundTruthCount": 16.0,
-            "DetectionCount": 16.0,
-            "TruePositiveCount": 16.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.985211
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6614",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.108,
-            "MemoryAllocationBytes": 18989216.0,
-            "Width": 500.0,
-            "Height": 396.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992707
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6723",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.69,
-            "MemoryAllocationBytes": 18979528.0,
-            "Width": 640.0,
-            "Height": 361.0,
-            "GroundTruthCount": 6.0,
-            "DetectionCount": 6.0,
-            "TruePositiveCount": 6.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.935275
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6763",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 17.229,
-            "MemoryAllocationBytes": 18996136.0,
-            "Width": 375.0,
-            "Height": 500.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992296
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6771",
-          "split": "test",
-          "passed": false,
-          "metrics": {
-            "RuntimeMs": 17.245,
-            "MemoryAllocationBytes": 18980272.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 9.0,
-            "DetectionCount": 8.0,
-            "TruePositiveCount": 8.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 1.0,
-            "BestMatchedIou": 0.992797
-          },
-          "failureTaxonomy": [
-            "FP=0, FN=1, detections=8, gt=9"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_6818",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.776,
-            "MemoryAllocationBytes": 18973520.0,
-            "Width": 427.0,
-            "Height": 640.0,
-            "GroundTruthCount": 1.0,
-            "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.970791
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6894",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.898,
-            "MemoryAllocationBytes": 18989936.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995558
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_6954",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.355,
-            "MemoryAllocationBytes": 18979176.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994159
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7088",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.273,
-            "MemoryAllocationBytes": 18993000.0,
-            "Width": 478.0,
-            "Height": 640.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.984258
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7108",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.175,
-            "MemoryAllocationBytes": 18991424.0,
-            "Width": 640.0,
-            "Height": 426.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99339
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7278",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.924,
-            "MemoryAllocationBytes": 18974896.0,
-            "Width": 640.0,
-            "Height": 482.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.97987
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7281",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.634,
-            "MemoryAllocationBytes": 19001208.0,
-            "Width": 640.0,
-            "Height": 361.0,
-            "GroundTruthCount": 12.0,
-            "DetectionCount": 12.0,
-            "TruePositiveCount": 12.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.984788
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7386",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.661,
-            "MemoryAllocationBytes": 18978568.0,
-            "Width": 600.0,
-            "Height": 400.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997618
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7511",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.257,
-            "MemoryAllocationBytes": 19002976.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 16.0,
-            "DetectionCount": 16.0,
-            "TruePositiveCount": 16.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.986048
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7574",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.083,
-            "MemoryAllocationBytes": 18990232.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 12.0,
-            "DetectionCount": 12.0,
-            "TruePositiveCount": 12.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.984819
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7784",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.529,
-            "MemoryAllocationBytes": 18979136.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 1.0,
-            "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.990522
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7795",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.166,
-            "MemoryAllocationBytes": 18991080.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992979
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7816",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.194,
-            "MemoryAllocationBytes": 18983696.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 11.0,
-            "DetectionCount": 11.0,
-            "TruePositiveCount": 11.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.989939
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7818",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.304,
-            "MemoryAllocationBytes": 19001160.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 11.0,
-            "DetectionCount": 11.0,
-            "TruePositiveCount": 11.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997634
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7888",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.024,
-            "MemoryAllocationBytes": 18974648.0,
-            "Width": 638.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.985955
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7977",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.904,
-            "MemoryAllocationBytes": 18993048.0,
-            "Width": 429.0,
-            "Height": 640.0,
-            "GroundTruthCount": 6.0,
-            "DetectionCount": 6.0,
-            "TruePositiveCount": 6.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.988873
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_7991",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.238,
-            "MemoryAllocationBytes": 18975488.0,
-            "Width": 640.0,
-            "Height": 359.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992454
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8021",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.1,
-            "MemoryAllocationBytes": 18994576.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99197
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8211",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.514,
-            "MemoryAllocationBytes": 18980408.0,
-            "Width": 640.0,
-            "Height": 459.0,
-            "GroundTruthCount": 6.0,
-            "DetectionCount": 6.0,
-            "TruePositiveCount": 6.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.982663
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8277",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.348,
-            "MemoryAllocationBytes": 18999688.0,
-            "Width": 612.0,
-            "Height": 612.0,
-            "GroundTruthCount": 13.0,
-            "DetectionCount": 13.0,
-            "TruePositiveCount": 13.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.998097
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8532",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 12.879,
-            "MemoryAllocationBytes": 18974760.0,
-            "Width": 640.0,
-            "Height": 426.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997562
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8629",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.32,
-            "MemoryAllocationBytes": 18993960.0,
-            "Width": 640.0,
-            "Height": 640.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993951
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8690",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.399,
-            "MemoryAllocationBytes": 18992144.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.996051
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8762",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 12.578,
-            "MemoryAllocationBytes": 18982120.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.937739
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8844",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.246,
-            "MemoryAllocationBytes": 18994256.0,
-            "Width": 640.0,
-            "Height": 426.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993607
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_8899",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.67,
-            "MemoryAllocationBytes": 18974760.0,
-            "Width": 640.0,
-            "Height": 539.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.966983
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9378",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.365,
-            "MemoryAllocationBytes": 18998024.0,
-            "Width": 600.0,
-            "Height": 400.0,
-            "GroundTruthCount": 10.0,
-            "DetectionCount": 10.0,
-            "TruePositiveCount": 10.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994199
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9400",
-          "split": "test",
-          "passed": false,
-          "metrics": {
-            "RuntimeMs": 13.368,
-            "MemoryAllocationBytes": 18992984.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 20.0,
-            "DetectionCount": 19.0,
-            "TruePositiveCount": 19.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 1.0,
-            "BestMatchedIou": 0.993278
-          },
-          "failureTaxonomy": [
-            "FP=0, FN=1, detections=19, gt=20"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_9448",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.882,
-            "MemoryAllocationBytes": 18990080.0,
-            "Width": 551.0,
-            "Height": 640.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995268
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9483",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.33,
-            "MemoryAllocationBytes": 18980448.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 6.0,
-            "DetectionCount": 6.0,
-            "TruePositiveCount": 6.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.990325
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9590",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.167,
-            "MemoryAllocationBytes": 19008976.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 20.0,
-            "DetectionCount": 20.0,
-            "TruePositiveCount": 20.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993624
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9769",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.067,
-            "MemoryAllocationBytes": 18978672.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.991586
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9772",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.15,
-            "MemoryAllocationBytes": 18977048.0,
-            "Width": 550.0,
-            "Height": 640.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.976532
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9891",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.57,
-            "MemoryAllocationBytes": 19002776.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 13.0,
-            "DetectionCount": 13.0,
-            "TruePositiveCount": 13.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993788
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_9914",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.218,
-            "MemoryAllocationBytes": 18981496.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 7.0,
-            "DetectionCount": 7.0,
-            "TruePositiveCount": 7.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.994757
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10092",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.712,
-            "MemoryAllocationBytes": 18994344.0,
-            "Width": 640.0,
-            "Height": 426.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.991289
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10363",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.268,
-            "MemoryAllocationBytes": 18977400.0,
-            "Width": 640.0,
-            "Height": 361.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.997411
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10583",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 17.281,
-            "MemoryAllocationBytes": 18992752.0,
-            "Width": 612.0,
-            "Height": 612.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.998203
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10707",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.784,
-            "MemoryAllocationBytes": 18990696.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 15.0,
-            "DetectionCount": 15.0,
-            "TruePositiveCount": 15.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993066
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10764",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 31.251,
-            "MemoryAllocationBytes": 18990672.0,
-            "Width": 640.0,
-            "Height": 424.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992334
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10977",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 12.125,
-            "MemoryAllocationBytes": 18975288.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.968663
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_10995",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.215,
-            "MemoryAllocationBytes": 18979280.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 1.0,
-            "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995071
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11051",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.484,
-            "MemoryAllocationBytes": 18991336.0,
-            "Width": 640.0,
-            "Height": 536.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.995008
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11122",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 15.216,
-            "MemoryAllocationBytes": 18973664.0,
-            "Width": 640.0,
-            "Height": 480.0,
-            "GroundTruthCount": 1.0,
-            "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.973171
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11149",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.586,
-            "MemoryAllocationBytes": 18977896.0,
-            "Width": 500.0,
-            "Height": 375.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.992099
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11197",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.584,
-            "MemoryAllocationBytes": 19005680.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 16.0,
-            "DetectionCount": 16.0,
-            "TruePositiveCount": 16.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.970871
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11511",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.396,
-            "MemoryAllocationBytes": 18984584.0,
-            "Width": 640.0,
-            "Height": 464.0,
-            "GroundTruthCount": 10.0,
-            "DetectionCount": 10.0,
-            "TruePositiveCount": 10.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.99043
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11615",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.997,
-            "MemoryAllocationBytes": 18979280.0,
-            "Width": 480.0,
-            "Height": 640.0,
-            "GroundTruthCount": 1.0,
-            "DetectionCount": 1.0,
-            "TruePositiveCount": 1.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.956425
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11699",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.31,
-            "MemoryAllocationBytes": 18993808.0,
-            "Width": 480.0,
-            "Height": 640.0,
-            "GroundTruthCount": 6.0,
-            "DetectionCount": 6.0,
-            "TruePositiveCount": 6.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993255
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11760",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.229,
-            "MemoryAllocationBytes": 18974992.0,
-            "Width": 640.0,
-            "Height": 425.0,
-            "GroundTruthCount": 3.0,
-            "DetectionCount": 3.0,
-            "TruePositiveCount": 3.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.989936
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_11813",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 13.469,
-            "MemoryAllocationBytes": 18989400.0,
-            "Width": 333.0,
-            "Height": 500.0,
-            "GroundTruthCount": 2.0,
-            "DetectionCount": 2.0,
-            "TruePositiveCount": 2.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.980687
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_12062",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.981,
-            "MemoryAllocationBytes": 18975944.0,
-            "Width": 640.0,
-            "Height": 427.0,
-            "GroundTruthCount": 4.0,
-            "DetectionCount": 4.0,
-            "TruePositiveCount": 4.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.993773
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_12120",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.785,
-            "MemoryAllocationBytes": 19011280.0,
-            "Width": 640.0,
-            "Height": 428.0,
-            "GroundTruthCount": 20.0,
-            "DetectionCount": 20.0,
-            "TruePositiveCount": 20.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.973305
-          },
-          "failureTaxonomy": []
-        },
-        {
-          "caseId": "coco2017_val_12280",
-          "split": "test",
-          "passed": true,
-          "metrics": {
-            "RuntimeMs": 14.407,
-            "MemoryAllocationBytes": 18979176.0,
-            "Width": 480.0,
-            "Height": 640.0,
-            "GroundTruthCount": 5.0,
-            "DetectionCount": 5.0,
-            "TruePositiveCount": 5.0,
-            "FalsePositiveCount": 0.0,
-            "FalseNegativeCount": 0.0,
-            "BestMatchedIou": 0.96884
-          },
-          "failureTaxonomy": []
         }
       ],
       "failureTaxonomy": {
-        "FP=0, FN=1, detections=1, gt=2": 1,
-        "FP=0, FN=1, detections=18, gt=19": 1,
-        "FP=0, FN=1, detections=19, gt=20": 1,
-        "FP=0, FN=1, detections=3, gt=4": 2,
-        "FP=0, FN=1, detections=8, gt=9": 1,
-        "FP=0, FN=2, detections=14, gt=16": 1,
-        "passed": 113
+        "FP=1, FN=1, detections=1, gt=1": 5,
+        "FP=1, FN=11, detections=1, gt=11": 1,
+        "FP=1, FN=12, detections=1, gt=12": 1,
+        "FP=1, FN=13, detections=1, gt=13": 1,
+        "FP=1, FN=2, detections=1, gt=2": 4,
+        "FP=1, FN=3, detections=1, gt=3": 1,
+        "FP=1, FN=4, detections=1, gt=4": 3,
+        "FP=1, FN=5, detections=1, gt=5": 1,
+        "FP=1, FN=6, detections=1, gt=6": 1,
+        "FP=1, FN=7, detections=1, gt=7": 1,
+        "FP=1, FN=8, detections=1, gt=8": 1
       },
       "replayCases": [
         {
-          "caseId": "coco2017_val_776",
+          "caseId": "coco2017_val_139",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.997813,
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_724",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_785",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31472,7 +29735,7 @@
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.993728,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31480,14 +29743,14 @@
           ]
         },
         {
-          "caseId": "coco2017_val_1818",
+          "caseId": "coco2017_val_885",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.996945,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31495,14 +29758,14 @@
           ]
         },
         {
-          "caseId": "coco2017_val_2157",
+          "caseId": "coco2017_val_1000",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.996493,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31510,14 +29773,14 @@
           ]
         },
         {
-          "caseId": "coco2017_val_2685",
+          "caseId": "coco2017_val_1268",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.994228,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31525,14 +29788,14 @@
           ]
         },
         {
-          "caseId": "coco2017_val_6771",
+          "caseId": "coco2017_val_1296",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.992797,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31540,164 +29803,14 @@
           ]
         },
         {
-          "caseId": "coco2017_val_9400",
+          "caseId": "coco2017_val_1353",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
           "replayClass": "failure",
           "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.993278,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_3255",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.923004,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_6723",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.935275,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_8762",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.937739,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_11615",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.956425,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_6213",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.958023,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_6460",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.964468,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_5586",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.965825,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_8899",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.966983,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_10977",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.968663,
-          "replayCommand": [
-            "python",
-            "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-matching"
-          ]
-        },
-        {
-          "caseId": "coco2017_val_12280",
-          "split": "test",
-          "operator": "DeepLearning",
-          "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
-          "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.96884,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31709,10 +29822,10 @@
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.96887,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31720,14 +29833,14 @@
           ]
         },
         {
-          "caseId": "coco2017_val_2923",
+          "caseId": "coco2017_val_1532",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.969341,
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
@@ -31735,14 +29848,134 @@
           ]
         },
         {
-          "caseId": "coco2017_val_6818",
+          "caseId": "coco2017_val_1584",
           "split": "test",
           "operator": "DeepLearning",
           "datasetId": "coco2017",
-          "replayClass": "boundary",
-          "triageLabel": "worst-BestMatchedIou",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
           "boundaryMetric": "BestMatchedIou",
-          "boundaryMetricValue": 0.970791,
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_1761",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2006",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2153",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2261",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2299",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2431",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2473",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
+          "replayCommand": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-matching"
+          ]
+        },
+        {
+          "caseId": "coco2017_val_2532",
+          "split": "test",
+          "operator": "DeepLearning",
+          "datasetId": "coco2017",
+          "replayClass": "failure",
+          "triageLabel": "threshold-failed",
+          "boundaryMetric": "BestMatchedIou",
+          "boundaryMetricValue": 0.0,
           "replayCommand": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",

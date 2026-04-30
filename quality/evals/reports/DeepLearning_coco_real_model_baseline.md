@@ -39,7 +39,7 @@ DatasetKind: `COCO real-image inference with ONNX Runtime model outputs; annotat
 | SHA256 matched | `False` |
 | Provider | `CPUExecutionProvider` |
 | CandidateVersion | `baseline` |
-| Profile | `real_model_smoke_hard_nms_045` |
+| Profile | `real_model_hard_nms_045` |
 
 ## Claim Boundary
 

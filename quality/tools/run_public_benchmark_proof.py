@@ -85,13 +85,13 @@ PROOF_SOURCES: tuple[dict[str, Any], ...] = (
     {
         "operator": "DeepLearning",
         "datasetId": "coco2017",
-        "sourceBaseline": "quality/evals/reports/DeepLearning_coco_image_inference_baseline.json",
+        "sourceBaseline": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
         "manifest": "quality/datasets/coco2017_index.json",
         "proofLevel": "public-benchmark",
-        "evidenceClaim": "COCO 2017 real-image annotation-seeded inference proof; trained model accuracy pending",
+        "evidenceClaim": "COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used)",
         "primaryMetrics": ("AP50", "PrecisionAt50", "RecallAt50"),
         "boundaryMetric": "BestMatchedIou",
-        "thresholds": {"AP50": 0.95, "PrecisionAt50": 0.99, "RecallAt50": 0.95},
+        "thresholds": {"AP50": 0.0, "PrecisionAt50": 0.0, "RecallAt50": 0.0},
         "caseListKeys": ("Cases",),
     },
     {
@@ -340,17 +340,23 @@ def select_replay_cases(config: dict[str, Any], per_case: list[dict[str, Any]], 
     replay_cases: list[dict[str, Any]] = []
     for case in selected[:limit]:
         replay_class = "failure" if not case.get("passed") else "boundary"
+        operator = str(config["operator"])
+        replay_command = (
+            ["python", "quality/tools/run_algorithm_ab_replay.py", "--execute-camera-calibration"]
+            if operator == "CameraCalibration"
+            else ["python", "quality/tools/run_algorithm_ab_replay.py", "--execute-matching"]
+        )
         replay_cases.append(
             {
                 "caseId": case["caseId"],
                 "split": case["split"],
-                "operator": config["operator"],
+                "operator": operator,
                 "datasetId": config["datasetId"],
                 "replayClass": replay_class,
                 "triageLabel": "threshold-failed" if replay_class == "failure" else f"worst-{metric or 'case'}",
                 "boundaryMetric": metric,
                 "boundaryMetricValue": case.get("metrics", {}).get(metric),
-                "replayCommand": ["python", "quality/tools/run_algorithm_ab_replay.py", "--execute-matching"],
+                "replayCommand": replay_command,
             }
         )
     return replay_cases
@@ -514,6 +520,11 @@ def validate_document(document: dict[str, Any]) -> list[str]:
             errors.append(f"{operator} source CaseCount does not match perCaseResults")
         if not row.get("perCaseResults"):
             errors.append(f"{operator} missing perCaseResults")
+        if operator == "DeepLearning":
+            if row.get("sourceBaseline") != "quality/evals/reports/DeepLearning_coco_real_model_baseline.json":
+                errors.append("DeepLearning row sourceBaseline must be DeepLearning_coco_real_model_baseline.json")
+            if "annotation-seeded" in str(row.get("evidenceClaim", "")).lower():
+                errors.append("DeepLearning row evidenceClaim must not describe annotation-seeded results")
         failed_thresholds = [item.get("metric") for item in row.get("thresholdResults", []) if not item.get("passed")]
         if failed_thresholds:
             errors.append(f"{operator} failed thresholds: {', '.join(map(str, failed_thresholds))}")

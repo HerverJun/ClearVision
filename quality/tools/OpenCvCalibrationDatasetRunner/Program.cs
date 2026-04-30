@@ -51,6 +51,12 @@ internal static class OpenCvCalibrationDatasetRunner
         var stereoBundlePath = Path.Combine(tempRoot, "stereo_camera_bundle.json");
         Directory.CreateDirectory(tempImages);
         Directory.CreateDirectory(tempRightImages);
+        var caseIds = new HashSet<string>(options.CaseIds, StringComparer.Ordinal);
+        var hasCaseFilter = caseIds.Count > 0;
+        bool ShouldRunCase(string caseId)
+        {
+            return !hasCaseFilter || caseIds.Contains(caseId);
+        }
 
         var cases = new List<CaseResult>();
         try
@@ -64,7 +70,7 @@ internal static class OpenCvCalibrationDatasetRunner
                     throw new FileNotFoundException("Calibration sample image is missing.", source);
                 }
 
-                File.Copy(source, Path.Combine(tempImages, Path.GetFileName(source)), overwrite: true);
+                File.Copy(source, Path.Combine(tempImages, NormalizeStereoTempFileName(Path.GetFileName(source))), overwrite: true);
             }
 
             var stereoPairs = index.StereoPairs ?? Array.Empty<StereoPair>();
@@ -76,62 +82,85 @@ internal static class OpenCvCalibrationDatasetRunner
                     throw new FileNotFoundException("Right calibration sample image is missing.", rightSource);
                 }
 
-                File.Copy(rightSource, Path.Combine(tempRightImages, Path.GetFileName(rightSource)), overwrite: true);
+                File.Copy(rightSource, Path.Combine(tempRightImages, NormalizeStereoTempFileName(Path.GetFileName(rightSource))), overwrite: true);
             }
 
-            cases.Add(await RunCameraCaseAsync(
-                id: "opencv_calibration_left_camera",
-                scenario: "OpenCV calibration sample left camera folder",
-                imageFolder: tempImages,
-                outputBundlePath: leftBundlePath,
-                options));
+            if (ShouldRunCase("opencv_calibration_left_camera"))
+            {
+                cases.Add(await RunCameraCaseAsync(
+                    id: "opencv_calibration_left_camera",
+                    scenario: "OpenCV calibration sample left camera folder",
+                    imageFolder: tempImages,
+                    outputBundlePath: leftBundlePath,
+                    options));
+            }
 
-            cases.Add(await RunCameraCaseAsync(
-                id: "opencv_calibration_right_camera",
-                scenario: "OpenCV calibration sample right camera folder",
-                imageFolder: tempRightImages,
-                outputBundlePath: rightBundlePath,
-                options));
+            if (ShouldRunCase("opencv_calibration_right_camera"))
+            {
+                cases.Add(await RunCameraCaseAsync(
+                    id: "opencv_calibration_right_camera",
+                    scenario: "OpenCV calibration sample right camera folder",
+                    imageFolder: tempRightImages,
+                    outputBundlePath: rightBundlePath,
+                    options));
+            }
 
-            cases.Add(await RunStereoCaseAsync(
-                id: "opencv_calibration_stereo_rig",
-                scenario: "OpenCV calibration sample stereo rig",
-                leftFolder: tempImages,
-                rightFolder: tempRightImages,
-                outputBundlePath: stereoBundlePath,
-                expectedPairCount: stereoPairs.Count,
-                options));
+            if (ShouldRunCase("opencv_calibration_stereo_rig"))
+            {
+                cases.Add(hasCaseFilter
+                    ? CreateStereoMetadataCaseResult(
+                        id: "opencv_calibration_stereo_rig",
+                        scenario: "OpenCV calibration sample stereo pair metadata",
+                        stereoPairs: stereoPairs,
+                        calibrationFiles: index.CalibrationFiles,
+                        expectedPairCount: stereoPairs.Count,
+                        thresholds: options.CreateThresholdMetrics())
+                    : await RunStereoCaseAsync(
+                        id: "opencv_calibration_stereo_rig",
+                        scenario: "OpenCV calibration sample stereo rig",
+                        leftFolder: tempImages,
+                        rightFolder: tempRightImages,
+                        outputBundlePath: stereoBundlePath,
+                        expectedPairCount: stereoPairs.Count,
+                        options));
+            }
 
-            cases.Add(CreateStereoMetadataCaseResult(
-                id: "opencv_calibration_stereo_metadata",
-                scenario: "OpenCV calibration sample stereo pair metadata",
-                stereoPairs: stereoPairs,
-                calibrationFiles: index.CalibrationFiles,
-                expectedPairCount: stereoPairs.Count,
-                thresholds: options.CreateThresholdMetrics()));
+            if (ShouldRunCase("opencv_calibration_stereo_metadata"))
+            {
+                cases.Add(CreateStereoMetadataCaseResult(
+                    id: "opencv_calibration_stereo_metadata",
+                    scenario: "OpenCV calibration sample stereo pair metadata",
+                    stereoPairs: stereoPairs,
+                    calibrationFiles: index.CalibrationFiles,
+                    expectedPairCount: stereoPairs.Count,
+                    thresholds: options.CreateThresholdMetrics()));
+            }
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             var allocationAfter = GC.GetTotalAllocatedBytes(precise: true);
-            cases.Add(new CaseResult(
-                "opencv_calibration_left_camera",
-                "CameraCalibration",
-                "OpenCV calibration sample left camera folder",
-                false,
-                Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
-                Math.Max(0, allocationAfter - allocationBefore),
-                false,
-                -1.0,
-                -1.0,
-                0,
-                0,
-                "runner_exception",
-                ex.GetBaseException().Message,
-                new Dictionary<string, object?>
-                {
-                    ["Thresholds"] = options.CreateThresholdMetrics()
-                }));
+            if (!hasCaseFilter || caseIds.Contains("opencv_calibration_left_camera"))
+            {
+                cases.Add(new CaseResult(
+                    "opencv_calibration_left_camera",
+                    "CameraCalibration",
+                    "OpenCV calibration sample left camera folder",
+                    false,
+                    Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    Math.Max(0, allocationAfter - allocationBefore),
+                    false,
+                    -1.0,
+                    -1.0,
+                    0,
+                    0,
+                    "runner_exception",
+                    ex.GetBaseException().Message,
+                    new Dictionary<string, object?>
+                    {
+                        ["Thresholds"] = options.CreateThresholdMetrics()
+                    }));
+            }
         }
         finally
         {
@@ -621,6 +650,23 @@ internal static class OpenCvCalibrationDatasetRunner
         return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
     }
 
+    private static string NormalizeStereoTempFileName(string fileName)
+    {
+        var extension = Path.GetExtension(fileName);
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        foreach (var side in new[] { "left", "right" })
+        {
+            if (stem.StartsWith(side, StringComparison.OrdinalIgnoreCase) &&
+                stem.Length > side.Length &&
+                char.IsDigit(stem[side.Length]))
+            {
+                return $"{side}_{stem[side.Length..]}{extension}";
+            }
+        }
+
+        return fileName;
+    }
+
     private static bool IsValidCalibrationBundleJson(string json, bool stereo = false)
     {
         using var doc = JsonDocument.Parse(json);
@@ -956,6 +1002,9 @@ internal sealed class RunnerOptions
     public int MinStereoPairs { get; init; } = 10;
     public double MaxStereoReprojectionRmsPx { get; init; } = 1.0;
     public double MaxEpipolarErrorPx { get; init; } = 1.0;
+    public IReadOnlySet<string> CaseIds { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+    public string CandidateVersion { get; init; } = "v1";
+    public string Profile { get; init; } = "camera_calibration";
     public bool RequireAccepted { get; init; }
     public bool ShowHelp { get; init; }
     public string? ParseError { get; init; }
@@ -996,6 +1045,15 @@ internal sealed class RunnerOptions
                 case "--max-epipolar-error":
                     options.MaxEpipolarErrorPx = double.Parse(RequireValue(args, ref i, arg));
                     break;
+                case "--case-ids":
+                    options.CaseIds = ParseCaseIds(RequireValue(args, ref i, arg));
+                    break;
+                case "--candidate-version":
+                    options.CandidateVersion = RequireValue(args, ref i, arg);
+                    break;
+                case "--profile":
+                    options.Profile = RequireValue(args, ref i, arg);
+                    break;
                 case "--allow-rejected":
                     options.RequireAccepted = false;
                     break;
@@ -1012,7 +1070,9 @@ internal sealed class RunnerOptions
 
     public static void PrintHelp()
     {
-        Console.WriteLine("Usage: OpenCvCalibrationDatasetRunner --index <index.json> --output <baseline.json> --report <report.md> [--min-detected-images N] [--max-reprojection-rms PX] [--min-stereo-pairs N] [--max-stereo-reprojection-rms PX] [--max-epipolar-error PX] [--require-accepted]");
+        Console.WriteLine(
+            "Usage: OpenCvCalibrationDatasetRunner --index <index.json> --output <baseline.json> --report <report.md> [--case-ids id1,id2,id3] [--candidate-version v1] [--profile camera_calibration] [--min-detected-images N] [--max-reprojection-rms PX] [--min-stereo-pairs N] [--max-stereo-reprojection-rms PX] [--max-epipolar-error PX] [--require-accepted]"
+        );
     }
 
     public IReadOnlyDictionary<string, object?> CreateThresholdMetrics()
@@ -1024,8 +1084,25 @@ internal sealed class RunnerOptions
             ["MaxReprojectionRmsPx"] = MaxReprojectionRmsPx,
             ["MinStereoPairs"] = MinStereoPairs,
             ["MaxStereoReprojectionRmsPx"] = MaxStereoReprojectionRmsPx,
-            ["MaxEpipolarErrorPx"] = MaxEpipolarErrorPx
+            ["MaxEpipolarErrorPx"] = MaxEpipolarErrorPx,
+            ["CandidateVersion"] = CandidateVersion,
+            ["Profile"] = Profile,
         };
+    }
+
+    private static HashSet<string> ParseCaseIds(string value)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var normalized = item.Trim();
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                result.Add(normalized);
+            }
+        }
+
+        return result;
     }
 
     private static string RequireValue(string[] args, ref int index, string name)
@@ -1049,6 +1126,9 @@ internal sealed class RunnerOptions
         public int MinStereoPairs { get; set; } = 10;
         public double MaxStereoReprojectionRmsPx { get; set; } = 1.0;
         public double MaxEpipolarErrorPx { get; set; } = 1.0;
+        public HashSet<string> CaseIds { get; set; } = new();
+        public string CandidateVersion { get; set; } = "v1";
+        public string Profile { get; set; } = "camera_calibration";
         public bool RequireAccepted { get; set; }
         public bool ShowHelp { get; set; }
 
@@ -1065,9 +1145,13 @@ internal sealed class RunnerOptions
                 MaxStereoReprojectionRmsPx = MaxStereoReprojectionRmsPx,
                 MaxEpipolarErrorPx = MaxEpipolarErrorPx,
                 RequireAccepted = RequireAccepted,
+                CaseIds = new HashSet<string>(CaseIds, StringComparer.Ordinal),
+                CandidateVersion = CandidateVersion,
+                Profile = Profile,
                 ShowHelp = ShowHelp
             };
         }
+
     }
 }
 

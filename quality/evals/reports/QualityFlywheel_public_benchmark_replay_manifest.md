@@ -7,7 +7,7 @@ Accepted: `Yes`
 
 - Replay cases: 183
 - Operators: 10
-- Class counts: `{'boundary': 136, 'failure': 47}`
+- Class counts: `{'boundary': 123, 'failure': 60}`
 
 ## Cases
 
@@ -76,26 +76,26 @@ Accepted: `Yes`
 | CameraCalibration | opencv_calibration_samples | opencv_calibration_right_camera | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.367839 |
 | CameraCalibration | opencv_calibration_samples | opencv_calibration_left_camera | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.33779 |
 | CameraCalibration | opencv_calibration_samples | opencv_calibration_stereo_rig | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.0 |
-| DeepLearning | coco2017 | coco2017_val_776 | failure | threshold-failed | BestMatchedIou | 0.997813 |
-| DeepLearning | coco2017 | coco2017_val_872 | failure | threshold-failed | BestMatchedIou | 0.993728 |
-| DeepLearning | coco2017 | coco2017_val_1818 | failure | threshold-failed | BestMatchedIou | 0.996945 |
-| DeepLearning | coco2017 | coco2017_val_2157 | failure | threshold-failed | BestMatchedIou | 0.996493 |
-| DeepLearning | coco2017 | coco2017_val_2685 | failure | threshold-failed | BestMatchedIou | 0.994228 |
-| DeepLearning | coco2017 | coco2017_val_6771 | failure | threshold-failed | BestMatchedIou | 0.992797 |
-| DeepLearning | coco2017 | coco2017_val_9400 | failure | threshold-failed | BestMatchedIou | 0.993278 |
-| DeepLearning | coco2017 | coco2017_val_3255 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.923004 |
-| DeepLearning | coco2017 | coco2017_val_6723 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.935275 |
-| DeepLearning | coco2017 | coco2017_val_8762 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.937739 |
-| DeepLearning | coco2017 | coco2017_val_11615 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.956425 |
-| DeepLearning | coco2017 | coco2017_val_6213 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.958023 |
-| DeepLearning | coco2017 | coco2017_val_6460 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.964468 |
-| DeepLearning | coco2017 | coco2017_val_5586 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.965825 |
-| DeepLearning | coco2017 | coco2017_val_8899 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.966983 |
-| DeepLearning | coco2017 | coco2017_val_10977 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.968663 |
-| DeepLearning | coco2017 | coco2017_val_12280 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.96884 |
-| DeepLearning | coco2017 | coco2017_val_1490 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.96887 |
-| DeepLearning | coco2017 | coco2017_val_2923 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.969341 |
-| DeepLearning | coco2017 | coco2017_val_6818 | boundary | worst-BestMatchedIou | BestMatchedIou | 0.970791 |
+| DeepLearning | coco2017 | coco2017_val_139 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_724 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_785 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_872 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_885 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1000 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1268 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1296 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1353 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1490 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1532 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1584 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_1761 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2006 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2153 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2261 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2299 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2431 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2473 | failure | threshold-failed | BestMatchedIou | 0.0 |
+| DeepLearning | coco2017 | coco2017_val_2532 | failure | threshold-failed | BestMatchedIou | 0.0 |
 | SemanticSegmentation | voc-style-protocol-bridge | SemanticSegmentation_single_region_0000 | boundary | worst-MeanIoU | MeanIoU | 1.0 |
 | SemanticSegmentation | voc-style-protocol-bridge | SemanticSegmentation_multi_class_regions_0000 | boundary | worst-MeanIoU | MeanIoU | 1.0 |
 | SemanticSegmentation | voc-style-protocol-bridge | SemanticSegmentation_thin_boundary_0000 | boundary | worst-MeanIoU | MeanIoU | 1.0 |

@@ -2,14 +2,14 @@
   "schemaVersion": "2026-04-29.public-benchmark-replay.v1",
   "generatedAtUtc": "2026-04-29T00:00:00Z",
   "sourceProofBaseline": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
-  "sourceProofSha256": "571696fddbeaf975d0b38dbaa156f4cd4ef25c00ae5e64688bae92532949c99d",
+  "sourceProofSha256": "df0b9c0b839ff38892916f70016df861ba2dead84db9edc56f47c471a60d7264",
   "accepted": true,
   "summary": {
     "replayCaseCount": 183,
     "operatorCount": 10,
     "classCounts": {
-      "boundary": 136,
-      "failure": 47
+      "boundary": 123,
+      "failure": 60
     }
   },
   "cases": [
@@ -925,7 +925,7 @@
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
+        "--execute-camera-calibration"
       ]
     },
     {
@@ -940,7 +940,7 @@
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
+        "--execute-camera-calibration"
       ]
     },
     {
@@ -955,18 +955,48 @@
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
+        "--execute-camera-calibration"
       ]
     },
     {
-      "caseId": "coco2017_val_776",
+      "caseId": "coco2017_val_139",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.997813,
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_724",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_785",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -981,7 +1011,7 @@
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.993728,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -989,14 +1019,14 @@
       ]
     },
     {
-      "caseId": "coco2017_val_1818",
+      "caseId": "coco2017_val_885",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.996945,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1004,14 +1034,14 @@
       ]
     },
     {
-      "caseId": "coco2017_val_2157",
+      "caseId": "coco2017_val_1000",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.996493,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1019,14 +1049,14 @@
       ]
     },
     {
-      "caseId": "coco2017_val_2685",
+      "caseId": "coco2017_val_1268",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.994228,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1034,14 +1064,14 @@
       ]
     },
     {
-      "caseId": "coco2017_val_6771",
+      "caseId": "coco2017_val_1296",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.992797,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1049,164 +1079,14 @@
       ]
     },
     {
-      "caseId": "coco2017_val_9400",
+      "caseId": "coco2017_val_1353",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
       "replayClass": "failure",
       "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.993278,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_3255",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.923004,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_6723",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.935275,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_8762",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.937739,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_11615",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.956425,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_6213",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.958023,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_6460",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.964468,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_5586",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.965825,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_8899",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.966983,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_10977",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.968663,
-      "replayCommand": [
-        "python",
-        "quality/tools/run_algorithm_ab_replay.py",
-        "--execute-matching"
-      ]
-    },
-    {
-      "caseId": "coco2017_val_12280",
-      "split": "test",
-      "operator": "DeepLearning",
-      "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
-      "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.96884,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1218,10 +1098,10 @@
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.96887,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1229,14 +1109,14 @@
       ]
     },
     {
-      "caseId": "coco2017_val_2923",
+      "caseId": "coco2017_val_1532",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.969341,
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",
@@ -1244,14 +1124,134 @@
       ]
     },
     {
-      "caseId": "coco2017_val_6818",
+      "caseId": "coco2017_val_1584",
       "split": "test",
       "operator": "DeepLearning",
       "datasetId": "coco2017",
-      "replayClass": "boundary",
-      "triageLabel": "worst-BestMatchedIou",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
       "boundaryMetric": "BestMatchedIou",
-      "boundaryMetricValue": 0.970791,
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1761",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2006",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2153",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2261",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2299",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2431",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2473",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2532",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
       "replayCommand": [
         "python",
         "quality/tools/run_algorithm_ab_replay.py",

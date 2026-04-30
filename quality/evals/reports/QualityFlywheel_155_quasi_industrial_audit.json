@@ -1,10 +1,10 @@
 {
   "schemaVersion": "2026-04-29.quasi-industrial-audit.v1",
-  "generatedAtUtc": "2026-04-30T01:19:49+00:00",
+  "generatedAtUtc": "2026-04-30T04:24:54+00:00",
   "passed": true,
   "summary": {
-    "checkCount": 44,
-    "passedCount": 44,
+    "checkCount": 57,
+    "passedCount": 57,
     "failedCount": 0,
     "realIndustrialValidationComplete": 0
   },
@@ -120,6 +120,16 @@
       "details": "public benchmark proof raw path scan"
     },
     {
+      "id": "public_benchmark_proof_deeplearning_baseline",
+      "passed": true,
+      "details": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json"
+    },
+    {
+      "id": "public_benchmark_proof_deeplearning_no_annotation_seeded_claim",
+      "passed": true,
+      "details": "COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used)"
+    },
+    {
       "id": "public_benchmark_replay_manifest_exists",
       "passed": true,
       "details": "quality/evals/reports/QualityFlywheel_public_benchmark_replay_manifest.json"
@@ -170,9 +180,64 @@
       "details": "183/183"
     },
     {
-      "id": "algorithm_ab_replay_report_matching_candidate_executed",
+      "id": "algorithm_ab_replay_report_candidate_executed_ge_183",
       "passed": true,
-      "details": "80"
+      "details": "183"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_executed",
+      "passed": true,
+      "details": "candidate-executed"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_real_model_cases_ge_20",
+      "passed": true,
+      "details": "20"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_processing_errors_zero",
+      "passed": true,
+      "details": "0"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_summary_accessible",
+      "passed": true,
+      "details": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_summary_exists",
+      "passed": true,
+      "details": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_profile",
+      "passed": true,
+      "details": "real_model_hard_nms_045"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_annotation_seeded_false",
+      "passed": true,
+      "details": "False"
+    },
+    {
+      "id": "algorithm_ab_replay_report_deeplearning_candidate_artifact_present",
+      "passed": true,
+      "details": "generated-smoke-fixture"
+    },
+    {
+      "id": "algorithm_ab_replay_report_candidate_camera_cases_executed_ge_3",
+      "passed": true,
+      "details": "3"
+    },
+    {
+      "id": "algorithm_ab_replay_report_camera_regressed_zero",
+      "passed": true,
+      "details": "0"
+    },
+    {
+      "id": "algorithm_ab_replay_report_camera_worse_metric_zero",
+      "passed": true,
+      "details": "0"
     },
     {
       "id": "algorithm_ab_replay_report_all_ops_wired",

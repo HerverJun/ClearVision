@@ -63,7 +63,7 @@
           "operators": ["DeepLearning"],
           "datasetManifest": "quality/datasets/coco2017_index.json",
           "modelManifest": "models/object_detection/coco_yolo_real_model_manifest.template.json",
-          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_baseline.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_baseline.md", "--max-cases", "120"],
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_baseline.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_baseline.md", "--profile", "real_model_hard_nms_045", "--max-cases", "120"],
           "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
           "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_baseline.md",
           "estimatedSeconds": 600,
