@@ -263,12 +263,105 @@ def build_kolektorsdd2_index() -> None:
     )
 
 
+def build_coco2017_index() -> None:
+    root = DATA_ROOT / "coco2017"
+    extracted = root / "extracted"
+    image_dir = extracted / "val2017"
+    annotations = extracted / "annotations" / "instances_val2017.json"
+    if not image_dir.exists() or not annotations.exists():
+        raise FileNotFoundError(f"COCO 2017 val images/annotations not found under: {extracted}")
+
+    with annotations.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+
+    annotations_by_image: dict[int, list[dict[str, Any]]] = {}
+    for annotation in data.get("annotations", []):
+        annotations_by_image.setdefault(int(annotation["image_id"]), []).append(annotation)
+
+    categories = {int(item["id"]): item["name"] for item in data.get("categories", [])}
+    records: list[dict[str, Any]] = []
+    for image in sorted(data.get("images", []), key=lambda item: item["file_name"]):
+        image_id = int(image["id"])
+        file_name = image["file_name"]
+        labels = annotations_by_image.get(image_id, [])
+        records.append(
+            {
+                "id": str(image_id),
+                "split": "val2017",
+                "image_path": repo_rel(image_dir / file_name),
+                "width": image.get("width"),
+                "height": image.get("height"),
+                "annotation_count": len(labels),
+                "category_ids": sorted({int(label["category_id"]) for label in labels}),
+            }
+        )
+
+    write_json(
+        OUTPUT_ROOT / "coco2017_index.json",
+        {
+            "name": "COCO 2017 validation",
+            "source_dataset": "COCO 2017",
+            "created_at": "2026-04-29",
+            "local_root": repo_rel(root),
+            "image_split": repo_rel(image_dir),
+            "annotation_file": repo_rel(annotations),
+            "category_count": len(categories),
+            "annotation_count": len(data.get("annotations", [])),
+            "record_count": len(records),
+            "records": records,
+        },
+    )
+
+
+def build_hpatches_index() -> None:
+    root = DATA_ROOT / "hpatches"
+    extracted = root / "extracted"
+    sequence_root = extracted / "hpatches-sequences-release"
+    if not sequence_root.exists():
+        sequence_root = extracted
+    if not sequence_root.exists():
+        raise FileNotFoundError(f"HPatches extracted root not found: {extracted}")
+
+    records: list[dict[str, Any]] = []
+    for sequence in sorted(path for path in sequence_root.iterdir() if path.is_dir()):
+        image_paths = sorted(sequence.glob("*.ppm"))
+        homographies = sorted(sequence.glob("H_1_*"))
+        if not image_paths:
+            continue
+        records.append(
+            {
+                "id": sequence.name,
+                "sequence_path": repo_rel(sequence),
+                "image_count": len(image_paths),
+                "images": [repo_rel(path) for path in image_paths],
+                "homography_count": len(homographies),
+                "homographies": [repo_rel(path) for path in homographies],
+                "sequence_type": "illumination" if sequence.name.startswith("i_") else "viewpoint"
+                if sequence.name.startswith("v_")
+                else "unknown",
+            }
+        )
+
+    write_json(
+        OUTPUT_ROOT / "hpatches_index.json",
+        {
+            "name": "HPatches",
+            "source_dataset": "HPatches image matching benchmark",
+            "created_at": "2026-04-29",
+            "local_root": repo_rel(root),
+            "sequence_root": repo_rel(sequence_root),
+            "record_count": len(records),
+            "records": records,
+        },
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build manifest-only indexes for downloaded public quality datasets.")
     parser.add_argument(
         "--dataset",
         action="append",
-        choices=("bsds500", "opencv_calibration_samples", "kolektorsdd2"),
+        choices=("bsds500", "opencv_calibration_samples", "kolektorsdd2", "coco2017", "hpatches"),
         help="Dataset to index. Repeatable. Defaults to all supported datasets.",
     )
     args = parser.parse_args()
@@ -281,6 +374,10 @@ def main() -> int:
             build_opencv_calibration_index()
         elif dataset == "kolektorsdd2":
             build_kolektorsdd2_index()
+        elif dataset == "coco2017":
+            build_coco2017_index()
+        elif dataset == "hpatches":
+            build_hpatches_index()
         print(f"indexed {dataset}")
 
     return 0

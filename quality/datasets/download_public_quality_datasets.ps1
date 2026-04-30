@@ -234,6 +234,46 @@ function Download-KolektorSdd2 {
     Expand-Zip -Archive $archive -Destination (Join-Path $root "extracted")
 }
 
+function Download-Coco2017 {
+    $root = Resolve-RepoPath "quality/public_datasets/coco2017"
+    $valArchive = Join-Path $root "_downloads/val2017.zip"
+    $annotationsArchive = Join-Path $root "_downloads/annotations_trainval2017.zip"
+
+    Invoke-CurlDownload `
+        -Url "http://images.cocodataset.org/zips/val2017.zip" `
+        -Destination $valArchive
+
+    Invoke-CurlDownload `
+        -Url "http://images.cocodataset.org/annotations/annotations_trainval2017.zip" `
+        -Destination $annotationsArchive
+
+    Expand-Zip -Archive $valArchive -Destination (Join-Path $root "extracted")
+    Expand-Zip -Archive $annotationsArchive -Destination (Join-Path $root "extracted")
+}
+
+function Download-HPatches {
+    $root = Resolve-RepoPath "quality/public_datasets/hpatches"
+    $archive = Join-Path $root "_downloads/hpatches-sequences-release.tar.gz"
+    $fallbackArchive = Join-Path $root "_downloads/hpatches-sequences-release.zip"
+
+    try {
+        Invoke-CurlDownload `
+            -Url "http://icvl.ee.ic.ac.uk/vbalnt/hpatches/hpatches-sequences-release.tar.gz" `
+            -Destination $archive
+
+        Expand-TarGz -Archive $archive -Destination (Join-Path $root "extracted")
+    }
+    catch {
+        Write-Warning "Primary HPatches host failed: $($_.Exception.Message)"
+        Write-Host "Falling back to the HPatches Hugging Face mirror published from the official dataset README."
+        Invoke-CurlDownload `
+            -Url "https://huggingface.co/datasets/vbalnt/hpatches/resolve/main/hpatches-sequences-release.zip" `
+            -Destination $fallbackArchive
+
+        Expand-Zip -Archive $fallbackArchive -Destination (Join-Path $root "extracted")
+    }
+}
+
 if (-not (Test-Command "curl.exe")) {
     throw "curl.exe is required."
 }
@@ -260,6 +300,8 @@ foreach ($datasetId in $Dataset) {
         "bsds500" { Download-Bsds500 }
         "opencv_calibration_samples" { Download-OpenCvCalibrationSamples }
         "kolektorsdd2" { Download-KolektorSdd2 }
+        "coco2017" { Download-Coco2017 }
+        "hpatches" { Download-HPatches }
         default { throw "Unknown dataset id: $datasetId" }
     }
 }

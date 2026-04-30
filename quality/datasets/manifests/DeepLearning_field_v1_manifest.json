@@ -71,10 +71,12 @@
   },
   "runner": {
     "project": "",
-    "command": "python quality/tools/build_core20_proof_assets.py --validate-only --operator DeepLearning",
+    "command": "python quality/tools/run_core20_field_proof.py --operator DeepLearning",
     "baselineJson": "quality/evals/reports/DeepLearning_field_v1_proof_baseline.json",
     "reportMarkdown": "quality/evals/reports/DeepLearning_field_v1_proof_baseline.md",
-    "legacyBaselineJson": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json"
+    "legacyBaselineJson": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json",
+    "algorithmProofResultsFile": "proof_results.json",
+    "algorithmProofContract": "External runner writes field_v1/proof_results.json with one result per fixed test split case; quality/tools/run_core20_field_proof.py validates coverage, metrics, thresholds, privacy, and per-case taxonomy."
   },
   "failureBoundaries": {
     "required": true,

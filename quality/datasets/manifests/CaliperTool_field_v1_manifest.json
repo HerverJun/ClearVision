@@ -67,10 +67,12 @@
   },
   "runner": {
     "project": "",
-    "command": "python quality/tools/build_core20_proof_assets.py --validate-only --operator CaliperTool",
+    "command": "python quality/tools/run_core20_field_proof.py --operator CaliperTool",
     "baselineJson": "quality/evals/reports/CaliperTool_field_v1_proof_baseline.json",
     "reportMarkdown": "quality/evals/reports/CaliperTool_field_v1_proof_baseline.md",
-    "legacyBaselineJson": "quality/evals/reports/CaliperTool_baseline.json"
+    "legacyBaselineJson": "quality/evals/reports/CaliperTool_baseline.json",
+    "algorithmProofResultsFile": "proof_results.json",
+    "algorithmProofContract": "External runner writes field_v1/proof_results.json with one result per fixed test split case; quality/tools/run_core20_field_proof.py validates coverage, metrics, thresholds, privacy, and per-case taxonomy."
   },
   "failureBoundaries": {
     "required": true,

@@ -1,0 +1,2562 @@
+{
+  "name": "HPatches",
+  "source_dataset": "HPatches image matching benchmark",
+  "created_at": "2026-04-29",
+  "local_root": "quality/public_datasets/hpatches",
+  "sequence_root": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release",
+  "record_count": 116,
+  "records": [
+    {
+      "id": "i_ajuntament",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ajuntament/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_autannes",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_autannes/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_bologna",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bologna/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_books",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_books/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_boutique",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_boutique/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_bridger",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_bridger/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_brooklyn",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_brooklyn/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_castle",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_castle/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_chestnuts",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_chestnuts/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_contruction",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_contruction/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_crownday",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownday/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_crownnight",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_crownnight/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_dc",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dc/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_dome",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_dome/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_duda",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_duda/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_fenis",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fenis/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_fog",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fog/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_fruits",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_fruits/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_gonnenberg",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_gonnenberg/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_greenhouse",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greenhouse/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_greentea",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_greentea/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_indiana",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_indiana/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_kions",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kions/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_ktirio",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ktirio/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_kurhaus",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_kurhaus/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_leuven",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_leuven/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_lionday",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionday/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_lionnight",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_lionnight/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_londonbridge",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_londonbridge/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_melon",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_melon/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_miniature",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_miniature/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_nescafe",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nescafe/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_nijmegen",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nijmegen/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_nuts",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_nuts/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_objects",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_objects/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_parking",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_parking/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_partyfood",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_partyfood/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_pencils",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pencils/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_pinard",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pinard/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_pool",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_pool/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_porta",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_porta/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_resort",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_resort/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_salon",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_salon/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_santuario",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_santuario/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_school",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_school/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_ski",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_ski/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_smurf",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_smurf/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_steps",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_steps/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_table",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_table/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_tools",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_tools/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_toy",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_toy/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_troulos",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_troulos/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_veggies",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_veggies/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_village",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_village/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_whitebuilding",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_whitebuilding/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_yellowtent",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_yellowtent/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "i_zion",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/i_zion/H_1_6"
+      ],
+      "sequence_type": "illumination"
+    },
+    {
+      "id": "v_abstract",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_abstract/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_adam",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_adam/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_apprentices",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_apprentices/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_artisans",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_artisans/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_astronautis",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_astronautis/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_azzola",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_azzola/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_bark",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bark/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_bees",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bees/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_beyus",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_beyus/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_bip",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bip/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_bird",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bird/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_birdwoman",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_birdwoman/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_blueprint",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_blueprint/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_boat",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_boat/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_bricks",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_bricks/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_busstop",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_busstop/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_calder",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_calder/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_cartooncity",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_cartooncity/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_charing",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_charing/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_churchill",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_churchill/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_circus",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_circus/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_coffeehouse",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_coffeehouse/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_colors",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_colors/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_courses",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_courses/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_dirtywall",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dirtywall/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_dogman",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_dogman/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_eastsouth",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_eastsouth/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_feast",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_feast/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_fest",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_fest/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_gardens",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_gardens/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_grace",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_grace/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_graffiti",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_graffiti/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_home",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_home/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_laptop",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_laptop/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_london",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_london/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_machines",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_machines/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_man",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_man/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_maskedman",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_maskedman/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_pomegranate",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_pomegranate/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_posters",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_posters/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_samples",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_samples/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_soldiers",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_soldiers/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_strand",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_strand/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_sunseason",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_sunseason/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_tabletop",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tabletop/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_talent",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_talent/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_tempera",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_tempera/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_there",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_there/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_underground",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_underground/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_vitro",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_vitro/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_wall",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wall/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_wapping",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wapping/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_war",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_war/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_weapons",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_weapons/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_woman",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_woman/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_wormhole",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wormhole/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_wounded",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_wounded/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_yard",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yard/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    },
+    {
+      "id": "v_yuri",
+      "sequence_path": "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri",
+      "image_count": 6,
+      "images": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/1.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/2.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/3.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/4.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/5.ppm",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/6.ppm"
+      ],
+      "homography_count": 5,
+      "homographies": [
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/H_1_2",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/H_1_3",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/H_1_4",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/H_1_5",
+        "quality/public_datasets/hpatches/extracted/hpatches-sequences-release/v_yuri/H_1_6"
+      ],
+      "sequence_type": "viewpoint"
+    }
+  ]
+}
