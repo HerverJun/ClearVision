@@ -170,6 +170,8 @@ def selected_entries(entries: list[SuiteEntry], entry_ids: set[str], include_pla
             continue
         if entry.status == "planned" and not include_planned:
             continue
+        if entry.status == "manual" and not entry_ids:
+            continue
         if entry.status in {"disabled", "planned", "blocked-missing-field-data"}:
             continue
         selected.append(entry)

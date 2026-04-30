@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Acme.Product.Core.Entities;
@@ -34,7 +35,8 @@ if (!string.IsNullOrWhiteSpace(options.ReportPath))
 }
 
 Console.WriteLine(
-    $"KolektorSDD2 SurfaceDefectDetection baseline complete: " +
+    $"KolektorSDD2 SurfaceDefectDetection run complete: " +
+    $"profile={result.Summary.ProfileName}, candidate={result.Summary.CandidateVersion}, " +
     $"passed={result.Summary.Passed}/{result.Summary.CaseCount}, failed={result.Summary.Failed}, " +
     $"pixel_f1={result.Summary.PixelF1:F4}, image_auroc={result.Summary.ImageAuroc:F4}, output={options.OutputPath}");
 
@@ -47,8 +49,12 @@ internal static class KolektorRunner
     public static async Task<BaselineResult> RunAsync(RunnerOptions options)
     {
         var index = LoadIndex(options.IndexPath);
+        var caseIds = options.CaseIds.Count == 0
+            ? null
+            : new HashSet<string>(options.CaseIds, StringComparer.OrdinalIgnoreCase);
         var records = index.Records
             .Where(item => item.Split.Equals(options.Split, StringComparison.OrdinalIgnoreCase))
+            .Where(item => caseIds is null || caseIds.Contains(item.Id))
             .OrderBy(item => item.Id, StringComparer.Ordinal)
             .Take(options.Limit > 0 ? options.Limit : int.MaxValue)
             .ToList();
@@ -87,13 +93,23 @@ internal static class KolektorRunner
             new BaselineSummary(
                 DateTimeOffset.UtcNow,
                 DatasetName,
+                options.CandidateVersion,
+                options.ProfileName,
                 options.IndexPath,
                 options.Split,
                 options.MaxSide,
                 options.Method,
                 options.ThresholdMode,
+                options.NormalizationMode,
                 options.Threshold,
                 options.MinArea,
+                options.MaxArea,
+                options.MorphCleanSize,
+                options.MorphMode,
+                options.BackgroundKernelSize,
+                options.ReferenceStatsSigma,
+                options.RobustReferenceStats,
+                options.ResponseNormalizeMode,
                 records.Count,
                 results.Count(item => item.Passed),
                 metricFailures.Count,
@@ -108,6 +124,9 @@ internal static class KolektorRunner
                 Math.Round(totals.F1, 6),
                 Math.Round(imageAuroc, 6),
                 Math.Round(pixelAuroc, 6),
+                Math.Round(SafeDivide(results.Count(item => item.IsDefect && item.PredictedDefect), results.Count(item => item.PredictedDefect)), 6),
+                Math.Round(SafeDivide(results.Count(item => item.IsDefect && item.PredictedDefect), results.Count(item => item.IsDefect)), 6),
+                Math.Round(ImageF1(results), 6),
                 Math.Round(falsePositivePerImage, 6),
                 Math.Round(runtimeP95, 3),
                 options.MinImageAuroc,
@@ -163,6 +182,7 @@ internal static class KolektorRunner
             outputData = output.OutputData;
             var defectMaskWrapper = GetImageWrapper(output, "DefectMask");
             var responseWrapper = GetImageWrapper(output, "ResponseImage");
+            var diagnostics = ExtractDiagnostics(output.OutputData);
             using var predictedMask = NormalizeMask(defectMaskWrapper.MatReadOnly, image.Size());
             using var response = NormalizeResponse(responseWrapper.MatReadOnly, image.Size());
 
@@ -171,6 +191,7 @@ internal static class KolektorRunner
             var score = ImageScore(response, predictedMask, output);
             var predictedDefect = Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0) > 0.0 ||
                                   Cv2.CountNonZero(predictedMask) > 0;
+            var taxonomy = ClassifyImage(record, predictedDefect, totals, Convert.ToInt32(output.OutputData?["DefectCount"] ?? 0), Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0), null);
             stopwatch.Stop();
             var allocationAfter = GC.GetTotalAllocatedBytes(precise: true);
 
@@ -184,6 +205,9 @@ internal static class KolektorRunner
                 Convert.ToInt32(output.OutputData?["DefectCount"] ?? 0),
                 Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0),
                 totals,
+                record.IsDefect == predictedDefect,
+                taxonomy,
+                diagnostics,
                 true,
                 Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
                 Math.Max(0, allocationAfter - allocationBefore),
@@ -203,6 +227,9 @@ internal static class KolektorRunner
                 0,
                 0,
                 PixelTotals.Empty,
+                !record.IsDefect,
+                ClassifyImage(record, false, PixelTotals.Empty, 0, 0, ex.GetBaseException().Message),
+                new Dictionary<string, object?>(),
                 false,
                 Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
                 Math.Max(0, allocationAfter - allocationBefore),
@@ -410,8 +437,12 @@ internal static class KolektorRunner
             ("MinArea", options.MinArea),
             ("MaxArea", options.MaxArea),
             ("MorphCleanSize", options.MorphCleanSize),
+            ("MorphMode", options.MorphMode),
             ("NormalizationMode", options.NormalizationMode),
-            ("BackgroundKernelSize", options.BackgroundKernelSize));
+            ("BackgroundKernelSize", options.BackgroundKernelSize),
+            ("ReferenceStatsSigma", options.ReferenceStatsSigma),
+            ("RobustReferenceStats", options.RobustReferenceStats),
+            ("ResponseNormalizeMode", options.ResponseNormalizeMode));
     }
 
     private static Operator CreateOperator(OperatorType type, params (string Name, object Value)[] parameters)
@@ -493,6 +524,92 @@ internal static class KolektorRunner
         return double.IsFinite(value) ? value : 0.0;
     }
 
+    private static double SafeDivide(double numerator, double denominator)
+    {
+        return denominator <= 0 ? 0.0 : numerator / denominator;
+    }
+
+    private static double ImageF1(IEnumerable<ImageResult> results)
+    {
+        var materialized = results.ToList();
+        var truePositive = materialized.Count(item => item.IsDefect && item.PredictedDefect);
+        var falsePositive = materialized.Count(item => !item.IsDefect && item.PredictedDefect);
+        var falseNegative = materialized.Count(item => item.IsDefect && !item.PredictedDefect);
+        var denominator = (2 * truePositive) + falsePositive + falseNegative;
+        return denominator <= 0 ? 0.0 : (2 * truePositive) / (double)denominator;
+    }
+
+    private static IReadOnlyDictionary<string, object?> ExtractDiagnostics(Dictionary<string, object>? outputData)
+    {
+        if (outputData is null ||
+            !outputData.TryGetValue("Diagnostics", out var raw) ||
+            raw is not IReadOnlyDictionary<string, object> diagnostics)
+        {
+            return new Dictionary<string, object?>();
+        }
+
+        return diagnostics.ToDictionary(item => item.Key, item => SanitizeDiagnosticValue(item.Value), StringComparer.Ordinal);
+    }
+
+    private static object? SanitizeDiagnosticValue(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string or bool or int or long or double or float or decimal => value,
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture)
+        };
+    }
+
+    private static List<string> ClassifyImage(
+        KolektorRecord record,
+        bool predictedDefect,
+        PixelTotals totals,
+        int defectCount,
+        double defectArea,
+        string? error)
+    {
+        var labels = new List<string>();
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            labels.Add("execution_error");
+            return labels;
+        }
+
+        var groundTruthArea = totals.TruePositive + totals.FalseNegative;
+        var predictedArea = totals.TruePositive + totals.FalsePositive;
+
+        if (!record.IsDefect && predictedDefect)
+        {
+            labels.Add(predictedArea <= 32 || defectArea <= 32 || defectCount <= 1
+                ? "texture_noise_false_positive"
+                : "oversegmentation_false_positive");
+        }
+        else if (record.IsDefect && !predictedDefect)
+        {
+            labels.Add(groundTruthArea <= 96
+                ? "small_defect_miss"
+                : "low_contrast_defect_miss");
+        }
+        else if (record.IsDefect && predictedDefect && totals.F1 < 0.35)
+        {
+            if (totals.FalseNegative > totals.FalsePositive * 2)
+            {
+                labels.Add("undersegmentation_false_negative");
+            }
+            else if (totals.FalsePositive > totals.FalseNegative * 2)
+            {
+                labels.Add("mask_overgrowth_false_positive");
+            }
+            else
+            {
+                labels.Add("mask_boundary_mismatch");
+            }
+        }
+
+        return labels;
+    }
+
     private static List<MetricFailure> EvaluateThresholds(PixelTotals totals, double imageAuroc, int errorCount, RunnerOptions options)
     {
         var failures = new List<MetricFailure>();
@@ -519,7 +636,10 @@ internal sealed record RunnerOptions(
     string IndexPath,
     string OutputPath,
     string ReportPath,
+    string CandidateVersion,
+    string ProfileName,
     string Split,
+    IReadOnlyList<string> CaseIds,
     int Limit,
     int MaxSide,
     string Method,
@@ -529,7 +649,11 @@ internal sealed record RunnerOptions(
     int MinArea,
     int MaxArea,
     int MorphCleanSize,
+    string MorphMode,
     int BackgroundKernelSize,
+    double ReferenceStatsSigma,
+    bool RobustReferenceStats,
+    string ResponseNormalizeMode,
     int PixelSampleStride,
     int MaxErrors,
     double MinImageAuroc,
@@ -543,7 +667,10 @@ internal sealed record RunnerOptions(
             IndexPath: "quality/datasets/kolektorsdd2_index.json",
             OutputPath: "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
             ReportPath: "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md",
+            CandidateVersion: "baseline",
+            ProfileName: "baseline_default",
             Split: "test",
+            CaseIds: Array.Empty<string>(),
             Limit: 0,
             MaxSide: 256,
             Method: "LocalContrast",
@@ -553,7 +680,11 @@ internal sealed record RunnerOptions(
             MinArea: 4,
             MaxArea: 1_000_000,
             MorphCleanSize: 1,
+            MorphMode: "OpenClose",
             BackgroundKernelSize: 31,
+            ReferenceStatsSigma: 2.5,
+            RobustReferenceStats: false,
+            ResponseNormalizeMode: "RawClamp",
             PixelSampleStride: 4,
             MaxErrors: 0,
             MinImageAuroc: 0.70,
@@ -586,21 +717,28 @@ internal sealed record RunnerOptions(
                     "--index" => options with { IndexPath = NextValue() },
                     "--output" => options with { OutputPath = NextValue() },
                     "--report" => options with { ReportPath = NextValue() },
+                    "--candidate-version" => options with { CandidateVersion = NextValue() },
+                    "--profile" => options with { ProfileName = NextValue() },
                     "--split" => options with { Split = NextValue() },
+                    "--case-ids" => options with { CaseIds = ParseCaseIds(NextValue()) },
                     "--limit" => options with { Limit = int.Parse(NextValue()) },
                     "--max-side" => options with { MaxSide = int.Parse(NextValue()) },
                     "--method" => options with { Method = NextValue() },
                     "--threshold-mode" => options with { ThresholdMode = NextValue() },
                     "--normalization-mode" => options with { NormalizationMode = NextValue() },
-                    "--threshold" => options with { Threshold = double.Parse(NextValue()) },
+                    "--threshold" => options with { Threshold = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--min-area" => options with { MinArea = int.Parse(NextValue()) },
                     "--max-area" => options with { MaxArea = int.Parse(NextValue()) },
                     "--morph-clean-size" => options with { MorphCleanSize = int.Parse(NextValue()) },
+                    "--morph-mode" => options with { MorphMode = NextValue() },
                     "--background-kernel-size" => options with { BackgroundKernelSize = int.Parse(NextValue()) },
+                    "--reference-stats-sigma" => options with { ReferenceStatsSigma = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--robust-reference-stats" => options with { RobustReferenceStats = bool.Parse(NextValue()) },
+                    "--response-normalize-mode" => options with { ResponseNormalizeMode = NextValue() },
                     "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue()) },
                     "--max-errors" => options with { MaxErrors = int.Parse(NextValue()) },
-                    "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue()) },
-                    "--min-pixel-f1" => options with { MinPixelF1 = double.Parse(NextValue()) },
+                    "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-pixel-f1" => options with { MinPixelF1 = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     _ => options with { ParseError = $"Unknown argument: {arg}" }
                 };
             }
@@ -618,6 +756,15 @@ internal sealed record RunnerOptions(
         return options;
     }
 
+    private static IReadOnlyList<string> ParseCaseIds(string value)
+    {
+        return value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public static void PrintHelp()
     {
         Console.WriteLine("""
@@ -625,9 +772,12 @@ internal sealed record RunnerOptions(
 
         Options:
           --index <path>                KolektorSDD2 JSON index.
-          --output <path>               Baseline JSON output path.
-          --report <path>               Baseline Markdown report path.
+          --output <path>               JSON output path.
+          --report <path>               Markdown report path.
+          --candidate-version <name>    Candidate/report version tag. Default: baseline.
+          --profile <name>              Profile name recorded in output. Default: baseline_default.
           --split <name>                Dataset split to evaluate. Default: test.
+          --case-ids <csv>              Optional comma-separated image ids to replay.
           --limit <int>                 Optional smoke subset size. Default: 0 (all records).
           --max-side <int>              Resize long image side before evaluation. Default: 256.
           --method <name>               Product operator method. Default: LocalContrast.
@@ -637,8 +787,15 @@ internal sealed record RunnerOptions(
           --min-area <int>              Minimum accepted connected-component area. Default: 4.
           --max-area <int>              Maximum accepted connected-component area. Default: 1000000.
           --morph-clean-size <int>      Morphological cleanup kernel. Default: 1.
+          --morph-mode <name>           Morphological cleanup mode. Default: OpenClose.
           --background-kernel-size <int>
                                       Local background kernel. Default: 31.
+          --reference-stats-sigma <float>
+                                      ReferenceStats sigma. Default: 2.5.
+          --robust-reference-stats <bool>
+                                      Use robust MAD reference stats. Default: false.
+          --response-normalize-mode <name>
+                                      RawClamp, MinMax, or PercentileClip. Default: RawClamp.
           --pixel-sample-stride <int>   Pixel AUROC sampling stride. Default: 4.
           --max-errors <int>            Crash/failure gate. Default: 0.
           --min-image-auroc <float>     Optional image AUROC floor. Default: 0.70.
@@ -657,6 +814,8 @@ internal static class MarkdownReport
             "",
             $"GeneratedAtUtc: `{result.Summary.GeneratedAtUtc:O}`",
             $"Index: `{result.Summary.IndexPath}`",
+            $"CandidateVersion: `{result.Summary.CandidateVersion}`",
+            $"Profile: `{result.Summary.ProfileName}`",
             "",
             "## Summary",
             "",
@@ -672,10 +831,19 @@ internal static class MarkdownReport
             $"| Pixel F1 | {result.Summary.PixelF1:F4} |",
             $"| Image AUROC | {result.Summary.ImageAuroc:F4} |",
             $"| Pixel AUROC | {result.Summary.PixelAuroc:F4} |",
+            $"| Image precision | {result.Summary.ImagePrecision:F4} |",
+            $"| Image recall | {result.Summary.ImageRecall:F4} |",
+            $"| Image F1 | {result.Summary.ImageF1:F4} |",
             $"| False positive per normal image | {result.Summary.FalsePositivePerImage:F4} |",
             $"| Runtime p95 ms | {result.Summary.RuntimeMsP95:F3} |",
             $"| Method | {result.Summary.Method} |",
             $"| Threshold mode | {result.Summary.ThresholdMode} |",
+            $"| Threshold | {result.Summary.Threshold:F3} |",
+            $"| Min area | {result.Summary.MinArea} |",
+            $"| Morph clean size | {result.Summary.MorphCleanSize} |",
+            $"| Morph mode | {result.Summary.MorphMode} |",
+            $"| Background kernel | {result.Summary.BackgroundKernelSize} |",
+            $"| Response normalize mode | {result.Summary.ResponseNormalizeMode} |",
             $"| Max side | {result.Summary.MaxSide} |"
         };
 
@@ -721,6 +889,28 @@ internal static class MarkdownReport
             }
         }
 
+        var taxonomyCounts = result.Images
+            .SelectMany(item => item.FailureTaxonomy)
+            .GroupBy(item => item, StringComparer.Ordinal)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.Ordinal)
+            .ToList();
+        if (taxonomyCounts.Count > 0)
+        {
+            lines.AddRange([
+                "",
+                "## Failure Taxonomy",
+                "",
+                "| Taxonomy | Count |",
+                "| --- | ---: |"
+            ]);
+
+            foreach (var group in taxonomyCounts)
+            {
+                lines.Add($"| {group.Key} | {group.Count()} |");
+            }
+        }
+
         lines.AddRange([
             "",
             "## Notes",
@@ -761,13 +951,23 @@ internal sealed record BaselineResult(
 internal sealed record BaselineSummary(
     DateTimeOffset GeneratedAtUtc,
     string Dataset,
+    string CandidateVersion,
+    string ProfileName,
     string IndexPath,
     string Split,
     int MaxSide,
     string Method,
     string ThresholdMode,
+    string NormalizationMode,
     double Threshold,
     int MinArea,
+    int MaxArea,
+    int MorphCleanSize,
+    string MorphMode,
+    int BackgroundKernelSize,
+    double ReferenceStatsSigma,
+    bool RobustReferenceStats,
+    string ResponseNormalizeMode,
     int CaseCount,
     int Passed,
     int Failed,
@@ -782,6 +982,9 @@ internal sealed record BaselineSummary(
     double PixelF1,
     double ImageAuroc,
     double PixelAuroc,
+    double ImagePrecision,
+    double ImageRecall,
+    double ImageF1,
     double FalsePositivePerImage,
     double RuntimeMsP95,
     double MinImageAuroc,
@@ -822,6 +1025,9 @@ internal sealed record ImageResult(
     int DefectCount,
     double DefectArea,
     PixelTotals PixelTotals,
+    bool ImageCorrect,
+    List<string> FailureTaxonomy,
+    IReadOnlyDictionary<string, object?> Diagnostics,
     bool Passed,
     double RuntimeMs,
     long MemoryAllocationBytes,

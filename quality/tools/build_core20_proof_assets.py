@@ -26,6 +26,7 @@ DRILL_ID = "2026-04-core20-proof-v1"
 PROOF_STATUS = "blocked-missing-field-data"
 PROOF_LEVEL = "field-proof-blocked"
 CORE20_OPERATORS = [item["operator"] for item in G3_OPERATORS]
+PILOT_FIELD_ALGORITHM_PROOF_OPERATORS = ["SurfaceDefectDetection", "DeepLearning", "CaliperTool"]
 
 
 LABEL_SCHEMAS: dict[str, str] = {
@@ -113,6 +114,14 @@ def field_baseline_path(operator: str) -> Path:
 
 def field_report_path(operator: str) -> Path:
     return REPORT_DIR / f"{proof_name(operator)}_proof_baseline.md"
+
+
+def field_algorithm_proof_baseline_path(operator: str) -> Path:
+    return REPORT_DIR / f"{proof_name(operator)}_algorithm_proof_baseline.json"
+
+
+def field_algorithm_proof_report_path(operator: str) -> Path:
+    return REPORT_DIR / f"{proof_name(operator)}_algorithm_proof_baseline.md"
 
 
 def source_baseline_path(item: dict[str, Any]) -> Path:
@@ -219,6 +228,28 @@ def build_field_manifest(item: dict[str, Any]) -> dict[str, Any]:
     operator = item["operator"]
     source = source_operator(item)
     case_count = int(source.get("CaseCount", 0) or source_summary(item).get("CaseCount", 0) or 0)
+    is_pilot_algorithm_proof = operator in PILOT_FIELD_ALGORITHM_PROOF_OPERATORS
+    runner = {
+        "project": "",
+        "command": (
+            f"python quality/tools/run_core20_field_proof.py --operator {operator}"
+            if is_pilot_algorithm_proof
+            else f"python quality/tools/build_core20_proof_assets.py --validate-only --operator {operator}"
+        ),
+        "baselineJson": repo(field_baseline_path(operator)),
+        "reportMarkdown": repo(field_report_path(operator)),
+        "legacyBaselineJson": repo(source_baseline_path(item)),
+    }
+    if is_pilot_algorithm_proof:
+        runner.update(
+            {
+                "algorithmProofResultsFile": "proof_results.json",
+                "algorithmProofContract": (
+                    "External runner writes field_v1/proof_results.json with one result per fixed test split case; "
+                    "quality/tools/run_core20_field_proof.py validates coverage, metrics, thresholds, privacy, and per-case taxonomy."
+                ),
+            }
+        )
     return {
         "schemaVersion": "2026-04-29.dataset-manifest",
         "datasetId": proof_name(operator),
@@ -267,13 +298,7 @@ def build_field_manifest(item: dict[str, Any]) -> dict[str, Any]:
             "secondary": SECONDARY_METRICS[operator],
             "thresholds": freeze_thresholds(item),
         },
-        "runner": {
-            "project": "",
-            "command": f"python quality/tools/build_core20_proof_assets.py --validate-only --operator {operator}",
-            "baselineJson": repo(field_baseline_path(operator)),
-            "reportMarkdown": repo(field_report_path(operator)),
-            "legacyBaselineJson": repo(source_baseline_path(item)),
-        },
+        "runner": runner,
         "failureBoundaries": {
             "required": True,
             "taxonomy": item["boundaries"],
@@ -409,6 +434,7 @@ def build_suite(items: list[dict[str, Any]]) -> dict[str, Any]:
         "CircleMeasurement",
         "GeometricFitting",
     ]
+    pilot_operators = PILOT_FIELD_ALGORITHM_PROOF_OPERATORS
     field_entries = [
         {
             "id": proof_name(item["operator"]),
@@ -456,6 +482,39 @@ def build_suite(items: list[dict[str, Any]]) -> dict[str, Any]:
         }
         for operator in representative_operators
     )
+    pilot_proof_entries = [
+        {
+            "id": "core20_pilot_field_proof_config_validate",
+            "status": "active",
+            "evidenceKind": "field-algorithm-proof-config",
+            "operators": pilot_operators,
+            "command": [
+                "python",
+                "quality/tools/run_core20_field_proof.py",
+                "--validate-config-only",
+                "--operators",
+                *pilot_operators,
+            ],
+            "baselineJson": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.json",
+            "reportMarkdown": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.md",
+            "estimatedSeconds": 15,
+        }
+    ]
+    pilot_proof_entries.extend(
+        {
+            "id": f"{operator}_field_algorithm_proof",
+            "status": "manual",
+            "evidenceKind": "field-algorithm-proof",
+            "operators": [operator],
+            "command": ["python", "quality/tools/run_core20_field_proof.py", "--operator", operator],
+            "datasetManifest": repo(field_manifest_path(operator)),
+            "baselineJson": repo(field_algorithm_proof_baseline_path(operator)),
+            "reportMarkdown": repo(field_algorithm_proof_report_path(operator)),
+            "estimatedSeconds": 300,
+            "notes": "Consumes fixed test split and field_v1/proof_results.json or algorithm_results.json; writes per-case algorithm proof metrics and gates.",
+        }
+        for operator in pilot_operators
+    )
     return {
         "schemaVersion": "2026-04-29.quality-suite.v1",
         "suiteId": "core20_proof_suite",
@@ -479,6 +538,7 @@ def build_suite(items: list[dict[str, Any]]) -> dict[str, Any]:
                 ],
             },
             {"id": "core20-representative-field-ingest", "entries": representative_ingest_entries},
+            {"id": "core20-pilot-field-algorithm-proof", "entries": pilot_proof_entries},
             {"id": "core20-field-datasets", "entries": field_entries},
             {
                 "id": "core20-field-replay",

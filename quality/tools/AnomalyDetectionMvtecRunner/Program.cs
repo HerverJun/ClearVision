@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Acme.Product.Infrastructure.AI.Anomaly;
@@ -29,7 +30,7 @@ if (!string.IsNullOrWhiteSpace(options.ReportPath))
 }
 
 Console.WriteLine(
-    $"AnomalyDetection MVTec baseline complete: " +
+    $"AnomalyDetection MVTec {result.Summary.CandidateVersion} complete: " +
     $"image_auroc={result.Summary.ImageAuroc:F4}, pixel_auroc={result.Summary.PixelAuroc:F4}, " +
     $"test={result.Summary.TestCount}, output={options.OutputPath}");
 
@@ -45,15 +46,25 @@ internal static class MvtecRunner
         var allPixelScores = new List<ScoredLabel>(capacity: 1024 * 1024);
         var stopwatchAll = Stopwatch.StartNew();
         var allocationBeforeAll = GC.GetTotalAllocatedBytes(precise: true);
+        ValidateCaseIds(index, options);
 
-        foreach (var category in index.Records.Select(item => item.Category).Distinct().OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+        var selectedTestRecords = index.Records
+            .Where(item => item.Split == "test")
+            .Where(item => !options.HasCaseFilter || options.CaseIds.Contains(CaseId(item)))
+            .ToList();
+        if (selectedTestRecords.Count == 0)
+        {
+            throw new InvalidOperationException("No MVTec test records selected for AnomalyDetection evaluation.");
+        }
+
+        foreach (var category in selectedTestRecords.Select(item => item.Category).Distinct().OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
         {
             var trainRecords = index.Records
                 .Where(item => item.Category == category && item.Split == "train" && !item.IsAnomaly)
                 .OrderBy(item => item.ImagePath, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            var testRecords = index.Records
-                .Where(item => item.Category == category && item.Split == "test")
+            var testRecords = selectedTestRecords
+                .Where(item => item.Category == category)
                 .OrderBy(item => item.ImagePath, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -102,6 +113,7 @@ internal static class MvtecRunner
                         allPixelScores.AddRange(pixelScores);
 
                         var imageResult = new ImageResult(
+                            CaseId(record),
                             record.Category,
                             record.DefectType,
                             record.ImagePath,
@@ -109,7 +121,10 @@ internal static class MvtecRunner
                             record.IsAnomaly,
                             analysis.Score,
                             analysis.IsAnomaly,
-                            analysis.PatchCount);
+                            analysis.PatchCount,
+                            record.IsAnomaly == analysis.IsAnomaly,
+                            BuildFailureTaxonomy(record, analysis.Score, analysis.IsAnomaly, options.Threshold),
+                            true);
                         categoryImageResults.Add(imageResult);
                         testResults.Add(imageResult);
                     }
@@ -131,8 +146,8 @@ internal static class MvtecRunner
                     bank.Features.Count,
                     Math.Round(trainWatch.Elapsed.TotalMilliseconds, 3),
                     Math.Round(inferenceWatch.Elapsed.TotalMilliseconds, 3),
-                    Math.Round(ComputeAuroc(categoryImageResults.Select(item => new ScoredLabel(item.Score, item.IsAnomaly))), 6),
-                    Math.Round(ComputeAuroc(categoryPixelScores), 6)));
+                    RoundMetric(ComputeAuroc(categoryImageResults.Select(item => new ScoredLabel(item.Score, item.IsAnomaly)))),
+                    RoundMetric(ComputeAuroc(categoryPixelScores))));
             }
             finally
             {
@@ -147,6 +162,13 @@ internal static class MvtecRunner
         var allocationAfterAll = GC.GetTotalAllocatedBytes(precise: true);
         var imageAuroc = ComputeAuroc(testResults.Select(item => new ScoredLabel(item.Score, item.IsAnomaly)));
         var pixelAuroc = ComputeAuroc(allPixelScores);
+        var imageTruePositive = testResults.Count(item => item.IsAnomaly && item.PredictedAnomaly);
+        var imageFalsePositive = testResults.Count(item => !item.IsAnomaly && item.PredictedAnomaly);
+        var imageFalseNegative = testResults.Count(item => item.IsAnomaly && !item.PredictedAnomaly);
+        var imageTrueNegative = testResults.Count(item => !item.IsAnomaly && !item.PredictedAnomaly);
+        var imagePrecision = SafeDivide(imageTruePositive, imageTruePositive + imageFalsePositive);
+        var imageRecall = SafeDivide(imageTruePositive, imageTruePositive + imageFalseNegative);
+        var imageF1 = SafeDivide(2 * imagePrecision * imageRecall, imagePrecision + imageRecall);
 
         var errorCount = testResults.Count(item => item.Error is not null);
         var metricFailures = EvaluateThresholds(imageAuroc, pixelAuroc, categoryResults, options);
@@ -155,6 +177,8 @@ internal static class MvtecRunner
             new BaselineSummary(
                 DateTimeOffset.UtcNow,
                 options.IndexPath,
+                options.CandidateVersion,
+                options.ProfileName,
                 options.MaxSide,
                 options.PatchSize,
                 options.PatchStride,
@@ -165,8 +189,15 @@ internal static class MvtecRunner
                 testResults.Count,
                 testResults.Count(item => item.IsAnomaly),
                 testResults.Count(item => !item.IsAnomaly),
-                Math.Round(imageAuroc, 6),
-                Math.Round(pixelAuroc, 6),
+                RoundMetric(imageAuroc),
+                RoundMetric(pixelAuroc),
+                imageTruePositive,
+                imageFalsePositive,
+                imageFalseNegative,
+                imageTrueNegative,
+                Math.Round(imagePrecision, 6),
+                Math.Round(imageRecall, 6),
+                Math.Round(imageF1, 6),
                 options.MinImageAuroc,
                 options.MinPixelAuroc,
                 options.MinCategoryImageAuroc,
@@ -199,6 +230,52 @@ internal static class MvtecRunner
 
         var index = JsonSerializer.Deserialize<MvtecIndex>(File.ReadAllText(fullPath), JsonSettings.Default);
         return index ?? throw new InvalidOperationException($"Failed to parse MVTec index: {fullPath}");
+    }
+
+    private static void ValidateCaseIds(MvtecIndex index, RunnerOptions options)
+    {
+        if (!options.HasCaseFilter)
+        {
+            return;
+        }
+
+        var available = index.Records
+            .Where(item => item.Split == "test")
+            .Select(CaseId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = options.CaseIds
+            .Where(id => !available.Contains(id))
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (missing.Count > 0)
+        {
+            throw new InvalidOperationException($"Unknown MVTec case id(s): {string.Join(", ", missing)}");
+        }
+    }
+
+    private static string CaseId(MvtecRecord record)
+    {
+        var path = record.ImagePath.Replace('\\', '/');
+        var fileName = path.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? record.ImagePath;
+        return $"{record.Category}/{record.DefectType}/{Path.GetFileNameWithoutExtension(fileName)}";
+    }
+
+    private static List<string> BuildFailureTaxonomy(MvtecRecord record, double score, bool predictedAnomaly, double threshold)
+    {
+        var tags = new List<string>();
+        if (record.IsAnomaly && !predictedAnomaly)
+        {
+            tags.Add("anomaly_miss");
+            tags.Add(score <= 1e-9 ? "zero_score_anomaly" : "below_threshold_anomaly");
+            tags.Add($"defect_{record.DefectType}");
+        }
+        else if (!record.IsAnomaly && predictedAnomaly)
+        {
+            tags.Add("good_false_positive");
+            tags.Add(score >= threshold ? "above_threshold_good" : "threshold_margin_good");
+        }
+
+        return tags;
     }
 
     private static Mat LoadImage(string relativePath, int maxSide, InterpolationFlags interpolation)
@@ -323,6 +400,16 @@ internal static class MvtecRunner
         return (rankSumPositive - positiveCount * (positiveCount + 1) / 2.0) / (positiveCount * negativeCount);
     }
 
+    private static double SafeDivide(double numerator, double denominator)
+    {
+        return denominator <= 0 ? 0 : numerator / denominator;
+    }
+
+    private static double RoundMetric(double value)
+    {
+        return double.IsFinite(value) ? Math.Round(value, 6) : 0;
+    }
+
     private static List<MetricFailure> EvaluateThresholds(
         double imageAuroc,
         double pixelAuroc,
@@ -344,9 +431,14 @@ internal static class MvtecRunner
 
     private static void AddIfBelow(List<MetricFailure> failures, string scope, string metric, double value, double minimum)
     {
+        if (double.IsNaN(value) && minimum <= 0)
+        {
+            return;
+        }
+
         if (double.IsNaN(value) || value < minimum)
         {
-            failures.Add(new MetricFailure(scope, metric, Math.Round(value, 6), minimum));
+            failures.Add(new MetricFailure(scope, metric, RoundMetric(value), minimum));
         }
     }
 }
@@ -355,6 +447,9 @@ internal sealed record RunnerOptions(
     string IndexPath,
     string OutputPath,
     string ReportPath,
+    string CandidateVersion,
+    string ProfileName,
+    IReadOnlySet<string> CaseIds,
     int MaxSide,
     int PatchSize,
     int PatchStride,
@@ -368,12 +463,17 @@ internal sealed record RunnerOptions(
     bool ShowHelp,
     string? ParseError)
 {
+    public bool HasCaseFilter => CaseIds.Count > 0;
+
     public static RunnerOptions Parse(string[] args)
     {
         var options = new RunnerOptions(
             IndexPath: "quality/datasets/mvtec_ad_lite_index.json",
             OutputPath: "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
             ReportPath: "quality/evals/reports/AnomalyDetection_mvtec_baseline.md",
+            CandidateVersion: "baseline",
+            ProfileName: "baseline_default",
+            CaseIds: new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             MaxSide: 128,
             PatchSize: 16,
             PatchStride: 16,
@@ -412,16 +512,19 @@ internal sealed record RunnerOptions(
                     "--index" => options with { IndexPath = NextValue() },
                     "--output" => options with { OutputPath = NextValue() },
                     "--report" => options with { ReportPath = NextValue() },
-                    "--max-side" => options with { MaxSide = int.Parse(NextValue()) },
-                    "--patch-size" => options with { PatchSize = int.Parse(NextValue()) },
-                    "--patch-stride" => options with { PatchStride = int.Parse(NextValue()) },
-                    "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue()) },
-                    "--coreset-ratio" => options with { CoresetRatio = double.Parse(NextValue()) },
-                    "--threshold" => options with { Threshold = double.Parse(NextValue()) },
-                    "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue()) },
-                    "--min-pixel-auroc" => options with { MinPixelAuroc = double.Parse(NextValue()) },
-                    "--min-category-image-auroc" => options with { MinCategoryImageAuroc = double.Parse(NextValue()) },
-                    "--min-category-pixel-auroc" => options with { MinCategoryPixelAuroc = double.Parse(NextValue()) },
+                    "--candidate-version" => options with { CandidateVersion = NextValue() },
+                    "--profile" => options with { ProfileName = NextValue() },
+                    "--case-ids" => options with { CaseIds = ParseCaseIds(NextValue()) },
+                    "--max-side" => options with { MaxSide = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--patch-size" => options with { PatchSize = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--patch-stride" => options with { PatchStride = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--coreset-ratio" => options with { CoresetRatio = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--threshold" => options with { Threshold = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-pixel-auroc" => options with { MinPixelAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-category-image-auroc" => options with { MinCategoryImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-category-pixel-auroc" => options with { MinCategoryPixelAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     _ => options with { ParseError = $"Unknown argument: {arg}" }
                 };
             }
@@ -439,6 +542,14 @@ internal sealed record RunnerOptions(
         return options;
     }
 
+    private static HashSet<string> ParseCaseIds(string raw)
+    {
+        return raw
+            .Split([',', ';', '\n', '\r', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => item.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     public static void PrintHelp()
     {
         Console.WriteLine("""
@@ -448,6 +559,10 @@ internal sealed record RunnerOptions(
           --index <path>          MVTec AD Lite JSON index.
           --output <path>         Baseline JSON output path.
           --report <path>         Baseline Markdown report path.
+          --candidate-version <id>
+                                  Candidate version label. Default: baseline.
+          --profile <name>        Candidate profile name. Default: baseline_default.
+          --case-ids <csv>        Optional comma-separated test case ids, e.g. grid/bent/000.
           --max-side <int>        Resize long image side before evaluation. Default: 128.
           --patch-size <int>      SimplePatchCore patch size. Default: 16.
           --patch-stride <int>    SimplePatchCore patch stride. Default: 16.
@@ -471,12 +586,17 @@ internal static class MarkdownReport
 {
     public static string Create(BaselineResult result)
     {
+        var label = string.Equals(result.Summary.CandidateVersion, "baseline", StringComparison.OrdinalIgnoreCase)
+            ? "Baseline"
+            : $"Candidate {result.Summary.CandidateVersion}";
         var lines = new List<string>
         {
-            "# AnomalyDetection MVTec AD Lite Baseline",
+            $"# AnomalyDetection MVTec AD Lite {label}",
             "",
             $"GeneratedAtUtc: `{result.Summary.GeneratedAtUtc:O}`",
             $"Index: `{result.Summary.IndexPath}`",
+            $"CandidateVersion: `{result.Summary.CandidateVersion}`",
+            $"Profile: `{result.Summary.ProfileName}`",
             "",
             "## Summary",
             "",
@@ -488,6 +608,10 @@ internal static class MarkdownReport
             $"| Test good images | {result.Summary.TestGoodCount} |",
             $"| Image AUROC | {result.Summary.ImageAuroc:F4} |",
             $"| Pixel AUROC | {result.Summary.PixelAuroc:F4} |",
+            $"| Image precision | {result.Summary.ImagePrecision:F4} |",
+            $"| Image recall | {result.Summary.ImageRecall:F4} |",
+            $"| Image F1 | {result.Summary.ImageF1:F4} |",
+            $"| Image TP / FP / FN / TN | {result.Summary.ImageTruePositive} / {result.Summary.ImageFalsePositive} / {result.Summary.ImageFalseNegative} / {result.Summary.ImageTrueNegative} |",
             $"| Min image AUROC | {result.Summary.MinImageAuroc:F4} |",
             $"| Min pixel AUROC | {result.Summary.MinPixelAuroc:F4} |",
             $"| Min category image AUROC | {result.Summary.MinCategoryImageAuroc:F4} |",
@@ -526,6 +650,51 @@ internal static class MarkdownReport
             foreach (var failure in result.MetricFailures)
             {
                 lines.Add($"| {failure.Scope} | {failure.Metric} | {failure.Value:F4} | {failure.Minimum:F4} |");
+            }
+        }
+
+        var failureTags = result.Images
+            .SelectMany(item => item.FailureTaxonomy)
+            .GroupBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (failureTags.Count > 0)
+        {
+            lines.AddRange([
+                "",
+                "## Failure Taxonomy",
+                "",
+                "| Tag | Count |",
+                "| --- | ---: |"
+            ]);
+
+            foreach (var group in failureTags)
+            {
+                lines.Add($"| {group.Key} | {group.Count()} |");
+            }
+        }
+
+        var imageRows = result.Images
+            .Where(item => item.FailureTaxonomy.Count > 0)
+            .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.DefectType, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.CaseId, StringComparer.OrdinalIgnoreCase)
+            .Take(25)
+            .ToList();
+        if (imageRows.Count > 0)
+        {
+            lines.AddRange([
+                "",
+                "## Diagnostic Images",
+                "",
+                "| Case | Is anomaly | Predicted | Score | Taxonomy |",
+                "| --- | --- | --- | ---: | --- |"
+            ]);
+
+            foreach (var image in imageRows)
+            {
+                lines.Add($"| {image.CaseId} | {image.IsAnomaly} | {image.PredictedAnomaly} | {image.Score:F4} | {string.Join(", ", image.FailureTaxonomy)} |");
             }
         }
 
@@ -569,6 +738,8 @@ internal sealed record BaselineResult(
 internal sealed record BaselineSummary(
     DateTimeOffset GeneratedAtUtc,
     string IndexPath,
+    string CandidateVersion,
+    string ProfileName,
     int MaxSide,
     int PatchSize,
     int PatchStride,
@@ -581,6 +752,13 @@ internal sealed record BaselineSummary(
     int TestGoodCount,
     double ImageAuroc,
     double PixelAuroc,
+    int ImageTruePositive,
+    int ImageFalsePositive,
+    int ImageFalseNegative,
+    int ImageTrueNegative,
+    double ImagePrecision,
+    double ImageRecall,
+    double ImageF1,
     double MinImageAuroc,
     double MinPixelAuroc,
     double MinCategoryImageAuroc,
@@ -616,6 +794,7 @@ internal sealed record MetricFailure(
     double Minimum);
 
 internal sealed record ImageResult(
+    string CaseId,
     string Category,
     string DefectType,
     string ImagePath,
@@ -624,6 +803,9 @@ internal sealed record ImageResult(
     double Score,
     bool PredictedAnomaly,
     int PatchCount,
+    bool ImageCorrect,
+    List<string> FailureTaxonomy,
+    bool Passed,
     string? Error = null);
 
 internal static class JsonSettings
