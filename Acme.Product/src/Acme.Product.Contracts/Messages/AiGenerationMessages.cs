@@ -77,6 +77,15 @@ public record GenerateFlowResponse
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
+
+    /// <summary>When true, the system needs more information before calling the LLM.</summary>
+    public bool ClarificationRequired { get; init; }
+
+    /// <summary>Structured requirement summary for the AI workbench.</summary>
+    public object? RequirementBrief { get; init; }
+
+    /// <summary>Top-N template candidates from scenario matching.</summary>
+    public List<object> TemplateCandidates { get; init; } = new();
 }
 
 /// <summary>

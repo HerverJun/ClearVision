@@ -33,6 +33,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IFlowTemplateService _templateService;
     private readonly IScenarioMatcher _scenarioMatcher;
     private readonly IRequirementBriefExtractor _requirementBriefExtractor;
+    private readonly IClarificationEngine _clarificationEngine;
+    private readonly IClarificationMemoryStore _clarificationMemory;
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
@@ -57,6 +59,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IFlowTemplateService templateService,
         IScenarioMatcher scenarioMatcher,
         IRequirementBriefExtractor requirementBriefExtractor,
+        IClarificationEngine clarificationEngine,
+        IClarificationMemoryStore clarificationMemory,
         ITemplateConstraintValidator templateConstraintValidator,
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
@@ -71,6 +75,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateService = templateService;
         _scenarioMatcher = scenarioMatcher;
         _requirementBriefExtractor = requirementBriefExtractor;
+        _clarificationEngine = clarificationEngine;
+        _clarificationMemory = clarificationMemory;
         _templateConstraintValidator = templateConstraintValidator;
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
@@ -115,9 +121,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ["templateName"] = context.Template?.Name ?? string.Empty,
                 ["confidence"] = context.Confidence.ToString("F4", CultureInfo.InvariantCulture)
             });
+        var attachmentCount = request.Attachments?.Count ?? 0;
         var requirementBrief = pipeline.Measure(
             "requirement_brief",
-            () => _requirementBriefExtractor.Extract(request.Description, request.AdditionalContext, templatePriority.PrimaryMatch),
+            () => _requirementBriefExtractor.Extract(
+                request.Description,
+                request.AdditionalContext,
+                templatePriority.PrimaryMatch,
+                attachmentCount: attachmentCount),
             brief => string.IsNullOrWhiteSpace(brief.ScenarioName)
                 ? "requirement brief extracted without a scenario"
                 : $"scenario={brief.ScenarioName}, clarifications={brief.ClarificationQuestions.Count}",
@@ -127,6 +138,62 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ["intentType"] = brief.IntentType,
                 ["clarificationCount"] = brief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture)
             });
+
+        // Apply session/template/line memory to fill known fields and reduce re-asking.
+        _clarificationMemory.ApplyToBrief(
+            requirementBrief,
+            conversationContext.SessionId,
+            templatePriority.Template?.Id.ToString());
+
+        // Clarification gate: if required fields are missing, return ClarificationRequired instead of calling LLM.
+        var clarificationResult = pipeline.Measure(
+            "clarification_gate",
+            () => _clarificationEngine.Evaluate(
+                requirementBrief,
+                templatePriority.PrimaryMatch,
+                templatePriority.ScenarioKey),
+            result => result.GateGeneration
+                ? $"gate triggered: missing={string.Join(",", result.MissingRequiredFields)}"
+                : "clarification passed",
+            result => new Dictionary<string, string>
+            {
+                ["gateGeneration"] = result.GateGeneration.ToString(),
+                ["missingRequired"] = string.Join(",", result.MissingRequiredFields),
+                ["questionCount"] = result.Questions.Count.ToString(CultureInfo.InvariantCulture)
+            });
+
+        if (clarificationResult.GateGeneration)
+        {
+            requirementBrief.ClarificationQuestions = clarificationResult.Questions;
+            requirementBrief.MissingFields = clarificationResult.MissingRequiredFields
+                .Concat(clarificationResult.MissingRecommendedFields)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            _conversationalFlowService.RecordAssistantResponse(
+                conversationContext.SessionId,
+                "需要更多信息才能生成流程，请补充以下内容。",
+                null,
+                null,
+                new ConversationTurnPayload
+                {
+                    Kind = "clarification_required",
+                    Status = AiFlowGenerationResult.CompletionStatusCompleted,
+                    Reply = "需要更多信息才能生成流程。"
+                });
+
+            return new AiFlowGenerationResult
+            {
+                Success = true,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+                ClarificationRequired = true,
+                RequirementBrief = requirementBrief,
+                TemplateCandidates = BuildTemplateCandidates(templatePriority),
+                StageTimeline = pipeline.Timeline.ToList()
+            };
+        }
+        ReportProgress("需求澄清通过，已准备开始流程生成。");
+
         if (templatePriority.IsTemplateFirst)
         {
             ReportProgress($"已命中模板优先场景：{templatePriority.Template?.Name ?? templatePriority.ScenarioName}，进入 {templatePriority.GenerationMode} 模式...");
@@ -372,6 +439,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         JsonSerializer.Serialize(generatedFlow, _jsonOptions),
                         JsonSerializer.Serialize(flowDto, _jsonOptions),
                         assistantPayload);
+
+                    // Persist confirmed requirement fields to session memory for reuse.
+                    SaveRequirementBriefToMemory(requirementBrief, conversationContext.SessionId,
+                        templatePriority.Template?.Id.ToString());
 
                     return new AiFlowGenerationResult
                     {
@@ -1992,6 +2063,40 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
         return flow;
     }
+
+    private void SaveRequirementBriefToMemory(
+        AiRequirementBrief brief,
+        string sessionId,
+        string? templateId)
+    {
+        if (brief == null || string.IsNullOrWhiteSpace(sessionId))
+            return;
+
+        void SaveIfMeaningful(string field, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) ||
+                string.Equals(value, "unknown", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "missing", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _clarificationMemory.Set(field, value, MemoryScope.Session, sessionId, templateId);
+        }
+
+        SaveIfMeaningful("sceneType", brief.SceneType);
+        SaveIfMeaningful("industry", brief.Industry);
+        SaveIfMeaningful("objectName", brief.ObjectName);
+        SaveIfMeaningful("imageSource", brief.ImageSource);
+        SaveIfMeaningful("triggerMode", brief.TriggerMode);
+        SaveIfMeaningful("outputTarget", brief.OutputTarget);
+        SaveIfMeaningful("modelResource", brief.ModelResource);
+        SaveIfMeaningful("roiRequirement", brief.RoiRequirement);
+        SaveIfMeaningful("calibrationRequirement", brief.CalibrationRequirement);
+        SaveIfMeaningful("decisionRule", brief.DecisionRule);
+
+        foreach (var defect in brief.DefectTypes)
+            SaveIfMeaningful("defectType", defect);
+
+        foreach (var target in brief.MeasurementTargets)
+            SaveIfMeaningful("measurementTarget", target);
+    }
 }
-
-

@@ -2016,3 +2016,214 @@
     border-color: rgba(0, 0, 0, 0.06);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
 }
+
+/* ==========================================================================
+   Requirement Brief Card (Direction 3: Requirement Clarification Loop)
+   ========================================================================== */
+
+.requirement-card { border-left: 3px solid var(--accent-blue); }
+.requirement-card .card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+.card-badge.badge-high { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+.card-badge.badge-medium { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+.card-badge.badge-low { background: rgba(231, 76, 60, 0.2); color: var(--cinnabar); }
+
+.requirement-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.req-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.req-field-ok {
+    background: rgba(46, 204, 113, 0.06);
+    border-color: rgba(46, 204, 113, 0.2);
+}
+
+.req-field-missing {
+    background: rgba(231, 76, 60, 0.08);
+    border-color: rgba(231, 76, 60, 0.3);
+    animation: req-pulse 2s ease-in-out infinite;
+}
+
+@keyframes req-pulse {
+    0%, 100% { border-color: rgba(231, 76, 60, 0.3); }
+    50% { border-color: rgba(231, 76, 60, 0.6); }
+}
+
+.req-field-label {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    min-width: 50px;
+}
+
+.req-field-value {
+    flex: 1;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.req-missing-dot {
+    color: var(--cinnabar);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.req-attachment-note {
+    margin-top: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+}
+
+/* Clarification questions */
+.clarification-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-gold);
+    margin: 10px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.clarification-item {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+}
+
+.clarification-required { border-left-color: var(--cinnabar); background: rgba(231, 76, 60, 0.06); }
+.clarification-recommended { border-left-color: var(--accent-gold); background: rgba(241, 196, 15, 0.04); }
+
+.clarification-question {
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.clarification-level-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.clarification-required .clarification-level-tag { background: rgba(231, 76, 60, 0.2); color: var(--cinnabar); }
+.clarification-recommended .clarification-level-tag { background: rgba(241, 196, 15, 0.2); color: #c9910a; }
+
+.clarification-reason {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    margin-left: 22px;
+}
+
+.clarification-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+    margin-left: 22px;
+}
+
+.clarification-option-btn {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clarification-option-btn:hover {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: #fff;
+}
+
+/* Template candidates card */
+.template-candidates-card { border-left: 3px solid var(--accent-gold); }
+
+.template-candidate-item {
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tc-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tc-confidence {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-gold);
+    background: rgba(241, 196, 15, 0.1);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.tc-industry {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.tc-reason {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.tc-matched {
+    font-size: 11px;
+    color: #2ecc71;
+    margin-top: 3px;
+}
+
+.tc-missing {
+    font-size: 11px;
+    color: var(--cinnabar);
+    margin-top: 3px;
+}

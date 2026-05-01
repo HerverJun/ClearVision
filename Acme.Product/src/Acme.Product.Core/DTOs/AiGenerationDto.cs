@@ -167,6 +167,12 @@ public class AiFlowGenerationResult
     public object? PromptTrace { get; set; }
 
     /// <summary>
+    /// When true, the system needs more information before calling the LLM.
+    /// The UI should display ClarificationQuestions and wait for user input.
+    /// </summary>
+    public bool ClarificationRequired { get; set; }
+
+    /// <summary>
     /// Parsed requirement summary used by the AI workbench before and after generation.
     /// </summary>
     public AiRequirementBrief? RequirementBrief { get; set; }
@@ -296,16 +302,78 @@ public class AiMissingResourceInfo
     public string Description { get; set; } = string.Empty;
 }
 
+public enum ClarificationLevel
+{
+    Required,
+    Recommended,
+    Optional
+}
+
 public class AiRequirementBrief
 {
+    /// <summary>appearance_defect / measurement / code_reading / wire_sequence / missing_part / calibration / other</summary>
+    public string SceneType { get; set; } = string.Empty;
+
     public string ScenarioKey { get; set; } = string.Empty;
     public string ScenarioName { get; set; } = string.Empty;
+
+    /// <summary>线束装配 / 空调制造 / 包装终检 / 通用制造 ...</summary>
+    public string Industry { get; set; } = string.Empty;
+
     public string IntentType { get; set; } = string.Empty;
+
+    /// <summary>产品/部件名</summary>
+    public string ObjectName { get; set; } = string.Empty;
+
     public List<string> ObjectTypes { get; set; } = new();
+
+    /// <summary>划伤、破损、脏污、漏装、错序 ...</summary>
     public List<string> DefectTypes { get; set; } = new();
+
+    /// <summary>孔距、间距、圆心距离 ...</summary>
     public List<string> MeasurementTargets { get; set; } = new();
+
+    /// <summary>camera / file / unknown</summary>
+    public string ImageSource { get; set; } = "unknown";
+
+    /// <summary>software / hardware / continuous / unknown</summary>
+    public string TriggerMode { get; set; } = "unknown";
+
+    /// <summary>ResultOutput / PLC / Database / unknown</summary>
+    public string OutputTarget { get; set; } = "unknown";
+
+    /// <summary>true / false / unknown</summary>
+    public string AiModelRequired { get; set; } = "unknown";
+
+    public string ModelResource { get; set; } = "missing";
+    public string LabelsPath { get; set; } = "missing";
+
+    /// <summary>none / region / unknown</summary>
+    public string RoiRequirement { get; set; } = "unknown";
+
+    /// <summary>none / pixel_to_world / hand_eye / unknown</summary>
+    public string CalibrationRequirement { get; set; } = "unknown";
+
+    /// <summary>OK/NG 判定逻辑</summary>
+    public string DecisionRule { get; set; } = string.Empty;
+
+    /// <summary>需求理解置信度 (0-1)</summary>
+    public double Confidence { get; set; }
+
+    /// <summary>缺失的关键字段</summary>
+    public List<string> MissingFields { get; set; } = new();
+
     public List<string> RequiredResources { get; set; } = new();
     public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
+
+    /// <summary>Attachment count and summary metadata</summary>
+    public int AttachmentCount { get; set; }
+
+    /// <summary>Whether the active model supports visual input for attachments</summary>
+    public bool ModelSupportsVision { get; set; }
+
+    /// <summary>Attachment observation summary when vision is available</summary>
+    public string AttachmentObservation { get; set; } = string.Empty;
 }
 
 public class AiClarificationQuestion
@@ -313,6 +381,15 @@ public class AiClarificationQuestion
     public string Field { get; set; } = string.Empty;
     public string Question { get; set; } = string.Empty;
     public bool Required { get; set; }
+
+    /// <summary>Required / Recommended / Optional</summary>
+    public string Level { get; set; } = "Required";
+
+    /// <summary>Predefined options the user can select from</summary>
+    public List<string> Options { get; set; } = new();
+
+    /// <summary>Why this question matters for the workflow</summary>
+    public string Reason { get; set; } = string.Empty;
 }
 
 public class AiTemplateCandidateInfo

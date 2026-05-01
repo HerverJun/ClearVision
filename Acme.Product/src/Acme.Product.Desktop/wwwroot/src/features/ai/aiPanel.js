@@ -236,6 +236,20 @@ export class AiPanel {
                 <aside class="ai-pane-right" id="ai-result-pane">
                     <div class="ai-result-status-note" id="ai-result-status-note"></div>
                     <div class="ai-results-scroll" id="ai-results-scroll">
+                        <div class="result-card requirement-card" id="ai-result-requirement-card" hidden>
+                            <div class="card-title">
+                                需求卡片
+                                <span class="card-badge" id="ai-requirement-confidence"></span>
+                            </div>
+                            <div class="ai-requirement-brief" id="ai-result-requirement-brief"></div>
+                            <div class="ai-clarification-questions" id="ai-result-clarification-questions"></div>
+                        </div>
+
+                        <div class="result-card template-candidates-card" id="ai-result-template-candidates-card" hidden>
+                            <div class="card-title">模板候选</div>
+                            <div class="ai-template-candidates" id="ai-result-template-candidates"></div>
+                        </div>
+
                         <div class="result-card overview">
                             <div class="card-title">方案概览</div>
                             <div class="ai-explanation" id="ai-result-summary">--</div>
@@ -717,6 +731,28 @@ export class AiPanel {
             return;
         }
 
+        // Handle clarification required - show requirement card with questions
+        const clarificationRequired = payload?.clarificationRequired || payload?.ClarificationRequired || false;
+        if (clarificationRequired) {
+            this._clearActiveRequestState();
+            const requirementBrief = payload?.requirementBrief ?? payload?.RequirementBrief ?? null;
+            this._renderRequirementBrief(requirementBrief);
+            this._renderTemplateCandidates(payload?.templateCandidates ?? payload?.TemplateCandidates ?? null);
+
+            const questions = requirementBrief?.clarificationQuestions || [];
+            if (questions.length > 0) {
+                const questionTexts = questions.map(q =>
+                    `• **${q.question}**${q.reason ? `\n  _${q.reason}_` : ''}`
+                ).join('\n\n');
+                this._addMessage('ai',
+                    `在开始生成流程之前，需要您补充以下信息：\n\n${questionTexts}\n\n请在右侧需求卡片中填写或直接回复。`);
+            }
+            this._setAssistantTurnStatus(activeTurn, '需要补充信息', 'warning');
+            this._setResultStatusNote('请先补充必要信息后再试。', 'warning');
+            this.activeAssistantTurn = null;
+            return;
+        }
+
         this._clearActiveRequestState();
         this._setCurrentResult(payload);
         this._resetPendingDraftState();
@@ -862,12 +898,188 @@ export class AiPanel {
 
         const matchedTemplateName = data?.recommendedTemplate?.templateName || '';
         const templateNotice = matchedTemplateName ? ` 已按模板优先命中「${matchedTemplateName}」。` : '';
+
+        // Render requirement brief and template candidates
+        this._renderRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
+        this._renderTemplateCandidates(data?.templateCandidates ?? data?.TemplateCandidates ?? null);
+
         this._renderFollowupChecklist(data, flow);
         this._renderParameterDraftEditor(data, flow);
         this._renderPromptTrace(data?.promptTrace ?? data?.PromptTrace ?? null);
         if (appendChatMessage) {
             this._addMessage('ai', `工程方案已生成！包含 ${ops.length} 个算子、${connections.length} 条连线。${templateNotice}可继续输入修改指令。`);
         }
+    }
+
+    /**
+     * Render the requirement brief card in the right pane.
+     * Shows identified fields, missing fields (yellow/red), and clarification questions.
+     */
+    _renderRequirementBrief(brief) {
+        const card = this.container?.querySelector('#ai-result-requirement-card');
+        const briefContainer = this.container?.querySelector('#ai-result-requirement-brief');
+        const questionsContainer = this.container?.querySelector('#ai-result-clarification-questions');
+        const confidenceBadge = this.container?.querySelector('#ai-requirement-confidence');
+        if (!card || !briefContainer) return;
+
+        if (!brief || typeof brief !== 'object') {
+            card.hidden = true;
+            return;
+        }
+
+        card.hidden = false;
+        const confidence = brief.confidence || 0;
+        if (confidenceBadge) {
+            const pct = (confidence * 100).toFixed(0);
+            confidenceBadge.textContent = `置信度 ${pct}%`;
+            confidenceBadge.className = `card-badge ${confidence >= 0.75 ? 'badge-high' : confidence >= 0.45 ? 'badge-medium' : 'badge-low'}`;
+        }
+
+        const fields = [
+            { key: 'sceneType', label: '场景类型', value: brief.sceneType || brief.SceneType || '', map: v => ({ 'appearance_defect': '外观缺陷检测', 'measurement': '尺寸测量', 'code_reading': '读码/OCR', 'wire_sequence': '线序检测', 'missing_part': '漏装/有无检测', 'calibration': '标定' }[v] || v || '--' }) },
+            { key: 'industry', label: '行业', value: brief.industry || brief.Industry || '--' },
+            { key: 'objectName', label: '检测对象', value: brief.objectName || brief.ObjectName || '--' },
+            { key: 'defectTypes', label: '缺陷类型', value: (brief.defectTypes || brief.DefectTypes || []).join('、') || '--' },
+            { key: 'measurementTargets', label: '测量目标', value: (brief.measurementTargets || brief.MeasurementTargets || []).join('、') || '--' },
+            { key: 'imageSource', label: '图像来源', value: { camera: '相机采集', file: '本地文件', unknown: '未知' }[brief.imageSource || brief.ImageSource] || '未知' },
+            { key: 'triggerMode', label: '触发方式', value: { hardware: '硬件触发', software: '软件触发', continuous: '连续采集', unknown: '未知' }[brief.triggerMode || brief.TriggerMode] || '未知' },
+            { key: 'outputTarget', label: '输出目标', value: { ResultOutput: '界面显示', PLC: 'PLC控制', Database: '数据库', unknown: '未知' }[brief.outputTarget || brief.OutputTarget] || '未知' },
+            { key: 'aiModelRequired', label: 'AI 模型', value: { true: '需要', false: '不需要', unknown: '未知' }[brief.aiModelRequired || brief.AiModelRequired] || '未知' },
+            { key: 'modelResource', label: '模型资源', value: brief.modelResource || brief.ModelResource || 'missing' },
+            { key: 'roiRequirement', label: 'ROI 要求', value: { region: '需要指定区域', none: '全图检测', unknown: '未知' }[brief.roiRequirement || brief.RoiRequirement] || '未知' },
+            { key: 'calibrationRequirement', label: '标定需求', value: { none: '不需要', pixel_to_world: '像素→物理', hand_eye: '手眼标定', unknown: '未知' }[brief.calibrationRequirement || brief.CalibrationRequirement] || '未知' },
+            { key: 'decisionRule', label: '判定逻辑', value: brief.decisionRule || brief.DecisionRule || '--' },
+        ];
+
+        const missingFields = new Set(brief.missingFields || brief.MissingFields || []);
+
+        let html = '<div class="requirement-fields-grid">';
+        for (const f of fields) {
+            const isMissing = missingFields.has(f.key);
+            const cssClass = isMissing ? 'req-field-missing' : 'req-field-ok';
+            const displayValue = typeof f.value === 'function' ? f.value(f) : f.value;
+            html += `<div class="req-field ${cssClass}" data-field="${f.key}">
+                <span class="req-field-label">${f.label}</span>
+                <span class="req-field-value">${this._escapeHtml(String(displayValue))}</span>
+                ${isMissing ? '<span class="req-missing-dot" title="待补充">●</span>' : ''}
+            </div>`;
+        }
+        html += '</div>';
+
+        // Attachment status
+        if (brief.attachmentCount > 0) {
+            const visionNote = brief.modelSupportsVision
+                ? '已发送给模型'
+                : '模型不支持视觉，仅用元信息';
+            html += `<div class="req-attachment-note">📎 ${brief.attachmentCount} 个附件 — ${visionNote}</div>`;
+        }
+
+        briefContainer.innerHTML = html;
+
+        // Render clarification questions
+        if (questionsContainer) {
+            const questions = brief.clarificationQuestions || brief.ClarificationQuestions || [];
+            if (questions.length > 0) {
+                let qHtml = '<div class="clarification-section-title">需要补充的信息</div>';
+                for (const q of questions) {
+                    const level = q.level || q.Level || (q.required || q.Required ? 'Required' : 'Recommended');
+                    const levelClass = level === 'Required' ? 'clarification-required' : 'clarification-recommended';
+                    const options = q.options || q.Options || [];
+                    qHtml += `<div class="clarification-item ${levelClass}">
+                        <div class="clarification-question">
+                            <span class="clarification-level-tag">${level === 'Required' ? '必填' : '建议'}</span>
+                            ${this._escapeHtml(q.question || q.Question || '')}
+                        </div>
+                        <div class="clarification-reason">${this._escapeHtml(q.reason || q.Reason || '')}</div>`;
+                    if (options.length > 0) {
+                        qHtml += '<div class="clarification-options">';
+                        for (const opt of options) {
+                            qHtml += `<button class="clarification-option-btn" data-field="${this._escapeHtml(q.field || q.Field || '')}" data-value="${this._escapeHtml(opt)}">${this._escapeHtml(opt)}</button>`;
+                        }
+                        qHtml += '</div>';
+                    }
+                    qHtml += '</div>';
+                }
+                questionsContainer.innerHTML = qHtml;
+
+                // Bind option button clicks
+                requestAnimationFrame(() => {
+                    questionsContainer.querySelectorAll('.clarification-option-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const field = btn.dataset.field;
+                            const value = btn.dataset.value;
+                            this._onClarificationOptionSelected(field, value, brief);
+                        });
+                    });
+                });
+            } else {
+                questionsContainer.innerHTML = '';
+            }
+        }
+    }
+
+    _onClarificationOptionSelected(field, value, brief) {
+        // Fill the selected option into the input and trigger re-generation
+        const hintParts = [];
+        if (field && value) {
+            hintParts.push(`${field}=${value}`);
+        }
+        const hint = hintParts.join('; ');
+
+        // Also update the displayed brief field immediately for UX feedback
+        const briefContainer = this.container?.querySelector('#ai-result-requirement-brief');
+        if (briefContainer) {
+            const matchingField = briefContainer.querySelector(`.req-field[data-field="${field}"]`);
+            if (matchingField) {
+                matchingField.classList.remove('req-field-missing');
+                matchingField.classList.add('req-field-ok');
+                const valueEl = matchingField.querySelector('.req-field-value');
+                if (valueEl) valueEl.textContent = value;
+                const dot = matchingField.querySelector('.req-missing-dot');
+                if (dot) dot.remove();
+            }
+        }
+
+        this.nextHintDraft = hint;
+        this._addMessage('user', `已选择：${value}`);
+        this._dispatchGenerateRequest({
+            description: this.lastUserPrompt,
+            hint: hint
+        });
+    }
+
+    _renderTemplateCandidates(candidates) {
+        const card = this.container?.querySelector('#ai-result-template-candidates-card');
+        const container = this.container?.querySelector('#ai-result-template-candidates');
+        if (!card || !container) return;
+
+        if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
+            card.hidden = true;
+            return;
+        }
+
+        card.hidden = false;
+        let html = '';
+        for (const tc of candidates.slice(0, 3)) {
+            const name = tc.templateName || tc.TemplateName || '未命名模板';
+            const industry = tc.industry || tc.Industry || '';
+            const confidence = (tc.confidence || tc.Confidence || 0) * 100;
+            const matchReason = tc.matchReason || tc.MatchReason || '';
+            const matchedFields = tc.matchedFields || tc.MatchedFields || [];
+            const missingSignals = tc.missingSignals || tc.MissingSignals || [];
+
+            html += `<div class="template-candidate-item">
+                <div class="tc-header">
+                    <span class="tc-name">${this._escapeHtml(name)}</span>
+                    <span class="tc-confidence">${confidence.toFixed(0)}%</span>
+                </div>
+                ${industry ? `<div class="tc-industry">${this._escapeHtml(industry)}</div>` : ''}
+                ${matchReason ? `<div class="tc-reason">${this._escapeHtml(matchReason)}</div>` : ''}
+                ${matchedFields.length > 0 ? `<div class="tc-matched">命中: ${this._escapeHtml(matchedFields.join('、'))}</div>` : ''}
+                ${missingSignals.length > 0 ? `<div class="tc-missing">缺失: ${this._escapeHtml(missingSignals.join('、'))}</div>` : ''}
+            </div>`;
+        }
+        container.innerHTML = html;
     }
 
     _renderPromptTrace(trace) {

@@ -103,7 +103,22 @@ public class GenerateFlowMessageHandler
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace
+                PromptTrace = result.PromptTrace,
+                ClarificationRequired = result.ClarificationRequired,
+                RequirementBrief = result.RequirementBrief,
+                TemplateCandidates = result.TemplateCandidates
+                    ?.Select(tc => (object)new
+                    {
+                        tc.TemplateId,
+                        tc.TemplateName,
+                        tc.TemplateVersion,
+                        tc.ScenarioKey,
+                        tc.Industry,
+                        tc.Confidence,
+                        tc.MatchReason,
+                        tc.MatchedFields,
+                        tc.MissingSignals
+                    }).ToList() ?? new List<object>()
             };
 
             return SerializeResponse(response, result.FailureType);
@@ -187,6 +202,9 @@ public class GenerateFlowMessageHandler
                 response.MissingResources,
                 response.ManualRetry,
                 response.PromptTrace,
+                response.ClarificationRequired,
+                response.RequirementBrief,
+                response.TemplateCandidates,
                 FailureType = failureType
             }, _jsonOptions);
     }
