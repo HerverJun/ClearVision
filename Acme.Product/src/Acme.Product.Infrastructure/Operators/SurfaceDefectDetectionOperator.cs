@@ -41,12 +41,23 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("ReferenceStatsSigma", "Reference Stats Sigma", "double", DefaultValue = 2.5, Min = 0.1, Max = 10.0)]
 [OperatorParam("RobustReferenceStats", "Robust Reference Stats", "bool", DefaultValue = false)]
 [OperatorParam("ResponseNormalizeMode", "Response Normalize Mode", "enum", DefaultValue = "RawClamp", Options = new[] { "RawClamp|Raw clamp", "MinMax|Min/max", "PercentileClip|Percentile clip" })]
-[OperatorParam("ComponentFilterMode", "Component Filter Mode", "enum", DefaultValue = "AreaOnly", Options = new[] { "AreaOnly|Area only", "ResponseStats|Response statistics" })]
+[OperatorParam("ComponentFilterMode", "Component Filter Mode", "enum", DefaultValue = "AreaOnly", Options = new[] { "AreaOnly|Area only", "ResponseStats|Response statistics", "ShapeAndResponseStats|Shape and response statistics" })]
+[OperatorParam("SmallNoiseAreaMax", "Small Noise Area Max", "int", DefaultValue = 0, Min = 0, Max = 10000000)]
+[OperatorParam("MinElongationForSmallComponent", "Min Elongation For Small Component", "double", DefaultValue = 0.0, Min = 0.0, Max = 50.0)]
+[OperatorParam("CompactNoiseAreaMax", "Compact Noise Area Max", "int", DefaultValue = 0, Min = 0, Max = 10000000)]
+[OperatorParam("CompactNoiseCircularityMin", "Compact Noise Circularity Min", "double", DefaultValue = 0.0, Min = 0.0, Max = 1.0)]
+[OperatorParam("CompactNoiseFillRatioMin", "Compact Noise Fill Ratio Min", "double", DefaultValue = 0.0, Min = 0.0, Max = 1.0)]
+[OperatorParam("MinLocalResponseProminence", "Min Local Response Prominence", "double", DefaultValue = 0.0, Min = 0.0, Max = 255.0)]
+[OperatorParam("EnableCandidateProfile", "Enable Candidate Profile", "bool", DefaultValue = false)]
+[OperatorParam("CandidateProfile", "Candidate Profile", "enum", DefaultValue = "default", Options = new[] { "default|Default", "taxonomy_v2|Surface taxonomy v2" })]
 public class SurfaceDefectDetectionOperator : OperatorBase
 {
     private const double MinAcceptedPhaseCorrelationResponse = 0.02;
     private const double MaxAcceptedShiftRatio = 0.45;
     private const double MinAcceptedImprovementRatio = -0.04;
+    private const string CandidateProfileDefault = "default";
+    private const string CandidateProfileTaxonomyV2 = "taxonomy_v2";
+    private const double TaxonomyV2ManualThresholdFloor = 15.0;
 
     public override OperatorType OperatorType => OperatorType.SurfaceDefectDetection;
 
@@ -86,6 +97,40 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         var robustReferenceStats = GetBoolParam(@operator, "RobustReferenceStats", false);
         var responseNormalizeMode = GetStringParam(@operator, "ResponseNormalizeMode", "RawClamp");
         var componentFilterMode = GetStringParam(@operator, "ComponentFilterMode", "AreaOnly");
+        var smallNoiseAreaMax = GetIntParam(@operator, "SmallNoiseAreaMax", 0, 0, 10_000_000);
+        var minElongationForSmallComponent = GetDoubleParam(@operator, "MinElongationForSmallComponent", 0.0, 0.0, 50.0);
+        var compactNoiseAreaMax = GetIntParam(@operator, "CompactNoiseAreaMax", 0, 0, 10_000_000);
+        var compactNoiseCircularityMin = GetDoubleParam(@operator, "CompactNoiseCircularityMin", 0.0, 0.0, 1.0);
+        var compactNoiseFillRatioMin = GetDoubleParam(@operator, "CompactNoiseFillRatioMin", 0.0, 0.0, 1.0);
+        var minLocalResponseProminence = GetDoubleParam(@operator, "MinLocalResponseProminence", 0.0, 0.0, 255.0);
+        var candidateProfile = ResolveCandidateProfile(@operator);
+        if (!IsSupportedCandidateProfile(candidateProfile.Profile))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("CandidateProfile must be 'default' or 'taxonomy_v2'."));
+        }
+
+        if (candidateProfile.Enabled && candidateProfile.Profile == CandidateProfileTaxonomyV2)
+        {
+            method = "LocalContrast";
+            thresholdMode = "Manual";
+            manualThreshold = Math.Max(manualThreshold, TaxonomyV2ManualThresholdFloor);
+            minArea = Math.Max(minArea, 6);
+            cleanSize = Math.Max(cleanSize, 3);
+            morphMode = "CloseOpen";
+            normalizationMode = "ClaheLocalMean";
+            backgroundKernelSize = 21;
+            claheClipLimit = 1.5;
+            claheTileGridSize = 8;
+            responseNormalizeMode = "RawClamp";
+            componentFilterMode = "ShapeAndResponseStats";
+            smallNoiseAreaMax = Math.Max(smallNoiseAreaMax, 32);
+            minElongationForSmallComponent = Math.Max(minElongationForSmallComponent, 2.5);
+            compactNoiseAreaMax = Math.Max(compactNoiseAreaMax, 64);
+            compactNoiseCircularityMin = Math.Max(compactNoiseCircularityMin, 0.68);
+            compactNoiseFillRatioMin = Math.Max(compactNoiseFillRatioMin, 0.45);
+            minLocalResponseProminence = Math.Max(minLocalResponseProminence, 4.0);
+            candidateProfile = candidateProfile with { Applied = true };
+        }
 
         using var gray = OperatorImageDepthHelper.EnsureSingleChannelGray(src);
 
@@ -135,9 +180,15 @@ public class SurfaceDefectDetectionOperator : OperatorBase
 
         var defectCount = 0;
         var defectArea = 0.0;
-        var componentRejectedCount = 0;
+        var componentResponseRejectedCount = 0;
+        var componentShapeRejectedCount = 0;
+        var componentCompactNoiseRejectedCount = 0;
+        var componentLocalProminenceRejectedCount = 0;
         Cv2.MeanStdDev(response, out var responseMean, out var responseStdDev);
-        var responseStatsFilter = componentFilterMode.Equals("ResponseStats", StringComparison.OrdinalIgnoreCase);
+        var responseStatsFilter =
+            componentFilterMode.Equals("ResponseStats", StringComparison.OrdinalIgnoreCase) ||
+            componentFilterMode.Equals("ShapeAndResponseStats", StringComparison.OrdinalIgnoreCase);
+        var shapeStatsFilter = componentFilterMode.Equals("ShapeAndResponseStats", StringComparison.OrdinalIgnoreCase);
         var componentMeanGate = responseStatsFilter
             ? Math.Max(appliedThreshold * 0.55, responseMean.Val0 + responseStdDev.Val0 * 0.10)
             : 0.0;
@@ -156,7 +207,45 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             if (responseStatsFilter &&
                 !AcceptComponentByResponseStats(response, contour, componentMeanGate, componentPeakGate, out _, out _))
             {
-                componentRejectedCount++;
+                componentResponseRejectedCount++;
+                continue;
+            }
+
+            if (shapeStatsFilter &&
+                !AcceptComponentByShapeStats(
+                    contour,
+                    area,
+                    smallNoiseAreaMax,
+                    minElongationForSmallComponent,
+                    compactNoiseAreaMax,
+                    compactNoiseCircularityMin,
+                    compactNoiseFillRatioMin,
+                    out _,
+                    out _,
+                    out _,
+                    out var shapeRejectReason))
+            {
+                if (shapeRejectReason == "CompactTextureNoise")
+                {
+                    componentCompactNoiseRejectedCount++;
+                }
+
+                componentShapeRejectedCount++;
+                continue;
+            }
+
+            if (shapeStatsFilter &&
+                !AcceptComponentByLocalResponseProminence(
+                    response,
+                    contour,
+                    area,
+                    compactNoiseAreaMax,
+                    minLocalResponseProminence,
+                    out _,
+                    out _,
+                    out _))
+            {
+                componentLocalProminenceRejectedCount++;
                 continue;
             }
 
@@ -191,9 +280,22 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             { "AlignmentShiftY", alignmentShift.Y },
             { "CandidateCount", contours.Length },
             { "AcceptedCount", defectCount },
-            { "ComponentRejectedCount", componentRejectedCount },
+            { "ComponentRejectedCount", componentResponseRejectedCount + componentShapeRejectedCount + componentLocalProminenceRejectedCount },
+            { "ComponentResponseRejectedCount", componentResponseRejectedCount },
+            { "ComponentShapeRejectedCount", componentShapeRejectedCount },
+            { "ComponentCompactNoiseRejectedCount", componentCompactNoiseRejectedCount },
+            { "ComponentLocalProminenceRejectedCount", componentLocalProminenceRejectedCount },
             { "ComponentMeanGate", componentMeanGate },
             { "ComponentPeakGate", componentPeakGate },
+            { "SmallNoiseAreaMax", smallNoiseAreaMax },
+            { "MinElongationForSmallComponent", minElongationForSmallComponent },
+            { "CompactNoiseAreaMax", compactNoiseAreaMax },
+            { "CompactNoiseCircularityMin", compactNoiseCircularityMin },
+            { "CompactNoiseFillRatioMin", compactNoiseFillRatioMin },
+            { "MinLocalResponseProminence", minLocalResponseProminence },
+            { "CandidateProfileEnabled", candidateProfile.Enabled },
+            { "CandidateProfile", candidateProfile.Profile },
+            { "CandidateProfileApplied", candidateProfile.Applied },
             { "RejectedReason", rejectedReason },
             { "ResponseMean", responseMean.Val0 },
             { "ResponseStdDev", responseStdDev.Val0 }
@@ -265,10 +367,52 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         }
 
         var componentFilterMode = GetStringParam(@operator, "ComponentFilterMode", "AreaOnly");
-        var validComponentFilterModes = new[] { "AreaOnly", "ResponseStats" };
+        var validComponentFilterModes = new[] { "AreaOnly", "ResponseStats", "ShapeAndResponseStats" };
         if (!validComponentFilterModes.Contains(componentFilterMode, StringComparer.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("ComponentFilterMode must be AreaOnly or ResponseStats");
+            return ValidationResult.Invalid("ComponentFilterMode must be AreaOnly, ResponseStats or ShapeAndResponseStats");
+        }
+
+        var smallNoiseAreaMax = GetIntParam(@operator, "SmallNoiseAreaMax", 0);
+        if (smallNoiseAreaMax < 0)
+        {
+            return ValidationResult.Invalid("SmallNoiseAreaMax must be non-negative.");
+        }
+
+        var minElongationForSmallComponent = GetDoubleParam(@operator, "MinElongationForSmallComponent", 0.0);
+        if (minElongationForSmallComponent < 0.0 || minElongationForSmallComponent > 50.0)
+        {
+            return ValidationResult.Invalid("MinElongationForSmallComponent must be between 0 and 50.");
+        }
+
+        var compactNoiseAreaMax = GetIntParam(@operator, "CompactNoiseAreaMax", 0);
+        if (compactNoiseAreaMax < 0)
+        {
+            return ValidationResult.Invalid("CompactNoiseAreaMax must be non-negative.");
+        }
+
+        var compactNoiseCircularityMin = GetDoubleParam(@operator, "CompactNoiseCircularityMin", 0.0);
+        if (compactNoiseCircularityMin < 0.0 || compactNoiseCircularityMin > 1.0)
+        {
+            return ValidationResult.Invalid("CompactNoiseCircularityMin must be between 0 and 1.");
+        }
+
+        var compactNoiseFillRatioMin = GetDoubleParam(@operator, "CompactNoiseFillRatioMin", 0.0);
+        if (compactNoiseFillRatioMin < 0.0 || compactNoiseFillRatioMin > 1.0)
+        {
+            return ValidationResult.Invalid("CompactNoiseFillRatioMin must be between 0 and 1.");
+        }
+
+        var minLocalResponseProminence = GetDoubleParam(@operator, "MinLocalResponseProminence", 0.0);
+        if (minLocalResponseProminence < 0.0 || minLocalResponseProminence > 255.0)
+        {
+            return ValidationResult.Invalid("MinLocalResponseProminence must be between 0 and 255.");
+        }
+
+        var candidateProfile = ResolveCandidateProfile(@operator);
+        if (!IsSupportedCandidateProfile(candidateProfile.Profile))
+        {
+            return ValidationResult.Invalid("CandidateProfile must be 'default' or 'taxonomy_v2'.");
         }
 
         var claheClipLimit = GetDoubleParam(@operator, "ClaheClipLimit", 2.0);
@@ -510,6 +654,118 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         componentMean = Cv2.Mean(response, mask).Val0;
         Cv2.MinMaxLoc(response, out _, out componentPeak, out _, out _, mask);
         return componentMean >= componentMeanGate || componentPeak >= componentPeakGate;
+    }
+
+    private static bool AcceptComponentByShapeStats(
+        Point[] contour,
+        double area,
+        int smallNoiseAreaMax,
+        double minElongationForSmallComponent,
+        int compactNoiseAreaMax,
+        double compactNoiseCircularityMin,
+        double compactNoiseFillRatioMin,
+        out double elongation,
+        out double fillRatio,
+        out double circularity,
+        out string rejectReason)
+    {
+        rejectReason = string.Empty;
+        var rect = Cv2.BoundingRect(contour);
+        var shorterSide = Math.Max(1, Math.Min(rect.Width, rect.Height));
+        var longerSide = Math.Max(rect.Width, rect.Height);
+        elongation = longerSide / (double)shorterSide;
+        fillRatio = area / Math.Max(1.0, rect.Width * rect.Height);
+        var perimeter = Cv2.ArcLength(contour, true);
+        circularity = perimeter <= 1e-6
+            ? 0.0
+            : Math.Clamp((4.0 * Math.PI * area) / (perimeter * perimeter), 0.0, 1.0);
+
+        var compactNoiseFilterEnabled =
+            compactNoiseAreaMax > 0 &&
+            area <= compactNoiseAreaMax &&
+            (compactNoiseCircularityMin > 0.0 || compactNoiseFillRatioMin > 0.0);
+        if (compactNoiseFilterEnabled)
+        {
+            var compactByCircularity = compactNoiseCircularityMin <= 0.0 || circularity >= compactNoiseCircularityMin;
+            var compactByFill = compactNoiseFillRatioMin <= 0.0 || fillRatio >= compactNoiseFillRatioMin;
+            if (compactByCircularity && compactByFill)
+            {
+                rejectReason = "CompactTextureNoise";
+                return false;
+            }
+        }
+
+        if (smallNoiseAreaMax <= 0 || minElongationForSmallComponent <= 0.0 || area > smallNoiseAreaMax)
+        {
+            return true;
+        }
+
+        if (elongation < minElongationForSmallComponent)
+        {
+            rejectReason = "SmallLowElongation";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool AcceptComponentByLocalResponseProminence(
+        Mat response,
+        Point[] contour,
+        double area,
+        int compactNoiseAreaMax,
+        double minLocalResponseProminence,
+        out double componentMean,
+        out double ringMean,
+        out double peakProminence)
+    {
+        componentMean = 0.0;
+        ringMean = 0.0;
+        peakProminence = 0.0;
+        if (compactNoiseAreaMax <= 0 || minLocalResponseProminence <= 0.0 || area > compactNoiseAreaMax)
+        {
+            return true;
+        }
+
+        using var mask = new Mat(response.Size(), MatType.CV_8UC1, Scalar.Black);
+        Cv2.DrawContours(mask, new[] { contour }, -1, Scalar.White, -1);
+        componentMean = Cv2.Mean(response, mask).Val0;
+        Cv2.MinMaxLoc(response, out _, out var componentPeak, out _, out _, mask);
+
+        using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(9, 9));
+        using var dilated = new Mat();
+        Cv2.Dilate(mask, dilated, kernel);
+        using var ring = new Mat();
+        Cv2.Subtract(dilated, mask, ring);
+        if (Cv2.CountNonZero(ring) <= 0)
+        {
+            return true;
+        }
+
+        ringMean = Cv2.Mean(response, ring).Val0;
+        peakProminence = componentPeak - ringMean;
+        return peakProminence >= minLocalResponseProminence;
+    }
+
+    private sealed record CandidateProfileState(bool Enabled, string Profile, bool Applied = false);
+
+    private CandidateProfileState ResolveCandidateProfile(Operator @operator)
+    {
+        return new CandidateProfileState(
+            GetBoolParam(@operator, "EnableCandidateProfile", false),
+            NormalizeCandidateProfile(GetStringParam(@operator, "CandidateProfile", CandidateProfileDefault)));
+    }
+
+    private static string NormalizeCandidateProfile(string raw)
+    {
+        return string.IsNullOrWhiteSpace(raw)
+            ? CandidateProfileDefault
+            : raw.Trim().ToLowerInvariant();
+    }
+
+    private static bool IsSupportedCandidateProfile(string profile)
+    {
+        return profile is CandidateProfileDefault or CandidateProfileTaxonomyV2;
     }
 
     private static Mat AlignReferenceToSource(

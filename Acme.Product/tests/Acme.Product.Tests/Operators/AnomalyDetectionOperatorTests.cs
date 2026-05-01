@@ -73,6 +73,104 @@ public sealed class AnomalyDetectionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithMvtecLiteV2CandidateProfile_ShouldApplyCompatibleProfile()
+    {
+        var sut = new AnomalyDetectionOperator(Substitute.For<ILogger<AnomalyDetectionOperator>>());
+        var featureBankPath = Path.Combine(Path.GetTempPath(), $"anomaly-bank-v2-{Guid.NewGuid():N}.json");
+
+        using var normalA = CreateUniformImage(new Scalar(90, 90, 90));
+        using var normalB = CreateUniformImage(new Scalar(92, 92, 92));
+        var bank = SimplePatchCoreDetector.BuildFeatureBank(
+            new[] { normalA.GetMat(), normalB.GetMat() },
+            new SimplePatchCoreOptions
+            {
+                PatchSize = 16,
+                PatchStride = 8,
+                CoresetRatio = 0.02,
+                Backbone = "simple_patchcore",
+                FeatureExtractorId = "lab_gradient_stats"
+            });
+        SimplePatchCoreDetector.Save(featureBankPath, bank);
+
+        var inferenceOp = CreateInferenceOperator(featureBankPath);
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("EnableCandidateProfile", true, "bool"));
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "mvtec_lite_v2", "string"));
+
+        using var image = CreateUniformImage(new Scalar(90, 90, 90));
+        var result = await sut.ExecuteAsync(inferenceOp, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToSingle(result.OutputData!["ThresholdUsed"]).Should().BeApproximately(0.10f, 0.0001f);
+        var diagnostics = result.OutputData["Diagnostics"].Should().BeOfType<Dictionary<string, object>>().Subject;
+        diagnostics["CandidateProfileEnabled"].Should().Be(true);
+        diagnostics["CandidateProfile"].Should().Be("mvtec_lite_v2");
+        diagnostics["CandidateProfileApplied"].Should().Be(true);
+        diagnostics["CandidateProfileFallbackReason"].Should().Be(string.Empty);
+        diagnostics["PatchStride"].Should().Be(8);
+
+        DisposeOutputs(result.OutputData);
+        File.Delete(featureBankPath);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMvtecLiteV2CandidateProfile_ShouldFallbackForIncompatibleBank()
+    {
+        var sut = new AnomalyDetectionOperator(Substitute.For<ILogger<AnomalyDetectionOperator>>());
+        var featureBankPath = Path.Combine(Path.GetTempPath(), $"anomaly-bank-fallback-{Guid.NewGuid():N}.json");
+
+        using var normalA = CreateUniformImage(new Scalar(90, 90, 90));
+        using var normalB = CreateUniformImage(new Scalar(92, 92, 92));
+        var bank = SimplePatchCoreDetector.BuildFeatureBank(
+            new[] { normalA.GetMat(), normalB.GetMat() },
+            new SimplePatchCoreOptions { PatchSize = 24, PatchStride = 12, CoresetRatio = 1.0 });
+        SimplePatchCoreDetector.Save(featureBankPath, bank);
+
+        var inferenceOp = CreateInferenceOperator(featureBankPath);
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("EnableCandidateProfile", true, "bool"));
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "mvtec_lite_v2", "string"));
+
+        using var image = CreateUniformImage(new Scalar(90, 90, 90));
+        var result = await sut.ExecuteAsync(inferenceOp, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToSingle(result.OutputData!["ThresholdUsed"]).Should().BeApproximately(0.15f, 0.0001f);
+        var diagnostics = result.OutputData["Diagnostics"].Should().BeOfType<Dictionary<string, object>>().Subject;
+        diagnostics["CandidateProfileEnabled"].Should().Be(true);
+        diagnostics["CandidateProfileApplied"].Should().Be(false);
+        diagnostics["CandidateProfileFallbackReason"].Should().BeOfType<string>().Subject.Should().Contain("patch size");
+
+        DisposeOutputs(result.OutputData);
+        File.Delete(featureBankPath);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMvtecLiteV2CandidateProfileAndFailFallback_ShouldFailForIncompatibleBank()
+    {
+        var sut = new AnomalyDetectionOperator(Substitute.For<ILogger<AnomalyDetectionOperator>>());
+        var featureBankPath = Path.Combine(Path.GetTempPath(), $"anomaly-bank-fail-{Guid.NewGuid():N}.json");
+
+        using var normalA = CreateUniformImage(new Scalar(90, 90, 90));
+        using var normalB = CreateUniformImage(new Scalar(92, 92, 92));
+        var bank = SimplePatchCoreDetector.BuildFeatureBank(
+            new[] { normalA.GetMat(), normalB.GetMat() },
+            new SimplePatchCoreOptions { PatchSize = 24, PatchStride = 12, CoresetRatio = 1.0 });
+        SimplePatchCoreDetector.Save(featureBankPath, bank);
+
+        var inferenceOp = CreateInferenceOperator(featureBankPath);
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("EnableCandidateProfile", true, "bool"));
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "mvtec_lite_v2", "string"));
+        inferenceOp.AddParameter(TestHelpers.CreateParameter("CandidateFallbackMode", "Fail", "string"));
+
+        using var image = CreateUniformImage(new Scalar(90, 90, 90));
+        var result = await sut.ExecuteAsync(inferenceOp, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("incompatible");
+
+        File.Delete(featureBankPath);
+    }
+
+    [Fact]
     public void Analyze_ShouldKeepMaskAndIsAnomalyConsistentWithinSameThresholdDomain()
     {
         using var image = new Mat(128, 128, MatType.CV_8UC3, new Scalar(90, 90, 90));
@@ -254,6 +352,18 @@ public sealed class AnomalyDetectionOperatorTests
         var sut = new AnomalyDetectionOperator(Substitute.For<ILogger<AnomalyDetectionOperator>>());
         var op = CreateTrainOperator("C:\\temp\\unused-bank.json");
         op.AddParameter(TestHelpers.CreateParameter("FeatureExtractorId", "clip_embedding", "string"));
+
+        var validation = sut.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ValidateParameters_WithUnsupportedCandidateProfile_ShouldReturnInvalid()
+    {
+        var sut = new AnomalyDetectionOperator(Substitute.For<ILogger<AnomalyDetectionOperator>>());
+        var op = CreateTrainOperator("C:\\temp\\unused-bank.json");
+        op.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "unsupported_v9", "string"));
 
         var validation = sut.ValidateParameters(op);
 

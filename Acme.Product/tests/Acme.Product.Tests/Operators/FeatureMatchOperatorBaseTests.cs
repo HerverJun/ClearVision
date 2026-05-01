@@ -1,4 +1,6 @@
 using System.Reflection;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -9,6 +11,54 @@ namespace Acme.Product.Tests.Operators;
 
 public class FeatureMatchOperatorBaseTests
 {
+    [Fact]
+    public void ValidateParameters_WithKnownCandidateProfiles_ShouldPass()
+    {
+        var akaze = new AkazeFeatureMatchOperator(Substitute.For<ILogger<AkazeFeatureMatchOperator>>());
+        var akazeOp = new Operator("akaze", OperatorType.AkazeFeatureMatch, 0, 0);
+        akazeOp.AddParameter(TestHelpers.CreateParameter("EnableCandidateProfile", true, "bool"));
+        akazeOp.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "default_v3", "string"));
+
+        var orb = new OrbFeatureMatchOperator(Substitute.For<ILogger<OrbFeatureMatchOperator>>());
+        var orbOp = new Operator("orb", OperatorType.OrbFeatureMatch, 0, 0);
+        orbOp.AddParameter(TestHelpers.CreateParameter("EnableCandidateProfile", true, "bool"));
+        orbOp.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "replay_safe_dense_strict", "string"));
+
+        akaze.ValidateParameters(akazeOp).IsValid.Should().BeTrue();
+        orb.ValidateParameters(orbOp).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateParameters_WithUnknownCandidateProfile_ShouldFail()
+    {
+        var sut = new OrbFeatureMatchOperator(Substitute.For<ILogger<OrbFeatureMatchOperator>>());
+        var op = new Operator("orb", OperatorType.OrbFeatureMatch, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "unknown_profile", "string"));
+
+        var validation = sut.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithOrbCandidateProfile_ShouldEmitAppliedProfileDiagnostics()
+    {
+        var sut = new OrbFeatureMatchOperator(Substitute.For<ILogger<OrbFeatureMatchOperator>>());
+        var op = new Operator("orb", OperatorType.OrbFeatureMatch, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("EnableCandidateProfile", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("CandidateProfile", "replay_safe_dense_strict", "string"));
+
+        using var image = TestHelpers.CreateGrayTestImage(width: 64, height: 64, value: 128);
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["CandidateProfileEnabled"].Should().Be(true);
+        result.OutputData["CandidateProfile"].Should().Be("replay_safe_dense_strict");
+        result.OutputData["CandidateProfileApplied"].Should().Be(true);
+
+        DisposeOutputImages(result.OutputData);
+    }
+
     [Fact]
     public void EstimateAndVerifyHomography_WhenVerificationFails_ShouldDropProjectedPoseData()
     {
@@ -258,5 +308,18 @@ public class FeatureMatchOperatorBaseTests
 
         largeExternalProjection.Should().BeFalse();
         lowInlierProjection.Should().BeFalse();
+    }
+
+    private static void DisposeOutputImages(Dictionary<string, object>? outputData)
+    {
+        if (outputData == null)
+        {
+            return;
+        }
+
+        foreach (var image in outputData.Values.OfType<ImageWrapper>())
+        {
+            image.Dispose();
+        }
     }
 }

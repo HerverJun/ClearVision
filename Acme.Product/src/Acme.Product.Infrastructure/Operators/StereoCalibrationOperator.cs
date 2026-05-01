@@ -428,17 +428,6 @@ public class StereoCalibrationOperator : OperatorBase
 
         try
         {
-            // 转换为OpenCV格式
-            var objectPointInputs = new InputArray[objectPoints.Count];
-            var leftImagePointInputs = new InputArray[leftImagePoints.Count];
-            var rightImagePointInputs = new InputArray[rightImagePoints.Count];
-            for (var i = 0; i < objectPoints.Count; i++)
-            {
-                objectPointInputs[i] = InputArray.Create(objectPoints[i]);
-                leftImagePointInputs[i] = InputArray.Create(leftImagePoints[i]);
-                rightImagePointInputs[i] = InputArray.Create(rightImagePoints[i]);
-            }
-
             var leftCalibration = CalibrateSingleCamera(objectPoints, leftImagePoints, imageSize);
             if (!leftCalibration.Success)
             {
@@ -466,15 +455,20 @@ public class StereoCalibrationOperator : OperatorBase
             result.LeftPerViewErrors = leftCalibration.PerViewErrors;
             result.RightPerViewErrors = rightCalibration.PerViewErrors;
 
+            var cameraMatrixLeft = ToDoubleMatrix(result.CameraMatrixLeft);
+            var distCoeffsLeft = ToDoubleVector(result.DistCoeffsLeft);
+            var cameraMatrixRight = ToDoubleMatrix(result.CameraMatrixRight);
+            var distCoeffsRight = ToDoubleVector(result.DistCoeffsRight);
+
             // 执行双目标定
             var stereoRms = Cv2.StereoCalibrate(
-                objectPointInputs,
-                leftImagePointInputs,
-                rightImagePointInputs,
-                result.CameraMatrixLeft,
-                result.DistCoeffsLeft,
-                result.CameraMatrixRight,
-                result.DistCoeffsRight,
+                objectPoints.Select(points => points.AsEnumerable()),
+                leftImagePoints.Select(points => points.AsEnumerable()),
+                rightImagePoints.Select(points => points.AsEnumerable()),
+                cameraMatrixLeft,
+                distCoeffsLeft,
+                cameraMatrixRight,
+                distCoeffsRight,
                 imageSize,
                 result.RotationMatrix,
                 result.TranslationVector,
@@ -485,6 +479,10 @@ public class StereoCalibrationOperator : OperatorBase
 
             result.ReprojectionErrorStereo = stereoRms;
             result.Success = true;
+            result.CameraMatrixLeft = CreateDoubleMatrix(cameraMatrixLeft);
+            result.DistCoeffsLeft = CreateDoubleVector(distCoeffsLeft);
+            result.CameraMatrixRight = CreateDoubleMatrix(cameraMatrixRight);
+            result.DistCoeffsRight = CreateDoubleVector(distCoeffsRight);
 
             // 计算单独的重投影误差
             var leftStats = CalculateReprojectionStats(
@@ -580,6 +578,62 @@ public class StereoCalibrationOperator : OperatorBase
         }
 
         return result;
+    }
+
+    private static double[,] ToDoubleMatrix(Mat mat)
+    {
+        var values = new double[mat.Rows, mat.Cols];
+        for (var row = 0; row < mat.Rows; row++)
+        {
+            for (var col = 0; col < mat.Cols; col++)
+            {
+                values[row, col] = mat.At<double>(row, col);
+            }
+        }
+
+        return values;
+    }
+
+    private static double[] ToDoubleVector(Mat mat)
+    {
+        var values = new double[mat.Rows * mat.Cols];
+        var index = 0;
+        for (var row = 0; row < mat.Rows; row++)
+        {
+            for (var col = 0; col < mat.Cols; col++)
+            {
+                values[index++] = mat.At<double>(row, col);
+            }
+        }
+
+        return values;
+    }
+
+    private static Mat CreateDoubleMatrix(double[,] values)
+    {
+        var rows = values.GetLength(0);
+        var cols = values.GetLength(1);
+        var mat = new Mat(rows, cols, MatType.CV_64FC1);
+        for (var row = 0; row < rows; row++)
+        {
+            for (var col = 0; col < cols; col++)
+            {
+                mat.Set(row, col, values[row, col]);
+            }
+        }
+
+        return mat;
+    }
+
+    private static Mat CreateDoubleVector(double[] values)
+    {
+        var mat = new Mat(1, values.Length, MatType.CV_64FC1);
+        for (var index = 0; index < values.Length; index++)
+        {
+            mat.Set(0, index, values[index]);
+        }
+
+        return mat;
     }
 
     private StereoRectificationResult PerformStereoRectification(

@@ -24,6 +24,43 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     {
     }
 
+    protected sealed record FeatureMatchCandidateProfile(string Name, bool Enabled, bool Applied = false);
+
+    protected FeatureMatchCandidateProfile ResolveFeatureMatchCandidateProfile(Operator @operator)
+    {
+        return new FeatureMatchCandidateProfile(
+            NormalizeFeatureMatchCandidateProfile(GetStringParam(@operator, "CandidateProfile", "default")),
+            GetBoolParam(@operator, "EnableCandidateProfile", false));
+    }
+
+    protected ValidationResult ValidateFeatureMatchCandidateProfile(Operator @operator, params string[] supportedProfiles)
+    {
+        var profile = ResolveFeatureMatchCandidateProfile(@operator);
+        var supported = supportedProfiles
+            .Append("default")
+            .Select(NormalizeFeatureMatchCandidateProfile)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return supported.Contains(profile.Name)
+            ? ValidationResult.Valid()
+            : ValidationResult.Invalid($"CandidateProfile must be one of: {string.Join(", ", supported.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}.");
+    }
+
+    protected static void AddFeatureMatchCandidateProfileOutputs(
+        Dictionary<string, object> data,
+        FeatureMatchCandidateProfile profile)
+    {
+        data["CandidateProfileEnabled"] = profile.Enabled;
+        data["CandidateProfile"] = profile.Name;
+        data["CandidateProfileApplied"] = profile.Applied;
+    }
+
+    private static string NormalizeFeatureMatchCandidateProfile(string raw)
+    {
+        return string.IsNullOrWhiteSpace(raw)
+            ? "default"
+            : raw.Trim().ToLowerInvariant();
+    }
+
     /// <summary>
     /// 浣跨敤瀵圭О娴嬭瘯鍖归厤鎻忚堪绗?    /// </summary>
     protected List<DMatch> MatchWithSymmetryTest(Mat templateDesc, Mat sceneDesc, double matchRatio = 0.75)

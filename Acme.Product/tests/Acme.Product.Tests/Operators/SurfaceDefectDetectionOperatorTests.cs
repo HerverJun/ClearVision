@@ -108,6 +108,110 @@ public class SurfaceDefectDetectionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithTaxonomyV2CandidateProfile_ShouldApplyDefaultOffProfile()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "EnableCandidateProfile", true },
+            { "CandidateProfile", "taxonomy_v2" },
+            { "Threshold", 10.0 }
+        });
+
+        using var source = CreateLowContrastLineDefect();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(source));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        var diagnostics = Assert.IsType<Dictionary<string, object>>(result.OutputData!["Diagnostics"]);
+        Assert.True(Convert.ToBoolean(diagnostics["CandidateProfileEnabled"]));
+        Assert.True(Convert.ToBoolean(diagnostics["CandidateProfileApplied"]));
+        Assert.Equal("taxonomy_v2", Convert.ToString(diagnostics["CandidateProfile"]));
+        Assert.Equal("ShapeAndResponseStats", Convert.ToString(diagnostics["ComponentFilterMode"]));
+        Assert.True(Convert.ToDouble(diagnostics["AppliedThreshold"]) >= 15.0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithShapeAndResponseStats_ShouldRejectSmallRoundTextureNoise()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "LocalContrast" },
+            { "ThresholdMode", "Manual" },
+            { "Threshold", 15.0 },
+            { "MinArea", 1 },
+            { "MaxArea", 100000 },
+            { "MorphCleanSize", 1 },
+            { "ComponentFilterMode", "ShapeAndResponseStats" },
+            { "SmallNoiseAreaMax", 100 },
+            { "MinElongationForSmallComponent", 3.0 }
+        });
+
+        using var source = CreateSmallRoundTextureNoise();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(source));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.Equal(0, Convert.ToInt32(result.OutputData!["DefectCount"]));
+        var diagnostics = Assert.IsType<Dictionary<string, object>>(result.OutputData["Diagnostics"]);
+        Assert.True(Convert.ToInt32(diagnostics["ComponentShapeRejectedCount"]) >= 1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCompactNoiseFeatures_ShouldRejectCircularFilledNoise()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "LocalContrast" },
+            { "ThresholdMode", "Manual" },
+            { "Threshold", 15.0 },
+            { "MinArea", 1 },
+            { "MaxArea", 100000 },
+            { "MorphCleanSize", 1 },
+            { "ComponentFilterMode", "ShapeAndResponseStats" },
+            { "SmallNoiseAreaMax", 0 },
+            { "MinElongationForSmallComponent", 0.0 },
+            { "CompactNoiseAreaMax", 100 },
+            { "CompactNoiseCircularityMin", 0.6 },
+            { "CompactNoiseFillRatioMin", 0.35 }
+        });
+
+        using var source = CreateSmallRoundTextureNoise();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(source));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.Equal(0, Convert.ToInt32(result.OutputData!["DefectCount"]));
+        var diagnostics = Assert.IsType<Dictionary<string, object>>(result.OutputData["Diagnostics"]);
+        Assert.True(Convert.ToInt32(diagnostics["ComponentCompactNoiseRejectedCount"]) >= 1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLocalProminenceFeature_ShouldRejectFlatTextureResponse()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Method", "LocalContrast" },
+            { "ThresholdMode", "Manual" },
+            { "Threshold", 15.0 },
+            { "MinArea", 1 },
+            { "MaxArea", 100000 },
+            { "MorphCleanSize", 1 },
+            { "ComponentFilterMode", "ShapeAndResponseStats" },
+            { "CompactNoiseAreaMax", 100 },
+            { "MinLocalResponseProminence", 255.0 }
+        });
+
+        using var source = CreateSmallRoundTextureNoise();
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(source));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.Equal(0, Convert.ToInt32(result.OutputData!["DefectCount"]));
+        var diagnostics = Assert.IsType<Dictionary<string, object>>(result.OutputData["Diagnostics"]);
+        Assert.True(Convert.ToInt32(diagnostics["ComponentLocalProminenceRejectedCount"]) >= 1);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithUnsupportedChannelCount_ShouldReturnClearFailure()
     {
         var sut = CreateSut();
@@ -220,6 +324,17 @@ public class SurfaceDefectDetectionOperatorTests
         Assert.False(validation.IsValid);
     }
 
+    [Fact]
+    public void ValidateParameters_WithInvalidCandidateProfile_ShouldReturnInvalid()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object> { { "CandidateProfile", "taxonomy_v9" } });
+
+        var validation = sut.ValidateParameters(op);
+
+        Assert.False(validation.IsValid);
+    }
+
     private static SurfaceDefectDetectionOperator CreateSut()
     {
         return new SurfaceDefectDetectionOperator(Substitute.For<ILogger<SurfaceDefectDetectionOperator>>());
@@ -271,6 +386,20 @@ public class SurfaceDefectDetectionOperatorTests
     private static ImageWrapper CreateTwoChannelImage()
     {
         var mat = new Mat(32, 32, MatType.CV_8UC2, Scalar.All(128));
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateLowContrastLineDefect()
+    {
+        var mat = new Mat(120, 120, MatType.CV_8UC3, new Scalar(90, 90, 90));
+        Cv2.Line(mat, new Point(20, 60), new Point(100, 62), new Scalar(120, 120, 120), 3);
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateSmallRoundTextureNoise()
+    {
+        var mat = new Mat(120, 120, MatType.CV_8UC3, new Scalar(90, 90, 90));
+        Cv2.Circle(mat, new Point(60, 60), 3, new Scalar(180, 180, 180), -1);
         return new ImageWrapper(mat);
     }
 

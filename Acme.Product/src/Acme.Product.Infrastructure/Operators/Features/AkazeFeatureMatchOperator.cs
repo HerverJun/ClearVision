@@ -26,6 +26,8 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MinMatchCount", "最小匹配数", "int", DefaultValue = 10, Min = 3, Max = 100)]
 [OperatorParam("EnableSymmetryTest", "对称测试", "bool", DefaultValue = true)]
 [OperatorParam("MaxFeatures", "最大特征点", "int", DefaultValue = 500, Min = 100, Max = 2000)]
+[OperatorParam("EnableCandidateProfile", "Enable Candidate Profile", "bool", DefaultValue = false)]
+[OperatorParam("CandidateProfile", "Candidate Profile", "enum", DefaultValue = "default", Options = new[] { "default|Default", "default_v3|AKAZE default_v3" })]
 [OutputPort("InlierRatio", "Inlier Ratio", PortDataType.Float)]
 [OutputPort("MeanReprojectionError", "Mean Reprojection Error", PortDataType.Float)]
 [OutputPort("MaxReprojectionError", "Max Reprojection Error", PortDataType.Float)]
@@ -95,6 +97,18 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
         var ransacThreshold = GetDoubleParam(@operator, "RansacThreshold", 5.0, min: 0.5, max: 10.0);
         var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25, min: 0.1, max: 1.0);
         var allowCenterOnlyProjection = GetBoolParam(@operator, "AllowCenterOnlyProjection", false);
+        var candidateProfile = ResolveFeatureMatchCandidateProfile(@operator);
+        if (candidateProfile.Enabled && candidateProfile.Name == "default_v3")
+        {
+            threshold = 0.001;
+            minMatchCount = 6;
+            maxFeatures = 1200;
+            matchRatio = 0.75;
+            ransacThreshold = 5.0;
+            minInlierRatio = 0.25;
+            allowCenterOnlyProjection = false;
+            candidateProfile = candidateProfile with { Applied = true };
+        }
 
         var srcImage = imageWrapper.GetMat();
         using var srcGray = ToGray(srcImage);
@@ -105,7 +119,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
         if (srcKeyPoints.Length < 4 || srcDescriptors.Empty())
         {
             srcDescriptors.Dispose();
-            return Task.FromResult(CreateFailedOutput(srcImage, "场景特征点不足。", 0, 0));
+            return Task.FromResult(CreateFailedOutput(srcImage, "场景特征点不足。", 0, 0, candidateProfile));
         }
 
         Mat? templateImage = null;
@@ -143,7 +157,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
 
             if (templateImage == null || templateKeyPoints == null || templateKeyPoints.Length < 4 || templateDescriptors == null || templateDescriptors.Empty())
             {
-                return Task.FromResult(CreateFailedOutput(srcImage, "模板特征点不足。", 0, 0));
+                return Task.FromResult(CreateFailedOutput(srcImage, "模板特征点不足。", 0, 0, candidateProfile));
             }
 
             var (filteredTemplateKeyPoints, filteredTemplateDescriptors) = FilterFeatures(templateKeyPoints, templateDescriptors, maxFeatures);
@@ -230,7 +244,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
 
             homography?.Dispose();
 
-            return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, new Dictionary<string, object>
+            var outputData = new Dictionary<string, object>
             {
                 { "IsMatch", isMatch },
                 { "Score", verificationScore },
@@ -251,7 +265,10 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
                 { "ProjectedCenterInside", metrics.ProjectedCenterInside },
                 { "Corners", corners.Select(c => new Position(c.X, c.Y)).ToList() },
                 { "OriginMode", GetStringParam(@operator, "OriginMode", "Center") }
-            })));
+            };
+            AddFeatureMatchCandidateProfileOutputs(outputData, candidateProfile);
+
+            return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, outputData)));
         }
         finally
         {
@@ -266,6 +283,12 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        var candidateValidation = ValidateFeatureMatchCandidateProfile(@operator, "default_v3");
+        if (!candidateValidation.IsValid)
+        {
+            return candidateValidation;
+        }
+
         var threshold = GetDoubleParam(@operator, "Threshold", 0.001);
         if (threshold < 0.0001 || threshold > 0.1)
         {
@@ -311,13 +334,18 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
         return gray;
     }
 
-    private OperatorExecutionOutput CreateFailedOutput(Mat input, string reason, int inliers, int totalMatches)
+    private OperatorExecutionOutput CreateFailedOutput(
+        Mat input,
+        string reason,
+        int inliers,
+        int totalMatches,
+        FeatureMatchCandidateProfile candidateProfile)
     {
         var output = input.Clone();
         Cv2.PutText(output, $"NG: {reason}", new Point(10, 30), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
         Cv2.PutText(output, $"Score: {inliers}/{totalMatches}", new Point(10, 60), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
 
-        return OperatorExecutionOutput.Success(CreateImageOutput(output, new Dictionary<string, object>
+        var outputData = new Dictionary<string, object>
         {
             { "IsMatch", false },
             { "Score", 0.0 },
@@ -337,7 +365,10 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
             { "AreaRatio", 0.0 },
             { "CornersInsideCount", 0 },
             { "ProjectedCenterInside", false }
-        }));
+        };
+        AddFeatureMatchCandidateProfileOutputs(outputData, candidateProfile);
+
+        return OperatorExecutionOutput.Success(CreateImageOutput(output, outputData));
     }
 
     private Position ResolveReferenceOrigin(Operator @operator, Size templateSize)
