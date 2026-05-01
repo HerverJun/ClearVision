@@ -80,6 +80,10 @@ internal static class BsdsEdgeContourDatasetRunner
         var consensusPrecision = SafeDivide(cases.Sum(item => item.ConsensusPrecisionNumerator), cases.Sum(item => item.ConsensusPrecisionDenominator));
         var consensusRecall = SafeDivide(cases.Sum(item => item.ConsensusRecallNumerator), cases.Sum(item => item.ConsensusRecallDenominator));
         var consensusF1 = Harmonic(consensusPrecision, consensusRecall);
+        var predictedToBoundaryDistance = WeightedMeanDistance(cases, item => item.PredictedToBoundaryMeanDistancePx, item => item.PredictedEdgePixels);
+        var boundaryToPredictedDistance = WeightedMeanDistance(cases, item => item.BoundaryToPredictedMeanDistancePx, item => item.UnionBoundaryPixels);
+        var predictedToConsensusDistance = WeightedMeanDistance(cases, item => item.PredictedToConsensusMeanDistancePx, item => item.PredictedEdgePixels);
+        var consensusToPredictedDistance = WeightedMeanDistance(cases, item => item.ConsensusToPredictedMeanDistancePx, item => item.ConsensusBoundaryPixels);
 
         return new BaselineResult(
             "dataset",
@@ -105,6 +109,10 @@ internal static class BsdsEdgeContourDatasetRunner
                 Math.Round(consensusPrecision, 6),
                 Math.Round(consensusRecall, 6),
                 Math.Round(consensusF1, 6),
+                predictedToBoundaryDistance,
+                boundaryToPredictedDistance,
+                predictedToConsensusDistance,
+                consensusToPredictedDistance,
                 BoundaryTolerancePixels,
                 Math.Round(cases.Sum(item => item.RuntimeMs), 3),
                 cases.Count == 0 ? 0 : Math.Round(cases.Average(item => item.RuntimeMs), 3),
@@ -192,6 +200,8 @@ internal static class BsdsEdgeContourDatasetRunner
                 Math.Round(unionEval.Precision, 6),
                 Math.Round(unionEval.Recall, 6),
                 Math.Round(unionEval.F1, 6),
+                unionEval.PredictedToBoundaryMeanDistancePx,
+                unionEval.BoundaryToPredictedMeanDistancePx,
                 consensusEval.PrecisionNumerator,
                 consensusEval.PrecisionDenominator,
                 consensusEval.RecallNumerator,
@@ -199,6 +209,8 @@ internal static class BsdsEdgeContourDatasetRunner
                 Math.Round(consensusEval.Precision, 6),
                 Math.Round(consensusEval.Recall, 6),
                 Math.Round(consensusEval.F1, 6),
+                consensusEval.PredictedToBoundaryMeanDistancePx,
+                consensusEval.BoundaryToPredictedMeanDistancePx,
                 null);
         }
         catch (Exception ex)
@@ -216,6 +228,10 @@ internal static class BsdsEdgeContourDatasetRunner
                 0,
                 options.Threshold1,
                 options.Threshold2,
+                0,
+                0,
+                0,
+                0,
                 0,
                 0,
                 0,
@@ -275,6 +291,8 @@ internal static class BsdsEdgeContourDatasetRunner
         var recallNumerator = Cv2.CountNonZero(recallHits);
         var precision = predictedPixels == 0 ? (expectedPixels == 0 ? 1d : 0d) : precisionNumerator / (double)predictedPixels;
         var recall = expectedPixels == 0 ? (predictedPixels == 0 ? 1d : 0d) : recallNumerator / (double)expectedPixels;
+        var predictedToBoundaryDistance = MeanDistanceToNearest(predictedBinary, expected, predictedPixels, expectedPixels);
+        var boundaryToPredictedDistance = MeanDistanceToNearest(expected, predictedBinary, expectedPixels, predictedPixels);
 
         return new BoundaryEvaluation(
             expected.Rows * expected.Cols,
@@ -286,7 +304,31 @@ internal static class BsdsEdgeContourDatasetRunner
             expectedPixels,
             precision,
             recall,
-            Harmonic(precision, recall));
+            Harmonic(precision, recall),
+            predictedToBoundaryDistance,
+            boundaryToPredictedDistance);
+    }
+
+    private static double MeanDistanceToNearest(Mat sourceMask, Mat targetMask, int sourcePixels, int targetPixels)
+    {
+        if (sourcePixels <= 0)
+        {
+            return 0;
+        }
+
+        if (targetPixels <= 0)
+        {
+            var diagonal = Math.Sqrt((sourceMask.Rows * sourceMask.Rows) + (sourceMask.Cols * sourceMask.Cols));
+            return Math.Round(diagonal, 6);
+        }
+
+        using var targetBinary = new Mat();
+        Cv2.Threshold(targetMask, targetBinary, 0, 255, ThresholdTypes.Binary);
+        using var invertedTarget = new Mat();
+        Cv2.BitwiseNot(targetBinary, invertedTarget);
+        using var distance = new Mat();
+        Cv2.DistanceTransform(invertedTarget, distance, DistanceTypes.L2, DistanceTransformMasks.Mask3);
+        return Math.Round(Cv2.Mean(distance, sourceMask).Val0, 6);
     }
 
     private static Mat Dilate(Mat source, int radius)
@@ -305,6 +347,7 @@ internal static class BsdsEdgeContourDatasetRunner
     private static Operator CreateOperator(RunnerOptions options)
     {
         var op = new Operator(Guid.NewGuid(), "BsdsEdgeContourDataset", OperatorType.EdgeDetection, 0, 0);
+        AddParameter(op, "Method", options.Method);
         AddParameter(op, "Threshold1", options.Threshold1);
         AddParameter(op, "Threshold2", options.Threshold2);
         AddParameter(op, "AutoThreshold", options.AutoThreshold);
@@ -314,6 +357,10 @@ internal static class BsdsEdgeContourDatasetRunner
         AddParameter(op, "GaussianKernelSize", options.GaussianKernelSize);
         AddParameter(op, "ApertureSize", options.ApertureSize);
         AddParameter(op, "L2Gradient", options.L2Gradient);
+        AddParameter(op, "EdgeModelPath", options.EdgeModelPath);
+        AddParameter(op, "EdgeModelId", options.EdgeModelId);
+        AddParameter(op, "ModelCatalogPath", options.ModelCatalogPath);
+        AddParameter(op, "EdgeBinarizationThreshold", options.EdgeBinarizationThreshold);
         return op;
     }
 
@@ -378,6 +425,20 @@ internal static class BsdsEdgeContourDatasetRunner
     private static double Harmonic(double precision, double recall)
     {
         return precision + recall <= 0 ? 0 : 2d * precision * recall / (precision + recall);
+    }
+
+    private static double WeightedMeanDistance(
+        IReadOnlyCollection<CaseResult> cases,
+        Func<CaseResult, double> valueSelector,
+        Func<CaseResult, int> weightSelector)
+    {
+        var denominator = cases.Sum(weightSelector);
+        if (denominator <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Round(cases.Sum(item => valueSelector(item) * weightSelector(item)) / denominator, 6);
     }
 
     private static double Percentile(IEnumerable<double> values, double percentile)
@@ -840,7 +901,9 @@ internal sealed record BoundaryEvaluation(
     int RecallDenominator,
     double Precision,
     double Recall,
-    double F1);
+    double F1,
+    double PredictedToBoundaryMeanDistancePx,
+    double BoundaryToPredictedMeanDistancePx);
 
 internal sealed record BaselineResult(
     string EvidenceKind,
@@ -871,6 +934,10 @@ internal sealed record DatasetSummary(
     double ConsensusBoundaryPrecision,
     double ConsensusBoundaryRecall,
     double ConsensusBoundaryF1,
+    double PredictedToBoundaryMeanDistancePx,
+    double BoundaryToPredictedMeanDistancePx,
+    double PredictedToConsensusMeanDistancePx,
+    double ConsensusToPredictedMeanDistancePx,
     int BoundaryTolerancePixels,
     double RuntimeMs,
     double RuntimeMsAvg,
@@ -919,6 +986,8 @@ internal sealed record CaseResult(
     double BoundaryPrecision,
     double BoundaryRecall,
     double BoundaryF1,
+    double PredictedToBoundaryMeanDistancePx,
+    double BoundaryToPredictedMeanDistancePx,
     int ConsensusPrecisionNumerator,
     int ConsensusPrecisionDenominator,
     int ConsensusRecallNumerator,
@@ -926,6 +995,8 @@ internal sealed record CaseResult(
     double ConsensusBoundaryPrecision,
     double ConsensusBoundaryRecall,
     double ConsensusBoundaryF1,
+    double PredictedToConsensusMeanDistancePx,
+    double ConsensusToPredictedMeanDistancePx,
     string? Failure);
 
 internal static class MarkdownReport
@@ -962,6 +1033,10 @@ internal static class MarkdownReport
             $"| Consensus boundary precision | {result.Summary.ConsensusBoundaryPrecision:0.####} |",
             $"| Consensus boundary recall | {result.Summary.ConsensusBoundaryRecall:0.####} |",
             $"| Consensus boundary F1 | {result.Summary.ConsensusBoundaryF1:0.####} |",
+            $"| Predicted to boundary mean distance px | {result.Summary.PredictedToBoundaryMeanDistancePx:0.####} |",
+            $"| Boundary to predicted mean distance px | {result.Summary.BoundaryToPredictedMeanDistancePx:0.####} |",
+            $"| Predicted to consensus mean distance px | {result.Summary.PredictedToConsensusMeanDistancePx:0.####} |",
+            $"| Consensus to predicted mean distance px | {result.Summary.ConsensusToPredictedMeanDistancePx:0.####} |",
             $"| Boundary tolerance px | {result.Summary.BoundaryTolerancePixels} |",
             $"| Runtime ms avg | {result.Summary.RuntimeMsAvg:0.###} |",
             $"| Runtime ms p95 | {result.Summary.RuntimeMsP95:0.###} |",
@@ -989,12 +1064,12 @@ internal static class MarkdownReport
             "",
             "## Cases",
             "",
-            "| Case | Split | Passed | Size | Annotations | Thresholds | Union F1 | Consensus F1 | Predicted | Union | Consensus | Runtime ms | Failure |",
-            "| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+            "| Case | Split | Passed | Size | Annotations | Thresholds | Union F1 | Union B->P px | Consensus F1 | Consensus B->P px | Predicted | Union | Consensus | Runtime ms | Failure |",
+            "| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
         ]);
 
         lines.AddRange(result.Cases.Select(item =>
-            $"| {item.CaseId} | {item.Split} | {item.Passed} | {item.Width}x{item.Height} | {item.AnnotationCount} | {item.Threshold1Used:0.###}/{item.Threshold2Used:0.###} | {item.BoundaryF1:0.####} | {item.ConsensusBoundaryF1:0.####} | {item.PredictedEdgePixels} | {item.UnionBoundaryPixels} | {item.ConsensusBoundaryPixels} | {item.RuntimeMs:0.###} | {item.Failure ?? "-"} |"));
+            $"| {item.CaseId} | {item.Split} | {item.Passed} | {item.Width}x{item.Height} | {item.AnnotationCount} | {item.Threshold1Used:0.###}/{item.Threshold2Used:0.###} | {item.BoundaryF1:0.####} | {item.BoundaryToPredictedMeanDistancePx:0.####} | {item.ConsensusBoundaryF1:0.####} | {item.ConsensusToPredictedMeanDistancePx:0.####} | {item.PredictedEdgePixels} | {item.UnionBoundaryPixels} | {item.ConsensusBoundaryPixels} | {item.RuntimeMs:0.###} | {item.Failure ?? "-"} |"));
 
         lines.Add("");
         return string.Join(Environment.NewLine, lines);
@@ -1007,6 +1082,7 @@ internal sealed record RunnerOptions(
     string ReportPath,
     string Split,
     int MaxCases,
+    string Method,
     double Threshold1,
     double Threshold2,
     bool AutoThreshold,
@@ -1016,6 +1092,10 @@ internal sealed record RunnerOptions(
     int GaussianKernelSize,
     int ApertureSize,
     bool L2Gradient,
+    string EdgeModelPath,
+    string EdgeModelId,
+    string ModelCatalogPath,
+    double EdgeBinarizationThreshold,
     string CandidateVersion,
     string Profile,
     IReadOnlySet<string> CaseIds,
@@ -1030,6 +1110,7 @@ internal sealed record RunnerOptions(
             "quality/evals/reports/EdgeDetection_bsds500_baseline.md",
             "test",
             0,
+            "Canny",
             50,
             150,
             false,
@@ -1039,6 +1120,10 @@ internal sealed record RunnerOptions(
             5,
             3,
             false,
+            "",
+            "",
+            "",
+            0.5,
             "baseline",
             "fixed_canny_50_150",
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -1066,6 +1151,7 @@ internal sealed record RunnerOptions(
                 "--report" => options with { ReportPath = value },
                 "--split" => options with { Split = value },
                 "--max-cases" => options with { MaxCases = int.Parse(value, CultureInfo.InvariantCulture) },
+                "--method" => options with { Method = value },
                 "--threshold1" => options with { Threshold1 = double.Parse(value, CultureInfo.InvariantCulture) },
                 "--threshold2" => options with { Threshold2 = double.Parse(value, CultureInfo.InvariantCulture) },
                 "--auto-threshold" => options with { AutoThreshold = bool.Parse(value) },
@@ -1075,6 +1161,10 @@ internal sealed record RunnerOptions(
                 "--gaussian-kernel-size" => options with { GaussianKernelSize = int.Parse(value, CultureInfo.InvariantCulture) },
                 "--aperture-size" => options with { ApertureSize = int.Parse(value, CultureInfo.InvariantCulture) },
                 "--l2-gradient" => options with { L2Gradient = bool.Parse(value) },
+                "--edge-model" => options with { EdgeModelPath = value },
+                "--edge-model-id" => options with { EdgeModelId = value },
+                "--model-catalog" => options with { ModelCatalogPath = value },
+                "--edge-binarization-threshold" => options with { EdgeBinarizationThreshold = double.Parse(value, CultureInfo.InvariantCulture) },
                 "--candidate-version" => options with { CandidateVersion = value },
                 "--profile" => options with { Profile = value },
                 "--case-ids" => options with { CaseIds = ParseCaseIds(value) },
@@ -1106,10 +1196,16 @@ internal sealed record RunnerOptions(
           --split <train|val|test|all>    Source split to run. Default: test.
           --max-cases <n>                 Optional smoke subset; 0 means all selected cases.
           --case-ids <id,id>              Optional comma-separated case id filter.
+          --method <Canny|OnnxEdge>       Product edge method. Default: Canny.
           --threshold1 <number>           Canny low threshold. Default: 50.
           --threshold2 <number>           Canny high threshold. Default: 150.
           --auto-threshold <bool>         Use product auto-thresholding. Default: false.
-          --auto-threshold-strategy <s>   MedianIntensity or GradientPercentile. Default: MedianIntensity.
+          --auto-threshold-strategy <s>   MedianIntensity, GradientPercentile, RecallGuardPercentile, or OtsuGradient. Default: MedianIntensity.
+          --edge-model <path>             External ONNX edge model path for Method=OnnxEdge.
+          --edge-model-id <id>            Model catalog id for Method=OnnxEdge.
+          --model-catalog <path>          Optional model catalog path for edge model resolution.
+          --edge-binarization-threshold <float>
+                                           Probability threshold for Method=OnnxEdge. Default: 0.5.
           --candidate-version <version>   Candidate version label written to the report.
           --profile <name>                Candidate profile label written to the report.
         """);

@@ -178,6 +178,7 @@ def summarize(operator: str, profile: SweepProfile, pair_index: int, document: d
         "passRate": summary.get("PassRate", 0),
         "meanPositionErrorPx": summary.get("MeanPositionErrorPx"),
         "p95PositionErrorPx": summary.get("P95PositionErrorPx"),
+        "p95CornerErrorPx": summary.get("P95CornerErrorPx"),
         "runtimeMs": summary.get("RuntimeMs"),
         "viewpointFixedProxyCount": sum(1 for case in viewpoint_cases if case.get("Passed") is True),
     }
@@ -380,6 +381,7 @@ def render_markdown(candidate: dict[str, Any]) -> str:
         f"| Pass rate | {summary['PassRate']} |",
         f"| Mean position error px | {summary['MeanPositionErrorPx']} |",
         f"| P95 position error px | {summary['P95PositionErrorPx']} |",
+        f"| P95 corner error px | {summary.get('P95CornerErrorPx', '-')} |",
         f"| Runtime ms | {summary['RuntimeMs']} |",
         "",
         "## Sweep Validation",
@@ -438,14 +440,15 @@ def render_markdown(candidate: dict[str, Any]) -> str:
             "",
             "## Case Diagnostics",
             "",
-            "| Case | Type | Pair | Passed | Error px | Inlier ratio | Mean reproj | Area ratio | Corners in | Center in | Homography failure |",
-            "|---|---|---|---|---:|---:|---:|---:|---:|---|---|",
+            "| Case | Type | Pair | Passed | Error px | Mean corner px | Max corner px | Inlier ratio | Mean reproj | Area ratio | Corners in | Center in | Homography failure |",
+            "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
         ]
     )
     for case in candidate.get("Cases", []):
         lines.append(
             f"| {case['CaseId']} | {case['SequenceType']} | {case['Pair']} | {case['Passed']} | "
-            f"{case['PositionErrorPx']} | {case.get('InlierRatio') or '-'} | "
+            f"{case['PositionErrorPx']} | {case.get('MeanCornerErrorPx') or '-'} | "
+            f"{case.get('MaxCornerErrorPx') or '-'} | {case.get('InlierRatio') or '-'} | "
             f"{case.get('MeanReprojectionError') or '-'} | {case.get('AreaRatio') or '-'} | "
             f"{case.get('CornersInsideCount', '-')} | {case.get('ProjectedCenterInside', '-')} | "
             f"{case.get('HomographyFailureReason') or '-'} |"

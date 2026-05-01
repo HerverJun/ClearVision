@@ -126,6 +126,10 @@ internal static class CocoRealModelRunner
         var processingFailed = results.Count(item => item.ProcessingError);
         var matchedCases = results.Count(item => item.Passed);
         var failedCases = results.Count - matchedCases;
+        var accepted = processingFailed == 0
+            && precision >= options.MinPrecisionAt50
+            && recall >= options.MinRecallAt50
+            && ap50 >= options.MinAP50;
 
         var summary = new RealModelSummary(
             DateTimeOffset.UtcNow,
@@ -146,6 +150,9 @@ internal static class CocoRealModelRunner
             Math.Round(precision, 6),
             Math.Round(recall, 6),
             Math.Round(ap50, 6),
+            options.MinPrecisionAt50,
+            options.MinRecallAt50,
+            options.MinAP50,
             Math.Round(matchedIous.Length == 0 ? 0 : matchedIous.Average(), 6),
             Math.Round(confidence, 6),
             Math.Round(nmsIou, 6),
@@ -168,7 +175,7 @@ internal static class CocoRealModelRunner
         return new RealModelResult(
             "2026-04-30.deep-learning-coco-real-model.v1",
             EvidenceKind,
-            processingFailed == 0,
+            accepted,
             summary,
             manifest.ToProvenancePayload(expectedSha256, modelSha256, modelSha256Matched),
             [
@@ -1208,6 +1215,9 @@ internal sealed record RealModelSummary(
     double PrecisionAt50,
     double RecallAt50,
     double AP50,
+    double MinPrecisionAt50,
+    double MinRecallAt50,
+    double MinAP50,
     double MeanMatchedIoU,
     double ConfidenceThreshold,
     double NmsIouThreshold,
@@ -1284,6 +1294,9 @@ internal static class MarkdownReport
             $"| Precision@0.50 | {result.Summary.PrecisionAt50:0.####} |",
             $"| Recall@0.50 | {result.Summary.RecallAt50:0.####} |",
             $"| AP50 | {result.Summary.AP50:0.####} |",
+            $"| Min Precision@0.50 | {result.Summary.MinPrecisionAt50:0.####} |",
+            $"| Min Recall@0.50 | {result.Summary.MinRecallAt50:0.####} |",
+            $"| Min AP50 | {result.Summary.MinAP50:0.####} |",
             $"| Mean matched IoU | {result.Summary.MeanMatchedIoU:0.####} |",
             $"| Runtime ms | {result.Summary.RuntimeMs:0.###} |",
             $"| Session create ms | {result.Summary.SessionCreateMs:0.###} |",
@@ -1338,6 +1351,9 @@ internal sealed record RunnerOptions(
     float? ConfidenceThreshold,
     float? NmsIouThreshold,
     float? MatchIouThreshold,
+    double MinPrecisionAt50,
+    double MinRecallAt50,
+    double MinAP50,
     string ModelVersion,
     string CandidateVersion,
     string Profile,
@@ -1363,6 +1379,9 @@ internal sealed record RunnerOptions(
             null,
             null,
             null,
+            0.0,
+            0.0,
+            0.0,
             "Auto",
             "baseline",
             "hard_nms_045",
@@ -1421,6 +1440,15 @@ internal sealed record RunnerOptions(
                 "--match-iou" => float.TryParse(value, out var matchIou) && matchIou is >= 0 and <= 1
                     ? options with { MatchIouThreshold = matchIou }
                     : options with { ParseError = "--match-iou must be between 0 and 1." },
+                "--min-precision-at-50" => double.TryParse(value, out var minPrecisionAt50) && minPrecisionAt50 is >= 0 and <= 1
+                    ? options with { MinPrecisionAt50 = minPrecisionAt50 }
+                    : options with { ParseError = "--min-precision-at-50 must be between 0 and 1." },
+                "--min-recall-at-50" => double.TryParse(value, out var minRecallAt50) && minRecallAt50 is >= 0 and <= 1
+                    ? options with { MinRecallAt50 = minRecallAt50 }
+                    : options with { ParseError = "--min-recall-at-50 must be between 0 and 1." },
+                "--min-ap50" => double.TryParse(value, out var minAp50) && minAp50 is >= 0 and <= 1
+                    ? options with { MinAP50 = minAp50 }
+                    : options with { ParseError = "--min-ap50 must be between 0 and 1." },
                 "--model-version" => options with { ModelVersion = value },
                 "--candidate-version" => options with { CandidateVersion = value },
                 "--profile" => options with { Profile = value },
@@ -1447,7 +1475,8 @@ internal sealed record RunnerOptions(
     {
         Console.WriteLine(
             "Usage: dotnet run --project quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj -- " +
-            "--index quality/datasets/coco2017_index.json --model-manifest models/object_detection/coco_yolo_real_model_manifest.template.json --model <onnx> --output <json> --report <md>");
+            "--index quality/datasets/coco2017_index.json --model-manifest models/object_detection/coco_yolo_real_model_manifest.template.json --model <onnx> --output <json> --report <md> " +
+            "[--max-cases 120|500|5000] [--min-ap50 0.45 --min-precision-at-50 0.45 --min-recall-at-50 0.35]");
     }
 }
 

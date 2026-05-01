@@ -110,6 +110,9 @@ internal static class KolektorRunner
                 options.ReferenceStatsSigma,
                 options.RobustReferenceStats,
                 options.ResponseNormalizeMode,
+                options.ClaheClipLimit,
+                options.ClaheTileGridSize,
+                options.ComponentFilterMode,
                 records.Count,
                 results.Count(item => item.Passed),
                 metricFailures.Count,
@@ -442,7 +445,10 @@ internal static class KolektorRunner
             ("BackgroundKernelSize", options.BackgroundKernelSize),
             ("ReferenceStatsSigma", options.ReferenceStatsSigma),
             ("RobustReferenceStats", options.RobustReferenceStats),
-            ("ResponseNormalizeMode", options.ResponseNormalizeMode));
+            ("ResponseNormalizeMode", options.ResponseNormalizeMode),
+            ("ClaheClipLimit", options.ClaheClipLimit),
+            ("ClaheTileGridSize", options.ClaheTileGridSize),
+            ("ComponentFilterMode", options.ComponentFilterMode));
     }
 
     private static Operator CreateOperator(OperatorType type, params (string Name, object Value)[] parameters)
@@ -654,6 +660,9 @@ internal sealed record RunnerOptions(
     double ReferenceStatsSigma,
     bool RobustReferenceStats,
     string ResponseNormalizeMode,
+    double ClaheClipLimit,
+    int ClaheTileGridSize,
+    string ComponentFilterMode,
     int PixelSampleStride,
     int MaxErrors,
     double MinImageAuroc,
@@ -685,6 +694,9 @@ internal sealed record RunnerOptions(
             ReferenceStatsSigma: 2.5,
             RobustReferenceStats: false,
             ResponseNormalizeMode: "RawClamp",
+            ClaheClipLimit: 2.0,
+            ClaheTileGridSize: 8,
+            ComponentFilterMode: "AreaOnly",
             PixelSampleStride: 4,
             MaxErrors: 0,
             MinImageAuroc: 0.70,
@@ -735,6 +747,9 @@ internal sealed record RunnerOptions(
                     "--reference-stats-sigma" => options with { ReferenceStatsSigma = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--robust-reference-stats" => options with { RobustReferenceStats = bool.Parse(NextValue()) },
                     "--response-normalize-mode" => options with { ResponseNormalizeMode = NextValue() },
+                    "--clahe-clip-limit" => options with { ClaheClipLimit = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--clahe-tile-grid-size" => options with { ClaheTileGridSize = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--component-filter-mode" => options with { ComponentFilterMode = NextValue() },
                     "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue()) },
                     "--max-errors" => options with { MaxErrors = int.Parse(NextValue()) },
                     "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
@@ -796,6 +811,11 @@ internal sealed record RunnerOptions(
                                       Use robust MAD reference stats. Default: false.
           --response-normalize-mode <name>
                                       RawClamp, MinMax, or PercentileClip. Default: RawClamp.
+          --clahe-clip-limit <float>  CLAHE clip limit when NormalizationMode=ClaheLocalMean. Default: 2.
+          --clahe-tile-grid-size <int>
+                                      CLAHE tile grid size when NormalizationMode=ClaheLocalMean. Default: 8.
+          --component-filter-mode <name>
+                                      AreaOnly or ResponseStats. Default: AreaOnly.
           --pixel-sample-stride <int>   Pixel AUROC sampling stride. Default: 4.
           --max-errors <int>            Crash/failure gate. Default: 0.
           --min-image-auroc <float>     Optional image AUROC floor. Default: 0.70.
@@ -844,6 +864,8 @@ internal static class MarkdownReport
             $"| Morph mode | {result.Summary.MorphMode} |",
             $"| Background kernel | {result.Summary.BackgroundKernelSize} |",
             $"| Response normalize mode | {result.Summary.ResponseNormalizeMode} |",
+            $"| CLAHE clip / tile | {result.Summary.ClaheClipLimit:0.###} / {result.Summary.ClaheTileGridSize} |",
+            $"| Component filter mode | {result.Summary.ComponentFilterMode} |",
             $"| Max side | {result.Summary.MaxSide} |"
         };
 
@@ -968,6 +990,9 @@ internal sealed record BaselineSummary(
     double ReferenceStatsSigma,
     bool RobustReferenceStats,
     string ResponseNormalizeMode,
+    double ClaheClipLimit,
+    int ClaheTileGridSize,
+    string ComponentFilterMode,
     int CaseCount,
     int Passed,
     int Failed,

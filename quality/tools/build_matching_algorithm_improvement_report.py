@@ -14,8 +14,9 @@ AUDIT_DIR = REPO_ROOT / "docs" / "审计资料" / "算法审计"
 AB_REPORT = REPORT_DIR / "QualityFlywheel_algorithm_ab_replay_report.json"
 SWEEP_REPORT = REPORT_DIR / "QualityFlywheel_hpatches_matching_sweep_v4.json"
 LEADERBOARD_REPORT = REPORT_DIR / "QualityFlywheel_hpatches_matching_family_leaderboard.json"
-AKAZE_REPORT = REPORT_DIR / "AkazeFeatureMatch_hpatches_candidate_v4.json"
-ORB_REPORT = REPORT_DIR / "OrbFeatureMatch_hpatches_candidate_v4.json"
+REPLAY_SAFE_PROFILE_REPORT = REPORT_DIR / "QualityFlywheel_matching_replay_safe_profile_candidates_v2.json"
+AKAZE_REPORT = REPORT_DIR / "AkazeFeatureMatch_hpatches_candidate_center_only_v1.json"
+ORB_REPORT = REPORT_DIR / "OrbFeatureMatch_hpatches_candidate_center_only_v1.json"
 
 OUTPUT_JSON = REPORT_DIR / "QualityFlywheel_matching_algorithm_improvement_v1.json"
 OUTPUT_MD = REPORT_DIR / "QualityFlywheel_matching_algorithm_improvement_v1.md"
@@ -63,13 +64,15 @@ def report_summary(path: Path) -> dict[str, Any]:
         "sourceReport": repo(path),
         "operator": summary["Operator"],
         "candidateVersion": document.get("CandidateVersion"),
-        "selectedProfile": document.get("Sweep", {}).get("selectedProfile"),
+        "selectedProfile": document.get("Sweep", {}).get("selectedProfile")
+        or ("center_only_projection_v1" if summary.get("AllowCenterOnlyProjection") is True else None),
         "caseCount": summary["CaseCount"],
         "passed": summary["Passed"],
         "failed": summary["Failed"],
         "passRate": summary["PassRate"],
         "meanPositionErrorPx": summary["MeanPositionErrorPx"],
         "p95PositionErrorPx": summary["P95PositionErrorPx"],
+        "p95CornerErrorPx": summary.get("P95CornerErrorPx"),
         "runtimeMs": summary["RuntimeMs"],
         "memoryAllocationBytes": summary.get("MemoryAllocationBytes"),
         "parameters": {
@@ -81,6 +84,7 @@ def report_summary(path: Path) -> dict[str, Any]:
             "FastThreshold": summary.get("FastThreshold"),
             "EdgeThreshold": summary.get("EdgeThreshold"),
             "AkazeThreshold": summary.get("AkazeThreshold"),
+            "AllowCenterOnlyProjection": summary.get("AllowCenterOnlyProjection"),
         },
         "viewpoint": scenario_summary(scenarios.get("viewpoint")),
         "illumination": scenario_summary(scenarios.get("illumination")),
@@ -239,6 +243,7 @@ def build_improvement_report(backlog: dict[str, Any]) -> dict[str, Any]:
     ab = read_json(AB_REPORT)
     sweep = read_json(SWEEP_REPORT)
     leaderboard = read_json(LEADERBOARD_REPORT)
+    replay_safe_profile = read_json(REPLAY_SAFE_PROFILE_REPORT)
     akaze = report_summary(AKAZE_REPORT)
     orb = report_summary(ORB_REPORT)
     rows = operator_rows(ab)
@@ -251,6 +256,7 @@ def build_improvement_report(backlog: dict[str, Any]) -> dict[str, Any]:
             repo(AB_REPORT),
             repo(SWEEP_REPORT),
             repo(LEADERBOARD_REPORT),
+            repo(REPLAY_SAFE_PROFILE_REPORT),
             repo(AKAZE_REPORT),
             repo(ORB_REPORT),
             repo(BACKLOG_JSON),
@@ -261,28 +267,32 @@ def build_improvement_report(backlog: dict[str, Any]) -> dict[str, Any]:
             "fixedCaseCount": ab["summary"]["fixedCaseCount"],
             "regressedCaseCount": ab["summary"]["regressedCaseCount"],
             "matchingViewpointFixedCaseCount": ab["summary"]["matchingViewpointFixedCaseCount"],
+            "replaySafePromotionCount": replay_safe_profile.get("promotionCount"),
+            "releaseGateStatus": replay_safe_profile.get("profileGate", {}).get("releaseGateStatus"),
             "recommendedPrimaryOperator": "OrbFeatureMatch",
             "remainingBacklogCaseCount": backlog["summary"]["caseCount"],
             "remainingBothOperatorsFailedCount": backlog["summary"]["bothOperatorsFailedCount"],
         },
+        "replaySafeProfileGate": replay_safe_profile.get("profileGate", {}),
         "operators": {
             "AkazeFeatureMatch": {
                 "candidate": akaze,
                 "abReplay": replay_operator_summary(rows["AkazeFeatureMatch"]),
-                "selectedProfile": selected_profile(sweep, "AkazeFeatureMatch"),
+                "selectedProfile": selected_profile(sweep, "AkazeFeatureMatch", akaze),
             },
             "OrbFeatureMatch": {
                 "candidate": orb,
                 "abReplay": replay_operator_summary(rows["OrbFeatureMatch"]),
-                "selectedProfile": selected_profile(sweep, "OrbFeatureMatch"),
+                "selectedProfile": selected_profile(sweep, "OrbFeatureMatch", orb),
             },
         },
         "leaderboard": leaderboard["rows"],
         "backlogSummary": backlog["summary"],
         "nextActions": [
-            "Use OrbFeatureMatch v4 as the next primary matching candidate.",
-            "Prototype center-first localization for extreme viewpoint crop failures.",
-            "Keep AkazeFeatureMatch v4 as a stable fallback candidate.",
+            "Use OrbFeatureMatch center_only_v1 as the next primary matching candidate profile.",
+            "Keep AllowCenterOnlyProjection default-off in product paths until release/field replay gate signs off.",
+            "Keep AkazeFeatureMatch center_only_v1 as a stable fallback candidate profile.",
+            "Treat QualityFlywheel_matching_replay_safe_profile_candidates_v2 as the promotion-ready profile gate; do not use it as product-default approval.",
             "After backlog triage, move Phase C SurfaceDefectDetection/AnomalyDetection into candidate execution.",
         ],
     }
@@ -298,7 +308,20 @@ def replay_operator_summary(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def selected_profile(sweep: dict[str, Any], operator: str) -> dict[str, Any]:
+def selected_profile(sweep: dict[str, Any], operator: str, candidate: dict[str, Any]) -> dict[str, Any]:
+    if candidate.get("parameters", {}).get("AllowCenterOnlyProjection") is True:
+        return {
+            "selectedProfile": "center_only_projection_v1",
+            "validation": {
+                "sourceReport": candidate["sourceReport"],
+                "passed": candidate["passed"],
+                "caseCount": candidate["caseCount"],
+                "p95PositionErrorPx": candidate["p95PositionErrorPx"],
+                "p95CornerErrorPx": candidate["p95CornerErrorPx"],
+            },
+            "replay": None,
+            "holdout": None,
+        }
     for item in sweep.get("results", []):
         if item.get("operator") == operator:
             return {
@@ -367,7 +390,8 @@ def render_improvement_markdown(report: dict[str, Any]) -> str:
         "",
         f"- A/B replay fixed `{report['summary']['fixedCaseCount']}` cases with `{report['summary']['regressedCaseCount']}` regressions.",
         f"- Matching viewpoint fixed `{report['summary']['matchingViewpointFixedCaseCount']}` cases.",
-        "- `OrbFeatureMatch` is the v4 primary candidate; `AkazeFeatureMatch` remains the stable fallback.",
+        "- `OrbFeatureMatch` center_only_v1 is the primary candidate profile; `AkazeFeatureMatch` center_only_v1 remains the stable fallback profile.",
+        f"- Replay-safe profile gate has `{report['summary']['replaySafePromotionCount']}` promotion-ready default-off profiles; release gate status is `{report['summary']['releaseGateStatus']}`.",
         f"- Remaining backlog: `{report['summary']['remainingBacklogCaseCount']}` HPatches cases, `{report['summary']['remainingBothOperatorsFailedCount']}` fail on both Akaze/ORB.",
         "",
         "## Candidate Results",
@@ -406,6 +430,9 @@ def render_improvement_markdown(report: dict[str, Any]) -> str:
 
 
 def render_audit_markdown(report: dict[str, Any], backlog: dict[str, Any]) -> str:
+    akaze_fixed = report["operators"]["AkazeFeatureMatch"]["abReplay"]["fixedCaseCount"]
+    orb_fixed = report["operators"]["OrbFeatureMatch"]["abReplay"]["fixedCaseCount"]
+    regressed = report["summary"]["regressedCaseCount"]
     lines = [
         "# 第4批 Matching 准工业算法调优报告",
         "",
@@ -416,15 +443,16 @@ def render_audit_markdown(report: dict[str, Any], backlog: dict[str, Any]) -> st
         "本轮 Matching 家族已经从单纯 HPatches 参数 sweep，收口为 `validation + public replay gate + holdout` 的候选选择流程。报告只声明准工业公开/替代证明，不声明真实产线签核。",
         "",
         f"- A/B replay：fixed {report['summary']['fixedCaseCount']}，regressed {report['summary']['regressedCaseCount']}。",
-        f"- HPatches leaderboard：Akaze/ORB v4 均为 90/116 passed。",
-        "- 主推候选：`OrbFeatureMatch` v4；稳定 fallback：`AkazeFeatureMatch` v4。",
+        f"- HPatches leaderboard：Akaze center_only_v1 为 {report['operators']['AkazeFeatureMatch']['candidate']['passed']}/116 passed；ORB center_only_v1 为 {report['operators']['OrbFeatureMatch']['candidate']['passed']}/116 passed。",
+        "- 主推候选 profile：`OrbFeatureMatch` center_only_v1；稳定 fallback profile：`AkazeFeatureMatch` center_only_v1。",
+        f"- Replay-safe profile gate：promotion-ready `{report['summary']['replaySafePromotionCount']}` 个；release gate 状态 `{report['summary']['releaseGateStatus']}`，产品默认仍不启用。",
         "",
         "## 2. 改动内容",
         "",
         "- `AkazeFeatureMatch` / `OrbFeatureMatch` 输出 HPatches 诊断字段：inlier ratio、reprojection error、area ratio、corners/center inside、homography failure reason。",
         "- `OrbFeatureMatch` 参数化 `FastThreshold`，HPatches runner 额外支持 `EdgeThreshold`。",
         "- HPatches sweep v4 增加 public replay gate，避免 candidate 在全量 benchmark 改善但 A/B fixed 下降。",
-        "- `run_algorithm_ab_replay.py` 默认读取 candidate v4 参数，replay 子集输出到独立 `candidate_replay_v4` 文件。",
+        "- `run_algorithm_ab_replay.py` 默认读取 matching candidate center_only_v1 参数；matching-only replay 可用 `--validation-scope matching` 独立收口。",
         "",
         "## 3. 结果",
         "",
@@ -461,10 +489,11 @@ def render_audit_markdown(report: dict[str, Any], backlog: dict[str, Any]) -> st
             "",
             "## 5. 对验收问题的回答",
             "",
-            "- 修了哪些失败样本：A/B replay 中 Akaze fixed 13、ORB fixed 16，总 fixed 29，regressed 0。",
+            f"- 修了哪些失败样本：A/B replay 中 Akaze fixed {akaze_fixed}、ORB fixed {orb_fixed}，总 fixed {report['summary']['fixedCaseCount']}，regressed {regressed}。",
             "- 哪些 viewpoint 仍失败：主要集中在 `extreme_viewpoint_crop`，另有少量 illumination / insufficient correspondence 残留，详见 `QualityFlywheel_matching_failure_backlog_v1.md`。",
-            "- 是否牺牲 illumination：没有。Akaze illumination 54/57，ORB illumination 55/57；ORB v4 illumination mean error 5.139 px。",
-            "- runtime/memory 是否可接受：ORB v4 runtime 3572.659 ms / 116 cases，约 30.8 ms/case；Akaze v4 runtime 8568.21 ms / 116 cases，适合作 fallback 而非主推。",
+            f"- 是否牺牲 illumination：没有。Akaze illumination {report['operators']['AkazeFeatureMatch']['candidate']['illumination']['passed']}/57，ORB illumination {report['operators']['OrbFeatureMatch']['candidate']['illumination']['passed']}/57。",
+            f"- runtime/memory 是否可接受：ORB center_only_v1 runtime {fmt(report['operators']['OrbFeatureMatch']['candidate']['runtimeMs'])} ms / 116 cases；Akaze center_only_v1 runtime {fmt(report['operators']['AkazeFeatureMatch']['candidate']['runtimeMs'])} ms / 116 cases。",
+            f"- 是否进入产品默认：不进入。当前只进入 promotion-ready profile，release gate 仍为 `{report['summary']['releaseGateStatus']}`。",
             "- 是否进入下一轮缺陷/异常调优：可以。Matching 第一轮已形成可复现 A/B、sweep、leaderboard 与 backlog，Phase C 可启动。",
             "",
             "## 6. 证据文件",

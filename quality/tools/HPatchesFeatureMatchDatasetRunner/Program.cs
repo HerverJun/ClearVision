@@ -51,6 +51,7 @@ internal static class HPatchesRunner
 
         var passed = results.Count(item => item.Passed);
         var errors = results.Select(item => item.PositionErrorPx).Where(double.IsFinite).OrderBy(item => item).ToArray();
+        var cornerErrors = results.Select(item => item.MaxCornerErrorPx ?? item.MeanCornerErrorPx).OfType<double>().Where(double.IsFinite).OrderBy(item => item).ToArray();
         var passRate = results.Count == 0 ? 0 : passed / (double)results.Count;
         var p95 = Percentile(errors, 0.95);
         var accepted = results.Count >= Math.Min(options.MaxSequences, 10) &&
@@ -69,6 +70,7 @@ internal static class HPatchesRunner
             Math.Round(passRate, 6),
             Math.Round(errors.Length == 0 ? 1_000_000 : errors.Average(), 6),
             Math.Round(p95, 6),
+            Math.Round(cornerErrors.Length == 0 ? 1_000_000 : Percentile(cornerErrors, 0.95), 6),
             Math.Round(results.Average(item => item.Inliers), 6),
             Math.Round(results.Average(item => item.TotalMatches), 6),
             Math.Round(results.Average(item => item.Score), 6),
@@ -88,6 +90,7 @@ internal static class HPatchesRunner
             options.FastThreshold,
             options.EdgeThreshold,
             options.AkazeThreshold,
+            options.AllowCenterOnlyProjection,
             accepted);
 
         return new BaselineResult(
@@ -140,6 +143,7 @@ internal static class HPatchesRunner
             using var template = ResizeForMaxSide(templateOriginal, options.MaxSide, out var templateScaleX, out var templateScaleY);
             using var scene = ResizeForMaxSide(sceneOriginal, options.MaxSide, out var sceneScaleX, out var sceneScaleY);
             var expected = ProjectCenter(testCase.Homography, templateOriginal.Width, templateOriginal.Height, templateScaleX, templateScaleY, sceneScaleX, sceneScaleY);
+            var expectedCorners = ProjectCorners(testCase.Homography, templateOriginal.Width, templateOriginal.Height, sceneScaleX, sceneScaleY);
 
             templateWrapper = new ImageWrapper(template.Clone());
             sceneWrapper = new ImageWrapper(scene.Clone());
@@ -167,6 +171,9 @@ internal static class HPatchesRunner
             var hasActual = TryGetPosition(execution.OutputData, "Position", out var position) ||
                 TryGetPosition(execution.OutputData, "Center", out position);
             var actual = hasActual ? position : new Point2d(0, 0);
+            var actualCorners = TryGetCorners(execution.OutputData, "Corners", out var corners) ? corners : [];
+            var meanCornerError = actualCorners.Count == 4 ? MeanCornerError(expectedCorners, actualCorners) : (double?)null;
+            var maxCornerError = actualCorners.Count == 4 ? MaxCornerError(expectedCorners, actualCorners) : (double?)null;
             var projectedCenterInside = TryGetBool(execution.OutputData, "ProjectedCenterInside", out var centerInsideValue)
                 ? centerInsideValue
                 : hasActual && IsPointInside(actual, scene.Size());
@@ -200,6 +207,8 @@ internal static class HPatchesRunner
                 RoundNullable(areaRatio, 6),
                 cornersInsideCount,
                 projectedCenterInside,
+                RoundNullable(meanCornerError, 6),
+                RoundNullable(maxCornerError, 6),
                 string.IsNullOrWhiteSpace(homographyFailureReason) ? null : homographyFailureReason,
                 failure);
         }
@@ -230,6 +239,8 @@ internal static class HPatchesRunner
                 null,
                 0,
                 false,
+                null,
+                null,
                 ex.GetBaseException().Message,
                 ex.GetBaseException().Message);
         }
@@ -272,6 +283,7 @@ internal static class HPatchesRunner
                 ["RoiHeight"] = 0,
                 ["EnableMultiScale"] = options.EnableMultiScale,
                 ["ScaleRange"] = options.ScaleRange,
+                ["AllowCenterOnlyProjection"] = options.AllowCenterOnlyProjection,
                 ["EnableEarlyExit"] = false
             };
 
@@ -292,6 +304,7 @@ internal static class HPatchesRunner
             ["MatchRatio"] = options.MatchRatio,
             ["RansacThreshold"] = options.RansacThreshold,
             ["MinInlierRatio"] = options.MinInlierRatio,
+            ["AllowCenterOnlyProjection"] = options.AllowCenterOnlyProjection,
             ["OriginMode"] = "Center",
             ["OriginX"] = 0.0,
             ["OriginY"] = 0.0
@@ -347,6 +360,22 @@ internal static class HPatchesRunner
     {
         var sourceX = width / 2.0;
         var sourceY = height / 2.0;
+        var denom = h[2, 0] * sourceX + h[2, 1] * sourceY + h[2, 2];
+        var projectedX = (h[0, 0] * sourceX + h[0, 1] * sourceY + h[0, 2]) / denom;
+        var projectedY = (h[1, 0] * sourceX + h[1, 1] * sourceY + h[1, 2]) / denom;
+        return new Point2d(projectedX * sceneScaleX, projectedY * sceneScaleY);
+    }
+
+    private static IReadOnlyList<Point2d> ProjectCorners(double[,] h, int width, int height, double sceneScaleX, double sceneScaleY) =>
+    [
+        ProjectPoint(h, 0, 0, sceneScaleX, sceneScaleY),
+        ProjectPoint(h, width, 0, sceneScaleX, sceneScaleY),
+        ProjectPoint(h, width, height, sceneScaleX, sceneScaleY),
+        ProjectPoint(h, 0, height, sceneScaleX, sceneScaleY)
+    ];
+
+    private static Point2d ProjectPoint(double[,] h, double sourceX, double sourceY, double sceneScaleX, double sceneScaleY)
+    {
         var denom = h[2, 0] * sourceX + h[2, 1] * sourceY + h[2, 2];
         var projectedX = (h[0, 0] * sourceX + h[0, 1] * sourceY + h[0, 2]) / denom;
         var projectedY = (h[1, 0] * sourceX + h[1, 1] * sourceY + h[1, 2]) / denom;
@@ -442,6 +471,29 @@ internal static class HPatchesRunner
         return TryConvertPoint(obj, out value);
     }
 
+    private static bool TryGetCorners(IReadOnlyDictionary<string, object>? output, string key, out IReadOnlyList<Point2d> corners)
+    {
+        var values = new List<Point2d>(4);
+        corners = values;
+        if (output is null || !output.TryGetValue(key, out var obj) || obj is string)
+        {
+            return false;
+        }
+
+        if (obj is System.Collections.IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+            {
+                if (TryConvertPoint(item, out var point))
+                {
+                    values.Add(point);
+                }
+            }
+        }
+
+        return values.Count == 4;
+    }
+
     private static bool TryConvertPoint(object? obj, out Point2d value)
     {
         value = default;
@@ -530,6 +582,12 @@ internal static class HPatchesRunner
         var dy = a.Y - b.Y;
         return Math.Sqrt(dx * dx + dy * dy);
     }
+
+    private static double MeanCornerError(IReadOnlyList<Point2d> expected, IReadOnlyList<Point2d> actual) =>
+        expected.Zip(actual, Distance).Average();
+
+    private static double MaxCornerError(IReadOnlyList<Point2d> expected, IReadOnlyList<Point2d> actual) =>
+        expected.Zip(actual, Distance).Max();
 
     private static double Percentile(double[] values, double percentile)
     {
@@ -652,10 +710,10 @@ internal static class HPatchesIndex
 
 internal sealed record HPatchesCase(string CaseId, string SequenceId, string SequenceType, string Pair, string TemplatePath, string ScenePath, double[,] Homography);
 internal sealed record BaselineResult(string EvidenceKind, DatasetSummary Summary, IReadOnlyList<OperatorSummary> Operators, IReadOnlyList<ScenarioSummary> Scenarios, IReadOnlyList<CaseResult> Cases);
-internal sealed record DatasetSummary(DateTimeOffset GeneratedAtUtc, string Operator, string DatasetName, string DatasetKind, string IndexPath, int CaseCount, int Passed, int Failed, double PassRate, double MeanPositionErrorPx, double P95PositionErrorPx, double MeanInliers, double MeanTotalMatches, double MeanScore, double RuntimeMs, long MemoryAllocationBytes, double MinPassRate, double MaxP95PositionErrorPx, int MaxFeatures, int MinInliers, double MatchRatio, double RansacThreshold, double MinInlierRatio, string DetectorType, double ScoreThreshold, bool EnableMultiScale, double ScaleRange, int FastThreshold, int EdgeThreshold, double AkazeThreshold, bool Accepted);
+internal sealed record DatasetSummary(DateTimeOffset GeneratedAtUtc, string Operator, string DatasetName, string DatasetKind, string IndexPath, int CaseCount, int Passed, int Failed, double PassRate, double MeanPositionErrorPx, double P95PositionErrorPx, double P95CornerErrorPx, double MeanInliers, double MeanTotalMatches, double MeanScore, double RuntimeMs, long MemoryAllocationBytes, double MinPassRate, double MaxP95PositionErrorPx, int MaxFeatures, int MinInliers, double MatchRatio, double RansacThreshold, double MinInlierRatio, string DetectorType, double ScoreThreshold, bool EnableMultiScale, double ScaleRange, int FastThreshold, int EdgeThreshold, double AkazeThreshold, bool AllowCenterOnlyProjection, bool Accepted);
 internal sealed record OperatorSummary(string Operator, int CaseCount, int Passed, int Failed, double PassRate, double RuntimeMsAvg, bool HasPublicDataset, string EvidenceKind, string DatasetName);
 internal sealed record ScenarioSummary(string Scenario, int CaseCount, int Passed, int Failed, double PassRate, double MeanPositionErrorPx, double RuntimeMsAvg);
-internal sealed record CaseResult(string CaseId, string Operator, string SequenceId, string SequenceType, string Pair, bool Passed, double RuntimeMs, long MemoryAllocationBytes, double ExpectedX, double ExpectedY, double ActualX, double ActualY, double PositionErrorPx, double Score, int Inliers, int TotalMatches, double? InlierRatio, double? MeanReprojectionError, double? MaxReprojectionError, double? AreaRatio, int CornersInsideCount, bool ProjectedCenterInside, string? HomographyFailureReason, string? Failure);
+internal sealed record CaseResult(string CaseId, string Operator, string SequenceId, string SequenceType, string Pair, bool Passed, double RuntimeMs, long MemoryAllocationBytes, double ExpectedX, double ExpectedY, double ActualX, double ActualY, double PositionErrorPx, double Score, int Inliers, int TotalMatches, double? InlierRatio, double? MeanReprojectionError, double? MaxReprojectionError, double? AreaRatio, int CornersInsideCount, bool ProjectedCenterInside, double? MeanCornerErrorPx, double? MaxCornerErrorPx, string? HomographyFailureReason, string? Failure);
 
 internal static class MarkdownReport
 {
@@ -682,6 +740,7 @@ internal static class MarkdownReport
             $"| Pass rate | {result.Summary.PassRate:0.####} |",
             $"| Mean position error px | {result.Summary.MeanPositionErrorPx:0.###} |",
             $"| P95 position error px | {result.Summary.P95PositionErrorPx:0.###} |",
+            $"| P95 corner error px | {result.Summary.P95CornerErrorPx:0.###} |",
             $"| Mean inliers | {result.Summary.MeanInliers:0.###} |",
             $"| Mean score | {result.Summary.MeanScore:0.####} |",
             $"| Runtime ms | {result.Summary.RuntimeMs:0.###} |",
@@ -697,15 +756,16 @@ internal static class MarkdownReport
             $"| ORB FAST threshold | {result.Summary.FastThreshold} |",
             $"| ORB edge threshold | {result.Summary.EdgeThreshold} |",
             $"| AKAZE detector threshold | {result.Summary.AkazeThreshold:0.######} |",
+            $"| Allow center-only projection | {result.Summary.AllowCenterOnlyProjection} |",
             "",
             "## Cases",
             "",
-            "| Case | Type | Pair | Passed | Error px | Score | Inliers | Inlier ratio | Mean reproj | Max reproj | Area ratio | Corners in | Center in | Runtime ms | Homography failure | Failure |",
-            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |"
+            "| Case | Type | Pair | Passed | Error px | Mean corner px | Max corner px | Score | Inliers | Inlier ratio | Mean reproj | Max reproj | Area ratio | Corners in | Center in | Runtime ms | Homography failure | Failure |",
+            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |"
         };
 
         lines.AddRange(result.Cases.Select(item =>
-            $"| {item.CaseId} | {item.SequenceType} | {item.Pair} | {item.Passed} | {item.PositionErrorPx:0.###} | {item.Score:0.####} | {item.Inliers}/{item.TotalMatches} | {FormatOptional(item.InlierRatio)} | {FormatOptional(item.MeanReprojectionError)} | {FormatOptional(item.MaxReprojectionError)} | {FormatOptional(item.AreaRatio)} | {item.CornersInsideCount} | {item.ProjectedCenterInside} | {item.RuntimeMs:0.###} | {item.HomographyFailureReason ?? "-"} | {item.Failure ?? "-"} |"));
+            $"| {item.CaseId} | {item.SequenceType} | {item.Pair} | {item.Passed} | {item.PositionErrorPx:0.###} | {FormatOptional(item.MeanCornerErrorPx)} | {FormatOptional(item.MaxCornerErrorPx)} | {item.Score:0.####} | {item.Inliers}/{item.TotalMatches} | {FormatOptional(item.InlierRatio)} | {FormatOptional(item.MeanReprojectionError)} | {FormatOptional(item.MaxReprojectionError)} | {FormatOptional(item.AreaRatio)} | {item.CornersInsideCount} | {item.ProjectedCenterInside} | {item.RuntimeMs:0.###} | {item.HomographyFailureReason ?? "-"} | {item.Failure ?? "-"} |"));
         lines.Add("");
         return string.Join(Environment.NewLine, lines);
     }
@@ -740,6 +800,7 @@ internal sealed record RunnerOptions(
     int FastThreshold,
     int EdgeThreshold,
     double AkazeThreshold,
+    bool AllowCenterOnlyProjection,
     bool IncludeIllumination,
     bool IncludeViewpoint,
     IReadOnlySet<string> CaseIds,
@@ -772,6 +833,7 @@ internal sealed record RunnerOptions(
             20,
             15,
             0.001,
+            false,
             true,
             true,
             new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -807,6 +869,18 @@ internal sealed record RunnerOptions(
             if (arg is "--enable-multiscale")
             {
                 options = options with { EnableMultiScale = true };
+                continue;
+            }
+
+            if (arg is "--allow-center-only-projection")
+            {
+                options = options with { AllowCenterOnlyProjection = true };
+                continue;
+            }
+
+            if (arg is "--disable-center-only-projection")
+            {
+                options = options with { AllowCenterOnlyProjection = false };
                 continue;
             }
 
@@ -910,7 +984,7 @@ internal sealed record RunnerOptions(
 
     public static void PrintHelp()
     {
-        Console.WriteLine("Usage: dotnet run --project quality/tools/HPatchesFeatureMatchDatasetRunner/HPatchesFeatureMatchDatasetRunner.csproj -- --operator AkazeFeatureMatch|OrbFeatureMatch|PlanarMatching --index quality/datasets/hpatches_index.json --output <json> --report <md> [--viewpoint-only] [--detector-type ORB] [--score-threshold 0.5] [--match-ratio 0.75] [--ransac-threshold 5.0] [--min-inlier-ratio 0.25] [--fast-threshold 20] [--edge-threshold 15] [--akaze-threshold 0.001] [--case-ids id1,id2]");
+        Console.WriteLine("Usage: dotnet run --project quality/tools/HPatchesFeatureMatchDatasetRunner/HPatchesFeatureMatchDatasetRunner.csproj -- --operator AkazeFeatureMatch|OrbFeatureMatch|PlanarMatching --index quality/datasets/hpatches_index.json --output <json> --report <md> [--viewpoint-only] [--detector-type ORB] [--score-threshold 0.5] [--match-ratio 0.75] [--ransac-threshold 5.0] [--min-inlier-ratio 0.25] [--fast-threshold 20] [--edge-threshold 15] [--akaze-threshold 0.001] [--allow-center-only-projection] [--case-ids id1,id2]");
     }
 }
 

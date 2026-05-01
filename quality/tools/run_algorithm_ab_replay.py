@@ -27,6 +27,7 @@ SHAPE_MATCHING_PROJECT = "quality/tools/ShapeMatchingGeometricDatasetRunner/Shap
 CAMERA_CALIBRATION_PROJECT = "quality/tools/OpenCvCalibrationDatasetRunner/OpenCvCalibrationDatasetRunner.csproj"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
 MATCHING_OPERATORS = {"AkazeFeatureMatch", "OrbFeatureMatch"}
+DETECTION_OPERATORS = {"SurfaceDefectDetection", "AnomalyDetection", "EdgeDetection"}
 SURFACE_DEFECT_OPERATORS = {"SurfaceDefectDetection"}
 ANOMALY_DETECTION_OPERATORS = {"AnomalyDetection"}
 DEEP_LEARNING_OPERATORS = {"DeepLearning"}
@@ -35,9 +36,9 @@ SEMANTIC_SEGMENTATION_OPERATORS = {"SemanticSegmentation"}
 TEMPLATE_MATCHING_OPERATORS = {"TemplateMatching"}
 SHAPE_MATCHING_OPERATORS = {"ShapeMatching"}
 CAMERA_CALIBRATION_OPERATORS = {"CameraCalibration"}
-DEFAULT_MATCHING_CANDIDATE_VERSION = "v4"
+DEFAULT_MATCHING_CANDIDATE_VERSION = "center_only_v1"
 DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION = "v1"
-DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION = "v1"
+DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION = "v2"
 DEFAULT_DEEP_LEARNING_CANDIDATE_VERSION = "v2"
 DEFAULT_EDGE_DETECTION_CANDIDATE_VERSION = "v1"
 DEFAULT_SEMANTIC_SEGMENTATION_CANDIDATE_VERSION = "v1"
@@ -540,6 +541,7 @@ def matching_candidate_parameters(operator: str, candidate_version: str) -> dict
         "FastThreshold": 20,
         "EdgeThreshold": 15,
         "AkazeThreshold": 0.001,
+        "AllowCenterOnlyProjection": False,
     }
     source = candidate_config_path(operator, candidate_version)
     if not source.exists():
@@ -703,6 +705,8 @@ def execute_matching_candidate(operator: str, case_ids: list[str], candidate_ver
         "--max-p95-position-error-px",
         "100000",
     ]
+    if parameters.get("AllowCenterOnlyProjection"):
+        command.append("--allow-center-only-projection")
     completed = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
     if completed.returncode != 0:
         raise SystemExit(
@@ -1494,7 +1498,7 @@ def build_report(
     }
 
 
-def validate(report: dict[str, Any]) -> list[str]:
+def validate(report: dict[str, Any], validation_scope: str = "full") -> list[str]:
     errors: list[str] = []
     rows = report.get("operators")
     summary = report.get("summary", {})
@@ -1506,6 +1510,58 @@ def validate(report: dict[str, Any]) -> list[str]:
         errors.append("A/B replay report must not contain candidate-pending rows")
     if summary.get("comparedCaseCount") != summary.get("replayCaseCount"):
         errors.append("A/B replay report must compare every replay case")
+    if validation_scope == "matching":
+        matching_rows = [row for row in rows if row.get("operator") in MATCHING_OPERATORS]
+        matching_cases = [
+            case
+            for row in matching_rows
+            for case in row.get("replayCases", [])
+        ]
+        if {row.get("operator") for row in matching_rows} != MATCHING_OPERATORS:
+            errors.append("matching-scoped A/B replay must include AkazeFeatureMatch and OrbFeatureMatch")
+        if len(matching_cases) < 40:
+            errors.append("matching-scoped A/B replay must include the full HPatches matching replay set")
+        if any(row.get("comparisonStatus") != "candidate-executed" for row in matching_rows):
+            errors.append("matching-scoped A/B replay rows must be candidate-executed")
+        if any(case.get("executionMode") != "candidate-executed" for case in matching_cases):
+            errors.append("matching-scoped A/B replay cases must be candidate-executed")
+        if any(case.get("old") is None or case.get("new") is None or case.get("delta") is None for case in matching_cases):
+            errors.append("matching-scoped A/B replay cases must include old/new/delta")
+        if sum(1 for case in matching_cases if case.get("status") == "regressed") != 0:
+            errors.append("matching-scoped A/B replay must have zero regressions")
+        if RAW_PATH_RE.search(json.dumps(report, ensure_ascii=False)):
+            errors.append("A/B replay report contains raw path pattern")
+        return errors
+
+    if validation_scope == "detection":
+        detection_rows = [row for row in rows if row.get("operator") in DETECTION_OPERATORS]
+        detection_cases = [
+            case
+            for row in detection_rows
+            for case in row.get("replayCases", [])
+        ]
+        if {row.get("operator") for row in detection_rows} != DETECTION_OPERATORS:
+            errors.append("detection-scoped A/B replay must include SurfaceDefectDetection, AnomalyDetection, and EdgeDetection")
+        if any(row.get("comparisonStatus") != "candidate-executed" for row in detection_rows):
+            errors.append("detection-scoped A/B replay rows must be candidate-executed")
+        if any(row.get("replayCaseCount", 0) < 20 for row in detection_rows):
+            errors.append("detection-scoped A/B replay rows must include the full public replay subset")
+        if any(case.get("executionMode") != "candidate-executed" for case in detection_cases):
+            errors.append("detection-scoped A/B replay cases must be candidate-executed")
+        if any(case.get("old") is None or case.get("new") is None or case.get("delta") is None for case in detection_cases):
+            errors.append("detection-scoped A/B replay cases must include old/new/delta")
+        if sum(1 for case in detection_cases if case.get("status") == "regressed") != 0:
+            errors.append("detection-scoped A/B replay must have zero pass/fail regressions")
+        if summary.get("surfaceDefectImprovedCaseCount", 0) <= 0:
+            errors.append("detection-scoped A/B replay must improve at least one SurfaceDefectDetection replay case")
+        if summary.get("anomalyDetectionImprovedCaseCount", 0) <= 0:
+            errors.append("detection-scoped A/B replay must improve at least one AnomalyDetection replay case")
+        if summary.get("edgeDetectionImprovedCaseCount", 0) <= 0:
+            errors.append("detection-scoped A/B replay must improve at least one EdgeDetection replay case")
+        if RAW_PATH_RE.search(json.dumps(report, ensure_ascii=False)):
+            errors.append("A/B replay report contains raw path pattern")
+        return errors
+
     if summary.get("replayCaseCount", 0) < 100:
         errors.append("A/B replay report must include the full replay set")
     if summary.get("executedCandidateCaseCount", 0) < 183:
@@ -1925,6 +1981,7 @@ def generate(
     camera_calibration_candidate_profile: str,
     deep_learning_model_manifest: str,
     deep_learning_model_path: str | None,
+    validation_scope: str = "full",
 ) -> dict[str, Any]:
     report = build_report(
         execute_matching,
@@ -1949,7 +2006,8 @@ def generate(
         deep_learning_model_manifest,
         deep_learning_model_path,
     )
-    errors = validate(report)
+    report["policy"]["validationScope"] = validation_scope
+    errors = validate(report, validation_scope)
     if errors:
         raise SystemExit("\n".join(f"error: {error}" for error in errors))
     write_json(OUTPUT_JSON, report)
@@ -1982,6 +2040,7 @@ def main() -> int:
     parser.add_argument("--deep-learning-model-manifest", default="models/object_detection/coco_yolo_real_model_manifest.template.json", help="DeepLearning real-model manifest path.")
     parser.add_argument("--deep-learning-model", default=None, help="Optional DeepLearning ONNX model artifact path. Model files must not be committed.")
     parser.add_argument("--validate-only", action="store_true", help="Validate the existing generated A/B replay report.")
+    parser.add_argument("--validation-scope", choices=("full", "matching", "detection"), default="full", help="Validation scope. Use matching or detection for focused replay gates.")
     args = parser.parse_args()
 
     execute_matching = args.execute_matching or args.execute_candidates
@@ -2015,8 +2074,9 @@ def main() -> int:
         args.camera_calibration_candidate_profile,
         args.deep_learning_model_manifest,
         args.deep_learning_model,
+        args.validation_scope,
     )
-    errors = validate(report)
+    errors = validate(report, args.validation_scope)
     if errors:
         for error in errors:
             print(f"error: {error}")
@@ -2037,6 +2097,7 @@ def main() -> int:
         f"cameraCases={report['summary'].get('cameraCalibrationCaseCount', 0)} "
         f"cameraExecuted={report['summary'].get('cameraCalibrationExecutedCaseCount', 0)} "
         f"deepLearningRealModel={report['summary'].get('deepLearningRealModelCaseCount', 0)} "
+        f"validationScope={args.validation_scope} "
         f"generatedAt={utc_now()}"
     )
     return 0

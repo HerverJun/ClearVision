@@ -40,8 +40,10 @@ return result.Accepted ? 0 : 1;
 
 internal static class MeasurementGeometryOracleRunner
 {
-    private const int CasesPerOperator = 300;
+    private const int BaselineCasesPerOperator = 300;
     private const int BoundaryCasesPerOperator = 40;
+    private const int StressV2CasesPerOperator = 120;
+    private const int StressV2VariantOffset = 1000;
     private static readonly string[] BoundaryScenarios =
     [
         "blur",
@@ -53,17 +55,29 @@ internal static class MeasurementGeometryOracleRunner
         "outlier_contour",
         "occlusion"
     ];
+    private static readonly string[] StressV2Scenarios =
+    [
+        "blur",
+        "noise",
+        "low_contrast",
+        "occlusion",
+        "polarity_flip",
+        "subpixel_offset",
+        "outlier_contour",
+        "weak_edge"
+    ];
 
     public static async Task<OracleResult> RunAsync(RunnerOptions options)
     {
-        var cases = new List<CaseResult>(CasesPerOperator * 5);
-        for (var i = 0; i < CasesPerOperator; i++)
+        var profile = RunProfile.Resolve(options.Profile);
+        var cases = new List<CaseResult>(profile.CasesPerOperator * 5);
+        for (var i = 0; i < profile.CasesPerOperator; i++)
         {
-            cases.Add(await RunCaliperCaseAsync(i));
-            cases.Add(await RunArcCaliperCaseAsync(i));
-            cases.Add(await RunLineCaseAsync(i));
-            cases.Add(await RunCircleCaseAsync(i));
-            cases.Add(await RunGeometricFittingCaseAsync(i));
+            cases.Add(await RunCaliperCaseAsync(i, profile));
+            cases.Add(await RunArcCaliperCaseAsync(i, profile));
+            cases.Add(await RunLineCaseAsync(i, profile));
+            cases.Add(await RunCircleCaseAsync(i, profile));
+            cases.Add(await RunGeometricFittingCaseAsync(i, profile));
         }
 
         var operators = cases
@@ -82,25 +96,29 @@ internal static class MeasurementGeometryOracleRunner
         var passRate = cases.Count == 0 ? 0 : (cases.Count - failed) / (double)cases.Count;
         var p95Pixel = Percentile(pixelErrors, 0.95);
         var p95Angle = Percentile(angleErrors, 0.95);
-        var accepted = operators.All(item => item.Accepted);
+        var accepted = operators.All(item => item.Accepted) &&
+            (!profile.StressOnly || operators.All(item => item.StressCaseCount >= 100));
 
         return new OracleResult(
-            "2026-04-30.measurement-geometry-oracle.v1",
+            profile.SchemaVersion,
             DateTimeOffset.UtcNow,
             accepted,
             new ClaimBoundary(
-                "This report is semisynthetic geometry-oracle evidence for measurement operators.",
+                profile.EvidenceRule,
                 "It is not real production-site validation or sign-off.",
-                "Boundary samples are stress cases over blur, noise, contrast, partial edges, polarity, subpixel offset, outliers, and occlusion."),
+                profile.BoundarySampleRule),
             new OracleSummary(
                 cases.Count,
                 cases.Count - failed,
                 failed,
                 Math.Round(passRate, 6),
                 cases.Count(item => item.IsBoundary),
+                cases.Count(item => item.IsBoundary),
                 0,
                 Math.Round(p95Pixel, 6),
                 Math.Round(p95Angle, 6),
+                Math.Round(AverageNullable(cases.Select(item => item.UncertaintyPx)), 6),
+                Math.Round(OutlierRate(cases), 6),
                 Math.Round(cases.Sum(item => item.RuntimeMs), 3)),
             operators,
             cases);
@@ -122,39 +140,49 @@ internal static class MeasurementGeometryOracleRunner
             operatorName,
             cases.Count,
             cases.Count(item => item.IsBoundary),
+            cases.Count(item => item.IsBoundary),
             cases.Count - failed,
             failed,
             Math.Round(passRate, 6),
             Math.Round(p95Pixel, 6),
             Math.Round(p95Angle, 6),
+            Math.Round(AverageNullable(cases.Select(item => item.UncertaintyPx)), 6),
+            Math.Round(OutlierRate(cases), 6),
             Math.Round(cases.Average(item => item.RuntimeMs), 3),
             accepted);
     }
 
-    private static async Task<CaseResult> RunCaliperCaseAsync(int index)
+    private static async Task<CaseResult> RunCaliperCaseAsync(int index, RunProfile profile)
     {
-        var scenario = ScenarioFor(index);
-        var isBoundary = index < BoundaryCasesPerOperator;
-        var width = 180;
+        var scenario = profile.ScenarioFor(index);
+        var isBoundary = profile.IsStressCase(index);
+        var variant = profile.VariantIndex(index);
+        var multiPairCount = profile.StressOnly && (variant % 6) == 0 ? 3 : profile.StressOnly && (variant % 6) == 1 ? 2 : 1;
+        var width = multiPairCount > 1 ? 260 : 180;
         var height = 120;
-        var stripeWidth = 18 + (index % 42);
-        var x1 = 45 + (index % 34);
-        var x2 = x1 + stripeWidth;
-        var dark = scenario == "low_contrast" ? 70 : 20;
-        var light = scenario == "low_contrast" ? 170 : 235;
+        var stripeWidth = 18 + (variant % 32);
+        var x1 = multiPairCount > 1 ? 24 + (variant % 8) : 45 + (variant % 34);
+        var dark = scenario == "weak_edge" ? 82 : IsLowSignalScenario(scenario) ? 70 : 20;
+        var light = scenario == "weak_edge" ? 178 : IsLowSignalScenario(scenario) ? 170 : 235;
         var polarityFlip = scenario == "polarity_flip";
 
         using var image = new Mat(height, width, MatType.CV_8UC3, polarityFlip ? new Scalar(light, light, light) : new Scalar(dark, dark, dark));
         var stripeColor = polarityFlip ? new Scalar(dark, dark, dark) : new Scalar(light, light, light);
-        Cv2.Rectangle(image, new Rect(x1, 18, stripeWidth, height - 36), stripeColor, -1);
-        ApplyStress(image, scenario, index);
+        for (var pair = 0; pair < multiPairCount; pair++)
+        {
+            var gap = 16 + (variant % 5);
+            var stripeX = x1 + (pair * (stripeWidth + gap));
+            Cv2.Rectangle(image, new Rect(stripeX, 18, stripeWidth, height - 36), stripeColor, -1);
+        }
+
+        ApplyStress(image, scenario, variant);
 
         var op = CreateOperator(
             OperatorType.CaliperTool,
             ("Direction", "Horizontal"),
             ("Polarity", "Both"),
-            ("ExpectedCount", 1),
-            ("EdgeThreshold", scenario == "low_contrast" ? 6.0 : 10.0),
+            ("ExpectedCount", multiPairCount),
+            ("EdgeThreshold", IsLowSignalScenario(scenario) ? 5.0 : 10.0),
             ("SubpixelAccuracy", true),
             ("PairDirection", "any"));
         using var wrapper = new ImageWrapper(image.Clone());
@@ -162,7 +190,7 @@ internal static class MeasurementGeometryOracleRunner
         {
             ["Image"] = wrapper,
             ["SearchRegion"] = scenario == "occlusion"
-                ? new Rect(8, 20, width - 16, 18)
+                ? new Rect(8, 20, width - 16, 22)
                 : new Rect(8, 34, width - 16, 52)
         };
 
@@ -175,11 +203,25 @@ internal static class MeasurementGeometryOracleRunner
 
         var actualWidth = TryGetDouble(output.OutputData, "Width", out var value) ? value : double.NaN;
         var pixelError = Math.Abs(actualWidth - stripeWidth);
+        var pairCount = TryGetInt(output.OutputData, "PairCount", out var detectedPairCount) ? detectedPairCount : 0;
+        var pairDistances = TryGetDoubleList(output.OutputData, "PairDistances");
+        var uncertainty = TryGetDouble(output.OutputData, "UncertaintyPx", out var uncertaintyValue) ? uncertaintyValue : double.NaN;
+        var outlierCount = CountOutliers(pairDistances);
+        var edgeCount = pairCount * 2;
         var passed = output.IsSuccess && double.IsFinite(pixelError) && pixelError <= 1.5;
+        var taxonomy = BuildMeasurementTaxonomy(
+            scenario,
+            passed,
+            edgeCount,
+            multiPairCount * 2,
+            pixelError,
+            uncertainty,
+            outlierCount,
+            output.ErrorMessage);
         ReleaseImageOutputs(output.OutputData);
 
         return new CaseResult(
-            $"CaliperTool_oracle_{index:000}",
+            profile.CaseId("CaliperTool", index),
             "CaliperTool",
             scenario,
             isBoundary,
@@ -190,29 +232,42 @@ internal static class MeasurementGeometryOracleRunner
             null,
             Math.Round((double)stripeWidth, 6),
             RoundValue(actualWidth),
-            passed ? null : output.ErrorMessage ?? $"widthError={pixelError:0.###}");
+            passed ? null : output.ErrorMessage ?? $"widthError={pixelError:0.###}",
+            null,
+            RoundNullable(pixelError),
+            RoundNullable(pixelError),
+            edgeCount,
+            RoundNullable(uncertainty),
+            outlierCount,
+            taxonomy);
     }
 
-    private static async Task<CaseResult> RunArcCaliperCaseAsync(int index)
+    private static async Task<CaseResult> RunArcCaliperCaseAsync(int index, RunProfile profile)
     {
-        var scenario = ScenarioFor(index);
-        var isBoundary = index < BoundaryCasesPerOperator;
+        var scenario = profile.ScenarioFor(index);
+        var isBoundary = profile.IsStressCase(index);
+        var variant = profile.VariantIndex(index);
         var width = 220;
         var height = 220;
         var centerX = width / 2;
         var centerY = height / 2;
-        var radius = 38 + index % 34;
-        var startAngle = (index * 13) % 330;
-        var span = scenario == "partial_edge" ? 72.0 : 118.0 + index % 90;
+        var radius = 38 + variant % 34;
+        var startAngle = (variant * 13) % 330;
+        var span = scenario == "partial_edge" || scenario == "occlusion" ? 72.0 : 118.0 + variant % 90;
         var endAngle = startAngle + span;
-        var lowContrast = scenario == "low_contrast";
+        var lowContrast = IsLowSignalScenario(scenario);
         var polarityFlip = scenario == "polarity_flip";
         var background = polarityFlip ? (lowContrast ? 210 : 235) : (lowContrast ? 70 : 18);
         var foreground = polarityFlip ? (lowContrast ? 70 : 18) : (lowContrast ? 210 : 238);
+        if (scenario == "weak_edge")
+        {
+            background = polarityFlip ? 178 : 82;
+            foreground = polarityFlip ? 82 : 178;
+        }
 
         using var image = new Mat(height, width, MatType.CV_8UC3, new Scalar(background, background, background));
         Cv2.Circle(image, new Point(centerX, centerY), radius, new Scalar(foreground, foreground, foreground), -1, LineTypes.AntiAlias);
-        ApplyStress(image, scenario, index);
+        ApplyStress(image, scenario, variant);
 
         var transition = polarityFlip ? "positive" : "negative";
         var sut = new ArcCaliperOperator(NullLogger<ArcCaliperOperator>.Instance);
@@ -235,16 +290,28 @@ internal static class MeasurementGeometryOracleRunner
         stopwatch.Stop();
 
         var points = TryGetArcPoints(output.OutputData, out var typedPoints) ? typedPoints : [];
-        var actualRadius = points.Count == 0
-            ? double.NaN
-            : points.Average(point => Math.Sqrt(Math.Pow(point.X - centerX, 2) + Math.Pow(point.Y - centerY, 2)));
+        var radialDistances = points
+            .Select(point => Math.Sqrt(Math.Pow(point.X - centerX, 2) + Math.Pow(point.Y - centerY, 2)))
+            .ToArray();
+        var actualRadius = radialDistances.Length == 0 ? double.NaN : radialDistances.Average();
         var pixelError = Math.Abs(actualRadius - radius);
         var minCount = Math.Max(8, (int)Math.Floor(Math.Abs(span) * 0.35));
+        var uncertainty = StandardDeviation(radialDistances);
+        var outlierCount = CountOutliers(radialDistances);
         var passed = output.IsSuccess && points.Count >= minCount && double.IsFinite(pixelError) && pixelError <= 1.5;
+        var taxonomy = BuildMeasurementTaxonomy(
+            scenario,
+            passed,
+            points.Count,
+            minCount,
+            pixelError,
+            uncertainty,
+            outlierCount,
+            output.ErrorMessage);
         ReleaseImageOutputs(output.OutputData);
 
         return new CaseResult(
-            $"ArcCaliper_oracle_{index:000}",
+            profile.CaseId("ArcCaliper", index),
             "ArcCaliper",
             scenario,
             isBoundary,
@@ -255,24 +322,33 @@ internal static class MeasurementGeometryOracleRunner
             null,
             Math.Round((double)radius, 6),
             RoundValue(actualRadius),
-            passed ? null : output.ErrorMessage ?? $"radiusError={pixelError:0.###}, points={points.Count}, min={minCount}");
+            passed ? null : output.ErrorMessage ?? $"radiusError={pixelError:0.###}, points={points.Count}, min={minCount}",
+            null,
+            RoundNullable(pixelError),
+            RoundNullable(pixelError),
+            points.Count,
+            RoundNullable(uncertainty),
+            outlierCount,
+            taxonomy);
     }
 
-    private static async Task<CaseResult> RunLineCaseAsync(int index)
+    private static async Task<CaseResult> RunLineCaseAsync(int index, RunProfile profile)
     {
-        var scenario = ScenarioFor(index);
-        var isBoundary = index < BoundaryCasesPerOperator;
+        var scenario = profile.ScenarioFor(index);
+        var isBoundary = profile.IsStressCase(index);
+        var variant = profile.VariantIndex(index);
         var width = 180;
         var height = 140;
-        var angle = new[] { 0.0, 90.0, 45.0, 135.0 }[index % 4];
-        using var image = new Mat(height, width, MatType.CV_8UC3, Scalar.Black);
-        DrawLineScene(image, angle, scenario, index);
-        ApplyStress(image, scenario, index);
+        var angle = new[] { 0.0, 90.0, 45.0, 135.0 }[variant % 4];
+        var background = scenario == "polarity_flip" ? Scalar.White : Scalar.Black;
+        using var image = new Mat(height, width, MatType.CV_8UC3, background);
+        DrawLineScene(image, angle, scenario, variant);
+        ApplyStress(image, scenario, variant);
 
         var op = CreateOperator(
             OperatorType.LineMeasurement,
             ("Method", "ProbabilisticHough"),
-            ("Threshold", scenario == "partial_edge" ? 16 : 22),
+            ("Threshold", scenario is "partial_edge" or "weak_edge" or "low_contrast" ? 14 : 22),
             ("MinLength", 35.0),
             ("MaxGap", scenario == "occlusion" ? 14.0 : 8.0));
         using var wrapper = new ImageWrapper(image.Clone());
@@ -289,11 +365,23 @@ internal static class MeasurementGeometryOracleRunner
         var residual = TryGetDouble(output.OutputData, "ResidualMean", out var residualValue) && double.IsFinite(residualValue)
             ? Math.Abs(residualValue)
             : 0.0;
+        var lineCount = TryGetInt(output.OutputData, "LineCount", out var detectedLineCount) ? detectedLineCount : 0;
+        var uncertainty = TryGetDouble(output.OutputData, "UncertaintyPx", out var uncertaintyValue) ? uncertaintyValue : residual;
+        var outlierCount = double.IsFinite(residual) && residual > 1.5 ? 1 : 0;
         var passed = output.IsSuccess && double.IsFinite(angleError) && angleError <= 2.0 && residual <= 1.5;
+        var taxonomy = BuildMeasurementTaxonomy(
+            scenario,
+            passed,
+            lineCount,
+            1,
+            residual,
+            uncertainty,
+            outlierCount,
+            output.ErrorMessage);
         ReleaseImageOutputs(output.OutputData);
 
         return new CaseResult(
-            $"LineMeasurement_oracle_{index:000}",
+            profile.CaseId("LineMeasurement", index),
             "LineMeasurement",
             scenario,
             isBoundary,
@@ -304,23 +392,35 @@ internal static class MeasurementGeometryOracleRunner
             RoundValue(angleError),
             Math.Round(angle, 6),
             RoundValue(actualAngle),
-            passed ? null : output.ErrorMessage ?? $"angleError={angleError:0.###}, residual={residual:0.###}");
+            passed ? null : output.ErrorMessage ?? $"angleError={angleError:0.###}, residual={residual:0.###}",
+            RoundNullable(residual),
+            RoundNullable(residual),
+            null,
+            lineCount,
+            RoundNullable(uncertainty),
+            outlierCount,
+            taxonomy);
     }
 
-    private static async Task<CaseResult> RunCircleCaseAsync(int index)
+    private static async Task<CaseResult> RunCircleCaseAsync(int index, RunProfile profile)
     {
-        var scenario = ScenarioFor(index);
-        var isBoundary = index < BoundaryCasesPerOperator;
+        var scenario = profile.ScenarioFor(index);
+        var isBoundary = profile.IsStressCase(index);
+        var variant = profile.VariantIndex(index);
         var width = 150;
         var height = 130;
-        var radius = 15 + (index % 24);
-        var centerX = 42 + (index * 7 % 58);
-        var centerY = 38 + (index * 5 % 48);
+        var radius = 15 + (variant % 24);
+        var centerX = 42 + (variant * 7 % 58);
+        var centerY = 38 + (variant * 5 % 48);
         centerX = Math.Clamp(centerX, radius + 8, width - radius - 8);
         centerY = Math.Clamp(centerY, radius + 8, height - radius - 8);
-        using var image = new Mat(height, width, MatType.CV_8UC3, Scalar.Black);
-        Cv2.Circle(image, new Point(centerX, centerY), radius, Scalar.White, -1, LineTypes.AntiAlias);
-        ApplyStress(image, scenario, index);
+        var background = scenario == "polarity_flip" ? Scalar.White : Scalar.Black;
+        var foreground = scenario == "polarity_flip"
+            ? Scalar.Black
+            : scenario == "weak_edge" ? new Scalar(190, 190, 190) : IsLowSignalScenario(scenario) ? new Scalar(185, 185, 185) : Scalar.White;
+        using var image = new Mat(height, width, MatType.CV_8UC3, background);
+        Cv2.Circle(image, new Point(centerX, centerY), radius, foreground, -1, LineTypes.AntiAlias);
+        ApplyStress(image, scenario, variant);
 
         var op = CreateOperator(
             OperatorType.CircleMeasurement,
@@ -342,11 +442,23 @@ internal static class MeasurementGeometryOracleRunner
             : double.NaN;
         var radiusError = Math.Abs(actualRadius - radius);
         var pixelError = Math.Max(centerError, radiusError);
+        var circleCount = TryGetInt(output.OutputData, "CircleCount", out var detectedCircleCount) ? detectedCircleCount : 0;
+        var uncertainty = TryGetDouble(output.OutputData, "UncertaintyPx", out var uncertaintyValue) ? uncertaintyValue : double.NaN;
+        var outlierCount = double.IsFinite(pixelError) && pixelError > 1.5 ? 1 : 0;
         var passed = output.IsSuccess && double.IsFinite(pixelError) && pixelError <= 1.5;
+        var taxonomy = BuildMeasurementTaxonomy(
+            scenario,
+            passed,
+            circleCount,
+            1,
+            pixelError,
+            uncertainty,
+            outlierCount,
+            output.ErrorMessage);
         ReleaseImageOutputs(output.OutputData);
 
         return new CaseResult(
-            $"CircleMeasurement_oracle_{index:000}",
+            profile.CaseId("CircleMeasurement", index),
             "CircleMeasurement",
             scenario,
             isBoundary,
@@ -357,57 +469,68 @@ internal static class MeasurementGeometryOracleRunner
             null,
             Math.Round((double)radius, 6),
             RoundValue(actualRadius),
-            passed ? null : output.ErrorMessage ?? $"pixelError={pixelError:0.###}");
+            passed ? null : output.ErrorMessage ?? $"pixelError={pixelError:0.###}",
+            RoundNullable(centerError),
+            RoundNullable(radiusError),
+            RoundNullable(radiusError),
+            circleCount,
+            RoundNullable(uncertainty),
+            outlierCount,
+            taxonomy);
     }
 
-    private static async Task<CaseResult> RunGeometricFittingCaseAsync(int index)
+    private static async Task<CaseResult> RunGeometricFittingCaseAsync(int index, RunProfile profile)
     {
-        var scenario = ScenarioFor(index);
-        var isBoundary = index < BoundaryCasesPerOperator;
-        var fitType = new[] { "Line", "Circle", "Ellipse" }[index % 3];
+        var scenario = profile.ScenarioFor(index);
+        var isBoundary = profile.IsStressCase(index);
+        var variant = profile.VariantIndex(index);
+        var fitType = new[] { "Line", "Circle", "Ellipse" }[variant % 3];
         var width = 180;
         var height = 150;
         using var image = new Mat(height, width, MatType.CV_8UC3, Scalar.Black);
+        var drawColor = scenario == "weak_edge"
+            ? new Scalar(190, 190, 190)
+            : IsLowSignalScenario(scenario) ? new Scalar(185, 185, 185) : Scalar.White;
 
         double expectedValue;
         switch (fitType)
         {
             case "Line":
-                expectedValue = new[] { 0.0, 45.0, 90.0, 135.0 }[(index / 3) % 4];
-                DrawFittingLineScene(image, expectedValue, scenario == "partial_edge" ? "partial_edge" : "nominal", index);
+                expectedValue = new[] { 0.0, 45.0, 90.0, 135.0 }[(variant / 3) % 4];
+                DrawFittingLineScene(image, expectedValue, scenario == "partial_edge" ? "partial_edge" : "nominal", variant, drawColor);
                 break;
             case "Circle":
-                var radius = 20 + index % 24;
-                var cx = 50 + index * 7 % 70;
-                var cy = 42 + index * 5 % 54;
+                var radius = 20 + variant % 24;
+                var cx = 50 + variant * 7 % 70;
+                var cy = 42 + variant * 5 % 54;
                 cx = Math.Clamp(cx, radius + 8, width - radius - 8);
                 cy = Math.Clamp(cy, radius + 8, height - radius - 8);
                 expectedValue = radius;
-                Cv2.Circle(image, new Point(cx, cy), radius, Scalar.White, 1, LineTypes.AntiAlias);
+                Cv2.Circle(image, new Point(cx, cy), radius, drawColor, 1, LineTypes.AntiAlias);
                 break;
             default:
-                var major = 26 + index % 18;
-                var minor = 14 + index % 10;
-                var angle = (index * 11) % 90;
+                var major = 26 + variant % 18;
+                var minor = 14 + variant % 10;
+                var angle = (variant * 11) % 90;
                 expectedValue = major * 2.0;
-                Cv2.Ellipse(image, new Point(width / 2, height / 2), new Size(major, minor), angle, 0, 360, Scalar.White, 1, LineTypes.AntiAlias);
+                Cv2.Ellipse(image, new Point(width / 2, height / 2), new Size(major, minor), angle, 0, 360, drawColor, 1, LineTypes.AntiAlias);
                 break;
         }
 
         if (scenario == "outlier_contour")
         {
-            ApplyGeometricOutlierStress(image, index);
+            ApplyGeometricOutlierStress(image, variant);
         }
         else
         {
-            ApplyStress(image, scenario, index);
+            ApplyStress(image, scenario, variant);
         }
 
         var sut = new GeometricFittingOperator(NullLogger<GeometricFittingOperator>.Instance);
         var op = CreateOperator(
             OperatorType.GeometricFitting,
             ("FitType", fitType),
-            ("Threshold", scenario == "low_contrast" ? 72.0 : 80.0),
+            ("Threshold", IsLowSignalScenario(scenario) ? 72.0 : 80.0),
             ("MinArea", 5),
             ("MinPoints", 5),
             ("ContourSelection", scenario == "outlier_contour" ? "LargestContour" : "BestResidual"),
@@ -424,6 +547,9 @@ internal static class MeasurementGeometryOracleRunner
 
         var actualValue = ExtractGeometricActualValue(output.OutputData, fitType);
         var residual = TryGetDouble(output.OutputData, "ResidualMean", out var residualValue) ? Math.Abs(residualValue) : double.NaN;
+        var uncertainty = TryGetDouble(output.OutputData, "UncertaintyPx", out var uncertaintyValue) ? uncertaintyValue : residual;
+        var pointCount = TryGetInt(output.OutputData, "PointCount", out var detectedPointCount) ? detectedPointCount : 0;
+        var outlierCount = TryGetGeometricOutlierCount(output.OutputData, pointCount);
         var angleError = fitType == "Line" ? AngleError(actualValue, expectedValue) : (double?)null;
         var pixelError = double.IsFinite(residual)
             ? residual
@@ -432,10 +558,19 @@ internal static class MeasurementGeometryOracleRunner
             double.IsFinite(pixelError) &&
             pixelError <= 1.5 &&
             (!angleError.HasValue || angleError.Value <= 2.0);
+        var taxonomy = BuildMeasurementTaxonomy(
+            scenario,
+            passed,
+            pointCount,
+            fitType == "Ellipse" ? 5 : fitType == "Circle" ? 3 : 2,
+            pixelError,
+            uncertainty,
+            outlierCount,
+            output.ErrorMessage);
         ReleaseImageOutputs(output.OutputData);
 
         return new CaseResult(
-            $"GeometricFitting_{fitType}_oracle_{index:000}",
+            profile.CaseId($"GeometricFitting_{fitType}", index),
             "GeometricFitting",
             scenario,
             isBoundary,
@@ -446,13 +581,18 @@ internal static class MeasurementGeometryOracleRunner
             angleError.HasValue ? RoundNullable(angleError.Value) : null,
             Math.Round(expectedValue, 6),
             RoundValue(actualValue),
-            passed ? null : output.ErrorMessage ?? $"{fitType}Error={pixelError:0.###}");
+            passed ? null : output.ErrorMessage ?? $"{fitType}Error={pixelError:0.###}",
+            fitType == "Line" ? RoundNullable(pixelError) : null,
+            RoundNullable(pixelError),
+            fitType is "Circle" or "Ellipse" ? RoundNullable(Math.Abs(actualValue - expectedValue)) : null,
+            pointCount,
+            RoundNullable(uncertainty),
+            outlierCount,
+            taxonomy);
     }
 
-    private static string ScenarioFor(int index) =>
-        index < BoundaryCasesPerOperator
-            ? BoundaryScenarios[index % BoundaryScenarios.Length]
-            : "nominal";
+    private static bool IsLowSignalScenario(string scenario) =>
+        scenario is "low_contrast" or "weak_edge";
 
     private static void DrawLineScene(Mat image, double angle, string scenario, int index)
     {
@@ -462,7 +602,9 @@ internal static class MeasurementGeometryOracleRunner
         var radians = angle * Math.PI / 180.0;
         var dx = Math.Cos(radians) * length / 2.0;
         var dy = Math.Sin(radians) * length / 2.0;
-        var color = scenario == "low_contrast" ? new Scalar(185, 185, 185) : Scalar.White;
+        var color = scenario == "polarity_flip"
+            ? Scalar.Black
+            : scenario == "weak_edge" ? new Scalar(150, 150, 150) : IsLowSignalScenario(scenario) ? new Scalar(185, 185, 185) : Scalar.White;
         Cv2.Line(
             image,
             new Point((int)Math.Round(cx - dx), (int)Math.Round(cy - dy)),
@@ -472,7 +614,7 @@ internal static class MeasurementGeometryOracleRunner
             LineTypes.AntiAlias);
     }
 
-    private static void DrawFittingLineScene(Mat image, double angle, string scenario, int index)
+    private static void DrawFittingLineScene(Mat image, double angle, string scenario, int index, Scalar color)
     {
         var cx = image.Width / 2.0 + ((index % 5) - 2);
         var cy = image.Height / 2.0 + ((index % 7) - 3);
@@ -484,7 +626,7 @@ internal static class MeasurementGeometryOracleRunner
             image,
             new Point((int)Math.Round(cx - dx), (int)Math.Round(cy - dy)),
             new Point((int)Math.Round(cx + dx), (int)Math.Round(cy + dy)),
-            Scalar.White,
+            color,
             1,
             LineTypes.AntiAlias);
     }
@@ -508,6 +650,10 @@ internal static class MeasurementGeometryOracleRunner
             case "subpixel_offset":
                 Cv2.GaussianBlur(image, image, new Size(3, 3), 0.6);
                 break;
+            case "weak_edge":
+                Cv2.GaussianBlur(image, image, new Size(3, 3), 0.8);
+                AddDeterministicNoise(image, seed, amplitude: 2);
+                break;
         }
     }
 
@@ -516,6 +662,100 @@ internal static class MeasurementGeometryOracleRunner
         var x = image.Width - 24 - seed % 5;
         var y = 12 + seed % 7;
         Cv2.Rectangle(image, new Rect(x, y, 8, 6), new Scalar(175, 175, 175), 1);
+    }
+
+    private static IReadOnlyList<string> BuildMeasurementTaxonomy(
+        string scenario,
+        bool passed,
+        int edgeCount,
+        int expectedEdgeCount,
+        double primaryError,
+        double uncertainty,
+        int outlierCount,
+        string? failure)
+    {
+        var labels = new List<string>();
+        if (scenario == "weak_edge" || failure?.Contains("NoFeature", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            labels.Add("weak-gradient");
+        }
+
+        if (scenario == "polarity_flip" && !passed)
+        {
+            labels.Add("polarity-mismatch");
+        }
+
+        if (double.IsFinite(primaryError) && primaryError > 1.5)
+        {
+            labels.Add("pair-distance-outlier");
+        }
+
+        if (scenario == "occlusion" && (edgeCount < expectedEdgeCount || !passed))
+        {
+            labels.Add("occluded-edge");
+        }
+
+        if (double.IsFinite(uncertainty) && uncertainty > 1.0)
+        {
+            labels.Add("unstable-subpixel-peak");
+        }
+
+        if (outlierCount > 0)
+        {
+            labels.Add("outlier-contour");
+        }
+
+        if (labels.Count == 0 && !passed)
+        {
+            labels.Add("unclassified-measurement-failure");
+        }
+
+        return labels.Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    private static double AverageNullable(IEnumerable<double?> values)
+    {
+        var finite = values
+            .Where(value => value.HasValue && double.IsFinite(value.Value))
+            .Select(value => value!.Value)
+            .ToArray();
+        return finite.Length == 0 ? 0.0 : finite.Average();
+    }
+
+    private static double OutlierRate(IReadOnlyList<CaseResult> cases)
+    {
+        if (cases.Count == 0)
+        {
+            return 0.0;
+        }
+
+        return cases.Count(item => item.OutlierCount > 0) / (double)cases.Count;
+    }
+
+    private static int CountOutliers(IReadOnlyList<double> values)
+    {
+        if (values.Count < 3)
+        {
+            return 0;
+        }
+
+        var center = values.Average();
+        var sigma = StandardDeviation(values);
+        var threshold = Math.Max(1.0, sigma * 3.0);
+        return values.Count(value => double.IsFinite(value) && Math.Abs(value - center) > threshold);
+    }
+
+    private static double StandardDeviation(IReadOnlyList<double> values)
+    {
+        var finite = values.Where(double.IsFinite).ToArray();
+        if (finite.Length <= 1)
+        {
+            return 0.0;
+        }
+
+        var mean = finite.Average();
+        var variance = finite.Select(value => (value - mean) * (value - mean)).Sum() / (finite.Length - 1);
+        return Math.Sqrt(Math.Max(0.0, variance));
     }
 
     private static void AddDeterministicNoise(Mat image, int seed, int amplitude)
@@ -573,6 +813,91 @@ internal static class MeasurementGeometryOracleRunner
 
         value = Convert.ToDouble(convertible);
         return true;
+    }
+
+    private static bool TryGetInt(IReadOnlyDictionary<string, object>? data, string key, out int value)
+    {
+        value = 0;
+        if (data is null || !data.TryGetValue(key, out var raw) || raw is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            value = Convert.ToInt32(raw);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        catch (InvalidCastException)
+        {
+            return false;
+        }
+    }
+
+    private static IReadOnlyList<double> TryGetDoubleList(IReadOnlyDictionary<string, object>? data, string key)
+    {
+        if (data is null || !data.TryGetValue(key, out var raw) || raw is null)
+        {
+            return Array.Empty<double>();
+        }
+
+        if (raw is IEnumerable<double> typed)
+        {
+            return typed.Where(double.IsFinite).ToArray();
+        }
+
+        if (raw is string)
+        {
+            return Array.Empty<double>();
+        }
+
+        if (raw is System.Collections.IEnumerable enumerable)
+        {
+            var values = new List<double>();
+            foreach (var item in enumerable)
+            {
+                if (item is IConvertible convertible)
+                {
+                    var value = Convert.ToDouble(convertible);
+                    if (double.IsFinite(value))
+                    {
+                        values.Add(value);
+                    }
+                }
+            }
+
+            return values;
+        }
+
+        return Array.Empty<double>();
+    }
+
+    private static int TryGetGeometricOutlierCount(IReadOnlyDictionary<string, object>? data, int pointCount)
+    {
+        if (data is null ||
+            !data.TryGetValue("FitResult", out var rawFit) ||
+            rawFit is not Dictionary<string, object> fit)
+        {
+            return 0;
+        }
+
+        if (fit.TryGetValue("InlierCount", out var rawInlier) && rawInlier is IConvertible inlier)
+        {
+            return Math.Max(0, pointCount - Convert.ToInt32(inlier));
+        }
+
+        if (fit.TryGetValue("ResidualMax", out var rawMax) &&
+            rawMax is IConvertible max &&
+            Convert.ToDouble(max) > 2.5)
+        {
+            return 1;
+        }
+
+        return 0;
     }
 
     private static bool TryGetPosition(IReadOnlyDictionary<string, object>? data, string key, out Position value)
@@ -695,45 +1020,131 @@ internal static class MeasurementGeometryOracleRunner
             }
         }
     }
+
+    private sealed record RunProfile(
+        string Name,
+        string SchemaVersion,
+        int CasesPerOperator,
+        int VariantOffset,
+        bool StressOnly,
+        string CaseIdSuffix,
+        string EvidenceRule,
+        string BoundarySampleRule)
+    {
+        public static RunProfile Resolve(string? profile)
+        {
+            var normalized = profile?.Trim().ToLowerInvariant() ?? "oracle-v1";
+            return normalized switch
+            {
+                "stress-v2" or "measurement-precision-stress-v2" => new RunProfile(
+                    "stress-v2",
+                    "2026-04-30.measurement-precision-stress.v2",
+                    StressV2CasesPerOperator,
+                    StressV2VariantOffset,
+                    true,
+                    "stress_v2",
+                    "This report is semisynthetic stress evidence for measurement-operator precision and robustness.",
+                    "Stress samples cover blur, noise, low contrast, occlusion, polarity flip, subpixel offset, outlier contour, and weak edge cases."),
+                "oracle-v1" or "measurement-geometry-oracle-v1" => new RunProfile(
+                    "oracle-v1",
+                    "2026-04-30.measurement-geometry-oracle.v1",
+                    BaselineCasesPerOperator,
+                    0,
+                    false,
+                    string.Empty,
+                    "This report is semisynthetic geometry-oracle evidence for measurement operators.",
+                    "Boundary samples are stress cases over blur, noise, contrast, partial edges, polarity, subpixel offset, outliers, and occlusion."),
+                _ => throw new ArgumentException($"Unknown measurement oracle profile: {profile}")
+            };
+        }
+
+        public string ScenarioFor(int index) =>
+            StressOnly
+                ? StressV2Scenarios[index % StressV2Scenarios.Length]
+                : index < BoundaryCasesPerOperator
+                    ? BoundaryScenarios[index % BoundaryScenarios.Length]
+                    : "nominal";
+
+        public bool IsStressCase(int index) => StressOnly || index < BoundaryCasesPerOperator;
+
+        public int VariantIndex(int index) => VariantOffset + index;
+
+        public string CaseId(string prefix, int index) =>
+            string.IsNullOrWhiteSpace(CaseIdSuffix)
+                ? $"{prefix}_oracle_{index:000}"
+                : $"{prefix}_{CaseIdSuffix}_{index:000}";
+    }
 }
 
-internal sealed record RunnerOptions(string OutputPath, string ReportPath, bool ShowHelp, string? ParseError)
+internal sealed record RunnerOptions(string OutputPath, string ReportPath, string Profile, bool ShowHelp, string? ParseError)
 {
     public static RunnerOptions Parse(string[] args)
     {
-        var options = new RunnerOptions(
-            "quality/evals/reports/QualityFlywheel_measurement_geometry_oracle_v1.json",
-            "quality/evals/reports/QualityFlywheel_measurement_geometry_oracle_v1.md",
-            false,
-            null);
+        string? outputPath = null;
+        string? reportPath = null;
+        var profile = "oracle-v1";
+        var showHelp = false;
+        string? parseError = null;
 
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];
             if (arg is "-h" or "--help")
             {
-                return options with { ShowHelp = true };
+                showHelp = true;
+                continue;
             }
 
             if (i + 1 >= args.Length)
             {
-                return options with { ParseError = $"Missing value for {arg}" };
+                parseError = $"Missing value for {arg}";
+                break;
             }
 
             var value = args[++i];
-            options = arg switch
+            switch (arg)
             {
-                "--output" => options with { OutputPath = value },
-                "--report" => options with { ReportPath = value },
-                _ => options with { ParseError = $"Unknown argument: {arg}" }
-            };
+                case "--output":
+                    outputPath = value;
+                    break;
+                case "--report":
+                    reportPath = value;
+                    break;
+                case "--profile":
+                    profile = value;
+                    break;
+                default:
+                    parseError = $"Unknown argument: {arg}";
+                    break;
+            }
         }
 
-        return options;
+        var defaults = DefaultPaths(profile);
+        return new RunnerOptions(
+            outputPath ?? defaults.Output,
+            reportPath ?? defaults.Report,
+            profile,
+            showHelp,
+            parseError);
+    }
+
+    private static (string Output, string Report) DefaultPaths(string profile)
+    {
+        var normalized = profile.Trim().ToLowerInvariant();
+        if (normalized is "stress-v2" or "measurement-precision-stress-v2")
+        {
+            return (
+                "quality/evals/reports/QualityFlywheel_measurement_precision_stress_v2.json",
+                "quality/evals/reports/QualityFlywheel_measurement_precision_stress_v2.md");
+        }
+
+        return (
+            "quality/evals/reports/QualityFlywheel_measurement_geometry_oracle_v1.json",
+            "quality/evals/reports/QualityFlywheel_measurement_geometry_oracle_v1.md");
     }
 
     public static void PrintHelp() =>
-        Console.WriteLine("Usage: dotnet run --project quality/tools/MeasurementGeometryOracleRunner/MeasurementGeometryOracleRunner.csproj -- [--output path] [--report path]");
+        Console.WriteLine("Usage: dotnet run --project quality/tools/MeasurementGeometryOracleRunner/MeasurementGeometryOracleRunner.csproj -- [--profile oracle-v1|stress-v2] [--output path] [--report path]");
 }
 
 internal static class MarkdownReport
@@ -762,38 +1173,41 @@ internal static class MarkdownReport
             $"| Failed | {result.Summary.Failed} |",
             $"| Pass rate | {result.Summary.PassRate:0.####} |",
             $"| Boundary/failure-oriented cases | {result.Summary.BoundaryCaseCount} |",
+            $"| Stress cases | {result.Summary.StressCaseCount} |",
             $"| Regression cases | {result.Summary.RegressionCaseCount} |",
             $"| P95 pixel error px | {result.Summary.P95PixelErrorPx:0.####} |",
             $"| P95 angle error deg | {result.Summary.P95AngleErrorDeg:0.####} |",
+            $"| Mean uncertainty px | {result.Summary.MeanUncertaintyPx:0.####} |",
+            $"| Outlier rate | {result.Summary.OutlierRate:0.####} |",
             $"| Runtime ms | {result.Summary.RuntimeMs:0.###} |",
             "",
             "## Operators",
             "",
-            "| Operator | Cases | Boundary | Passed | Failed | Pass rate | P95 pixel error | P95 angle error | Avg runtime ms | Accepted |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+            "| Operator | Cases | Stress | Passed | Failed | Pass rate | P95 pixel error | P95 angle error | Mean uncertainty | Outlier rate | Avg runtime ms | Accepted |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
         };
 
         lines.AddRange(result.Operators.Select(item =>
-            $"| {item.Operator} | {item.CaseCount} | {item.BoundaryCaseCount} | {item.Passed} | {item.Failed} | {item.PassRate:0.####} | {item.P95PixelErrorPx:0.####} | {item.P95AngleErrorDeg:0.####} | {item.RuntimeMsAvg:0.###} | {item.Accepted} |"));
+            $"| {item.Operator} | {item.CaseCount} | {item.StressCaseCount} | {item.Passed} | {item.Failed} | {item.PassRate:0.####} | {item.P95PixelErrorPx:0.####} | {item.P95AngleErrorDeg:0.####} | {item.MeanUncertaintyPx:0.####} | {item.OutlierRate:0.####} | {item.RuntimeMsAvg:0.###} | {item.Accepted} |"));
 
         lines.AddRange(
         [
             "",
             "## Failed Cases",
             "",
-            "| Case | Operator | Scenario | Pixel error | Angle error | Expected | Actual | Failure |",
-            "| --- | --- | --- | ---: | ---: | ---: | ---: | --- |"
+            "| Case | Operator | Scenario | Pixel error | Angle error | Edge count | Uncertainty | Outliers | Taxonomy | Failure |",
+            "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |"
         ]);
 
         var failures = result.Cases.Where(item => !item.Passed).Take(40).ToArray();
         if (failures.Length == 0)
         {
-            lines.Add("| - | - | - | - | - | - | - | - |");
+            lines.Add("| - | - | - | - | - | - | - | - | - | - |");
         }
         else
         {
             lines.AddRange(failures.Select(item =>
-                $"| {item.CaseId} | {item.Operator} | {item.Scenario} | {Format(item.PixelErrorPx)} | {Format(item.AngleErrorDeg)} | {item.ExpectedValue:0.######} | {item.ActualValue:0.######} | {item.Failure ?? "-"} |"));
+                $"| {item.CaseId} | {item.Operator} | {item.Scenario} | {Format(item.PixelErrorPx)} | {Format(item.AngleErrorDeg)} | {item.EdgeCount} | {Format(item.UncertaintyPx)} | {item.OutlierCount} | {FormatTaxonomy(item.Taxonomy)} | {item.Failure ?? "-"} |"));
         }
 
         lines.Add("");
@@ -802,6 +1216,9 @@ internal static class MarkdownReport
 
     private static string Format(double? value) =>
         value.HasValue && double.IsFinite(value.Value) ? value.Value.ToString("0.####") : "-";
+
+    private static string FormatTaxonomy(IReadOnlyList<string>? taxonomy) =>
+        taxonomy is { Count: > 0 } ? string.Join(", ", taxonomy) : "-";
 }
 
 internal sealed record ClaimBoundary(string EvidenceRule, string FieldSignoffRule, string BoundarySampleRule);
@@ -811,19 +1228,25 @@ internal sealed record OracleSummary(
     int Failed,
     double PassRate,
     int BoundaryCaseCount,
+    int StressCaseCount,
     int RegressionCaseCount,
     double P95PixelErrorPx,
     double P95AngleErrorDeg,
+    double MeanUncertaintyPx,
+    double OutlierRate,
     double RuntimeMs);
 internal sealed record OperatorSummary(
     string Operator,
     int CaseCount,
     int BoundaryCaseCount,
+    int StressCaseCount,
     int Passed,
     int Failed,
     double PassRate,
     double P95PixelErrorPx,
     double P95AngleErrorDeg,
+    double MeanUncertaintyPx,
+    double OutlierRate,
     double RuntimeMsAvg,
     bool Accepted);
 internal sealed record CaseResult(
@@ -838,7 +1261,14 @@ internal sealed record CaseResult(
     double? AngleErrorDeg,
     double ExpectedValue,
     double ActualValue,
-    string? Failure);
+    string? Failure,
+    double? PositionErrorPx = null,
+    double? MeasurementErrorPx = null,
+    double? RadiusOrDistanceErrorPx = null,
+    int EdgeCount = 0,
+    double? UncertaintyPx = null,
+    int OutlierCount = 0,
+    IReadOnlyList<string>? Taxonomy = null);
 internal sealed record OracleResult(
     string SchemaVersion,
     DateTimeOffset GeneratedAtUtc,

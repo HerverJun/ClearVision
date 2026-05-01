@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Acme.Product.Infrastructure.AI.Anomaly;
+using Acme.Product.Infrastructure.AI.Runtime;
 using OpenCvSharp;
 
 var options = RunnerOptions.Parse(args);
@@ -38,6 +39,8 @@ return result.Summary.Failed == 0 ? 0 : 1;
 
 internal static class MvtecRunner
 {
+    private static readonly string[] SupportedEmbeddingCatalogTypes = ["anomaly_embedding", "embedding"];
+
     public static BaselineResult Run(RunnerOptions options)
     {
         var index = LoadIndex(options.IndexPath);
@@ -47,6 +50,7 @@ internal static class MvtecRunner
         var stopwatchAll = Stopwatch.StartNew();
         var allocationBeforeAll = GC.GetTotalAllocatedBytes(precise: true);
         ValidateCaseIds(index, options);
+        var embedding = ResolveEmbeddingModel(options);
 
         var selectedTestRecords = index.Records
             .Where(item => item.Split == "test")
@@ -79,7 +83,9 @@ internal static class MvtecRunner
                 PatchStride = options.PatchStride,
                 CoresetRatio = options.CoresetRatio,
                 Backbone = "simple_patchcore",
-                FeatureExtractorId = "lab_gradient_stats"
+                FeatureExtractorId = options.FeatureExtractorId,
+                EmbeddingModelId = embedding.ModelId,
+                EmbeddingModelPath = embedding.Path
             };
 
             var trainImages = new List<Mat>(trainRecords.Count);
@@ -185,6 +191,10 @@ internal static class MvtecRunner
                 options.PixelSampleStride,
                 options.CoresetRatio,
                 options.Threshold,
+                options.FeatureExtractorId,
+                embedding.ModelId,
+                embedding.Source,
+                embedding.Configured,
                 categoryResults.Sum(item => item.TrainCount),
                 testResults.Count,
                 testResults.Count(item => item.IsAnomaly),
@@ -251,6 +261,43 @@ internal static class MvtecRunner
         {
             throw new InvalidOperationException($"Unknown MVTec case id(s): {string.Join(", ", missing)}");
         }
+    }
+
+    private static EmbeddingResolution ResolveEmbeddingModel(RunnerOptions options)
+    {
+        if (!options.FeatureExtractorId.Equals("onnx_embedding", StringComparison.OrdinalIgnoreCase))
+        {
+            return EmbeddingResolution.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.EmbeddingModelPath))
+        {
+            var fullPath = Path.GetFullPath(options.EmbeddingModelPath);
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException($"Embedding model not found: {fullPath}");
+            }
+
+            return new EmbeddingResolution(fullPath, options.EmbeddingModelId, "ExplicitPath", true);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.EmbeddingModelId))
+        {
+            var resolved = ModelCatalog.ResolveExplicitOrCatalogPath(
+                explicitPath: null,
+                modelId: options.EmbeddingModelId,
+                catalogPath: options.ModelCatalogPath,
+                expectedTypes: SupportedEmbeddingCatalogTypes,
+                out _);
+            if (!File.Exists(resolved))
+            {
+                throw new FileNotFoundException($"Embedding model not found: {resolved}");
+            }
+
+            return new EmbeddingResolution(Path.GetFullPath(resolved), options.EmbeddingModelId, "ModelCatalog", true);
+        }
+
+        throw new InvalidOperationException("FeatureExtractorId=onnx_embedding requires --embedding-model or --embedding-model-id.");
     }
 
     private static string CaseId(MvtecRecord record)
@@ -456,6 +503,10 @@ internal sealed record RunnerOptions(
     int PixelSampleStride,
     double CoresetRatio,
     double Threshold,
+    string FeatureExtractorId,
+    string EmbeddingModelPath,
+    string EmbeddingModelId,
+    string ModelCatalogPath,
     double MinImageAuroc,
     double MinPixelAuroc,
     double MinCategoryImageAuroc,
@@ -480,6 +531,10 @@ internal sealed record RunnerOptions(
             PixelSampleStride: 2,
             CoresetRatio: 0.02,
             Threshold: 0.35,
+            FeatureExtractorId: "lab_gradient_stats",
+            EmbeddingModelPath: string.Empty,
+            EmbeddingModelId: string.Empty,
+            ModelCatalogPath: string.Empty,
             MinImageAuroc: 0.5,
             MinPixelAuroc: 0.5,
             MinCategoryImageAuroc: 0.5,
@@ -521,6 +576,10 @@ internal sealed record RunnerOptions(
                     "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--coreset-ratio" => options with { CoresetRatio = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--threshold" => options with { Threshold = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--feature-extractor-id" => options with { FeatureExtractorId = NextValue() },
+                    "--embedding-model" => options with { EmbeddingModelPath = NextValue() },
+                    "--embedding-model-id" => options with { EmbeddingModelId = NextValue() },
+                    "--model-catalog" => options with { ModelCatalogPath = NextValue() },
                     "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--min-pixel-auroc" => options with { MinPixelAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--min-category-image-auroc" => options with { MinCategoryImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
@@ -570,6 +629,13 @@ internal sealed record RunnerOptions(
                                   Pixel AUROC sampling stride. Default: 2.
           --coreset-ratio <float> Feature-bank coreset ratio. Default: 0.02.
           --threshold <float>     Inference threshold for IsAnomaly/mask. Default: 0.35.
+          --feature-extractor-id <id>
+                                  lab_gradient_stats or onnx_embedding. Default: lab_gradient_stats.
+          --embedding-model <path>
+                                  External ONNX embedding model for FeatureExtractorId=onnx_embedding.
+          --embedding-model-id <id>
+                                  Model catalog id for FeatureExtractorId=onnx_embedding.
+          --model-catalog <path>  Optional model catalog path for embedding model resolution.
           --min-image-auroc <float>
                                   Overall image AUROC release gate. Default: 0.5.
           --min-pixel-auroc <float>
@@ -621,6 +687,10 @@ internal static class MarkdownReport
             $"| Patch size / stride | {result.Summary.PatchSize} / {result.Summary.PatchStride} |",
             $"| Pixel sample stride | {result.Summary.PixelSampleStride} |",
             $"| Coreset ratio | {result.Summary.CoresetRatio:F4} |",
+            $"| Feature extractor | {result.Summary.FeatureExtractorId} |",
+            $"| Embedding model id | {result.Summary.EmbeddingModelId} |",
+            $"| Embedding model source | {result.Summary.EmbeddingModelSource} |",
+            $"| Embedding model configured | {result.Summary.EmbeddingModelConfigured} |",
             $"| Runtime ms | {result.Summary.RuntimeMs:F3} |",
             "",
             "## Categories",
@@ -702,7 +772,7 @@ internal static class MarkdownReport
             "",
             "## Notes",
             "",
-            "- Baseline uses the current SimplePatchCore-Lite implementation with `lab_gradient_stats` features.",
+            "- Baseline uses the current SimplePatchCore-Lite implementation; `onnx_embedding` is an explicit candidate path and keeps model artifacts outside git.",
             "- Images and masks are resized to the configured max side before evaluation.",
             "- Pixel AUROC is computed from the normalized float `ScoreMap`, not from the thresholded mask.",
             "- Current AUROC is recorded as baseline evidence for SimplePatchCore-Lite; it is not a claim of production-grade anomaly accuracy."
@@ -728,6 +798,11 @@ internal sealed record MvtecRecord(
 
 internal readonly record struct ScoredLabel(double Score, bool Label);
 
+internal readonly record struct EmbeddingResolution(string Path, string ModelId, string Source, bool Configured)
+{
+    public static EmbeddingResolution Empty { get; } = new(string.Empty, string.Empty, "None", false);
+}
+
 internal sealed record BaselineResult(
     BaselineSummary Summary,
     List<OperatorSummary> Operators,
@@ -746,6 +821,10 @@ internal sealed record BaselineSummary(
     int PixelSampleStride,
     double CoresetRatio,
     double Threshold,
+    string FeatureExtractorId,
+    string EmbeddingModelId,
+    string EmbeddingModelSource,
+    bool EmbeddingModelConfigured,
     int TrainCount,
     int TestCount,
     int TestAnomalyCount,

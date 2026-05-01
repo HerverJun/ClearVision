@@ -48,7 +48,7 @@ internal static class HomographyBridgeRunner
 
     public static async Task<BridgeResult> RunAsync(RunnerOptions options)
     {
-        var specs = BuildCases()
+        var specs = BuildCases(options)
             .Where(options.IncludesCase)
             .ToList();
         var results = new List<BridgeCaseResult>(specs.Count);
@@ -95,8 +95,11 @@ internal static class HomographyBridgeRunner
     {
         using var baseScene = CreateBaseScene();
         using var warpedScene = ApplyHomography(baseScene, spec);
-        using var sceneForSearch = ApplyPhotometric(warpedScene, spec);
-        using var template = CreateTemplate(baseScene, sceneForSearch, spec);
+        using var bridgeScene = ApplyPhotometric(warpedScene, spec);
+        using var template = CreateTemplate(baseScene, bridgeScene, spec);
+        using var sceneForSearch = spec.EnablePoseSearch
+            ? CreatePoseSearchScene(bridgeScene, template, spec)
+            : bridgeScene.Clone();
 
         ImageWrapper? sceneWrapper = null;
         ImageWrapper? templateWrapper = null;
@@ -126,6 +129,14 @@ internal static class HomographyBridgeRunner
         var positionError = Distance(actual, spec.ExpectedCenter);
         var score = ReadDouble(execution, "Score");
         var normalizedScore = ReadDouble(execution, "NormalizedScore");
+        var subpixelOffsetX = ReadDouble(execution, "SubpixelOffsetX");
+        var subpixelOffsetY = ReadDouble(execution, "SubpixelOffsetY");
+        var peakCurvature = ReadDouble(execution, "PeakCurvature");
+        var actualAngle = ReadDouble(execution, "Angle");
+        var actualScale = ReadDouble(execution, "Scale");
+        var pyramidLevels = ReadInt(execution, "PyramidLevels");
+        var angleError = spec.EnablePoseSearch ? Math.Abs(NormalizeAngle(actualAngle - spec.ExpectedAngleDeg)) : 0.0;
+        var scaleError = spec.EnablePoseSearch ? Math.Abs(actualScale - spec.ExpectedScale) : 0.0;
         var isMatch = execution?.IsSuccess == true &&
             execution.OutputData?.TryGetValue("IsMatch", out var isMatchObj) == true &&
             isMatchObj is bool b &&
@@ -135,7 +146,8 @@ internal static class HomographyBridgeRunner
             double.IsFinite(positionError) &&
             positionError <= PositionTolerancePx &&
             normalizedScore >= 0.75 &&
-            normalizedScore <= 1.000001;
+            normalizedScore <= 1.000001 &&
+            (!spec.EnablePoseSearch || (angleError <= spec.PoseSearchAngleStep + 0.1 && scaleError <= spec.PoseSearchScaleStep + 0.011));
 
         ReleaseImageOutputs(execution?.OutputData);
         sceneWrapper?.Dispose();
@@ -156,10 +168,20 @@ internal static class HomographyBridgeRunner
             Math.Round(positionError, 4),
             Math.Round(score, 6),
             Math.Round(normalizedScore, 6),
+            Math.Round(subpixelOffsetX, 6),
+            Math.Round(subpixelOffsetY, 6),
+            Math.Round(peakCurvature, 6),
+            Math.Round(spec.ExpectedAngleDeg, 6),
+            Math.Round(actualAngle, 6),
+            Math.Round(angleError, 6),
+            Math.Round(spec.ExpectedScale, 6),
+            Math.Round(actualScale, 6),
+            Math.Round(scaleError, 6),
+            pyramidLevels,
             passed ? null : execution?.ErrorMessage ?? "Position/score contract failed");
     }
 
-    private static IEnumerable<BridgeCaseSpec> BuildCases()
+    private static IEnumerable<BridgeCaseSpec> BuildCases(RunnerOptions options)
     {
         var anchors = new[]
         {
@@ -202,8 +224,67 @@ internal static class HomographyBridgeRunner
                     sequence.Beta,
                     anchor,
                     topLeft,
-                    center);
+                    center,
+                    PatchWidth,
+                    PatchHeight);
             }
+        }
+
+        if (!options.IncludesPoseSearch)
+        {
+            yield break;
+        }
+
+        foreach (var spec in BuildPoseSearchCases())
+        {
+            yield return spec;
+        }
+    }
+
+    private static IEnumerable<BridgeCaseSpec> BuildPoseSearchCases()
+    {
+        var specs = new[]
+        {
+            new PoseReplaySpec("pose_small_rotation", new Point2d(70, 58), new Point2d(118, 38), -5.0, 1.00, -5.0, 10.0, 1.0, 1.00, 1.00, 0.05),
+            new PoseReplaySpec("pose_small_rotation", new Point2d(132, 72), new Point2d(190, 44), 5.0, 1.00, -5.0, 10.0, 1.0, 1.00, 1.00, 0.05),
+            new PoseReplaySpec("pose_medium_rotation", new Point2d(214, 62), new Point2d(72, 104), -12.0, 1.00, -15.0, 30.0, 1.0, 1.00, 1.00, 0.05),
+            new PoseReplaySpec("pose_medium_rotation", new Point2d(82, 148), new Point2d(186, 108), 14.0, 1.00, -15.0, 30.0, 1.0, 1.00, 1.00, 0.05),
+            new PoseReplaySpec("pose_scale", new Point2d(166, 152), new Point2d(58, 166), 0.0, 0.90, 0.0, 0.0, 1.0, 0.90, 1.10, 0.05),
+            new PoseReplaySpec("pose_scale", new Point2d(238, 164), new Point2d(166, 166), 0.0, 1.10, 0.0, 0.0, 1.0, 0.90, 1.10, 0.05),
+            new PoseReplaySpec("pose_rotation_scale", new Point2d(132, 72), new Point2d(250, 70), 8.0, 0.95, -15.0, 30.0, 1.0, 0.90, 1.10, 0.05),
+            new PoseReplaySpec("pose_rotation_scale", new Point2d(166, 152), new Point2d(244, 150), -10.0, 1.05, -15.0, 30.0, 1.0, 0.90, 1.10, 0.05)
+        };
+
+        var counters = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var pose in specs)
+        {
+            counters.TryGetValue(pose.Sequence, out var index);
+            counters[pose.Sequence] = index + 1;
+            var size = TransformedSize(new Size(PatchWidth, PatchHeight), pose.AngleDeg, pose.Scale);
+            var targetTopLeft = new Point2d(
+                Math.Clamp(Math.Round(pose.TargetTopLeft.X), 0, SceneWidth - size.Width),
+                Math.Clamp(Math.Round(pose.TargetTopLeft.Y), 0, SceneHeight - size.Height));
+            yield return new BridgeCaseSpec(
+                $"TemplateMatching_{pose.Sequence}_{index:0000}",
+                pose.Sequence,
+                "Source",
+                Translation(0, 0),
+                1.0,
+                0.0,
+                pose.SourceAnchor,
+                targetTopLeft,
+                new Point2d(targetTopLeft.X + (size.Width / 2.0), targetTopLeft.Y + (size.Height / 2.0)),
+                size.Width,
+                size.Height,
+                true,
+                pose.AngleDeg,
+                pose.Scale,
+                pose.SearchAngleStart,
+                pose.SearchAngleExtent,
+                pose.SearchAngleStep,
+                pose.SearchScaleMin,
+                pose.SearchScaleMax,
+                pose.SearchScaleStep);
         }
     }
 
@@ -262,22 +343,43 @@ internal static class HomographyBridgeRunner
         return new Mat(targetScene, new Rect((int)spec.TargetTopLeft.X, (int)spec.TargetTopLeft.Y, PatchWidth, PatchHeight)).Clone();
     }
 
+    private static Mat CreatePoseSearchScene(Mat sourceScene, Mat template, BridgeCaseSpec spec)
+    {
+        var scene = sourceScene.Clone();
+        using var transformed = TransformTemplate(template, spec.ExpectedAngleDeg, spec.ExpectedScale);
+        using var roi = new Mat(scene, new Rect((int)spec.TargetTopLeft.X, (int)spec.TargetTopLeft.Y, transformed.Width, transformed.Height));
+        transformed.CopyTo(roi);
+        return scene;
+    }
+
     private static Operator CreateOperator(BridgeCaseSpec spec)
     {
         var op = new Operator("TemplateMatchingHomographyBridge", OperatorType.TemplateMatching, 0, 0);
         op.Parameters.Add(new Parameter(Guid.NewGuid(), "Method", "Method", string.Empty, "string", "CCoeffNormed"));
         op.Parameters.Add(new Parameter(Guid.NewGuid(), "Domain", "Domain", string.Empty, "string", "Gray"));
-        op.Parameters.Add(new Parameter(Guid.NewGuid(), "Threshold", "Threshold", string.Empty, "double", 0.72));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "Threshold", "Threshold", string.Empty, "double", spec.EnablePoseSearch ? 0.55 : 0.72));
         op.Parameters.Add(new Parameter(Guid.NewGuid(), "MaxMatches", "MaxMatches", string.Empty, "int", 1));
         var roiX = Math.Max(0, (int)spec.TargetTopLeft.X - 18);
         var roiY = Math.Max(0, (int)spec.TargetTopLeft.Y - 18);
-        var roiRight = Math.Min(SceneWidth, (int)spec.TargetTopLeft.X + PatchWidth + 18);
-        var roiBottom = Math.Min(SceneHeight, (int)spec.TargetTopLeft.Y + PatchHeight + 18);
+        var roiRight = Math.Min(SceneWidth, (int)spec.TargetTopLeft.X + spec.TargetWidth + 18);
+        var roiBottom = Math.Min(SceneHeight, (int)spec.TargetTopLeft.Y + spec.TargetHeight + 18);
         op.Parameters.Add(new Parameter(Guid.NewGuid(), "UseRoi", "UseRoi", string.Empty, "bool", true));
         op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiX", "RoiX", string.Empty, "int", roiX));
         op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiY", "RoiY", string.Empty, "int", roiY));
-        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiWidth", "RoiWidth", string.Empty, "int", Math.Max(PatchWidth, roiRight - roiX)));
-        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiHeight", "RoiHeight", string.Empty, "int", Math.Max(PatchHeight, roiBottom - roiY)));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiWidth", "RoiWidth", string.Empty, "int", Math.Max(spec.TargetWidth, roiRight - roiX)));
+        op.Parameters.Add(new Parameter(Guid.NewGuid(), "RoiHeight", "RoiHeight", string.Empty, "int", Math.Max(spec.TargetHeight, roiBottom - roiY)));
+        if (spec.EnablePoseSearch)
+        {
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "EnablePoseSearch", "EnablePoseSearch", string.Empty, "bool", true));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "AngleStart", "AngleStart", string.Empty, "double", spec.PoseSearchAngleStart));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "AngleExtent", "AngleExtent", string.Empty, "double", spec.PoseSearchAngleExtent));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "AngleStep", "AngleStep", string.Empty, "double", spec.PoseSearchAngleStep));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "ScaleMin", "ScaleMin", string.Empty, "double", spec.PoseSearchScaleMin));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "ScaleMax", "ScaleMax", string.Empty, "double", spec.PoseSearchScaleMax));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "ScaleStep", "ScaleStep", string.Empty, "double", spec.PoseSearchScaleStep));
+            op.Parameters.Add(new Parameter(Guid.NewGuid(), "PyramidLevels", "PyramidLevels", string.Empty, "int", 3));
+        }
+
         return op;
     }
 
@@ -315,6 +417,48 @@ internal static class HomographyBridgeRunner
             (h[1, 0] * point.X + h[1, 1] * point.Y + h[1, 2]) / denominator);
     }
 
+    private static Mat TransformTemplate(Mat source, double angleDeg, double scale)
+    {
+        var center = new Point2f(source.Width / 2f, source.Height / 2f);
+        using var matrix = Cv2.GetRotationMatrix2D(center, angleDeg, scale);
+        var size = TransformedSize(source.Size(), angleDeg, scale);
+        matrix.Set(0, 2, matrix.Get<double>(0, 2) + (size.Width / 2.0) - center.X);
+        matrix.Set(1, 2, matrix.Get<double>(1, 2) + (size.Height / 2.0) - center.Y);
+
+        var transformed = new Mat();
+        Cv2.WarpAffine(source, transformed, matrix, size, InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
+        return transformed;
+    }
+
+    private static Size TransformedSize(Size sourceSize, double angleDeg, double scale)
+    {
+        var center = new Point2f(sourceSize.Width / 2f, sourceSize.Height / 2f);
+        using var matrix = Cv2.GetRotationMatrix2D(center, angleDeg, scale);
+        var m00 = matrix.Get<double>(0, 0);
+        var m01 = matrix.Get<double>(0, 1);
+        var m10 = matrix.Get<double>(1, 0);
+        var m11 = matrix.Get<double>(1, 1);
+        return new Size(
+            Math.Max(1, (int)Math.Ceiling((sourceSize.Width * Math.Abs(m00)) + (sourceSize.Height * Math.Abs(m01)))),
+            Math.Max(1, (int)Math.Ceiling((sourceSize.Width * Math.Abs(m10)) + (sourceSize.Height * Math.Abs(m11)))));
+    }
+
+    private static double NormalizeAngle(double angle)
+    {
+        var value = angle;
+        while (value > 180.0)
+        {
+            value -= 360.0;
+        }
+
+        while (value < -180.0)
+        {
+            value += 360.0;
+        }
+
+        return value;
+    }
+
     private static Point2d ReadPosition(OperatorExecutionOutput? output)
     {
         if (output?.OutputData is null || !output.OutputData.TryGetValue("Position", out var raw))
@@ -344,6 +488,23 @@ internal static class HomographyBridgeRunner
         catch
         {
             return double.NaN;
+        }
+    }
+
+    private static int ReadInt(OperatorExecutionOutput? output, string key)
+    {
+        if (output?.OutputData is null || !output.OutputData.TryGetValue(key, out var raw))
+        {
+            return 0;
+        }
+
+        try
+        {
+            return Convert.ToInt32(raw);
+        }
+        catch
+        {
+            return 0;
         }
     }
 
@@ -396,7 +557,31 @@ internal sealed record BridgeCaseSpec(
     double Beta,
     Point2d SourceAnchor,
     Point2d TargetTopLeft,
-    Point2d ExpectedCenter);
+    Point2d ExpectedCenter,
+    int TargetWidth,
+    int TargetHeight,
+    bool EnablePoseSearch = false,
+    double ExpectedAngleDeg = 0.0,
+    double ExpectedScale = 1.0,
+    double PoseSearchAngleStart = 0.0,
+    double PoseSearchAngleExtent = 0.0,
+    double PoseSearchAngleStep = 1.0,
+    double PoseSearchScaleMin = 1.0,
+    double PoseSearchScaleMax = 1.0,
+    double PoseSearchScaleStep = 0.05);
+
+internal sealed record PoseReplaySpec(
+    string Sequence,
+    Point2d SourceAnchor,
+    Point2d TargetTopLeft,
+    double AngleDeg,
+    double Scale,
+    double SearchAngleStart,
+    double SearchAngleExtent,
+    double SearchAngleStep,
+    double SearchScaleMin,
+    double SearchScaleMax,
+    double SearchScaleStep);
 
 internal sealed record SequenceSpec(
     string Name,
@@ -450,6 +635,16 @@ internal sealed record BridgeCaseResult(
     double PositionErrorPx,
     double Score,
     double NormalizedScore,
+    double SubpixelOffsetX,
+    double SubpixelOffsetY,
+    double PeakCurvature,
+    double ExpectedAngleDeg,
+    double ActualAngleDeg,
+    double AngleErrorDeg,
+    double ExpectedScale,
+    double ActualScale,
+    double ScaleError,
+    int PyramidLevels,
     string? ErrorMessage);
 
 internal static class MarkdownReport
@@ -492,12 +687,12 @@ internal static class MarkdownReport
             string.Empty,
             "## Cases",
             string.Empty,
-            "| Case | Sequence | Template | Passed | Pos Error Px | Score | Norm Score | Runtime Ms | Error |",
-            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |"
+            "| Case | Sequence | Template | Passed | Pos Error Px | Angle Err | Scale Err | Pyramid Levels | Score | Norm Score | Subpixel X | Subpixel Y | Peak Curvature | Runtime Ms | Error |",
+            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
         ]);
 
         lines.AddRange(result.Cases.Select(item =>
-            $"| {item.CaseId} | {item.Sequence} | {item.TemplateSource} | {item.Passed} | {item.PositionErrorPx:0.####} | {item.Score:0.######} | {item.NormalizedScore:0.######} | {item.RuntimeMs:0.###} | {item.ErrorMessage ?? "-"} |"));
+            $"| {item.CaseId} | {item.Sequence} | {item.TemplateSource} | {item.Passed} | {item.PositionErrorPx:0.####} | {item.AngleErrorDeg:0.###} | {item.ScaleError:0.###} | {item.PyramidLevels} | {item.Score:0.######} | {item.NormalizedScore:0.######} | {item.SubpixelOffsetX:0.######} | {item.SubpixelOffsetY:0.######} | {item.PeakCurvature:0.######} | {item.RuntimeMs:0.###} | {item.ErrorMessage ?? "-"} |"));
 
         lines.Add(string.Empty);
         return string.Join(Environment.NewLine, lines);
@@ -514,6 +709,9 @@ internal sealed record RunnerOptions(
     string? ParseError)
 {
     public bool IncludesCase(BridgeCaseSpec spec) => CaseIds.Count == 0 || CaseIds.Contains(spec.CaseId);
+    public bool IncludesPoseSearch =>
+        Profile.Contains("precision_v2", StringComparison.OrdinalIgnoreCase) ||
+        Profile.Contains("pose", StringComparison.OrdinalIgnoreCase);
 
     public static RunnerOptions Parse(string[] args)
     {

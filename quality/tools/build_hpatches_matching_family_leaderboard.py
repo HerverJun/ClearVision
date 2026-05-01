@@ -11,8 +11,8 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 DEFAULT_REPORTS = (
-    REPORT_DIR / "AkazeFeatureMatch_hpatches_candidate_v4.json",
-    REPORT_DIR / "OrbFeatureMatch_hpatches_candidate_v4.json",
+    REPORT_DIR / "AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+    REPORT_DIR / "OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
     REPORT_DIR / "PlanarMatching_hpatches_baseline.json",
     REPORT_DIR / "PlanarMatching_hpatches_akaze_baseline.json",
 )
@@ -85,6 +85,7 @@ def row_from_report(path: Path) -> dict[str, Any]:
         "illuminationPassRate": pass_rate(illumination_cases),
         "meanPositionErrorPx": summary.get("MeanPositionErrorPx"),
         "p95PositionErrorPx": summary.get("P95PositionErrorPx"),
+        "p95CornerErrorPx": summary.get("P95CornerErrorPx"),
         "runtimeMs": summary.get("RuntimeMs"),
         "maxFeatures": summary.get("MaxFeatures"),
         "matchRatio": summary.get("MatchRatio"),
@@ -93,6 +94,7 @@ def row_from_report(path: Path) -> dict[str, Any]:
         "fastThreshold": summary.get("FastThreshold"),
         "edgeThreshold": summary.get("EdgeThreshold"),
         "akazeThreshold": summary.get("AkazeThreshold"),
+        "allowCenterOnlyProjection": summary.get("AllowCenterOnlyProjection"),
         "scoreThreshold": summary.get("ScoreThreshold"),
         "topFailures": [
             {"reason": reason, "count": count}
@@ -118,8 +120,8 @@ def render_markdown(document: dict[str, Any]) -> str:
         f"GeneratedAtUtc: `{document['generatedAtUtc']}`",
         f"RankingPolicy: `{document['rankingPolicy']}`",
         "",
-        "| Rank | Candidate | Viewpoint pass | Total pass | P95 error px | Mean error px | Runtime ms | Params | Report |",
-        "|---:|---|---:|---:|---:|---:|---:|---|---|",
+        "| Rank | Candidate | Viewpoint pass | Total pass | P95 position px | P95 corner px | Mean error px | Runtime ms | Params | Report |",
+        "|---:|---|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for index, row in enumerate(document["rows"], start=1):
         params = [
@@ -137,12 +139,15 @@ def render_markdown(document: dict[str, Any]) -> str:
             params.append(f"detector={row['detectorType']}")
         if row.get("operator") == "PlanarMatching" and row.get("scoreThreshold") is not None:
             params.append(f"score={row['scoreThreshold']}")
+        if row.get("allowCenterOnlyProjection") is not None:
+            params.append(f"centerOnly={row['allowCenterOnlyProjection']}")
 
         lines.append(
             f"| {index} | {row['label']} | "
             f"{row['viewpointPassed']}/{row['viewpointCaseCount']} ({row['viewpointPassRate']}) | "
             f"{row['passed']}/{row['caseCount']} ({row['passRate']}) | "
-            f"{row.get('p95PositionErrorPx')} | {row.get('meanPositionErrorPx')} | {row.get('runtimeMs')} | "
+            f"{row.get('p95PositionErrorPx')} | {row.get('p95CornerErrorPx')} | "
+            f"{row.get('meanPositionErrorPx')} | {row.get('runtimeMs')} | "
             f"{', '.join(params)} | {row['sourceReport']} |"
         )
 
