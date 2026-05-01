@@ -102,4 +102,26 @@ public class CircleMeasurementOperatorTests
         center.Y.Should().BeApproximately(154.0, 0.50);
         Convert.ToDouble(result.OutputData["Circularity"]).Should().BeGreaterThan(0.89);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDarkCircleOnBrightBackground_ShouldUseInvertedFitEllipseFallback()
+    {
+        var op = new Operator("circle-dark", OperatorType.CircleMeasurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Method", "FitEllipse", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("MinRadius", 36, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxRadius", 200, "int"));
+
+        using var mat = new Mat(160, 180, MatType.CV_8UC3, Scalar.White);
+        Cv2.Circle(mat, new Point(86, 78), 42, Scalar.Black, -1, LineTypes.AntiAlias);
+        using var image = new ImageWrapper(mat);
+
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        var center = result.OutputData!["Center"].Should().BeOfType<Position>().Subject;
+        var radius = Convert.ToDouble(result.OutputData["Radius"]);
+        center.X.Should().BeApproximately(86.0, 0.75);
+        center.Y.Should().BeApproximately(78.0, 0.75);
+        radius.Should().BeApproximately(42.0, 0.75);
+    }
 }
