@@ -126,10 +126,73 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         session.History.Last().Payload!.ManualRetry!.Stage.Should().Be("validation");
     }
 
+    [Fact]
+    public async Task GenerateFlowAsync_RequiredClarification_ShouldReturnBeforeCallingModel()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
+        requirementBriefExtractor.Extract(
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<ScenarioMatchResult?>(),
+                Arg.Any<IReadOnlyList<string>?>())
+            .Returns(new AiRequirementBrief
+            {
+                ScenarioName = "外观缺陷检测",
+                IntentType = "defect_detection",
+                Confidence = 0.2,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                MissingFields = ["defectTypes"],
+                ClarificationQuestions =
+                [
+                    new AiClarificationQuestion
+                    {
+                        Field = "defectTypes",
+                        Question = "请补充需要判定的缺陷类别。",
+                        Level = "required",
+                        Required = true
+                    }
+                ]
+            });
+
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            requirementBriefExtractor);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "检测缺陷",
+            SessionId: "clarification-required"));
+
+        result.Success.Should().BeTrue();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.ClarificationQuestions.Should().ContainSingle(question => question.Required);
+        result.StageTimeline.Should().Contain(stage => stage.Stage == "clarification_gate" && stage.Status == "blocked");
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+        validator.DidNotReceive().Validate(Arg.Any<AiGeneratedFlowJson>());
+
+        var session = conversationService.GetSession("clarification-required");
+        session.Should().NotBeNull();
+        session!.History.Last().Payload.Should().NotBeNull();
+        session.History.Last().Payload!.Kind.Should().Be("clarification_required");
+    }
+
     private static AiFlowGenerationService CreateService(
         IAiConnector connector,
         IAiFlowValidator validator,
-        IConversationalFlowService conversationService)
+        IConversationalFlowService conversationService,
+        IRequirementBriefExtractor? requirementBriefExtractorOverride = null)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
         modelSelector.SelectGenerationModel().Returns(new AiModelConfig
@@ -156,12 +219,16 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<ScenarioMatchResult>>(Array.Empty<ScenarioMatchResult>()));
 
-        var requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
-        requirementBriefExtractor.Extract(
-                Arg.Any<string?>(),
-                Arg.Any<string?>(),
-                Arg.Any<ScenarioMatchResult?>())
-            .Returns(new AiRequirementBrief());
+        var requirementBriefExtractor = requirementBriefExtractorOverride ?? Substitute.For<IRequirementBriefExtractor>();
+        if (requirementBriefExtractorOverride == null)
+        {
+            requirementBriefExtractor.Extract(
+                    Arg.Any<string?>(),
+                    Arg.Any<string?>(),
+                    Arg.Any<ScenarioMatchResult?>(),
+                    Arg.Any<IReadOnlyList<string>?>())
+                .Returns(new AiRequirementBrief());
+        }
 
         var templateConstraintValidator = Substitute.For<ITemplateConstraintValidator>();
         templateConstraintValidator.Validate(

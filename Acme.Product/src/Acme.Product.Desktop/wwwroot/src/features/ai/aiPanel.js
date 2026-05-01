@@ -50,6 +50,7 @@ export class AiPanel {
         this._streamFlushPending = false;
         this.activeAssistantTurn = null;
         this.pendingManualRetry = null;
+        this.pendingRequirementBrief = null;
         
         // 绑定方法
         this._handleGenerate = this._handleGenerate.bind(this);
@@ -99,6 +100,7 @@ export class AiPanel {
         this._resetCurrentResultSyncState();
         this.pendingParameterFilePickContext = null;
         this.pendingManualRetry = null;
+        this.pendingRequirementBrief = null;
         this.activeAssistantTurn = null;
         this._clearResultPane();
         this._renderAttachments();
@@ -236,6 +238,13 @@ export class AiPanel {
                 <aside class="ai-pane-right" id="ai-result-pane">
                     <div class="ai-result-status-note" id="ai-result-status-note"></div>
                     <div class="ai-results-scroll" id="ai-results-scroll">
+                        <div class="result-card requirement-card">
+                            <div class="card-title">需求卡片</div>
+                            <div class="ai-requirement-brief is-empty" id="ai-result-requirement">
+                                <div class="ai-followup-empty">输入需求后将生成结构化需求卡片。</div>
+                            </div>
+                        </div>
+
                         <div class="result-card overview">
                             <div class="card-title">方案概览</div>
                             <div class="ai-explanation" id="ai-result-summary">--</div>
@@ -378,6 +387,12 @@ export class AiPanel {
         const input = this.container.querySelector('#ai-input');
         const normalizedDescription = String(description || '').trim();
         const normalizedHint = String(hint || '').trim();
+        const requirementHint = this.pendingRequirementBrief
+            ? this._buildRequirementBriefHint(this.pendingRequirementBrief)
+            : '';
+        const combinedHint = [normalizedHint, requirementHint]
+            .filter(value => String(value || '').trim())
+            .join('\n\n');
         const requestId = this._createGenerateRequestId();
 
         if (!normalizedDescription) {
@@ -423,7 +438,7 @@ export class AiPanel {
             webMessageBridge.sendMessage('GenerateFlow', {
                 payload: {
                     description: normalizedDescription,
-                    hint: normalizedHint || null,
+                    hint: combinedHint || null,
                     mode: resolvedMode,
                     debugPrompt: this._shouldRequestPromptTrace(),
                     requestId,
@@ -688,6 +703,36 @@ export class AiPanel {
             return;
         }
 
+        if (this._isClarificationRequiredResult(payload)) {
+            this._clearActiveRequestState();
+            this.pendingManualRetry = null;
+            this._renderManualRetryBanner();
+            this.pendingRequirementBrief = this._normalizeRequirementBrief(
+                payload?.requirementBrief ?? payload?.RequirementBrief
+            );
+            this._setAssistantTurnStatus(activeTurn, '待补充需求', 'warning');
+            this._setAssistantSectionText(
+                activeTurn,
+                'reply',
+                payload.aiExplanation || payload.AiExplanation || this._buildClarificationReplyText(this.pendingRequirementBrief)
+            );
+            this._setResultStatusNote('已暂停生成：请先补充需求卡片中的必填信息，再继续生成。', 'warning');
+            this._renderRequirementBrief(payload);
+            this._renderFollowupChecklist(payload, null);
+            this._renderParameterDraftEditor({ pendingParameters: [] }, null);
+            this._renderPromptTrace(payload?.promptTrace ?? payload?.PromptTrace ?? null);
+            if (this.sessionId) {
+                this._addToHistory({
+                    sessionId: this.sessionId,
+                    lastMessage: this.lastUserPrompt || '待补充需求',
+                    updatedAtUtc: new Date().toISOString(),
+                    turnCount: 0
+                });
+            }
+            this.activeAssistantTurn = null;
+            return;
+        }
+
         if (!payload.success) {
             this._clearActiveRequestState();
             const manualRetry = payload.manualRetry || payload.ManualRetry || null;
@@ -721,6 +766,7 @@ export class AiPanel {
         this._setCurrentResult(payload);
         this._resetPendingDraftState();
         this.pendingManualRetry = null;
+        this.pendingRequirementBrief = null;
         this._renderManualRetryBanner();
         this._rebuildPendingOperatorBindings({
             pending: payload?.pendingParameters ?? payload?.PendingParameters,
@@ -829,6 +875,7 @@ export class AiPanel {
         const ops = this._extractOperators(flow);
         const connections = this._extractConnections(flow);
         this._syncPendingParameterDrafts(data, flow);
+        this._renderRequirementBrief(data);
 
         const summaryLines = [
             `该方案包含 <span class="result-count">${ops.length}</span> 个算子和 <span class="result-count">${connections.length}</span> 条连线。`
@@ -940,6 +987,247 @@ export class AiPanel {
         } catch {
             return String(value);
         }
+    }
+
+    _renderRequirementBrief(data) {
+        const container = this.container?.querySelector('#ai-result-requirement');
+        if (!container) return;
+
+        const brief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief);
+        const rootQuestions = this._normalizeClarificationQuestions(
+            data?.clarificationQuestions ?? data?.ClarificationQuestions
+        );
+        if (brief && rootQuestions.length > 0 && brief.clarificationQuestions.length === 0) {
+            brief.clarificationQuestions = rootQuestions;
+        }
+
+        if (!brief) {
+            container.classList.add('is-empty');
+            container.innerHTML = '<div class="ai-followup-empty">输入需求后将生成结构化需求卡片。</div>';
+            return;
+        }
+
+        const questions = brief.clarificationQuestions;
+        const requiredCount = questions.filter(question => question.required).length;
+        const riskLabel = requiredCount > 0 ? '待澄清' : (questions.length > 0 ? '可生成草案' : '信息充分');
+        const riskTone = requiredCount > 0 ? 'is-blocked' : (questions.length > 0 ? 'is-draft' : 'is-ready');
+        const confidenceText = Number.isFinite(brief.confidence) && brief.confidence > 0
+            ? `${Math.round(brief.confidence * 100)}%`
+            : '--';
+
+        const fieldRows = [
+            ['场景', brief.scenarioName || brief.scenarioKey || '--'],
+            ['行业', brief.industry || '--'],
+            ['对象', brief.objectName || brief.objectTypes.join('、') || '--'],
+            ['缺陷', brief.defectTypes.join('、') || '--'],
+            ['测量', brief.measurementTargets.join('、') || '--'],
+            ['图像', this._formatRequirementValue(brief.imageSource)],
+            ['输出', this._formatRequirementValue(brief.outputTarget)],
+            ['资源', brief.requiredResources.join('、') || this._formatRequirementValue(brief.modelResource)]
+        ];
+
+        const factsHtml = brief.knownFacts.length > 0
+            ? `<div class="ai-requirement-facts">${brief.knownFacts.map(fact => `<span>${this._escapeHtml(fact)}</span>`).join('')}</div>`
+            : '';
+
+        const questionsHtml = questions.length > 0
+            ? `
+                <div class="ai-requirement-questions">
+                    <div class="ai-followup-section-label">澄清问题</div>
+                    <div class="ai-followup-list">
+                        ${questions.map(question => `
+                            <div class="ai-requirement-question ${question.required ? 'is-required' : ''}">
+                                <div class="ai-requirement-question-top">
+                                    <span>${this._escapeHtml(question.required ? '必填' : '建议')}</span>
+                                    <strong>${this._escapeHtml(question.field || 'field')}</strong>
+                                </div>
+                                <div class="ai-followup-item-body">${this._escapeHtml(question.question)}</div>
+                                ${question.options.length > 0
+                                    ? `<div class="ai-requirement-options">${question.options.map(option => `
+                                        <button type="button" data-requirement-option="${this._escapeHtml(option)}" data-requirement-field="${this._escapeHtml(question.field || '')}">${this._escapeHtml(option)}</button>
+                                    `).join('')}</div>`
+                                    : ''}
+                                ${question.reason ? `<div class="ai-followup-item-meta">${this._escapeHtml(question.reason)}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `
+            : '<div class="ai-followup-empty">当前没有必须澄清的问题。</div>';
+
+        const missingHtml = brief.missingFields.length > 0
+            ? `<div class="ai-requirement-missing">缺失字段：${this._escapeHtml(brief.missingFields.join('、'))}</div>`
+            : '';
+
+        container.classList.remove('is-empty');
+        container.innerHTML = `
+            <div class="ai-requirement-header">
+                <div>
+                    <div class="ai-requirement-title">${this._escapeHtml(brief.scenarioName || '待识别场景')}</div>
+                    <div class="ai-requirement-subtitle">意图 ${this._escapeHtml(brief.intentType || '--')} · 置信度 ${this._escapeHtml(confidenceText)}</div>
+                </div>
+                <div class="ai-requirement-risk ${riskTone}">${riskLabel}</div>
+            </div>
+            ${factsHtml}
+            <div class="ai-requirement-grid">
+                ${fieldRows.map(([label, value]) => `
+                    <div class="ai-requirement-field">
+                        <span>${this._escapeHtml(label)}</span>
+                        <strong>${this._escapeHtml(value)}</strong>
+                    </div>
+                `).join('')}
+            </div>
+            ${missingHtml}
+            ${questionsHtml}
+            <div class="ai-followup-actions">
+                <div class="ai-followup-actions-hint">下一轮发送时会自动携带本轮需求上下文，也可手动插入问题。</div>
+                <div class="ai-followup-action-row">
+                    <button class="ai-followup-action" type="button" data-requirement-action="copy">复制澄清问题</button>
+                    <button class="ai-followup-action" type="button" data-requirement-action="insert">插入输入框</button>
+                    <button class="ai-followup-action" type="button" data-requirement-action="queue">用于下一轮提示</button>
+                </div>
+            </div>
+        `;
+
+        const hintText = this._buildRequirementBriefHint(brief);
+        container.querySelectorAll('[data-requirement-option]').forEach(button => {
+            button.disabled = this.isGenerating;
+            button.addEventListener('click', () => {
+                const field = button.dataset.requirementField || '补充';
+                const value = button.dataset.requirementOption || '';
+                this._appendFollowupTextToInput(`${field}：${value}`);
+            });
+        });
+
+        container.querySelectorAll('[data-requirement-action]').forEach(button => {
+            button.disabled = this.isGenerating;
+            button.addEventListener('click', async () => {
+                const action = button.dataset.requirementAction;
+                if (action === 'copy') {
+                    const copied = await this._copyTextToClipboard(hintText);
+                    this._addMessage('system', copied ? '澄清问题已复制。' : '复制失败，请手动复制澄清问题。');
+                    return;
+                }
+
+                if (action === 'insert') {
+                    this._appendFollowupTextToInput(hintText);
+                    this._addMessage('system', '澄清问题已插入输入框。');
+                    return;
+                }
+
+                if (action === 'queue') {
+                    this.nextHintDraft = [this.nextHintDraft, hintText]
+                        .filter(value => String(value || '').trim())
+                        .join('\n\n');
+                    this._renderQueuedHintBanner();
+                    this._addMessage('system', '需求澄清上下文已挂到下一轮 hint。');
+                }
+            });
+        });
+    }
+
+    _formatRequirementValue(value) {
+        const normalized = String(value || '').trim();
+        if (!normalized || normalized === 'unknown') return '--';
+        if (normalized === 'file') return '文件/附件';
+        if (normalized === 'camera') return '相机';
+        if (normalized === 'not_required') return '不需要';
+        if (normalized === 'missing') return '待补资源';
+        if (normalized === 'provided') return '已提供';
+        return normalized;
+    }
+
+    _normalizeRequirementBrief(item) {
+        if (!item || typeof item !== 'object') return null;
+
+        const list = (value) => Array.isArray(value)
+            ? value.map(entry => String(entry || '').trim()).filter(Boolean)
+            : [];
+        const scenarioKey = String(item?.scenarioKey ?? item?.ScenarioKey ?? '').trim();
+        const scenarioName = String(item?.scenarioName ?? item?.ScenarioName ?? '').trim();
+        const questions = this._normalizeClarificationQuestions(
+            item?.clarificationQuestions ?? item?.ClarificationQuestions
+        );
+        const hasBrief = scenarioKey || scenarioName || questions.length > 0 ||
+            list(item?.knownFacts ?? item?.KnownFacts).length > 0;
+        if (!hasBrief) return null;
+
+        const confidence = Number(item?.confidence ?? item?.Confidence ?? 0);
+        return {
+            scenarioKey,
+            scenarioName,
+            industry: String(item?.industry ?? item?.Industry ?? '').trim(),
+            intentType: String(item?.intentType ?? item?.IntentType ?? '').trim(),
+            objectName: String(item?.objectName ?? item?.ObjectName ?? '').trim(),
+            objectTypes: list(item?.objectTypes ?? item?.ObjectTypes),
+            defectTypes: list(item?.defectTypes ?? item?.DefectTypes),
+            measurementTargets: list(item?.measurementTargets ?? item?.MeasurementTargets),
+            imageSource: String(item?.imageSource ?? item?.ImageSource ?? 'unknown').trim(),
+            triggerMode: String(item?.triggerMode ?? item?.TriggerMode ?? 'unknown').trim(),
+            outputTarget: String(item?.outputTarget ?? item?.OutputTarget ?? 'unknown').trim(),
+            modelResource: String(item?.modelResource ?? item?.ModelResource ?? 'unknown').trim(),
+            roiRequirement: String(item?.roiRequirement ?? item?.RoiRequirement ?? 'unknown').trim(),
+            calibrationRequirement: String(item?.calibrationRequirement ?? item?.CalibrationRequirement ?? 'unknown').trim(),
+            decisionRule: String(item?.decisionRule ?? item?.DecisionRule ?? '').trim(),
+            confidence: Number.isFinite(confidence) ? confidence : 0,
+            draftRiskLevel: String(item?.draftRiskLevel ?? item?.DraftRiskLevel ?? 'low').trim(),
+            knownFacts: list(item?.knownFacts ?? item?.KnownFacts),
+            missingFields: list(item?.missingFields ?? item?.MissingFields),
+            requiredResources: list(item?.requiredResources ?? item?.RequiredResources),
+            clarificationQuestions: questions
+        };
+    }
+
+    _normalizeClarificationQuestions(items) {
+        if (!Array.isArray(items)) return [];
+
+        return items
+            .map(item => ({
+                field: String(item?.field ?? item?.Field ?? '').trim(),
+                question: String(item?.question ?? item?.Question ?? '').trim(),
+                level: String(item?.level ?? item?.Level ?? '').trim(),
+                reason: String(item?.reason ?? item?.Reason ?? '').trim(),
+                options: Array.isArray(item?.options ?? item?.Options)
+                    ? (item?.options ?? item?.Options).map(option => String(option || '').trim()).filter(Boolean)
+                    : [],
+                required: Boolean(item?.required ?? item?.Required)
+            }))
+            .filter(item => item.question);
+    }
+
+    _buildRequirementBriefHint(briefInput) {
+        const brief = this._normalizeRequirementBrief(briefInput);
+        if (!brief) return '';
+
+        const lines = ['上一轮需求澄清上下文：'];
+        if (brief.knownFacts.length > 0) {
+            lines.push(`已识别：${brief.knownFacts.join('；')}`);
+        } else {
+            lines.push(`已识别场景：${brief.scenarioName || brief.scenarioKey || '未确认'}`);
+        }
+
+        const questions = brief.clarificationQuestions.filter(question => question.required);
+        if (questions.length > 0) {
+            lines.push('仍需用户回答：');
+            questions.forEach(question => lines.push(`- ${question.field || 'field'}：${question.question}`));
+        }
+
+        if (brief.requiredResources.length > 0) {
+            lines.push(`相关资源：${brief.requiredResources.join('、')}`);
+        }
+
+        lines.push('请把用户本轮回答合并进需求卡片后，再决定是否生成工作流。');
+        return lines.join('\n');
+    }
+
+    _buildClarificationReplyText(briefInput) {
+        const brief = this._normalizeRequirementBrief(briefInput);
+        const questions = brief?.clarificationQuestions?.filter(question => question.required) || [];
+        if (questions.length === 0) {
+            return '还需要补充关键需求信息后再生成。';
+        }
+
+        return ['生成前还需要确认：', ...questions.map(question => `- ${question.question}`)].join('\n');
     }
 
     _buildTemplateFirstSummary(data) {
@@ -3218,6 +3506,13 @@ export class AiPanel {
             || ['user_cancelled', 'user_canceled'].includes(failureType);
     }
 
+    _isClarificationRequiredResult(payload) {
+        const status = this._normalizeGenerateStatus(payload);
+        const required = payload?.clarificationRequired ?? payload?.ClarificationRequired;
+
+        return required === true || status === 'clarification_required';
+    }
+
     _clearActiveRequestState() {
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
@@ -3226,6 +3521,11 @@ export class AiPanel {
     _clearResultPane() {
         const summary = this.container.querySelector('#ai-result-summary');
         if (summary) summary.textContent = '--';
+        const requirement = this.container.querySelector('#ai-result-requirement');
+        if (requirement) {
+            requirement.classList.add('is-empty');
+            requirement.innerHTML = '<div class="ai-followup-empty">输入需求后将生成结构化需求卡片。</div>';
+        }
         const ops = this.container.querySelector('#ai-result-ops');
         if (ops) ops.innerHTML = '';
         const followups = this.container.querySelector('#ai-result-followups');
@@ -3245,6 +3545,7 @@ export class AiPanel {
         this._setResultStatusNote('', '');
         this._streamBuffer = { thinking: '', content: '' };
         this._streamFlushPending = false;
+        this.pendingRequirementBrief = null;
     }
     
     _scrollToBottom() {

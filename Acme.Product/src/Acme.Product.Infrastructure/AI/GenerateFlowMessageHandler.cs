@@ -103,7 +103,12 @@ public class GenerateFlowMessageHandler
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace
+                PromptTrace = result.PromptTrace,
+                ClarificationRequired = result.ClarificationRequired,
+                RequirementBrief = MapRequirementBrief(result.RequirementBrief),
+                ClarificationQuestions = MapClarificationQuestions(result.RequirementBrief?.ClarificationQuestions),
+                TemplateCandidates = MapTemplateCandidates(result.TemplateCandidates),
+                StageTimeline = MapStageTimeline(result.StageTimeline)
             };
 
             return SerializeResponse(response, result.FailureType);
@@ -187,6 +192,11 @@ public class GenerateFlowMessageHandler
                 response.MissingResources,
                 response.ManualRetry,
                 response.PromptTrace,
+                response.ClarificationRequired,
+                response.RequirementBrief,
+                response.ClarificationQuestions,
+                response.TemplateCandidates,
+                response.StageTimeline,
                 FailureType = failureType
             }, _jsonOptions);
     }
@@ -279,5 +289,102 @@ public class GenerateFlowMessageHandler
             LastOutputSummary = manualRetry.LastOutputSummary,
             Diagnostics = manualRetry.Diagnostics.Cast<object>().ToList()
         };
+    }
+
+    private static GenerateFlowRequirementBrief? MapRequirementBrief(AiRequirementBrief? brief)
+    {
+        if (brief == null)
+        {
+            return null;
+        }
+
+        return new GenerateFlowRequirementBrief
+        {
+            ScenarioKey = brief.ScenarioKey,
+            ScenarioName = brief.ScenarioName,
+            Industry = brief.Industry,
+            IntentType = brief.IntentType,
+            ObjectName = brief.ObjectName,
+            ObjectTypes = brief.ObjectTypes.ToList(),
+            DefectTypes = brief.DefectTypes.ToList(),
+            MeasurementTargets = brief.MeasurementTargets.ToList(),
+            ImageSource = brief.ImageSource,
+            TriggerMode = brief.TriggerMode,
+            OutputTarget = brief.OutputTarget,
+            AiModelRequired = brief.AiModelRequired,
+            ModelResource = brief.ModelResource,
+            RoiRequirement = brief.RoiRequirement,
+            CalibrationRequirement = brief.CalibrationRequirement,
+            DecisionRule = brief.DecisionRule,
+            Confidence = brief.Confidence,
+            CanGenerateDraftNow = brief.CanGenerateDraftNow,
+            DraftRiskLevel = brief.DraftRiskLevel,
+            KnownFacts = brief.KnownFacts.ToList(),
+            MissingFields = brief.MissingFields.ToList(),
+            RequiredResources = brief.RequiredResources.ToList(),
+            ClarificationQuestions = MapClarificationQuestions(brief.ClarificationQuestions)
+        };
+    }
+
+    private static List<GenerateFlowClarificationQuestion> MapClarificationQuestions(
+        IReadOnlyCollection<AiClarificationQuestion>? questions)
+    {
+        if (questions == null || questions.Count == 0)
+        {
+            return new List<GenerateFlowClarificationQuestion>();
+        }
+
+        return questions.Select(question => new GenerateFlowClarificationQuestion
+        {
+            Field = question.Field,
+            Question = question.Question,
+            Level = question.Level,
+            Reason = question.Reason,
+            Options = question.Options.ToList(),
+            Required = question.Required
+        }).ToList();
+    }
+
+    private static List<GenerateFlowTemplateCandidate> MapTemplateCandidates(
+        IReadOnlyCollection<AiTemplateCandidateInfo>? candidates)
+    {
+        if (candidates == null || candidates.Count == 0)
+        {
+            return new List<GenerateFlowTemplateCandidate>();
+        }
+
+        return candidates.Select(candidate => new GenerateFlowTemplateCandidate
+        {
+            TemplateId = candidate.TemplateId,
+            TemplateName = candidate.TemplateName,
+            TemplateVersion = candidate.TemplateVersion,
+            ScenarioKey = candidate.ScenarioKey,
+            Industry = candidate.Industry,
+            Confidence = candidate.Confidence,
+            MatchReason = candidate.MatchReason,
+            MatchedFields = candidate.MatchedFields.ToList(),
+            MissingSignals = candidate.MissingSignals.ToList()
+        }).ToList();
+    }
+
+    private static List<GenerateFlowStageDiagnostic> MapStageTimeline(
+        IReadOnlyCollection<AiGenerationStageDiagnostic>? stages)
+    {
+        if (stages == null || stages.Count == 0)
+        {
+            return new List<GenerateFlowStageDiagnostic>();
+        }
+
+        return stages.Select(stage => new GenerateFlowStageDiagnostic
+        {
+            Stage = stage.Stage,
+            Status = stage.Status,
+            Summary = stage.Summary,
+            DurationMs = stage.DurationMs,
+            Metadata = stage.Metadata.ToDictionary(
+                item => item.Key,
+                item => item.Value,
+                StringComparer.OrdinalIgnoreCase)
+        }).ToList();
     }
 }

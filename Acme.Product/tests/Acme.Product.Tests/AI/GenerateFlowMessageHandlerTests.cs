@@ -313,6 +313,78 @@ public class GenerateFlowMessageHandlerTests
             .Should().Be("DeepLearning.ModelPath");
     }
 
+    [Fact(DisplayName = "GenerateFlowMessageHandler should serialize requirement clarification payload")]
+    public async Task HandleAsync_ShouldSerializeRequirementClarificationPayload()
+    {
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = true,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                ClarificationRequired = true,
+                AiExplanation = "生成前还需要补充关键信息。",
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ScenarioName = "外观缺陷检测",
+                    IntentType = "defect_detection",
+                    MissingFields = ["defectTypes"],
+                    ClarificationQuestions =
+                    [
+                        new AiClarificationQuestion
+                        {
+                            Field = "defectTypes",
+                            Question = "请补充需要判定的缺陷类别。",
+                            Level = "required",
+                            Required = true
+                        }
+                    ]
+                },
+                TemplateCandidates =
+                [
+                    new AiTemplateCandidateInfo
+                    {
+                        TemplateName = "包装箱外观检测",
+                        ScenarioKey = "carton-appearance-inspection",
+                        Confidence = 0.75
+                    }
+                ],
+                StageTimeline =
+                [
+                    new AiGenerationStageDiagnostic
+                    {
+                        Stage = "clarification_gate",
+                        Status = "blocked",
+                        Summary = "required=1"
+                    }
+                ]
+            }));
+
+        var resultJson = await handler.HandleAsync("检测缺陷");
+
+        using var doc = JsonDocument.Parse(resultJson);
+        var root = doc.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeTrue();
+        root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        root.GetProperty("clarificationRequired").GetBoolean().Should().BeTrue();
+        root.GetProperty("requirementBrief").GetProperty("scenarioName").GetString()
+            .Should().Be("外观缺陷检测");
+        root.GetProperty("clarificationQuestions").GetArrayLength().Should().Be(1);
+        root.GetProperty("clarificationQuestions")[0].GetProperty("field").GetString()
+            .Should().Be("defectTypes");
+        root.GetProperty("templateCandidates").GetArrayLength().Should().Be(1);
+        root.GetProperty("stageTimeline")[0].GetProperty("stage").GetString()
+            .Should().Be("clarification_gate");
+    }
+
     [Fact(DisplayName = "GenerateFlowMessageHandler should serialize prompt trace when returned")]
     public async Task HandleAsync_ShouldSerializePromptTrace()
     {

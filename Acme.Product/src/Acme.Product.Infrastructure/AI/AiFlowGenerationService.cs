@@ -117,7 +117,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             });
         var requirementBrief = pipeline.Measure(
             "requirement_brief",
-            () => _requirementBriefExtractor.Extract(request.Description, request.AdditionalContext, templatePriority.PrimaryMatch),
+            () => _requirementBriefExtractor.Extract(
+                request.Description,
+                request.AdditionalContext,
+                templatePriority.PrimaryMatch,
+                request.Attachments),
             brief => string.IsNullOrWhiteSpace(brief.ScenarioName)
                 ? "requirement brief extracted without a scenario"
                 : $"scenario={brief.ScenarioName}, clarifications={brief.ClarificationQuestions.Count}",
@@ -127,6 +131,29 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ["intentType"] = brief.IntentType,
                 ["clarificationCount"] = brief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture)
             });
+        if (ShouldPauseForClarification(conversationContext.Mode, requirementBrief))
+        {
+            pipeline.AddStage(
+                "clarification_gate",
+                "blocked",
+                $"required={requirementBrief.ClarificationQuestions.Count(question => question.Required)}",
+                TimeSpan.Zero,
+                new Dictionary<string, string>
+                {
+                    ["missingFields"] = string.Join(",", requirementBrief.MissingFields),
+                    ["risk"] = requirementBrief.DraftRiskLevel
+                });
+            ReportProgress("需求信息不足，已暂停生成并整理澄清问题。");
+
+            return CreateClarificationRequiredResult(
+                conversationContext.SessionId,
+                conversationContext.Intent,
+                requirementBrief,
+                BuildTemplateCandidates(templatePriority),
+                pipeline.Timeline.ToList(),
+                progressMessages);
+        }
+
         if (templatePriority.IsTemplateFirst)
         {
             ReportProgress($"已命中模板优先场景：{templatePriority.Template?.Name ?? templatePriority.ScenarioName}，进入 {templatePriority.GenerationMode} 模式...");
@@ -236,7 +263,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         ["supportsVision"] = capabilities.SupportsVisionInput.ToString(CultureInfo.InvariantCulture),
                         ["supportsJsonMode"] = capabilities.SupportsJsonMode.ToString(CultureInfo.InvariantCulture)
                     });
-                var rawResponse = completionResult.Content;
+                var rawResponse = completionResult.Content ?? string.Empty;
                 lastRawResponse = rawResponse;
                 _logger.LogDebug("AI 原始响应长度：{Length}", rawResponse.Length);
                 if (!string.IsNullOrEmpty(completionResult.Reasoning))
@@ -584,6 +611,80 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private bool ShouldIncludePromptTrace(bool debugPrompt)
     {
         return debugPrompt || _hostEnvironment.IsDevelopment() || System.Diagnostics.Debugger.IsAttached;
+    }
+
+    private static bool ShouldPauseForClarification(GenerateFlowMode mode, AiRequirementBrief requirementBrief)
+    {
+        if (mode is GenerateFlowMode.Modify or GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters)
+            return false;
+
+        return requirementBrief.ClarificationQuestions.Any(question => question.Required);
+    }
+
+    private AiFlowGenerationResult CreateClarificationRequiredResult(
+        string sessionId,
+        ConversationIntent intent,
+        AiRequirementBrief requirementBrief,
+        List<AiTemplateCandidateInfo> templateCandidates,
+        IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline,
+        IReadOnlyList<string> progressMessages)
+    {
+        var assistantReply = BuildClarificationReply(requirementBrief);
+        _conversationalFlowService.RecordAssistantResponse(
+            sessionId,
+            assistantReply,
+            latestFlowJson: null,
+            latestCanvasFlowJson: null,
+            payload: new ConversationTurnPayload
+            {
+                Kind = "clarification_required",
+                Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                Reply = assistantReply,
+                Progress = progressMessages.ToList()
+            });
+
+        return new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            ClarificationRequired = true,
+            AiExplanation = assistantReply,
+            SessionId = sessionId,
+            DetectedIntent = intent.ToString().ToUpperInvariant(),
+            RequirementBrief = requirementBrief,
+            TemplateCandidates = templateCandidates,
+            StageTimeline = stageTimeline.ToList()
+        };
+    }
+
+    private static string BuildClarificationReply(AiRequirementBrief requirementBrief)
+    {
+        var requiredQuestions = requirementBrief.ClarificationQuestions
+            .Where(question => question.Required)
+            .ToList();
+        var questions = requiredQuestions.Count > 0
+            ? requiredQuestions
+            : requirementBrief.ClarificationQuestions.Take(3).ToList();
+
+        var sb = new StringBuilder();
+        sb.Append("生成前还需要补充关键信息");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ScenarioName))
+        {
+            sb.Append($"（当前判断：{requirementBrief.ScenarioName}）");
+        }
+        sb.AppendLine("：");
+
+        foreach (var question in questions)
+        {
+            sb.AppendLine($"- {question.Question}");
+        }
+
+        if (questions.Count == 0)
+        {
+            sb.AppendLine("- 请补充检测对象、缺陷/测量目标，以及结果输出方式。");
+        }
+
+        return sb.ToString().Trim();
     }
 
     private static string BuildTemplatePriorityPromptSection(TemplatePriorityContext templatePriority)

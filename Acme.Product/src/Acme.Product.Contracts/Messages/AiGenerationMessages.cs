@@ -77,6 +77,11 @@ public record GenerateFlowResponse
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
+    public bool ClarificationRequired { get; init; }
+    public GenerateFlowRequirementBrief? RequirementBrief { get; init; }
+    public List<GenerateFlowClarificationQuestion> ClarificationQuestions { get; init; } = new();
+    public List<GenerateFlowTemplateCandidate> TemplateCandidates { get; init; } = new();
+    public List<GenerateFlowStageDiagnostic> StageTimeline { get; init; } = new();
 }
 
 /// <summary>
@@ -140,6 +145,65 @@ public record GenerateFlowManualRetry
     public string RepairTarget { get; init; } = string.Empty;
     public string LastOutputSummary { get; init; } = string.Empty;
     public List<object> Diagnostics { get; init; } = new();
+}
+
+public record GenerateFlowRequirementBrief
+{
+    public string ScenarioKey { get; init; } = string.Empty;
+    public string ScenarioName { get; init; } = string.Empty;
+    public string Industry { get; init; } = string.Empty;
+    public string IntentType { get; init; } = string.Empty;
+    public string ObjectName { get; init; } = string.Empty;
+    public List<string> ObjectTypes { get; init; } = new();
+    public List<string> DefectTypes { get; init; } = new();
+    public List<string> MeasurementTargets { get; init; } = new();
+    public string ImageSource { get; init; } = "unknown";
+    public string TriggerMode { get; init; } = "unknown";
+    public string OutputTarget { get; init; } = "unknown";
+    public bool? AiModelRequired { get; init; }
+    public string ModelResource { get; init; } = "unknown";
+    public string RoiRequirement { get; init; } = "unknown";
+    public string CalibrationRequirement { get; init; } = "unknown";
+    public string DecisionRule { get; init; } = string.Empty;
+    public double Confidence { get; init; }
+    public bool CanGenerateDraftNow { get; init; }
+    public string DraftRiskLevel { get; init; } = "low";
+    public List<string> KnownFacts { get; init; } = new();
+    public List<string> MissingFields { get; init; } = new();
+    public List<string> RequiredResources { get; init; } = new();
+    public List<GenerateFlowClarificationQuestion> ClarificationQuestions { get; init; } = new();
+}
+
+public record GenerateFlowClarificationQuestion
+{
+    public string Field { get; init; } = string.Empty;
+    public string Question { get; init; } = string.Empty;
+    public string Level { get; init; } = "recommended";
+    public string Reason { get; init; } = string.Empty;
+    public List<string> Options { get; init; } = new();
+    public bool Required { get; init; }
+}
+
+public record GenerateFlowTemplateCandidate
+{
+    public string? TemplateId { get; init; }
+    public string TemplateName { get; init; } = string.Empty;
+    public string? TemplateVersion { get; init; }
+    public string? ScenarioKey { get; init; }
+    public string? Industry { get; init; }
+    public double Confidence { get; init; }
+    public string MatchReason { get; init; } = string.Empty;
+    public List<string> MatchedFields { get; init; } = new();
+    public List<string> MissingSignals { get; init; } = new();
+}
+
+public record GenerateFlowStageDiagnostic
+{
+    public string Stage { get; init; } = string.Empty;
+    public string Status { get; init; } = "completed";
+    public string Summary { get; init; } = string.Empty;
+    public long DurationMs { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
 }
 
 

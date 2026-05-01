@@ -65,6 +65,7 @@ public static class GenerateFlowModeExtensions
 public class AiFlowGenerationResult
 {
     public const string CompletionStatusCompleted = "completed";
+    public const string CompletionStatusClarificationRequired = "clarification_required";
     public const string CompletionStatusCancelled = "cancelled";
     public const string CompletionStatusTimedOut = "timed_out";
     public const string CompletionStatusFailed = "failed";
@@ -165,6 +166,11 @@ public class AiFlowGenerationResult
     /// </summary>
     public AiManualRetryInfo? ManualRetry { get; set; }
     public object? PromptTrace { get; set; }
+
+    /// <summary>
+    /// True when generation was intentionally paused until the user clarifies required fields.
+    /// </summary>
+    public bool ClarificationRequired { get; set; }
 
     /// <summary>
     /// Parsed requirement summary used by the AI workbench before and after generation.
@@ -300,10 +306,25 @@ public class AiRequirementBrief
 {
     public string ScenarioKey { get; set; } = string.Empty;
     public string ScenarioName { get; set; } = string.Empty;
+    public string Industry { get; set; } = string.Empty;
     public string IntentType { get; set; } = string.Empty;
+    public string ObjectName { get; set; } = string.Empty;
     public List<string> ObjectTypes { get; set; } = new();
     public List<string> DefectTypes { get; set; } = new();
     public List<string> MeasurementTargets { get; set; } = new();
+    public string ImageSource { get; set; } = "unknown";
+    public string TriggerMode { get; set; } = "unknown";
+    public string OutputTarget { get; set; } = "unknown";
+    public bool? AiModelRequired { get; set; }
+    public string ModelResource { get; set; } = "unknown";
+    public string RoiRequirement { get; set; } = "unknown";
+    public string CalibrationRequirement { get; set; } = "unknown";
+    public string DecisionRule { get; set; } = string.Empty;
+    public double Confidence { get; set; }
+    public bool CanGenerateDraftNow { get; set; } = true;
+    public string DraftRiskLevel { get; set; } = "low";
+    public List<string> KnownFacts { get; set; } = new();
+    public List<string> MissingFields { get; set; } = new();
     public List<string> RequiredResources { get; set; } = new();
     public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
 }
@@ -312,6 +333,9 @@ public class AiClarificationQuestion
 {
     public string Field { get; set; } = string.Empty;
     public string Question { get; set; } = string.Empty;
+    public string Level { get; set; } = "recommended";
+    public string Reason { get; set; } = string.Empty;
+    public List<string> Options { get; set; } = new();
     public bool Required { get; set; }
 }
 
