@@ -106,4 +106,39 @@ public class PreviewMetricsAnalyzerTests
             item.ParameterName == "BoxNms.IouThreshold" &&
             string.Equals(Convert.ToString(item.SuggestedValue), "decrease", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void Analyze_Defects_ShouldPreserveRejectReasonWhenPresentAndAllowNull()
+    {
+        using var image = new Mat(24, 24, MatType.CV_8UC1, Scalar.All(128));
+        var analyzer = new PreviewMetricsAnalyzer(NullLogger<PreviewMetricsAnalyzer>.Instance);
+        var outputData = new Dictionary<string, object>
+        {
+            ["Defects"] = new List<Dictionary<string, object>>
+            {
+                new()
+                {
+                    ["X"] = 1,
+                    ["Y"] = 2,
+                    ["Width"] = 3,
+                    ["Height"] = 4,
+                    ["RejectReason"] = null!
+                },
+                new()
+                {
+                    ["X"] = 5,
+                    ["Y"] = 6,
+                    ["Width"] = 7,
+                    ["Height"] = 8,
+                    ["RejectReason"] = "TooSmall"
+                }
+            }
+        };
+
+        var metrics = analyzer.Analyze(image, outputData!, new AutoTuneGoal());
+
+        metrics.BlobStats.Should().HaveCount(2);
+        metrics.BlobStats[0].RejectReason.Should().BeNull();
+        metrics.BlobStats[1].RejectReason.Should().Be("TooSmall");
+    }
 }

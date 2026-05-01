@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "2026-04-29.dataset-manifest",
+  "datasetId": "PyramidShapeMatch_g3_dataset_closure_v1",
+  "operator": "PyramidShapeMatch",
+  "evidenceKind": "dataset",
+  "tier": "B",
+  "status": "promoted",
+  "source": {
+    "kind": "public-or-semi-synthetic-protocol",
+    "name": "Semi-synthetic multiscale pyramid shape scenes",
+    "version": "g3-closure-v1",
+    "uri": "in-repo protocol evidence",
+    "license": "repo-local synthetic protocol or documented public bridge",
+    "citation": "Quality Flywheel G3 closure using semi-synthetic-multiscale-scenes and source baseline quality/evals/reports/PyramidShapeMatch_contract_baseline.json.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-protocol",
+    "seed": 20260429,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 24,
+    "caseListPath": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json"
+  },
+  "labels": {
+    "schema": "PyramidShapeMatch protocol oracle labels",
+    "positiveClasses": [
+      "PyramidShapeMatch"
+    ],
+    "negativeClasses": [
+      "boundary_negative"
+    ],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "PassRate",
+    "secondary": [
+      "Passed",
+      "Failed",
+      "RuntimeMsAvg",
+      "MemoryAllocationBytesAvg"
+    ],
+    "thresholds": {
+      "Failed": 0,
+      "PassRate": 1.0,
+      "PositionTolerancePx": 12.0
+    }
+  },
+  "runner": {
+    "project": "",
+    "command": "python quality/tools/build_quality_flywheel_g3_closure.py --operator PyramidShapeMatch",
+    "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+    "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md",
+    "sourceBaseline": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": [
+      "template-mode",
+      "shape-descriptor-mode",
+      "max-matches",
+      "blank-scene",
+      "invalid-template"
+    ],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Closure manifests reference synthetic/protocol summaries only; no raw customer image path is stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

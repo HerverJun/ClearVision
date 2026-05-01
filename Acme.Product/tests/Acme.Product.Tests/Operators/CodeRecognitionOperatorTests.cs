@@ -8,6 +8,7 @@ using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenCvSharp;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -43,6 +44,21 @@ public class CodeRecognitionOperatorTests
         var result = await _operator.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().ContainKey("Image");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithGrayImage_ShouldReturnSuccess()
+    {
+        var op = new Operator("test", OperatorType.CodeRecognition, 0, 0);
+        using var image = TestHelpers.CreateGrayTestImage(80, 80, 240);
+
+        Cv2.Rectangle(image.GetMat(), new Rect(16, 16, 48, 48), Scalar.Black, 2);
+
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().ContainKey("Image");
+        result.OutputData.Should().ContainKey("CodeCount");
     }
 
     [Fact]

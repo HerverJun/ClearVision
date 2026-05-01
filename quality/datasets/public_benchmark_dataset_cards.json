@@ -1,0 +1,97 @@
+{
+  "datasets": [
+    {
+      "datasetId": "kolektorsdd2",
+      "name": "Kolektor Surface-Defect Dataset 2",
+      "targetOperators": [
+        "SurfaceDefectDetection",
+        "AnomalyDetection"
+      ],
+      "proofUse": "public industrial surface defect benchmark",
+      "sourceUrl": "https://go.vicos.si/kolektorsdd2",
+      "license": "public research dataset terms; review before commercial redistribution",
+      "localRoot": "quality/public_datasets/kolektorsdd2",
+      "indexPath": "quality/datasets/kolektorsdd2_index.json",
+      "recordCount": 3335,
+      "status": "available-local"
+    },
+    {
+      "datasetId": "mvtec_ad_lite",
+      "name": "MVTec AD Lite",
+      "targetOperators": [
+        "AnomalyDetection",
+        "SurfaceDefectDetection"
+      ],
+      "proofUse": "public industrial anomaly detection benchmark subset",
+      "sourceUrl": "https://www.mvtec.com/research-teaching/datasets/mvtec-ad",
+      "license": "CC-BY-NC-SA-4.0",
+      "localRoot": "quality/public_datasets/mvtec_ad_lite",
+      "indexPath": "quality/datasets/mvtec_ad_lite_index.json",
+      "recordCount": 444,
+      "status": "available-local"
+    },
+    {
+      "datasetId": "bsds500",
+      "name": "Berkeley Segmentation Dataset and Benchmark 500",
+      "targetOperators": [
+        "EdgeDetection",
+        "SemanticSegmentation",
+        "ContourDetection"
+      ],
+      "proofUse": "public boundary and segmentation benchmark",
+      "sourceUrl": "https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html",
+      "license": "research dataset terms; review before redistribution",
+      "localRoot": "quality/public_datasets/bsds500",
+      "indexPath": "quality/datasets/bsds500_index.json",
+      "recordCount": 500,
+      "status": "available-local"
+    },
+    {
+      "datasetId": "opencv_calibration_samples",
+      "name": "OpenCV calibration samples",
+      "targetOperators": [
+        "CameraCalibration",
+        "Undistort",
+        "FisheyeUndistort",
+        "CoordinateTransform"
+      ],
+      "proofUse": "public calibration sample images and parameter files",
+      "sourceUrl": "https://github.com/opencv/opencv/tree/4.x/samples/data",
+      "license": "OpenCV project license terms",
+      "localRoot": "quality/public_datasets/opencv_calibration_samples",
+      "indexPath": "quality/datasets/opencv_calibration_samples_index.json",
+      "recordCount": 13,
+      "status": "available-local"
+    },
+    {
+      "datasetId": "coco2017",
+      "name": "COCO 2017 validation images and annotations",
+      "targetOperators": [
+        "DeepLearning"
+      ],
+      "proofUse": "public object detection benchmark bridge",
+      "sourceUrl": "https://cocodataset.org/#download",
+      "license": "COCO terms; images carry source licenses, annotations are public benchmark data",
+      "localRoot": "quality/public_datasets/coco2017",
+      "indexPath": "quality/datasets/coco2017_index.json",
+      "recordCount": 5000,
+      "status": "available-local"
+    },
+    {
+      "datasetId": "hpatches",
+      "name": "HPatches image matching benchmark",
+      "targetOperators": [
+        "AkazeFeatureMatch",
+        "OrbFeatureMatch",
+        "PlanarMatching"
+      ],
+      "proofUse": "public homography and feature matching benchmark",
+      "sourceUrl": "https://github.com/hpatches/hpatches-dataset",
+      "license": "HPatches research dataset terms",
+      "localRoot": "quality/public_datasets/hpatches",
+      "indexPath": "quality/datasets/hpatches_index.json",
+      "recordCount": 116,
+      "status": "available-local"
+    }
+  ]
+}

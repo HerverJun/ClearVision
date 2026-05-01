@@ -4,6 +4,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Security.Cryptography;
 
 namespace Acme.Product.Application.Services;
 
@@ -13,6 +14,7 @@ namespace Acme.Product.Application.Services;
 public class AuthService : IAuthService
 {
     private const int UsernameMinLength = 3;
+    private const int SessionTokenByteLength = 32;
     public const string InitialAdminSetupAlreadyCompletedMessage = "系统已完成初始化，请直接登录";
     private const string InitialAdminPasswordMismatchMessage = "两次输入的密码不一致";
 
@@ -306,7 +308,11 @@ public class AuthService : IAuthService
 
     private static string GenerateToken()
     {
-        return Guid.NewGuid().ToString("N");
+        var tokenBytes = RandomNumberGenerator.GetBytes(SessionTokenByteLength);
+        return Convert.ToBase64String(tokenBytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 
     private TimeSpan ResolveSessionTimeout()

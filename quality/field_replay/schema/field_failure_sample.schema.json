@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "2026-04-29.field-replay.schema",
+  "description": "Schema contract for anonymized field failure replay sample series. The manifest stores series metadata, not raw customer image paths.",
+  "requiredManifestFields": [
+    "schemaVersion",
+    "manifestId",
+    "drillPolicy",
+    "sampleSeries"
+  ],
+  "requiredSampleSeriesFields": [
+    "sampleSeriesId",
+    "operator",
+    "sampleCount",
+    "reproducibleCount",
+    "regressionizedCount",
+    "redactionStatus",
+    "containsRawCustomerPath",
+    "replayCommand",
+    "triageLabels"
+  ],
+  "redactionRules": [
+    "Raw customer filesystem paths are forbidden.",
+    "Sample ids must be hashed or synthetic identifiers.",
+    "Images may be stored only in approved anonymized fixture packs.",
+    "Reports may include metrics and taxonomy labels, not customer names, site names, serial numbers, or order identifiers."
+  ],
+  "slaRules": {
+    "p0p1TriageBusinessDays": 5,
+    "reproducibleToRegressionBusinessDays": 10,
+    "stableDrillDefinition": "Three consecutive passing drills with reproducible rate >= 80%, regressionized rate >= 60%, and zero privacy/path leaks."
+  }
+}

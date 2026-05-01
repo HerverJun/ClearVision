@@ -69,6 +69,45 @@ public class FindContoursOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithOtsuThresholdMode_ShouldExposeForegroundDiagnostics()
+    {
+        var op = new Operator("test", OperatorType.ContourDetection, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ThresholdMode", "Otsu", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 10, "int"));
+
+        using var mat = new Mat(120, 160, MatType.CV_8UC4, new Scalar(0, 0, 0, 255));
+        Cv2.Rectangle(mat, new Rect(20, 20, 80, 60), new Scalar(255, 255, 255, 255), -1);
+        using var image = new ImageWrapper(mat.Clone());
+
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["ThresholdMode"].Should().Be("Otsu");
+        Convert.ToDouble(result.OutputData["ForegroundRatio"]).Should().BeGreaterThan(0.0);
+        var outputImage = result.OutputData["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        outputImage.MatReadOnly.Channels().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInputBinaryInverse_ShouldPreserveMaxValueRange()
+    {
+        var op = new Operator("test", OperatorType.ContourDetection, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ThresholdMode", "InputBinary", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ThresholdType", "BinaryInv", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxValue", 1.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 1, "int"));
+
+        using var mat = new Mat(20, 20, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(mat, new Rect(5, 5, 10, 10), new Scalar(1), -1);
+        using var image = new ImageWrapper(mat.Clone());
+
+        var result = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["ForegroundPixelCount"]).Should().Be(300);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithFilteredContours_ShouldRemapHierarchyIndices()
     {
         var op = new Operator("test", OperatorType.ContourDetection, 0, 0);

@@ -1,0 +1,1013 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T03:29:47.2951802+00:00",
+    "CaseCount": 72,
+    "Passed": 72,
+    "Failed": 0,
+    "RuntimeMs": 123.037
+  },
+  "Operators": [
+    {
+      "Operator": "CalibrationLoader",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 3.31,
+      "MemoryAllocationBytesAvg": 39254
+    },
+    {
+      "Operator": "NPointCalibration",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.406,
+      "MemoryAllocationBytesAvg": 21999
+    },
+    {
+      "Operator": "TranslationRotationCalibration",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.411,
+      "MemoryAllocationBytesAvg": 22329
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Affine geometry oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 3.708
+    },
+    {
+      "Scenario": "Degenerate geometry failure contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.113
+    },
+    {
+      "Scenario": "Insufficient points failure contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.188
+    },
+    {
+      "Scenario": "Invalid JSON failure contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.738
+    },
+    {
+      "Scenario": "Missing file failure contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.139
+    },
+    {
+      "Scenario": "Parameter validation contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.102
+    },
+    {
+      "Scenario": "Perspective geometry oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.365
+    },
+    {
+      "Scenario": "Rigid transform oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.109
+    },
+    {
+      "Scenario": "Similarity transform oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.99
+    },
+    {
+      "Scenario": "Valid bundle load",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 8.853
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_00",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 58.357,
+      "MemoryAllocationBytes": 662320,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_01",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 1.39,
+      "MemoryAllocationBytes": 20392,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_02",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 1.617,
+      "MemoryAllocationBytes": 19296,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_03",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 0.804,
+      "MemoryAllocationBytes": 19304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_04",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 0.755,
+      "MemoryAllocationBytes": 19168,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_05",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 0.742,
+      "MemoryAllocationBytes": 19176,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_06",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 6.121,
+      "MemoryAllocationBytes": 19176,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_valid_v2_bundle_07",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Valid bundle load",
+      "Passed": true,
+      "RuntimeMs": 1.035,
+      "MemoryAllocationBytes": 19304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Accepted": true,
+        "PathExists": true
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_00",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.896,
+      "MemoryAllocationBytes": 5720,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_01",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.065,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_02",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.023,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_03",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.02,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_04",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.051,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_05",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.025,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_06",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_missing_file_07",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Missing file failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.019,
+      "MemoryAllocationBytes": 4048,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingFile"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_invalid_json_00",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Invalid JSON failure contract",
+      "Passed": true,
+      "RuntimeMs": 3.527,
+      "MemoryAllocationBytes": 53312,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidJson"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_invalid_json_01",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Invalid JSON failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.873,
+      "MemoryAllocationBytes": 16496,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidJson"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_invalid_json_02",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Invalid JSON failure contract",
+      "Passed": true,
+      "RuntimeMs": 1.36,
+      "MemoryAllocationBytes": 16472,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidJson"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_invalid_json_03",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Invalid JSON failure contract",
+      "Passed": true,
+      "RuntimeMs": 1.191,
+      "MemoryAllocationBytes": 16472,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidJson"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_empty_path_validation_00",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.531,
+      "MemoryAllocationBytes": 1816,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "EmptyPath"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_empty_path_validation_01",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 1776,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "EmptyPath"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_empty_path_validation_02",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 1776,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "EmptyPath"
+      }
+    },
+    {
+      "CaseId": "CalibrationLoader_empty_path_validation_03",
+      "Operator": "CalibrationLoader",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 1776,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "EmptyPath"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_00",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 28.899,
+      "MemoryAllocationBytes": 138616,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 3.0939509755270964E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_01",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.269,
+      "MemoryAllocationBytes": 20584,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 1.1217691117462884E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_02",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.092,
+      "MemoryAllocationBytes": 20536,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 2.870548787179986E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_03",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.088,
+      "MemoryAllocationBytes": 20864,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 2.2364525487035887E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_04",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.081,
+      "MemoryAllocationBytes": 20512,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 1.7113537741625245E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_05",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.083,
+      "MemoryAllocationBytes": 20584,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 1.3403303824014752E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_06",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.076,
+      "MemoryAllocationBytes": 20832,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 2.22126192815652E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_affine_round_trip_07",
+      "Operator": "NPointCalibration",
+      "Scenario": "Affine geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.077,
+      "MemoryAllocationBytes": 20856,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 2.6954970914631877E-06,
+        "TransformModel": "Affine"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_00",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 2.056,
+      "MemoryAllocationBytes": 21480,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 5.293834137830427E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_01",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.169,
+      "MemoryAllocationBytes": 21768,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 1.4428920668468004E-06,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_02",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.134,
+      "MemoryAllocationBytes": 21736,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 5.19255093141359E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_03",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.121,
+      "MemoryAllocationBytes": 22064,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 5.826024804072933E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_04",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.108,
+      "MemoryAllocationBytes": 21768,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 7.905541937697487E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_05",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.111,
+      "MemoryAllocationBytes": 21784,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 5.321941600114903E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_06",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.109,
+      "MemoryAllocationBytes": 22048,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 5.335428299111836E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_perspective_round_trip_07",
+      "Operator": "NPointCalibration",
+      "Scenario": "Perspective geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.114,
+      "MemoryAllocationBytes": 22048,
+      "ErrorMessage": null,
+      "Observed": {
+        "ReprojectionError": 8.848250346429478E-07,
+        "TransformModel": "Homography"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_insufficient_perspective_pairs_00",
+      "Operator": "NPointCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.816,
+      "MemoryAllocationBytes": 16824,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InsufficientPerspectivePairs"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_insufficient_perspective_pairs_01",
+      "Operator": "NPointCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.031,
+      "MemoryAllocationBytes": 7824,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InsufficientPerspectivePairs"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_insufficient_perspective_pairs_02",
+      "Operator": "NPointCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.021,
+      "MemoryAllocationBytes": 7768,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InsufficientPerspectivePairs"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_insufficient_perspective_pairs_03",
+      "Operator": "NPointCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 12224,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InsufficientPerspectivePairs"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_invalid_mode_validation_00",
+      "Operator": "NPointCalibration",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.229,
+      "MemoryAllocationBytes": 6072,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidMode"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_invalid_mode_validation_01",
+      "Operator": "NPointCalibration",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6344,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidMode"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_invalid_mode_validation_02",
+      "Operator": "NPointCalibration",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6320,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidMode"
+      }
+    },
+    {
+      "CaseId": "NPointCalibration_invalid_mode_validation_03",
+      "Operator": "NPointCalibration",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 6512,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidMode"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_00",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 7.384,
+      "MemoryAllocationBytes": 90120,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 8.444704010915923E-15,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_01",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.14,
+      "MemoryAllocationBytes": 24696,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 1.0048591735576161E-14,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_02",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.076,
+      "MemoryAllocationBytes": 24720,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 9.697021187062789E-15,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_03",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.065,
+      "MemoryAllocationBytes": 24920,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 9.031512475762442E-15,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_04",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 24528,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 3.809860975949991E-15,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_05",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 24712,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 9.204545682473235E-15,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_06",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.064,
+      "MemoryAllocationBytes": 25056,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 1.0539051923921737E-14,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_least_squares_similarity_07",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Similarity transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.066,
+      "MemoryAllocationBytes": 25048,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 6.4047456679787536E-15,
+        "TransformModel": "Similarity"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_00",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.415,
+      "MemoryAllocationBytes": 23816,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 2.1018137570293106E-15,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_01",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.072,
+      "MemoryAllocationBytes": 24392,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 1.1064863871295526E-14,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_02",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.068,
+      "MemoryAllocationBytes": 24232,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 3.462756959325817E-15,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_03",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.064,
+      "MemoryAllocationBytes": 24728,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 3.972054645195637E-15,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_04",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 24288,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 3.1776437161565094E-15,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_05",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.062,
+      "MemoryAllocationBytes": 24360,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 7.983731028902322E-15,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_06",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 24696,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 1.103630933628286E-14,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_svd_rigid_07",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Rigid transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.066,
+      "MemoryAllocationBytes": 24680,
+      "ErrorMessage": null,
+      "Observed": {
+        "CalibrationError": 1.0892413880551923E-14,
+        "TransformModel": "Rigid"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_too_few_points_00",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.546,
+      "MemoryAllocationBytes": 10176,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "TooFewPoints"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_too_few_points_01",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.026,
+      "MemoryAllocationBytes": 8000,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "TooFewPoints"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_too_few_points_02",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.02,
+      "MemoryAllocationBytes": 7952,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "TooFewPoints"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_too_few_points_03",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Insufficient points failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.02,
+      "MemoryAllocationBytes": 8160,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "TooFewPoints"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_degenerate_points_00",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Degenerate geometry failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.364,
+      "MemoryAllocationBytes": 10584,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "DegenerateGeometry"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_degenerate_points_01",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Degenerate geometry failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.033,
+      "MemoryAllocationBytes": 10680,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "DegenerateGeometry"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_degenerate_points_02",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Degenerate geometry failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.028,
+      "MemoryAllocationBytes": 10680,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "DegenerateGeometry"
+      }
+    },
+    {
+      "CaseId": "TranslationRotationCalibration_degenerate_points_03",
+      "Operator": "TranslationRotationCalibration",
+      "Scenario": "Degenerate geometry failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.028,
+      "MemoryAllocationBytes": 10680,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "DegenerateGeometry"
+      }
+    }
+  ]
+}

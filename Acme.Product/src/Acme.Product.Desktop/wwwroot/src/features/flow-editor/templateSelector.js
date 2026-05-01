@@ -1,4 +1,5 @@
 import httpClient from '../../core/messaging/httpClient.js';
+import serviceRegistry from '../../core/app/serviceRegistry.js';
 import { showToast } from '../../shared/components/uiComponents.js';
 
 /**
@@ -61,7 +62,7 @@ export class TemplateSelector {
 
     async _loadOperatorMetadata() {
         // 优先复用已加载的算子库，避免额外请求。
-        const cachedOperators = window.operatorLibraryPanel?.getOperators?.() ?? [];
+        const cachedOperators = serviceRegistry.get('operatorLibraryPanel')?.getOperators?.() ?? [];
         const operators = cachedOperators.length > 0
             ? cachedOperators
             : await httpClient.get('/operators/library');

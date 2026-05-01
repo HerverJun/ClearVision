@@ -5,6 +5,11 @@
 
 import httpClient from '../../core/messaging/httpClient.js';
 import { renderDiagnosticsCardsHtml } from '../inspection/analysisCardsPanel.js';
+import {
+    buildResultCardsFromOutputData,
+    renderResultCardHtml,
+    summarizeResultField
+} from './portDataTypeRenderer.mjs';
 
 class ResultPanel {
     constructor(containerId) {
@@ -1249,6 +1254,7 @@ class ResultPanel {
                             <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${processingTime}ms</span></div>
                         </div>
                         ${this.renderAnalysisDataSection(result.analysisData)}
+                        ${this.renderStructuredOutputSection(result.outputData, result.status)}
                         ${this.renderDiagnosticsSection(result.outputData, result.status)}
                         ${this.renderOutputDataTable(result.outputData)}
                         ${result.defects?.length > 0 ? `
@@ -1299,6 +1305,22 @@ class ResultPanel {
     /**
      * 渲染输出数据表格（详情弹窗内完整展示）
      */
+    renderStructuredOutputSection(outputData, fallbackStatus) {
+        const cards = buildResultCardsFromOutputData(outputData, { status: fallbackStatus || 'OK' });
+        if (cards.length === 0) {
+            return '';
+        }
+
+        return `
+            <div class="detail-section">
+                <div class="detail-section-title">结构化输出</div>
+                <div class="analysis-cards-container ac-diagnostics-inline ac-diagnostics-detail">
+                    ${cards.map(card => renderResultCardHtml(card, { fallbackStatus })).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     renderOutputDataTable(outputData) {
         if (!outputData || typeof outputData !== 'object' || Object.keys(outputData).length === 0) return '';
         
@@ -1395,7 +1417,12 @@ class ResultPanel {
         }
 
         const label = firstField.label || firstField.key || '值';
-        const value = this.formatAnalysisFieldValue(firstField.value);
+        const value = summarizeResultField({
+            key: firstField.key || firstField.label || label,
+            value: firstField.value,
+            unit: firstField.unit,
+            dataType: firstField.dataType || firstField.DataType
+        });
         return `${label}: ${value}`;
     }
 

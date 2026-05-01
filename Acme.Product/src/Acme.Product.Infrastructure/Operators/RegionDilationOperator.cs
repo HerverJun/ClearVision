@@ -22,7 +22,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Dilates a region using a specified structuring element (Region-based morphology).",
     Category = "Morphology",
     IconName = "region-dilation",
-    Keywords = new[] { "Region", "Dilation", "Morphology", "Expand", "Grow", "RLE" }
+    Keywords = new[] { "Region", "Dilation", "Morphology", "Expand", "Grow", "RLE" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Region morphology dilation",
+    CoreApi = "MorphologyKernel.GetOffsets -> HashSet expanded points -> PointsToRuns",
+    ImplementationStrategy = "Applies every structuring-element offset to each source point, de-duplicates expanded points, then converts the expanded set back to RLE runs.",
+    TimeComplexity = "O(I*P*K + P' log P')",
+    TypicalLatency = "Avg 0.536 ms, max 6.379 ms over 100 synthetic golden cases",
+    SpaceComplexity = "O(P'+K)",
+    SuitableUseCases = new[] { "Expanding foreground masks, closing small gaps before boolean operations, and adding pixel-domain tolerance to ROIs." },
+    UnsuitableUseCases = new[] { "Workflows that require automatic clipping to the original image extent unless an explicit downstream clip is added." },
+    KnownLimitations = new[] { "Dilation can emit coordinates outside the original region or image domain by design.", "Kernel shapes are discrete Rectangle/Ellipse/Cross rasterizations rather than analytic continuous geometry." }
 )]
 [InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]

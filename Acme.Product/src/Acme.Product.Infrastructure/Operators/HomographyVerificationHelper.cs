@@ -4,6 +4,10 @@ namespace Acme.Product.Infrastructure.Operators;
 
 internal static class HomographyVerificationHelper
 {
+    private const double CenterOnlyMaxAreaRatio = 1.5;
+    private const double CenterOnlyMaxMeanReprojectionErrorPx = 1.2;
+    private const double CenterOnlyMinInlierRatio = 0.75;
+
     internal readonly record struct HomographyVerificationMetrics(
         bool VerificationPassed,
         int MatchCount,
@@ -13,6 +17,8 @@ internal static class HomographyVerificationHelper
         double MaxReprojectionError,
         double AreaRatio,
         bool CornersValid,
+        int CornersInsideCount,
+        bool ProjectedCenterInside,
         string FailureReason);
 
     public static bool TryEstimateAndVerify(
@@ -28,6 +34,35 @@ internal static class HomographyVerificationHelper
         out Point2f[] corners,
         out HomographyVerificationMetrics metrics)
     {
+        return TryEstimateAndVerify(
+            templatePoints,
+            searchPoints,
+            templateSize,
+            searchImageSize,
+            ransacThreshold,
+            minMatchCount,
+            minInliers,
+            minInlierRatio,
+            allowCenterOnlyProjection: false,
+            out homography,
+            out corners,
+            out metrics);
+    }
+
+    public static bool TryEstimateAndVerify(
+        Point2f[] templatePoints,
+        Point2f[] searchPoints,
+        Size templateSize,
+        Size searchImageSize,
+        double ransacThreshold,
+        int minMatchCount,
+        int minInliers,
+        double minInlierRatio,
+        bool allowCenterOnlyProjection,
+        out Mat? homography,
+        out Point2f[] corners,
+        out HomographyVerificationMetrics metrics)
+    {
         homography = null;
         corners = Array.Empty<Point2f>();
         metrics = new HomographyVerificationMetrics(
@@ -39,6 +74,8 @@ internal static class HomographyVerificationHelper
             MaxReprojectionError: double.PositiveInfinity,
             AreaRatio: 0,
             CornersValid: false,
+            CornersInsideCount: 0,
+            ProjectedCenterInside: false,
             FailureReason: "Homography estimation failed.");
 
         if (templatePoints.Length != searchPoints.Length || templatePoints.Length < 4)
@@ -78,7 +115,15 @@ internal static class HomographyVerificationHelper
             estimated);
 
         var areaRatio = ComputeAreaRatio(corners, templateSize);
-        var cornersValid = AreCornersValid(corners, areaRatio, searchImageSize);
+        var projectedCenters = Cv2.PerspectiveTransform(
+            new[] { new Point2f(templateSize.Width / 2.0f, templateSize.Height / 2.0f) },
+            estimated);
+        var projectedCenter = projectedCenters.Length == 1 ? projectedCenters[0] : new Point2f(float.NaN, float.NaN);
+        var (cornersValid, cornersInsideCount, projectedCenterInside) =
+            EvaluateProjectedQuadrilateral(corners, projectedCenter, areaRatio, searchImageSize);
+        var centerOnlyAccepted = allowCenterOnlyProjection &&
+            projectedCenterInside &&
+            IsCenterOnlyProjectionAcceptable(corners, areaRatio, inlierRatio, meanReprojectionError);
         var maxMeanReprojectionError = Math.Max(1.0, ransacThreshold * 1.35);
         var maxPeakReprojectionError = Math.Max(2.0, ransacThreshold * 2.5);
 
@@ -99,7 +144,7 @@ internal static class HomographyVerificationHelper
         {
             failureReason = $"Reprojection error too large (mean={meanReprojectionError:F2}px, max={maxReprojectionError:F2}px).";
         }
-        else if (!cornersValid)
+        else if (!cornersValid && !centerOnlyAccepted)
         {
             failureReason = "Projected quadrilateral is invalid.";
         }
@@ -113,7 +158,9 @@ internal static class HomographyVerificationHelper
             MeanReprojectionError: meanReprojectionError,
             MaxReprojectionError: maxReprojectionError,
             AreaRatio: areaRatio,
-            CornersValid: cornersValid,
+            CornersValid: cornersValid || centerOnlyAccepted,
+            CornersInsideCount: cornersInsideCount,
+            ProjectedCenterInside: projectedCenterInside,
             FailureReason: verificationPassed ? string.Empty : failureReason);
 
         homography = estimated.Clone();
@@ -216,40 +263,84 @@ internal static class HomographyVerificationHelper
         return templateArea <= 0 ? 0 : area / templateArea;
     }
 
-    private static bool AreCornersValid(Point2f[] corners, double areaRatio, Size searchImageSize)
+    private static (bool CornersValid, int CornersInsideCount, bool ProjectedCenterInside) EvaluateProjectedQuadrilateral(
+        Point2f[] corners,
+        Point2f projectedCenter,
+        double areaRatio,
+        Size searchImageSize)
     {
+        var projectedCenterInside = IsPointInsideSearchImage(projectedCenter, searchImageSize);
         if (corners.Length != 4)
         {
-            return false;
-        }
-
-        if (corners.Any(point => !float.IsFinite(point.X) || !float.IsFinite(point.Y)))
-        {
-            return false;
-        }
-
-        if (Math.Abs(SignedArea(corners)) < 1e-3)
-        {
-            return false;
-        }
-
-        if (areaRatio is < 0.1 or > 8.0)
-        {
-            return false;
-        }
-
-        if (!IsConvexQuadrilateral(corners) || HasSelfIntersection(corners))
-        {
-            return false;
+            return (false, 0, projectedCenterInside);
         }
 
         var insideCount = corners.Count(point =>
+            float.IsFinite(point.X) &&
+            float.IsFinite(point.Y) &&
             point.X >= -1 &&
             point.Y >= -1 &&
             point.X <= searchImageSize.Width + 1 &&
             point.Y <= searchImageSize.Height + 1);
 
-        return insideCount >= 3;
+        if (corners.Any(point => !float.IsFinite(point.X) || !float.IsFinite(point.Y)))
+        {
+            return (false, insideCount, projectedCenterInside);
+        }
+
+        if (Math.Abs(SignedArea(corners)) < 1e-3)
+        {
+            return (false, insideCount, projectedCenterInside);
+        }
+
+        if (areaRatio is < 0.1 or > 8.0)
+        {
+            return (false, insideCount, projectedCenterInside);
+        }
+
+        if (!IsConvexQuadrilateral(corners) || HasSelfIntersection(corners))
+        {
+            return (false, insideCount, projectedCenterInside);
+        }
+
+        if (insideCount >= 3)
+        {
+            return (true, insideCount, projectedCenterInside);
+        }
+
+        // HPatches viewpoint pairs often crop part of the original plane. When the
+        // homography is otherwise stable, a visible projected center is sufficient
+        // for localization operators that report a reference point rather than a
+        // full in-frame quadrilateral.
+        return (insideCount >= 2 && projectedCenterInside, insideCount, projectedCenterInside);
+    }
+
+    private static bool IsCenterOnlyProjectionAcceptable(
+        Point2f[] corners,
+        double areaRatio,
+        double inlierRatio,
+        double meanReprojectionError)
+    {
+        return corners.Length == 4 &&
+               corners.All(point => float.IsFinite(point.X) && float.IsFinite(point.Y)) &&
+               Math.Abs(SignedArea(corners)) >= 1e-3 &&
+               inlierRatio >= CenterOnlyMinInlierRatio &&
+               double.IsFinite(meanReprojectionError) &&
+               areaRatio is >= 0.1 and <= 8.0 &&
+               (areaRatio <= CenterOnlyMaxAreaRatio ||
+                meanReprojectionError <= CenterOnlyMaxMeanReprojectionErrorPx) &&
+               IsConvexQuadrilateral(corners) &&
+               !HasSelfIntersection(corners);
+    }
+
+    private static bool IsPointInsideSearchImage(Point2f point, Size searchImageSize)
+    {
+        return float.IsFinite(point.X) &&
+               float.IsFinite(point.Y) &&
+               point.X >= -1 &&
+               point.Y >= -1 &&
+               point.X <= searchImageSize.Width + 1 &&
+               point.Y <= searchImageSize.Height + 1;
     }
 
     private static double SignedArea(Point2f[] polygon)

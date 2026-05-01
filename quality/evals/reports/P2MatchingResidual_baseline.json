@@ -1,0 +1,1000 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T03:29:51.0563385+00:00",
+    "CaseCount": 72,
+    "Passed": 72,
+    "Failed": 0,
+    "RuntimeMs": 1838.195
+  },
+  "Operators": [
+    {
+      "Operator": "LocalDeformableMatching",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 29.374,
+      "MemoryAllocationBytesAvg": 9876710
+    },
+    {
+      "Operator": "PlanarMatching",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 30.527,
+      "MemoryAllocationBytesAvg": 285681
+    },
+    {
+      "Operator": "ShapeMatching",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 16.69,
+      "MemoryAllocationBytesAvg": 39562881
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Blank scene no-match contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 25.336
+    },
+    {
+      "Scenario": "Blank scene rejection contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 5.637
+    },
+    {
+      "Scenario": "Direct pose oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 11.08
+    },
+    {
+      "Scenario": "Feature homography identity oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 71.243
+    },
+    {
+      "Scenario": "Local deformation oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 86.096
+    },
+    {
+      "Scenario": "Low-feature no-match contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.743
+    },
+    {
+      "Scenario": "Missing input failure contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.151
+    },
+    {
+      "Scenario": "Missing template contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.485
+    },
+    {
+      "Scenario": "Parameter validation contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.125
+    },
+    {
+      "Scenario": "Perspective homography oracle",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 17.438
+    },
+    {
+      "Scenario": "Rotation-scale oracle",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 27.153
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "ShapeMatching_direct_match_00",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 71.492,
+      "MemoryAllocationBytes": 1437408,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_01",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 3.017,
+      "MemoryAllocationBytes": 763808,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_02",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 2.363,
+      "MemoryAllocationBytes": 761776,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_03",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 2.233,
+      "MemoryAllocationBytes": 744616,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_04",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 2.259,
+      "MemoryAllocationBytes": 744616,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_05",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 2.462,
+      "MemoryAllocationBytes": 744616,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_06",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 2.318,
+      "MemoryAllocationBytes": 744616,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_direct_match_07",
+      "Operator": "ShapeMatching",
+      "Scenario": "Direct pose oracle",
+      "Passed": true,
+      "RuntimeMs": 2.5,
+      "MemoryAllocationBytes": 744616,
+      "ErrorMessage": null,
+      "Observed": {
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_00",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 31.029,
+      "MemoryAllocationBytes": 76664608,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_01",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 25.072,
+      "MemoryAllocationBytes": 76688736,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_02",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 25.607,
+      "MemoryAllocationBytes": 76668440,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_03",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 24.112,
+      "MemoryAllocationBytes": 76671896,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_04",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 24.834,
+      "MemoryAllocationBytes": 76669784,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_05",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 24.305,
+      "MemoryAllocationBytes": 76669792,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_06",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 24.437,
+      "MemoryAllocationBytes": 76670024,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_blank_scene_07",
+      "Operator": "ShapeMatching",
+      "Scenario": "Blank scene no-match contract",
+      "Passed": true,
+      "RuntimeMs": 23.292,
+      "MemoryAllocationBytes": 76669288,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoMatch"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_match_00",
+      "Operator": "ShapeMatching",
+      "Scenario": "Rotation-scale oracle",
+      "Passed": true,
+      "RuntimeMs": 30.248,
+      "MemoryAllocationBytes": 77751128,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedAngle": 20,
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_match_01",
+      "Operator": "ShapeMatching",
+      "Scenario": "Rotation-scale oracle",
+      "Passed": true,
+      "RuntimeMs": 25.38,
+      "MemoryAllocationBytes": 78658000,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedAngle": 25,
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_match_02",
+      "Operator": "ShapeMatching",
+      "Scenario": "Rotation-scale oracle",
+      "Passed": true,
+      "RuntimeMs": 27.724,
+      "MemoryAllocationBytes": 86504064,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedAngle": 30,
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_rotated_match_03",
+      "Operator": "ShapeMatching",
+      "Scenario": "Rotation-scale oracle",
+      "Passed": true,
+      "RuntimeMs": 25.259,
+      "MemoryAllocationBytes": 86517144,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedAngle": 35,
+        "MatchCount": 1
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_missing_inputs_00",
+      "Operator": "ShapeMatching",
+      "Scenario": "Missing input failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.596,
+      "MemoryAllocationBytes": 14912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingInput"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_missing_inputs_01",
+      "Operator": "ShapeMatching",
+      "Scenario": "Missing input failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 1752,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingInput"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_missing_inputs_02",
+      "Operator": "ShapeMatching",
+      "Scenario": "Missing input failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.001,
+      "MemoryAllocationBytes": 1752,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingInput"
+      }
+    },
+    {
+      "CaseId": "ShapeMatching_missing_inputs_03",
+      "Operator": "ShapeMatching",
+      "Scenario": "Missing input failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.001,
+      "MemoryAllocationBytes": 1752,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingInput"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_00",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 153.02,
+      "MemoryAllocationBytes": 580064,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "ORB",
+        "InlierCount": 226
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_01",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 76.447,
+      "MemoryAllocationBytes": 254760,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "AKAZE",
+        "InlierCount": 113
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_02",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 82.473,
+      "MemoryAllocationBytes": 290072,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "BRISK",
+        "InlierCount": 174
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_03",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 14.02,
+      "MemoryAllocationBytes": 447568,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "ORB",
+        "InlierCount": 226
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_04",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 71.159,
+      "MemoryAllocationBytes": 254536,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "AKAZE",
+        "InlierCount": 113
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_05",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 84.828,
+      "MemoryAllocationBytes": 289904,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "BRISK",
+        "InlierCount": 174
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_06",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 14.468,
+      "MemoryAllocationBytes": 447568,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "ORB",
+        "InlierCount": 226
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_same_image_07",
+      "Operator": "PlanarMatching",
+      "Scenario": "Feature homography identity oracle",
+      "Passed": true,
+      "RuntimeMs": 73.53,
+      "MemoryAllocationBytes": 254536,
+      "ErrorMessage": null,
+      "Observed": {
+        "DetectorType": "AKAZE",
+        "InlierCount": 113
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_00",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 19.72,
+      "MemoryAllocationBytes": 491416,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 22
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_01",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 17.845,
+      "MemoryAllocationBytes": 485584,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 33
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_02",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 16.98,
+      "MemoryAllocationBytes": 489000,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 32
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_03",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 16.668,
+      "MemoryAllocationBytes": 490248,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 22
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_04",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 16.965,
+      "MemoryAllocationBytes": 486352,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 25
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_05",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 17.124,
+      "MemoryAllocationBytes": 489168,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 24
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_06",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 17.187,
+      "MemoryAllocationBytes": 491640,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 24
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_perspective_warp_07",
+      "Operator": "PlanarMatching",
+      "Scenario": "Perspective homography oracle",
+      "Passed": true,
+      "RuntimeMs": 17.017,
+      "MemoryAllocationBytes": 494680,
+      "ErrorMessage": null,
+      "Observed": {
+        "InlierCount": 25
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_blank_scene_00",
+      "Operator": "PlanarMatching",
+      "Scenario": "Blank scene rejection contract",
+      "Passed": true,
+      "RuntimeMs": 7.752,
+      "MemoryAllocationBytes": 27960,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "BlankScene"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_blank_scene_01",
+      "Operator": "PlanarMatching",
+      "Scenario": "Blank scene rejection contract",
+      "Passed": true,
+      "RuntimeMs": 5.065,
+      "MemoryAllocationBytes": 27936,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "BlankScene"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_blank_scene_02",
+      "Operator": "PlanarMatching",
+      "Scenario": "Blank scene rejection contract",
+      "Passed": true,
+      "RuntimeMs": 4.798,
+      "MemoryAllocationBytes": 27936,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "BlankScene"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_blank_scene_03",
+      "Operator": "PlanarMatching",
+      "Scenario": "Blank scene rejection contract",
+      "Passed": true,
+      "RuntimeMs": 4.932,
+      "MemoryAllocationBytes": 27936,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "BlankScene"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_invalid_detector_00",
+      "Operator": "PlanarMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.641,
+      "MemoryAllocationBytes": 1872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidDetector"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_invalid_detector_01",
+      "Operator": "PlanarMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 1872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidDetector"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_invalid_detector_02",
+      "Operator": "PlanarMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidDetector"
+      }
+    },
+    {
+      "CaseId": "PlanarMatching_invalid_detector_03",
+      "Operator": "PlanarMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 1872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidDetector"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_00",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 95.094,
+      "MemoryAllocationBytes": 29440816,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 53.342445508857104
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_01",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 85.204,
+      "MemoryAllocationBytes": 29361328,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 52.937718935946044
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_02",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 83.678,
+      "MemoryAllocationBytes": 29370464,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 53.504227748895346
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_03",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 89.323,
+      "MemoryAllocationBytes": 29236480,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 52.6523361281955
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_04",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 88.476,
+      "MemoryAllocationBytes": 29226928,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 53.29947197410104
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_05",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 82.075,
+      "MemoryAllocationBytes": 29873624,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 52.950872745230214
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_06",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 81.182,
+      "MemoryAllocationBytes": 29618832,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 53.81459011373158
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_local_warp_07",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Local deformation oracle",
+      "Passed": true,
+      "RuntimeMs": 83.732,
+      "MemoryAllocationBytes": 30728840,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "MLS_Deformable",
+        "DeformationMagnitude": 53.33553296455891
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_00",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 3.571,
+      "MemoryAllocationBytes": 28760,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_01",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.698,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_02",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.423,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_03",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.427,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_04",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.681,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_05",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.5,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_06",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.325,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_low_feature_seed_07",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Low-feature no-match contract",
+      "Passed": true,
+      "RuntimeMs": 1.321,
+      "MemoryAllocationBytes": 16968,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "LowFeatureNoMatch"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_missing_template_00",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Missing template contract",
+      "Passed": true,
+      "RuntimeMs": 0.917,
+      "MemoryAllocationBytes": 7872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingTemplate"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_missing_template_01",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Missing template contract",
+      "Passed": true,
+      "RuntimeMs": 0.518,
+      "MemoryAllocationBytes": 6888,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingTemplate"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_missing_template_02",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Missing template contract",
+      "Passed": true,
+      "RuntimeMs": 0.255,
+      "MemoryAllocationBytes": 6888,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingTemplate"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_missing_template_03",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Missing template contract",
+      "Passed": true,
+      "RuntimeMs": 0.251,
+      "MemoryAllocationBytes": 6888,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingTemplate"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_invalid_pyramid_00",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.327,
+      "MemoryAllocationBytes": 1912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidPyramidLevels"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_invalid_pyramid_01",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 1912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidPyramidLevels"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_invalid_pyramid_02",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 1912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidPyramidLevels"
+      }
+    },
+    {
+      "CaseId": "LocalDeformableMatching_invalid_pyramid_03",
+      "Operator": "LocalDeformableMatching",
+      "Scenario": "Parameter validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 1912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidPyramidLevels"
+      }
+    }
+  ]
+}

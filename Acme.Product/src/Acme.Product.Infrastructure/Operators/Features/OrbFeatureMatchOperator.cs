@@ -28,9 +28,51 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("EdgeThreshold", "边缘阈值", "int", DefaultValue = 31, Min = 3, Max = 100)]
 [OperatorParam("EnableSymmetryTest", "对称测试", "bool", DefaultValue = true)]
 [OperatorParam("MinMatchCount", "最小匹配数", "int", DefaultValue = 10, Min = 3, Max = 100)]
+[OperatorParam("EnableCandidateProfile", "Enable Candidate Profile", "bool", DefaultValue = false)]
+[OperatorParam("CandidateProfile", "Candidate Profile", "enum", DefaultValue = "default", Options = new[] { "default|Default", "replay_safe_dense_strict|ORB replay_safe_dense_strict" })]
+[OutputPort("InlierRatio", "Inlier Ratio", PortDataType.Float)]
+[OutputPort("MeanReprojectionError", "Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("MaxReprojectionError", "Max Reprojection Error", PortDataType.Float)]
+[OutputPort("AreaRatio", "Projected Area Ratio", PortDataType.Float)]
+[OutputPort("CornersInsideCount", "Projected Corners Inside", PortDataType.Integer)]
+[OutputPort("ProjectedCenterInside", "Projected Center Inside", PortDataType.Boolean)]
+[OutputPort("Corners", "Projected Corners", PortDataType.PointList)]
+[OutputPort("HomographyFailureReason", "Homography Failure Reason", PortDataType.String)]
+[OperatorParam("MatchRatio", "Match Ratio (Lowe's)", "double", DefaultValue = 0.75, Min = 0.5, Max = 0.95)]
+[OperatorParam("RansacThreshold", "RANSAC Threshold (px)", "double", DefaultValue = 5.0, Min = 0.5, Max = 10.0)]
+[OperatorParam("MinInlierRatio", "Min Inlier Ratio", "double", DefaultValue = 0.25, Min = 0.1, Max = 1.0)]
+[OperatorParam("AllowCenterOnlyProjection", "Allow Center-Only Projection", "bool", DefaultValue = false)]
+[OperatorParam("FastThreshold", "ORB FAST Threshold", "int", DefaultValue = 20, Min = 1, Max = 100)]
 [OperatorParam("OriginMode", "Origin Mode", "enum", DefaultValue = "Center", Options = new[] { "Center|Center", "TopLeft|TopLeft", "Custom|Custom" })]
 [OperatorParam("OriginX", "Origin X", "double", DefaultValue = 0.0)]
 [OperatorParam("OriginY", "Origin Y", "double", DefaultValue = 0.0)]
+[AlgorithmInfo(
+    Name = "ORB Homography Feature Match",
+    CoreApi = "OpenCvSharp.ORB + BFMatcher(Hamming) + FindHomography(RANSAC)",
+    ImplementationStrategy = "Extract ORB descriptors from the scene and template, filter candidate matches with ratio and optional symmetry tests, verify geometry with a RANSAC homography, then emit Position, MatchPoint, Score, and NG diagnostics.",
+    TimeComplexity = "O(P + T*S) where P is image pixels and T/S are retained template and scene descriptors",
+    TypicalLatency = "FeatureMatchContractRunner baseline: 22 cases passed, avg runtime about 7.6 ms on synthetic contract images.",
+    SpaceComplexity = "O(P + T + S) plus bounded static template cache entries for TemplatePath mode.",
+    SuitableUseCases = new[]
+    {
+        "Realtime feature-based localization when the template has enough repeatable ORB corners.",
+        "Moderate rotation and small scale changes where a homography can explain the target pose.",
+        "Contract-driven pipelines that use IsMatch and FailureReason rather than execution status alone."
+    },
+    UnsuitableUseCases = new[]
+    {
+        "Low-texture or repetitive-pattern templates that produce unstable descriptor matches.",
+        "Precision measurement workflows that require a calibrated target center or subpixel edge result.",
+        "Scenes where a large number of background features should be searched without ROI or threshold tuning."
+    },
+    KnownLimitations = new[]
+    {
+        "Score is a homography verification score based on inlier evidence, not a descriptor distance.",
+        "MatchRatio, RANSAC threshold, MinMatchCount, MinInlierRatio, and ORB FAST threshold are configurable and should be validated with replay evidence.",
+        "TemplatePath mode uses a bounded in-process cache keyed by file fingerprint and detector configuration."
+    },
+    Dependencies = new[] { "OpenCvSharp" }
+)]
 public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
 {
     public override OperatorType OperatorType => OperatorType.OrbFeatureMatch;
@@ -56,17 +98,35 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
         var edgeThreshold = GetIntParam(@operator, "EdgeThreshold", 31, min: 3, max: 100);
         var enableSymmetryTest = GetBoolParam(@operator, "EnableSymmetryTest", true);
         var minMatchCount = GetIntParam(@operator, "MinMatchCount", 10, min: 3, max: 100);
+        var matchRatio = GetDoubleParam(@operator, "MatchRatio", 0.75, min: 0.5, max: 0.95);
+        var ransacThreshold = GetDoubleParam(@operator, "RansacThreshold", 5.0, min: 0.5, max: 10.0);
+        var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25, min: 0.1, max: 1.0);
+        var allowCenterOnlyProjection = GetBoolParam(@operator, "AllowCenterOnlyProjection", false);
+        var fastThreshold = GetIntParam(@operator, "FastThreshold", 20, min: 1, max: 100);
+        var candidateProfile = ResolveFeatureMatchCandidateProfile(@operator);
+        if (candidateProfile.Enabled && candidateProfile.Name == "replay_safe_dense_strict")
+        {
+            maxFeatures = 2000;
+            edgeThreshold = 10;
+            minMatchCount = 6;
+            matchRatio = 0.70;
+            ransacThreshold = 7.0;
+            minInlierRatio = 0.25;
+            allowCenterOnlyProjection = false;
+            fastThreshold = 16;
+            candidateProfile = candidateProfile with { Applied = true };
+        }
 
         var srcImage = imageWrapper.GetMat();
         using var srcGray = ToGray(srcImage);
-        using var orb = ORB.Create(maxFeatures, (float)scaleFactor, nLevels, edgeThreshold);
+        using var orb = ORB.Create(maxFeatures, (float)scaleFactor, nLevels, edgeThreshold, 0, 2, ORBScoreType.Harris, 31, fastThreshold);
 
         var srcDescriptors = new Mat();
         orb.DetectAndCompute(srcGray, null, out KeyPoint[] srcKeyPoints, srcDescriptors);
         if (srcKeyPoints.Length < 4 || srcDescriptors.Empty())
         {
             srcDescriptors.Dispose();
-            return Task.FromResult(CreateFailedOutput(srcImage, "场景特征点不足。", 0, 0));
+            return Task.FromResult(CreateFailedOutput(srcImage, "场景特征点不足。", 0, 0, candidateProfile));
         }
 
         Mat? templateImage = null;
@@ -87,7 +147,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             {
                 var cached = GetOrLoadTemplate(
                     templatePath,
-                    $"ORB:{maxFeatures}:{scaleFactor:F3}:{nLevels}:{edgeThreshold}",
+                    $"ORB:{maxFeatures}:{scaleFactor:F3}:{nLevels}:{edgeThreshold}:{fastThreshold}",
                     templateGray =>
                     {
                         var descriptors = new Mat();
@@ -104,7 +164,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
 
             if (templateImage == null || templateKeyPoints == null || templateKeyPoints.Length < 4 || templateDescriptors == null || templateDescriptors.Empty())
             {
-                return Task.FromResult(CreateFailedOutput(srcImage, "模板特征点不足。", 0, 0));
+                return Task.FromResult(CreateFailedOutput(srcImage, "模板特征点不足。", 0, 0, candidateProfile));
             }
 
             var (filteredTemplateKeyPoints, filteredTemplateDescriptors) = FilterFeatures(templateKeyPoints, templateDescriptors, maxFeatures);
@@ -115,7 +175,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             List<DMatch> goodMatches;
             if (enableSymmetryTest)
             {
-                goodMatches = MatchWithSymmetryTest(templateDescriptors, srcDescriptors);
+                goodMatches = MatchWithSymmetryTest(templateDescriptors, srcDescriptors, matchRatio);
             }
             else
             {
@@ -124,7 +184,7 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
                 goodMatches = new List<DMatch>();
                 foreach (var match in matches)
                 {
-                    if (match.Length >= 2 && match[0].Distance < 0.75 * match[1].Distance)
+                    if (match.Length >= 2 && match[0].Distance < matchRatio * match[1].Distance)
                     {
                         goodMatches.Add(match[0]);
                     }
@@ -137,13 +197,14 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
                 goodMatches,
                 new Size(templateImage.Width, templateImage.Height),
                 srcImage.Size(),
-                ransacThreshold: 5.0,
+                ransacThreshold,
                 minMatchCount,
                 minInliers: minMatchCount,
-                minInlierRatio: 0.25);
+                minInlierRatio,
+                allowCenterOnlyProjection);
             var origin = ResolveReferenceOrigin(@operator, templateImage.Size());
 
-            var verificationScore = HomographyVerificationHelper.ComputeVerificationScore(metrics, 5.0);
+            var verificationScore = HomographyVerificationHelper.ComputeVerificationScore(metrics, ransacThreshold);
             var isMatch = metrics.VerificationPassed;
             var resultImage = srcImage.Clone();
             var boxColor = isMatch ? new Scalar(0, 255, 0) : new Scalar(0, 0, 255);
@@ -190,22 +251,31 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
 
             homography?.Dispose();
 
-            return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, new Dictionary<string, object>
+            var outputData = new Dictionary<string, object>
             {
                 { "IsMatch", isMatch },
                 { "Score", verificationScore },
                 { "Inliers", metrics.InlierCount },
                 { "TotalMatches", metrics.MatchCount },
+                { "InlierRatio", metrics.InlierRatio },
                 { "Position", position },
                 { "MatchPoint", new Position(representativePoint.X, representativePoint.Y) },
                 { "X", position.X },
                 { "Y", position.Y },
                 { "ScoreDefinition", "HomographyVerificationScore" },
                 { "FailureReason", metrics.FailureReason },
+                { "HomographyFailureReason", metrics.FailureReason },
                 { "MeanReprojectionError", metrics.MeanReprojectionError },
                 { "MaxReprojectionError", metrics.MaxReprojectionError },
+                { "AreaRatio", metrics.AreaRatio },
+                { "CornersInsideCount", metrics.CornersInsideCount },
+                { "ProjectedCenterInside", metrics.ProjectedCenterInside },
+                { "Corners", corners.Select(c => new Position(c.X, c.Y)).ToList() },
                 { "OriginMode", GetStringParam(@operator, "OriginMode", "Center") }
-            })));
+            };
+            AddFeatureMatchCandidateProfileOutputs(outputData, candidateProfile);
+
+            return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, outputData)));
         }
         finally
         {
@@ -220,6 +290,12 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        var candidateValidation = ValidateFeatureMatchCandidateProfile(@operator, "replay_safe_dense_strict");
+        if (!candidateValidation.IsValid)
+        {
+            return candidateValidation;
+        }
+
         var maxFeatures = GetIntParam(@operator, "MaxFeatures", 500);
         if (maxFeatures < 100 || maxFeatures > 2000)
         {
@@ -238,6 +314,30 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
             return ValidationResult.Invalid("最小匹配数必须在 3-100 之间。");
         }
 
+        var matchRatio = GetDoubleParam(@operator, "MatchRatio", 0.75);
+        if (matchRatio < 0.5 || matchRatio > 0.95)
+        {
+            return ValidationResult.Invalid("MatchRatio must be between 0.5 and 0.95.");
+        }
+
+        var ransacThreshold = GetDoubleParam(@operator, "RansacThreshold", 5.0);
+        if (ransacThreshold < 0.5 || ransacThreshold > 10.0)
+        {
+            return ValidationResult.Invalid("RansacThreshold must be between 0.5 and 10.0.");
+        }
+
+        var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25);
+        if (minInlierRatio < 0.1 || minInlierRatio > 1.0)
+        {
+            return ValidationResult.Invalid("MinInlierRatio must be between 0.1 and 1.0.");
+        }
+
+        var fastThreshold = GetIntParam(@operator, "FastThreshold", 20);
+        if (fastThreshold < 1 || fastThreshold > 100)
+        {
+            return ValidationResult.Invalid("FastThreshold must be between 1 and 100.");
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -253,26 +353,41 @@ public class OrbFeatureMatchOperator : FeatureMatchOperatorBase
         return gray;
     }
 
-    private OperatorExecutionOutput CreateFailedOutput(Mat input, string reason, int inliers, int totalMatches)
+    private OperatorExecutionOutput CreateFailedOutput(
+        Mat input,
+        string reason,
+        int inliers,
+        int totalMatches,
+        FeatureMatchCandidateProfile candidateProfile)
     {
         var output = input.Clone();
         Cv2.PutText(output, $"NG: {reason}", new Point(10, 30), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
         Cv2.PutText(output, $"Score: {inliers}/{totalMatches}", new Point(10, 60), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 0, 255), 2);
 
-        return OperatorExecutionOutput.Success(CreateImageOutput(output, new Dictionary<string, object>
+        var outputData = new Dictionary<string, object>
         {
             { "IsMatch", false },
             { "Score", 0.0 },
             { "Inliers", inliers },
             { "TotalMatches", totalMatches },
+            { "InlierRatio", 0.0 },
             { "Message", reason },
             { "FailureReason", reason },
+            { "HomographyFailureReason", reason },
             { "Position", new Position(0, 0) },
             { "MatchPoint", new Position(0, 0) },
             { "X", 0 },
             { "Y", 0 },
-            { "ScoreDefinition", "HomographyVerificationScore" }
-        }));
+            { "ScoreDefinition", "HomographyVerificationScore" },
+            { "MeanReprojectionError", double.PositiveInfinity },
+            { "MaxReprojectionError", double.PositiveInfinity },
+            { "AreaRatio", 0.0 },
+            { "CornersInsideCount", 0 },
+            { "ProjectedCenterInside", false }
+        };
+        AddFeatureMatchCandidateProfileOutputs(outputData, candidateProfile);
+
+        return OperatorExecutionOutput.Success(CreateImageOutput(output, outputData));
     }
 
     private Position ResolveReferenceOrigin(Operator @operator, Size templateSize)

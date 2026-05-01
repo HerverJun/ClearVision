@@ -196,8 +196,8 @@ public class BlobDetectionOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid"));
         }
 
-        var sourceMat = sourceWrapper?.GetMat();
-        if (sourceMat == null || sourceMat.Empty())
+        Mat sourceMat = sourceWrapper?.GetMat() ?? src;
+        if (sourceMat.Empty())
         {
             sourceMat = src;
         }
@@ -207,7 +207,7 @@ public class BlobDetectionOperator : OperatorBase
 
         try
         {
-            if (sourceMat != null && !sourceMat.Empty())
+            if (!sourceMat.Empty())
             {
                 graySource = new Mat();
                 if (sourceMat.Channels() == 1)
@@ -253,7 +253,7 @@ public class BlobDetectionOperator : OperatorBase
             var labelCount = Cv2.ConnectedComponentsWithStats(binary, labels, stats, centroids, PixelConnectivity.Connectivity8, MatType.CV_32S);
 
             var resultImage = new Mat();
-            if (sourceMat.Channels() == 1)
+            if (sourceMat!.Channels() == 1)
             {
                 Cv2.CvtColor(sourceMat, resultImage, ColorConversionCodes.GRAY2BGR);
             }

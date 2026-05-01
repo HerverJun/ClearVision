@@ -498,6 +498,8 @@ public class FlowTemplateService : IFlowTemplateService
             },
             CreateAiInspectionTemplate(
                 name: "包装箱外观检测",
+                scenarioKey: "carton-appearance-inspection",
+                industry: "包装终检",
                 description: "适合包装终检工位的包装箱外观缺陷检测，默认骨架为缩放 + AI 检测 + Region ROI 过滤 + NMS + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
                 explanation: "适用于包装终检工位的包装箱外观检测，默认检测箱体破损、压痕、脏污、封箱异常、标签异常等缺陷。",
                 tags: ["包装箱", "外观", "AI", "YOLO"],
@@ -509,6 +511,8 @@ public class FlowTemplateService : IFlowTemplateService
                 includeTargetClassesInReview: true),
             CreateAiInspectionTemplate(
                 name: "空调内机外观检测",
+                scenarioKey: "aircon-indoor-appearance-inspection",
+                industry: AirConditioningIndustry,
                 description: "适合总装/终检工位的空调内机外观检测，默认骨架为缩放 + AI 检测 + Region ROI 过滤 + NMS + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
                 explanation: "适用于总装或终检工位的空调内机外观检测，默认检测面板划伤、面板缝隙、污渍、磕碰等缺陷。",
                 tags: ["内机", "外观", "AI", "YOLO"],
@@ -520,6 +524,8 @@ public class FlowTemplateService : IFlowTemplateService
                 includeTargetClassesInReview: true),
             CreateAiInspectionTemplate(
                 name: "空调外机外观检测",
+                scenarioKey: "aircon-outdoor-appearance-inspection",
+                industry: AirConditioningIndustry,
                 description: "适合总装/终检工位的空调外机外观检测，默认骨架为缩放 + AI 检测 + Region ROI 过滤 + NMS + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
                 explanation: "适用于总装或终检工位的空调外机外观检测，默认检测翅片变形、护网破损、凹陷、缺件等缺陷。",
                 tags: ["外机", "外观", "AI", "YOLO"],
@@ -531,6 +537,8 @@ public class FlowTemplateService : IFlowTemplateService
                 includeTargetClassesInReview: true),
             CreateAiInspectionTemplate(
                 name: "遥控器漏装检测",
+                scenarioKey: "remote-controller-missing-inspection",
+                industry: AirConditioningIndustry,
                 description: "适合包装位/附件位的遥控器漏装检测，默认骨架为缩放 + AI 目标检测 + Region ROI 过滤 + NMS + 有无判定；需人工确认模型、ROI 与阈值。",
                 explanation: "适用于包装位或附件位的遥控器漏装检测，默认判断附件区域中是否存在遥控器目标。",
                 tags: ["遥控器", "漏装", "附件", "AI"],
@@ -546,6 +554,8 @@ public class FlowTemplateService : IFlowTemplateService
 
     private static FlowTemplate CreateAiInspectionTemplate(
         string name,
+        string scenarioKey,
+        string industry,
         string description,
         string explanation,
         IReadOnlyList<string> tags,
@@ -570,9 +580,25 @@ public class FlowTemplateService : IFlowTemplateService
             Id = Guid.NewGuid(),
             Name = name,
             Description = description,
-            Industry = AirConditioningIndustry,
+            Industry = industry,
             Tags = tags.ToList(),
-            TemplateVersion = "1.0.0",
+            TemplateVersion = "1.1.0",
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = new ScenarioPackageBinding
+            {
+                PackageKey = scenarioKey,
+                PackageVersion = "1.0.0",
+                AssetVersionIds =
+                [
+                    $"template:{scenarioKey}@1.1.0",
+                    $"model:{scenarioKey}-detector@1.0.0",
+                    $"label:{scenarioKey}-labels@1.0.0"
+                ],
+                RequiredResources =
+                [
+                    "DeepLearning.ModelPath"
+                ]
+            },
             FlowJson = JsonSerializer.Serialize(new
             {
                 explanation,
@@ -659,7 +685,19 @@ public class FlowTemplateService : IFlowTemplateService
             Description = "适合两器装配工位的铜孔间距检测，默认骨架为滤波 + 边缘检测 + 间距测量 + 范围判定；需人工确认预处理、阈值与像素间距范围。",
             Industry = AirConditioningIndustry,
             Tags = ["两器", "铜孔", "间距", "测量"],
-            TemplateVersion = "1.0.0",
+            TemplateVersion = "1.1.0",
+            ScenarioKey = "copper-hole-spacing-measurement",
+            ScenarioPackage = new ScenarioPackageBinding
+            {
+                PackageKey = "copper-hole-spacing-measurement",
+                PackageVersion = "1.0.0",
+                AssetVersionIds =
+                [
+                    "template:copper-hole-spacing-measurement@1.1.0",
+                    "rule:copper-hole-spacing-range@1.0.0"
+                ],
+                RequiredResources = []
+            },
             FlowJson = JsonSerializer.Serialize(new
             {
                 explanation = "适用于两器装配工位的铜孔间距检测，先做滤波和边缘增强，再按投影与多扫描方式测量像素间距。",

@@ -8,6 +8,7 @@ import httpClient from '../../core/messaging/httpClient.js';
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { createSignal } from '../../core/state/store.js';
 import { getStoredToken } from '../auth/authStorage.js';
+import { buildSseHeaders, parseSseFrame } from './inspectionSseClient.mjs';
 
 // 检测状态
 const [getInspectionState, setInspectionState, subscribeInspectionState] = createSignal({
@@ -25,11 +26,22 @@ class InspectionController {
         this.projectId = null;
         this.cameraId = null;
         this.abortController = null;
+        this.flowProvider = null;
+        this.imageSinks = [];
         
         // 【架构修复 v2】SSE 相关
         this.eventSource = null;
-        this.isSseSupported = typeof EventSource !== 'undefined';
+        this.isSseSupported = typeof fetch !== 'undefined'
+            && typeof ReadableStream !== 'undefined'
+            && typeof TextDecoder !== 'undefined';
         this.useSse = false;  // 是否使用 SSE（根据连接成功与否动态决定）
+        this.lastSseEventId = null;
+        this.sseProjectId = null;
+        this.sseConnectionId = 0;
+        this.sseReconnectTimer = null;
+        this.sseReconnectAttempt = 0;
+        this.sseReconnectBaseDelayMs = 1000;
+        this.sseReconnectMaxDelayMs = 10000;
         
         // 初始化监听
         this.initializeWebMessage();
@@ -49,12 +61,44 @@ class InspectionController {
         this.cameraId = cameraId;
     }
 
+    setFlowProvider(provider) {
+        this.flowProvider = typeof provider === 'function' ? provider : null;
+    }
+
+    setImageSinks(sinks) {
+        this.imageSinks = Array.isArray(sinks)
+            ? sinks.filter(sink => typeof sink === 'function')
+            : [];
+    }
+
     getCurrentFlowData() {
-        if (window.flowCanvas && typeof window.flowCanvas.serialize === 'function') {
-            return window.flowCanvas.serialize();
+        if (this.flowProvider) {
+            return this.flowProvider();
         }
 
         return null;
+    }
+
+    publishImageData(imageData) {
+        if (!imageData) {
+            return;
+        }
+
+        this.imageSinks.forEach((sink) => {
+            try {
+                sink(imageData);
+            } catch (error) {
+                console.error('[InspectionController] Image sink failed:', error);
+            }
+        });
+    }
+
+    publishBase64Image(imageBase64) {
+        if (!imageBase64) {
+            return;
+        }
+
+        this.publishImageData(`data:image/png;base64,${imageBase64}`);
     }
 
     /**
@@ -118,66 +162,21 @@ class InspectionController {
             console.log('[InspectionController] 连接 SSE:', projectId);
             
             const token = getStoredToken();
-            const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
-            const eventUrl = `${httpClient.baseUrl}/inspection/realtime/${projectId}/events${tokenQuery}`;
-            this.eventSource = new EventSource(eventUrl);
+            const eventUrl = `${httpClient.baseUrl}/inspection/realtime/${projectId}/events`;
+            if (this.sseProjectId !== projectId) {
+                this.lastSseEventId = null;
+                this.sseProjectId = projectId;
+            }
 
-            // 初始状态
-            this.eventSource.addEventListener('initialState', (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[InspectionController] SSE 初始状态:', data);
-                setInspectionState({
-                    ...getInspectionState(),
-                    isRealtime: data.status === 'Running' || data.status === 'Starting',
-                    status: data.status === 'Running' ? 'running' : 'idle'
-                });
-            });
-
-            // 状态变更
-            this.eventSource.addEventListener('stateChanged', (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[InspectionController] SSE 状态变更:', data);
-                this.handleStateChanged(data);
-            });
-
-            // 检测结果
-            this.eventSource.addEventListener('resultProduced', (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[InspectionController] SSE 检测结果:', data);
-                this.handleResultEvent(data);
-            });
-
-            // 进度更新
-            this.eventSource.addEventListener('progressChanged', (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[InspectionController] SSE 进度:', data);
-                this.updateProgress(data);
-            });
-
-            // 心跳
-            this.eventSource.addEventListener('faulted', (e) => {
-                const data = JSON.parse(e.data);
-                console.error('[InspectionController] SSE faulted:', data);
-                this.handleInspectionError(new Error(data.errorMessage || 'Realtime inspection faulted'));
-            });
-
-            this.eventSource.addEventListener('heartbeat', (e) => {
-                // 心跳只用于保活，不处理
-                console.debug('[InspectionController] SSE 心跳');
-            });
-
-            // 打开连接
-            this.eventSource.onopen = () => {
-                console.log('[InspectionController] SSE 连接已建立');
-                this.useSse = true;
+            const controller = new AbortController();
+            const connectionId = ++this.sseConnectionId;
+            this.sseReconnectAttempt = 0;
+            this.eventSource = {
+                connectionId,
+                close: () => controller.abort()
             };
 
-            // 错误处理
-            this.eventSource.onerror = (error) => {
-                console.error('[InspectionController] SSE 错误:', error);
-                this.useSse = false;
-                // 错误时回退到 WebMessage（已自动处理）
-            };
+            this.runSseStreamWithReconnect(eventUrl, token, controller.signal, connectionId);
 
             return true;
         } catch (error) {
@@ -187,16 +186,201 @@ class InspectionController {
         }
     }
 
+    async runSseStreamWithReconnect(eventUrl, token, signal, connectionId) {
+        while (!signal.aborted && this.isActiveSseConnection(connectionId)) {
+            try {
+                await this.openSseStream(eventUrl, token, signal);
+                if (signal.aborted || !this.isActiveSseConnection(connectionId)) {
+                    return;
+                }
+
+                console.warn('[InspectionController] SSE stream ended, reconnecting');
+            } catch (error) {
+                if (error?.name === 'AbortError' ||
+                    signal.aborted ||
+                    !this.isActiveSseConnection(connectionId)) {
+                    return;
+                }
+
+                console.error('[InspectionController] SSE 错误:', error);
+            }
+
+            this.useSse = false;
+            this.sseReconnectAttempt += 1;
+
+            try {
+                await this.waitForSseReconnect(signal, connectionId);
+            } catch (error) {
+                if (error?.name !== 'AbortError') {
+                    console.error('[InspectionController] SSE reconnect wait failed:', error);
+                }
+                return;
+            }
+        }
+    }
+
+    async openSseStream(eventUrl, token, signal) {
+        const headers = buildSseHeaders(token, this.lastSseEventId);
+
+        const response = await fetch(eventUrl, {
+            method: 'GET',
+            headers,
+            signal
+        });
+
+        if (!response.ok || !response.body) {
+            throw new Error(`SSE connection failed: HTTP ${response.status}`);
+        }
+
+        console.log('[InspectionController] SSE 连接已建立');
+        this.useSse = true;
+        this.sseReconnectAttempt = 0;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+
+            buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
+            let separatorIndex = buffer.indexOf('\n\n');
+            while (separatorIndex >= 0) {
+                const frame = buffer.slice(0, separatorIndex);
+                buffer = buffer.slice(separatorIndex + 2);
+                this.dispatchSseFrame(frame);
+                separatorIndex = buffer.indexOf('\n\n');
+            }
+        }
+
+        this.useSse = false;
+    }
+
+    isActiveSseConnection(connectionId) {
+        return this.eventSource?.connectionId === connectionId;
+    }
+
+    waitForSseReconnect(signal, connectionId) {
+        if (signal.aborted || !this.isActiveSseConnection(connectionId)) {
+            return Promise.reject(this.createSseAbortError());
+        }
+
+        const delayMs = this.getSseReconnectDelayMs();
+
+        return new Promise((resolve, reject) => {
+            let timer = null;
+            const cleanup = () => {
+                if (timer !== null) {
+                    clearTimeout(timer);
+                }
+                if (this.sseReconnectTimer === timer) {
+                    this.sseReconnectTimer = null;
+                }
+                signal.removeEventListener('abort', onAbort);
+            };
+            const onAbort = () => {
+                cleanup();
+                reject(this.createSseAbortError());
+            };
+
+            this.clearSseReconnectTimer();
+            timer = setTimeout(() => {
+                cleanup();
+                if (this.isActiveSseConnection(connectionId)) {
+                    resolve();
+                } else {
+                    reject(this.createSseAbortError());
+                }
+            }, delayMs);
+            this.sseReconnectTimer = timer;
+            signal.addEventListener('abort', onAbort, { once: true });
+        });
+    }
+
+    getSseReconnectDelayMs() {
+        const attempt = Math.max(0, this.sseReconnectAttempt - 1);
+        const backoffMultiplier = 2 ** Math.min(attempt, 4);
+        return Math.min(
+            this.sseReconnectMaxDelayMs,
+            this.sseReconnectBaseDelayMs * backoffMultiplier
+        );
+    }
+
+    clearSseReconnectTimer() {
+        if (this.sseReconnectTimer !== null) {
+            clearTimeout(this.sseReconnectTimer);
+            this.sseReconnectTimer = null;
+        }
+    }
+
+    createSseAbortError() {
+        const error = new Error('SSE reconnect aborted');
+        error.name = 'AbortError';
+        return error;
+    }
+
+    dispatchSseFrame(frame) {
+        const parsed = parseSseFrame(frame);
+        if (parsed === null) {
+            return;
+        }
+
+        const { eventName, eventId, payload } = parsed;
+        if (eventId) {
+            this.lastSseEventId = eventId;
+        }
+
+        switch (eventName) {
+            case 'initialState':
+                console.log('[InspectionController] SSE 初始状态:', payload);
+                setInspectionState({
+                    ...getInspectionState(),
+                    isRealtime: payload.status === 'Running' || payload.status === 'Starting',
+                    status: payload.status === 'Running' ? 'running' : 'idle'
+                });
+                break;
+            case 'stateChanged':
+                console.log('[InspectionController] SSE 状态变更:', payload);
+                this.handleStateChanged(payload);
+                break;
+            case 'resultProduced':
+                console.log('[InspectionController] SSE 检测结果:', payload);
+                this.handleResultEvent(payload);
+                break;
+            case 'progressChanged':
+                console.log('[InspectionController] SSE 进度:', payload);
+                this.updateProgress(payload);
+                break;
+            case 'faulted':
+                console.error('[InspectionController] SSE faulted:', payload);
+                this.handleInspectionError(new Error(payload.errorMessage || 'Realtime inspection faulted'));
+                break;
+            case 'heartbeat':
+                console.debug('[InspectionController] SSE 心跳');
+                break;
+            default:
+                console.debug('[InspectionController] 未处理的 SSE 事件:', eventName);
+                break;
+        }
+    }
+
     /**
      * 【架构修复 v2】取消 SSE 订阅
      */
     unsubscribeFromSseEvents() {
+        this.clearSseReconnectTimer();
         if (this.eventSource) {
             console.log('[InspectionController] 关闭 SSE 连接');
             this.eventSource.close();
             this.eventSource = null;
-            this.useSse = false;
         }
+
+        this.sseConnectionId += 1;
+        this.useSse = false;
     }
 
     /**
@@ -247,13 +431,7 @@ class InspectionController {
 
         // 如果有输出图像，显示它
         if (result.outputImageBase64) {
-            const imageData = `data:image/png;base64,${result.outputImageBase64}`;
-            if (window.inspectionImageViewer) {
-                window.inspectionImageViewer.loadImage(imageData);
-            }
-            if (window.imageViewer) {
-                window.imageViewer.loadImage(imageData);
-            }
+            this.publishBase64Image(result.outputImageBase64);
         }
 
         this.notifyInspectionCompleted(result);
@@ -342,6 +520,7 @@ class InspectionController {
 
         } catch (error) {
             console.error('[InspectionController] 启动实时检测失败:', error);
+            this.unsubscribeFromSseEvents();
             throw error;
         }
     }
@@ -376,6 +555,7 @@ class InspectionController {
 
         } catch (error) {
             console.error('[InspectionController] 启动失败:', error);
+            this.unsubscribeFromSseEvents();
             throw error;
         }
     }
@@ -393,7 +573,7 @@ class InspectionController {
             }
 
             // 【架构修复 v2】取消 SSE 订阅
-
+            this.unsubscribeFromSseEvents();
 
             console.log('[InspectionController] 实时检测已停止');
 
@@ -439,13 +619,7 @@ class InspectionController {
 
             // 显示预览结果
             if (result.outputImageBase64) {
-                const imageData = `data:image/png;base64,${result.outputImageBase64}`;
-                if (window.inspectionImageViewer) {
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-                if (window.imageViewer) {
-                    window.imageViewer.loadImage(imageData);
-                }
+                this.publishBase64Image(result.outputImageBase64);
             }
 
             return result;
@@ -472,13 +646,7 @@ class InspectionController {
             });
 
             if (result?.previewImageBase64) {
-                const imageData = `data:image/png;base64,${result.previewImageBase64}`;
-                if (window.inspectionImageViewer) {
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-                if (window.imageViewer) {
-                    window.imageViewer.loadImage(imageData);
-                }
+                this.publishBase64Image(result.previewImageBase64);
             }
 
             return result;
@@ -505,13 +673,7 @@ class InspectionController {
 
             const finalPreview = result?.finalPreview || null;
             if (finalPreview?.previewImageBase64) {
-                const imageData = `data:image/png;base64,${finalPreview.previewImageBase64}`;
-                if (window.inspectionImageViewer) {
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-                if (window.imageViewer) {
-                    window.imageViewer.loadImage(imageData);
-                }
+                this.publishBase64Image(finalPreview.previewImageBase64);
             }
 
             return result;
@@ -551,15 +713,7 @@ class InspectionController {
             || normalizedResult.resultImageBase64
             || normalizedResult.outputImageBase64;
         if (outputImage) {
-            const imageData = `data:image/png;base64,${outputImage}`;
-
-            if (window.inspectionImageViewer) {
-                window.inspectionImageViewer.loadImage(imageData);
-            }
-
-            if (window.imageViewer) {
-                window.imageViewer.loadImage(imageData);
-            }
+            this.publishBase64Image(outputImage);
         }
 
         this.notifyInspectionCompleted(normalizedResult);

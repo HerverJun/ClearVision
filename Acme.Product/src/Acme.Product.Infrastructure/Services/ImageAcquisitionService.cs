@@ -35,7 +35,6 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     private readonly Dictionary<Guid, Mat> _imageCache = new();
     private readonly LinkedList<Guid> _cacheOrder = new();
     private readonly Dictionary<Guid, LinkedListNode<Guid>> _cacheOrderNodes = new();
-    private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _continuousAcquisitionTokens = new();
     private bool _disposed;
 
@@ -752,7 +751,6 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
             _cacheOrderNodes.Clear();
         }
 
-        _cacheLock.Dispose();
         _disposed = true;
     }
 }

@@ -5,6 +5,12 @@
  */
 
 // 专业 SVG 图标表
+import {
+    buildResultCardsFromOutputData,
+    renderPortDataTypeValue,
+    renderResultCardHtml
+} from '../results/portDataTypeRenderer.mjs';
+
 const ICONS = {
     distance: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
     angle: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"></path><path d="M3 20L19.4 3"></path><path d="M10 20a7 7 0 0 1 5-5.6"></path></svg>`,
@@ -443,7 +449,13 @@ class AnalysisCardsPanel {
         }
 
         if (!this._isAnalysisData(data)) {
-            this.container.innerHTML = '<p class="empty-text">无显式分析数据</p>';
+            const cards = buildResultCardsFromOutputData(data, { status });
+            if (cards.length === 0) {
+                this.container.innerHTML = '<p class="empty-text">无显式分析数据</p>';
+                return;
+            }
+
+            this._renderAnalysisData({ version: 1, cards }, status);
             return;
         }
 
@@ -511,7 +523,7 @@ class AnalysisCardsPanel {
             case 'diagnostic':
                 return renderDiagnosticCardHtml(card, fallbackStatus);
             default:
-                return this._renderStructuredGenericCard(card, fallbackStatus);
+                return renderResultCardHtml(card, { fallbackStatus });
         }
     }
 
@@ -522,6 +534,9 @@ class AnalysisCardsPanel {
             const numericValue = typeof field?.value === 'number'
                 ? field.value
                 : Number.parseFloat(field?.value);
+            const dataType = field?.dataType || field?.DataType;
+            const isNumeric = Number.isFinite(numericValue)
+                && (!dataType || ['Integer', 'Float'].includes(String(dataType)));
             const displayValue = Number.isFinite(numericValue)
                 ? (Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(2))
                 : (field?.value ?? '--');
@@ -543,8 +558,14 @@ class AnalysisCardsPanel {
                         ${statusBadge}
                     </div>
                     <div class="ac-measurement-value ${isNG ? 'ng' : 'ok'}">
-                        <span class="ac-big-number">${this._escapeHtml(String(displayValue))}</span>
-                        <span class="ac-unit">${this._escapeHtml(unit)}</span>
+                        ${isNumeric
+                            ? `<span class="ac-big-number">${this._escapeHtml(String(displayValue))}</span><span class="ac-unit">${this._escapeHtml(unit)}</span>`
+                            : renderPortDataTypeValue({
+                                key: field?.key || field?.label || '',
+                                value: field?.value,
+                                dataType,
+                                unit
+                            })}
                     </div>
                 </div>
             `;

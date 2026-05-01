@@ -1,0 +1,1433 @@
+{
+  "EvidenceKind": "dataset",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T03:21:22.7700048+00:00",
+    "DatasetName": "COCO-style semi-synthetic detection protocol bridge",
+    "DatasetKind": "Tier A protocol bridge for public/COCO-style object detection metrics; no external image pixels are stored.",
+    "CaseCount": 36,
+    "Passed": 36,
+    "Failed": 0,
+    "GroundTruthCount": 42,
+    "TruePositiveCount": 42,
+    "FalsePositiveCount": 0,
+    "FalseNegativeCount": 0,
+    "PrecisionAt50": 1,
+    "RecallAt50": 1,
+    "AP50": 1,
+    "MeanMatchedIoU": 0.973502,
+    "ConfidenceThreshold": 0.44999998807907104,
+    "NmsIouThreshold": 0.44999998807907104,
+    "MatchIouThreshold": 0.5,
+    "RuntimeMs": 1057.938,
+    "MemoryAllocationBytes": 651523016
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 36,
+      "Passed": 36,
+      "Failed": 0,
+      "RuntimeMsAvg": 29.387,
+      "MemoryAllocationBytesAvg": 18097862,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetName": "COCO-style semi-synthetic detection protocol bridge"
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "different_class_overlap",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "GroundTruthCount": 12,
+      "DetectionCount": 12,
+      "TruePositiveCount": 12,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "RuntimeMsAvg": 20.505
+    },
+    {
+      "Scenario": "edge_clamp",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "GroundTruthCount": 6,
+      "DetectionCount": 6,
+      "TruePositiveCount": 6,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "RuntimeMsAvg": 18.665
+    },
+    {
+      "Scenario": "multi_class",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "GroundTruthCount": 12,
+      "DetectionCount": 12,
+      "TruePositiveCount": 12,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "RuntimeMsAvg": 18.576
+    },
+    {
+      "Scenario": "negative_low_confidence",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "RuntimeMsAvg": 18.018
+    },
+    {
+      "Scenario": "same_class_nms",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "GroundTruthCount": 6,
+      "DetectionCount": 6,
+      "TruePositiveCount": 6,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "RuntimeMsAvg": 18.091
+    },
+    {
+      "Scenario": "single_object",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "GroundTruthCount": 6,
+      "DetectionCount": 6,
+      "TruePositiveCount": 6,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "RuntimeMsAvg": 82.469
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "DeepLearning_single_object_0000",
+      "Scenario": "single_object",
+      "Passed": true,
+      "RuntimeMs": 399.717,
+      "MemoryAllocationBytes": 18152640,
+      "Width": 320,
+      "Height": 240,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.918967,
+      "MatchedIous": [
+        0.918967
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.98,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 77.799995,
+          "Y": 73.4,
+          "Width": 51.200005,
+          "Height": 43.200005,
+          "Confidence": 0.98,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_multi_class_0000",
+      "Scenario": "multi_class",
+      "Passed": true,
+      "RuntimeMs": 20.794,
+      "MemoryAllocationBytes": 18111824,
+      "Width": 320,
+      "Height": 240,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.958429,
+      "MatchedIous": [
+        0.958429,
+        0.938432
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.96,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.92,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 77.299995,
+          "Y": 74.9,
+          "Width": 51.200005,
+          "Height": 43.200005,
+          "Confidence": 0.96,
+          "ClassId": 0
+        },
+        {
+          "X": 188.30002,
+          "Y": 109,
+          "Width": 44.799988,
+          "Height": 48,
+          "Confidence": 0.92,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_edge_clamp_0000",
+      "Scenario": "edge_clamp",
+      "Passed": true,
+      "RuntimeMs": 18.017,
+      "MemoryAllocationBytes": 18087576,
+      "Width": 320,
+      "Height": 240,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.876318,
+      "MatchedIous": [
+        0.876318
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 0,
+          "Y": 42.200005,
+          "Width": 56.600002,
+          "Height": 43.199997,
+          "Confidence": 0.93,
+          "ClassId": 2
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_same_class_nms_0000",
+      "Scenario": "same_class_nms",
+      "Passed": true,
+      "RuntimeMs": 18.542,
+      "MemoryAllocationBytes": 18088032,
+      "Width": 320,
+      "Height": 240,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 1,
+      "MatchedIous": [
+        1
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.95,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 124.8,
+          "Y": 86.399994,
+          "Width": 70.399994,
+          "Height": 57.600006,
+          "Confidence": 0.95,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_different_class_overlap_0000",
+      "Scenario": "different_class_overlap",
+      "Passed": true,
+      "RuntimeMs": 18.312,
+      "MemoryAllocationBytes": 18103448,
+      "Width": 320,
+      "Height": 240,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.982789,
+      "MatchedIous": [
+        0.982789,
+        0.982789
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 138.09999,
+          "Y": 102,
+          "Width": 57.600006,
+          "Height": 45.600006,
+          "Confidence": 0.93,
+          "ClassId": 0
+        },
+        {
+          "X": 143.5,
+          "Y": 104.399994,
+          "Width": 57.600006,
+          "Height": 45.600006,
+          "Confidence": 0.9,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_negative_low_confidence_0000",
+      "Scenario": "negative_low_confidence",
+      "Passed": true,
+      "RuntimeMs": 16.914,
+      "MemoryAllocationBytes": 18086152,
+      "Width": 320,
+      "Height": 240,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [],
+      "Detections": [],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_single_object_0001",
+      "Scenario": "single_object",
+      "Passed": true,
+      "RuntimeMs": 18.717,
+      "MemoryAllocationBytes": 18097360,
+      "Width": 512,
+      "Height": 384,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.948372,
+      "MatchedIous": [
+        0.948372
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.98,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 123.87999,
+          "Y": 118.04,
+          "Width": 81.92001,
+          "Height": 69.12,
+          "Confidence": 0.98,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_multi_class_0001",
+      "Scenario": "multi_class",
+      "Passed": true,
+      "RuntimeMs": 17.593,
+      "MemoryAllocationBytes": 18103904,
+      "Width": 512,
+      "Height": 384,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.973762,
+      "MatchedIous": [
+        0.973762,
+        0.960966
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.96,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.92,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 123.37999,
+          "Y": 119.54,
+          "Width": 81.92001,
+          "Height": 69.12,
+          "Confidence": 0.96,
+          "ClassId": 0
+        },
+        {
+          "X": 301.58002,
+          "Y": 173.8,
+          "Width": 71.67999,
+          "Height": 76.8,
+          "Confidence": 0.92,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_edge_clamp_0001",
+      "Scenario": "edge_clamp",
+      "Passed": true,
+      "RuntimeMs": 18.644,
+      "MemoryAllocationBytes": 18088208,
+      "Width": 512,
+      "Height": 384,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.920588,
+      "MatchedIous": [
+        0.920588
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 0,
+          "Y": 68.12001,
+          "Width": 91.16,
+          "Height": 69.119995,
+          "Confidence": 0.93,
+          "ClassId": 2
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_same_class_nms_0001",
+      "Scenario": "same_class_nms",
+      "Passed": true,
+      "RuntimeMs": 17.406,
+      "MemoryAllocationBytes": 18094168,
+      "Width": 512,
+      "Height": 384,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 1,
+      "MatchedIous": [
+        1
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.95,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 199.68001,
+          "Y": 138.23999,
+          "Width": 112.64,
+          "Height": 92.16,
+          "Confidence": 0.95,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_different_class_overlap_0001",
+      "Scenario": "different_class_overlap",
+      "Passed": true,
+      "RuntimeMs": 18.768,
+      "MemoryAllocationBytes": 18107648,
+      "Width": 512,
+      "Height": 384,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.989208,
+      "MatchedIous": [
+        0.989208,
+        0.989208
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 220.65999,
+          "Y": 163.19998,
+          "Width": 92.16002,
+          "Height": 72.96001,
+          "Confidence": 0.93,
+          "ClassId": 0
+        },
+        {
+          "X": 229.9,
+          "Y": 167.04,
+          "Width": 92.16,
+          "Height": 72.96001,
+          "Confidence": 0.9,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_negative_low_confidence_0001",
+      "Scenario": "negative_low_confidence",
+      "Passed": true,
+      "RuntimeMs": 17.979,
+      "MemoryAllocationBytes": 18086072,
+      "Width": 512,
+      "Height": 384,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [],
+      "Detections": [],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_single_object_0002",
+      "Scenario": "single_object",
+      "Passed": true,
+      "RuntimeMs": 18.962,
+      "MemoryAllocationBytes": 18093672,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.958429,
+      "MatchedIous": [
+        0.958429
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.98,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 154.59999,
+          "Y": 147.8,
+          "Width": 102.40001,
+          "Height": 86.40001,
+          "Confidence": 0.98,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_multi_class_0002",
+      "Scenario": "multi_class",
+      "Passed": true,
+      "RuntimeMs": 17.735,
+      "MemoryAllocationBytes": 18108792,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.978941,
+      "MatchedIous": [
+        0.978941,
+        0.968622
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.96,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.92,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 154.09999,
+          "Y": 149.3,
+          "Width": 102.40001,
+          "Height": 86.40001,
+          "Confidence": 0.96,
+          "ClassId": 0
+        },
+        {
+          "X": 377.10004,
+          "Y": 217,
+          "Width": 89.599976,
+          "Height": 96,
+          "Confidence": 0.92,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_edge_clamp_0002",
+      "Scenario": "edge_clamp",
+      "Passed": true,
+      "RuntimeMs": 18.689,
+      "MemoryAllocationBytes": 18088208,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.935888,
+      "MatchedIous": [
+        0.935888
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 0,
+          "Y": 85.40001,
+          "Width": 114.200005,
+          "Height": 86.399994,
+          "Confidence": 0.93,
+          "ClassId": 2
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_same_class_nms_0002",
+      "Scenario": "same_class_nms",
+      "Passed": true,
+      "RuntimeMs": 18.254,
+      "MemoryAllocationBytes": 18099544,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 1,
+      "MatchedIous": [
+        1
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.95,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 249.6,
+          "Y": 172.79999,
+          "Width": 140.79999,
+          "Height": 115.20001,
+          "Confidence": 0.95,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_different_class_overlap_0002",
+      "Scenario": "different_class_overlap",
+      "Passed": true,
+      "RuntimeMs": 28.189,
+      "MemoryAllocationBytes": 18103504,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.991357,
+      "MatchedIous": [
+        0.991357,
+        0.991357
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 275.69998,
+          "Y": 204,
+          "Width": 115.20001,
+          "Height": 91.20001,
+          "Confidence": 0.93,
+          "ClassId": 0
+        },
+        {
+          "X": 287.5,
+          "Y": 208.79999,
+          "Width": 115.20001,
+          "Height": 91.20001,
+          "Confidence": 0.9,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_negative_low_confidence_0002",
+      "Scenario": "negative_low_confidence",
+      "Passed": true,
+      "RuntimeMs": 27.622,
+      "MemoryAllocationBytes": 18092272,
+      "Width": 640,
+      "Height": 480,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [],
+      "Detections": [],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_single_object_0003",
+      "Scenario": "single_object",
+      "Passed": true,
+      "RuntimeMs": 29.115,
+      "MemoryAllocationBytes": 18096520,
+      "Width": 800,
+      "Height": 600,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.966569,
+      "MatchedIous": [
+        0.966569
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.98,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 193.00002,
+          "Y": 185,
+          "Width": 128.00002,
+          "Height": 108.00003,
+          "Confidence": 0.98,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_multi_class_0003",
+      "Scenario": "multi_class",
+      "Passed": true,
+      "RuntimeMs": 29.309,
+      "MemoryAllocationBytes": 18104168,
+      "Width": 800,
+      "Height": 600,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.983108,
+      "MatchedIous": [
+        0.983108,
+        0.9748
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.96,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.92,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 192.5,
+          "Y": 186.50002,
+          "Width": 128,
+          "Height": 108.000015,
+          "Confidence": 0.96,
+          "ClassId": 0
+        },
+        {
+          "X": 471.5,
+          "Y": 271.00003,
+          "Width": 112,
+          "Height": 120,
+          "Confidence": 0.92,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_edge_clamp_0003",
+      "Scenario": "edge_clamp",
+      "Passed": true,
+      "RuntimeMs": 29.122,
+      "MemoryAllocationBytes": 18088264,
+      "Width": 800,
+      "Height": 600,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.948331,
+      "MatchedIous": [
+        0.948331
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 0,
+          "Y": 107.00001,
+          "Width": 143,
+          "Height": 108.00002,
+          "Confidence": 0.93,
+          "ClassId": 2
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_same_class_nms_0003",
+      "Scenario": "same_class_nms",
+      "Passed": true,
+      "RuntimeMs": 28.667,
+      "MemoryAllocationBytes": 18099968,
+      "Width": 800,
+      "Height": 600,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 1,
+      "MatchedIous": [
+        1
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.95,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 312,
+          "Y": 216.00002,
+          "Width": 176,
+          "Height": 144.00002,
+          "Confidence": 0.95,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_different_class_overlap_0003",
+      "Scenario": "different_class_overlap",
+      "Passed": true,
+      "RuntimeMs": 29.57,
+      "MemoryAllocationBytes": 18103960,
+      "Width": 800,
+      "Height": 600,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.99308,
+      "MatchedIous": [
+        0.993079,
+        0.99308
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 344.5,
+          "Y": 255,
+          "Width": 144.00003,
+          "Height": 114,
+          "Confidence": 0.93,
+          "ClassId": 0
+        },
+        {
+          "X": 359.50003,
+          "Y": 260.99994,
+          "Width": 144.00003,
+          "Height": 114.00003,
+          "Confidence": 0.9,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_negative_low_confidence_0003",
+      "Scenario": "negative_low_confidence",
+      "Passed": true,
+      "RuntimeMs": 20.228,
+      "MemoryAllocationBytes": 18086152,
+      "Width": 800,
+      "Height": 600,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [],
+      "Detections": [],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_single_object_0004",
+      "Scenario": "single_object",
+      "Passed": true,
+      "RuntimeMs": 13.365,
+      "MemoryAllocationBytes": 18100064,
+      "Width": 960,
+      "Height": 540,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.967088,
+      "MatchedIous": [
+        0.967088
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.98,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 231.4,
+          "Y": 166.40002,
+          "Width": 153.59998,
+          "Height": 97.19998,
+          "Confidence": 0.98,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_multi_class_0004",
+      "Scenario": "multi_class",
+      "Passed": true,
+      "RuntimeMs": 12.117,
+      "MemoryAllocationBytes": 18104424,
+      "Width": 960,
+      "Height": 540,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.983374,
+      "MatchedIous": [
+        0.983374,
+        0.974441
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.96,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.92,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 230.9,
+          "Y": 167.90002,
+          "Width": 153.59998,
+          "Height": 97.19998,
+          "Confidence": 0.96,
+          "ClassId": 0
+        },
+        {
+          "X": 565.9001,
+          "Y": 244.00003,
+          "Width": 134.39996,
+          "Height": 108,
+          "Confidence": 0.92,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_edge_clamp_0004",
+      "Scenario": "edge_clamp",
+      "Passed": true,
+      "RuntimeMs": 12.941,
+      "MemoryAllocationBytes": 18088256,
+      "Width": 960,
+      "Height": 540,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.951889,
+      "MatchedIous": [
+        0.951889
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 0,
+          "Y": 96.2,
+          "Width": 171.8,
+          "Height": 97.20003,
+          "Confidence": 0.93,
+          "ClassId": 2
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_same_class_nms_0004",
+      "Scenario": "same_class_nms",
+      "Passed": true,
+      "RuntimeMs": 12.102,
+      "MemoryAllocationBytes": 18094528,
+      "Width": 960,
+      "Height": 540,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 1,
+      "MatchedIous": [
+        1
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.95,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 374.4,
+          "Y": 194.39996,
+          "Width": 211.19998,
+          "Height": 129.60004,
+          "Confidence": 0.95,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_different_class_overlap_0004",
+      "Scenario": "different_class_overlap",
+      "Passed": true,
+      "RuntimeMs": 13.221,
+      "MemoryAllocationBytes": 18104352,
+      "Width": 960,
+      "Height": 540,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.994229,
+      "MatchedIous": [
+        0.994229,
+        0.994229
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 413.3,
+          "Y": 229.5,
+          "Width": 172.79999,
+          "Height": 102.60004,
+          "Confidence": 0.93,
+          "ClassId": 0
+        },
+        {
+          "X": 431.50003,
+          "Y": 234.89996,
+          "Width": 172.80002,
+          "Height": 102.60004,
+          "Confidence": 0.9,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_negative_low_confidence_0004",
+      "Scenario": "negative_low_confidence",
+      "Passed": true,
+      "RuntimeMs": 11.916,
+      "MemoryAllocationBytes": 18088808,
+      "Width": 960,
+      "Height": 540,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [],
+      "Detections": [],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_single_object_0005",
+      "Scenario": "single_object",
+      "Passed": true,
+      "RuntimeMs": 14.936,
+      "MemoryAllocationBytes": 18093800,
+      "Width": 1280,
+      "Height": 720,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.975189,
+      "MatchedIous": [
+        0.975189
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.98,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 308.19998,
+          "Y": 222.20001,
+          "Width": 204.80002,
+          "Height": 129.59998,
+          "Confidence": 0.98,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_multi_class_0005",
+      "Scenario": "multi_class",
+      "Passed": true,
+      "RuntimeMs": 13.908,
+      "MemoryAllocationBytes": 18104040,
+      "Width": 1280,
+      "Height": 720,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.987498,
+      "MatchedIous": [
+        0.987498,
+        0.980756
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.96,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.92,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 307.69998,
+          "Y": 223.70001,
+          "Width": 204.80002,
+          "Height": 129.59998,
+          "Confidence": 0.96,
+          "ClassId": 0
+        },
+        {
+          "X": 754.7001,
+          "Y": 325,
+          "Width": 179.19995,
+          "Height": 144,
+          "Confidence": 0.92,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_edge_clamp_0005",
+      "Scenario": "edge_clamp",
+      "Passed": true,
+      "RuntimeMs": 14.577,
+      "MemoryAllocationBytes": 18088200,
+      "Width": 1280,
+      "Height": 720,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.96366,
+      "MatchedIous": [
+        0.96366
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 0,
+          "Y": 128.60004,
+          "Width": 229.40001,
+          "Height": 129.59998,
+          "Confidence": 0.93,
+          "ClassId": 2
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_same_class_nms_0005",
+      "Scenario": "same_class_nms",
+      "Passed": true,
+      "RuntimeMs": 13.573,
+      "MemoryAllocationBytes": 18093744,
+      "Width": 1280,
+      "Height": 720,
+      "GroundTruthCount": 1,
+      "DetectionCount": 1,
+      "TruePositiveCount": 1,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 1,
+      "MatchedIous": [
+        1
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.95,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 499.2,
+          "Y": 259.19995,
+          "Width": 281.59998,
+          "Height": 172.80005,
+          "Confidence": 0.95,
+          "ClassId": 0
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_different_class_overlap_0005",
+      "Scenario": "different_class_overlap",
+      "Passed": true,
+      "RuntimeMs": 14.97,
+      "MemoryAllocationBytes": 18104280,
+      "Width": 1280,
+      "Height": 720,
+      "GroundTruthCount": 2,
+      "DetectionCount": 2,
+      "TruePositiveCount": 2,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0.995669,
+      "MatchedIous": [
+        0.995669,
+        0.995669
+      ],
+      "ScoredPredictions": [
+        {
+          "Confidence": 0.93,
+          "IsTruePositive": true
+        },
+        {
+          "Confidence": 0.9,
+          "IsTruePositive": true
+        }
+      ],
+      "Detections": [
+        {
+          "X": 550.89996,
+          "Y": 306,
+          "Width": 230.40002,
+          "Height": 136.80005,
+          "Confidence": 0.93,
+          "ClassId": 0
+        },
+        {
+          "X": 575.5,
+          "Y": 313.19995,
+          "Width": 230.40002,
+          "Height": 136.80005,
+          "Confidence": 0.9,
+          "ClassId": 1
+        }
+      ],
+      "Failure": null
+    },
+    {
+      "CaseId": "DeepLearning_negative_low_confidence_0005",
+      "Scenario": "negative_low_confidence",
+      "Passed": true,
+      "RuntimeMs": 13.447,
+      "MemoryAllocationBytes": 18086464,
+      "Width": 1280,
+      "Height": 720,
+      "GroundTruthCount": 0,
+      "DetectionCount": 0,
+      "TruePositiveCount": 0,
+      "FalsePositiveCount": 0,
+      "FalseNegativeCount": 0,
+      "BestMatchedIou": 0,
+      "MatchedIous": [],
+      "ScoredPredictions": [],
+      "Detections": [],
+      "Failure": null
+    }
+  ]
+}

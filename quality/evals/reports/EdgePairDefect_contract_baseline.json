@@ -1,0 +1,309 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T03:30:09.2290316+00:00",
+    "CaseCount": 27,
+    "Passed": 27,
+    "Failed": 0,
+    "RuntimeMs": 149.572
+  },
+  "Operators": [
+    {
+      "Operator": "EdgePairDefect",
+      "CaseCount": 27,
+      "Passed": 27,
+      "Failed": 0,
+      "RuntimeMsAvg": 5.54,
+      "MemoryAllocationBytesAvg": 44190
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Auto line detection",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 3.792
+    },
+    {
+      "Scenario": "Edge method contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.284
+    },
+    {
+      "Scenario": "Failure contract",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.4
+    },
+    {
+      "Scenario": "Line input contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.849
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.795
+    },
+    {
+      "Scenario": "Private helper contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.322
+    },
+    {
+      "Scenario": "Provided line geometry",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 32.287
+    },
+    {
+      "Scenario": "Sampling contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.114
+    },
+    {
+      "Scenario": "Tolerance contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.742
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.291
+    }
+  ],
+  "Cases": [
+    {
+      "Case": "provided_parallel_lines_zero_defects",
+      "Scenario": "Provided line geometry",
+      "Passed": true,
+      "RuntimeMs": 126.198,
+      "MemoryAllocationBytes": 706000,
+      "Failure": null
+    },
+    {
+      "Case": "provided_wide_pair_single_defect",
+      "Scenario": "Provided line geometry",
+      "Passed": true,
+      "RuntimeMs": 1.208,
+      "MemoryAllocationBytes": 34536,
+      "Failure": null
+    },
+    {
+      "Case": "provided_narrow_pair_single_defect",
+      "Scenario": "Provided line geometry",
+      "Passed": true,
+      "RuntimeMs": 0.757,
+      "MemoryAllocationBytes": 28440,
+      "Failure": null
+    },
+    {
+      "Case": "tolerance_boundary_is_not_defect",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 0.65,
+      "MemoryAllocationBytes": 19608,
+      "Failure": null
+    },
+    {
+      "Case": "tolerance_exceeded_is_defect",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 0.834,
+      "MemoryAllocationBytes": 21832,
+      "Failure": null
+    },
+    {
+      "Case": "high_sample_count_returns_requested_deviations",
+      "Scenario": "Sampling contract",
+      "Passed": true,
+      "RuntimeMs": 1.786,
+      "MemoryAllocationBytes": 171440,
+      "Failure": null
+    },
+    {
+      "Case": "min_sample_count_returns_requested_deviations",
+      "Scenario": "Sampling contract",
+      "Passed": true,
+      "RuntimeMs": 0.443,
+      "MemoryAllocationBytes": 9672,
+      "Failure": null
+    },
+    {
+      "Case": "diagonal_parallel_lines_zero_defects",
+      "Scenario": "Provided line geometry",
+      "Passed": true,
+      "RuntimeMs": 0.986,
+      "MemoryAllocationBytes": 32056,
+      "Failure": null
+    },
+    {
+      "Case": "sobel_provided_lines_zero_defects",
+      "Scenario": "Edge method contract",
+      "Passed": true,
+      "RuntimeMs": 1.284,
+      "MemoryAllocationBytes": 20856,
+      "Failure": null
+    },
+    {
+      "Case": "auto_detect_canny_pair_success",
+      "Scenario": "Auto line detection",
+      "Passed": true,
+      "RuntimeMs": 6.091,
+      "MemoryAllocationBytes": 13656,
+      "Failure": null
+    },
+    {
+      "Case": "auto_detect_sobel_pair_success",
+      "Scenario": "Auto line detection",
+      "Passed": true,
+      "RuntimeMs": 1.493,
+      "MemoryAllocationBytes": 14872,
+      "Failure": null
+    },
+    {
+      "Case": "auto_detect_blank_without_lines_fails",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.634,
+      "MemoryAllocationBytes": 7392,
+      "Failure": null
+    },
+    {
+      "Case": "missing_image_fails",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.258,
+      "MemoryAllocationBytes": 3408,
+      "Failure": null
+    },
+    {
+      "Case": "degenerate_line_fails",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.309,
+      "MemoryAllocationBytes": 5560,
+      "Failure": null
+    },
+    {
+      "Case": "dict_start_end_line_parse",
+      "Scenario": "Line input contract",
+      "Passed": true,
+      "RuntimeMs": 0.671,
+      "MemoryAllocationBytes": 20728,
+      "Failure": null
+    },
+    {
+      "Case": "dict_x1_y1_line_parse",
+      "Scenario": "Line input contract",
+      "Passed": true,
+      "RuntimeMs": 0.561,
+      "MemoryAllocationBytes": 20728,
+      "Failure": null
+    },
+    {
+      "Case": "legacy_hashtable_line_parse",
+      "Scenario": "Line input contract",
+      "Passed": true,
+      "RuntimeMs": 2.056,
+      "MemoryAllocationBytes": 22344,
+      "Failure": null
+    },
+    {
+      "Case": "validate_defaults_valid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.397,
+      "MemoryAllocationBytes": 2848,
+      "Failure": null
+    },
+    {
+      "Case": "validate_negative_expected_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.111,
+      "MemoryAllocationBytes": 2040,
+      "Failure": null
+    },
+    {
+      "Case": "validate_negative_tolerance_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.045,
+      "MemoryAllocationBytes": 2488,
+      "Failure": null
+    },
+    {
+      "Case": "validate_bad_edge_method_invalid",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.612,
+      "MemoryAllocationBytes": 3224,
+      "Failure": null
+    },
+    {
+      "Case": "build_edge_map_canny_nonzero",
+      "Scenario": "Private helper contract",
+      "Passed": true,
+      "RuntimeMs": 0.583,
+      "MemoryAllocationBytes": 1792,
+      "Failure": null
+    },
+    {
+      "Case": "build_edge_map_sobel_nonzero",
+      "Scenario": "Private helper contract",
+      "Passed": true,
+      "RuntimeMs": 0.533,
+      "MemoryAllocationBytes": 5712,
+      "Failure": null
+    },
+    {
+      "Case": "distance_point_to_line_horizontal",
+      "Scenario": "Private helper contract",
+      "Passed": true,
+      "RuntimeMs": 0.108,
+      "MemoryAllocationBytes": 696,
+      "Failure": null
+    },
+    {
+      "Case": "angle_diff_wraps_180",
+      "Scenario": "Private helper contract",
+      "Passed": true,
+      "RuntimeMs": 0.062,
+      "MemoryAllocationBytes": 584,
+      "Failure": null
+    },
+    {
+      "Case": "try_parse_line_rejects_bad_dict",
+      "Scenario": "Line input contract",
+      "Passed": true,
+      "RuntimeMs": 0.107,
+      "MemoryAllocationBytes": 1128,
+      "Failure": null
+    },
+    {
+      "Case": "output_image_is_color_and_same_size",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.795,
+      "MemoryAllocationBytes": 19488,
+      "Failure": null
+    }
+  ]
+}

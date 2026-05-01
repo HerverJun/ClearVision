@@ -7,8 +7,112 @@ namespace Acme.Product.Infrastructure.AI.Anomaly;
 
 internal static class OnnxPatchEmbeddingExtractor
 {
-    private static readonly ConcurrentDictionary<string, InferenceSession> SessionCache = new(StringComparer.OrdinalIgnoreCase);
+    private const int MaxCachedSessions = 4;
+
+    private static readonly ConcurrentDictionary<string, CachedSession> SessionCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> SessionLocks = new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class CachedSession : IDisposable
+    {
+        private int _leaseCount;
+        private int _disposeRequested;
+        private int _disposed;
+        private long _lastAccessTicks;
+
+        public CachedSession(InferenceSession session, long modelLength, DateTime modelLastWriteUtc)
+        {
+            Session = session;
+            ModelLength = modelLength;
+            ModelLastWriteUtc = modelLastWriteUtc;
+            _lastAccessTicks = DateTime.UtcNow.Ticks;
+        }
+
+        public InferenceSession Session { get; }
+        private long ModelLength { get; }
+        private DateTime ModelLastWriteUtc { get; }
+        public DateTime LastAccessUtc => new(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc);
+
+        public bool Matches(FileInfo modelFile)
+        {
+            return modelFile.Length == ModelLength &&
+                   modelFile.LastWriteTimeUtc == ModelLastWriteUtc;
+        }
+
+        public bool TryAcquireLease(out SessionLease lease)
+        {
+            lease = null!;
+
+            if (Volatile.Read(ref _disposeRequested) != 0)
+            {
+                return false;
+            }
+
+            Interlocked.Increment(ref _leaseCount);
+            if (Volatile.Read(ref _disposeRequested) != 0)
+            {
+                ReleaseLease();
+                return false;
+            }
+
+            Touch();
+            lease = new SessionLease(this);
+            return true;
+        }
+
+        public void Touch()
+        {
+            Interlocked.Exchange(ref _lastAccessTicks, DateTime.UtcNow.Ticks);
+        }
+
+        public void Dispose()
+        {
+            Retire();
+        }
+
+        public void Retire()
+        {
+            if (Interlocked.Exchange(ref _disposeRequested, 1) == 0 &&
+                Volatile.Read(ref _leaseCount) == 0)
+            {
+                DisposeSession();
+            }
+        }
+
+        private void ReleaseLease()
+        {
+            if (Interlocked.Decrement(ref _leaseCount) == 0 &&
+                Volatile.Read(ref _disposeRequested) != 0)
+            {
+                DisposeSession();
+            }
+        }
+
+        private void DisposeSession()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                Session.Dispose();
+            }
+        }
+
+        public sealed class SessionLease : IDisposable
+        {
+            private CachedSession? _owner;
+
+            public SessionLease(CachedSession owner)
+            {
+                _owner = owner;
+            }
+
+            public InferenceSession Session => _owner?.Session
+                ?? throw new ObjectDisposedException(nameof(SessionLease));
+
+            public void Dispose()
+            {
+                Interlocked.Exchange(ref _owner, null)?.ReleaseLease();
+            }
+        }
+    }
 
     public static float[] ExtractEmbedding(Mat patch, SimplePatchCoreOptions options)
     {
@@ -17,7 +121,8 @@ internal static class OnnxPatchEmbeddingExtractor
             throw new InvalidOperationException("EmbeddingModelPath is required when FeatureExtractorId is 'onnx_embedding'.");
         }
 
-        var session = GetOrCreateSession(options.EmbeddingModelPath);
+        using var lease = GetOrCreateSessionLease(options.EmbeddingModelPath);
+        var session = lease.Session;
         var input = session.InputMetadata.First();
         var dimensions = input.Value.Dimensions;
         var inputHeight = ResolveImageDimension(dimensions, 2, options.PatchSize);
@@ -55,7 +160,8 @@ internal static class OnnxPatchEmbeddingExtractor
             throw new InvalidOperationException("EmbeddingModelPath is required when FeatureExtractorId is 'onnx_embedding'.");
         }
 
-        var session = GetOrCreateSession(options.EmbeddingModelPath);
+        using var lease = GetOrCreateSessionLease(options.EmbeddingModelPath);
+        var session = lease.Session;
         var input = session.InputMetadata.First();
         var dimensions = input.Value.Dimensions;
         var inputHeight = ResolveImageDimension(dimensions, 2, options.PatchSize);
@@ -83,21 +189,33 @@ internal static class OnnxPatchEmbeddingExtractor
         return embeddings;
     }
 
-    private static InferenceSession GetOrCreateSession(string modelPath)
+    private static CachedSession.SessionLease GetOrCreateSessionLease(string modelPath)
     {
         var resolvedModelPath = Path.GetFullPath(modelPath);
-        if (SessionCache.TryGetValue(resolvedModelPath, out var cached))
+        var modelFile = new FileInfo(resolvedModelPath);
+        if (!modelFile.Exists)
         {
-            return cached;
+            throw new FileNotFoundException("Embedding ONNX model was not found.", resolvedModelPath);
+        }
+
+        if (TryGetCurrentCachedSession(resolvedModelPath, modelFile, out var lease))
+        {
+            return lease;
         }
 
         var gate = SessionLocks.GetOrAdd(resolvedModelPath, _ => new SemaphoreSlim(1, 1));
         gate.Wait();
         try
         {
-            if (SessionCache.TryGetValue(resolvedModelPath, out cached))
+            modelFile.Refresh();
+            if (!modelFile.Exists)
             {
-                return cached;
+                throw new FileNotFoundException("Embedding ONNX model was not found.", resolvedModelPath);
+            }
+
+            if (TryGetCurrentCachedSession(resolvedModelPath, modelFile, out lease))
+            {
+                return lease;
             }
 
             var options = new SessionOptions
@@ -106,12 +224,79 @@ internal static class OnnxPatchEmbeddingExtractor
             };
 
             var session = new InferenceSession(resolvedModelPath, options);
-            SessionCache[resolvedModelPath] = session;
-            return session;
+            var cachedSession = new CachedSession(session, modelFile.Length, modelFile.LastWriteTimeUtc);
+            SessionCache[resolvedModelPath] = cachedSession;
+            EnforceSessionCacheLimit(resolvedModelPath);
+
+            if (cachedSession.TryAcquireLease(out lease))
+            {
+                return lease;
+            }
+
+            throw new ObjectDisposedException(nameof(InferenceSession), "Embedding ONNX session was evicted before it could be leased.");
         }
         finally
         {
             gate.Release();
+        }
+    }
+
+    internal static void ClearSessionCache()
+    {
+        foreach (var key in SessionCache.Keys)
+        {
+            if (SessionCache.TryRemove(key, out var cached))
+            {
+                cached.Retire();
+            }
+        }
+    }
+
+    private static bool TryGetCurrentCachedSession(
+        string resolvedModelPath,
+        FileInfo modelFile,
+        out CachedSession.SessionLease lease)
+    {
+        lease = null!;
+
+        if (!SessionCache.TryGetValue(resolvedModelPath, out var cached))
+        {
+            return false;
+        }
+
+        if (cached.Matches(modelFile))
+        {
+            return cached.TryAcquireLease(out lease);
+        }
+
+        if (SessionCache.TryRemove(new KeyValuePair<string, CachedSession>(resolvedModelPath, cached)))
+        {
+            cached.Retire();
+        }
+
+        return false;
+    }
+
+    private static void EnforceSessionCacheLimit(string protectedKey)
+    {
+        if (SessionCache.Count <= MaxCachedSessions)
+        {
+            return;
+        }
+
+        foreach (var candidate in SessionCache
+                     .Where(entry => !entry.Key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(entry => entry.Value.LastAccessUtc))
+        {
+            if (SessionCache.Count <= MaxCachedSessions)
+            {
+                break;
+            }
+
+            if (SessionCache.TryRemove(new KeyValuePair<string, CachedSession>(candidate.Key, candidate.Value)))
+            {
+                candidate.Value.Retire();
+            }
         }
     }
 

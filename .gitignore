@@ -17,6 +17,7 @@
 *.suo
 *.userprefs
 *.lock.json
+!**/packages.lock.json
 
 # Architecture-specific output
 x64/
@@ -103,7 +104,11 @@ BenchmarkDotNet.Artifacts/
 # Local scratch / one-off scripts
 docs/templates/temp.md
 test_zxing.cs
+tools/virtual-plc/modbus/.venv/
+tools/virtual-plc/modbus/.vendor/
 /.tmp/localdeform-debug/
+/.tmp/dotnet-cli-home/
+/.tmp/python-temp/
 /.tmp/publish-check/
 /.tmp/NuGet/
 /.tmp/appdata/
@@ -115,3 +120,15 @@ test_zxing.cs
 /.tmp/userprofile/
 401.py
 .codex-tools/
+
+# Generated quality flywheel cases; regenerate from quality/synthetic/generators/
+/quality/synthetic/cases/
+
+# Local public datasets used by quality evals; keep large downloaded data out of git.
+/quality/public_datasets/
+__pycache__/
+*.pyc
+
+# Local production/field datasets; repo stores only manifests, splits, and reports.
+/quality/production_datasets/
+/quality/field_datasets/

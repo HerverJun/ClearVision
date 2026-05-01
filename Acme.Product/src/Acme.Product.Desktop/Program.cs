@@ -126,7 +126,10 @@ static class Program
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+                    policy
+                        .SetIsOriginAllowed(origin => IsAllowedApiOrigin(origin, _webPort))
+                        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+                        .WithHeaders("Authorization", "Content-Type", "Last-Event-ID", "X-Auth-Token", "X-Requested-With");
                 });
             });
 
@@ -337,6 +340,45 @@ static class Program
     }
 
     public static int GetWebPort() => _webPort;
+
+    internal static bool IsAllowedApiOrigin(string? origin, int webPort)
+    {
+        if (string.IsNullOrWhiteSpace(origin) ||
+            !Uri.TryCreate(origin, UriKind.Absolute, out var originUri))
+        {
+            return false;
+        }
+
+        if (originUri.Scheme is not ("http" or "https"))
+        {
+            return false;
+        }
+
+        if (string.Equals(originUri.Host, "app.local", StringComparison.OrdinalIgnoreCase))
+        {
+            return originUri.Scheme == Uri.UriSchemeHttp &&
+                   (originUri.IsDefaultPort || originUri.Port == 80);
+        }
+
+        if (!IsLoopbackHost(originUri.Host))
+        {
+            return false;
+        }
+
+        return originUri.Port == webPort ||
+               originUri.Port is >= MinWebPort and <= MaxWebPort;
+    }
+
+    private static bool IsLoopbackHost(string host)
+    {
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return System.Net.IPAddress.TryParse(host, out var address) &&
+               System.Net.IPAddress.IsLoopback(address);
+    }
 
     private static async Task EnsureInspectionResultAnalysisDataColumnAsync(Acme.Product.Infrastructure.Data.VisionDbContext dbContext)
     {

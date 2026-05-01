@@ -36,6 +36,33 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("DescriptorTypes", "描述符类型", "enum", DefaultValue = "Hu+Fourier", Options = new[] { "Hu|Hu矩", "Fourier|傅里叶描述符", "Hu+Fourier|全部" })]
 [OperatorParam("PreFilterArea", "面积预筛选", "bool", DefaultValue = true)]
 [OperatorParam("AreaTolerance", "面积容差", "double", DefaultValue = 0.3, Min = 0.0, Max = 1.0)]
+[AlgorithmInfo(
+    Name = "LINEMOD Pyramid Shape Matching",
+    CoreApi = "TemplateMatcher or ShapeDescriptorMatcher over OpenCvSharp Mats",
+    ImplementationStrategy = "Train either a LINEMOD-style template matcher or a contour descriptor matcher from the provided template, search the scene with configured pyramid, angle, and feature parameters, and return the best match plus diagnostics.",
+    TimeComplexity = "Template mode is roughly O(L*A*P) for pyramid levels, angle samples, and searched pixels; descriptor mode depends on contour count.",
+    TypicalLatency = "PyramidShapeMatchContractRunner baseline: 24 cases passed, avg runtime about 4.4 ms on synthetic contract images.",
+    SpaceComplexity = "O(P + F) for image pyramids, gradient maps, template features, and candidate match diagnostics.",
+    SuitableUseCases = new[]
+    {
+        "Shape-led template localization where edge orientation is more stable than raw grayscale intensity.",
+        "Coarse positioning or presence checks that can consume score, angle, match count, and matcher diagnostics.",
+        "Comparing Template and ShapeDescriptor modes under controlled ROI and threshold settings."
+    },
+    UnsuitableUseCases = new[]
+    {
+        "Weak-edge templates or scenes where the trained template has too few stable gradient features.",
+        "Dense multi-object retrieval that requires a fully ranked candidate list beyond the current primary output contract.",
+        "Subpixel metrology tasks where a dedicated edge or caliper operator should own the measurement contract."
+    },
+    KnownLimitations = new[]
+    {
+        "Template mode and ShapeDescriptor mode use different position semantics; downstream flows should consume MatcherDiagnostics.",
+        "The baseline locks current allowed-position tolerance before a stricter center contract is introduced.",
+        "MagnitudeThreshold is exposed for template mode and should be tuned together with weak and strong thresholds."
+    },
+    Dependencies = new[] { "OpenCvSharp" }
+)]
 public class PyramidShapeMatchOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.PyramidShapeMatch;

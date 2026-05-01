@@ -251,59 +251,75 @@ public class CircleMeasurementOperator : OperatorBase
         failureReason = string.Empty;
         using var blurred = new Mat();
         Cv2.GaussianBlur(gray, blurred, new Size(5, 5), 1.5);
-        using var binary = new Mat();
-        Cv2.Threshold(blurred, binary, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
-        Cv2.FindContours(binary, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
-
-        var candidates = contours
-            .Where(c => c.Length >= 5)
-            .Select(c => new
-            {
-                Contour = c,
-                Area = Cv2.ContourArea(c),
-                Perimeter = Cv2.ArcLength(c, true),
-                Ellipse = Cv2.FitEllipse(c)
-            })
-            .Where(x => x.Area > 1.0 && x.Perimeter > 1.0)
-            .OrderByDescending(x => x.Area)
-            .ToList();
-
-        if (candidates.Count == 0)
+        var triedCandidateCount = 0;
+        foreach (var thresholdType in new[] { ThresholdTypes.Binary | ThresholdTypes.Otsu, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu })
         {
-            failureReason = "Not enough contour points for ellipse fitting";
-            return false;
-        }
+            using var binary = new Mat();
+            Cv2.Threshold(blurred, binary, 0, 255, thresholdType);
+            Cv2.FindContours(binary, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
-        foreach (var candidate in candidates)
-        {
-            var radius = (candidate.Ellipse.Size.Width + candidate.Ellipse.Size.Height) * 0.25;
-            if (radius < minRadius || radius > maxRadius)
+            var candidates = contours
+                .Where(c => c.Length >= 5)
+                .Select(c => new
+                {
+                    Contour = c,
+                    Bounds = Cv2.BoundingRect(c),
+                    Area = Cv2.ContourArea(c),
+                    Perimeter = Cv2.ArcLength(c, true),
+                    Ellipse = Cv2.FitEllipse(c)
+                })
+                .Where(x => x.Area > 1.0 && x.Perimeter > 1.0)
+                .Where(x => !IsFrameSizedContour(x.Bounds, gray.Size()))
+                .OrderByDescending(x => x.Area)
+                .ToList();
+            triedCandidateCount += candidates.Count;
+
+            foreach (var candidate in candidates)
             {
-                continue;
+                var radius = (candidate.Ellipse.Size.Width + candidate.Ellipse.Size.Height) * 0.25;
+                if (radius < minRadius || radius > maxRadius)
+                {
+                    continue;
+                }
+
+                var circularity = 4.0 * Math.PI * candidate.Area / (candidate.Perimeter * candidate.Perimeter);
+                circularity = Math.Clamp(circularity, 0.0, 1.0);
+                Cv2.Ellipse(resultImage, candidate.Ellipse, new Scalar(0, 255, 0), 2);
+                var centerPoint = new Point((int)Math.Round(candidate.Ellipse.Center.X), (int)Math.Round(candidate.Ellipse.Center.Y));
+                Cv2.Circle(resultImage, centerPoint, 3, new Scalar(0, 0, 255), -1);
+
+                circleResults.Add(new Dictionary<string, object>
+                {
+                    { "Center", new Position(candidate.Ellipse.Center.X, candidate.Ellipse.Center.Y) },
+                    { "Radius", radius },
+                    { "Circularity", circularity },
+                    { "PolarityProfile", thresholdType.HasFlag(ThresholdTypes.BinaryInv) ? "dark-object" : "bright-object" }
+                });
+                circleDataList.Add(new CircleData((float)candidate.Ellipse.Center.X, (float)candidate.Ellipse.Center.Y, (float)radius));
             }
 
-            var circularity = 4.0 * Math.PI * candidate.Area / (candidate.Perimeter * candidate.Perimeter);
-            circularity = Math.Clamp(circularity, 0.0, 1.0);
-            Cv2.Ellipse(resultImage, candidate.Ellipse, new Scalar(0, 255, 0), 2);
-            var centerPoint = new Point((int)Math.Round(candidate.Ellipse.Center.X), (int)Math.Round(candidate.Ellipse.Center.Y));
-            Cv2.Circle(resultImage, centerPoint, 3, new Scalar(0, 0, 255), -1);
-
-            circleResults.Add(new Dictionary<string, object>
-            {
-                { "Center", new Position(candidate.Ellipse.Center.X, candidate.Ellipse.Center.Y) },
-                { "Radius", radius },
-                { "Circularity", circularity }
-            });
-            circleDataList.Add(new CircleData((float)candidate.Ellipse.Center.X, (float)candidate.Ellipse.Center.Y, (float)radius));
         }
 
         if (circleResults.Count == 0)
         {
-            failureReason = "No fitted ellipse passed radius constraints";
+            failureReason = triedCandidateCount == 0
+                ? "Not enough contour points for ellipse fitting"
+                : "No fitted ellipse passed radius constraints";
             return false;
         }
 
         return true;
+    }
+
+    private static bool IsFrameSizedContour(Rect bounds, Size imageSize)
+    {
+        var touchesFrame = bounds.X <= 1 &&
+            bounds.Y <= 1 &&
+            bounds.Right >= imageSize.Width - 1 &&
+            bounds.Bottom >= imageSize.Height - 1;
+        var coversMostOfFrame = bounds.Width >= imageSize.Width * 0.9 &&
+            bounds.Height >= imageSize.Height * 0.9;
+        return touchesFrame && coversMostOfFrame;
     }
 
     private double CalculateCircularity(Mat grayImage, Point center, int radius)

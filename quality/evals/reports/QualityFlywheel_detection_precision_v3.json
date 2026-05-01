@@ -1,0 +1,1342 @@
+{
+  "schemaVersion": "2026-05-01.detection-precision.v3",
+  "generatedAtUtc": "2026-05-01T06:09:10+00:00",
+  "accepted": true,
+  "claimBoundary": "Public benchmark and replay evidence only; no report in this flywheel represents real production-site sign-off.",
+  "sourceReports": [
+    "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v1.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_sweep_v1.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_failure_taxonomy_v1.json",
+    "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json",
+    "quality/evals/reports/EdgeDetection_bsds500_baseline.json",
+    "quality/evals/reports/EdgeDetection_bsds500_candidate_replay_v1.json",
+    "quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v2.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+    "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json",
+    "quality/evals/reports/DeepLearning_coco_image_inference_baseline.json",
+    "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
+    "quality/evals/reports/EdgeDetection_bsds500_baseline.json",
+    "quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v2.json",
+    "quality/evals/reports/AkazeFeatureMatch_hpatches_baseline.json",
+    "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v5.json",
+    "quality/evals/reports/OrbFeatureMatch_hpatches_baseline.json",
+    "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v5.json",
+    "quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v5.json",
+    "quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json",
+    "quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.json",
+    "quality/evals/reports/CameraCalibration_opencv_samples_baseline.json",
+    "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json",
+    "quality/evals/reports/QualityFlywheel_candidate_profile_governance_v1.json"
+  ],
+  "summary": {
+    "surfacePixelF1Delta": 0.0,
+    "surfaceRecallAtFixedFprDelta": 0.0,
+    "surfaceFalsePositivePerImageDelta": 0.0,
+    "anomalyImageAurocDelta": 0.256879,
+    "anomalyPixelAurocDelta": 0.198397,
+    "anomalyImageRecallDelta": 0.747126,
+    "anomalyImageF1Delta": 0.780013,
+    "anomalyImageFalsePositiveDelta": 3.0,
+    "anomalyThreshold": 0.1,
+    "anomalyRemainingMissedAnomalyCount": 18,
+    "edgeReplayBoundaryRecallDelta": -0.056581,
+    "edgeReplayBoundaryF1Delta": 0.009847,
+    "abReplayRegressedCaseCount": 0
+  },
+  "surfaceDefectDetection": {
+    "decision": "candidate-ready-with-low-contrast-backlog",
+    "baseline": {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+      "profile": "baseline_default",
+      "caseCount": 1004,
+      "pixelF1": 0.269226,
+      "imageAuroc": 0.772432,
+      "pixelAuroc": 0.659955,
+      "imageF1": 0.567073,
+      "imageRecall": 0.845455,
+      "falsePositivePerImage": 0.139821,
+      "imageFalsePositiveRate": 0.139821,
+      "recallAtOwnFpr": 0.518182,
+      "recallAtFixedFpr": 0.518182,
+      "runtimeMsP95": 5.17,
+      "confusion": {
+        "tp": 93,
+        "fp": 125,
+        "fn": 17,
+        "tn": 769
+      }
+    },
+    "candidate": {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
+      "profile": "baseline_default",
+      "caseCount": 1004,
+      "pixelF1": 0.269226,
+      "imageAuroc": 0.772432,
+      "pixelAuroc": 0.659955,
+      "imageF1": 0.567073,
+      "imageRecall": 0.845455,
+      "falsePositivePerImage": 0.139821,
+      "imageFalsePositiveRate": 0.139821,
+      "recallAtOwnFpr": 0.518182,
+      "recallAtFixedFpr": 0.518182,
+      "runtimeMsP95": 4.575,
+      "confusion": {
+        "tp": 93,
+        "fp": 125,
+        "fn": 17,
+        "tn": 769
+      }
+    },
+    "abReplay": {
+      "replayCaseCount": 20,
+      "improvedMetricCaseCount": 0,
+      "worseMetricCaseCount": 0,
+      "regressedCaseCount": 0
+    },
+    "taxonomySummary": {
+      "caseCount": 189,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 123,
+        "oversegmentation_false_positive": 2,
+        "low_contrast_defect_miss": 15,
+        "undersegmentation_false_negative": 46,
+        "small_defect_miss": 2,
+        "mask_overgrowth_false_positive": 1
+      }
+    },
+    "nextAction": "Do not lower the global threshold further; target low-contrast and undersegmentation misses with guarded local normalization or component filtering."
+  },
+  "anomalyDetection": {
+    "decision": "candidate-ready-threshold-calibrated-runtime-heavy",
+    "baseline": {
+      "sourceReport": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+      "profile": "baseline_default",
+      "caseCount": 120,
+      "imageAuroc": 0.66092,
+      "pixelAuroc": 0.670852,
+      "imagePrecision": 1,
+      "imageRecall": 0.045977,
+      "imageF1": 0.087912,
+      "imageTruePositive": 4,
+      "imageFalsePositive": 0,
+      "imageFalseNegative": 83,
+      "runtimeMs": 5731.224,
+      "parameters": {
+        "MaxSide": 128,
+        "PatchSize": 16,
+        "PatchStride": 16,
+        "CoresetRatio": 0.02,
+        "Threshold": 0.35
+      }
+    },
+    "candidate": {
+      "sourceReport": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+      "profile": "max192_dense_stride8_threshold_010",
+      "caseCount": 120,
+      "imageAuroc": 0.917799,
+      "pixelAuroc": 0.869249,
+      "imagePrecision": 0.958333,
+      "imageRecall": 0.793103,
+      "imageF1": 0.867925,
+      "imageTruePositive": 69,
+      "imageFalsePositive": 3,
+      "imageFalseNegative": 18,
+      "runtimeMs": 26809.452,
+      "parameters": {
+        "MaxSide": 192,
+        "PatchSize": 16,
+        "PatchStride": 8,
+        "CoresetRatio": 0.02,
+        "Threshold": 0.1
+      }
+    },
+    "categories": [
+      {
+        "category": "grid",
+        "testCount": 78,
+        "testAnomalyCount": 57,
+        "imageAurocOld": 0.614035,
+        "imageAurocNew": 0.883876,
+        "imageAurocDelta": 0.269841,
+        "pixelAurocOld": 0.560461,
+        "pixelAurocNew": 0.793107,
+        "pixelAurocDelta": 0.232646
+      },
+      {
+        "category": "toothbrush",
+        "testCount": 42,
+        "testAnomalyCount": 30,
+        "imageAurocOld": 0.75,
+        "imageAurocNew": 0.983333,
+        "imageAurocDelta": 0.233333,
+        "pixelAurocOld": 0.763036,
+        "pixelAurocNew": 0.954248,
+        "pixelAurocDelta": 0.191212
+      }
+    ],
+    "thresholdCalibration": {
+      "schemaVersion": "2026-04-30.anomaly-threshold-calibration.v1",
+      "generatedAtUtc": "2026-05-01T03:34:55+00:00",
+      "accepted": true,
+      "claimBoundary": "MVTec AD Lite score-threshold calibration only; no product default promotion and no field sign-off claim.",
+      "sourceCandidate": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v1.json",
+      "targetCandidateVersion": "v2",
+      "targetProfile": "max192_dense_stride8_threshold_010",
+      "productDefaultChange": false,
+      "selectionPolicy": "Select highest image F1 below the current threshold while keeping image precision >= 0.95 and false positives <= 3.",
+      "current": {
+        "threshold": 0.35,
+        "imageTruePositive": 55,
+        "imageFalsePositive": 0,
+        "imageFalseNegative": 32,
+        "imageTrueNegative": 33,
+        "imagePrecision": 1.0,
+        "imageRecall": 0.632184,
+        "imageF1": 0.774648,
+        "recoveredAnomalyCount": 0,
+        "remainingMissedAnomalyCount": 32,
+        "recoveredByDefectType": {},
+        "remainingMissedByDefectType": {
+          "broken": 9,
+          "defective": 9,
+          "bent": 8,
+          "glue": 5,
+          "metal_contamination": 1
+        },
+        "falsePositiveCaseIds": [],
+        "taxonomyCounts": {
+          "anomaly_miss": 32,
+          "below_threshold_anomaly": 22,
+          "zero_score_anomaly": 10,
+          "defect_broken": 9,
+          "defect_defective": 9,
+          "defect_bent": 8,
+          "defect_glue": 5,
+          "defect_metal_contamination": 1
+        }
+      },
+      "selected": {
+        "threshold": 0.1,
+        "imageTruePositive": 69,
+        "imageFalsePositive": 3,
+        "imageFalseNegative": 18,
+        "imageTrueNegative": 30,
+        "imagePrecision": 0.958333,
+        "imageRecall": 0.793103,
+        "imageF1": 0.867925,
+        "recoveredAnomalyCount": 14,
+        "remainingMissedAnomalyCount": 18,
+        "recoveredByDefectType": {
+          "broken": 4,
+          "defective": 4,
+          "bent": 3,
+          "glue": 2,
+          "metal_contamination": 1
+        },
+        "remainingMissedByDefectType": {
+          "bent": 5,
+          "broken": 5,
+          "defective": 5,
+          "glue": 3
+        },
+        "falsePositiveCaseIds": [
+          "grid/good/005",
+          "grid/good/010",
+          "grid/good/014"
+        ],
+        "taxonomyCounts": {
+          "anomaly_miss": 18,
+          "zero_score_anomaly": 10,
+          "below_threshold_anomaly": 8,
+          "defect_bent": 5,
+          "defect_broken": 5,
+          "defect_defective": 5,
+          "defect_glue": 3,
+          "false_positive_good": 3,
+          "above_threshold_good": 3
+        }
+      },
+      "thresholdRows": [
+        {
+          "threshold": 0.35,
+          "imageTruePositive": 55,
+          "imageFalsePositive": 0,
+          "imageFalseNegative": 32,
+          "imageTrueNegative": 33,
+          "imagePrecision": 1.0,
+          "imageRecall": 0.632184,
+          "imageF1": 0.774648,
+          "recoveredAnomalyCount": 0,
+          "remainingMissedAnomalyCount": 32,
+          "recoveredByDefectType": {},
+          "remainingMissedByDefectType": {
+            "broken": 9,
+            "defective": 9,
+            "bent": 8,
+            "glue": 5,
+            "metal_contamination": 1
+          },
+          "falsePositiveCaseIds": [],
+          "taxonomyCounts": {
+            "anomaly_miss": 32,
+            "below_threshold_anomaly": 22,
+            "zero_score_anomaly": 10,
+            "defect_broken": 9,
+            "defect_defective": 9,
+            "defect_bent": 8,
+            "defect_glue": 5,
+            "defect_metal_contamination": 1
+          }
+        },
+        {
+          "threshold": 0.3,
+          "imageTruePositive": 57,
+          "imageFalsePositive": 0,
+          "imageFalseNegative": 30,
+          "imageTrueNegative": 33,
+          "imagePrecision": 1.0,
+          "imageRecall": 0.655172,
+          "imageF1": 0.791667,
+          "recoveredAnomalyCount": 2,
+          "remainingMissedAnomalyCount": 30,
+          "recoveredByDefectType": {
+            "bent": 1,
+            "glue": 1
+          },
+          "remainingMissedByDefectType": {
+            "broken": 9,
+            "defective": 9,
+            "bent": 7,
+            "glue": 4,
+            "metal_contamination": 1
+          },
+          "falsePositiveCaseIds": [],
+          "taxonomyCounts": {
+            "anomaly_miss": 30,
+            "below_threshold_anomaly": 20,
+            "zero_score_anomaly": 10,
+            "defect_broken": 9,
+            "defect_defective": 9,
+            "defect_bent": 7,
+            "defect_glue": 4,
+            "defect_metal_contamination": 1
+          }
+        },
+        {
+          "threshold": 0.25,
+          "imageTruePositive": 60,
+          "imageFalsePositive": 0,
+          "imageFalseNegative": 27,
+          "imageTrueNegative": 33,
+          "imagePrecision": 1.0,
+          "imageRecall": 0.689655,
+          "imageF1": 0.816327,
+          "recoveredAnomalyCount": 5,
+          "remainingMissedAnomalyCount": 27,
+          "recoveredByDefectType": {
+            "bent": 2,
+            "broken": 1,
+            "glue": 1,
+            "defective": 1
+          },
+          "remainingMissedByDefectType": {
+            "broken": 8,
+            "defective": 8,
+            "bent": 6,
+            "glue": 4,
+            "metal_contamination": 1
+          },
+          "falsePositiveCaseIds": [],
+          "taxonomyCounts": {
+            "anomaly_miss": 27,
+            "below_threshold_anomaly": 17,
+            "zero_score_anomaly": 10,
+            "defect_broken": 8,
+            "defect_defective": 8,
+            "defect_bent": 6,
+            "defect_glue": 4,
+            "defect_metal_contamination": 1
+          }
+        },
+        {
+          "threshold": 0.2,
+          "imageTruePositive": 62,
+          "imageFalsePositive": 0,
+          "imageFalseNegative": 25,
+          "imageTrueNegative": 33,
+          "imagePrecision": 1.0,
+          "imageRecall": 0.712644,
+          "imageF1": 0.832215,
+          "recoveredAnomalyCount": 7,
+          "remainingMissedAnomalyCount": 25,
+          "recoveredByDefectType": {
+            "bent": 2,
+            "broken": 2,
+            "glue": 2,
+            "defective": 1
+          },
+          "remainingMissedByDefectType": {
+            "defective": 8,
+            "broken": 7,
+            "bent": 6,
+            "glue": 3,
+            "metal_contamination": 1
+          },
+          "falsePositiveCaseIds": [],
+          "taxonomyCounts": {
+            "anomaly_miss": 25,
+            "below_threshold_anomaly": 15,
+            "zero_score_anomaly": 10,
+            "defect_defective": 8,
+            "defect_broken": 7,
+            "defect_bent": 6,
+            "defect_glue": 3,
+            "defect_metal_contamination": 1
+          }
+        },
+        {
+          "threshold": 0.15,
+          "imageTruePositive": 67,
+          "imageFalsePositive": 1,
+          "imageFalseNegative": 20,
+          "imageTrueNegative": 32,
+          "imagePrecision": 0.985294,
+          "imageRecall": 0.770115,
+          "imageF1": 0.864516,
+          "recoveredAnomalyCount": 12,
+          "remainingMissedAnomalyCount": 20,
+          "recoveredByDefectType": {
+            "bent": 3,
+            "broken": 3,
+            "defective": 3,
+            "glue": 2,
+            "metal_contamination": 1
+          },
+          "remainingMissedByDefectType": {
+            "broken": 6,
+            "defective": 6,
+            "bent": 5,
+            "glue": 3
+          },
+          "falsePositiveCaseIds": [
+            "grid/good/014"
+          ],
+          "taxonomyCounts": {
+            "anomaly_miss": 20,
+            "zero_score_anomaly": 10,
+            "below_threshold_anomaly": 10,
+            "defect_broken": 6,
+            "defect_defective": 6,
+            "defect_bent": 5,
+            "defect_glue": 3,
+            "false_positive_good": 1,
+            "above_threshold_good": 1
+          }
+        },
+        {
+          "threshold": 0.1,
+          "imageTruePositive": 69,
+          "imageFalsePositive": 3,
+          "imageFalseNegative": 18,
+          "imageTrueNegative": 30,
+          "imagePrecision": 0.958333,
+          "imageRecall": 0.793103,
+          "imageF1": 0.867925,
+          "recoveredAnomalyCount": 14,
+          "remainingMissedAnomalyCount": 18,
+          "recoveredByDefectType": {
+            "broken": 4,
+            "defective": 4,
+            "bent": 3,
+            "glue": 2,
+            "metal_contamination": 1
+          },
+          "remainingMissedByDefectType": {
+            "bent": 5,
+            "broken": 5,
+            "defective": 5,
+            "glue": 3
+          },
+          "falsePositiveCaseIds": [
+            "grid/good/005",
+            "grid/good/010",
+            "grid/good/014"
+          ],
+          "taxonomyCounts": {
+            "anomaly_miss": 18,
+            "zero_score_anomaly": 10,
+            "below_threshold_anomaly": 8,
+            "defect_bent": 5,
+            "defect_broken": 5,
+            "defect_defective": 5,
+            "defect_glue": 3,
+            "false_positive_good": 3,
+            "above_threshold_good": 3
+          }
+        },
+        {
+          "threshold": 0.05,
+          "imageTruePositive": 69,
+          "imageFalsePositive": 4,
+          "imageFalseNegative": 18,
+          "imageTrueNegative": 29,
+          "imagePrecision": 0.945205,
+          "imageRecall": 0.793103,
+          "imageF1": 0.8625,
+          "recoveredAnomalyCount": 14,
+          "remainingMissedAnomalyCount": 18,
+          "recoveredByDefectType": {
+            "broken": 4,
+            "defective": 4,
+            "bent": 3,
+            "glue": 2,
+            "metal_contamination": 1
+          },
+          "remainingMissedByDefectType": {
+            "bent": 5,
+            "broken": 5,
+            "defective": 5,
+            "glue": 3
+          },
+          "falsePositiveCaseIds": [
+            "grid/good/005",
+            "grid/good/010",
+            "grid/good/014",
+            "grid/good/017"
+          ],
+          "taxonomyCounts": {
+            "anomaly_miss": 18,
+            "zero_score_anomaly": 10,
+            "below_threshold_anomaly": 8,
+            "defect_bent": 5,
+            "defect_broken": 5,
+            "defect_defective": 5,
+            "false_positive_good": 4,
+            "above_threshold_good": 4,
+            "defect_glue": 3
+          }
+        },
+        {
+          "threshold": 0.01,
+          "imageTruePositive": 77,
+          "imageFalsePositive": 5,
+          "imageFalseNegative": 10,
+          "imageTrueNegative": 28,
+          "imagePrecision": 0.939024,
+          "imageRecall": 0.885057,
+          "imageF1": 0.911243,
+          "recoveredAnomalyCount": 22,
+          "remainingMissedAnomalyCount": 10,
+          "recoveredByDefectType": {
+            "defective": 8,
+            "broken": 6,
+            "bent": 4,
+            "glue": 3,
+            "metal_contamination": 1
+          },
+          "remainingMissedByDefectType": {
+            "bent": 4,
+            "broken": 3,
+            "glue": 2,
+            "defective": 1
+          },
+          "falsePositiveCaseIds": [
+            "grid/good/000",
+            "grid/good/005",
+            "grid/good/010",
+            "grid/good/014",
+            "grid/good/017"
+          ],
+          "taxonomyCounts": {
+            "anomaly_miss": 10,
+            "zero_score_anomaly": 10,
+            "false_positive_good": 5,
+            "above_threshold_good": 5,
+            "defect_bent": 4,
+            "defect_broken": 3,
+            "defect_glue": 2,
+            "defect_defective": 1
+          }
+        }
+      ],
+      "summary": {
+        "thresholdOld": 0.35,
+        "thresholdNew": 0.1,
+        "imagePrecisionOld": 1.0,
+        "imagePrecisionNew": 0.958333,
+        "imageRecallOld": 0.632184,
+        "imageRecallNew": 0.793103,
+        "imageRecallDelta": 0.160919,
+        "imageF1Old": 0.774648,
+        "imageF1New": 0.867925,
+        "imageF1Delta": 0.093277,
+        "falsePositiveOld": 0,
+        "falsePositiveNew": 3,
+        "falseNegativeOld": 32,
+        "falseNegativeNew": 18,
+        "recoveredAnomalyCount": 14,
+        "remainingMissedAnomalyCount": 18
+      },
+      "v2RunnerCommand": [
+        "dotnet",
+        "run",
+        "--project",
+        "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj",
+        "--",
+        "--index",
+        "quality/datasets/mvtec_ad_lite_index.json",
+        "--output",
+        "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+        "--report",
+        "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.md",
+        "--candidate-version",
+        "v2",
+        "--profile",
+        "max192_dense_stride8_threshold_010",
+        "--max-side",
+        "192",
+        "--patch-size",
+        "16",
+        "--patch-stride",
+        "8",
+        "--pixel-sample-stride",
+        "2",
+        "--coreset-ratio",
+        "0.02",
+        "--threshold",
+        "0.1",
+        "--min-image-auroc",
+        "0.70",
+        "--min-pixel-auroc",
+        "0.70",
+        "--min-category-image-auroc",
+        "0.70",
+        "--min-category-pixel-auroc",
+        "0.70"
+      ],
+      "gates": {
+        "productDefaultChange": false,
+        "selectedBelowCurrentThreshold": true,
+        "precisionFloor": true,
+        "falsePositiveLimit": true,
+        "recallImproved": true,
+        "f1Improved": true
+      }
+    },
+    "taxonomySummary": {
+      "caseCount": 120,
+      "missedAnomalyCount": 18,
+      "detectedAnomalyCount": 69,
+      "falsePositiveGoodCount": 3
+    },
+    "taxonomyCounts": {
+      "anomaly_miss": 18,
+      "zero_score_anomaly": 10,
+      "below_threshold_anomaly": 8,
+      "defect_bent": 5,
+      "defect_broken": 5,
+      "defect_defective": 5,
+      "defect_glue": 3,
+      "good_false_positive": 3,
+      "above_threshold_good": 3
+    },
+    "legacyTaxonomySummary": {
+      "caseCount": 120,
+      "missedAnomalyCount": 32,
+      "detectedAnomalyCount": 55,
+      "falsePositiveGoodCount": 0
+    },
+    "missedByDefectType": {
+      "bent": 5,
+      "broken": 5,
+      "defective": 5,
+      "glue": 3
+    },
+    "falsePositiveCaseIds": [
+      "grid/good/005",
+      "grid/good/010",
+      "grid/good/014"
+    ],
+    "abReplay": {
+      "replayCaseCount": 20,
+      "improvedMetricCaseCount": 14,
+      "regressedCaseCount": 0,
+      "detectedAnomalyCaseCount": 11,
+      "imageCorrectCaseCount": 11
+    },
+    "nextAction": "Keep v2 as a promotion-ready candidate and require field replay before any default threshold promotion."
+  },
+  "edgeDetection": {
+    "decision": "hold-recall-tuning",
+    "fullBaseline": {
+      "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_baseline.json",
+      "profile": "fixed_canny_50_150",
+      "caseCount": 200,
+      "boundaryPrecision": 0.379579,
+      "boundaryRecall": 0.757494,
+      "boundaryF1": 0.505735,
+      "consensusBoundaryPrecision": 0.138818,
+      "consensusBoundaryRecall": 0.891469,
+      "consensusBoundaryF1": 0.240228,
+      "predictedToBoundaryMeanDistancePx": 14.911714,
+      "boundaryToPredictedMeanDistancePx": 5.192537,
+      "predictedToConsensusMeanDistancePx": 28.540858,
+      "consensusToPredictedMeanDistancePx": 2.276445,
+      "runtimeMsP95": 30.973
+    },
+    "candidateReplayReport": {
+      "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_candidate_replay_v1.json",
+      "profile": "fixed_50_150_l2",
+      "caseCount": 20,
+      "boundaryPrecision": 0.181055,
+      "boundaryRecall": 0.629233,
+      "boundaryF1": 0.281198,
+      "consensusBoundaryPrecision": 0.070398,
+      "consensusBoundaryRecall": 0.839479,
+      "consensusBoundaryF1": 0.129903,
+      "predictedToBoundaryMeanDistancePx": 28.78297,
+      "boundaryToPredictedMeanDistancePx": 12.849971,
+      "predictedToConsensusMeanDistancePx": 42.807576,
+      "consensusToPredictedMeanDistancePx": 4.59948,
+      "runtimeMsP95": 26.716
+    },
+    "replayOld": {
+      "caseCount": 20,
+      "boundaryPrecision": 0.169136,
+      "boundaryRecall": 0.685814,
+      "boundaryF1": 0.271351,
+      "consensusBoundaryPrecision": 0.062221,
+      "consensusBoundaryRecall": 0.886117,
+      "consensusBoundaryF1": 0.116276,
+      "predictedEdgePixels": 372819
+    },
+    "replayCandidate": {
+      "caseCount": 20,
+      "boundaryPrecision": 0.181055,
+      "boundaryRecall": 0.629233,
+      "boundaryF1": 0.281198,
+      "consensusBoundaryPrecision": 0.070398,
+      "consensusBoundaryRecall": 0.839479,
+      "consensusBoundaryF1": 0.129903,
+      "predictedEdgePixels": 306598
+    },
+    "taxonomySummary": {
+      "boundary_recall_drop": 20,
+      "consensus_recall_drop": 16,
+      "reduced_edge_density": 20,
+      "boundary_f1_drop_gt_0_01": 4,
+      "precision_gain_recall_tradeoff": 10
+    },
+    "focusCases": [
+      {
+        "caseId": "101027",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.057155,
+        "boundaryPrecisionDelta": 0.012051,
+        "boundaryF1Delta": 0.007653,
+        "predictedEdgePixelsDelta": -2568.0
+      },
+      {
+        "caseId": "103006",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.03868,
+        "boundaryPrecisionDelta": 0.023767,
+        "boundaryF1Delta": 0.024833,
+        "predictedEdgePixelsDelta": -4642.0
+      },
+      {
+        "caseId": "108069",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.14115,
+        "boundaryPrecisionDelta": 0.003427,
+        "boundaryF1Delta": 0.00232,
+        "predictedEdgePixelsDelta": -4581.0
+      },
+      {
+        "caseId": "164046",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.062314,
+        "boundaryPrecisionDelta": 0.116481,
+        "boundaryF1Delta": 0.130521,
+        "predictedEdgePixelsDelta": -5724.0
+      },
+      {
+        "caseId": "196088",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.054841,
+        "boundaryPrecisionDelta": 0.004821,
+        "boundaryF1Delta": 0.001901,
+        "predictedEdgePixelsDelta": -4189.0
+      },
+      {
+        "caseId": "223060",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.053877,
+        "boundaryPrecisionDelta": 0.006649,
+        "boundaryF1Delta": 0.004269,
+        "predictedEdgePixelsDelta": -2323.0
+      },
+      {
+        "caseId": "232076",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.026213,
+        "boundaryPrecisionDelta": 0.037343,
+        "boundaryF1Delta": 0.039253,
+        "predictedEdgePixelsDelta": -4330.0
+      },
+      {
+        "caseId": "306052",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.096072,
+        "boundaryPrecisionDelta": 0.044026,
+        "boundaryF1Delta": 0.040522,
+        "predictedEdgePixelsDelta": -5051.0
+      },
+      {
+        "caseId": "326085",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.076442,
+        "boundaryPrecisionDelta": 0.017782,
+        "boundaryF1Delta": 0.020878,
+        "predictedEdgePixelsDelta": -5390.0
+      },
+      {
+        "caseId": "33044",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.032554,
+        "boundaryPrecisionDelta": 0.034745,
+        "boundaryF1Delta": 0.041487,
+        "predictedEdgePixelsDelta": -5065.0
+      },
+      {
+        "caseId": "41096",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.012708,
+        "boundaryPrecisionDelta": 0.01672,
+        "boundaryF1Delta": 0.023239,
+        "predictedEdgePixelsDelta": -2557.0
+      },
+      {
+        "caseId": "49024",
+        "status": "improved",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.011012,
+        "boundaryPrecisionDelta": 0.089941,
+        "boundaryF1Delta": 0.040403,
+        "predictedEdgePixelsDelta": -1411.0
+      },
+      {
+        "caseId": "109055",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "boundary_f1_drop_gt_0_01",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.067446,
+        "boundaryPrecisionDelta": -0.002688,
+        "boundaryF1Delta": -0.010614,
+        "predictedEdgePixelsDelta": -2314.0
+      },
+      {
+        "caseId": "141012",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "boundary_f1_drop_gt_0_01",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.107326,
+        "boundaryPrecisionDelta": -0.004883,
+        "boundaryF1Delta": -0.010487,
+        "predictedEdgePixelsDelta": -6052.0
+      },
+      {
+        "caseId": "159022",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "precision_gain_recall_tradeoff",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.058642,
+        "boundaryPrecisionDelta": 0.01897,
+        "boundaryF1Delta": -0.000406,
+        "predictedEdgePixelsDelta": -1874.0
+      },
+      {
+        "caseId": "160067",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.090857,
+        "boundaryPrecisionDelta": -0.001986,
+        "boundaryF1Delta": -0.009651,
+        "predictedEdgePixelsDelta": -1492.0
+      },
+      {
+        "caseId": "202000",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "boundary_f1_drop_gt_0_01",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.043275,
+        "boundaryPrecisionDelta": -0.007944,
+        "boundaryF1Delta": -0.016054,
+        "predictedEdgePixelsDelta": -1243.0
+      },
+      {
+        "caseId": "302022",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "boundary_f1_drop_gt_0_01",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.092654,
+        "boundaryPrecisionDelta": -0.009224,
+        "boundaryF1Delta": -0.019004,
+        "predictedEdgePixelsDelta": -2223.0
+      },
+      {
+        "caseId": "48017",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.057176,
+        "boundaryPrecisionDelta": -0.001551,
+        "boundaryF1Delta": -0.006538,
+        "predictedEdgePixelsDelta": -1948.0
+      },
+      {
+        "caseId": "97010",
+        "status": "worse-metric",
+        "labels": [
+          "boundary_recall_drop",
+          "consensus_recall_drop",
+          "reduced_edge_density"
+        ],
+        "boundaryRecallDelta": -0.027688,
+        "boundaryPrecisionDelta": -0.002134,
+        "boundaryF1Delta": -0.004866,
+        "predictedEdgePixelsDelta": -1244.0
+      }
+    ],
+    "recallGuardSweep": {
+      "schemaVersion": "2026-04-30.edge-detection-recall-guard-sweep.v1",
+      "generatedAtUtc": "2026-05-01T03:25:22+00:00",
+      "claimBoundary": "BSDS500 replay-subset threshold probe only; no product default promotion.",
+      "caseIds": [
+        "108069",
+        "141012",
+        "302022",
+        "49024",
+        "232076",
+        "41096",
+        "109055",
+        "202000",
+        "326085",
+        "306052",
+        "48017",
+        "97010",
+        "160067",
+        "103006",
+        "164046",
+        "101027",
+        "159022",
+        "223060",
+        "33044",
+        "196088"
+      ],
+      "baselineProxy": {
+        "profile": "canny_default_50_150",
+        "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_default_50_150.json",
+        "caseCount": 20,
+        "threshold1": 50,
+        "threshold2": 150,
+        "l2Gradient": false,
+        "autoThreshold": false,
+        "autoThresholdStrategy": "MedianIntensity",
+        "predictedEdgePixels": 372819,
+        "boundaryPrecision": 0.169136,
+        "boundaryRecall": 0.685814,
+        "boundaryF1": 0.271351,
+        "consensusBoundaryPrecision": 0.062221,
+        "consensusBoundaryRecall": 0.886117,
+        "consensusBoundaryF1": 0.116276,
+        "boundaryToPredictedMeanDistancePx": 11.114452,
+        "consensusToPredictedMeanDistancePx": 3.838998,
+        "runtimeMsP95": 25.828
+      },
+      "currentCandidate": {
+        "profile": "canny_l2_50_150",
+        "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_l2_50_150.json",
+        "caseCount": 20,
+        "threshold1": 50,
+        "threshold2": 150,
+        "l2Gradient": true,
+        "autoThreshold": false,
+        "autoThresholdStrategy": "MedianIntensity",
+        "predictedEdgePixels": 306598,
+        "boundaryPrecision": 0.181055,
+        "boundaryRecall": 0.629233,
+        "boundaryF1": 0.281198,
+        "consensusBoundaryPrecision": 0.070398,
+        "consensusBoundaryRecall": 0.839479,
+        "consensusBoundaryF1": 0.129903,
+        "boundaryToPredictedMeanDistancePx": 12.849971,
+        "consensusToPredictedMeanDistancePx": 4.59948,
+        "runtimeMsP95": 25.318
+      },
+      "rows": [
+        {
+          "profile": "canny_default_50_150",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_default_50_150.json",
+          "caseCount": 20,
+          "threshold1": 50,
+          "threshold2": 150,
+          "l2Gradient": false,
+          "autoThreshold": false,
+          "autoThresholdStrategy": "MedianIntensity",
+          "predictedEdgePixels": 372819,
+          "boundaryPrecision": 0.169136,
+          "boundaryRecall": 0.685814,
+          "boundaryF1": 0.271351,
+          "consensusBoundaryPrecision": 0.062221,
+          "consensusBoundaryRecall": 0.886117,
+          "consensusBoundaryF1": 0.116276,
+          "boundaryToPredictedMeanDistancePx": 11.114452,
+          "consensusToPredictedMeanDistancePx": 3.838998,
+          "runtimeMsP95": 25.828
+        },
+        {
+          "profile": "canny_l2_50_150",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_l2_50_150.json",
+          "caseCount": 20,
+          "threshold1": 50,
+          "threshold2": 150,
+          "l2Gradient": true,
+          "autoThreshold": false,
+          "autoThresholdStrategy": "MedianIntensity",
+          "predictedEdgePixels": 306598,
+          "boundaryPrecision": 0.181055,
+          "boundaryRecall": 0.629233,
+          "boundaryF1": 0.281198,
+          "consensusBoundaryPrecision": 0.070398,
+          "consensusBoundaryRecall": 0.839479,
+          "consensusBoundaryF1": 0.129903,
+          "boundaryToPredictedMeanDistancePx": 12.849971,
+          "consensusToPredictedMeanDistancePx": 4.59948,
+          "runtimeMsP95": 25.318
+        },
+        {
+          "profile": "canny_fixed_low_45_135",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_fixed_low_45_135.json",
+          "caseCount": 20,
+          "threshold1": 45,
+          "threshold2": 135,
+          "l2Gradient": true,
+          "autoThreshold": false,
+          "autoThresholdStrategy": "MedianIntensity",
+          "predictedEdgePixels": 338806,
+          "boundaryPrecision": 0.176487,
+          "boundaryRecall": 0.662988,
+          "boundaryF1": 0.278767,
+          "consensusBoundaryPrecision": 0.066604,
+          "consensusBoundaryRecall": 0.867178,
+          "consensusBoundaryF1": 0.123707,
+          "boundaryToPredictedMeanDistancePx": 11.641003,
+          "consensusToPredictedMeanDistancePx": 4.175261,
+          "runtimeMsP95": 27.089
+        },
+        {
+          "profile": "canny_fixed_low_40_120",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_fixed_low_40_120.json",
+          "caseCount": 20,
+          "threshold1": 40,
+          "threshold2": 120,
+          "l2Gradient": true,
+          "autoThreshold": false,
+          "autoThresholdStrategy": "MedianIntensity",
+          "predictedEdgePixels": 372728,
+          "boundaryPrecision": 0.17029,
+          "boundaryRecall": 0.691137,
+          "boundaryF1": 0.273253,
+          "consensusBoundaryPrecision": 0.062665,
+          "consensusBoundaryRecall": 0.887118,
+          "consensusBoundaryF1": 0.117061,
+          "boundaryToPredictedMeanDistancePx": 10.867466,
+          "consensusToPredictedMeanDistancePx": 3.746487,
+          "runtimeMsP95": 26.822
+        },
+        {
+          "profile": "canny_fixed_low_35_105",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_fixed_low_35_105.json",
+          "caseCount": 20,
+          "threshold1": 35,
+          "threshold2": 105,
+          "l2Gradient": true,
+          "autoThreshold": false,
+          "autoThresholdStrategy": "MedianIntensity",
+          "predictedEdgePixels": 409424,
+          "boundaryPrecision": 0.165916,
+          "boundaryRecall": 0.720968,
+          "boundaryF1": 0.269754,
+          "consensusBoundaryPrecision": 0.058905,
+          "consensusBoundaryRecall": 0.905473,
+          "consensusBoundaryF1": 0.110614,
+          "boundaryToPredictedMeanDistancePx": 7.337591,
+          "consensusToPredictedMeanDistancePx": 2.478243,
+          "runtimeMsP95": 25.707
+        },
+        {
+          "profile": "canny_recall_guard_percentile",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_recall_guard_percentile.json",
+          "caseCount": 20,
+          "threshold1": 50,
+          "threshold2": 150,
+          "l2Gradient": true,
+          "autoThreshold": true,
+          "autoThresholdStrategy": "RecallGuardPercentile",
+          "predictedEdgePixels": 426392,
+          "boundaryPrecision": 0.16433,
+          "boundaryRecall": 0.754008,
+          "boundaryF1": 0.269849,
+          "consensusBoundaryPrecision": 0.057696,
+          "consensusBoundaryRecall": 0.923077,
+          "consensusBoundaryF1": 0.108603,
+          "boundaryToPredictedMeanDistancePx": 5.187371,
+          "consensusToPredictedMeanDistancePx": 1.577446,
+          "runtimeMsP95": 53.897
+        },
+        {
+          "profile": "canny_otsu_gradient",
+          "sourceReport": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_sweep_v1_canny_otsu_gradient.json",
+          "caseCount": 20,
+          "threshold1": 50,
+          "threshold2": 150,
+          "l2Gradient": true,
+          "autoThreshold": true,
+          "autoThresholdStrategy": "OtsuGradient",
+          "predictedEdgePixels": 526377,
+          "boundaryPrecision": 0.156815,
+          "boundaryRecall": 0.830742,
+          "boundaryF1": 0.263829,
+          "consensusBoundaryPrecision": 0.050756,
+          "consensusBoundaryRecall": 0.96888,
+          "consensusBoundaryF1": 0.09646,
+          "boundaryToPredictedMeanDistancePx": 3.10431,
+          "consensusToPredictedMeanDistancePx": 1.026971,
+          "runtimeMsP95": 27.533
+        }
+      ],
+      "selectedProfile": null,
+      "decision": "hold-current-no-recall-safe-profile",
+      "productDefaultChange": false
+    },
+    "abReplay": {
+      "replayCaseCount": 20,
+      "improvedMetricCaseCount": 12,
+      "worseMetricCaseCount": 8,
+      "regressedCaseCount": 0
+    },
+    "nextAction": "Keep EdgeDetection in hold status until recall-guard replay has a profile that restores recall without losing the F1/precision gain."
+  },
+  "gates": {
+    "productDefaultChange": false,
+    "detectionScopedReplay": "detection",
+    "noPassFailRegressions": true,
+    "surfaceFalsePositiveNotHigher": true,
+    "surfaceRecallAtFixedFprNotLower": true,
+    "anomalyAurocNotLower": true,
+    "anomalyCandidateVersion": "v2",
+    "anomalyThresholdCalibrationAttached": true,
+    "anomalyPrecisionFloor": true,
+    "anomalyFalsePositiveLimit": true,
+    "edgeRecallNeedsFollowup": true,
+    "allNewAlgorithmsDefaultOff": true,
+    "noRawDatasetOrModelArtifactsInGit": true
+  },
+  "planDate": "2026-05-01",
+  "datasetScope": [
+    "quality/public_datasets/hpatches",
+    "quality/public_datasets/coco2017",
+    "quality/public_datasets/kolektorsdd2",
+    "quality/public_datasets/mvtec_ad_lite",
+    "quality/public_datasets/bsds500",
+    "quality/public_datasets/opencv_calibration_samples"
+  ],
+  "scopePolicy": {
+    "includedOnly": true,
+    "excludedThisRound": [
+      "quality/public_datasets/mvtec_ad_full",
+      "quality/public_datasets/uded",
+      "MVTec LOCO AD",
+      "MVTec AD2",
+      "BIPEDv2"
+    ],
+    "reason": "This v3 report implements the 2026-05-01 existing-public-dataset tuning plan and does not use additional public datasets for claims."
+  },
+  "capabilityBackfillPlan": {
+    "surfaceDefectDetection": {
+      "candidateVersion": "v2",
+      "targetTaxonomy": [
+        "texture_noise_false_positive",
+        "low_contrast_defect_miss",
+        "undersegmentation_false_negative"
+      ],
+      "candidateParameters": {
+        "NormalizationMode": "ClaheLocalMean",
+        "ComponentFilterMode": "ResponseStats",
+        "ClaheClipLimit": 2.0,
+        "ClaheTileGridSize": 8
+      },
+      "promotionGate": "KSDD2 v2 tuning is restricted to the target taxonomy and must not lower the global manual threshold below baseline."
+    },
+    "anomalyDetection": {
+      "dataset": "mvtec_ad_lite",
+      "candidateProfile": "mvtec_lite_v2",
+      "candidateDefault": "off",
+      "profileParameters": {
+        "PatchSize": 16,
+        "PatchStride": 8,
+        "CoresetRatio": 0.02,
+        "Threshold": 0.1,
+        "FeatureExtractorId": "lab_gradient_stats"
+      },
+      "featureExtractorId": "lab_gradient_stats",
+      "promotionGate": "Lite advisory only: mvtec_lite_v2 remains default-off. Release/field replay must meet the signed FP standard before default-on."
+    },
+    "deepLearning": {
+      "modelId": "coco_yolo_external_onnx",
+      "artifactPolicy": "Real ONNX model files stay outside git; the current no-model path is contract/postprocess smoke only.",
+      "promotionGate": "When a real model is provided: 500-case COCO AP50 >= 0.45, Precision@50 >= 0.45, Recall@50 >= 0.35, AnnotationSeeded=false."
+    },
+    "edgeDetection": {
+      "cannyCandidate": "RecallGuardPercentile",
+      "onnxCandidate": "Method=OnnxEdge with EdgeModelPath/Id default-off.",
+      "promotionGate": "Promotion paused. Next profile must keep boundary recall and consensus boundary recall not lower than canny_l2_50_150; F1 alone is insufficient."
+    },
+    "matchingPlanarTemplate": {
+      "dataset": "hpatches",
+      "sourceReport": "quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json",
+      "optionalProfiles": {
+        "AkazeFeatureMatch": "default_v3",
+        "OrbFeatureMatch": "replay_safe_dense_strict"
+      },
+      "promotionGate": "Overall pass rate must not fall below baseline; P95 corner error must not worsen; ORB must meet the signed runtime budget before default-on."
+    },
+    "cameraCalibration": {
+      "dataset": "opencv_calibration_samples",
+      "promotionGate": "Board detection failures must not increase and reprojection error must not rise versus baseline."
+    }
+  },
+  "candidateProfileGovernance": {
+    "sourceReport": "quality/evals/reports/QualityFlywheel_candidate_profile_governance_v1.json",
+    "statusCounts": {
+      "default_off_candidate_ready_with_fp_tradeoff": 1,
+      "hold-current-no-targeted-improvement": 1,
+      "paused": 1,
+      "blocked_external_model": 1,
+      "stable_smoke": 1,
+      "default_off_ready_no_accuracy_delta": 1,
+      "default_off_ready_metric_gain_runtime_tradeoff": 1
+    },
+    "mainlineValidationPolicy": "Default-off/advisory/paused profiles may pass governance; blocked external model work is tracked separately from mainline algorithm validation."
+  },
+  "releaseFieldReplayGate": {
+    "sourceReport": "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json",
+    "gateStatus": "standards-signed-replay-required",
+    "standardsSigned": true,
+    "currentPublicEvidenceWithinSignedStandards": true,
+    "releaseFieldReplayEvidenceStatus": "required_not_attached",
+    "defaultOnReady": false
+  }
+}

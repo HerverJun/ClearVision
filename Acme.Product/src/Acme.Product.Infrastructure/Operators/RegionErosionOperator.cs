@@ -22,7 +22,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Erodes a region using a specified structuring element (Region-based morphology).",
     Category = "Morphology",
     IconName = "region-erosion",
-    Keywords = new[] { "Region", "Erosion", "Morphology", "Shrink", "RLE" }
+    Keywords = new[] { "Region", "Erosion", "Morphology", "Shrink", "RLE" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Region morphology erosion",
+    CoreApi = "MorphologyKernel.GetOffsets -> Region.ContainsPoint -> PointsToRuns",
+    ImplementationStrategy = "Builds a discrete structuring element, tests whether all kernel offsets remain inside the source region for each candidate point, and converts accepted points back to RLE runs.",
+    TimeComplexity = "O(I*P*K*log Rrow)",
+    TypicalLatency = "Avg 0.359 ms, max 1.585 ms over 100 synthetic golden cases",
+    SpaceComplexity = "O(P+K)",
+    SuitableUseCases = new[] { "Shrinking foreground regions, removing boundary noise, and enforcing minimum feature width before measurement." },
+    UnsuitableUseCases = new[] { "Subpixel morphology or grayscale morphology on raw image intensity." },
+    KnownLimitations = new[] { "Large kernels can remove small or thin regions entirely, which is expected erosion behavior.", "Kernel shapes are discrete Rectangle/Ellipse/Cross rasterizations rather than analytic continuous geometry." }
 )]
 [InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]

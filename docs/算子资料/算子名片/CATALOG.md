@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-04-22 00:43:58 +08:00`
+> 生成时间 / Generated At: `2026-05-01 14:53:33 +08:00`
 > 算子总数 / Total Operators: **155**
 
 ## 分类统计 / Category Summary
@@ -39,12 +39,10 @@
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **89.7**
+- 平均分 / Average: **95.5**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
-| A | 115 |
-| B | 27 |
-| C | 13 |
+| A | 155 |
 
 ## 分类索引 / Grouped Index
 
@@ -54,14 +52,14 @@
 | `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | 1 | 3 | 3 | 100 (A) | `1.0.0` | - | [EuclideanClusterExtraction](./EuclideanClusterExtraction.md) |
 | `OperatorType.PPFEstimation` | PPF点对特征 | 1 | 3 | 3 | 95 (A) | `1.0.0` | - | [PPFEstimation](./PPFEstimation.md) |
 | `OperatorType.PPFMatch` | PPF表面匹配 | 2 | 16 | 10 | 95 (A) | `1.0.4` | - | [PPFMatch](./PPFMatch.md) |
-| `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | 1 | 8 | 3 | 95 (A) | `1.0.0` | - | [RansacPlaneSegmentation](./RansacPlaneSegmentation.md) |
+| `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | 1 | 8 | 4 | 95 (A) | `1.0.0` | - | [RansacPlaneSegmentation](./RansacPlaneSegmentation.md) |
 | `OperatorType.StatisticalOutlierRemoval` | 统计滤波 | 1 | 3 | 2 | 95 (A) | `1.0.0` | - | [StatisticalOutlierRemoval](./StatisticalOutlierRemoval.md) |
-| `OperatorType.VoxelDownsample` | 体素下采样 | 1 | 2 | 1 | 85 (A) | `1.0.0` | - | [VoxelDownsample](./VoxelDownsample.md) |
+| `OperatorType.VoxelDownsample` | 体素下采样 | 1 | 2 | 1 | 95 (A) | `1.0.1` | Voxel grid centroid downsampling | [VoxelDownsample](./VoxelDownsample.md) |
 
 ### AI Detection (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.DualModalVoting` | Dual Modal Voting | 2 | 3 | 6 | 94 (A) | `1.0.0` | 该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。 | [DualModalVoting](./DualModalVoting.md) |
+| `OperatorType.DualModalVoting` | Dual Modal Voting | 2 | 3 | 6 | 94 (A) | `1.0.0` | 该算子把深度学习结果和传统规则结果融合成最终 OK/NG 判定。它不执行视觉推理，而… | [DualModalVoting](./DualModalVoting.md) |
 
 ### AI Inspection (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -72,20 +70,20 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AnomalyDetection` | 异常检测 | 2 | 8 | 13 | 100 (A) | `1.0.0` | Simplified PatchCore | [AnomalyDetection](./AnomalyDetection.md) |
-| `OperatorType.DeepLearning` | 深度学习 | 1 | 7 | 10 | 100 (A) | `1.0.0` | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | [DeepLearning](./DeepLearning.md) |
-| `OperatorType.EdgePairDefect` | 边缘对缺陷 | 3 | 4 | 4 | 96 (A) | `1.0.0` | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | [EdgePairDefect](./EdgePairDefect.md) |
-| `OperatorType.SemanticSegmentation` | 语义分割 | 1 | 5 | 11 | 90 (A) | `1.0.0` | - | [SemanticSegmentation](./SemanticSegmentation.md) |
+| `OperatorType.DeepLearning` | 深度学习 | 1 | 12 | 13 | 100 (A) | `1.0.0` | 当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持： | [DeepLearning](./DeepLearning.md) |
+| `OperatorType.EdgePairDefect` | 边缘对缺陷 | 3 | 4 | 4 | 96 (A) | `1.0.0` | 该算子检查一对边缘之间的间距是否偏离期望宽度。它可以直接使用上游传入的 Line1/… | [EdgePairDefect](./EdgePairDefect.md) |
+| `OperatorType.SemanticSegmentation` | 语义分割 | 1 | 10 | 11 | 100 (A) | `1.0.0` | 该算子通过 ONNX Runtime 执行语义分割模型，将输入图像预处理为模型张量，… | [SemanticSegmentation](./SemanticSegmentation.md) |
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | 2 | 8 | 10 | 100 (A) | `2.0.0` | - | [SurfaceDefectDetection](./SurfaceDefectDetection.md) |
 
 ### Analysis (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.DistanceTransform` | Distance Transform | 1 | 4 | 7 | 90 (A) | `1.0.0` | - | [DistanceTransform](./DistanceTransform.md) |
+| `OperatorType.DistanceTransform` | Distance Transform | 1 | 4 | 7 | 100 (A) | `1.0.1` | OpenCV binary distance transform | [DistanceTransform](./DistanceTransform.md) |
 
 ### Communication (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.MitsubishiMcCommunication` | Mitsubishi MC Communication | 1 | 2 | 13 | 80 (B) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [MitsubishiMcCommunication](./MitsubishiMcCommunication.md) |
+| `OperatorType.MitsubishiMcCommunication` | Mitsubishi MC Communication | 1 | 2 | 13 | 98 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [MitsubishiMcCommunication](./MitsubishiMcCommunication.md) |
 
 ### Detection (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -96,57 +94,57 @@
 ### Flow Control (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.ResultJudgment` | Result Judgment | 2 | 5 | 8 | 84 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ResultJudgment](./ResultJudgment.md) |
+| `OperatorType.ResultJudgment` | Result Judgment | 2 | 5 | 8 | 90 (A) | `1.0.1` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ResultJudgment](./ResultJudgment.md) |
 
 ### Frequency (3)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.FFT1D` | FFT 1D | 2 | 4 | 0 | 71 (B) | `1.0.0` | - | [FFT1D](./FFT1D.md) |
-| `OperatorType.FrequencyFilter` | Frequency Filter | 5 | 3 | 0 | 71 (B) | `1.0.0` | - | [FrequencyFilter](./FrequencyFilter.md) |
-| `OperatorType.InverseFFT1D` | Inverse FFT 1D | 2 | 4 | 0 | 71 (B) | `1.0.0` | - | [InverseFFT1D](./InverseFFT1D.md) |
+| `OperatorType.FFT1D` | FFT 1D | 2 | 4 | 0 | 89 (A) | `1.0.0` | - | [FFT1D](./FFT1D.md) |
+| `OperatorType.FrequencyFilter` | Frequency Filter | 5 | 3 | 0 | 91 (A) | `1.0.0` | - | [FrequencyFilter](./FrequencyFilter.md) |
+| `OperatorType.InverseFFT1D` | Inverse FFT 1D | 2 | 4 | 0 | 89 (A) | `1.0.0` | - | [InverseFFT1D](./InverseFFT1D.md) |
 
 ### Morphology (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RegionClosing` | Region Closing | 2 | 3 | 3 | 63 (C) | `1.0.0` | - | [RegionClosing](./RegionClosing.md) |
-| `OperatorType.RegionDilation` | Region Dilation | 2 | 3 | 4 | 63 (C) | `1.0.0` | - | [RegionDilation](./RegionDilation.md) |
-| `OperatorType.RegionErosion` | Region Erosion | 2 | 3 | 4 | 63 (C) | `1.0.0` | - | [RegionErosion](./RegionErosion.md) |
-| `OperatorType.RegionOpening` | Region Opening | 2 | 3 | 3 | 63 (C) | `1.0.0` | - | [RegionOpening](./RegionOpening.md) |
-| `OperatorType.RegionSkeleton` | Region Skeleton | 2 | 5 | 2 | 63 (C) | `1.0.0` | - | [RegionSkeleton](./RegionSkeleton.md) |
+| `OperatorType.RegionClosing` | Region Closing | 2 | 3 | 3 | 90 (A) | `1.0.1` | Region morphology closing | [RegionClosing](./RegionClosing.md) |
+| `OperatorType.RegionDilation` | Region Dilation | 2 | 3 | 4 | 90 (A) | `1.0.1` | Region morphology dilation | [RegionDilation](./RegionDilation.md) |
+| `OperatorType.RegionErosion` | Region Erosion | 2 | 3 | 4 | 90 (A) | `1.0.1` | Region morphology erosion | [RegionErosion](./RegionErosion.md) |
+| `OperatorType.RegionOpening` | Region Opening | 2 | 3 | 3 | 90 (A) | `1.0.1` | Region morphology opening | [RegionOpening](./RegionOpening.md) |
+| `OperatorType.RegionSkeleton` | Region Skeleton | 2 | 5 | 2 | 90 (A) | `1.0.1` | Zhang-Suen thinning | [RegionSkeleton](./RegionSkeleton.md) |
 
 ### Region (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.RegionComplement` | Region Complement | 4 | 3 | 0 | 58 (C) | `1.0.0` | - | [RegionComplement](./RegionComplement.md) |
-| `OperatorType.RegionDifference` | Region Difference | 2 | 3 | 0 | 61 (C) | `1.0.0` | - | [RegionDifference](./RegionDifference.md) |
-| `OperatorType.RegionIntersection` | Region Intersection | 2 | 3 | 0 | 61 (C) | `1.0.0` | - | [RegionIntersection](./RegionIntersection.md) |
-| `OperatorType.RegionUnion` | Region Union | 2 | 3 | 0 | 61 (C) | `1.0.0` | - | [RegionUnion](./RegionUnion.md) |
+| `OperatorType.RegionComplement` | Region Complement | 4 | 3 | 0 | 85 (A) | `1.0.1` | Bounded run-length complement | [RegionComplement](./RegionComplement.md) |
+| `OperatorType.RegionDifference` | Region Difference | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length row subtraction | [RegionDifference](./RegionDifference.md) |
+| `OperatorType.RegionIntersection` | Region Intersection | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length row intersection | [RegionIntersection](./RegionIntersection.md) |
+| `OperatorType.RegionUnion` | Region Union | 2 | 3 | 0 | 89 (A) | `1.0.1` | Run-length region union | [RegionUnion](./RegionUnion.md) |
 
 ### Texture (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.GlcmTexture` | GLCM Texture Features | 1 | 6 | 9 | 90 (A) | `1.0.0` | - | [GlcmTexture](./GlcmTexture.md) |
-| `OperatorType.LawsTextureFilter` | Laws Texture Filter | 1 | 3 | 5 | 90 (A) | `1.0.0` | - | [LawsTextureFilter](./LawsTextureFilter.md) |
+| `OperatorType.GlcmTexture` | GLCM Texture Features | 1 | 6 | 9 | 100 (A) | `1.0.1` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./GlcmTexture.md) |
+| `OperatorType.LawsTextureFilter` | Laws Texture Filter | 1 | 3 | 5 | 100 (A) | `1.0.1` | Laws 5x5 texture energy filtering | [LawsTextureFilter](./LawsTextureFilter.md) |
 
 ### 匹配定位 (8)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 2 | 5 | 8 | 73 (B) | `1.0.0` | 该算子基于局部特征点匹配完成模板定位，核心流程是： | [AkazeFeatureMatch](./AkazeFeatureMatch.md) |
-| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 2 | 5 | 11 | 83 (B) | `1.0.0` | 该算子不是直接在原始灰度图上做相关性匹配，而是使用自定义 GradientShape… | [GradientShapeMatch](./GradientShapeMatch.md) |
-| `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 2 | 6 | 15 | 90 (A) | `1.1.0` | - | [LocalDeformableMatching](./LocalDeformableMatching.md) |
-| `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 2 | 5 | 10 | 73 (B) | `1.0.0` | 该算子与 AkazeFeatureMatchOperator 属于同一类局部特征匹配… | [OrbFeatureMatch](./OrbFeatureMatch.md) |
-| `OperatorType.PlanarMatching` | Planar Matching | 2 | 13 | 19 | 90 (A) | `1.1.1` | - | [PlanarMatching](./PlanarMatching.md) |
-| `OperatorType.PyramidShapeMatch` | 金字塔形状匹配 | 2 | 5 | 15 | 83 (B) | `1.0.0` | 该算子围绕模板、特征或几何相似性执行定位匹配，用于判断目标是否存在以及位姿大致位置。 | [PyramidShapeMatch](./PyramidShapeMatch.md) |
+| `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 2 | 5 | 8 | 90 (A) | `1.0.0` | AKAZE Homography Feature Match | [AkazeFeatureMatch](./AkazeFeatureMatch.md) |
+| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 2 | 6 | 12 | 100 (A) | `1.1.0` | Gradient Direction Template Match | [GradientShapeMatch](./GradientShapeMatch.md) |
+| `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 2 | 6 | 15 | 100 (A) | `1.1.1` | Coarse-to-fine local deformable matching | [LocalDeformableMatching](./LocalDeformableMatching.md) |
+| `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 2 | 5 | 10 | 90 (A) | `1.0.0` | ORB Homography Feature Match | [OrbFeatureMatch](./OrbFeatureMatch.md) |
+| `OperatorType.PlanarMatching` | Planar Matching | 2 | 13 | 19 | 100 (A) | `1.1.2` | Feature homography planar matching | [PlanarMatching](./PlanarMatching.md) |
+| `OperatorType.PyramidShapeMatch` | 金字塔形状匹配 | 2 | 5 | 15 | 100 (A) | `1.0.0` | LINEMOD Pyramid Shape Matching | [PyramidShapeMatch](./PyramidShapeMatch.md) |
 | `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | 2 | 2 | 13 | 100 (A) | `1.2.0` | 虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子… | [ShapeMatching](./ShapeMatching.md) |
 | `OperatorType.TemplateMatching` | 模板匹配 | 3 | 8 | 12 | 96 (A) | `1.2.0` | 该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NM… | [TemplateMatching](./TemplateMatching.md) |
 
 ### 变量 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 79 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [CycleCounter](./CycleCounter.md) |
-| `OperatorType.VariableIncrement` | 变量递增 | 0 | 5 | 5 | 73 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableIncrement](./VariableIncrement.md) |
-| `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 3 | 73 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableRead](./VariableRead.md) |
-| `OperatorType.VariableWrite` | 变量写入 | 1 | 3 | 4 | 73 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableWrite](./VariableWrite.md) |
+| `OperatorType.CycleCounter` | 循环计数器 | 0 | 5 | 2 | 96 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [CycleCounter](./CycleCounter.md) |
+| `OperatorType.VariableIncrement` | 变量递增 | 0 | 5 | 5 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableIncrement](./VariableIncrement.md) |
+| `OperatorType.VariableRead` | 变量读取 | 0 | 3 | 3 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableRead](./VariableRead.md) |
+| `OperatorType.VariableWrite` | 变量写入 | 1 | 3 | 4 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [VariableWrite](./VariableWrite.md) |
 
 ### 图像处理 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -177,12 +175,12 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.Aggregator` | 数据聚合 | 3 | 6 | 1 | 94 (A) | `1.0.0` | 该算子把多路输入聚合成列表，并在可解析为有限数值的输入上计算统计结果。 | [Aggregator](./Aggregator.md) |
-| `OperatorType.ArrayIndexer` | 数组索引器 | 1 | 3 | 3 | 79 (B) | `1.0.0` | - | [ArrayIndexer](./ArrayIndexer.md) |
+| `OperatorType.ArrayIndexer` | 数组索引器 | 1 | 3 | 3 | 96 (A) | `1.0.0` | - | [ArrayIndexer](./ArrayIndexer.md) |
 | `OperatorType.BoxFilter` | 候选框过滤 (Bounding Box) | 2 | 3 | 9 | 94 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [BoxFilter](./BoxFilter.md) |
 | `OperatorType.BoxNms` | 候选框抑制 | 3 | 7 | 4 | 90 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [BoxNms](./BoxNms.md) |
 | `OperatorType.DatabaseWrite` | 数据库写入 | 2 | 2 | 3 | 100 (A) | `1.0.0` | 该算子把输入数据持久化到数据库表中，当前正式支持 SQLite、SQLServer、… | [DatabaseWrite](./DatabaseWrite.md) |
-| `OperatorType.JsonExtractor` | JSON 提取器 | 1 | 2 | 4 | 83 (B) | `1.0.0` | - | [JsonExtractor](./JsonExtractor.md) |
-| `OperatorType.MathOperation` | 数值计算 | 2 | 2 | 1 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [MathOperation](./MathOperation.md) |
+| `OperatorType.JsonExtractor` | JSON 提取器 | 1 | 2 | 4 | 100 (A) | `1.0.0` | - | [JsonExtractor](./JsonExtractor.md) |
+| `OperatorType.MathOperation` | 数值计算 | 2 | 2 | 1 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [MathOperation](./MathOperation.md) |
 | `OperatorType.PointAlignment` | 点位对齐 | 2 | 3 | 2 | 96 (A) | `1.0.3` | - | [PointAlignment](./PointAlignment.md) |
 | `OperatorType.PointCorrection` | 点位修正 | 4 | 5 | 4 | 96 (A) | `1.0.3` | - | [PointCorrection](./PointCorrection.md) |
 | `OperatorType.UnitConvert` | 单位换算 | 2 | 2 | 4 | 96 (A) | `1.0.0` | 该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。 | [UnitConvert](./UnitConvert.md) |
@@ -196,7 +194,7 @@
 | `OperatorType.FisheyeCalibration` | Fisheye Calibration | 1 | 2 | 9 | 100 (A) | `1.0.0` | - | [FisheyeCalibration](./FisheyeCalibration.md) |
 | `OperatorType.FisheyeUndistort` | Fisheye Undistort | 2 | 2 | 4 | 96 (A) | `1.0.0` | - | [FisheyeUndistort](./FisheyeUndistort.md) |
 | `OperatorType.HandEyeCalibration` | Hand-Eye Calibration | 2 | 7 | 4 | 100 (A) | `1.0.0` | OpenCV Hand-Eye Calibration | [HandEyeCalibration](./HandEyeCalibration.md) |
-| `OperatorType.HandEyeCalibrationValidator` | Hand-Eye Calibration Validator | 3 | 8 | 1 | 83 (B) | `1.0.1` | Hand-Eye Consistency Validation | [HandEyeCalibrationValidator](./HandEyeCalibrationValidator.md) |
+| `OperatorType.HandEyeCalibrationValidator` | Hand-Eye Calibration Validator | 3 | 8 | 1 | 100 (A) | `1.0.1` | Hand-Eye Consistency Validation | [HandEyeCalibrationValidator](./HandEyeCalibrationValidator.md) |
 | `OperatorType.NPointCalibration` | N Point Calibration | 1 | 2 | 3 | 100 (A) | `1.0.0` | - | [NPointCalibration](./NPointCalibration.md) |
 | `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 3 | 3 | 7 | 100 (A) | `1.0.0` | - | [PixelToWorldTransform](./PixelToWorldTransform.md) |
 | `OperatorType.StereoCalibration` | Stereo Calibration | 2 | 6 | 11 | 100 (A) | `1.0.0` | - | [StereoCalibration](./StereoCalibration.md) |
@@ -206,10 +204,10 @@
 ### 检测 (18)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.ArcCaliper` | Arc Caliper | 7 | 2 | 0 | 64 (C) | `1.0.0` | - | [ArcCaliper](./ArcCaliper.md) |
+| `OperatorType.ArcCaliper` | Arc Caliper | 7 | 2 | 0 | 91 (A) | `1.0.1` | Radial band-profile arc edge scan | [ArcCaliper](./ArcCaliper.md) |
 | `OperatorType.CaliperTool` | 卡尺工具 | 2 | 7 | 9 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [CaliperTool](./CaliperTool.md) |
 | `OperatorType.CircleMeasurement` | 圆测量 | 1 | 7 | 7 | 100 (A) | `1.0.0` | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | [CircleMeasurement](./CircleMeasurement.md) |
-| `OperatorType.ContourExtrema` | Contour Extrema | 3 | 6 | 0 | 61 (C) | `1.0.0` | - | [ContourExtrema](./ContourExtrema.md) |
+| `OperatorType.ContourExtrema` | Contour Extrema | 3 | 6 | 0 | 89 (A) | `1.0.1` | Directional contour extrema scan | [ContourExtrema](./ContourExtrema.md) |
 | `OperatorType.GapMeasurement` | 间隙测量 | 2 | 9 | 8 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [GapMeasurement](./GapMeasurement.md) |
 | `OperatorType.GeoMeasurement` | 几何测量 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [GeoMeasurement](./GeoMeasurement.md) |
 | `OperatorType.GeometricFitting` | Geometric Fitting | 1 | 2 | 8 | 100 (A) | `1.0.0` | 当前实现的几何拟合流程并不是直接接收点集输入，而是： | [GeometricFitting](./GeometricFitting.md) |
@@ -218,8 +216,8 @@
 | `OperatorType.LineLineDistance` | 线线距离 | 2 | 5 | 3 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [LineLineDistance](./LineLineDistance.md) |
 | `OperatorType.LineMeasurement` | 直线测量 | 1 | 5 | 4 | 96 (A) | `1.0.0` | 该算子从边缘图中提取直线段候选，再基于几何关系输出线结构或测量结果。 | [LineMeasurement](./LineMeasurement.md) |
 | `OperatorType.Measurement` | 测量 | 3 | 2 | 5 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [Measurement](./Measurement.md) |
-| `OperatorType.MinEnclosingGeometry` | Min Enclosing Geometry | 1 | 2 | 10 | 90 (A) | `1.0.0` | - | [MinEnclosingGeometry](./MinEnclosingGeometry.md) |
-| `OperatorType.PhaseClosure` | Phase Closure | 4 | 4 | 0 | 61 (C) | `1.0.0` | - | [PhaseClosure](./PhaseClosure.md) |
+| `OperatorType.MinEnclosingGeometry` | Min Enclosing Geometry | 1 | 2 | 10 | 100 (A) | `1.0.1` | Contour-derived enclosing geometry and robust fitting | [MinEnclosingGeometry](./MinEnclosingGeometry.md) |
+| `OperatorType.PhaseClosure` | Phase Closure | 4 | 4 | 0 | 89 (A) | `1.0.1` | Itoh/quality-guided phase unwrapping | [PhaseClosure](./PhaseClosure.md) |
 | `OperatorType.PixelStatistics` | 像素统计 | 2 | 6 | 5 | 96 (A) | `1.0.0` | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | [PixelStatistics](./PixelStatistics.md) |
 | `OperatorType.PointLineDistance` | 点线距离 | 2 | 2 | 2 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [PointLineDistance](./PointLineDistance.md) |
 | `OperatorType.SharpnessEvaluation` | 清晰度评估 | 1 | 3 | 7 | 96 (A) | `1.0.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [SharpnessEvaluation](./SharpnessEvaluation.md) |
@@ -228,10 +226,10 @@
 ### 流程控制 (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 71 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Comparator](./Comparator.md) |
+| `OperatorType.Comparator` | 数值比较 | 2 | 2 | 5 | 89 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Comparator](./Comparator.md) |
 | `OperatorType.ConditionalBranch` | 条件分支 | 1 | 2 | 3 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ConditionalBranch](./ConditionalBranch.md) |
-| `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Delay](./Delay.md) |
-| `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ForEach](./ForEach.md) |
+| `OperatorType.Delay` | 延时 | 1 | 2 | 1 | 94 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Delay](./Delay.md) |
+| `OperatorType.ForEach` | ForEach 循环 | 1 | 1 | 4 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ForEach](./ForEach.md) |
 | `OperatorType.TryCatch` | 异常捕获 | 1 | 4 | 3 | 93 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TryCatch](./TryCatch.md) |
 
 ### 特征提取 (4)
@@ -239,7 +237,7 @@
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.BlobAnalysis` | Blob分析 | 2 | 4 | 17 | 100 (A) | `1.1.0` | 该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。 | [BlobAnalysis](./BlobAnalysis.md) |
 | `OperatorType.ContourDetection` | 轮廓检测 | 1 | 3 | 8 | 94 (A) | `1.0.0` | 该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。 | [ContourDetection](./ContourDetection.md) |
-| `OperatorType.EdgeDetection` | Edge Detection | 1 | 2 | 8 | 94 (A) | `1.0.0` | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | [EdgeDetection](./EdgeDetection.md) |
+| `OperatorType.EdgeDetection` | Edge Detection | 1 | 2 | 8 | 100 (A) | `1.0.0` | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | [EdgeDetection](./EdgeDetection.md) |
 | `OperatorType.SubpixelEdgeDetection` | Subpixel Edge Detection | 1 | 2 | 5 | 94 (A) | `1.0.0` | 该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。 | [SubpixelEdgeDetection](./SubpixelEdgeDetection.md) |
 
 ### 识别 (2)
@@ -251,9 +249,9 @@
 ### 辅助 (3)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.Comment` | 注释 | 1 | 2 | 1 | 61 (C) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Comment](./Comment.md) |
+| `OperatorType.Comment` | 注释 | 1 | 2 | 1 | 90 (A) | `1.0.1` | Workflow annotation passthrough | [Comment](./Comment.md) |
 | `OperatorType.RoiManager` | ROI管理器 | 1 | 2 | 10 | 100 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [RoiManager](./RoiManager.md) |
-| `OperatorType.RoiTransform` | ROI跟踪 | 2 | 1 | 1 | 86 (A) | `1.0.0` | - | [RoiTransform](./RoiTransform.md) |
+| `OperatorType.RoiTransform` | ROI跟踪 | 2 | 1 | 1 | 96 (A) | `1.0.1` | Pose-driven ROI rectangle transform | [RoiTransform](./RoiTransform.md) |
 
 ### 输出 (2)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -267,18 +265,18 @@
 | `OperatorType.HttpRequest` | HTTP 请求 | 2 | 3 | 6 | 100 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [HttpRequest](./HttpRequest.md) |
 | `OperatorType.ModbusCommunication` | Modbus通信 | 1 | 2 | 8 | 100 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [ModbusCommunication](./ModbusCommunication.md) |
 | `OperatorType.MqttPublish` | MQTT 发布 | 2 | 1 | 6 | 100 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [MqttPublish](./MqttPublish.md) |
-| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 1 | 2 | 13 | 80 (B) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [OmronFinsCommunication](./OmronFinsCommunication.md) |
+| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 1 | 2 | 13 | 98 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [OmronFinsCommunication](./OmronFinsCommunication.md) |
 | `OperatorType.SerialCommunication` | 串口通信 | 1 | 1 | 8 | 100 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [SerialCommunication](./SerialCommunication.md) |
-| `OperatorType.SiemensS7Communication` | 西门子S7通信 | 1 | 2 | 15 | 80 (B) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [SiemensS7Communication](./SiemensS7Communication.md) |
+| `OperatorType.SiemensS7Communication` | 西门子S7通信 | 1 | 2 | 15 | 98 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [SiemensS7Communication](./SiemensS7Communication.md) |
 | `OperatorType.TcpCommunication` | TCP通信 | 1 | 2 | 6 | 100 (A) | `1.0.0` | 该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解… | [TcpCommunication](./TcpCommunication.md) |
 
 ### 通用 (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.LogicGate` | 逻辑门 | 2 | 1 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [LogicGate](./LogicGate.md) |
+| `OperatorType.LogicGate` | 逻辑门 | 2 | 1 | 1 | 94 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [LogicGate](./LogicGate.md) |
 | `OperatorType.Statistics` | Statistics | 1 | 7 | 5 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [Statistics](./Statistics.md) |
-| `OperatorType.StringFormat` | 字符串格式化 | 2 | 1 | 1 | 76 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [StringFormat](./StringFormat.md) |
-| `OperatorType.TypeConvert` | Type Convert | 1 | 6 | 2 | 83 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TypeConvert](./TypeConvert.md) |
+| `OperatorType.StringFormat` | 字符串格式化 | 2 | 1 | 1 | 94 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [StringFormat](./StringFormat.md) |
+| `OperatorType.TypeConvert` | Type Convert | 1 | 6 | 2 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TypeConvert](./TypeConvert.md) |
 
 ### 逻辑工具 (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -286,13 +284,13 @@
 | `OperatorType.PointSetTool` | 点集工具 | 2 | 4 | 6 | 90 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [PointSetTool](./PointSetTool.md) |
 | `OperatorType.ScriptOperator` | 脚本算子 | 4 | 2 | 3 | 100 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [ScriptOperator](./ScriptOperator.md) |
 | `OperatorType.TextSave` | Text Save | 2 | 2 | 5 | 100 (A) | `1.0.0` | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | [TextSave](./TextSave.md) |
-| `OperatorType.TimerStatistics` | 计时统计 | 1 | 4 | 2 | 84 (B) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TimerStatistics](./TimerStatistics.md) |
+| `OperatorType.TimerStatistics` | 计时统计 | 1 | 4 | 2 | 94 (A) | `1.0.1` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TimerStatistics](./TimerStatistics.md) |
 | `OperatorType.TriggerModule` | 触发模块 | 1 | 3 | 3 | 90 (A) | `1.0.0` | 该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。 | [TriggerModule](./TriggerModule.md) |
 
 ### 采集 (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.ImageAcquisition` | 图像采集 | 2 | 1 | 6 | 78 (B) | `1.0.0` | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | [ImageAcquisition](./ImageAcquisition.md) |
+| `OperatorType.ImageAcquisition` | 图像采集 | 2 | 1 | 6 | 95 (A) | `1.0.0` | 该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。 | [ImageAcquisition](./ImageAcquisition.md) |
 
 ### 预处理 (23)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |

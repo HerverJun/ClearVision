@@ -1,0 +1,393 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T05:51:03.5501022+00:00",
+    "CaseCount": 22,
+    "Passed": 22,
+    "Failed": 0,
+    "RuntimeMs": 22.449
+  },
+  "Operators": [
+    {
+      "Operator": "JsonExtractor",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.02,
+      "MemoryAllocationBytesAvg": 4319
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Error handling",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.556
+    },
+    {
+      "Scenario": "Extraction",
+      "CaseCount": 13,
+      "Passed": 13,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.493
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.028
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.075
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "simple_object_path",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 14.7824,
+      "MemoryAllocationBytes": 16496,
+      "Metrics": {
+        "JsonPath": "$.data",
+        "IsSuccess": true,
+        "Value": "42",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "nested_path",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.1665,
+      "MemoryAllocationBytes": 3616,
+      "Metrics": {
+        "JsonPath": "$.a.b",
+        "IsSuccess": true,
+        "Value": "1",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "array_index",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.4466,
+      "MemoryAllocationBytes": 3624,
+      "Metrics": {
+        "JsonPath": "$.items[0]",
+        "IsSuccess": true,
+        "Value": "10",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "array_index_second",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0247,
+      "MemoryAllocationBytes": 3624,
+      "Metrics": {
+        "JsonPath": "$.items[1]",
+        "IsSuccess": true,
+        "Value": "20",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "array_nested_object",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0172,
+      "MemoryAllocationBytes": 4152,
+      "Metrics": {
+        "JsonPath": "$.a[0].b",
+        "IsSuccess": true,
+        "Value": "1",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "deeply_nested",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0113,
+      "MemoryAllocationBytes": 4208,
+      "Metrics": {
+        "JsonPath": "$.a.b.c.d",
+        "IsSuccess": true,
+        "Value": "99",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "root_path_dollar",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.1421,
+      "MemoryAllocationBytes": 2912,
+      "Metrics": {
+        "JsonPath": "$",
+        "IsSuccess": true,
+        "Value": "{\r\n  \u0022x\u0022: 1\r\n}",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_type_string",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0089,
+      "MemoryAllocationBytes": 3024,
+      "Metrics": {
+        "JsonPath": "$.data",
+        "IsSuccess": true,
+        "Value": "hello",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_type_float",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 3.7259,
+      "MemoryAllocationBytes": 3856,
+      "Metrics": {
+        "JsonPath": "$.data",
+        "IsSuccess": true,
+        "Value": "3.14",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_type_integer",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0418,
+      "MemoryAllocationBytes": 3368,
+      "Metrics": {
+        "JsonPath": "$.data",
+        "IsSuccess": true,
+        "Value": "42",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_type_boolean",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0302,
+      "MemoryAllocationBytes": 3376,
+      "Metrics": {
+        "JsonPath": "$.data",
+        "IsSuccess": true,
+        "Value": "True",
+        "ExtractedIsSuccess": "True",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "default_value_used",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0107,
+      "MemoryAllocationBytes": 3352,
+      "Metrics": {
+        "JsonPath": "$.missing",
+        "IsSuccess": true,
+        "Value": "fallback",
+        "ExtractedIsSuccess": "False",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "default_value_numeric",
+      "Operator": "JsonExtractor",
+      "Scenario": "Extraction",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0057,
+      "MemoryAllocationBytes": 3352,
+      "Metrics": {
+        "JsonPath": "$.missing",
+        "IsSuccess": true,
+        "Value": "99",
+        "ExtractedIsSuccess": "False",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "path_miss_required",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.1935,
+      "MemoryAllocationBytes": 4560,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "\u672A\u627E\u5230\u8DEF\u5F84 \u0027$.missing\u0027 \u5BF9\u5E94\u503C",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "invalid_json",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 2.3182,
+      "MemoryAllocationBytes": 20192,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "JSON \u89E3\u6790\u5931\u8D25: \u0027b\u0027 is an invalid start of a property name. Expected a \u0027\u0022\u0027. LineNumber: 0 | BytePositionInLine: 1.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "empty_json",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0032,
+      "MemoryAllocationBytes": 632,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Json \u8F93\u5165\u4E3A\u7A7A",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "null_json_input",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0018,
+      "MemoryAllocationBytes": 632,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "\u672A\u63D0\u4F9B Json \u8F93\u5165",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "invalid_output_type_conversion",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error handling",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.2642,
+      "MemoryAllocationBytes": 2864,
+      "Metrics": {
+        "ExpectedFailure": true,
+        "ActualIsSuccess": false,
+        "ErrorMessage": "Extracted value cannot be converted to output type \u0027Float\u0027.",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_empty_jsonpath",
+      "Operator": "JsonExtractor",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.1575,
+      "MemoryAllocationBytes": 1160,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "JsonPath \u4E0D\u80FD\u4E3A\u7A7A",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_invalid_outputtype",
+      "Operator": "JsonExtractor",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0482,
+      "MemoryAllocationBytes": 1672,
+      "Metrics": {
+        "ExpectedValid": false,
+        "ActualValid": false,
+        "Errors": "OutputType \u5FC5\u987B\u662F\u4EE5\u4E0B\u4E4B\u4E00: Any, String, Float, Double, Integer, Int, Boolean, Bool",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "validate_valid_params",
+      "Operator": "JsonExtractor",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0203,
+      "MemoryAllocationBytes": 1256,
+      "Metrics": {
+        "ExpectedValid": true,
+        "ActualValid": true,
+        "Errors": "",
+        "Passed": true
+      }
+    },
+    {
+      "CaseId": "output_keys_present",
+      "Operator": "JsonExtractor",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "ErrorMessage": null,
+      "RuntimeMs": 0.0277,
+      "MemoryAllocationBytes": 3080,
+      "Metrics": {
+        "RequiredKeys": "Value, IsSuccess",
+        "MissingKeys": "",
+        "Passed": true
+      }
+    }
+  ]
+}

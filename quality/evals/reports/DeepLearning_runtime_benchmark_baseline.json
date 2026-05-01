@@ -1,0 +1,497 @@
+{
+  "EvidenceKind": "contract",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-26T15:30:45.1735996+00:00",
+    "CaseCount": 20,
+    "Passed": 20,
+    "Failed": 0,
+    "RuntimeMs": 753.676,
+    "MemoryAllocationBytes": 718330568,
+    "AvailableProviders": [
+      "AzureExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "RequestedProvider": "GPU",
+    "ActiveProvider": "CPUExecutionProvider",
+    "FallbackToCpu": true,
+    "Scope": "preprocess+YOLO postprocess benchmark; ONNX provider availability/fallback metadata is recorded without model inference"
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 37.684,
+      "MemoryAllocationBytesAvg": 35916528,
+      "HasBenchmark": true,
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "EvidenceKind": "contract"
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 27.836,
+      "PreprocessMsAvg": 20.291,
+      "PostprocessMsAvg": 4.385,
+      "DetectionCountAvg": 4
+    },
+    {
+      "Scenario": "4k_cpu_preprocess_postprocess",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 29.85,
+      "PreprocessMsAvg": 22.324,
+      "PostprocessMsAvg": 3.009,
+      "DetectionCountAvg": 4
+    },
+    {
+      "Scenario": "batch_pressure_1080p_x4",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 78.424,
+      "PreprocessMsAvg": 66.371,
+      "PostprocessMsAvg": 10.931,
+      "DetectionCountAvg": 16
+    },
+    {
+      "Scenario": "gpu_cpu_fallback_contract",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 15.028,
+      "PreprocessMsAvg": 11.72,
+      "PostprocessMsAvg": 2.775,
+      "DetectionCountAvg": 4
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "1080p_cpu_preprocess_postprocess_0000",
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 52.368,
+      "MemoryAllocationBytes": 20684176,
+      "PreprocessMs": 27.521,
+      "PostprocessMs": 11.385,
+      "DetectionCount": 4,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "1080p_cpu_preprocess_postprocess_0001",
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 22.853,
+      "MemoryAllocationBytes": 20626000,
+      "PreprocessMs": 18.656,
+      "PostprocessMs": 3.089,
+      "DetectionCount": 4,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "1080p_cpu_preprocess_postprocess_0002",
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 22.231,
+      "MemoryAllocationBytes": 20618008,
+      "PreprocessMs": 18.223,
+      "PostprocessMs": 2.935,
+      "DetectionCount": 4,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "1080p_cpu_preprocess_postprocess_0003",
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 23.519,
+      "MemoryAllocationBytes": 20618008,
+      "PreprocessMs": 19.386,
+      "PostprocessMs": 3.029,
+      "DetectionCount": 4,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "1080p_cpu_preprocess_postprocess_0004",
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 22.951,
+      "MemoryAllocationBytes": 20633464,
+      "PreprocessMs": 18.733,
+      "PostprocessMs": 3.088,
+      "DetectionCount": 4,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "1080p_cpu_preprocess_postprocess_0005",
+      "Scenario": "1080p_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 23.091,
+      "MemoryAllocationBytes": 20618912,
+      "PreprocessMs": 19.228,
+      "PostprocessMs": 2.782,
+      "DetectionCount": 4,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "4k_cpu_preprocess_postprocess_0000",
+      "Scenario": "4k_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 29.235,
+      "MemoryAllocationBytes": 20633696,
+      "PreprocessMs": 21.988,
+      "PostprocessMs": 3.124,
+      "DetectionCount": 4,
+      "Width": 3840,
+      "Height": 2160,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "4k_cpu_preprocess_postprocess_0001",
+      "Scenario": "4k_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 30.394,
+      "MemoryAllocationBytes": 20619008,
+      "PreprocessMs": 22.942,
+      "PostprocessMs": 2.864,
+      "DetectionCount": 4,
+      "Width": 3840,
+      "Height": 2160,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "4k_cpu_preprocess_postprocess_0002",
+      "Scenario": "4k_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 30.205,
+      "MemoryAllocationBytes": 20633720,
+      "PreprocessMs": 22.255,
+      "PostprocessMs": 3.32,
+      "DetectionCount": 4,
+      "Width": 3840,
+      "Height": 2160,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "4k_cpu_preprocess_postprocess_0003",
+      "Scenario": "4k_cpu_preprocess_postprocess",
+      "Passed": true,
+      "RuntimeMs": 29.568,
+      "MemoryAllocationBytes": 20619216,
+      "PreprocessMs": 22.111,
+      "PostprocessMs": 2.728,
+      "DetectionCount": 4,
+      "Width": 3840,
+      "Height": 2160,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "batch_pressure_1080p_x4_0000",
+      "Scenario": "batch_pressure_1080p_x4",
+      "Passed": true,
+      "RuntimeMs": 120.223,
+      "MemoryAllocationBytes": 81782160,
+      "PreprocessMs": 106.539,
+      "PostprocessMs": 12.597,
+      "DetectionCount": 16,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 4,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "batch_pressure_1080p_x4_0001",
+      "Scenario": "batch_pressure_1080p_x4",
+      "Passed": true,
+      "RuntimeMs": 68.328,
+      "MemoryAllocationBytes": 81762968,
+      "PreprocessMs": 56.962,
+      "PostprocessMs": 10.274,
+      "DetectionCount": 16,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 4,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "batch_pressure_1080p_x4_0002",
+      "Scenario": "batch_pressure_1080p_x4",
+      "Passed": true,
+      "RuntimeMs": 69.372,
+      "MemoryAllocationBytes": 81783184,
+      "PreprocessMs": 57.576,
+      "PostprocessMs": 10.705,
+      "DetectionCount": 16,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 4,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "batch_pressure_1080p_x4_0003",
+      "Scenario": "batch_pressure_1080p_x4",
+      "Passed": true,
+      "RuntimeMs": 66.786,
+      "MemoryAllocationBytes": 81779096,
+      "PreprocessMs": 55.322,
+      "PostprocessMs": 10.352,
+      "DetectionCount": 16,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 4,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "batch_pressure_1080p_x4_0004",
+      "Scenario": "batch_pressure_1080p_x4",
+      "Passed": true,
+      "RuntimeMs": 67.412,
+      "MemoryAllocationBytes": 81780568,
+      "PreprocessMs": 55.456,
+      "PostprocessMs": 10.726,
+      "DetectionCount": 16,
+      "Width": 1920,
+      "Height": 1080,
+      "BatchSize": 4,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "gpu_cpu_fallback_contract_0000",
+      "Scenario": "gpu_cpu_fallback_contract",
+      "Passed": true,
+      "RuntimeMs": 14.808,
+      "MemoryAllocationBytes": 20618928,
+      "PreprocessMs": 11.602,
+      "PostprocessMs": 2.63,
+      "DetectionCount": 4,
+      "Width": 1280,
+      "Height": 720,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "gpu_cpu_fallback_contract_0001",
+      "Scenario": "gpu_cpu_fallback_contract",
+      "Passed": true,
+      "RuntimeMs": 15.621,
+      "MemoryAllocationBytes": 20633424,
+      "PreprocessMs": 12.23,
+      "PostprocessMs": 2.884,
+      "DetectionCount": 4,
+      "Width": 1280,
+      "Height": 720,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "gpu_cpu_fallback_contract_0002",
+      "Scenario": "gpu_cpu_fallback_contract",
+      "Passed": true,
+      "RuntimeMs": 14.497,
+      "MemoryAllocationBytes": 20618712,
+      "PreprocessMs": 11.471,
+      "PostprocessMs": 2.529,
+      "DetectionCount": 4,
+      "Width": 1280,
+      "Height": 720,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "gpu_cpu_fallback_contract_0003",
+      "Scenario": "gpu_cpu_fallback_contract",
+      "Passed": true,
+      "RuntimeMs": 15.496,
+      "MemoryAllocationBytes": 20633416,
+      "PreprocessMs": 12.05,
+      "PostprocessMs": 2.878,
+      "DetectionCount": 4,
+      "Width": 1280,
+      "Height": 720,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    },
+    {
+      "CaseId": "gpu_cpu_fallback_contract_0004",
+      "Scenario": "gpu_cpu_fallback_contract",
+      "Passed": true,
+      "RuntimeMs": 14.718,
+      "MemoryAllocationBytes": 20633904,
+      "PreprocessMs": 11.245,
+      "PostprocessMs": 2.954,
+      "DetectionCount": 4,
+      "Width": 1280,
+      "Height": 720,
+      "BatchSize": 1,
+      "AvailableProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "RequestedProvider": "GPU",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": true,
+      "Failure": null
+    }
+  ]
+}

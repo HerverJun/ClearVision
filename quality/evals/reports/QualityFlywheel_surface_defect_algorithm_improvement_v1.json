@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "2026-04-29.surface-defect-algorithm-improvement.v1",
+  "generatedAtUtc": "2026-05-01T03:24:21+00:00",
+  "accepted": true,
+  "claimBoundary": "准工业公开/替代证明；不声明真实产线工业验证完成。",
+  "sourceReports": [
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v1.json",
+    "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v1.json",
+    "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json"
+  ],
+  "baseline": {
+    "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+    "profile": "baseline_default",
+    "caseCount": 1004,
+    "pixelF1": 0.269226,
+    "imageAuroc": 0.772432,
+    "pixelAuroc": 0.659955,
+    "imageF1": 0.567073,
+    "falsePositivePerImage": 0.139821,
+    "runtimeMsP95": 5.17,
+    "score": 2.11879085,
+    "parameters": {
+      "Method": "LocalContrast",
+      "ThresholdMode": "Manual",
+      "Threshold": 15,
+      "MinArea": 4,
+      "MorphCleanSize": 1,
+      "MorphMode": "OpenClose",
+      "BackgroundKernelSize": 31,
+      "ResponseNormalizeMode": "RawClamp",
+      "ClaheClipLimit": 2,
+      "ClaheTileGridSize": 8,
+      "ComponentFilterMode": "AreaOnly"
+    }
+  },
+  "candidate": {
+    "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
+    "profile": "baseline_default",
+    "caseCount": 1004,
+    "pixelF1": 0.269226,
+    "imageAuroc": 0.772432,
+    "pixelAuroc": 0.659955,
+    "imageF1": 0.567073,
+    "falsePositivePerImage": 0.139821,
+    "runtimeMsP95": 4.575,
+    "score": 2.11998085,
+    "parameters": {
+      "Method": "LocalContrast",
+      "ThresholdMode": "Manual",
+      "Threshold": 15,
+      "MinArea": 4,
+      "MorphCleanSize": 1,
+      "MorphMode": "OpenClose",
+      "BackgroundKernelSize": 31,
+      "ResponseNormalizeMode": "RawClamp",
+      "ClaheClipLimit": 2,
+      "ClaheTileGridSize": 8,
+      "ComponentFilterMode": "AreaOnly"
+    }
+  },
+  "sweep": {
+    "profileCount": 10,
+    "validationCaseCount": 480,
+    "selectedProfile": "baseline_default",
+    "selectedValidationScore": 2.44984845,
+    "selectionPolicy": "Prefer validation profiles that improve PixelF1 without increasing false positives per normal image, then rank by composite score.",
+    "candidatePixelF1": 0.269226,
+    "candidateImageAuroc": 0.772432,
+    "candidateImageF1": 0.567073
+  },
+  "taxonomySummary": {
+    "caseCount": 189,
+    "taxonomyCounts": {
+      "texture_noise_false_positive": 123,
+      "oversegmentation_false_positive": 2,
+      "low_contrast_defect_miss": 15,
+      "undersegmentation_false_negative": 46,
+      "small_defect_miss": 2,
+      "mask_overgrowth_false_positive": 1
+    }
+  },
+  "abReplay": {
+    "status": "candidate-executed",
+    "replayCaseCount": 20,
+    "improvedMetricCaseCount": 10,
+    "regressedCaseCount": 0,
+    "worseMetricCaseCount": 8,
+    "candidateBaseline": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_replay_v1.json"
+  },
+  "nextActions": [
+    "Keep v1 profile as the replay-gated SurfaceDefectDetection candidate.",
+    "Next tuning should target residual low-contrast misses and undersegmentation before lowering global thresholds further.",
+    "Move AnomalyDetection into candidate execution after this SurfaceDefectDetection evidence chain stays green."
+  ]
+}

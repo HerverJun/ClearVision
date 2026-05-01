@@ -7,6 +7,7 @@ console.log('[InspectionPanel] 模块已加载');
 import inspectionController, { getInspectionState } from './inspectionController.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
+import serviceRegistry from '../../core/app/serviceRegistry.js';
 import { getCurrentProject } from '../project/projectManager.js';
 import { AnalysisCardsPanel, buildDiagnosticsAnalysisData } from './analysisCardsPanel.js';
 import { showToast } from '../../shared/components/uiComponents.js';
@@ -123,7 +124,8 @@ class InspectionPanel {
 
     getActiveFlowDefinition() {
         try {
-            const canvasFlow = window.flowCanvas?.serialize?.();
+        const canvasFlow = serviceRegistry.get('flowCanvasAdapter')?.serialize?.()
+            || serviceRegistry.get('flowCanvas')?.serialize?.();
             const operators = canvasFlow?.operators || canvasFlow?.Operators;
             if (Array.isArray(operators) && operators.length > 0) {
                 return canvasFlow;
@@ -840,11 +842,9 @@ class InspectionPanel {
                 const result = getRecentResults().find(r => r.id === id);
                 if (result && result.imageData) {
                     const imageData = `data:image/png;base64,${result.imageData}`;
-                    if (window.inspectionImageViewer) {
-                        window.inspectionImageViewer.loadImage(imageData);
-                    } else if (window.imageViewer) {
-                        window.imageViewer.loadImage(imageData);
-                    }
+                    const imageViewer = serviceRegistry.get('inspectionImageViewer')
+                        || serviceRegistry.get('imageViewer');
+                    imageViewer?.loadImage?.(imageData);
                 }
             });
         });

@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "2026-04-27.quality-suite.v1",
+  "suiteId": "quick_contract_suite",
+  "description": "Serial quick lane for contract-style evidence. Keep this lane suitable for local validation and CI gating.",
+  "ciBudgetMinutes": 10,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "p2-contract",
+      "entries": [
+        {
+          "id": "deep_learning_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["DeepLearning"],
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningContractRunner/DeepLearningContractRunner.csproj", "--", "--output", "quality/evals/reports/DeepLearning_contract_baseline.json", "--report", "quality/evals/reports/DeepLearning_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/DeepLearning_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_contract_baseline.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "semantic_segmentation_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["SemanticSegmentation"],
+          "command": ["dotnet", "run", "--project", "quality/tools/SemanticSegmentationContractRunner/SemanticSegmentationContractRunner.csproj", "--", "--output", "quality/evals/reports/SemanticSegmentation_contract_baseline.json", "--report", "quality/evals/reports/SemanticSegmentation_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/SemanticSegmentation_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/SemanticSegmentation_contract_baseline.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "edge_pair_defect_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["EdgePairDefect"],
+          "command": ["dotnet", "run", "--project", "quality/tools/EdgePairDefectContractRunner/EdgePairDefectContractRunner.csproj", "--", "--output", "quality/evals/reports/EdgePairDefect_contract_baseline.json", "--report", "quality/evals/reports/EdgePairDefect_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/EdgePairDefect_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/EdgePairDefect_contract_baseline.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "dual_modal_voting_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["DualModalVoting"],
+          "command": ["dotnet", "run", "--project", "quality/tools/DualModalVotingContractRunner/DualModalVotingContractRunner.csproj", "--", "--output", "quality/evals/reports/DualModalVoting_contract_baseline.json", "--report", "quality/evals/reports/DualModalVoting_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/DualModalVoting_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/DualModalVoting_contract_baseline.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "feature_match_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["AkazeFeatureMatch", "OrbFeatureMatch"],
+          "command": ["dotnet", "run", "--project", "quality/tools/FeatureMatchContractRunner/FeatureMatchContractRunner.csproj", "--", "--output", "quality/evals/reports/FeatureMatch_contract_baseline.json", "--report", "quality/evals/reports/FeatureMatch_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/FeatureMatch_contract_baseline.md",
+          "estimatedSeconds": 45
+        },
+        {
+          "id": "pyramid_shape_match_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["PyramidShapeMatch"],
+          "command": ["dotnet", "run", "--project", "quality/tools/PyramidShapeMatchContractRunner/PyramidShapeMatchContractRunner.csproj", "--", "--output", "quality/evals/reports/PyramidShapeMatch_contract_baseline.json", "--report", "quality/evals/reports/PyramidShapeMatch_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/PyramidShapeMatch_contract_baseline.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "hand_eye_validator_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["HandEyeCalibrationValidator"],
+          "command": ["dotnet", "run", "--project", "quality/tools/HandEyeCalibrationValidatorContractRunner/HandEyeCalibrationValidatorContractRunner.csproj", "--", "--output", "quality/evals/reports/HandEyeCalibrationValidator_contract_baseline.json", "--report", "quality/evals/reports/HandEyeCalibrationValidator_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/HandEyeCalibrationValidator_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/HandEyeCalibrationValidator_contract_baseline.md",
+          "estimatedSeconds": 30
+        }
+      ]
+    },
+    {
+      "id": "p3-contract-expansion",
+      "entries": [
+        {
+          "id": "p3_core_contracts",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["Comparator", "LogicGate", "StringFormat", "ArrayIndexer", "JsonExtractor", "MathOperation", "TypeConvert", "ResultJudgment", "TimerStatistics", "VariableRead", "VariableWrite", "VariableIncrement", "CycleCounter", "Delay", "ForEach", "MitsubishiMcCommunication", "OmronFinsCommunication", "SiemensS7Communication", "ImageAcquisition"],
+          "command": ["dotnet", "run", "--project", "quality/tools/P3CoreContractRunner/P3CoreContractRunner.csproj", "--", "--output", "quality/evals/reports/P3CoreContracts_baseline.json", "--report", "quality/evals/reports/P3CoreContracts_baseline.md"],
+          "baselineJson": "quality/evals/reports/P3CoreContracts_baseline.json",
+          "reportMarkdown": "quality/evals/reports/P3CoreContracts_baseline.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "g1_p3_contract_batch1",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["BilateralFilter", "BoxFilter", "ClaheEnhancement", "ColorConversion", "ContourMeasurement", "CopyMakeBorder", "CornerDetection", "Filtering", "FrameAveraging", "HistogramAnalysis", "HistogramEqualization", "ImageBlend", "ImageCompose", "ImageCrop", "ImageNormalize", "ImageResize", "ImageRotate", "ImageStitching", "ImageTiling", "LaplacianSharpen", "MeanFilter", "MedianBlur", "MorphologicalOperation", "Morphology", "ParallelLineFind", "PositionCorrection", "QuadrilateralFind", "RectangleDetection", "SubpixelEdgeDetection", "Thresholding", "AngleMeasurement", "ColorDetection", "ColorMeasurement", "EdgeIntersection", "GapMeasurement", "GeoMeasurement", "GeometricTolerance", "LineLineDistance", "Measurement", "PixelStatistics"],
+          "command": ["dotnet", "run", "--project", "quality/tools/G1P3ContractBatch1Runner/G1P3ContractBatch1Runner.csproj", "--", "--output", "quality/evals/reports/G1P3ContractBatch1_baseline.json", "--report", "quality/evals/reports/G1P3ContractBatch1_baseline.md"],
+          "baselineJson": "quality/evals/reports/G1P3ContractBatch1_baseline.json",
+          "reportMarkdown": "quality/evals/reports/G1P3ContractBatch1_baseline.md",
+          "estimatedSeconds": 120
+        },
+        {
+          "id": "g1_p3_contract_batch2",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["BoxNms", "ConditionalBranch", "PointSetTool", "VoxelDownsample", "CodeRecognition", "DatabaseWrite", "EuclideanClusterExtraction", "GlcmTexture", "HttpRequest", "ImageAdd", "ImageSave", "LawsTextureFilter", "MinEnclosingGeometry", "ModbusCommunication", "MqttPublish", "OcrRecognition", "PolarUnwrap", "RoiManager", "ScriptOperator", "SerialCommunication", "TcpCommunication", "TextSave"],
+          "command": ["dotnet", "run", "--project", "quality/tools/G1P3ContractBatch2Runner/G1P3ContractBatch2Runner.csproj", "--", "--output", "quality/evals/reports/G1P3ContractBatch2_baseline.json", "--report", "quality/evals/reports/G1P3ContractBatch2_baseline.md"],
+          "baselineJson": "quality/evals/reports/G1P3ContractBatch2_baseline.json",
+          "reportMarkdown": "quality/evals/reports/G1P3ContractBatch2_baseline.md",
+          "estimatedSeconds": 120
+        }
+      ]
+    }
+  ]
+}

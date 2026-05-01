@@ -34,6 +34,9 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MaxValue", "二值化最大值", "double", DefaultValue = 255.0)]
 [OperatorParam("ThresholdType", "阈值类型", "enum", DefaultValue = "Binary", Options = new[] { "Binary|Binary", "BinaryInv|Binary Inv" })]
 [OperatorParam("DrawContours", "绘制轮廓", "bool", DefaultValue = true)]
+[OperatorParam("ThresholdMode", "Threshold Mode", "enum", DefaultValue = "Manual", Options = new[] { "Manual|Manual", "Otsu|Otsu", "AdaptiveMean|Adaptive mean", "AdaptiveGaussian|Adaptive gaussian", "InputBinary|Input binary" })]
+[OperatorParam("AdaptiveBlockSize", "Adaptive Block Size", "int", DefaultValue = 31, Min = 3, Max = 301)]
+[OperatorParam("AdaptiveC", "Adaptive C", "double", DefaultValue = 2.0, Min = -255.0, Max = 255.0)]
 public class FindContoursOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.ContourDetection;
@@ -60,6 +63,9 @@ public class FindContoursOperator : OperatorBase
         var threshold = GetDoubleParam(@operator, "Threshold", 127.0, min: 0, max: 255);
         var maxValue = GetDoubleParam(@operator, "MaxValue", 255.0, min: 0, max: 255);
         var thresholdType = GetStringParam(@operator, "ThresholdType", "Binary");
+        var thresholdMode = GetStringParam(@operator, "ThresholdMode", "Manual");
+        var adaptiveBlockSize = GetIntParam(@operator, "AdaptiveBlockSize", 31, 3, 301);
+        var adaptiveC = GetDoubleParam(@operator, "AdaptiveC", 2.0, -255.0, 255.0);
 
         var src = imageWrapper.GetMat();
         if (src.Empty())
@@ -68,22 +74,18 @@ public class FindContoursOperator : OperatorBase
         }
 
         // 转换为灰度图
-        using var gray = new Mat();
-        if (src.Channels() == 1)
-        {
-            src.CopyTo(gray);
-        }
-        else
-        {
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-        }
+        using var gray = OperatorImageDepthHelper.EnsureSingleChannelGray(src);
 
         // 二值化
         using var binary = new Mat();
         var threshType = thresholdType.Equals("BinaryInv", StringComparison.OrdinalIgnoreCase)
             ? ThresholdTypes.BinaryInv
             : ThresholdTypes.Binary;
-        Cv2.Threshold(gray, binary, threshold, maxValue, threshType);
+        var appliedThreshold = ApplyThreshold(gray, binary, thresholdMode, threshold, maxValue, threshType, adaptiveBlockSize, adaptiveC);
+        var foregroundPixels = Cv2.CountNonZero(binary);
+        var foregroundRatio = binary.Width > 0 && binary.Height > 0
+            ? (double)foregroundPixels / (binary.Width * binary.Height)
+            : 0.0;
 
         // 查找轮廓
         var retrievalMode = mode.ToLower() switch
@@ -121,7 +123,7 @@ public class FindContoursOperator : OperatorBase
             .ToArray();
 
         // 绘制轮廓
-        var resultImg = src.Clone();
+        var resultImg = OperatorImageDepthHelper.EnsureBgrColor(src);
         if (drawContours && filteredContours.Length > 0)
         {
             for (int i = 0; i < filteredContours.Length; i++)
@@ -190,7 +192,11 @@ public class FindContoursOperator : OperatorBase
             { "ContourCount", filteredContours.Length },
             { "Contours", contourPayload },
             { "ContourSummaries", contourSummaries },
-            { "Hierarchy", hierarchyPayload }
+            { "Hierarchy", hierarchyPayload },
+            { "ThresholdMode", thresholdMode },
+            { "AppliedThreshold", appliedThreshold },
+            { "ForegroundPixelCount", foregroundPixels },
+            { "ForegroundRatio", foregroundRatio }
         };
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImg, additionalData)));
     }
@@ -224,7 +230,54 @@ public class FindContoursOperator : OperatorBase
             return ValidationResult.Invalid("ThresholdType must be Binary or BinaryInv.");
         }
 
+        var thresholdMode = GetStringParam(@operator, "ThresholdMode", "Manual");
+        var validThresholdModes = new[] { "Manual", "Otsu", "AdaptiveMean", "AdaptiveGaussian", "InputBinary" };
+        if (!validThresholdModes.Contains(thresholdMode, StringComparer.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("ThresholdMode must be Manual, Otsu, AdaptiveMean, AdaptiveGaussian or InputBinary.");
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static double ApplyThreshold(
+        Mat gray,
+        Mat binary,
+        string thresholdMode,
+        double threshold,
+        double maxValue,
+        ThresholdTypes thresholdType,
+        int adaptiveBlockSize,
+        double adaptiveC)
+    {
+        if (thresholdMode.Equals("InputBinary", StringComparison.OrdinalIgnoreCase))
+        {
+            Cv2.Threshold(gray, binary, 0, maxValue, thresholdType);
+            return 0.0;
+        }
+
+        if (thresholdMode.Equals("Otsu", StringComparison.OrdinalIgnoreCase))
+        {
+            return Cv2.Threshold(gray, binary, 0, maxValue, thresholdType | ThresholdTypes.Otsu);
+        }
+
+        if (thresholdMode.Equals("AdaptiveMean", StringComparison.OrdinalIgnoreCase) ||
+            thresholdMode.Equals("AdaptiveGaussian", StringComparison.OrdinalIgnoreCase))
+        {
+            var blockSize = adaptiveBlockSize % 2 == 0 ? adaptiveBlockSize + 1 : adaptiveBlockSize;
+            blockSize = Math.Max(3, blockSize);
+            var adaptiveMethod = thresholdMode.Equals("AdaptiveGaussian", StringComparison.OrdinalIgnoreCase)
+                ? AdaptiveThresholdTypes.GaussianC
+                : AdaptiveThresholdTypes.MeanC;
+            var adaptiveThresholdType = thresholdType == ThresholdTypes.BinaryInv
+                ? ThresholdTypes.BinaryInv
+                : ThresholdTypes.Binary;
+            Cv2.AdaptiveThreshold(gray, binary, maxValue, adaptiveMethod, adaptiveThresholdType, blockSize, adaptiveC);
+            return double.NaN;
+        }
+
+        Cv2.Threshold(gray, binary, threshold, maxValue, thresholdType);
+        return threshold;
     }
 
     private static HierarchyIndex RemapHierarchy(

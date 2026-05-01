@@ -15,7 +15,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Unwraps wrapped phase maps while preserving the original phase domain semantics.",
     Category = "Measurement",
     IconName = "phase-closure",
-    Keywords = new[] { "Phase", "Unwrap", "Interferometry", "Closure", "Wavelength" }
+    Keywords = new[] { "Phase", "Unwrap", "Interferometry", "Closure", "Wavelength" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Itoh/quality-guided phase unwrapping",
+    CoreApi = "ImageWrapper -> wrapped CV_32F phase -> Itoh/quality/floodfill unwrap -> discontinuity map",
+    ImplementationStrategy = "Normalizes phase input to a wrapped float map, unwraps adjacent phase differences with Itoh, quality-guided, or flood-fill traversal, and emits the unwrapped phase plus discontinuity visualization.",
+    TimeComplexity = "O(W*H log(W*H)) for quality-guided mode, O(W*H) for Itoh/floodfill",
+    TypicalLatency = "Avg 1.429 ms, max 4.590 ms over 22 synthetic golden cases",
+    SpaceComplexity = "O(W*H)",
+    SuitableUseCases = new[] { "Smooth wrapped phase maps whose adjacent phase step stays within the unwrap assumptions.", "Interferometry-style inspection where a discontinuity map and quality metric are needed with the unwrapped phase." },
+    UnsuitableUseCases = new[] { "Severely noisy phase maps without masking or preprocessing.", "Topology-heavy phase fields that require branch-cut optimization or domain-specific residue handling." },
+    KnownLimitations = new[] { "Quality-guided mode uses a local gradient-derived quality map when no external map is provided.", "The current output quality is a stability heuristic, not a calibrated metrology uncertainty." }
 )]
 [InputPort("PhaseImage", "Wrapped Phase Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Wavelength", "Wavelength (nm)", PortDataType.Float, IsRequired = false)]

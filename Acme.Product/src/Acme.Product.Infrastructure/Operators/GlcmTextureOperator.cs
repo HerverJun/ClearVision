@@ -14,7 +14,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Category = "Texture",
     IconName = "texture",
     Keywords = new[] { "Texture", "GLCM", "Contrast", "Correlation", "Energy", "Entropy" },
-    Version = "1.0.0"
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Quantized gray-level co-occurrence matrix",
+    CoreApi = "ROI -> GlcmTexture.Compute -> quantize gray image -> per-direction GLCM -> averaged Haralick features",
+    ImplementationStrategy = "Converts the selected ROI to gray, quantizes intensities to the configured number of levels, builds co-occurrence matrices for 0/45/90/135-degree directions, and returns mean plus per-direction texture statistics.",
+    TimeComplexity = "O(D*(W*H+L^2))",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by texture unit and integration tests",
+    SpaceComplexity = "O(L^2)",
+    SuitableUseCases = new[] { "Texture inspection where contrast, energy, homogeneity, entropy, and correlation are meaningful summary features.", "ROI-based material or surface comparison with fixed quantization and direction settings." },
+    UnsuitableUseCases = new[] { "Rotation-invariant texture classification without downstream aggregation or augmentation.", "Large images with high quantization levels when per-frame latency is tightly bounded." },
+    KnownLimitations = new[] { "Supported directions are currently limited to 0, 45, 90, and 135 degrees.", "The operator reports statistical texture features only; it does not classify texture defects by itself." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Contrast", "Contrast", PortDataType.Float)]

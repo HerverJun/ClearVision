@@ -34,35 +34,7 @@ public static class InspectionEventEndpoints
 
         var lastSequenceId = ParseLastEventId(context.Request);
         var currentState = coordinator.GetState(projectId);
-
-        if (currentState is not null)
-        {
-            foreach (var snapshot in InspectionRealtimeEventMapper.CreateSnapshot(currentState))
-            {
-                await context.Response.WriteSseMessageAsync(
-                    new SseMessage(
-                        null,
-                        snapshot.EventType,
-                        snapshot.Payload),
-                    ct);
-            }
-        }
-
-        if (lastSequenceId > 0)
-        {
-            foreach (var storedEvent in eventStore.GetEventsAfter(projectId, lastSequenceId))
-            {
-                foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(storedEvent.Event))
-                {
-                    await context.Response.WriteSseMessageAsync(
-                        new SseMessage(
-                            storedEvent.SequenceId,
-                            mappedEvent.EventType,
-                            mappedEvent.Payload),
-                        ct);
-                }
-            }
-        }
+        var replayWatermark = lastSequenceId;
 
         var channel = Channel.CreateUnbounded<SseMessage>(new UnboundedChannelOptions
         {
@@ -85,6 +57,36 @@ public static class InspectionEventEndpoints
             return Task.CompletedTask;
         });
 
+        if (currentState is not null)
+        {
+            foreach (var snapshot in InspectionRealtimeEventMapper.CreateSnapshot(currentState))
+            {
+                await context.Response.WriteSseMessageAsync(
+                    new SseMessage(
+                        null,
+                        snapshot.EventType,
+                        snapshot.Payload),
+                    ct);
+            }
+        }
+
+        if (lastSequenceId > 0)
+        {
+            foreach (var storedEvent in eventStore.GetEventsAfter(projectId, lastSequenceId))
+            {
+                replayWatermark = Math.Max(replayWatermark, storedEvent.SequenceId);
+                foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(storedEvent.Event))
+                {
+                    await context.Response.WriteSseMessageAsync(
+                        new SseMessage(
+                            storedEvent.SequenceId,
+                            mappedEvent.EventType,
+                            mappedEvent.Payload),
+                        ct);
+                }
+            }
+        }
+
         using var channelRegistration = ct.Register(() => channel.Writer.TryComplete());
         var heartbeatTask = SendHeartbeatsAsync(channel.Writer, ct);
 
@@ -92,6 +94,11 @@ public static class InspectionEventEndpoints
         {
             await foreach (var message in channel.Reader.ReadAllAsync(ct))
             {
+                if (message.SequenceId.HasValue && message.SequenceId.Value <= replayWatermark)
+                {
+                    continue;
+                }
+
                 await context.Response.WriteSseMessageAsync(message, ct);
             }
         }

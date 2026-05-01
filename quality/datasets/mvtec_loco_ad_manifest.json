@@ -1,0 +1,28 @@
+{
+  "schema_version": "2026-04-30.public-quality-dataset-manifest.v1",
+  "dataset_id": "mvtec_loco_ad",
+  "name": "MVTec LOCO AD",
+  "target_operators": ["AnomalyDetection"],
+  "download_priority": 2,
+  "local_root": "quality/public_datasets/mvtec_loco_ad",
+  "license": {
+    "id": "CC-BY-NC-SA-4.0",
+    "commercial_use": false,
+    "notes": "Research/evaluation only; do not use as production sign-off evidence."
+  },
+  "source": {
+    "url": "https://www.mvtec.com/research-teaching/datasets/mvtec-loco-ad",
+    "publisher": "MVTec Software GmbH",
+    "description": "Logical and structural anomaly detection benchmark."
+  },
+  "archives": [],
+  "expected_categories": [
+    "breakfast_box",
+    "juice_bottle",
+    "pushpins",
+    "screw_bag",
+    "splicing_connectors"
+  ],
+  "index_output": "quality/datasets/mvtec_loco_ad_index.json",
+  "claim_boundary": "Public benchmark research evidence only; advisory for logical anomaly behavior until threshold calibration is separately approved."
+}

@@ -1,0 +1,14 @@
+services:
+  virtual-modbus-plc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "1502:1502"
+    command:
+      - python
+      - virtual_plc_modbus.py
+      - --host
+      - 0.0.0.0
+      - --port
+      - "1502"

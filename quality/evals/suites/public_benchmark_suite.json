@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "2026-04-29.quality-suite.v1",
+  "suiteId": "public_benchmark_suite",
+  "description": "Public benchmark dataset inventory, download hooks, and manifest validation for quasi-industrial proof.",
+  "ciBudgetMinutes": 60,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "public-benchmark-inventory",
+      "entries": [
+        {
+          "id": "public_benchmark_inventory_validate",
+          "status": "active",
+          "evidenceKind": "public-benchmark-inventory",
+          "command": [
+            "python",
+            "quality/tools/build_quasi_industrial_proof_assets.py",
+            "--validate-only",
+            "--focus",
+            "datasets"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "public_benchmark_proof_validate",
+          "status": "active",
+          "evidenceKind": "public-benchmark-proof",
+          "command": [
+            "python",
+            "quality/tools/run_public_benchmark_proof.py",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.md",
+          "estimatedSeconds": 30
+        }
+      ]
+    },
+    {
+      "id": "public-benchmark-downloads",
+      "entries": [
+        {
+          "id": "download_kolektorsdd2",
+          "status": "manual",
+          "evidenceKind": "public-dataset-download",
+          "datasetId": "kolektorsdd2",
+          "command": [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "quality/datasets/download_public_quality_datasets.ps1",
+            "-Dataset",
+            "kolektorsdd2"
+          ],
+          "estimatedSeconds": 1800,
+          "notes": "Large public datasets are downloaded only on explicit request; repo stores manifests and indexes, not images."
+        },
+        {
+          "id": "download_mvtec_ad_lite",
+          "status": "manual",
+          "evidenceKind": "public-dataset-download",
+          "datasetId": "mvtec_ad_lite",
+          "command": [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "quality/datasets/download_mvtec_ad_lite.ps1"
+          ],
+          "estimatedSeconds": 1800,
+          "notes": "Large public datasets are downloaded only on explicit request; repo stores manifests and indexes, not images."
+        },
+        {
+          "id": "download_bsds500",
+          "status": "manual",
+          "evidenceKind": "public-dataset-download",
+          "datasetId": "bsds500",
+          "command": [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "quality/datasets/download_public_quality_datasets.ps1",
+            "-Dataset",
+            "bsds500"
+          ],
+          "estimatedSeconds": 1800,
+          "notes": "Large public datasets are downloaded only on explicit request; repo stores manifests and indexes, not images."
+        },
+        {
+          "id": "download_opencv_calibration_samples",
+          "status": "manual",
+          "evidenceKind": "public-dataset-download",
+          "datasetId": "opencv_calibration_samples",
+          "command": [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "quality/datasets/download_public_quality_datasets.ps1",
+            "-Dataset",
+            "opencv_calibration_samples"
+          ],
+          "estimatedSeconds": 1800,
+          "notes": "Large public datasets are downloaded only on explicit request; repo stores manifests and indexes, not images."
+        },
+        {
+          "id": "download_coco2017",
+          "status": "manual",
+          "evidenceKind": "public-dataset-download",
+          "datasetId": "coco2017",
+          "command": [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "quality/datasets/download_public_quality_datasets.ps1",
+            "-Dataset",
+            "coco2017"
+          ],
+          "estimatedSeconds": 1800,
+          "notes": "Large public datasets are downloaded only on explicit request; repo stores manifests and indexes, not images."
+        },
+        {
+          "id": "download_hpatches",
+          "status": "manual",
+          "evidenceKind": "public-dataset-download",
+          "datasetId": "hpatches",
+          "command": [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "quality/datasets/download_public_quality_datasets.ps1",
+            "-Dataset",
+            "hpatches"
+          ],
+          "estimatedSeconds": 1800,
+          "notes": "Large public datasets are downloaded only on explicit request; repo stores manifests and indexes, not images."
+        }
+      ]
+    }
+  ]
+}

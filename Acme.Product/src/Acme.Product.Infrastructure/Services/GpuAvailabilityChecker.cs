@@ -277,7 +277,10 @@ public static class GpuAvailabilityChecker
                 // 简化版本提取
                 return "12.x"; // 实际应解析JSON
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GpuAvailabilityChecker] Failed to read CUDA version file: {ex.Message}");
+            }
         }
 
         // 从路径名推断
@@ -315,7 +318,10 @@ public static class GpuAvailabilityChecker
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[GpuAvailabilityChecker] Failed to locate nvcc: {ex.Message}");
+        }
 
         return null;
     }
@@ -345,7 +351,10 @@ public static class GpuAvailabilityChecker
                 return "12.x"; // 简化处理
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[GpuAvailabilityChecker] Failed to read nvcc version: {ex.Message}");
+        }
 
         return null;
     }

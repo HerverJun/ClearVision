@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest",
+  "datasetId": "semantic_segmentation_voc_style_protocol_bridge_v1",
+  "operator": "SemanticSegmentation",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "semi-synthetic-public-protocol",
+    "name": "VOC-style semi-synthetic semantic segmentation protocol bridge",
+    "version": "v1",
+    "uri": "in-repo generated protocol",
+    "license": "repo-local synthetic protocol",
+    "citation": "VOC-style pixel accuracy, mean IoU, Dice, and boundary-IoU semantic segmentation protocol proxy; no external images are stored.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 20260427,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 36,
+    "caseListPath": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json"
+  },
+  "labels": {
+    "schema": "dense per-pixel semantic class map with foreground/background classes",
+    "positiveClasses": ["surface", "scratch", "contaminant"],
+    "negativeClasses": ["background", "class_absent"],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "MeanIoU",
+    "secondary": ["PixelAccuracy", "MeanDice", "MeanBoundaryIoU", "RuntimeMs"],
+    "thresholds": {
+      "MeanIoU": 0.999,
+      "PixelAccuracy": 0.999,
+      "MeanDice": 0.999,
+      "MeanBoundaryIoU": 0.999,
+      "Failed": 0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/SemanticSegmentationDatasetRunner/SemanticSegmentationDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/SemanticSegmentationDatasetRunner/SemanticSegmentationDatasetRunner.csproj -- --output quality/evals/reports/SemanticSegmentation_dataset_baseline.json --report quality/evals/reports/SemanticSegmentation_dataset_baseline.md",
+    "baselineJson": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
+    "reportMarkdown": "quality/evals/reports/SemanticSegmentation_dataset_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["single_region", "multi_class_regions", "thin_boundary", "small_object", "class_absent", "nested_regions", "mask_key_regression", "palette_regression"],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Generated geometric fixtures only; no public or customer image pixels are stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

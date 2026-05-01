@@ -41,7 +41,7 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MeasureMode", "Measure Mode", "enum", DefaultValue = "edge_pairs", Options = new[] { "edge_pairs|edge_pairs" })]
 [OperatorParam("PairDirection", "Pair Direction", "enum", DefaultValue = "any", Options = new[] { "positive_to_negative|positive_to_negative", "negative_to_positive|negative_to_positive", "any|any" })]
 [OperatorParam("SubpixelAccuracy", "Subpixel Accuracy", "bool", DefaultValue = false)]
-[OperatorParam("SubPixelMode", "Sub Pixel Mode", "enum", DefaultValue = "gradient_centroid", Options = new[] { "gradient_centroid|gradient_centroid", "zernike|zernike" })]
+[OperatorParam("SubPixelMode", "Sub Pixel Mode", "enum", DefaultValue = "gradient_centroid", Options = new[] { "gradient_centroid|gradient_centroid", "gradient_moment|gradient_moment", "zernike|zernike (legacy alias)" })]
 public class CaliperToolOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.CaliperTool;
@@ -74,7 +74,8 @@ public class CaliperToolOperator : OperatorBase
         var measureMode = GetStringParam(@operator, "MeasureMode", "edge_pairs");
         var pairDirection = GetStringParam(@operator, "PairDirection", "any");
         var subpixel = GetBoolParam(@operator, "SubpixelAccuracy", false);
-        var subPixelMode = GetStringParam(@operator, "SubPixelMode", "gradient_centroid");
+        var requestedSubPixelMode = GetStringParam(@operator, "SubPixelMode", "gradient_centroid");
+        var subPixelMode = NormalizeSubPixelMode(requestedSubPixelMode);
         if (!measureMode.Equals("edge_pairs", StringComparison.OrdinalIgnoreCase))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("MeasureMode must be edge_pairs"));
@@ -194,6 +195,8 @@ public class CaliperToolOperator : OperatorBase
             { "Confidence", pairCount > 0 ? 1.0 : 0.0 },
             { "UncertaintyPx", reportedUncertaintyPx }
         });
+        output["RequestedSubPixelMode"] = requestedSubPixelMode;
+        output["SubPixelMode"] = subPixelMode;
         // Override image width key with measured width to match operator output contract.
         output["Width"] = widthValue;
 
@@ -229,11 +232,11 @@ public class CaliperToolOperator : OperatorBase
             return ValidationResult.Invalid("PairDirection must be positive_to_negative, negative_to_positive or any");
         }
 
-        var subPixelMode = GetStringParam(@operator, "SubPixelMode", "gradient_centroid");
-        var validModes = new[] { "gradient_centroid", "zernike" };
+        var subPixelMode = NormalizeSubPixelMode(GetStringParam(@operator, "SubPixelMode", "gradient_centroid"));
+        var validModes = new[] { "gradient_centroid", "gradient_moment" };
         if (!validModes.Contains(subPixelMode, StringComparer.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("SubPixelMode must be gradient_centroid or zernike");
+            return ValidationResult.Invalid("SubPixelMode must be gradient_centroid, gradient_moment, or legacy zernike");
         }
 
         return ValidationResult.Valid();
@@ -502,6 +505,20 @@ public class CaliperToolOperator : OperatorBase
         };
     }
 
+    private static string NormalizeSubPixelMode(string? mode)
+    {
+        var normalized = mode?.Trim().ToLowerInvariant() ?? "gradient_centroid";
+        return normalized switch
+        {
+            "zernike" => "gradient_moment",
+            "gradientmoment" => "gradient_moment",
+            "gradient_moment" => "gradient_moment",
+            "gradient_centroid" => "gradient_centroid",
+            "gradientcentroid" => "gradient_centroid",
+            _ => normalized
+        };
+    }
+
     private static List<Position> BuildDrawEdgeList(
         IReadOnlyList<DetectedEdge> detectedEdges,
         IReadOnlyList<(int First, int Second)> pairs,
@@ -561,7 +578,7 @@ public class CaliperToolOperator : OperatorBase
 
         if (detector != null)
         {
-            if (subPixelMode.Equals("zernike", StringComparison.OrdinalIgnoreCase) &&
+            if (subPixelMode.Equals("gradient_moment", StringComparison.OrdinalIgnoreCase) &&
                 TryRefineSubpixelGradientMoment(samples, idx, sampleCount, edgeThreshold, polarity, detector, out var refinedGradientMoment))
             {
                 return refinedGradientMoment;

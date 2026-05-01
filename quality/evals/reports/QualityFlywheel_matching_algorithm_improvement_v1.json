@@ -1,0 +1,398 @@
+{
+  "schemaVersion": "2026-04-29.matching-algorithm-improvement.v1",
+  "generatedAtUtc": "2026-05-01T03:28:42+00:00",
+  "accepted": true,
+  "claimBoundary": "准工业公开/替代证明；不声明真实产线工业验证完成。",
+  "sourceReports": [
+    "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
+    "quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v4.json",
+    "quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.json",
+    "quality/evals/reports/QualityFlywheel_matching_replay_safe_profile_candidates_v2.json",
+    "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+    "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+    "quality/evals/reports/QualityFlywheel_matching_failure_backlog_v1.json"
+  ],
+  "summary": {
+    "abReplayCaseCount": 183,
+    "executedCandidateCaseCount": 160,
+    "fixedCaseCount": 37,
+    "regressedCaseCount": 0,
+    "matchingViewpointFixedCaseCount": 10,
+    "replaySafePromotionCount": 2,
+    "releaseGateStatus": "blocked-missing-field-replay",
+    "recommendedPrimaryOperator": "OrbFeatureMatch",
+    "remainingBacklogCaseCount": 4,
+    "remainingBothOperatorsFailedCount": 2
+  },
+  "replaySafeProfileGate": {
+    "status": "promotion-ready-default-off",
+    "productDefaultChange": false,
+    "primaryCandidate": "OrbFeatureMatch/center_only_projection_v1",
+    "fallbackCandidate": "AkazeFeatureMatch/center_only_projection_v1",
+    "releaseGateStatus": "blocked-missing-field-replay",
+    "requiredBeforeDefaultOn": [
+      "run release/field replay with product default enabled in a separate candidate profile",
+      "show zero matching regressions and no P95 position/corner regression against the pinned default-off baseline",
+      "attach runtime budget and field owner sign-off"
+    ]
+  },
+  "operators": {
+    "AkazeFeatureMatch": {
+      "candidate": {
+        "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+        "operator": "AkazeFeatureMatch",
+        "candidateVersion": null,
+        "selectedProfile": "center_only_projection_v1",
+        "caseCount": 116,
+        "passed": 114,
+        "failed": 2,
+        "passRate": 0.982759,
+        "meanPositionErrorPx": 4.176081,
+        "p95PositionErrorPx": 2.014785,
+        "p95CornerErrorPx": 9.246627,
+        "runtimeMs": 6786.379,
+        "memoryAllocationBytes": 58695368,
+        "parameters": {
+          "MaxFeatures": 1200,
+          "MinInliers": 6,
+          "MatchRatio": 0.75,
+          "RansacThreshold": 5,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 20,
+          "EdgeThreshold": 15,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
+        },
+        "viewpoint": {
+          "caseCount": 59,
+          "passed": 58,
+          "failed": 1,
+          "passRate": 0.983051,
+          "meanPositionErrorPx": 3.553514,
+          "runtimeMsAvg": 61.224
+        },
+        "illumination": {
+          "caseCount": 57,
+          "passed": 56,
+          "failed": 1,
+          "passRate": 0.982456,
+          "meanPositionErrorPx": 4.820493,
+          "runtimeMsAvg": 55.687
+        }
+      },
+      "abReplay": {
+        "oldMetrics": {
+          "caseCount": 20,
+          "passed": 0,
+          "failed": 20,
+          "passRate": 0.0,
+          "meanPositionErrorPx": 247.281487
+        },
+        "candidateMetrics": {
+          "caseCount": 20,
+          "passed": 19,
+          "failed": 1,
+          "passRate": 0.95,
+          "meanPositionErrorPx": 13.100564
+        },
+        "fixedCaseCount": 19,
+        "regressedCaseCount": 0,
+        "candidateBaseline": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_replay_center_only_v1.json"
+      },
+      "selectedProfile": {
+        "selectedProfile": "center_only_projection_v1",
+        "validation": {
+          "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+          "passed": 114,
+          "caseCount": 116,
+          "p95PositionErrorPx": 2.014785,
+          "p95CornerErrorPx": 9.246627
+        },
+        "replay": null,
+        "holdout": null
+      }
+    },
+    "OrbFeatureMatch": {
+      "candidate": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+        "operator": "OrbFeatureMatch",
+        "candidateVersion": null,
+        "selectedProfile": "center_only_projection_v1",
+        "caseCount": 116,
+        "passed": 112,
+        "failed": 4,
+        "passRate": 0.965517,
+        "meanPositionErrorPx": 7.270331,
+        "p95PositionErrorPx": 2.561756,
+        "p95CornerErrorPx": 8.454432,
+        "runtimeMs": 2954.6,
+        "memoryAllocationBytes": 68163288,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.7,
+          "RansacThreshold": 7,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
+        },
+        "viewpoint": {
+          "caseCount": 59,
+          "passed": 56,
+          "failed": 3,
+          "passRate": 0.949153,
+          "meanPositionErrorPx": 13.719773,
+          "runtimeMsAvg": 25.757
+        },
+        "illumination": {
+          "caseCount": 57,
+          "passed": 56,
+          "failed": 1,
+          "passRate": 0.982456,
+          "meanPositionErrorPx": 0.594593,
+          "runtimeMsAvg": 25.174
+        }
+      },
+      "abReplay": {
+        "oldMetrics": {
+          "caseCount": 20,
+          "passed": 0,
+          "failed": 20,
+          "passRate": 0.0,
+          "meanPositionErrorPx": 183.177404
+        },
+        "candidateMetrics": {
+          "caseCount": 20,
+          "passed": 18,
+          "failed": 2,
+          "passRate": 0.9,
+          "meanPositionErrorPx": 16.048727
+        },
+        "fixedCaseCount": 18,
+        "regressedCaseCount": 0,
+        "candidateBaseline": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_center_only_v1.json"
+      },
+      "selectedProfile": {
+        "selectedProfile": "center_only_projection_v1",
+        "validation": {
+          "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+          "passed": 112,
+          "caseCount": 116,
+          "p95PositionErrorPx": 2.561756,
+          "p95CornerErrorPx": 8.454432
+        },
+        "replay": null,
+        "holdout": null
+      }
+    }
+  },
+  "leaderboard": [
+    {
+      "label": "AkazeFeatureMatch",
+      "operator": "AkazeFeatureMatch",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
+      "accepted": true,
+      "caseCount": 116,
+      "passed": 114,
+      "passRate": 0.982759,
+      "viewpointCaseCount": 59,
+      "viewpointPassed": 58,
+      "viewpointPassRate": 0.983051,
+      "illuminationCaseCount": 57,
+      "illuminationPassed": 56,
+      "illuminationPassRate": 0.982456,
+      "meanPositionErrorPx": 4.176081,
+      "p95PositionErrorPx": 2.014785,
+      "p95CornerErrorPx": 9.246627,
+      "runtimeMs": 6786.379,
+      "maxFeatures": 1200,
+      "matchRatio": 0.75,
+      "ransacThreshold": 5,
+      "minInlierRatio": 0.25,
+      "fastThreshold": 20,
+      "edgeThreshold": 15,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": true,
+      "scoreThreshold": 0.5,
+      "topFailures": [
+        {
+          "reason": "At least four point correspondences are required.",
+          "count": 1
+        },
+        {
+          "reason": "Projected quadrilateral is invalid.",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "label": "OrbFeatureMatch",
+      "operator": "OrbFeatureMatch",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
+      "accepted": true,
+      "caseCount": 116,
+      "passed": 112,
+      "passRate": 0.965517,
+      "viewpointCaseCount": 59,
+      "viewpointPassed": 56,
+      "viewpointPassRate": 0.949153,
+      "illuminationCaseCount": 57,
+      "illuminationPassed": 56,
+      "illuminationPassRate": 0.982456,
+      "meanPositionErrorPx": 7.270331,
+      "p95PositionErrorPx": 2.561756,
+      "p95CornerErrorPx": 8.454432,
+      "runtimeMs": 2954.6,
+      "maxFeatures": 2000,
+      "matchRatio": 0.7,
+      "ransacThreshold": 7,
+      "minInlierRatio": 0.25,
+      "fastThreshold": 16,
+      "edgeThreshold": 10,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": true,
+      "scoreThreshold": 0.5,
+      "topFailures": [
+        {
+          "reason": "Projected quadrilateral is invalid.",
+          "count": 3
+        },
+        {
+          "reason": "At least four point correspondences are required.",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "label": "PlanarMatching(ORB)",
+      "operator": "PlanarMatching",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
+      "accepted": true,
+      "caseCount": 80,
+      "passed": 60,
+      "passRate": 0.75,
+      "viewpointCaseCount": 23,
+      "viewpointPassed": 7,
+      "viewpointPassRate": 0.304348,
+      "illuminationCaseCount": 57,
+      "illuminationPassed": 53,
+      "illuminationPassRate": 0.929825,
+      "meanPositionErrorPx": 25022.378956,
+      "p95PositionErrorPx": 101.637356,
+      "p95CornerErrorPx": 35.477532,
+      "runtimeMs": 4408.856,
+      "maxFeatures": 1200,
+      "matchRatio": 0.75,
+      "ransacThreshold": 5,
+      "minInlierRatio": 0.25,
+      "fastThreshold": 20,
+      "edgeThreshold": 15,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": false,
+      "scoreThreshold": 0.5,
+      "topFailures": [
+        {
+          "reason": "Projected quadrilateral is invalid.",
+          "count": 10
+        },
+        {
+          "reason": "Insufficient feature matches (4 < 6).",
+          "count": 1
+        },
+        {
+          "reason": "Insufficient feature matches (3 < 6).",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.63, inliers=7, totalMatches=10, error=101.637, tolerance=35",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.769, inliers=148, totalMatches=149, error=44.549, tolerance=35",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "label": "PlanarMatching(AKAZE)",
+      "operator": "PlanarMatching",
+      "detectorType": "AKAZE",
+      "sourceReport": "quality/evals/reports/PlanarMatching_hpatches_akaze_baseline.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
+      "accepted": true,
+      "caseCount": 116,
+      "passed": 70,
+      "passRate": 0.603448,
+      "viewpointCaseCount": 59,
+      "viewpointPassed": 16,
+      "viewpointPassRate": 0.271186,
+      "illuminationCaseCount": 57,
+      "illuminationPassed": 54,
+      "illuminationPassRate": 0.947368,
+      "meanPositionErrorPx": 8648.600934,
+      "p95PositionErrorPx": 118.723182,
+      "p95CornerErrorPx": 8.253566,
+      "runtimeMs": 20655.251,
+      "maxFeatures": 1600,
+      "matchRatio": 0.75,
+      "ransacThreshold": 5,
+      "minInlierRatio": 0.2,
+      "fastThreshold": 20,
+      "edgeThreshold": 15,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": null,
+      "scoreThreshold": 0.5,
+      "topFailures": [
+        {
+          "reason": "Projected quadrilateral is invalid.",
+          "count": 24
+        },
+        {
+          "reason": "Insufficient feature matches (1 < 6).",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.741, inliers=8, totalMatches=8, error=153.71, tolerance=35",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.824, inliers=46, totalMatches=46, error=45.672, tolerance=35",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.795, inliers=258, totalMatches=259, error=97.086, tolerance=35",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "backlogSummary": {
+    "caseCount": 4,
+    "bothOperatorsFailedCount": 2,
+    "viewpointCaseCount": 3,
+    "illuminationCaseCount": 1,
+    "taxonomyCounts": {
+      "extreme_viewpoint_crop": 3,
+      "insufficient_correspondences": 1
+    }
+  },
+  "nextActions": [
+    "Use OrbFeatureMatch center_only_v1 as the next primary matching candidate profile.",
+    "Keep AllowCenterOnlyProjection default-off in product paths until release/field replay gate signs off.",
+    "Keep AkazeFeatureMatch center_only_v1 as a stable fallback candidate profile.",
+    "Treat QualityFlywheel_matching_replay_safe_profile_candidates_v2 as the promotion-ready profile gate; do not use it as product-default approval.",
+    "After backlog triage, move Phase C SurfaceDefectDetection/AnomalyDetection into candidate execution."
+  ]
+}

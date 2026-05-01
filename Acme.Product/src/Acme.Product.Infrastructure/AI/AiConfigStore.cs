@@ -20,6 +20,7 @@ public class AiConfigStore
     private readonly AiGenerationOptions _initialOptions;
     private readonly string _modelsFilePath;
     private readonly string _legacyConfigFilePath;
+    private readonly IAiApiKeySecretStore _apiKeySecretStore;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -46,6 +47,7 @@ public class AiConfigStore
         Directory.CreateDirectory(storageDirectory);
         _modelsFilePath = Path.Combine(storageDirectory, "ai_models.json");
         _legacyConfigFilePath = Path.Combine(storageDirectory, "ai_config.json");
+        _apiKeySecretStore = new DpapiFileAiApiKeySecretStore(Path.Combine(storageDirectory, "ai_model_secrets"));
         _models = LoadOrMigrate(_initialOptions);
     }
 
@@ -85,6 +87,16 @@ public class AiConfigStore
     {
         lock (_lock)
         {
+            if (string.IsNullOrWhiteSpace(model.Id))
+            {
+                model.Id = $"model_{Guid.NewGuid():N}";
+            }
+
+            if (_models.Any(x => string.Equals(x.Id, model.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException($"AI model id already exists: {model.Id}");
+            }
+
             if (model.Reasoning == null)
                 model.NormalizeAdvancedFields();
 
@@ -192,6 +204,21 @@ public class AiConfigStore
         return resetModels;
     }
 
+    private void TryDeleteLegacyConfigFile()
+    {
+        try
+        {
+            if (File.Exists(_legacyConfigFilePath))
+            {
+                File.Delete(_legacyConfigFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[AiConfigStore] 删除旧版 ai_config.json 失败: {Message}", ex.Message);
+        }
+    }
+
     private List<AiModelConfig> LoadOrMigrate(AiGenerationOptions fallback)
     {
         if (File.Exists(_modelsFilePath))
@@ -202,9 +229,16 @@ public class AiConfigStore
                 var models = JsonSerializer.Deserialize<List<AiModelConfig>>(json, JsonOptions);
                 if (models is { Count: > 0 })
                 {
+                    EnsureUniqueModelIds(models);
                     EnsureOneActive(models);
                     EnsureCapabilities(models);
                     EnsureAdvancedFields(models);
+                    var hadInlineKeys = ImportOrHydrateApiKeys(models);
+                    _models = models;
+                    if (hadInlineKeys)
+                    {
+                        Save();
+                    }
                     _logger.LogInformation("[AiConfigStore] 从 ai_models.json 加载 {Count} 个模型配置", models.Count);
                     return models;
                 }
@@ -246,6 +280,7 @@ public class AiConfigStore
                     var models = new List<AiModelConfig> { migrated };
                     _models = models;
                     Save();
+                    TryDeleteLegacyConfigFile();
                     return models;
                 }
             }
@@ -266,6 +301,20 @@ public class AiConfigStore
     {
         if (!models.Any(x => x.IsActive) && models.Count > 0)
             models[0].IsActive = true;
+    }
+
+    private static void EnsureUniqueModelIds(List<AiModelConfig> models)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var model in models)
+        {
+            if (string.IsNullOrWhiteSpace(model.Id) || seen.Contains(model.Id))
+            {
+                model.Id = $"model_{Guid.NewGuid():N}";
+            }
+
+            seen.Add(model.Id);
+        }
     }
 
     private static void EnsureCapabilities(List<AiModelConfig> models)
@@ -289,12 +338,64 @@ public class AiConfigStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(_models, JsonOptions);
+            List<AiModelConfig> snapshot;
+            lock (_lock)
+            {
+                snapshot = _models.Select(CloneModel).ToList();
+            }
+
+            PersistApiKeys(snapshot);
+            _apiKeySecretStore.PruneExcept(snapshot.Select(model => model.Id));
+
+            var persistedModels = snapshot.Select(CloneModelForPersistence).ToList();
+            var json = JsonSerializer.Serialize(persistedModels, JsonOptions);
             File.WriteAllText(_modelsFilePath, json);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[AiConfigStore] 持久化失败: {Message}", ex.Message);
+        }
+    }
+
+    private bool ImportOrHydrateApiKeys(List<AiModelConfig> models)
+    {
+        var hadInlineKeys = false;
+        foreach (var model in models)
+        {
+            if (string.IsNullOrWhiteSpace(model.Id))
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(model.ApiKey))
+            {
+                _apiKeySecretStore.Save(model.Id, model.ApiKey);
+                hadInlineKeys = true;
+                continue;
+            }
+
+            if (_apiKeySecretStore.TryRead(model.Id, out var apiKey))
+            {
+                model.ApiKey = apiKey;
+            }
+        }
+
+        return hadInlineKeys;
+    }
+
+    private void PersistApiKeys(IEnumerable<AiModelConfig> models)
+    {
+        foreach (var model in models)
+        {
+            if (string.IsNullOrWhiteSpace(model.Id))
+                continue;
+
+            if (string.IsNullOrWhiteSpace(model.ApiKey))
+            {
+                _apiKeySecretStore.Delete(model.Id);
+            }
+            else
+            {
+                _apiKeySecretStore.Save(model.Id, model.ApiKey);
+            }
         }
     }
 
@@ -320,6 +421,13 @@ public class AiConfigStore
         defaultModel.NormalizeAdvancedFields();
 
         return new List<AiModelConfig> { defaultModel };
+    }
+
+    private static AiModelConfig CloneModelForPersistence(AiModelConfig model)
+    {
+        var clone = CloneModel(model);
+        clone.ApiKey = string.Empty;
+        return clone;
     }
 
     private static AiModelConfig CloneModel(AiModelConfig model) => new()

@@ -400,3 +400,116 @@
 [data-theme="dark"] .ac-generic-row {
     border-color: rgba(255, 255, 255, 0.06);
 }
+
+/* Result card renderer */
+.cv-result-card-body {
+    display: grid;
+    gap: 8px;
+}
+
+.cv-result-field {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.38fr) 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.52);
+    border: 1px solid rgba(225, 190, 188, 0.28);
+    border-radius: 8px;
+}
+
+.cv-result-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.cv-result-rendered-value {
+    min-width: 0;
+    color: var(--text-color);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.cv-result-number,
+.cv-result-geometry,
+.cv-result-list-summary,
+.cv-result-unit,
+.cv-result-detection-score,
+.cv-result-kv-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.cv-result-number {
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.cv-result-unit,
+.cv-result-muted,
+.cv-result-empty,
+.cv-result-hint {
+    color: var(--text-muted);
+}
+
+.cv-result-bool,
+.cv-result-card-status {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.cv-result-bool.true,
+.cv-result-card-status.ok {
+    color: #00685b;
+    background: rgba(0, 104, 91, 0.1);
+    border: 1px solid rgba(0, 104, 91, 0.18);
+}
+
+.cv-result-bool.false,
+.cv-result-card-status.ng {
+    color: #ba1a1a;
+    background: rgba(186, 26, 26, 0.1);
+    border: 1px solid rgba(186, 26, 26, 0.18);
+}
+
+.cv-result-text {
+    white-space: pre-wrap;
+}
+
+.cv-result-detection-list,
+.cv-result-kv-table {
+    display: grid;
+    gap: 6px;
+}
+
+.cv-result-detection-row,
+.cv-result-kv-row {
+    display: grid;
+    grid-template-columns: minmax(80px, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.cv-result-detection-box {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.cv-result-kv-row {
+    grid-template-columns: minmax(80px, 0.36fr) 1fr;
+}
+
+.cv-result-kv-key {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+}

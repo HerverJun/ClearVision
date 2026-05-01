@@ -438,6 +438,8 @@ public class EdgePairDefectOperator : OperatorBase
                 line = new LineData(x1, y1, x2, y2);
                 return true;
             }
+
+            return false;
         }
 
         if (raw is IDictionary legacy)

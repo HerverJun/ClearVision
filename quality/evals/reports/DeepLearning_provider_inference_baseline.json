@@ -1,0 +1,41 @@
+{
+  "EvidenceKind": "contract",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-28T16:05:32.8845552+00:00",
+    "CaseCount": 1,
+    "Passed": 1,
+    "Failed": 0,
+    "AvailableProviders": [
+      "CPUExecutionProvider"
+    ]
+  },
+  "Operators": [
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "HasBenchmark": true,
+      "Benchmark": "provider-smoke"
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "cpu_smoke_identity",
+      "RequestedProvider": "CPUExecutionProvider",
+      "ActiveProvider": "CPUExecutionProvider",
+      "FallbackToCpu": false,
+      "RealOnnxInference": true,
+      "Passed": true,
+      "Required": true,
+      "LatencyMs": 50.2555,
+      "AvailableProviders": [
+        "CPUExecutionProvider"
+      ],
+      "FallbackReason": "",
+      "ProviderFailureCode": "",
+      "ProviderFailureMessage": "",
+      "ProviderFailureExceptionType": ""
+    }
+  ]
+}

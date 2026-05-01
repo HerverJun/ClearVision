@@ -1,0 +1,3815 @@
+{
+  "EvidenceKind": "golden",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T03:29:57.3419805+00:00",
+    "CaseCount": 280,
+    "Passed": 280,
+    "Failed": 0,
+    "RuntimeMs": 429.97
+  },
+  "Operators": [
+    {
+      "Operator": "AdaptiveThreshold",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.797,
+      "MemoryAllocationBytesAvg": 75427
+    },
+    {
+      "Operator": "AffineTransform",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.221,
+      "MemoryAllocationBytesAvg": 8394
+    },
+    {
+      "Operator": "BlobAnalysis",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.07,
+      "MemoryAllocationBytesAvg": 26215
+    },
+    {
+      "Operator": "BlobLabeling",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.447,
+      "MemoryAllocationBytesAvg": 15121
+    },
+    {
+      "Operator": "CircleMeasurement",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.42,
+      "MemoryAllocationBytesAvg": 10655
+    },
+    {
+      "Operator": "ContourDetection",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 5.504,
+      "MemoryAllocationBytesAvg": 14834
+    },
+    {
+      "Operator": "DistanceTransform",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.628,
+      "MemoryAllocationBytesAvg": 11744
+    },
+    {
+      "Operator": "EdgeDetection",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.399,
+      "MemoryAllocationBytesAvg": 9662
+    },
+    {
+      "Operator": "GeometricFitting",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.218,
+      "MemoryAllocationBytesAvg": 68641
+    },
+    {
+      "Operator": "ImageDiff",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.425,
+      "MemoryAllocationBytesAvg": 7455
+    },
+    {
+      "Operator": "ImageSubtract",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.851,
+      "MemoryAllocationBytesAvg": 10536
+    },
+    {
+      "Operator": "LineMeasurement",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.38,
+      "MemoryAllocationBytesAvg": 155806
+    },
+    {
+      "Operator": "PerspectiveTransform",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.367,
+      "MemoryAllocationBytesAvg": 10712
+    },
+    {
+      "Operator": "WidthMeasurement",
+      "EvidenceKind": "golden",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 5.771,
+      "MemoryAllocationBytesAvg": 894005
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Affine matrix oracle",
+      "CaseCount": 12,
+      "Passed": 12,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.186
+    },
+    {
+      "Scenario": "Circle fit oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.413
+    },
+    {
+      "Scenario": "Circle fitting oracle",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.078
+    },
+    {
+      "Scenario": "Connected component oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.549
+    },
+    {
+      "Scenario": "Contour count oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 6.839
+    },
+    {
+      "Scenario": "Distance limit contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.817
+    },
+    {
+      "Scenario": "Ellipse fitting oracle",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.132
+    },
+    {
+      "Scenario": "Failure contract",
+      "CaseCount": 27,
+      "Passed": 27,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.734
+    },
+    {
+      "Scenario": "Line fitting oracle",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.078
+    },
+    {
+      "Scenario": "Line geometry oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.896
+    },
+    {
+      "Scenario": "Manual line width oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 7.132
+    },
+    {
+      "Scenario": "OpenCV Canny oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.457
+    },
+    {
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.954
+    },
+    {
+      "Scenario": "OpenCV distance transform oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.681
+    },
+    {
+      "Scenario": "Pixel difference oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.708
+    },
+    {
+      "Scenario": "Point set transform oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.404
+    },
+    {
+      "Scenario": "Provided blob label oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.51
+    },
+    {
+      "Scenario": "Subtraction statistics oracle",
+      "CaseCount": 16,
+      "Passed": 16,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.043
+    },
+    {
+      "Scenario": "Three-point transform oracle",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.329
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 28,
+      "Passed": 28,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.177
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "ImageDiff_pixel_diff_00",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 27.174,
+      "MemoryAllocationBytes": 73976,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.01953125,
+        "DiffRate": 0.01953125
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_01",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.046,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.029296875,
+        "DiffRate": 0.029296875
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_02",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.041015625,
+        "DiffRate": 0.041015625
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_03",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.0546875,
+        "DiffRate": 0.0546875
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_04",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.0390625,
+        "DiffRate": 0.0390625
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_05",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.052734375,
+        "DiffRate": 0.052734375
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_06",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.02734375,
+        "DiffRate": 0.02734375
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_07",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.0390625,
+        "DiffRate": 0.0390625
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_08",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.029296875,
+        "DiffRate": 0.029296875
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_09",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.041015625,
+        "DiffRate": 0.041015625
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_10",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.0546875,
+        "DiffRate": 0.0546875
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_11",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.0703125,
+        "DiffRate": 0.0703125
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_12",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.01953125,
+        "DiffRate": 0.01953125
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_13",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.029296875,
+        "DiffRate": 0.029296875
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_14",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.041015625,
+        "DiffRate": 0.041015625
+      }
+    },
+    {
+      "CaseId": "ImageDiff_pixel_diff_15",
+      "Operator": "ImageDiff",
+      "Scenario": "Pixel difference oracle",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 4632,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDiffRate": 0.0546875,
+        "DiffRate": 0.0546875
+      }
+    },
+    {
+      "CaseId": "ImageDiff_mismatched_size_00",
+      "Operator": "ImageDiff",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 1.149,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MismatchedSize"
+      }
+    },
+    {
+      "CaseId": "ImageDiff_mismatched_size_01",
+      "Operator": "ImageDiff",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.017,
+      "MemoryAllocationBytes": 2536,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MismatchedSize"
+      }
+    },
+    {
+      "CaseId": "ImageDiff_mismatched_size_02",
+      "Operator": "ImageDiff",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 2536,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MismatchedSize"
+      }
+    },
+    {
+      "CaseId": "ImageDiff_mismatched_size_03",
+      "Operator": "ImageDiff",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 2536,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MismatchedSize"
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_00",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 16.469,
+      "MemoryAllocationBytes": 111760,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 90,
+        "MeanDifference": 90
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_01",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.055,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 90,
+        "MeanDifference": 90
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_02",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.018,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 90,
+        "MeanDifference": 90
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_03",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5992,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 90,
+        "MeanDifference": 90
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_04",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 90,
+        "MeanDifference": 90
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_05",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 85,
+        "MeanDifference": 85
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_06",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5992,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 85,
+        "MeanDifference": 85
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_07",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 85,
+        "MeanDifference": 85
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_08",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.019,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 85,
+        "MeanDifference": 85
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_09",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 5992,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 85,
+        "MeanDifference": 85
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_10",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 80,
+        "MeanDifference": 80
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_11",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 80,
+        "MeanDifference": 80
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_12",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5992,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 80,
+        "MeanDifference": 80
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_13",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 80,
+        "MeanDifference": 80
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_14",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5792,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 80,
+        "MeanDifference": 80
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_constant_abs_15",
+      "Operator": "ImageSubtract",
+      "Scenario": "Subtraction statistics oracle",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 5992,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedDifference": 75,
+        "MeanDifference": 75
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_missing_input_00",
+      "Operator": "ImageSubtract",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.318,
+      "MemoryAllocationBytes": 3944,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage2"
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_missing_input_01",
+      "Operator": "ImageSubtract",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 2376,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage2"
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_missing_input_02",
+      "Operator": "ImageSubtract",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 2376,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage2"
+      }
+    },
+    {
+      "CaseId": "ImageSubtract_missing_input_03",
+      "Operator": "ImageSubtract",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 2376,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage2"
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_00",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 13.88,
+      "MemoryAllocationBytes": 660944,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "BinaryInv",
+        "BlockSize": 5
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_01",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.174,
+      "MemoryAllocationBytes": 55888,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "Binary",
+        "BlockSize": 7
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_02",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.106,
+      "MemoryAllocationBytes": 55936,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "Binary",
+        "BlockSize": 9
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_03",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.084,
+      "MemoryAllocationBytes": 55936,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "BinaryInv",
+        "BlockSize": 11
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_04",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.092,
+      "MemoryAllocationBytes": 55952,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "Binary",
+        "BlockSize": 13
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_05",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.081,
+      "MemoryAllocationBytes": 55888,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "Binary",
+        "BlockSize": 5
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_06",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.082,
+      "MemoryAllocationBytes": 55968,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "BinaryInv",
+        "BlockSize": 7
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_07",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.095,
+      "MemoryAllocationBytes": 55888,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "Binary",
+        "BlockSize": 9
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_08",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 55952,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "Binary",
+        "BlockSize": 11
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_09",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.078,
+      "MemoryAllocationBytes": 55936,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "BinaryInv",
+        "BlockSize": 13
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_10",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.078,
+      "MemoryAllocationBytes": 55936,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "Binary",
+        "BlockSize": 5
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_11",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.077,
+      "MemoryAllocationBytes": 55888,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "Binary",
+        "BlockSize": 7
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_12",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.083,
+      "MemoryAllocationBytes": 55968,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "BinaryInv",
+        "BlockSize": 9
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_13",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.084,
+      "MemoryAllocationBytes": 55904,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "Binary",
+        "BlockSize": 11
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_14",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.087,
+      "MemoryAllocationBytes": 55952,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Gaussian",
+        "ThresholdType": "Binary",
+        "BlockSize": 13
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_opencv_oracle_15",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "OpenCV adaptive threshold oracle",
+      "Passed": true,
+      "RuntimeMs": 0.085,
+      "MemoryAllocationBytes": 55920,
+      "ErrorMessage": null,
+      "Observed": {
+        "Method": "Mean",
+        "ThresholdType": "BinaryInv",
+        "BlockSize": 5
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_invalid_method",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.369,
+      "MemoryAllocationBytes": 2176,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_invalid_threshold_type",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.042,
+      "MemoryAllocationBytes": 2320,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_invalid_block_size",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.04,
+      "MemoryAllocationBytes": 1848,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "AdaptiveThreshold_missing_image",
+      "Operator": "AdaptiveThreshold",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.222,
+      "MemoryAllocationBytes": 2336,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_00",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 4.259,
+      "MemoryAllocationBytes": 13104,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 281
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_01",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.562,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 288
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_02",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.255,
+      "MemoryAllocationBytes": 11504,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 287
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_03",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.249,
+      "MemoryAllocationBytes": 11512,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 291
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_04",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.208,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 267
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_05",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.174,
+      "MemoryAllocationBytes": 11488,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 290
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_06",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.197,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 287
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_07",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.175,
+      "MemoryAllocationBytes": 11504,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 292
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_08",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.141,
+      "MemoryAllocationBytes": 11488,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 269
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_09",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.159,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 281
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_10",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.142,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 287
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_11",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.192,
+      "MemoryAllocationBytes": 11504,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 295
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_12",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.127,
+      "MemoryAllocationBytes": 11488,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 272
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_13",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.162,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 281
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_14",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.16,
+      "MemoryAllocationBytes": 11504,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 281
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_canny_oracle_15",
+      "Operator": "EdgeDetection",
+      "Scenario": "OpenCV Canny oracle",
+      "Passed": true,
+      "RuntimeMs": 0.145,
+      "MemoryAllocationBytes": 11496,
+      "ErrorMessage": null,
+      "Observed": {
+        "EdgePixels": 293
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_invalid_threshold1",
+      "Operator": "EdgeDetection",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.206,
+      "MemoryAllocationBytes": 2016,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_invalid_threshold2",
+      "Operator": "EdgeDetection",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.078,
+      "MemoryAllocationBytes": 1984,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_invalid_auto_sigma",
+      "Operator": "EdgeDetection",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.05,
+      "MemoryAllocationBytes": 1968,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "EdgeDetection_missing_image",
+      "Operator": "EdgeDetection",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.348,
+      "MemoryAllocationBytes": 1696,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_00",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 108.534,
+      "MemoryAllocationBytes": 18640,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 1
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_01",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.227,
+      "MemoryAllocationBytes": 17888,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 2
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_02",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.075,
+      "MemoryAllocationBytes": 21712,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 3
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_03",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.038,
+      "MemoryAllocationBytes": 14248,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 1
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_04",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.048,
+      "MemoryAllocationBytes": 17888,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 2
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_05",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.054,
+      "MemoryAllocationBytes": 21712,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 3
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_06",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.036,
+      "MemoryAllocationBytes": 14248,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 1
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_07",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.046,
+      "MemoryAllocationBytes": 17888,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 2
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_08",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.052,
+      "MemoryAllocationBytes": 21712,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 3
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_09",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.033,
+      "MemoryAllocationBytes": 14248,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 1
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_10",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.044,
+      "MemoryAllocationBytes": 17888,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 2
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_11",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 21712,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 3
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_12",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.04,
+      "MemoryAllocationBytes": 14248,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 1
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_13",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.048,
+      "MemoryAllocationBytes": 17888,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 2
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_14",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.048,
+      "MemoryAllocationBytes": 21712,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 3
+      }
+    },
+    {
+      "CaseId": "ContourDetection_rectangles_15",
+      "Operator": "ContourDetection",
+      "Scenario": "Contour count oracle",
+      "Passed": true,
+      "RuntimeMs": 0.033,
+      "MemoryAllocationBytes": 14248,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedContourCount": 1
+      }
+    },
+    {
+      "CaseId": "ContourDetection_invalid_area",
+      "Operator": "ContourDetection",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.242,
+      "MemoryAllocationBytes": 2432,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "ContourDetection_invalid_mode",
+      "Operator": "ContourDetection",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.089,
+      "MemoryAllocationBytes": 2296,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "ContourDetection_invalid_threshold_type",
+      "Operator": "ContourDetection",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.082,
+      "MemoryAllocationBytes": 2328,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "ContourDetection_missing_image",
+      "Operator": "ContourDetection",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.244,
+      "MemoryAllocationBytes": 1744,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_00",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 5.027,
+      "MemoryAllocationBytes": 17512,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 1
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_01",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.423,
+      "MemoryAllocationBytes": 23640,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 2
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_02",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.3,
+      "MemoryAllocationBytes": 31000,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 3
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_03",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.228,
+      "MemoryAllocationBytes": 16280,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 1
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_04",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.237,
+      "MemoryAllocationBytes": 23640,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 2
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_05",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.265,
+      "MemoryAllocationBytes": 31000,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 3
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_06",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.169,
+      "MemoryAllocationBytes": 16280,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 1
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_07",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.198,
+      "MemoryAllocationBytes": 23640,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 2
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_08",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.244,
+      "MemoryAllocationBytes": 31000,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 3
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_09",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.19,
+      "MemoryAllocationBytes": 16280,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 1
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_10",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.212,
+      "MemoryAllocationBytes": 23640,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 2
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_11",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.287,
+      "MemoryAllocationBytes": 31000,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 3
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_12",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.204,
+      "MemoryAllocationBytes": 16280,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 1
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_13",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.208,
+      "MemoryAllocationBytes": 23640,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 2
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_14",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.338,
+      "MemoryAllocationBytes": 31000,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 3
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_components_15",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Connected component oracle",
+      "Passed": true,
+      "RuntimeMs": 0.255,
+      "MemoryAllocationBytes": 16280,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedBlobCount": 1
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_invalid_area",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.427,
+      "MemoryAllocationBytes": 2424,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_invalid_color",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.117,
+      "MemoryAllocationBytes": 2096,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_invalid_feature_filter",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 11.763,
+      "MemoryAllocationBytes": 145976,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidFeatureFilter"
+      }
+    },
+    {
+      "CaseId": "BlobAnalysis_missing_image",
+      "Operator": "BlobAnalysis",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.3,
+      "MemoryAllocationBytes": 1696,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_00",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 7.194,
+      "MemoryAllocationBytes": 62160,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_01",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.146,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_02",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_03",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.054,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_04",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.057,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_05",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.064,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_06",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.064,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_07",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.057,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_08",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.058,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_09",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.056,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_10",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.055,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_11",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.057,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_12",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.057,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_13",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.065,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_14",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.055,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_provided_blobs_15",
+      "Operator": "BlobLabeling",
+      "Scenario": "Provided blob label oracle",
+      "Passed": true,
+      "RuntimeMs": 0.063,
+      "MemoryAllocationBytes": 15304,
+      "ErrorMessage": null,
+      "Observed": {
+        "Labels": "Small,Medium,Large"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_invalid_label_by",
+      "Operator": "BlobLabeling",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.192,
+      "MemoryAllocationBytes": 1856,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_invalid_thresholds",
+      "Operator": "BlobLabeling",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.055,
+      "MemoryAllocationBytes": 3752,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_invalid_blob_input",
+      "Operator": "BlobLabeling",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.331,
+      "MemoryAllocationBytes": 3400,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "InvalidBlobInput"
+      }
+    },
+    {
+      "CaseId": "BlobLabeling_missing_image",
+      "Operator": "BlobLabeling",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.202,
+      "MemoryAllocationBytes": 1696,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_00",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 25.857,
+      "MemoryAllocationBytes": 257176,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_01",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.359,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98746490478516,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_02",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.842,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_03",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.232,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98749542236328,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_04",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.982,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_05",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.104,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98751068115234,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_06",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.817,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_07",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.11,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98749542236328,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_08",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.506,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_09",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.001,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98750305175781,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_10",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.512,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_11",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.042,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98746490478516,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_12",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.845,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_13",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.928,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98749542236328,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_14",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 1.352,
+      "MemoryAllocationBytes": 255408,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 0,
+        "Length": 179
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_probabilistic_hough_15",
+      "Operator": "LineMeasurement",
+      "Scenario": "Line geometry oracle",
+      "Passed": true,
+      "RuntimeMs": 0.852,
+      "MemoryAllocationBytes": 132656,
+      "ErrorMessage": null,
+      "Observed": {
+        "Angle": 89.98751068115234,
+        "Length": 139
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_invalid_method",
+      "Operator": "LineMeasurement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.252,
+      "MemoryAllocationBytes": 2136,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_invalid_threshold",
+      "Operator": "LineMeasurement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.062,
+      "MemoryAllocationBytes": 2096,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_blank_image_no_feature",
+      "Operator": "LineMeasurement",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.577,
+      "MemoryAllocationBytes": 3904,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoFeature"
+      }
+    },
+    {
+      "CaseId": "LineMeasurement_missing_image",
+      "Operator": "LineMeasurement",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.366,
+      "MemoryAllocationBytes": 1696,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_00",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 3.918,
+      "MemoryAllocationBytes": 13232,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 18,
+        "Radius": 17.55646324157715
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_01",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.282,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 19,
+        "Radius": 18.683107376098633
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_02",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.204,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 20,
+        "Radius": 19.62559700012207
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_03",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.178,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 21,
+        "Radius": 20.51172637939453
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_04",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.177,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 22,
+        "Radius": 21.66536521911621
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_05",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.152,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 23,
+        "Radius": 22.578298568725586
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_06",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.166,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 24,
+        "Radius": 23.547033309936523
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_07",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.169,
+      "MemoryAllocationBytes": 13056,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 25,
+        "Radius": 24.576744079589844
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_08",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.148,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 18,
+        "Radius": 17.55646324157715
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_09",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.152,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 19,
+        "Radius": 18.683107376098633
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_10",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.162,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 20,
+        "Radius": 19.62559700012207
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_11",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.157,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 21,
+        "Radius": 20.51172637939453
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_12",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.152,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 22,
+        "Radius": 21.66536521911621
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_13",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.163,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 23,
+        "Radius": 22.578298568725586
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_14",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.179,
+      "MemoryAllocationBytes": 12544,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 24,
+        "Radius": 23.547033309936523
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_fit_ellipse_15",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Circle fit oracle",
+      "Passed": true,
+      "RuntimeMs": 0.247,
+      "MemoryAllocationBytes": 13056,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedRadius": 25,
+        "Radius": 24.576744079589844
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_invalid_method",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.452,
+      "MemoryAllocationBytes": 2400,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_invalid_radius",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.232,
+      "MemoryAllocationBytes": 2944,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_blank_image_no_feature",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.789,
+      "MemoryAllocationBytes": 5168,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoFeature"
+      }
+    },
+    {
+      "CaseId": "CircleMeasurement_missing_image",
+      "Operator": "CircleMeasurement",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.32,
+      "MemoryAllocationBytes": 1704,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_00",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 12.943,
+      "MemoryAllocationBytes": 1077152,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 28,
+        "MeanWidth": 28.02092794467808
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_01",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 6.43,
+      "MemoryAllocationBytes": 1093616,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 29,
+        "MeanWidth": 29.020987821965445
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_02",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.157,
+      "MemoryAllocationBytes": 1111536,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 30,
+        "MeanWidth": 30.02103393025435
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_03",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.778,
+      "MemoryAllocationBytes": 1129456,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 31,
+        "MeanWidth": 31.021067455751744
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_04",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.362,
+      "MemoryAllocationBytes": 1147376,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 32,
+        "MeanWidth": 32.02108947831153
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_05",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 8.635,
+      "MemoryAllocationBytes": 1166432,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 33,
+        "MeanWidth": 33.02110098209449
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_06",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 5.762,
+      "MemoryAllocationBytes": 1086680,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 28,
+        "MeanWidth": 28.02092794467808
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_07",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 5.667,
+      "MemoryAllocationBytes": 1093616,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 29,
+        "MeanWidth": 29.020987821965445
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_08",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 5.84,
+      "MemoryAllocationBytes": 1111536,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 30,
+        "MeanWidth": 30.02103393025435
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_09",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.243,
+      "MemoryAllocationBytes": 1129456,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 31,
+        "MeanWidth": 31.021067455751744
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_10",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.048,
+      "MemoryAllocationBytes": 1147376,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 32,
+        "MeanWidth": 32.02108947831153
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_11",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.232,
+      "MemoryAllocationBytes": 1165296,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 33,
+        "MeanWidth": 33.02110098209449
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_12",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 5.862,
+      "MemoryAllocationBytes": 1075696,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 28,
+        "MeanWidth": 28.02092794467808
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_13",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 6.062,
+      "MemoryAllocationBytes": 1093616,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 29,
+        "MeanWidth": 29.020987821965445
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_14",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 6.014,
+      "MemoryAllocationBytes": 1111536,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 30,
+        "MeanWidth": 30.02103393025435
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_lines_15",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Manual line width oracle",
+      "Passed": true,
+      "RuntimeMs": 7.071,
+      "MemoryAllocationBytes": 1129456,
+      "ErrorMessage": null,
+      "Observed": {
+        "ExpectedWidth": 31,
+        "MeanWidth": 31.021067455751744
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_invalid_mode",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.344,
+      "MemoryAllocationBytes": 1848,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_invalid_multiscan",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.073,
+      "MemoryAllocationBytes": 2488,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_manual_missing_lines",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.312,
+      "MemoryAllocationBytes": 4224,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingManualLines"
+      }
+    },
+    {
+      "CaseId": "WidthMeasurement_missing_image",
+      "Operator": "WidthMeasurement",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.593,
+      "MemoryAllocationBytes": 1704,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_line_fit_00",
+      "Operator": "GeometricFitting",
+      "Scenario": "Line fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 7.969,
+      "MemoryAllocationBytes": 124256,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Line",
+        "PointCount": 1040
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_line_fit_01",
+      "Operator": "GeometricFitting",
+      "Scenario": "Line fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.797,
+      "MemoryAllocationBytes": 88872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Line",
+        "PointCount": 754
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_line_fit_02",
+      "Operator": "GeometricFitting",
+      "Scenario": "Line fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.747,
+      "MemoryAllocationBytes": 122264,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Line",
+        "PointCount": 1040
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_line_fit_03",
+      "Operator": "GeometricFitting",
+      "Scenario": "Line fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.676,
+      "MemoryAllocationBytes": 88872,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Line",
+        "PointCount": 754
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_line_fit_04",
+      "Operator": "GeometricFitting",
+      "Scenario": "Line fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 1.453,
+      "MemoryAllocationBytes": 123272,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Line",
+        "PointCount": 1040
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_line_fit_05",
+      "Operator": "GeometricFitting",
+      "Scenario": "Line fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.823,
+      "MemoryAllocationBytes": 99856,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Line",
+        "PointCount": 754
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_circle_fit_00",
+      "Operator": "GeometricFitting",
+      "Scenario": "Circle fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 3.532,
+      "MemoryAllocationBytes": 65896,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Circle",
+        "ResidualMean": 0.1743434194748578
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_circle_fit_01",
+      "Operator": "GeometricFitting",
+      "Scenario": "Circle fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.607,
+      "MemoryAllocationBytes": 66592,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Circle",
+        "ResidualMean": 0.16453771522894697
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_circle_fit_02",
+      "Operator": "GeometricFitting",
+      "Scenario": "Circle fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.586,
+      "MemoryAllocationBytes": 68896,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Circle",
+        "ResidualMean": 0.21095003985778588
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_circle_fit_03",
+      "Operator": "GeometricFitting",
+      "Scenario": "Circle fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.589,
+      "MemoryAllocationBytes": 70336,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Circle",
+        "ResidualMean": 0.1627072145676392
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_circle_fit_04",
+      "Operator": "GeometricFitting",
+      "Scenario": "Circle fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.582,
+      "MemoryAllocationBytes": 65152,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Circle",
+        "ResidualMean": 0.1743434194748578
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_circle_fit_05",
+      "Operator": "GeometricFitting",
+      "Scenario": "Circle fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.572,
+      "MemoryAllocationBytes": 66592,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Circle",
+        "ResidualMean": 0.16453771522894697
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_ellipse_fit_00",
+      "Operator": "GeometricFitting",
+      "Scenario": "Ellipse fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 2.273,
+      "MemoryAllocationBytes": 75328,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Ellipse",
+        "ResidualMean": 0.20235955833874872
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_ellipse_fit_01",
+      "Operator": "GeometricFitting",
+      "Scenario": "Ellipse fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.778,
+      "MemoryAllocationBytes": 77240,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Ellipse",
+        "ResidualMean": 0.19969362820820652
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_ellipse_fit_02",
+      "Operator": "GeometricFitting",
+      "Scenario": "Ellipse fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.737,
+      "MemoryAllocationBytes": 79264,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Ellipse",
+        "ResidualMean": 0.2001434524486562
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_ellipse_fit_03",
+      "Operator": "GeometricFitting",
+      "Scenario": "Ellipse fitting oracle",
+      "Passed": true,
+      "RuntimeMs": 0.74,
+      "MemoryAllocationBytes": 79000,
+      "ErrorMessage": null,
+      "Observed": {
+        "FitType": "Ellipse",
+        "ResidualMean": 0.20396093912653226
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_invalid_fit_type",
+      "Operator": "GeometricFitting",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.332,
+      "MemoryAllocationBytes": 2424,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_invalid_min_points",
+      "Operator": "GeometricFitting",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.065,
+      "MemoryAllocationBytes": 1976,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_invalid_robust_method",
+      "Operator": "GeometricFitting",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.041,
+      "MemoryAllocationBytes": 2824,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "GeometricFitting_blank_image_no_feature",
+      "Operator": "GeometricFitting",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.467,
+      "MemoryAllocationBytes": 3912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "NoFeature"
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_00",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 4.894,
+      "MemoryAllocationBytes": 19440,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 80,
+        "OutputHeight": 70
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_01",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.16,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 81,
+        "OutputHeight": 71
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_02",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.101,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 82,
+        "OutputHeight": 72
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_03",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.098,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 83,
+        "OutputHeight": 73
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_04",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.098,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 84,
+        "OutputHeight": 74
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_05",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.094,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 85,
+        "OutputHeight": 70
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_06",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 86,
+        "OutputHeight": 71
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_07",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.095,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 87,
+        "OutputHeight": 72
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_08",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 88,
+        "OutputHeight": 73
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_09",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 89,
+        "OutputHeight": 74
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_10",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.095,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 90,
+        "OutputHeight": 70
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_11",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.096,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 91,
+        "OutputHeight": 71
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_12",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.097,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 92,
+        "OutputHeight": 72
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_13",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.125,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 93,
+        "OutputHeight": 73
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_14",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.128,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 94,
+        "OutputHeight": 74
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_pointset_15",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Point set transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.094,
+      "MemoryAllocationBytes": 12032,
+      "ErrorMessage": null,
+      "Observed": {
+        "OutputWidth": 95,
+        "OutputHeight": 70
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_invalid_output_width",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.228,
+      "MemoryAllocationBytes": 1856,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_missing_dst_json",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.051,
+      "MemoryAllocationBytes": 2368,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_degenerate_src_points",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.345,
+      "MemoryAllocationBytes": 8384,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "DegeneratePoints"
+      }
+    },
+    {
+      "CaseId": "PerspectiveTransform_missing_image",
+      "Operator": "PerspectiveTransform",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.241,
+      "MemoryAllocationBytes": 1712,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_00",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 1.414,
+      "MemoryAllocationBytes": 10624,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 2,
+        "TranslateY": -3
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_01",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.106,
+      "MemoryAllocationBytes": 9896,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 3,
+        "TranslateY": -2
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_02",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.073,
+      "MemoryAllocationBytes": 9896,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 4,
+        "TranslateY": -1
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_03",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.077,
+      "MemoryAllocationBytes": 9880,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 5,
+        "TranslateY": 0
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_04",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 9896,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 6,
+        "TranslateY": -3
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_05",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 9896,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 7,
+        "TranslateY": -2
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_06",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.072,
+      "MemoryAllocationBytes": 9896,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 8,
+        "TranslateY": -1
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_07",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 9880,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 9,
+        "TranslateY": 0
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_08",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 9912,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 10,
+        "TranslateY": -3
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_09",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 9912,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 11,
+        "TranslateY": -2
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_10",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.068,
+      "MemoryAllocationBytes": 9912,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 12,
+        "TranslateY": -1
+      }
+    },
+    {
+      "CaseId": "AffineTransform_translate_11",
+      "Operator": "AffineTransform",
+      "Scenario": "Affine matrix oracle",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 9896,
+      "ErrorMessage": null,
+      "Observed": {
+        "TranslateX": 13,
+        "TranslateY": 0
+      }
+    },
+    {
+      "CaseId": "AffineTransform_three_point_identity_00",
+      "Operator": "AffineTransform",
+      "Scenario": "Three-point transform oracle",
+      "Passed": true,
+      "RuntimeMs": 1.114,
+      "MemoryAllocationBytes": 9288,
+      "ErrorMessage": null,
+      "Observed": {
+        "Mode": "ThreePoint"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_three_point_identity_01",
+      "Operator": "AffineTransform",
+      "Scenario": "Three-point transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.086,
+      "MemoryAllocationBytes": 9232,
+      "ErrorMessage": null,
+      "Observed": {
+        "Mode": "ThreePoint"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_three_point_identity_02",
+      "Operator": "AffineTransform",
+      "Scenario": "Three-point transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.059,
+      "MemoryAllocationBytes": 9232,
+      "ErrorMessage": null,
+      "Observed": {
+        "Mode": "ThreePoint"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_three_point_identity_03",
+      "Operator": "AffineTransform",
+      "Scenario": "Three-point transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.057,
+      "MemoryAllocationBytes": 9232,
+      "ErrorMessage": null,
+      "Observed": {
+        "Mode": "ThreePoint"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_invalid_mode",
+      "Operator": "AffineTransform",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.222,
+      "MemoryAllocationBytes": 1888,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_invalid_scale",
+      "Operator": "AffineTransform",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.054,
+      "MemoryAllocationBytes": 1912,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_degenerate_three_point",
+      "Operator": "AffineTransform",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.372,
+      "MemoryAllocationBytes": 5912,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "DegeneratePoints"
+      }
+    },
+    {
+      "CaseId": "AffineTransform_missing_image",
+      "Operator": "AffineTransform",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.218,
+      "MemoryAllocationBytes": 1696,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_00",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 3.913,
+      "MemoryAllocationBytes": 14464,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Manhattan",
+        "MaxDistance": 13
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_01",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.394,
+      "MemoryAllocationBytes": 13560,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Chessboard",
+        "MaxDistance": 10
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_02",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.459,
+      "MemoryAllocationBytes": 13464,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Euclidean",
+        "MaxDistance": 14
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_03",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.422,
+      "MemoryAllocationBytes": 13528,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Manhattan",
+        "MaxDistance": 16
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_04",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.48,
+      "MemoryAllocationBytes": 13496,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Chessboard",
+        "MaxDistance": 13
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_05",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.412,
+      "MemoryAllocationBytes": 13544,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Euclidean",
+        "MaxDistance": 11.984498977661133
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_06",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.397,
+      "MemoryAllocationBytes": 13464,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Manhattan",
+        "MaxDistance": 14
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_07",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.458,
+      "MemoryAllocationBytes": 13560,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Chessboard",
+        "MaxDistance": 10
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_08",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.452,
+      "MemoryAllocationBytes": 13464,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Euclidean",
+        "MaxDistance": 13
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_09",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.554,
+      "MemoryAllocationBytes": 13528,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Manhattan",
+        "MaxDistance": 17
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_10",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.564,
+      "MemoryAllocationBytes": 13496,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Chessboard",
+        "MaxDistance": 14
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_11",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.531,
+      "MemoryAllocationBytes": 13544,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Euclidean",
+        "MaxDistance": 12.987598419189453
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_12",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.443,
+      "MemoryAllocationBytes": 13464,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Manhattan",
+        "MaxDistance": 13
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_13",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.525,
+      "MemoryAllocationBytes": 13560,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Chessboard",
+        "MaxDistance": 11
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_14",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.486,
+      "MemoryAllocationBytes": 13464,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Euclidean",
+        "MaxDistance": 14
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_opencv_distance_15",
+      "Operator": "DistanceTransform",
+      "Scenario": "OpenCV distance transform oracle",
+      "Passed": true,
+      "RuntimeMs": 0.403,
+      "MemoryAllocationBytes": 13528,
+      "ErrorMessage": null,
+      "Observed": {
+        "DistanceType": "Manhattan",
+        "MaxDistance": 13
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_invalid_mask",
+      "Operator": "DistanceTransform",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.477,
+      "MemoryAllocationBytes": 1752,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_invalid_threshold",
+      "Operator": "DistanceTransform",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.076,
+      "MemoryAllocationBytes": 1896,
+      "ErrorMessage": null,
+      "Observed": {
+        "Validation": "Invalid"
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_max_limit_contract",
+      "Operator": "DistanceTransform",
+      "Scenario": "Distance limit contract",
+      "Passed": true,
+      "RuntimeMs": 0.817,
+      "MemoryAllocationBytes": 11736,
+      "ErrorMessage": null,
+      "Observed": {
+        "MaxDistanceLimit": 5,
+        "MaxDistance": 5
+      }
+    },
+    {
+      "CaseId": "DistanceTransform_missing_image",
+      "Operator": "DistanceTransform",
+      "Scenario": "Failure contract",
+      "Passed": true,
+      "RuntimeMs": 0.3,
+      "MemoryAllocationBytes": 2360,
+      "ErrorMessage": null,
+      "Observed": {
+        "FailureReason": "MissingImage"
+      }
+    }
+  ]
+}

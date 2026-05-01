@@ -1,0 +1,2777 @@
+{
+  "schemaVersion": "2026-04-29.public-benchmark-replay.v1",
+  "generatedAtUtc": "2026-04-29T00:00:00Z",
+  "sourceProofBaseline": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
+  "sourceProofSha256": "d481bfb1267eea14843941e66b1fe3d56104746f9d51997c10880de50f7f41cf",
+  "accepted": true,
+  "summary": {
+    "replayCaseCount": 184,
+    "operatorCount": 10,
+    "classCounts": {
+      "boundary": 139,
+      "failure": 45
+    }
+  },
+  "cases": [
+    {
+      "caseId": "grid/bent/000",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/001",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/003",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/004",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/005",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/006",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/007",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/008",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/009",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/010",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/bent/011",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/000",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/002",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/004",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/005",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/006",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/007",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/008",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/009",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "grid/broken/010",
+      "split": "test",
+      "operator": "AnomalyDetection",
+      "datasetId": "mvtec_ad_lite",
+      "replayClass": "boundary",
+      "triageLabel": "worst-Score",
+      "boundaryMetric": "Score",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20006",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20008",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20015",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20017",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20018",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20021",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20023",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20027",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20054",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20068",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20080",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20083",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20091",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20105",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20109",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20111",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20112",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20113",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20134",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "20139",
+      "split": "test",
+      "operator": "SurfaceDefectDetection",
+      "datasetId": "kolektorsdd2",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PixelTotals.F1",
+      "boundaryMetric": "PixelTotals.F1",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "108069",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.169729,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "141012",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.188572,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "302022",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.219216,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "49024",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.23045,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "232076",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.240082,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "41096",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.241991,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "109055",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.243456,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "202000",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.243957,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "326085",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.251818,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "306052",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.271893,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "48017",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.284155,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "97010",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.287066,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "160067",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.303038,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "103006",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.310262,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "164046",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.31385,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "101027",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.320886,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "159022",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.322506,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "223060",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.323807,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "33044",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.32963,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "196088",
+      "split": "test",
+      "operator": "EdgeDetection",
+      "datasetId": "bsds500",
+      "replayClass": "boundary",
+      "triageLabel": "worst-BoundaryF1",
+      "boundaryMetric": "BoundaryF1",
+      "boundaryMetricValue": 0.33714,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "opencv_calibration_stereo_rig",
+      "split": "test",
+      "operator": "CameraCalibration",
+      "datasetId": "opencv_calibration_samples",
+      "replayClass": "boundary",
+      "triageLabel": "worst-ReprojectionRmsPx",
+      "boundaryMetric": "ReprojectionRmsPx",
+      "boundaryMetricValue": 0.392596,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-camera-calibration"
+      ]
+    },
+    {
+      "caseId": "opencv_calibration_right_camera",
+      "split": "test",
+      "operator": "CameraCalibration",
+      "datasetId": "opencv_calibration_samples",
+      "replayClass": "boundary",
+      "triageLabel": "worst-ReprojectionRmsPx",
+      "boundaryMetric": "ReprojectionRmsPx",
+      "boundaryMetricValue": 0.367839,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-camera-calibration"
+      ]
+    },
+    {
+      "caseId": "opencv_calibration_left_camera",
+      "split": "test",
+      "operator": "CameraCalibration",
+      "datasetId": "opencv_calibration_samples",
+      "replayClass": "boundary",
+      "triageLabel": "worst-ReprojectionRmsPx",
+      "boundaryMetric": "ReprojectionRmsPx",
+      "boundaryMetricValue": 0.33779,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-camera-calibration"
+      ]
+    },
+    {
+      "caseId": "opencv_calibration_stereo_metadata",
+      "split": "test",
+      "operator": "CameraCalibration",
+      "datasetId": "opencv_calibration_samples",
+      "replayClass": "boundary",
+      "triageLabel": "worst-ReprojectionRmsPx",
+      "boundaryMetric": "ReprojectionRmsPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-camera-calibration"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_139",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_724",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_785",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_872",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_885",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1000",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1268",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1296",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1353",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1490",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1532",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1584",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_1761",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2006",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2153",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2261",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2299",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2431",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2473",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "coco2017_val_2532",
+      "split": "test",
+      "operator": "DeepLearning",
+      "datasetId": "coco2017",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "BestMatchedIou",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_single_region_0000",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_multi_class_regions_0000",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_thin_boundary_0000",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_small_object_0000",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_class_absent_0000",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_nested_regions_0000",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_single_region_0001",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_multi_class_regions_0001",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_thin_boundary_0001",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_small_object_0001",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_class_absent_0001",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_nested_regions_0001",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_single_region_0002",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_multi_class_regions_0002",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_thin_boundary_0002",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_small_object_0002",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_class_absent_0002",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_nested_regions_0002",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_single_region_0003",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "SemanticSegmentation_multi_class_regions_0003",
+      "split": "test",
+      "operator": "SemanticSegmentation",
+      "datasetId": "voc-style-protocol-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanIoU",
+      "boundaryMetric": "MeanIoU",
+      "boundaryMetricValue": 1.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_scaled_pose_0002",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.256371,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_scaled_pose_0000",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.219968,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_scaled_pose_0001",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.171097,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_scaled_pose_0003",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.147647,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_scaled_pose_0005",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.098888,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_direct_pose_0003",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.003382,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_rotated_pose_0001",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.002829,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_top_left_origin_0002",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.002074,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_rotated_pose_0005",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.001617,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_multi_target_0002",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.00142,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_multi_target_0000",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.001406,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_multi_target_0001",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.00108,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_rotated_pose_0004",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.00094,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_rotated_pose_0002",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.000562,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_rotated_pose_0003",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.000207,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_direct_pose_0000",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 0.000101,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_top_left_origin_0004",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 7.3e-05,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_direct_pose_0001",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 6.1e-05,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_top_left_origin_0003",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 6.1e-05,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "ShapeMatching_direct_pose_0005",
+      "split": "test",
+      "operator": "ShapeMatching",
+      "datasetId": "semisynthetic-geometric-shape-scenes",
+      "replayClass": "boundary",
+      "triageLabel": "worst-MeanPositionErrorPx",
+      "boundaryMetric": "MeanPositionErrorPx",
+      "boundaryMetricValue": 6.1e-05,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_illumination_translation_0000",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_illumination_translation_0001",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_illumination_translation_0002",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_illumination_translation_0003",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_illumination_translation_0004",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_illumination_translation_0005",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_viewpoint_translation_0000",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_viewpoint_translation_0001",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_viewpoint_translation_0002",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_viewpoint_translation_0003",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_viewpoint_translation_0004",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_viewpoint_translation_0005",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_shear_0000",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_shear_0001",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_shear_0002",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_shear_0003",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_shear_0004",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_shear_0005",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_perspective_0000",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "TemplateMatching_homography_perspective_0001",
+      "split": "test",
+      "operator": "TemplateMatching",
+      "datasetId": "hpatches-style-homography-bridge",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 0.0,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_leuven_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 376.316618,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_londonbridge_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 235.136131,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_pool_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 230.10704,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_abstract_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 378.273983,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_astronautis_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 400.797501,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_azzola_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 254.382484,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_bark_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 187.998106,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_boat_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 196.691884,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_bricks_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 221.668085,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_busstop_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 150.087361,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_charing_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 402.336312,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_churchill_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 192.562205,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_colors_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 318.251043,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_tools_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 17.052355,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_lionday_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 3.377624,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_santuario_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 2.049038,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_nijmegen_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.413999,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_troulos_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.301589,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_kions_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.268936,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_bologna_1_2",
+      "split": "test",
+      "operator": "AkazeFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.113518,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_leuven_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 358.139701,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_pool_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 241.446164,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_abstract_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 391.905789,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_astronautis_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 108.405272,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_azzola_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 210.717561,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_bark_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 290.880317,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_boat_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 79.05124,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_bricks_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 299.729975,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_busstop_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 291.625171,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_charing_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 310.929828,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_churchill_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 255.466091,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_colors_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "failure",
+      "triageLabel": "threshold-failed",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 243.874766,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "v_beyus_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 4.952967,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_castle_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 4.857597,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_tools_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 4.168836,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_londonbridge_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 2.024709,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_santuario_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.926692,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_kions_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.879087,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_dc_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.863585,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    },
+    {
+      "caseId": "i_pencils_1_2",
+      "split": "test",
+      "operator": "OrbFeatureMatch",
+      "datasetId": "hpatches",
+      "replayClass": "boundary",
+      "triageLabel": "worst-PositionErrorPx",
+      "boundaryMetric": "PositionErrorPx",
+      "boundaryMetricValue": 1.634537,
+      "replayCommand": [
+        "python",
+        "quality/tools/run_algorithm_ab_replay.py",
+        "--execute-matching"
+      ]
+    }
+  ]
+}

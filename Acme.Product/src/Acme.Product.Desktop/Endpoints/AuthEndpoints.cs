@@ -155,6 +155,11 @@ public static class AuthEndpoints
             return authHeader.Substring("Bearer ".Length).Trim();
         }
 
+        if (context.Request.Headers.TryGetValue("X-Auth-Token", out var customToken))
+        {
+            return customToken.FirstOrDefault();
+        }
+
         return null;
     }
 

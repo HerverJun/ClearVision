@@ -30,6 +30,19 @@ public readonly struct ShapeMatchResult
 }
 
 /// <summary>
+/// 梯度形状匹配专用异常，用于传递结构化失败原因
+/// </summary>
+public class GradientShapeMatchException : Exception
+{
+    public string FailureReason { get; }
+
+    public GradientShapeMatchException(string failureReason, string message) : base(message)
+    {
+        FailureReason = failureReason;
+    }
+}
+
+/// <summary>
 /// 特征点结构
 /// </summary>
 internal readonly struct FeaturePoint
@@ -71,12 +84,27 @@ internal sealed class RotatedTemplate
     }
 }
 
+public sealed class GradientShapeInvalidTemplateException : GradientShapeMatchException
+{
+    public GradientShapeInvalidTemplateException(int featureCount, int minFeatureCount)
+        : base("InvalidTemplate", $"[InvalidTemplate] Template has insufficient gradient features ({featureCount}/{minFeatureCount}).")
+    {
+        FeatureCount = featureCount;
+        MinFeatureCount = minFeatureCount;
+    }
+
+    public int FeatureCount { get; }
+
+    public int MinFeatureCount { get; }
+}
+
 /// <summary>
 /// 基于梯度形状的模板匹配器 - 从清霜V3移植
 /// </summary>
 public sealed class GradientShapeMatcher : IDisposable
 {
     private const int NumDirections = 8;
+    private const int MinTemplateFeatureCount = 10;
     private const double DirectionStep = Math.PI / 4.0;
     private const int DefaultMagnitudeThreshold = 30;
     private const int DefaultAngleStep = 1;
@@ -107,8 +135,8 @@ public sealed class GradientShapeMatcher : IDisposable
         using var gray = EnsureGray(image);
         var baseFeatures = ExtractFeatures(gray, mask);
 
-        if (baseFeatures.Count < 10)
-            throw new InvalidOperationException($"特征点不足 ({baseFeatures.Count})");
+        if (baseFeatures.Count < MinTemplateFeatureCount)
+            throw new GradientShapeInvalidTemplateException(baseFeatures.Count, MinTemplateFeatureCount);
 
         int centerX = gray.Width / 2;
         int centerY = gray.Height / 2;
@@ -150,6 +178,59 @@ public sealed class GradientShapeMatcher : IDisposable
         }
 
         return FindBestMatch(sceneDirections, sceneMagnitudes, region, minScore);
+    }
+
+    /// <summary>
+    /// 匹配并返回前 TopK 个候选
+    /// </summary>
+    public List<ShapeMatchResult> MatchTopK(Mat sceneImage, double minScore = 80, Rect? searchRegion = null, int topK = 1)
+    {
+        if (!_isTrained)
+            throw new InvalidOperationException("模板未训练");
+
+        if (sceneImage == null || sceneImage.Empty())
+            throw new ArgumentException("场景图像不能为空", nameof(sceneImage));
+
+        using var gray = EnsureGray(sceneImage);
+        var (sceneDirections, sceneMagnitudes) = ComputeSceneGradients(gray);
+        Rect region = searchRegion ?? new Rect(0, 0, gray.Width, gray.Height);
+        region = new Rect(
+            Math.Clamp(region.X, 0, gray.Width),
+            Math.Clamp(region.Y, 0, gray.Height),
+            Math.Clamp(region.Width, 0, gray.Width - Math.Clamp(region.X, 0, gray.Width)),
+            Math.Clamp(region.Height, 0, gray.Height - Math.Clamp(region.Y, 0, gray.Height)));
+        if (region.Width <= 0 || region.Height <= 0)
+        {
+            return new List<ShapeMatchResult>();
+        }
+
+        var candidates = FindAllCandidates(sceneDirections, sceneMagnitudes, region, minScore);
+        candidates.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+        int suppressRadius = _templates.Count > 0 ? Math.Max(5, Math.Min(_templates[0].Width, _templates[0].Height) / 4) : 5;
+        var filtered = new List<ShapeMatchResult>();
+        foreach (var candidate in candidates)
+        {
+            bool tooClose = false;
+            foreach (var kept in filtered)
+            {
+                int dx = candidate.Position.X - kept.Position.X;
+                int dy = candidate.Position.Y - kept.Position.Y;
+                if (dx * dx + dy * dy < suppressRadius * suppressRadius)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (!tooClose)
+            {
+                filtered.Add(candidate);
+                if (filtered.Count >= topK)
+                    break;
+            }
+        }
+
+        return filtered;
     }
 
     private unsafe List<FeaturePoint> ExtractFeatures(Mat gray, Mat? mask)
@@ -400,6 +481,77 @@ public sealed class GradientShapeMatcher : IDisposable
         }
 
         return best;
+    }
+
+    private List<ShapeMatchResult> FindAllCandidates(byte[,] sceneDirections, ushort[,] sceneMagnitudes,
+        Rect searchRegion, double minScore)
+    {
+        int sceneWidth = sceneDirections.GetLength(1);
+        int sceneHeight = sceneDirections.GetLength(0);
+
+        var allResults = new ConcurrentBag<ShapeMatchResult>();
+        double minScoreNormalized = minScore / 100.0;
+
+        Parallel.ForEach(_templates, template =>
+        {
+            int startX = Math.Max(searchRegion.X - template.MinX, -template.MinX);
+            int startY = Math.Max(searchRegion.Y - template.MinY, -template.MinY);
+            int endX = Math.Min(searchRegion.X + searchRegion.Width - template.MaxX, sceneWidth - template.MaxX);
+            int endY = Math.Min(searchRegion.Y + searchRegion.Height - template.MaxY, sceneHeight - template.MaxY);
+
+            int stepX = 2;
+            int stepY = 2;
+
+            // Collect all coarse positions above relaxed threshold
+            var coarseCandidates = new List<(int x, int y, double score)>();
+            for (int y = startY; y < endY; y += stepY)
+            {
+                for (int x = startX; x < endX; x += stepX)
+                {
+                    double score = ComputeMatchScore(sceneDirections, sceneMagnitudes, template, x, y);
+                    if (score >= minScoreNormalized * 0.8)
+                    {
+                        coarseCandidates.Add((x, y, score));
+                    }
+                }
+            }
+
+            // Sort by score descending
+            coarseCandidates.Sort((a, b) => b.score.CompareTo(a.score));
+
+            // Apply position NMS and refine to keep multiple peaks per template
+            int nmsRadius = Math.Max(5, Math.Min(template.Width, template.Height) / 4);
+            var refined = new List<ShapeMatchResult>();
+            foreach (var c in coarseCandidates)
+            {
+                bool tooClose = false;
+                foreach (var r in refined)
+                {
+                    int dx = c.x - r.Position.X;
+                    int dy = c.y - r.Position.Y;
+                    if (dx * dx + dy * dy < nmsRadius * nmsRadius)
+                    {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (!tooClose)
+                {
+                    var (rx, ry, rscore) = RefineMatch(sceneDirections, sceneMagnitudes, template, c.x, c.y, stepX, stepY);
+                    if (rscore >= minScoreNormalized)
+                    {
+                        refined.Add(new ShapeMatchResult(new Point(rx, ry), template.Angle, rscore * 100));
+                    }
+                }
+            }
+
+            foreach (var r in refined)
+            {
+                allResults.Add(r);
+            }
+        });
+
+        return allResults.ToList();
     }
 
     private (int x, int y, double score) RefineMatch(byte[,] sceneDirections, ushort[,] sceneMagnitudes,

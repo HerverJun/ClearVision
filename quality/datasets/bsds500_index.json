@@ -1,0 +1,3518 @@
+{
+  "name": "BSDS500",
+  "source_dataset": "Berkeley Segmentation Dataset and Benchmark 500",
+  "created_at": "2026-04-29",
+  "local_root": "quality/public_datasets/bsds500",
+  "archive": {
+    "path": "quality/public_datasets/bsds500/_downloads/BSR_bsds500.tgz",
+    "size_bytes": 70763455
+  },
+  "split_counts": {
+    "train": 200,
+    "val": 100,
+    "test": 200
+  },
+  "record_count": 500,
+  "records": [
+    {
+      "id": "100075",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/100075.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/100075.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "100080",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/100080.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/100080.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "100098",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/100098.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/100098.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "103041",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/103041.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/103041.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "104022",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/104022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/104022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "105019",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/105019.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/105019.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "105053",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/105053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/105053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "106020",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/106020.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/106020.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "106025",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/106025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/106025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108041",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/108041.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/108041.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108073",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/108073.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/108073.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "109034",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/109034.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/109034.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "112082",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/112082.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/112082.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "113009",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/113009.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/113009.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "113016",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/113016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/113016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "113044",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/113044.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/113044.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "117054",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/117054.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/117054.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "118020",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/118020.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/118020.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "118035",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/118035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/118035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "12003",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/12003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/12003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "12074",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/12074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/12074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "122048",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/122048.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/122048.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "124084",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/124084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/124084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "126039",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/126039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/126039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "130034",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/130034.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/130034.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "134008",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/134008.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/134008.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "134052",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/134052.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/134052.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "135037",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/135037.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/135037.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "135069",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/135069.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/135069.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "138032",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/138032.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/138032.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "138078",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/138078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/138078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "140055",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/140055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/140055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "140075",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/140075.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/140075.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "144067",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/144067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/144067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "145014",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/145014.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/145014.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "145053",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/145053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/145053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "147021",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/147021.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/147021.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "147062",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/147062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/147062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "15004",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/15004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/15004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "15088",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/15088.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/15088.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "151087",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/151087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/151087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "153077",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/153077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/153077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "153093",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/153093.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/153093.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "155060",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/155060.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/155060.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "156079",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/156079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/156079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "157036",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/157036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/157036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "159029",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/159029.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/159029.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "159045",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/159045.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/159045.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "159091",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/159091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/159091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "16052",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/16052.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/16052.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "161062",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/161062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/161062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "163014",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/163014.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/163014.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "163062",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/163062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/163062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "164074",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/164074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/164074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "166081",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/166081.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/166081.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "169012",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/169012.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/169012.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "170054",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/170054.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/170054.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "172032",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/172032.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/172032.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "173036",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/173036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/173036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "176019",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/176019.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/176019.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "176035",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/176035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/176035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "176039",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/176039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/176039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "178054",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/178054.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/178054.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "181018",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/181018.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/181018.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "181079",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/181079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/181079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "181091",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/181091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/181091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "183055",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/183055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/183055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "183087",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/183087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/183087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187003",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/187003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/187003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187029",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/187029.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/187029.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187039",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/187039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/187039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187071",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/187071.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/187071.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187083",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/187083.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/187083.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "188005",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/188005.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/188005.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "188063",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/188063.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/188063.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "188091",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/188091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/188091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189003",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/189003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/189003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189011",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/189011.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/189011.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "196015",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/196015.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/196015.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "198004",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/198004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/198004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "198023",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/198023.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/198023.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "198054",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/198054.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/198054.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "20008",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/20008.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/20008.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "202012",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/202012.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/202012.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "207056",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/207056.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/207056.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "209070",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/209070.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/209070.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "2092",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/2092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/2092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "216041",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/216041.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/216041.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "216053",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/216053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/216053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "216066",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/216066.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/216066.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "22013",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/22013.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/22013.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "22090",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/22090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/22090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "22093",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/22093.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/22093.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "225017",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/225017.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/225017.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "227040",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/227040.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/227040.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "227046",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/227046.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/227046.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "23025",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/23025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/23025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "23080",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/23080.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/23080.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "23084",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/23084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/23084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "231015",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/231015.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/231015.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "232038",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/232038.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/232038.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "236017",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/236017.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/236017.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "238011",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/238011.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/238011.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "239007",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/239007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/239007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "239096",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/239096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/239096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "24004",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/24004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/24004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "24063",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/24063.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/24063.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "242078",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/242078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/242078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "245051",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/245051.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/245051.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "246016",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/246016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/246016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "246053",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/246053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/246053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "247085",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/247085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/247085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "249061",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/249061.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/249061.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "249087",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/249087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/249087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "25098",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/25098.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/25098.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "253036",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/253036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/253036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "254033",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/254033.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/254033.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "254054",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/254054.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/254054.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "260081",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/260081.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/260081.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "26031",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/26031.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/26031.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "268002",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/268002.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/268002.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "27059",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/27059.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/27059.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "271008",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/271008.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/271008.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "271031",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/271031.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/271031.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "274007",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/274007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/274007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "277095",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/277095.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/277095.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "28075",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/28075.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/28075.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "28096",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/28096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/28096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "285036",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/285036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/285036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "286092",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/286092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/286092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "292066",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/292066.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/292066.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "293029",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/293029.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/293029.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "299091",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/299091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/299091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "301007",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/301007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/301007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "302003",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/302003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/302003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "309004",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/309004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/309004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "310007",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/310007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/310007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "311068",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/311068.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/311068.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "311081",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/311081.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/311081.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "314016",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/314016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/314016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "317080",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/317080.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/317080.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "323016",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/323016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/323016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "326038",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/326038.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/326038.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "33066",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/33066.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/33066.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35008",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/35008.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/35008.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35010",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/35010.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/35010.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35058",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/35058.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/35058.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35070",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/35070.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/35070.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35091",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/35091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/35091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "353013",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/353013.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/353013.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "361084",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/361084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/361084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "365025",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/365025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/365025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "365073",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/365073.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/365073.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "368016",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/368016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/368016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "368078",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/368078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/368078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "370036",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/370036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/370036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "372047",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/372047.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/372047.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "374020",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/374020.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/374020.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "374067",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/374067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/374067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "376001",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/376001.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/376001.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "376020",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/376020.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/376020.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "385028",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/385028.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/385028.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "388016",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/388016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/388016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41004",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/41004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/41004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41025",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/41025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/41025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "42044",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/42044.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/42044.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "42078",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/42078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/42078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "43070",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/43070.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/43070.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "43083",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/43083.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/43083.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "45077",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/45077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/45077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "46076",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/46076.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/46076.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "48055",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/48055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/48055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "54005",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/54005.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/54005.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "55067",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/55067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/55067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "55075",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/55075.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/55075.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "56028",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/56028.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/56028.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "59078",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/59078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/59078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "60079",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/60079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/60079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "61060",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/61060.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/61060.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "61086",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/61086.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/61086.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "65010",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/65010.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/65010.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "65019",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/65019.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/65019.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "65074",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/65074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/65074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "65132",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/65132.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/65132.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "66039",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/66039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/66039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "66075",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/66075.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/66075.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "67079",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/67079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/67079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "68077",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/68077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/68077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "71046",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/71046.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/71046.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "76002",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/76002.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/76002.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "78019",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/78019.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/78019.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "80099",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/80099.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/80099.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "8049",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/8049.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/8049.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "8143",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/8143.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/8143.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "87065",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/87065.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/87065.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "90076",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/90076.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/90076.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "92059",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/92059.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/92059.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "94079",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/94079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/94079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "95006",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/95006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/95006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "97017",
+      "split": "train",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/train/97017.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/train/97017.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "101085",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/101085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/101085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "101087",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/101087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/101087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "102061",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/102061.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/102061.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "103070",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/103070.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/103070.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "105025",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/105025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/105025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "106024",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/106024.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/106024.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108005",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/108005.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/108005.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108070",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/108070.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/108070.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108082",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/108082.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/108082.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "109053",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/109053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/109053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "119082",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/119082.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/119082.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "12084",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/12084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/12084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "123074",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/123074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/123074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "126007",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/126007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/126007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "130026",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/130026.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/130026.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "134035",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/134035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/134035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "14037",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/14037.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/14037.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "143090",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/143090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/143090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "145086",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/145086.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/145086.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "147091",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/147091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/147091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "148026",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/148026.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/148026.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "148089",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/148089.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/148089.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "156065",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/156065.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/156065.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "157055",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/157055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/157055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "159008",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/159008.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/159008.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "160068",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/160068.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/160068.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "16077",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/16077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/16077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "163085",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/163085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/163085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "167062",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/167062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/167062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "167083",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/167083.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/167083.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "170057",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/170057.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/170057.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "175032",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/175032.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/175032.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "175043",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/175043.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/175043.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "182053",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/182053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/182053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189080",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/189080.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/189080.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "19021",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/19021.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/19021.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "196073",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/196073.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/196073.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "197017",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/197017.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/197017.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "208001",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/208001.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/208001.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "210088",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/210088.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/210088.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "21077",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/21077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/21077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "216081",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/216081.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/216081.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "219090",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/219090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/219090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "220075",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/220075.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/220075.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "223061",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/223061.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/223061.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "227092",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/227092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/227092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "229036",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/229036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/229036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "236037",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/236037.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/236037.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "24077",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/24077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/24077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "241004",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/241004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/241004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "241048",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/241048.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/241048.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "253027",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/253027.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/253027.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "253055",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/253055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/253055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "260058",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/260058.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/260058.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "271035",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/271035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/271035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "285079",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/285079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/285079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "291000",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/291000.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/291000.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "295087",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/295087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/295087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "296007",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/296007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/296007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "296059",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/296059.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/296059.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "299086",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/299086.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/299086.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "300091",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/300091.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/300091.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "302008",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/302008.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/302008.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "304034",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/304034.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/304034.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "304074",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/304074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/304074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "306005",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/306005.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/306005.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "3096",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/3096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/3096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "33039",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/33039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/33039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "351093",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/351093.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/351093.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "361010",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/361010.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/361010.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "37073",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/37073.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/37073.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "376043",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/376043.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/376043.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "38082",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/38082.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/38082.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "38092",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/38092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/38092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "385039",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/385039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/385039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41033",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/41033.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/41033.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41069",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/41069.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/41069.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "42012",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/42012.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/42012.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "42049",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/42049.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/42049.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "43074",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/43074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/43074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "45096",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/45096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/45096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "54082",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/54082.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/54082.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "55073",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/55073.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/55073.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "58060",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/58060.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/58060.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "62096",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/62096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/62096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "65033",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/65033.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/65033.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "66053",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/66053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/66053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "69015",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/69015.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/69015.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "69020",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/69020.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/69020.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "69040",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/69040.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/69040.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "76053",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/76053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/76053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "78004",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/78004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/78004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "8023",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/8023.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/8023.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "85048",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/85048.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/85048.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "86000",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/86000.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/86000.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "86016",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/86016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/86016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "86068",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/86068.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/86068.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "87046",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/87046.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/87046.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "89072",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/89072.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/89072.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "97033",
+      "split": "val",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/val/97033.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/val/97033.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "100007",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/100007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/100007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "100039",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/100039.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/100039.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "100099",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/100099.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/100099.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "10081",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/10081.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/10081.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "101027",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/101027.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/101027.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "101084",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/101084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/101084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "102062",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/102062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/102062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "103006",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/103006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/103006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "103029",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/103029.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/103029.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "103078",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/103078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/103078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "104010",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/104010.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/104010.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "104055",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/104055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/104055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "105027",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/105027.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/105027.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "106005",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/106005.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/106005.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "106047",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/106047.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/106047.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "107014",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/107014.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/107014.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "107045",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/107045.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/107045.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "107072",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/107072.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/107072.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108004",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/108004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/108004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108036",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/108036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/108036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "108069",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/108069.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/108069.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "109055",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/109055.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/109055.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "112056",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/112056.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/112056.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "112090",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/112090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/112090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "117025",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/117025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/117025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "118015",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/118015.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/118015.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "118031",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/118031.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/118031.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "118072",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/118072.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/118072.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "120003",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/120003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/120003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "120093",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/120093.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/120093.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "123057",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/123057.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/123057.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "128035",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/128035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/128035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "130014",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/130014.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/130014.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "130066",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/130066.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/130066.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "134049",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/134049.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/134049.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "134067",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/134067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/134067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "140006",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/140006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/140006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "140088",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/140088.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/140088.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "14085",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/14085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/14085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "14092",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/14092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/14092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "141012",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/141012.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/141012.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "141048",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/141048.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/141048.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "145059",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/145059.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/145059.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "145079",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/145079.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/145079.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "146074",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/146074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/146074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "147077",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/147077.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/147077.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "147080",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/147080.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/147080.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "15011",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/15011.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/15011.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "15062",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/15062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/15062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "156054",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/156054.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/156054.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "157032",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/157032.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/157032.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "157087",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/157087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/157087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "159002",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/159002.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/159002.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "159022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/159022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/159022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "160006",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/160006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/160006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "16004",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/16004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/16004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "160067",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/160067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/160067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "16068",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/16068.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/16068.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "161045",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/161045.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/161045.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "163004",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/163004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/163004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "163096",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/163096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/163096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "164046",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/164046.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/164046.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "168084",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/168084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/168084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "17067",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/17067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/17067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "175083",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/175083.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/175083.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "176051",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/176051.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/176051.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "179084",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/179084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/179084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "181021",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/181021.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/181021.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "183066",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/183066.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/183066.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "185092",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/185092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/185092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187058",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/187058.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/187058.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "187099",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/187099.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/187099.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "188025",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/188025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/188025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189006",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/189006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/189006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189013",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/189013.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/189013.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189029",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/189029.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/189029.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "189096",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/189096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/189096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "196027",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/196027.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/196027.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "196040",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/196040.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/196040.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "196062",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/196062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/196062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "196088",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/196088.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/196088.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "198087",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/198087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/198087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "20069",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/20069.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/20069.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "201080",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/201080.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/201080.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "2018",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/2018.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/2018.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "202000",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/202000.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/202000.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "206062",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/206062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/206062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "206097",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/206097.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/206097.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "207038",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/207038.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/207038.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "207049",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/207049.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/207049.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "208078",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/208078.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/208078.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "209021",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/209021.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/209021.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "217013",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/217013.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/217013.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "217090",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/217090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/217090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "220003",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/220003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/220003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "223004",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/223004.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/223004.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "223060",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/223060.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/223060.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "225022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/225022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/225022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "226022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/226022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/226022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "226033",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/226033.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/226033.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "226043",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/226043.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/226043.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "226060",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/226060.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/226060.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "228076",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/228076.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/228076.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "230063",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/230063.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/230063.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "230098",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/230098.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/230098.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "23050",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/23050.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/23050.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "232076",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/232076.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/232076.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "235098",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/235098.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/235098.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "238025",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/238025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/238025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "243095",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/243095.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/243095.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "246009",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/246009.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/246009.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "247003",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/247003.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/247003.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "247012",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/247012.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/247012.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "249021",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/249021.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/249021.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "250047",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/250047.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/250047.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "250087",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/250087.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/250087.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "253016",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/253016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/253016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "253092",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/253092.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/253092.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "257098",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/257098.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/257098.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "258089",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/258089.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/258089.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "259060",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/259060.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/259060.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "267036",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/267036.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/267036.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "268048",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/268048.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/268048.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "268074",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/268074.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/268074.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "277053",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/277053.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/277053.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "279005",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/279005.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/279005.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "28083",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/28083.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/28083.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "281017",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/281017.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/281017.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "285022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/285022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/285022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "288024",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/288024.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/288024.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "289011",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/289011.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/289011.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "290035",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/290035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/290035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "29030",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/29030.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/29030.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "296028",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/296028.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/296028.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "296058",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/296058.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/296058.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "302022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/302022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/302022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "306051",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/306051.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/306051.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "306052",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/306052.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/306052.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "3063",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/3063.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/3063.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "309040",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/309040.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/309040.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "317043",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/317043.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/317043.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "326025",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/326025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/326025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "326085",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/326085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/326085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "33044",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/33044.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/33044.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "334025",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/334025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/334025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "335088",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/335088.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/335088.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "335094",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/335094.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/335094.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "344010",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/344010.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/344010.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "346016",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/346016.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/346016.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "347031",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/347031.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/347031.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35028",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/35028.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/35028.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "35049",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/35049.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/35049.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "36046",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/36046.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/36046.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "365072",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/365072.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/365072.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "368037",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/368037.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/368037.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "372019",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/372019.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/372019.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "376086",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/376086.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/376086.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "384022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/384022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/384022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "384089",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/384089.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/384089.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "385022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/385022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/385022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "388006",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/388006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/388006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "388018",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/388018.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/388018.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "388067",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/388067.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/388067.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "393035",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/393035.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/393035.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41006",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/41006.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/41006.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41029",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/41029.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/41029.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41085",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/41085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/41085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "41096",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/41096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/41096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "43033",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/43033.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/43033.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "43051",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/43051.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/43051.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "45000",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/45000.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/45000.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "48017",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/48017.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/48017.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "48025",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/48025.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/48025.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "49024",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/49024.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/49024.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "5096",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/5096.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/5096.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "51084",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/51084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/51084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "6046",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/6046.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/6046.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "61034",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/61034.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/61034.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "64061",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/64061.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/64061.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "65084",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/65084.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/65084.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "69000",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/69000.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/69000.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "69007",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/69007.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/69007.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "69022",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/69022.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/69022.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "70011",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/70011.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/70011.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "70090",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/70090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/70090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "71076",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/71076.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/71076.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "71099",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/71099.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/71099.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "77062",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/77062.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/77062.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "78098",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/78098.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/78098.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "79073",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/79073.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/79073.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "80085",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/80085.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/80085.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "80090",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/80090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/80090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "8068",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/8068.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/8068.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "81066",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/81066.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/81066.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "81090",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/81090.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/81090.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "81095",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/81095.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/81095.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "87015",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/87015.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/87015.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "92014",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/92014.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/92014.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "94095",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/94095.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/94095.mat",
+      "has_ground_truth": true
+    },
+    {
+      "id": "97010",
+      "split": "test",
+      "image_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/images/test/97010.jpg",
+      "ground_truth_path": "quality/public_datasets/bsds500/extracted/BSR/BSDS500/data/groundTruth/test/97010.mat",
+      "has_ground_truth": true
+    }
+  ]
+}

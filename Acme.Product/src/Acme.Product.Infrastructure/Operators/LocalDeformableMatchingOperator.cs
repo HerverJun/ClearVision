@@ -25,7 +25,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Category = "Matching",
     IconName = "deformable-match",
     Keywords = new[] { "Deformable", "Local", "Matching", "MLS", "Occlusion", "MultiTarget", "NMS" },
-    Version = "1.1.0"
+    Version = "1.1.1"
+)]
+[AlgorithmInfo(
+    Name = "Coarse-to-fine local deformable matching",
+    CoreApi = "candidate windows -> ORB pyramid matching -> homography seed -> MLS/TPS-style warp -> occlusion verification -> NMS",
+    ImplementationStrategy = "Generates template-match candidate windows, evaluates each candidate through coarse-to-fine ORB feature alignment, refines the control grid with moving-least-squares deformation, verifies occlusion and deformation limits, and applies NMS across accepted matches.",
+    TimeComplexity = "O(C*L*(F+M) + C*G*I*P)",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by deformable matching operator tests",
+    SpaceComplexity = "O(W*H + C*G + F)",
+    SuitableUseCases = new[] { "Textured templates that may undergo local deformation, mild occlusion, or multiple target instances.", "Workflows that need deformation field, occlusion mask, and rigid fallback diagnostics in addition to match score." },
+    UnsuitableUseCases = new[] { "Blank or low-texture templates where ORB feature support is insufficient.", "Real-time high-throughput matching without constraining candidate count, pyramid levels, and deformation grid size." },
+    KnownLimitations = new[] { "The implementation uses MLS-style deformation under the legacy TPS parameter names.", "Candidate generation still starts from normalized template matching, so strong repetitive backgrounds can require ROI constraints or higher thresholds." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Search Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Template", "Template Image", PortDataType.Image, IsRequired = false)]

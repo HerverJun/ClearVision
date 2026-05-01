@@ -111,6 +111,34 @@ public class DualModalVotingOperatorTests
     }
 
     [Fact]
+    public async Task Execute_WithDefectCountWithoutConfidence_ShouldStayConservativeNg()
+    {
+        var dlDict = new Dictionary<string, object>
+        {
+            { "DefectCount", 1 },
+            { "Defects", new List<object>() }
+        };
+
+        var traditionalDict = new Dictionary<string, object>
+        {
+            { "DefectCount", 1 }
+        };
+
+        var inputs = new Dictionary<string, object>
+        {
+            { "DLResult", dlDict },
+            { "TraditionalResult", traditionalDict }
+        };
+
+        var result = await _operator.ExecuteAsync(_operatorEntity, inputs, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["IsOk"].Should().Be(false);
+        ((double)result.OutputData["Confidence"]).Should().BeApproximately(1.0, 0.001);
+    }
+
+    [Fact]
     public async Task Execute_WithWeightedAverage_ShouldNotAverageHighConfidenceNgIntoOk()
     {
         var dlResult = DetectionResult.Success(true, 0.51);
@@ -175,6 +203,27 @@ public class DualModalVotingOperatorTests
         result.OutputData!["IsOk"].Should().Be(false);
         result.OutputData["JudgmentValue"].Should().Be("0");
         ((double)result.OutputData["Confidence"]).Should().BeApproximately(0.4, 0.001);
+    }
+
+    [Fact]
+    public async Task Execute_WithLowercaseStrategy_ShouldMatchValidation()
+    {
+        _operatorEntity.AddParameter(TestHelpers.CreateParameter("VotingStrategy", "weightedaverage", "string"));
+
+        var validation = _operator.ValidateParameters(_operatorEntity);
+        validation.IsValid.Should().BeTrue();
+
+        var inputs = new Dictionary<string, object>
+        {
+            { "DLResult", DetectionResult.Success(true, 0.9) },
+            { "TraditionalResult", DetectionResult.Success(false, 0.4) }
+        };
+
+        var result = await _operator.ExecuteAsync(_operatorEntity, inputs, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["IsOk"].Should().Be(true);
+        ((double)result.OutputData["Confidence"]).Should().BeApproximately(0.78, 0.001);
     }
 
     [Fact]

@@ -65,6 +65,10 @@ public class TemplateMatchOperatorTests
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().NotBeNull();
         result.OutputData.Should().ContainKey("Image");
+        result.OutputData.Should().ContainKeys("SubpixelOffsetX", "SubpixelOffsetY", "PeakCurvature");
+        Convert.ToDouble(result.OutputData!["SubpixelOffsetX"]).Should().BeInRange(-0.5, 0.5);
+        Convert.ToDouble(result.OutputData["SubpixelOffsetY"]).Should().BeInRange(-0.5, 0.5);
+        Convert.ToDouble(result.OutputData["PeakCurvature"]).Should().BeGreaterThanOrEqualTo(0.0);
 
         var outputImage = result.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
         var outputBytes = outputImage.GetBytes();
@@ -369,6 +373,79 @@ public class TemplateMatchOperatorTests
         result.OutputData["Method"].Should().Be("CCoeffNormed:Edge");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithPoseSearchRotationScale_ShouldReportPose()
+    {
+        var op = new Operator("template_pose_search", OperatorType.TemplateMatching, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Threshold", 0.55, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EnablePoseSearch", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("AngleStart", -10.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("AngleExtent", 20.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("AngleStep", 2.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ScaleMin", 0.9, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ScaleMax", 1.1, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ScaleStep", 0.05, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("PyramidLevels", 3, "int"));
+
+        using var template = CreatePatternTemplate();
+        using var transformed = TransformTemplate(template, 6.0, 1.05);
+        using var transformedMask = TransformTemplateMask(template.Size(), 6.0, 1.05);
+        using var src = new Mat(220, 220, MatType.CV_8UC3, new Scalar(128, 128, 128));
+        CopyTemplate(src, transformed, transformedMask, 76, 84);
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = src.ToBytes(".png"),
+            ["Template"] = template.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["IsMatch"].Should().Be(true);
+        result.OutputData["PoseSearchEnabled"].Should().Be(true);
+        Convert.ToInt32(result.OutputData["PyramidLevels"]).Should().Be(3);
+        Convert.ToDouble(result.OutputData["Angle"]).Should().BeApproximately(6.0, 4.1);
+        Convert.ToDouble(result.OutputData["Scale"]).Should().BeApproximately(1.05, 0.051);
+
+        var position = result.OutputData["Position"].Should().BeOfType<Position>().Subject;
+        position.X.Should().BeApproximately(76 + transformed.Width / 2.0, 1.5);
+        position.Y.Should().BeApproximately(84 + transformed.Height / 2.0, 1.5);
+        Convert.ToInt32(result.OutputData["MatchedTemplateWidth"]).Should().BeInRange(transformed.Width - 3, transformed.Width + 3);
+        Convert.ToInt32(result.OutputData["MatchedTemplateHeight"]).Should().BeInRange(transformed.Height - 3, transformed.Height + 3);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPoseSearchNoMatch_ShouldPreservePoseDiagnostics()
+    {
+        var op = new Operator("template_pose_search_no_match", OperatorType.TemplateMatching, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Threshold", 0.99, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("EnablePoseSearch", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("AngleStart", -12.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("AngleExtent", 24.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("AngleStep", 3.0, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ScaleMin", 0.85, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ScaleMax", 1.15, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("ScaleStep", 0.05, "double"));
+        op.AddParameter(TestHelpers.CreateParameter("PyramidLevels", 3, "int"));
+
+        using var src = new Mat(120, 120, MatType.CV_8UC3, new Scalar(80, 80, 80));
+        Cv2.Circle(src, new Point(60, 60), 18, new Scalar(170, 170, 170), -1);
+        using var template = CreatePatternTemplate();
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = src.ToBytes(".png"),
+            ["Template"] = template.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["IsMatch"].Should().Be(false);
+        result.OutputData["PoseSearchEnabled"].Should().Be(true);
+        Convert.ToInt32(result.OutputData["PyramidLevels"]).Should().Be(3);
+        Convert.ToDouble(result.OutputData["AngleStep"]).Should().Be(3.0);
+        Convert.ToDouble(result.OutputData["ScaleMin"]).Should().Be(0.85);
+        Convert.ToDouble(result.OutputData["ScaleMax"]).Should().Be(1.15);
+    }
+
     [Theory]
     [InlineData("SqDiff")]
     [InlineData("SqDiffNormed")]
@@ -473,5 +550,48 @@ public class TemplateMatchOperatorTests
     {
         using var roi = new Mat(scene, new Rect(x, y, template.Width, template.Height));
         template.CopyTo(roi);
+    }
+
+    private static void CopyTemplate(Mat scene, Mat template, Mat mask, int x, int y)
+    {
+        using var roi = new Mat(scene, new Rect(x, y, template.Width, template.Height));
+        template.CopyTo(roi, mask);
+    }
+
+    private static Mat TransformTemplate(Mat src, double angle, double scale)
+    {
+        var center = new Point2f(src.Width / 2f, src.Height / 2f);
+        using var matrix = Cv2.GetRotationMatrix2D(center, angle, scale);
+        var m00 = matrix.Get<double>(0, 0);
+        var m01 = matrix.Get<double>(0, 1);
+        var m10 = matrix.Get<double>(1, 0);
+        var m11 = matrix.Get<double>(1, 1);
+        var boundWidth = Math.Max(1, (int)Math.Ceiling((src.Width * Math.Abs(m00)) + (src.Height * Math.Abs(m01))));
+        var boundHeight = Math.Max(1, (int)Math.Ceiling((src.Width * Math.Abs(m10)) + (src.Height * Math.Abs(m11))));
+        matrix.Set(0, 2, matrix.Get<double>(0, 2) + (boundWidth / 2.0) - center.X);
+        matrix.Set(1, 2, matrix.Get<double>(1, 2) + (boundHeight / 2.0) - center.Y);
+
+        var transformed = new Mat();
+        Cv2.WarpAffine(src, transformed, matrix, new Size(boundWidth, boundHeight), InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
+        return transformed;
+    }
+
+    private static Mat TransformTemplateMask(Size sourceSize, double angle, double scale)
+    {
+        var center = new Point2f(sourceSize.Width / 2f, sourceSize.Height / 2f);
+        using var matrix = Cv2.GetRotationMatrix2D(center, angle, scale);
+        var m00 = matrix.Get<double>(0, 0);
+        var m01 = matrix.Get<double>(0, 1);
+        var m10 = matrix.Get<double>(1, 0);
+        var m11 = matrix.Get<double>(1, 1);
+        var boundWidth = Math.Max(1, (int)Math.Ceiling((sourceSize.Width * Math.Abs(m00)) + (sourceSize.Height * Math.Abs(m01))));
+        var boundHeight = Math.Max(1, (int)Math.Ceiling((sourceSize.Width * Math.Abs(m10)) + (sourceSize.Height * Math.Abs(m11))));
+        matrix.Set(0, 2, matrix.Get<double>(0, 2) + (boundWidth / 2.0) - center.X);
+        matrix.Set(1, 2, matrix.Get<double>(1, 2) + (boundHeight / 2.0) - center.Y);
+
+        using var sourceMask = new Mat(sourceSize, MatType.CV_8UC1, Scalar.White);
+        var transformed = new Mat();
+        Cv2.WarpAffine(sourceMask, transformed, matrix, new Size(boundWidth, boundHeight), InterpolationFlags.Nearest, BorderTypes.Constant, Scalar.Black);
+        return transformed;
     }
 }

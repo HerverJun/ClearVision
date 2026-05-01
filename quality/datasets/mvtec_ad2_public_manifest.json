@@ -1,0 +1,21 @@
+{
+  "schema_version": "2026-04-30.public-quality-dataset-manifest.v1",
+  "dataset_id": "mvtec_ad2_public",
+  "name": "MVTec AD 2 public part",
+  "target_operators": ["AnomalyDetection", "SurfaceDefectDetection"],
+  "download_priority": 5,
+  "local_root": "quality/public_datasets/mvtec_ad2_public",
+  "license": {
+    "id": "MVTec-AD2-dataset-terms",
+    "commercial_use": false,
+    "notes": "Manifest-only until the public-part archive URL, hash, and size are pinned from the official source."
+  },
+  "source": {
+    "url": "https://www.mvtec.com/research-teaching/datasets/mvtec-ad-2",
+    "publisher": "MVTec Software GmbH",
+    "description": "Second-generation MVTec anomaly benchmark; public data can be replayed locally, private test requires the official server."
+  },
+  "archives": [],
+  "index_output": "quality/datasets/mvtec_ad2_public_index.json",
+  "claim_boundary": "Public-part local replay only; private server scores and production claims are out of scope."
+}

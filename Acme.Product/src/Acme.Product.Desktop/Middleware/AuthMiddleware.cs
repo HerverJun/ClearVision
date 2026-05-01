@@ -114,7 +114,7 @@ public class AuthMiddleware
     }
 
     /// <summary>
-    /// 从请求头或查询字符串提取 Token
+    /// 从请求头提取 Token
     /// </summary>
     private static string? ExtractToken(HttpContext context)
     {
@@ -126,13 +126,7 @@ public class AuthMiddleware
             return authHeader.Substring("Bearer ".Length).Trim();
         }
 
-        // 2. 从查询字符串提取（用于WebSocket等场景）
-        if (context.Request.Query.TryGetValue("token", out var tokenValue))
-        {
-            return tokenValue.FirstOrDefault();
-        }
-
-        // 3. 从自定义头 X-Auth-Token 提取（备选方案）
+        // 2. 从自定义头 X-Auth-Token 提取（备选方案）
         if (context.Request.Headers.TryGetValue("X-Auth-Token", out var customToken))
         {
             return customToken.FirstOrDefault();

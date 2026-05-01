@@ -18,7 +18,20 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Transforms a base ROI using match pose (CenterX/CenterY/Angle/Scale) and outputs SearchRegion.",
     Category = "辅助",
     IconName = "roi-track",
-    Keywords = new[] { "ROI", "track", "transform", "match", "pose", "SearchRegion" }
+    Keywords = new[] { "ROI", "track", "transform", "match", "pose", "SearchRegion" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Pose-driven ROI rectangle transform",
+    CoreApi = "BaseRoi + selected match -> TryReadPose/TryNormalizeDictionary -> RoiTracker.TransformRoi",
+    ImplementationStrategy = "Normalizes a match dictionary or indexed match sequence, resolves center, angle, and scale from supported match-result shapes, then transforms the base ROI around its center and emits the tracked SearchRegion rectangle.",
+    TimeComplexity = "O(I+C)",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by ROI tracker and caliper bridge tests",
+    SpaceComplexity = "O(C)",
+    SuitableUseCases = new[] { "Passing shape-matching or planar-matching poses into downstream measurement operators as a tracked search ROI.", "Translation, rotation, and scale adjustment of a known reference ROI between frames." },
+    UnsuitableUseCases = new[] { "Full multi-object tracking or selecting the best match by score inside this operator.", "Perspective or non-rigid ROI deformation where a rectangle bounding box is insufficient." },
+    KnownLimitations = new[] { "Output is an integer bounding rectangle around the transformed ROI corners.", "The operator does not clip the SearchRegion to image bounds and clamps non-positive scale values back to 1.0." },
+    Dependencies = new[] { "OpenCvSharp", "RoiTracker" }
 )]
 [InputPort("BaseRoi", "Base ROI", PortDataType.Rectangle, IsRequired = true)]
 [InputPort("Matches", "Matches", PortDataType.Any, IsRequired = true)]

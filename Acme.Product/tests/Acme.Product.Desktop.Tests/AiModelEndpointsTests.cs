@@ -39,9 +39,14 @@ public class AiModelEndpointsTests
         using var response = await host.Client.GetAsync("/api/ai/models");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var responseJson = await response.Content.ReadAsStringAsync();
+        responseJson.Should().NotContain("default-key");
+        using var document = JsonDocument.Parse(responseJson);
         var models = document.RootElement;
         models.ValueKind.Should().Be(JsonValueKind.Array);
+        var defaultModel = models.EnumerateArray().First(x => x.GetProperty("id").GetString() == "model_default");
+        defaultModel.TryGetProperty("apiKey", out _).Should().BeFalse();
+        defaultModel.GetProperty("hasApiKey").GetBoolean().Should().BeTrue();
         var gpt5 = models.EnumerateArray().First(x => x.GetProperty("id").GetString() == "gpt5");
         gpt5.GetProperty("reasoning").GetProperty("mode").GetString().Should().Be("on");
         gpt5.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
@@ -94,6 +99,48 @@ public class AiModelEndpointsTests
         using var document = JsonDocument.Parse(await modelsResponse.Content.ReadAsStringAsync());
         var model = document.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "deepseek-reasoner");
         model.GetProperty("reasoning").GetProperty("mode").GetString().Should().Be("auto");
+        model.GetProperty("hasApiKey").GetBoolean().Should().BeFalse();
+        host.AiConfigStore.GetById("deepseek-reasoner")!.ApiKey.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateAiModel_ShouldPersistSecretAndNeverReturnApiKey()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        var payload = JsonSerializer.Serialize(new
+        {
+            name = "Created Model",
+            provider = "OpenAI Compatible",
+            model = "gpt-4o-mini",
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "created-secret-key",
+            timeoutMs = 90000
+        });
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var responseJson = await response.Content.ReadAsStringAsync();
+        responseJson.Should().NotContain("created-secret-key");
+        using var createDocument = JsonDocument.Parse(responseJson);
+        var createdId = createDocument.RootElement.TryGetProperty("id", out var idProperty)
+            ? idProperty.GetString()
+            : createDocument.RootElement.GetProperty("Id").GetString();
+        createdId.Should().NotBeNullOrWhiteSpace();
+        host.AiConfigStore.GetById(createdId!)!.ApiKey.Should().Be("created-secret-key");
+
+        using var modelsResponse = await host.Client.GetAsync("/api/ai/models");
+        var modelsJson = await modelsResponse.Content.ReadAsStringAsync();
+        modelsJson.Should().NotContain("created-secret-key");
+        using var modelsDocument = JsonDocument.Parse(modelsJson);
+        var createdModel = modelsDocument.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == createdId);
+        createdModel.TryGetProperty("apiKey", out _).Should().BeFalse();
+        createdModel.GetProperty("hasApiKey").GetBoolean().Should().BeTrue();
+
+        var reloaded = host.CreateReloadedStore();
+        reloaded.GetById(createdId!)!.ApiKey.Should().Be("created-secret-key");
     }
 
     [Fact]
@@ -125,16 +172,34 @@ public class AiModelEndpointsTests
     {
         private readonly WebApplication _app;
 
-        private AiModelEndpointTestHost(WebApplication app, AiConfigStore aiConfigStore)
+        private readonly string _storageDirectory;
+
+        private AiModelEndpointTestHost(WebApplication app, AiConfigStore aiConfigStore, string storageDirectory)
         {
             _app = app;
             AiConfigStore = aiConfigStore;
+            _storageDirectory = storageDirectory;
             Client = app.GetTestClient();
         }
 
         public HttpClient Client { get; }
 
         public AiConfigStore AiConfigStore { get; }
+
+        public AiConfigStore CreateReloadedStore()
+        {
+            return new AiConfigStore(
+                Options.Create(new AiGenerationOptions
+                {
+                    Provider = "OpenAI Compatible",
+                    Model = "gpt-4o-mini",
+                    ApiKey = string.Empty,
+                    BaseUrl = "https://api.openai.com/v1",
+                    TimeoutSeconds = 90
+                }),
+                NullLogger<AiConfigStore>.Instance,
+                _storageDirectory);
+        }
 
         public static async Task<AiModelEndpointTestHost> CreateAsync()
         {
@@ -151,6 +216,7 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton(configService);
             builder.Services.AddSingleton(Substitute.For<Acme.Product.Core.Cameras.ICameraManager>());
 
+            var storageDirectory = Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
                 {
@@ -161,14 +227,14 @@ public class AiModelEndpointsTests
                     TimeoutSeconds = 90
                 }),
                 NullLogger<AiConfigStore>.Instance,
-                Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}"));
+                storageDirectory);
             builder.Services.AddSingleton(aiConfigStore);
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
             var app = builder.Build();
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new AiModelEndpointTestHost(app, aiConfigStore);
+            return new AiModelEndpointTestHost(app, aiConfigStore, storageDirectory);
         }
 
         public async ValueTask DisposeAsync()
@@ -176,6 +242,10 @@ public class AiModelEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+            if (Directory.Exists(_storageDirectory))
+            {
+                Directory.Delete(_storageDirectory, recursive: true);
+            }
         }
     }
 }

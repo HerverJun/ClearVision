@@ -51,10 +51,16 @@ public class SettingsResetEndpointTests
         models[0].Model.Should().Be("gpt-4o-mini");
         models[0].IsActive.Should().BeTrue();
 
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var responseJson = await response.Content.ReadAsStringAsync();
+        responseJson.Should().NotContain("default-key");
+        responseJson.Should().NotContain("custom-key");
+        using var document = JsonDocument.Parse(responseJson);
         var resetScope = document.RootElement.GetProperty("resetScope").EnumerateArray().Select(x => x.GetString()).ToArray();
         resetScope.Should().Contain(new[] { "appConfig", "aiModels" });
         document.RootElement.GetProperty("aiModels").GetArrayLength().Should().Be(1);
+        var aiModel = document.RootElement.GetProperty("aiModels")[0];
+        aiModel.TryGetProperty("apiKey", out _).Should().BeFalse();
+        aiModel.GetProperty("hasApiKey").GetBoolean().Should().BeTrue();
         document.RootElement.GetProperty("config").ValueKind.Should().Be(JsonValueKind.Object);
         document.RootElement.GetProperty("config").GetProperty("general").GetProperty("theme").GetString().Should().Be(GeneralConfig.ThemeDark);
     }

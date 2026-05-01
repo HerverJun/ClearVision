@@ -1,0 +1,449 @@
+{
+  "schemaVersion": "2026-04-30.anomaly-threshold-calibration.v1",
+  "generatedAtUtc": "2026-05-01T03:34:55+00:00",
+  "accepted": true,
+  "claimBoundary": "MVTec AD Lite score-threshold calibration only; no product default promotion and no field sign-off claim.",
+  "sourceCandidate": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v1.json",
+  "targetCandidateVersion": "v2",
+  "targetProfile": "max192_dense_stride8_threshold_010",
+  "productDefaultChange": false,
+  "selectionPolicy": "Select highest image F1 below the current threshold while keeping image precision >= 0.95 and false positives <= 3.",
+  "current": {
+    "threshold": 0.35,
+    "imageTruePositive": 55,
+    "imageFalsePositive": 0,
+    "imageFalseNegative": 32,
+    "imageTrueNegative": 33,
+    "imagePrecision": 1.0,
+    "imageRecall": 0.632184,
+    "imageF1": 0.774648,
+    "recoveredAnomalyCount": 0,
+    "remainingMissedAnomalyCount": 32,
+    "recoveredByDefectType": {},
+    "remainingMissedByDefectType": {
+      "broken": 9,
+      "defective": 9,
+      "bent": 8,
+      "glue": 5,
+      "metal_contamination": 1
+    },
+    "falsePositiveCaseIds": [],
+    "taxonomyCounts": {
+      "anomaly_miss": 32,
+      "below_threshold_anomaly": 22,
+      "zero_score_anomaly": 10,
+      "defect_broken": 9,
+      "defect_defective": 9,
+      "defect_bent": 8,
+      "defect_glue": 5,
+      "defect_metal_contamination": 1
+    }
+  },
+  "selected": {
+    "threshold": 0.1,
+    "imageTruePositive": 69,
+    "imageFalsePositive": 3,
+    "imageFalseNegative": 18,
+    "imageTrueNegative": 30,
+    "imagePrecision": 0.958333,
+    "imageRecall": 0.793103,
+    "imageF1": 0.867925,
+    "recoveredAnomalyCount": 14,
+    "remainingMissedAnomalyCount": 18,
+    "recoveredByDefectType": {
+      "broken": 4,
+      "defective": 4,
+      "bent": 3,
+      "glue": 2,
+      "metal_contamination": 1
+    },
+    "remainingMissedByDefectType": {
+      "bent": 5,
+      "broken": 5,
+      "defective": 5,
+      "glue": 3
+    },
+    "falsePositiveCaseIds": [
+      "grid/good/005",
+      "grid/good/010",
+      "grid/good/014"
+    ],
+    "taxonomyCounts": {
+      "anomaly_miss": 18,
+      "zero_score_anomaly": 10,
+      "below_threshold_anomaly": 8,
+      "defect_bent": 5,
+      "defect_broken": 5,
+      "defect_defective": 5,
+      "defect_glue": 3,
+      "false_positive_good": 3,
+      "above_threshold_good": 3
+    }
+  },
+  "thresholdRows": [
+    {
+      "threshold": 0.35,
+      "imageTruePositive": 55,
+      "imageFalsePositive": 0,
+      "imageFalseNegative": 32,
+      "imageTrueNegative": 33,
+      "imagePrecision": 1.0,
+      "imageRecall": 0.632184,
+      "imageF1": 0.774648,
+      "recoveredAnomalyCount": 0,
+      "remainingMissedAnomalyCount": 32,
+      "recoveredByDefectType": {},
+      "remainingMissedByDefectType": {
+        "broken": 9,
+        "defective": 9,
+        "bent": 8,
+        "glue": 5,
+        "metal_contamination": 1
+      },
+      "falsePositiveCaseIds": [],
+      "taxonomyCounts": {
+        "anomaly_miss": 32,
+        "below_threshold_anomaly": 22,
+        "zero_score_anomaly": 10,
+        "defect_broken": 9,
+        "defect_defective": 9,
+        "defect_bent": 8,
+        "defect_glue": 5,
+        "defect_metal_contamination": 1
+      }
+    },
+    {
+      "threshold": 0.3,
+      "imageTruePositive": 57,
+      "imageFalsePositive": 0,
+      "imageFalseNegative": 30,
+      "imageTrueNegative": 33,
+      "imagePrecision": 1.0,
+      "imageRecall": 0.655172,
+      "imageF1": 0.791667,
+      "recoveredAnomalyCount": 2,
+      "remainingMissedAnomalyCount": 30,
+      "recoveredByDefectType": {
+        "bent": 1,
+        "glue": 1
+      },
+      "remainingMissedByDefectType": {
+        "broken": 9,
+        "defective": 9,
+        "bent": 7,
+        "glue": 4,
+        "metal_contamination": 1
+      },
+      "falsePositiveCaseIds": [],
+      "taxonomyCounts": {
+        "anomaly_miss": 30,
+        "below_threshold_anomaly": 20,
+        "zero_score_anomaly": 10,
+        "defect_broken": 9,
+        "defect_defective": 9,
+        "defect_bent": 7,
+        "defect_glue": 4,
+        "defect_metal_contamination": 1
+      }
+    },
+    {
+      "threshold": 0.25,
+      "imageTruePositive": 60,
+      "imageFalsePositive": 0,
+      "imageFalseNegative": 27,
+      "imageTrueNegative": 33,
+      "imagePrecision": 1.0,
+      "imageRecall": 0.689655,
+      "imageF1": 0.816327,
+      "recoveredAnomalyCount": 5,
+      "remainingMissedAnomalyCount": 27,
+      "recoveredByDefectType": {
+        "bent": 2,
+        "broken": 1,
+        "glue": 1,
+        "defective": 1
+      },
+      "remainingMissedByDefectType": {
+        "broken": 8,
+        "defective": 8,
+        "bent": 6,
+        "glue": 4,
+        "metal_contamination": 1
+      },
+      "falsePositiveCaseIds": [],
+      "taxonomyCounts": {
+        "anomaly_miss": 27,
+        "below_threshold_anomaly": 17,
+        "zero_score_anomaly": 10,
+        "defect_broken": 8,
+        "defect_defective": 8,
+        "defect_bent": 6,
+        "defect_glue": 4,
+        "defect_metal_contamination": 1
+      }
+    },
+    {
+      "threshold": 0.2,
+      "imageTruePositive": 62,
+      "imageFalsePositive": 0,
+      "imageFalseNegative": 25,
+      "imageTrueNegative": 33,
+      "imagePrecision": 1.0,
+      "imageRecall": 0.712644,
+      "imageF1": 0.832215,
+      "recoveredAnomalyCount": 7,
+      "remainingMissedAnomalyCount": 25,
+      "recoveredByDefectType": {
+        "bent": 2,
+        "broken": 2,
+        "glue": 2,
+        "defective": 1
+      },
+      "remainingMissedByDefectType": {
+        "defective": 8,
+        "broken": 7,
+        "bent": 6,
+        "glue": 3,
+        "metal_contamination": 1
+      },
+      "falsePositiveCaseIds": [],
+      "taxonomyCounts": {
+        "anomaly_miss": 25,
+        "below_threshold_anomaly": 15,
+        "zero_score_anomaly": 10,
+        "defect_defective": 8,
+        "defect_broken": 7,
+        "defect_bent": 6,
+        "defect_glue": 3,
+        "defect_metal_contamination": 1
+      }
+    },
+    {
+      "threshold": 0.15,
+      "imageTruePositive": 67,
+      "imageFalsePositive": 1,
+      "imageFalseNegative": 20,
+      "imageTrueNegative": 32,
+      "imagePrecision": 0.985294,
+      "imageRecall": 0.770115,
+      "imageF1": 0.864516,
+      "recoveredAnomalyCount": 12,
+      "remainingMissedAnomalyCount": 20,
+      "recoveredByDefectType": {
+        "bent": 3,
+        "broken": 3,
+        "defective": 3,
+        "glue": 2,
+        "metal_contamination": 1
+      },
+      "remainingMissedByDefectType": {
+        "broken": 6,
+        "defective": 6,
+        "bent": 5,
+        "glue": 3
+      },
+      "falsePositiveCaseIds": [
+        "grid/good/014"
+      ],
+      "taxonomyCounts": {
+        "anomaly_miss": 20,
+        "zero_score_anomaly": 10,
+        "below_threshold_anomaly": 10,
+        "defect_broken": 6,
+        "defect_defective": 6,
+        "defect_bent": 5,
+        "defect_glue": 3,
+        "false_positive_good": 1,
+        "above_threshold_good": 1
+      }
+    },
+    {
+      "threshold": 0.1,
+      "imageTruePositive": 69,
+      "imageFalsePositive": 3,
+      "imageFalseNegative": 18,
+      "imageTrueNegative": 30,
+      "imagePrecision": 0.958333,
+      "imageRecall": 0.793103,
+      "imageF1": 0.867925,
+      "recoveredAnomalyCount": 14,
+      "remainingMissedAnomalyCount": 18,
+      "recoveredByDefectType": {
+        "broken": 4,
+        "defective": 4,
+        "bent": 3,
+        "glue": 2,
+        "metal_contamination": 1
+      },
+      "remainingMissedByDefectType": {
+        "bent": 5,
+        "broken": 5,
+        "defective": 5,
+        "glue": 3
+      },
+      "falsePositiveCaseIds": [
+        "grid/good/005",
+        "grid/good/010",
+        "grid/good/014"
+      ],
+      "taxonomyCounts": {
+        "anomaly_miss": 18,
+        "zero_score_anomaly": 10,
+        "below_threshold_anomaly": 8,
+        "defect_bent": 5,
+        "defect_broken": 5,
+        "defect_defective": 5,
+        "defect_glue": 3,
+        "false_positive_good": 3,
+        "above_threshold_good": 3
+      }
+    },
+    {
+      "threshold": 0.05,
+      "imageTruePositive": 69,
+      "imageFalsePositive": 4,
+      "imageFalseNegative": 18,
+      "imageTrueNegative": 29,
+      "imagePrecision": 0.945205,
+      "imageRecall": 0.793103,
+      "imageF1": 0.8625,
+      "recoveredAnomalyCount": 14,
+      "remainingMissedAnomalyCount": 18,
+      "recoveredByDefectType": {
+        "broken": 4,
+        "defective": 4,
+        "bent": 3,
+        "glue": 2,
+        "metal_contamination": 1
+      },
+      "remainingMissedByDefectType": {
+        "bent": 5,
+        "broken": 5,
+        "defective": 5,
+        "glue": 3
+      },
+      "falsePositiveCaseIds": [
+        "grid/good/005",
+        "grid/good/010",
+        "grid/good/014",
+        "grid/good/017"
+      ],
+      "taxonomyCounts": {
+        "anomaly_miss": 18,
+        "zero_score_anomaly": 10,
+        "below_threshold_anomaly": 8,
+        "defect_bent": 5,
+        "defect_broken": 5,
+        "defect_defective": 5,
+        "false_positive_good": 4,
+        "above_threshold_good": 4,
+        "defect_glue": 3
+      }
+    },
+    {
+      "threshold": 0.01,
+      "imageTruePositive": 77,
+      "imageFalsePositive": 5,
+      "imageFalseNegative": 10,
+      "imageTrueNegative": 28,
+      "imagePrecision": 0.939024,
+      "imageRecall": 0.885057,
+      "imageF1": 0.911243,
+      "recoveredAnomalyCount": 22,
+      "remainingMissedAnomalyCount": 10,
+      "recoveredByDefectType": {
+        "defective": 8,
+        "broken": 6,
+        "bent": 4,
+        "glue": 3,
+        "metal_contamination": 1
+      },
+      "remainingMissedByDefectType": {
+        "bent": 4,
+        "broken": 3,
+        "glue": 2,
+        "defective": 1
+      },
+      "falsePositiveCaseIds": [
+        "grid/good/000",
+        "grid/good/005",
+        "grid/good/010",
+        "grid/good/014",
+        "grid/good/017"
+      ],
+      "taxonomyCounts": {
+        "anomaly_miss": 10,
+        "zero_score_anomaly": 10,
+        "false_positive_good": 5,
+        "above_threshold_good": 5,
+        "defect_bent": 4,
+        "defect_broken": 3,
+        "defect_glue": 2,
+        "defect_defective": 1
+      }
+    }
+  ],
+  "summary": {
+    "thresholdOld": 0.35,
+    "thresholdNew": 0.1,
+    "imagePrecisionOld": 1.0,
+    "imagePrecisionNew": 0.958333,
+    "imageRecallOld": 0.632184,
+    "imageRecallNew": 0.793103,
+    "imageRecallDelta": 0.160919,
+    "imageF1Old": 0.774648,
+    "imageF1New": 0.867925,
+    "imageF1Delta": 0.093277,
+    "falsePositiveOld": 0,
+    "falsePositiveNew": 3,
+    "falseNegativeOld": 32,
+    "falseNegativeNew": 18,
+    "recoveredAnomalyCount": 14,
+    "remainingMissedAnomalyCount": 18
+  },
+  "v2RunnerCommand": [
+    "dotnet",
+    "run",
+    "--project",
+    "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj",
+    "--",
+    "--index",
+    "quality/datasets/mvtec_ad_lite_index.json",
+    "--output",
+    "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+    "--report",
+    "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.md",
+    "--candidate-version",
+    "v2",
+    "--profile",
+    "max192_dense_stride8_threshold_010",
+    "--max-side",
+    "192",
+    "--patch-size",
+    "16",
+    "--patch-stride",
+    "8",
+    "--pixel-sample-stride",
+    "2",
+    "--coreset-ratio",
+    "0.02",
+    "--threshold",
+    "0.1",
+    "--min-image-auroc",
+    "0.70",
+    "--min-pixel-auroc",
+    "0.70",
+    "--min-category-image-auroc",
+    "0.70",
+    "--min-category-pixel-auroc",
+    "0.70"
+  ],
+  "gates": {
+    "productDefaultChange": false,
+    "selectedBelowCurrentThreshold": true,
+    "precisionFloor": true,
+    "falsePositiveLimit": true,
+    "recallImproved": true,
+    "f1Improved": true
+  }
+}

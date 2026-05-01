@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest",
+  "datasetId": "shape_matching_geometric_scenes_v1",
+  "operator": "ShapeMatching",
+  "evidenceKind": "dataset",
+  "tier": "B",
+  "status": "promoted",
+  "source": {
+    "kind": "semi-synthetic",
+    "name": "Semi-synthetic geometric shape matching scene protocol",
+    "version": "v1",
+    "uri": "in-repo generated protocol",
+    "license": "repo-local synthetic protocol",
+    "citation": "Fixed-seed geometric-scene pose matching protocol for translation, rotation, scale, multi-target, origin, and negative scenes.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 20260427,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 36,
+    "caseListPath": "quality/evals/reports/ShapeMatching_dataset_baseline.json"
+  },
+  "labels": {
+    "schema": "pose labels with reference point, angle, scale, and no-match negatives",
+    "positiveClasses": ["shape_pose"],
+    "negativeClasses": ["blank_negative"],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "F1",
+    "secondary": ["Precision", "Recall", "MeanPositionErrorPx", "MeanAngleErrorDeg", "MeanScaleError", "FalsePositiveCount", "FalseNegativeCount", "RuntimeMs"],
+    "thresholds": {
+      "F1": 0.999,
+      "Precision": 0.999,
+      "Recall": 0.999,
+      "MeanPositionErrorPx": 8.0,
+      "MeanAngleErrorDeg": 6.0,
+      "MeanScaleError": 0.16,
+      "Failed": 0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/ShapeMatchingGeometricDatasetRunner/ShapeMatchingGeometricDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/ShapeMatchingGeometricDatasetRunner/ShapeMatchingGeometricDatasetRunner.csproj -- --output quality/evals/reports/ShapeMatching_dataset_baseline.json --report quality/evals/reports/ShapeMatching_dataset_baseline.md",
+    "baselineJson": "quality/evals/reports/ShapeMatching_dataset_baseline.json",
+    "reportMarkdown": "quality/evals/reports/ShapeMatching_dataset_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["direct_pose", "rotated_pose", "scaled_pose", "multi_target", "top_left_origin", "blank_negative", "pose_error_regression", "false_positive_regression", "false_negative_regression"],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Generated geometric fixtures only; no public or customer image pixels are stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

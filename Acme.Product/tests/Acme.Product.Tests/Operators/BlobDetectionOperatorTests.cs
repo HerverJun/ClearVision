@@ -152,4 +152,57 @@ public class BlobDetectionOperatorTests
         var blobs = result.OutputData["Blobs"].Should().BeOfType<List<Dictionary<string, object>>>().Subject;
         Convert.ToDouble(blobs[0]["CenterX"]).Should().BeLessThan(100.0);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMaskAndSourceImage_ShouldDetectFromMaskAndRenderOnSource()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 10, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxArea", 10000, "int"));
+
+        using var mask = new Mat(100, 100, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(mask, new Rect(30, 20, 20, 10), Scalar.White, -1);
+        using var source = new Mat(100, 100, MatType.CV_8UC3, new Scalar(16, 32, 48));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = new ImageWrapper(mask),
+            ["SourceImage"] = new ImageWrapper(source)
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(1);
+
+        var blobs = result.OutputData["Blobs"].Should().BeOfType<List<Dictionary<string, object>>>().Subject;
+        Convert.ToDouble(blobs[0]["CenterX"]).Should().BeApproximately(39.5, 1.0);
+        Convert.ToDouble(blobs[0]["CenterY"]).Should().BeApproximately(24.5, 1.0);
+
+        var outputImage = result.OutputData["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        outputImage.Width.Should().Be(100);
+        outputImage.Height.Should().Be(100);
+        outputImage.Channels.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithEmptySourceImage_ShouldFallBackToInputImage()
+    {
+        var op = new Operator("test", OperatorType.BlobAnalysis, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MinArea", 10, "int"));
+
+        using var mask = new Mat(80, 80, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Circle(mask, new Point(40, 40), 8, Scalar.White, -1);
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = new ImageWrapper(mask),
+            ["SourceImage"] = new ImageWrapper(new Mat())
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["BlobCount"]).Should().Be(1);
+        var outputImage = result.OutputData["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        outputImage.Width.Should().Be(80);
+        outputImage.Height.Should().Be(80);
+        outputImage.Channels.Should().Be(3);
+    }
 }

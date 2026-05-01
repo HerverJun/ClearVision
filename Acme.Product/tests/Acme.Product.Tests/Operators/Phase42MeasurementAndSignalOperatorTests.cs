@@ -37,6 +37,29 @@ public class Phase42MeasurementAndSignalOperatorTests
     }
 
     [Fact]
+    public async Task ArcCaliper_ShouldDetectWeakArcEdges()
+    {
+        var sut = new ArcCaliperOperator(Substitute.For<ILogger<ArcCaliperOperator>>());
+        var op = new Operator("ArcCaliper", OperatorType.ArcCaliper, 0, 0);
+        using var image = CreateWeakArcEdgeImage();
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["CenterX"] = 100,
+            ["CenterY"] = 100,
+            ["Radius"] = 55,
+            ["StartAngle"] = 20.0,
+            ["EndAngle"] = 160.0,
+            ["Transition"] = "negative"
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        Convert.ToInt32(result.OutputData!["Count"]).Should().BeGreaterThan(20);
+        Convert.ToDouble(result.OutputData["AverageContrast"]).Should().BeGreaterThan(6.0);
+    }
+
+    [Fact]
     public async Task ArcCaliper_ShouldFail_OnEmptyImage()
     {
         var sut = new ArcCaliperOperator(Substitute.For<ILogger<ArcCaliperOperator>>());
@@ -282,6 +305,30 @@ public class Phase42MeasurementAndSignalOperatorTests
         inverseResult.IsSuccess.Should().BeTrue();
         var reconstructed = inverseResult.OutputData!["Signal"].Should().BeOfType<double[]>().Subject;
         reconstructed.Length.Should().Be(signal.Length);
+    }
+
+    [Fact]
+    public async Task FrequencyFilter_WithUnknownFilterType_ShouldFailClosed()
+    {
+        var sut = new FrequencyFilterOperator(Substitute.For<ILogger<FrequencyFilterOperator>>());
+        var spectrum = new[]
+        {
+            Complex.One,
+            new Complex(0.5, -0.25),
+            Complex.Zero,
+            new Complex(-0.5, 0.25)
+        };
+
+        var result = await sut.ExecuteAsync(new Operator("FrequencyFilter", OperatorType.FrequencyFilter, 0, 0), new Dictionary<string, object>
+        {
+            ["Spectrum"] = spectrum,
+            ["FilterType"] = "identity-by-typo",
+            ["CutoffLow"] = 0.2,
+            ["CutoffHigh"] = 0.4
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("FilterType");
     }
 
     [Fact]
@@ -616,6 +663,14 @@ public class Phase42MeasurementAndSignalOperatorTests
     {
         var mat = new Mat(200, 200, MatType.CV_8UC3, Scalar.Black);
         Cv2.Circle(mat, new Point(100, 100), 55, Scalar.White, 4);
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateWeakArcEdgeImage()
+    {
+        var mat = new Mat(200, 200, MatType.CV_8UC3, new Scalar(82, 82, 82));
+        Cv2.Circle(mat, new Point(100, 100), 55, new Scalar(178, 178, 178), -1, LineTypes.AntiAlias);
+        Cv2.GaussianBlur(mat, mat, new Size(3, 3), 0.8);
         return new ImageWrapper(mat);
     }
 

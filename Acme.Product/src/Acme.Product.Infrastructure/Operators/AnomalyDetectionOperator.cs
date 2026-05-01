@@ -47,10 +47,23 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("PatchStride", "Patch Stride", "int", DefaultValue = 16, Min = 1, Max = 256)]
 [OperatorParam("CoresetRatio", "Coreset Ratio", "double", DefaultValue = 0.2, Min = 0.01, Max = 1.0)]
 [OperatorParam("Threshold", "Threshold", "double", DefaultValue = 0.35, Min = 0.0, Max = 1.0)]
+[OperatorParam("EnableCandidateProfile", "Enable Candidate Profile", "bool", DefaultValue = false)]
+[OperatorParam("CandidateProfile", "Candidate Profile", "enum", DefaultValue = "default", Options = new[] { "default|Default", "mvtec_lite_v2|MVTec Lite v2" })]
+[OperatorParam("CandidateFallbackMode", "Candidate Fallback Mode", "enum", DefaultValue = "UseDefault", Options = new[] { "UseDefault|Use Default", "Fail|Fail" })]
 public sealed class AnomalyDetectionOperator : OperatorBase
 {
     private static readonly string[] SupportedCatalogTypes = ["anomaly_detection", "anomaly_feature_bank", "feature_bank"];
     private static readonly string[] SupportedEmbeddingCatalogTypes = ["anomaly_embedding", "embedding"];
+    private const string CandidateProfileDefault = "default";
+    private const string CandidateProfileMvtecLiteV2 = "mvtec_lite_v2";
+    private const string CandidateFallbackUseDefault = "UseDefault";
+    private const string CandidateFallbackFail = "Fail";
+    private const int MvtecLiteV2PatchSize = 16;
+    private const int MvtecLiteV2PatchStride = 8;
+    private const double MvtecLiteV2CoresetRatio = 0.02;
+    private const double MvtecLiteV2Threshold = 0.10;
+    private const string MvtecLiteV2Backbone = "simple_patchcore";
+    private const string MvtecLiteV2FeatureExtractorId = "lab_gradient_stats";
 
     public AnomalyDetectionOperator(ILogger<AnomalyDetectionOperator> logger)
         : base(logger)
@@ -65,8 +78,19 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         CancellationToken cancellationToken)
     {
         var mode = NormalizeMode(GetStringParam(@operator, "Mode", "inference"));
-        var threshold = GetDoubleParam(@operator, "Threshold", 0.35, 0.0, 1.0);
-        var options = new SimplePatchCoreOptions
+        var candidateProfile = ResolveCandidateProfile(@operator);
+        if (!IsSupportedCandidateProfile(candidateProfile.Profile))
+        {
+            return OperatorExecutionOutput.Failure("CandidateProfile must be 'default' or 'mvtec_lite_v2'.");
+        }
+
+        if (!IsSupportedCandidateFallbackMode(candidateProfile.FallbackMode))
+        {
+            return OperatorExecutionOutput.Failure("CandidateFallbackMode must be 'UseDefault' or 'Fail'.");
+        }
+
+        var baseThreshold = GetDoubleParam(@operator, "Threshold", 0.35, 0.0, 1.0);
+        var baseOptions = new SimplePatchCoreOptions
         {
             PatchSize = GetIntParam(@operator, "PatchSize", 32, 4, 256),
             PatchStride = GetIntParam(@operator, "PatchStride", 16, 1, 256),
@@ -76,8 +100,17 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             EmbeddingModelId = GetStringParam(@operator, "EmbeddingModelId", string.Empty),
             EmbeddingModelPath = GetStringParam(@operator, "EmbeddingModelPath", string.Empty)
         };
+        var threshold = baseThreshold;
+        var options = baseOptions;
         if (mode == "train")
         {
+            if (candidateProfile.Enabled && candidateProfile.Profile == CandidateProfileMvtecLiteV2)
+            {
+                threshold = MvtecLiteV2Threshold;
+                options = ApplyMvtecLiteV2Profile(baseOptions);
+                candidateProfile = candidateProfile with { Applied = true };
+            }
+
             if (!TryGetNormalImages(inputs, out var normalImages, out var normalImagesError))
             {
                 return OperatorExecutionOutput.Failure(normalImagesError);
@@ -139,7 +172,7 @@ public sealed class AnomalyDetectionOperator : OperatorBase
                 return OperatorExecutionOutput.Failure($"Anomaly preview failed: {ex.Message}");
             }
 
-            return OperatorExecutionOutput.Success(CreateOutputs(analysisResult, bank, saveTarget, embeddingTarget, "train", options, threshold));
+            return OperatorExecutionOutput.Success(CreateOutputs(analysisResult, bank, saveTarget, embeddingTarget, "train", options, threshold, candidateProfile));
         }
 
         if (!TryGetInputImage(inputs, out var imageWrapper) || imageWrapper == null)
@@ -169,13 +202,33 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         }
 
         var inferenceOptions = CloneOptions(
-            options,
+            baseOptions,
             patchSize: loadedBank.PatchSize,
             patchStride: loadedBank.PatchStride,
             backbone: loadedBank.Backbone,
             featureExtractorId: loadedBank.FeatureExtractorId,
             embeddingModelId: loadedBank.EmbeddingModelId,
             embeddingModelPath: loadedBank.EmbeddingModelPath);
+        if (candidateProfile.Enabled && candidateProfile.Profile == CandidateProfileMvtecLiteV2)
+        {
+            if (!IsMvtecLiteV2FeatureBankCompatible(loadedBank, out var fallbackReason))
+            {
+                if (candidateProfile.FallbackMode == CandidateFallbackFail)
+                {
+                    return OperatorExecutionOutput.Failure($"Candidate profile mvtec_lite_v2 is incompatible with the loaded feature bank: {fallbackReason}");
+                }
+
+                threshold = baseThreshold;
+                candidateProfile = candidateProfile with { Applied = false, FallbackReason = fallbackReason };
+            }
+            else
+            {
+                threshold = MvtecLiteV2Threshold;
+                inferenceOptions = ApplyMvtecLiteV2Profile(inferenceOptions);
+                candidateProfile = candidateProfile with { Applied = true };
+            }
+        }
+
         var resolvedEmbeddingTarget = ResolveInferenceEmbeddingModelTarget(@operator, loadedBank);
         if (RequiresOnnxEmbedding(inferenceOptions.FeatureExtractorId) && string.IsNullOrWhiteSpace(resolvedEmbeddingTarget.Path))
         {
@@ -187,7 +240,7 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             var result = await RunCpuBoundWork(
                 () => SimplePatchCoreDetector.Analyze(imageWrapper.GetMat(), loadedBank, threshold, inferenceOptions),
                 cancellationToken);
-            return OperatorExecutionOutput.Success(CreateOutputs(result, loadedBank, featureBankTarget, resolvedEmbeddingTarget, "inference", inferenceOptions, threshold));
+            return OperatorExecutionOutput.Success(CreateOutputs(result, loadedBank, featureBankTarget, resolvedEmbeddingTarget, "inference", inferenceOptions, threshold, candidateProfile));
         }
         catch (Exception ex)
         {
@@ -202,6 +255,17 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         if (mode is not ("inference" or "train"))
         {
             return ValidationResult.Invalid("Mode must be 'inference' or 'train'.");
+        }
+
+        var candidateProfile = ResolveCandidateProfile(@operator);
+        if (!IsSupportedCandidateProfile(candidateProfile.Profile))
+        {
+            return ValidationResult.Invalid("CandidateProfile must be 'default' or 'mvtec_lite_v2'.");
+        }
+
+        if (!IsSupportedCandidateFallbackMode(candidateProfile.FallbackMode))
+        {
+            return ValidationResult.Invalid("CandidateFallbackMode must be 'UseDefault' or 'Fail'.");
         }
 
         var backbone = GetStringParam(@operator, "Backbone", "simple_patchcore").Trim();
@@ -277,7 +341,8 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         EmbeddingModelResolution embeddingTarget,
         string mode,
         SimplePatchCoreOptions options,
-        double requestedThreshold)
+        double requestedThreshold,
+        CandidateProfileState candidateProfile)
     {
         var diagnostics = new Dictionary<string, object>
         {
@@ -298,9 +363,16 @@ public sealed class AnomalyDetectionOperator : OperatorBase
             ["PatchStride"] = bank.PatchStride,
             ["RequestedThreshold"] = requestedThreshold,
             ["ThresholdUsed"] = result.ThresholdUsed,
+            ["CandidateProfileEnabled"] = candidateProfile.Enabled,
+            ["CandidateProfile"] = candidateProfile.Profile,
+            ["CandidateProfileApplied"] = candidateProfile.Applied,
+            ["CandidateFallbackMode"] = candidateProfile.FallbackMode,
+            ["CandidateProfileFallbackReason"] = candidateProfile.FallbackReason,
             ["MeanNearestDistance"] = bank.MeanNearestDistance,
             ["StdNearestDistance"] = bank.StdNearestDistance
         };
+
+        result.ScoreMap.Dispose();
 
         return new Dictionary<string, object>
         {
@@ -533,6 +605,96 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         public static EmbeddingModelResolution Empty => new(string.Empty, "None", string.Empty, string.Empty);
     }
 
+    private sealed record CandidateProfileState(
+        bool Enabled,
+        string Profile,
+        string FallbackMode,
+        bool Applied = false,
+        string FallbackReason = "");
+
+    private CandidateProfileState ResolveCandidateProfile(Operator @operator)
+    {
+        return new CandidateProfileState(
+            GetBoolParam(@operator, "EnableCandidateProfile", false),
+            NormalizeCandidateProfile(GetStringParam(@operator, "CandidateProfile", CandidateProfileDefault)),
+            NormalizeCandidateFallbackMode(GetStringParam(@operator, "CandidateFallbackMode", CandidateFallbackUseDefault)));
+    }
+
+    private static string NormalizeCandidateProfile(string raw)
+    {
+        return string.IsNullOrWhiteSpace(raw)
+            ? CandidateProfileDefault
+            : raw.Trim().ToLowerInvariant();
+    }
+
+    private static string NormalizeCandidateFallbackMode(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return CandidateFallbackUseDefault;
+        }
+
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "usedefault" or "use_default" or "use-default" => CandidateFallbackUseDefault,
+            "fail" => CandidateFallbackFail,
+            _ => raw.Trim()
+        };
+    }
+
+    private static bool IsSupportedCandidateProfile(string profile)
+    {
+        return profile is CandidateProfileDefault or CandidateProfileMvtecLiteV2;
+    }
+
+    private static bool IsSupportedCandidateFallbackMode(string fallbackMode)
+    {
+        return fallbackMode is CandidateFallbackUseDefault or CandidateFallbackFail;
+    }
+
+    private static SimplePatchCoreOptions ApplyMvtecLiteV2Profile(SimplePatchCoreOptions source)
+    {
+        return CloneOptions(
+            source,
+            patchSize: MvtecLiteV2PatchSize,
+            patchStride: MvtecLiteV2PatchStride,
+            coresetRatio: MvtecLiteV2CoresetRatio,
+            backbone: MvtecLiteV2Backbone,
+            featureExtractorId: MvtecLiteV2FeatureExtractorId,
+            embeddingModelId: string.Empty,
+            embeddingModelPath: string.Empty);
+    }
+
+    private static bool IsMvtecLiteV2FeatureBankCompatible(SimplePatchCoreFeatureBank bank, out string fallbackReason)
+    {
+        if (bank.PatchSize != MvtecLiteV2PatchSize)
+        {
+            fallbackReason = $"Feature bank patch size {bank.PatchSize} does not match mvtec_lite_v2 patch size {MvtecLiteV2PatchSize}.";
+            return false;
+        }
+
+        if (bank.PatchStride != MvtecLiteV2PatchStride)
+        {
+            fallbackReason = $"Feature bank patch stride {bank.PatchStride} does not match mvtec_lite_v2 patch stride {MvtecLiteV2PatchStride}.";
+            return false;
+        }
+
+        if (!string.Equals(bank.Backbone, MvtecLiteV2Backbone, StringComparison.OrdinalIgnoreCase))
+        {
+            fallbackReason = $"Feature bank backbone '{bank.Backbone}' does not match mvtec_lite_v2 backbone '{MvtecLiteV2Backbone}'.";
+            return false;
+        }
+
+        if (!string.Equals(bank.FeatureExtractorId, MvtecLiteV2FeatureExtractorId, StringComparison.OrdinalIgnoreCase))
+        {
+            fallbackReason = $"Feature bank extractor '{bank.FeatureExtractorId}' does not match mvtec_lite_v2 extractor '{MvtecLiteV2FeatureExtractorId}'.";
+            return false;
+        }
+
+        fallbackReason = string.Empty;
+        return true;
+    }
+
     private static bool RequiresOnnxEmbedding(string featureExtractorId)
     {
         return string.Equals(featureExtractorId?.Trim(), "onnx_embedding", StringComparison.OrdinalIgnoreCase);
@@ -554,6 +716,7 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         SimplePatchCoreOptions source,
         int? patchSize = null,
         int? patchStride = null,
+        double? coresetRatio = null,
         string? backbone = null,
         string? featureExtractorId = null,
         string? embeddingModelId = null,
@@ -563,7 +726,7 @@ public sealed class AnomalyDetectionOperator : OperatorBase
         {
             PatchSize = patchSize ?? source.PatchSize,
             PatchStride = patchStride ?? source.PatchStride,
-            CoresetRatio = source.CoresetRatio,
+            CoresetRatio = coresetRatio ?? source.CoresetRatio,
             Backbone = backbone ?? source.Backbone,
             FeatureExtractorId = featureExtractorId ?? source.FeatureExtractorId,
             EmbeddingModelId = embeddingModelId ?? source.EmbeddingModelId,

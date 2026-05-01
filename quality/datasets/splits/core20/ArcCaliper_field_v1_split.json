@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "2026-04-29.core20-hash-split.v1",
+  "datasetId": "ArcCaliper_field_v1",
+  "operator": "ArcCaliper",
+  "status": "blocked-missing-field-data",
+  "strategy": "hashed-case-id-60-20-20",
+  "seed": 20260429,
+  "hashAlgorithm": "sha256",
+  "caseIdPolicy": "Only hashed/de-identified case ids are allowed. Raw customer paths and serial numbers are forbidden.",
+  "assignment": {
+    "train": "hash_fraction >= 0.00 and < 0.60",
+    "validation": "hash_fraction >= 0.60 and < 0.80",
+    "test": "hash_fraction >= 0.80 and < 1.00"
+  },
+  "counts": {
+    "train": 0,
+    "validation": 0,
+    "test": 0,
+    "total": 0
+  },
+  "train": [],
+  "validation": [],
+  "test": [],
+  "blockedReason": "No approved de-identified production field cases have been registered yet."
+}

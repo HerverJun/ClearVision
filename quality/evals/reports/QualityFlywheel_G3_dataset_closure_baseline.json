@@ -1,0 +1,777 @@
+{
+  "EvidenceKind": "dataset",
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T00:00:00Z",
+    "DatasetName": "Quality Flywheel G3 dataset evidence closure",
+    "DatasetKind": "Tier A/B public, public-bridge, and semi-synthetic protocol evidence for the frozen 20 operator set.",
+    "OperatorCount": 20,
+    "CaseCount": 793,
+    "Passed": 793,
+    "Failed": 0,
+    "TierAOperators": 5,
+    "TierBOperators": 15,
+    "PromotionRule": "Each operator has a manifest, source baseline, metric thresholds, and failure/boundary taxonomy."
+  },
+  "Operators": [
+    {
+      "Operator": "TemplateMatching",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.386,
+      "MemoryAllocationBytesAvg": 48998,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "A",
+      "DatasetMode": "public-bridge",
+      "DatasetName": "HPatches-style synthetic homography public bridge",
+      "DatasetManifest": "quality/datasets/manifests/TemplateMatching_public_bridge_manifest.json",
+      "SourceBaseline": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "AnomalyDetection",
+      "CaseCount": 120,
+      "Passed": 120,
+      "Failed": 0,
+      "RuntimeMsAvg": 43.998,
+      "MemoryAllocationBytesAvg": 55230256,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "A",
+      "DatasetMode": "public-dataset",
+      "DatasetName": "MVTec AD Lite protocol",
+      "DatasetManifest": "quality/datasets/manifests/AnomalyDetection_mvtec_lite_manifest.json",
+      "SourceBaseline": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "DeepLearning",
+      "CaseCount": 36,
+      "Passed": 36,
+      "Failed": 0,
+      "RuntimeMsAvg": 29.387,
+      "MemoryAllocationBytesAvg": 18097862,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "A",
+      "DatasetMode": "coco-style-detection-protocol-bridge",
+      "DatasetName": "COCO-style detection protocol bridge",
+      "DatasetManifest": "quality/datasets/manifests/DeepLearning_detection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset"
+    },
+    {
+      "Operator": "SemanticSegmentation",
+      "CaseCount": 36,
+      "Passed": 36,
+      "Failed": 0,
+      "RuntimeMsAvg": 19.33,
+      "MemoryAllocationBytesAvg": 3418179,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "A",
+      "DatasetMode": "voc-style-segmentation-protocol-bridge",
+      "DatasetName": "VOC-style segmentation protocol bridge",
+      "DatasetManifest": "quality/datasets/manifests/SemanticSegmentation_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset"
+    },
+    {
+      "Operator": "EdgeDetection",
+      "CaseCount": 36,
+      "Passed": 36,
+      "Failed": 0,
+      "RuntimeMsAvg": 8.942,
+      "MemoryAllocationBytesAvg": 1070159,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "A",
+      "DatasetMode": "bsds-style-edge-benchmark-protocol-bridge",
+      "DatasetName": "BSDS-style edge benchmark protocol bridge",
+      "DatasetManifest": "quality/datasets/manifests/EdgeDetection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/EdgeDetection_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset"
+    },
+    {
+      "Operator": "ShapeMatching",
+      "CaseCount": 36,
+      "Passed": 36,
+      "Failed": 0,
+      "RuntimeMsAvg": 46.075,
+      "MemoryAllocationBytesAvg": 86540607,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-geometric-scenes",
+      "DatasetName": "Semi-synthetic geometric shape matching scenes",
+      "DatasetManifest": "quality/datasets/manifests/ShapeMatching_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/ShapeMatching_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset"
+    },
+    {
+      "Operator": "GradientShapeMatch",
+      "CaseCount": 117,
+      "Passed": 117,
+      "Failed": 0,
+      "RuntimeMsAvg": 102.19,
+      "MemoryAllocationBytesAvg": 637504,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-template-scenes",
+      "DatasetName": "Semi-synthetic gradient template scenes",
+      "DatasetManifest": "quality/datasets/manifests/GradientShapeMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/GradientShapeMatch_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "PyramidShapeMatch",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.425,
+      "MemoryAllocationBytesAvg": 45580,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-multiscale-scenes",
+      "DatasetName": "Semi-synthetic multiscale pyramid shape scenes",
+      "DatasetManifest": "quality/datasets/manifests/PyramidShapeMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "AkazeFeatureMatch",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 11.686,
+      "MemoryAllocationBytesAvg": 51317,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-feature-scenes",
+      "DatasetName": "Semi-synthetic AKAZE feature matching scenes",
+      "DatasetManifest": "quality/datasets/manifests/AkazeFeatureMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "OrbFeatureMatch",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 11.474,
+      "MemoryAllocationBytesAvg": 152028,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-feature-scenes",
+      "DatasetName": "Semi-synthetic ORB feature matching scenes",
+      "DatasetManifest": "quality/datasets/manifests/OrbFeatureMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "PlanarMatching",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 34.321,
+      "MemoryAllocationBytesAvg": 282650,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-homography-scenes",
+      "DatasetName": "Semi-synthetic planar homography scenes",
+      "DatasetManifest": "quality/datasets/manifests/PlanarMatching_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/P2MatchingResidual_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "LocalDeformableMatching",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 30.8,
+      "MemoryAllocationBytesAvg": 9876743,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-deformation-scenes",
+      "DatasetName": "Semi-synthetic local deformation scenes",
+      "DatasetManifest": "quality/datasets/manifests/LocalDeformableMatching_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/P2MatchingResidual_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "CaliperTool",
+      "CaseCount": 117,
+      "Passed": 117,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.113,
+      "MemoryAllocationBytesAvg": 142414,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-edge-caliper-scenes",
+      "DatasetName": "Semi-synthetic edge caliper scenes",
+      "DatasetManifest": "quality/datasets/manifests/CaliperTool_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/CaliperTool_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "ArcCaliper",
+      "CaseCount": 31,
+      "Passed": 31,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.358,
+      "MemoryAllocationBytesAvg": 762741,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-arc-edge-scenes",
+      "DatasetName": "Semi-synthetic arc edge scenes",
+      "DatasetManifest": "quality/datasets/manifests/ArcCaliper_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/ArcCaliper_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "ContourDetection",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.814,
+      "MemoryAllocationBytesAvg": 14834,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-contour-scenes",
+      "DatasetName": "Semi-synthetic contour detection scenes",
+      "DatasetManifest": "quality/datasets/manifests/ContourDetection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "BlobAnalysis",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.045,
+      "MemoryAllocationBytesAvg": 26215,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-blob-scenes",
+      "DatasetName": "Semi-synthetic blob analysis scenes",
+      "DatasetManifest": "quality/datasets/manifests/BlobAnalysis_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "LineMeasurement",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.855,
+      "MemoryAllocationBytesAvg": 155806,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-line-metrology-scenes",
+      "DatasetName": "Semi-synthetic line metrology scenes",
+      "DatasetManifest": "quality/datasets/manifests/LineMeasurement_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "CircleMeasurement",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.343,
+      "MemoryAllocationBytesAvg": 10655,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-circle-metrology-scenes",
+      "DatasetName": "Semi-synthetic circle metrology scenes",
+      "DatasetManifest": "quality/datasets/manifests/CircleMeasurement_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "GeometricFitting",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.256,
+      "MemoryAllocationBytesAvg": 68641,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-fitting-scenes",
+      "DatasetName": "Semi-synthetic geometric fitting scenes",
+      "DatasetManifest": "quality/datasets/manifests/GeometricFitting_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden"
+    },
+    {
+      "Operator": "SurfaceDefectDetection",
+      "CaseCount": 24,
+      "Passed": 24,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.518,
+      "MemoryAllocationBytesAvg": 16118,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "DatasetTier": "B",
+      "DatasetMode": "semi-synthetic-surface-defect-scenes",
+      "DatasetName": "Semi-synthetic surface defect scenes",
+      "DatasetManifest": "quality/datasets/manifests/SurfaceDefectDetection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/P2InspectionResidual_baseline.json",
+      "SourceEvidenceKind": "golden"
+    }
+  ],
+  "PromotionRecords": [
+    {
+      "Operator": "TemplateMatching",
+      "Tier": "A",
+      "DatasetMode": "public-bridge",
+      "Manifest": "quality/datasets/manifests/TemplateMatching_public_bridge_manifest.json",
+      "SourceBaseline": "quality/evals/reports/TemplateMatching_public_bridge_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 24,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0
+      },
+      "FailureBoundaries": [
+        "homography",
+        "rotation",
+        "scale",
+        "low-texture",
+        "negative-scene"
+      ]
+    },
+    {
+      "Operator": "AnomalyDetection",
+      "Tier": "A",
+      "DatasetMode": "public-dataset",
+      "Manifest": "quality/datasets/manifests/AnomalyDetection_mvtec_lite_manifest.json",
+      "SourceBaseline": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 120,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "ImageAurocMin": 0.5
+      },
+      "FailureBoundaries": [
+        "good",
+        "defective",
+        "mask-present",
+        "mask-absent"
+      ]
+    },
+    {
+      "Operator": "DeepLearning",
+      "Tier": "A",
+      "DatasetMode": "coco-style-detection-protocol-bridge",
+      "Manifest": "quality/datasets/manifests/DeepLearning_detection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/DeepLearning_detection_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset",
+      "CaseCount": 36,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "AP50": 0.999,
+        "PrecisionAt50": 0.999,
+        "RecallAt50": 0.999
+      },
+      "FailureBoundaries": [
+        "edge-clamp",
+        "same-class-nms",
+        "different-class-overlap",
+        "negative-low-confidence"
+      ]
+    },
+    {
+      "Operator": "SemanticSegmentation",
+      "Tier": "A",
+      "DatasetMode": "voc-style-segmentation-protocol-bridge",
+      "Manifest": "quality/datasets/manifests/SemanticSegmentation_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/SemanticSegmentation_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset",
+      "CaseCount": 36,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "MeanIoU": 0.999,
+        "MeanDice": 0.999
+      },
+      "FailureBoundaries": [
+        "multi-class",
+        "thin-boundary",
+        "small-object",
+        "class-absent",
+        "nested-region"
+      ]
+    },
+    {
+      "Operator": "EdgeDetection",
+      "Tier": "A",
+      "DatasetMode": "bsds-style-edge-benchmark-protocol-bridge",
+      "Manifest": "quality/datasets/manifests/EdgeDetection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/EdgeDetection_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset",
+      "CaseCount": 36,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "F1": 0.999,
+        "MeanBoundaryF1": 0.999
+      },
+      "FailureBoundaries": [
+        "hard-step",
+        "diagonal",
+        "thin-line",
+        "low-contrast",
+        "blurred-noise",
+        "color-input"
+      ]
+    },
+    {
+      "Operator": "ShapeMatching",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-geometric-scenes",
+      "Manifest": "quality/datasets/manifests/ShapeMatching_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/ShapeMatching_dataset_baseline.json",
+      "SourceEvidenceKind": "dataset",
+      "CaseCount": 36,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "F1": 0.999,
+        "MeanPositionErrorPx": 8.0
+      },
+      "FailureBoundaries": [
+        "direct-pose",
+        "rotated-pose",
+        "scaled-pose",
+        "multi-target",
+        "blank-negative"
+      ]
+    },
+    {
+      "Operator": "GradientShapeMatch",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-template-scenes",
+      "Manifest": "quality/datasets/manifests/GradientShapeMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/GradientShapeMatch_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 117,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "PositionTolerancePx": 5.0
+      },
+      "FailureBoundaries": [
+        "translation",
+        "rotation",
+        "low-contrast",
+        "strong-background",
+        "partial-occlusion"
+      ]
+    },
+    {
+      "Operator": "PyramidShapeMatch",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-multiscale-scenes",
+      "Manifest": "quality/datasets/manifests/PyramidShapeMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 24,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "PositionTolerancePx": 12.0
+      },
+      "FailureBoundaries": [
+        "template-mode",
+        "shape-descriptor-mode",
+        "max-matches",
+        "blank-scene",
+        "invalid-template"
+      ]
+    },
+    {
+      "Operator": "AkazeFeatureMatch",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-feature-scenes",
+      "Manifest": "quality/datasets/manifests/AkazeFeatureMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 22,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "MinAcceptedMatches": 8
+      },
+      "FailureBoundaries": [
+        "template-path",
+        "translation",
+        "scale",
+        "rotation",
+        "symmetry",
+        "low-feature"
+      ]
+    },
+    {
+      "Operator": "OrbFeatureMatch",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-feature-scenes",
+      "Manifest": "quality/datasets/manifests/OrbFeatureMatch_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/FeatureMatch_contract_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 22,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "MinAcceptedMatches": 8
+      },
+      "FailureBoundaries": [
+        "template-path",
+        "translation",
+        "scale",
+        "rotation",
+        "symmetry",
+        "low-feature"
+      ]
+    },
+    {
+      "Operator": "PlanarMatching",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-homography-scenes",
+      "Manifest": "quality/datasets/manifests/PlanarMatching_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/P2MatchingResidual_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 24,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "HomographyErrorPx": 5.0
+      },
+      "FailureBoundaries": [
+        "planar-homography",
+        "missing-template",
+        "low-match",
+        "invalid-threshold"
+      ]
+    },
+    {
+      "Operator": "LocalDeformableMatching",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-deformation-scenes",
+      "Manifest": "quality/datasets/manifests/LocalDeformableMatching_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/P2MatchingResidual_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 24,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "DeformationErrorPx": 8.0
+      },
+      "FailureBoundaries": [
+        "local-warp",
+        "pyramid-validation",
+        "occlusion",
+        "deformation-limit"
+      ]
+    },
+    {
+      "Operator": "CaliperTool",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-edge-caliper-scenes",
+      "Manifest": "quality/datasets/manifests/CaliperTool_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/CaliperTool_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 117,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "WidthErrorPx": 1.0,
+        "PairCountAccuracy": 1.0
+      },
+      "FailureBoundaries": [
+        "horizontal",
+        "vertical",
+        "blurred-edge",
+        "strong-noise",
+        "wrong-polarity"
+      ]
+    },
+    {
+      "Operator": "ArcCaliper",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-arc-edge-scenes",
+      "Manifest": "quality/datasets/manifests/ArcCaliper_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/ArcCaliper_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 31,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "RadiusErrorPx": 2.0
+      },
+      "FailureBoundaries": [
+        "positive-polarity",
+        "negative-polarity",
+        "wraparound",
+        "zero-span",
+        "low-texture"
+      ]
+    },
+    {
+      "Operator": "ContourDetection",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-contour-scenes",
+      "Manifest": "quality/datasets/manifests/ContourDetection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 20,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "ContourCountError": 0
+      },
+      "FailureBoundaries": [
+        "single-contour",
+        "nested-contour",
+        "touching-contour",
+        "noise",
+        "empty"
+      ]
+    },
+    {
+      "Operator": "BlobAnalysis",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-blob-scenes",
+      "Manifest": "quality/datasets/manifests/BlobAnalysis_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 20,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "BlobCountError": 0
+      },
+      "FailureBoundaries": [
+        "small-blob",
+        "large-blob",
+        "touching-blob",
+        "hole",
+        "empty"
+      ]
+    },
+    {
+      "Operator": "LineMeasurement",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-line-metrology-scenes",
+      "Manifest": "quality/datasets/manifests/LineMeasurement_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 20,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "LineErrorPx": 2.0
+      },
+      "FailureBoundaries": [
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "short-line",
+        "no-line"
+      ]
+    },
+    {
+      "Operator": "CircleMeasurement",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-circle-metrology-scenes",
+      "Manifest": "quality/datasets/manifests/CircleMeasurement_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 20,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "RadiusErrorPx": 2.0
+      },
+      "FailureBoundaries": [
+        "single-circle",
+        "partial-circle",
+        "small-radius",
+        "large-radius",
+        "no-circle"
+      ]
+    },
+    {
+      "Operator": "GeometricFitting",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-fitting-scenes",
+      "Manifest": "quality/datasets/manifests/GeometricFitting_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/G2P3VisionCore_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 20,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "FitResidualPx": 2.0
+      },
+      "FailureBoundaries": [
+        "line-fit",
+        "circle-fit",
+        "rectangle-fit",
+        "outliers",
+        "degenerate"
+      ]
+    },
+    {
+      "Operator": "SurfaceDefectDetection",
+      "Tier": "B",
+      "DatasetMode": "semi-synthetic-surface-defect-scenes",
+      "Manifest": "quality/datasets/manifests/SurfaceDefectDetection_dataset_manifest.json",
+      "SourceBaseline": "quality/evals/reports/P2InspectionResidual_baseline.json",
+      "SourceEvidenceKind": "golden",
+      "CaseCount": 24,
+      "Failed": 0,
+      "MetricThresholds": {
+        "Failed": 0,
+        "PassRate": 1.0,
+        "FalsePositiveCount": 0
+      },
+      "FailureBoundaries": [
+        "scratch",
+        "spot",
+        "low-contrast",
+        "reference-diff",
+        "clean-negative"
+      ]
+    }
+  ]
+}

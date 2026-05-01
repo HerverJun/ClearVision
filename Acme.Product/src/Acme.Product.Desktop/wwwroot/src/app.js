@@ -5,6 +5,13 @@
 
 import { Dialog } from './shared/components/dialog.js';
 import { buildOperatorNodeConfig } from './shared/operatorVisuals.js';
+import eventBus from './core/app/eventBus.js';
+import serviceRegistry from './core/app/serviceRegistry.js';
+import { installLegacyGlobalAccessors } from './core/app/legacyGlobals.js';
+import { createViewManager } from './core/app/viewManager.js';
+import { bindToolbarCommands } from './core/app/commandHandlers.js';
+import { createFlowCanvasAdapter } from './core/canvas/flowCanvasAdapter.js';
+import { createAiGenerationController } from './features/ai/aiGenerationController.js';
 
 // ============================================
 // 全局错误捕获 - 用于调试
@@ -50,7 +57,6 @@ console.log('[App] Starting module imports...');
 // ============================================
 import { bootstrapAuthSession, logout } from './features/auth/auth.js';
 
-import webMessageBridge from './core/messaging/webMessageBridge.js';
 import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
 import FlowCanvas from './core/canvas/flowCanvas.js';
@@ -79,6 +85,8 @@ const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
 const [getSelectedOperator, setSelectedOperator, subscribeSelectedOperator] = createSignal(null);
 const [getOperatorLibrary, setOperatorLibrary, subscribeOperatorLibrary] = createSignal([]);
 
+installLegacyGlobalAccessors();
+
 // 订阅管理器，防止内存泄漏
 const subscriptions = [];
 function trackedSubscribe(subscribeFn, callback) {
@@ -100,6 +108,9 @@ let projectView = null;
 let resultPanel = null;
 let inspectionPanel = null;
 let aiPanel = null;
+let viewManager = null;
+let toolbarCommandDisposer = null;
+let aiGenerationController = null;
 let appInitialized = false;
 let appBootstrapPromise = null;
 let statusBarStarted = false;
@@ -155,12 +166,49 @@ function updateAuthenticatedUserDisplay() {
 }
 
 function syncActiveNavButton(view) {
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === view);
-    });
+    getViewManager().syncActiveNavButton(view);
+}
+
+function getViewManager() {
+    if (!viewManager) {
+        viewManager = createViewManager({
+            documentRef: document,
+            eventBus,
+            serviceRegistry,
+            setCurrentView,
+            onFeatureLoadError: handleFeatureLoadError,
+            getFlowCanvas: () => serviceRegistry.get('flowCanvasAdapter') || flowCanvas,
+            getPropertySidebarController: () => propertySidebarController,
+            ensureInspectionPanelReady,
+            initializeInspectionImageViewer,
+            ensureResultPanel,
+            loadInspectionHistory,
+            ensureProjectView,
+            ensureAiPanel
+        });
+    }
+
+    return viewManager;
+}
+
+function getAiGenerationController() {
+    if (!aiGenerationController) {
+        aiGenerationController = createAiGenerationController({
+            eventBus,
+            serviceRegistry,
+            ensureAiPanel,
+            switchView,
+            setCurrentView,
+            syncActiveNavButton
+        });
+        serviceRegistry.register('aiGenerationController', aiGenerationController);
+    }
+
+    return aiGenerationController;
 }
 
 async function handleProjectChange(project) {
+    eventBus.emit('project:changed', { project });
     if (!project?.id) {
         inspectionController.setProject(null);
         inspectionPanel?.setProjectContext?.(null);
@@ -172,12 +220,12 @@ async function handleProjectChange(project) {
     inspectionController.setProject(project.id);
     inspectionPanel?.setProjectContext?.(project.id);
 
-    if (project.flow && window.flowCanvas) {
+    if (project.flow && flowCanvas) {
         console.log('[App] 当前工程已切换，加载流程数据:', project.flow);
-        window.flowCanvas.deserialize(project.flow);
-    } else if (window.flowCanvas) {
+        flowCanvas.deserialize(project.flow);
+    } else if (flowCanvas) {
         console.log('[App] 当前工程没有流程数据，清空画布');
-        window.flowCanvas.clear();
+        flowCanvas.clear();
     }
 
     resultPanel?.setProjectContext?.(project.id);
@@ -210,7 +258,6 @@ async function initializeApp() {
     initializeOperatorLibraryPanel();
     initializeFlowEditor();
     initializeImageViewer();
-    initializeWebMessage();
     initializeInspectionController();
     initializePropertyPanel();
     initializePropertySidebarController();
@@ -259,16 +306,7 @@ async function bootstrapApp() {
  * 初始化导航
  */
 function initializeNavigation() {
-    const navButtons = document.querySelectorAll('.nav-btn');
-
-    navButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const view = btn.dataset.view;
-            setCurrentView(view);
-            syncActiveNavButton(view);
-            void switchView(view).catch(error => handleFeatureLoadError('视图切换', error));
-        });
-    });
+    getViewManager().bindNavigation();
 }
 
 function handleFeatureLoadError(featureName, error) {
@@ -307,7 +345,7 @@ async function ensureResultPanel() {
 
     const { ResultPanel } = await loadResultPanelModule();
     resultPanel = new ResultPanel('results-list-container');
-    window.resultPanel = resultPanel;
+    serviceRegistry.register('resultPanel', resultPanel);
     resultPanel.setProjectContext(getCurrentProject()?.id || null);
     resultPanel.setHistoryLoader(loadInspectionHistory);
 
@@ -348,13 +386,14 @@ async function ensureInspectionPanelReady() {
 
     const { InspectionPanel } = await loadInspectionPanelModule();
 
-    if (window.inspectionPanel && typeof window.inspectionPanel.dispose === 'function') {
+    const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
+    if (existingInspectionPanel && typeof existingInspectionPanel.dispose === 'function') {
         console.warn('[App] 发现残留的 InspectionPanel 实例，正在销毁...');
-        window.inspectionPanel.dispose();
+        existingInspectionPanel.dispose();
     }
 
     inspectionPanel = new InspectionPanel('inspection-control-panel');
-    window.inspectionPanel = inspectionPanel;
+    serviceRegistry.register('inspectionPanel', inspectionPanel);
     inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
     console.log('[App] 检测控制面板初始化完成');
     return inspectionPanel;
@@ -365,123 +404,25 @@ async function ensureAiPanel() {
         return aiPanel;
     }
 
-    if (!window.flowCanvas) {
+    const flowCanvasService = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+    if (!flowCanvasService) {
         console.warn('[App] FlowCanvas 未就绪，无法初始化 AI 面板');
         return null;
     }
 
     const { AiPanel } = await loadAiPanelModule();
-    aiPanel = new AiPanel('ai-view', window.flowCanvas);
-    window.aiPanel = aiPanel;
+    aiPanel = new AiPanel('ai-view', flowCanvasService, {
+        getOperators: () => operatorLibraryPanel?.getOperators?.() || [],
+        showToast,
+        onApplied: (flow) => getAiGenerationController().publishApplied(flow)
+    });
+    serviceRegistry.register('aiPanel', aiPanel);
     console.log('[App] AI 面板初始化完成');
     return aiPanel;
 }
 
 async function switchView(view) {
-    console.log(`[App] 切换视图到 ${view}`);
-    const flowEditor = document.getElementById('flow-editor');
-    const imageViewerContainer = document.getElementById('image-viewer');
-    const inspectionViewContainer = document.getElementById('inspection-view');
-    const resultsViewContainer = document.getElementById('results-view');
-    const projectViewContainer = document.getElementById('project-view');
-    const aiViewContainer = document.getElementById('ai-view');
-    const settingsViewContainer = document.getElementById('settings-view');
-
-    flowEditor?.classList.add('hidden');
-    imageViewerContainer?.classList.add('hidden');
-    inspectionViewContainer?.classList.add('hidden');
-    resultsViewContainer?.classList.add('hidden');
-    projectViewContainer?.classList.add('hidden');
-    aiViewContainer?.classList.add('hidden');
-    settingsViewContainer?.classList.add('hidden');
-
-    const leftSidebar = document.querySelector('.sidebar.left');
-    const rightSidebar = document.querySelector('.sidebar.right');
-
-    if (view === 'flow') {
-        leftSidebar?.classList.remove('hidden');
-        rightSidebar?.classList.remove('hidden');
-    } else {
-        leftSidebar?.classList.add('hidden');
-        rightSidebar?.classList.add('hidden');
-    }
-
-    propertySidebarController?.sync(view);
-
-    switch (view) {
-        case 'flow':
-            flowEditor?.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                if (window.flowCanvas) {
-                    window.flowCanvas.resize();
-                }
-            });
-            break;
-        case 'image':
-            imageViewerContainer?.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                if (window.imageViewer?.imageCanvas) {
-                    window.imageViewer.imageCanvas.resize();
-                }
-            });
-            break;
-        case 'inspection': {
-            inspectionViewContainer?.classList.remove('hidden');
-            const panel = await ensureInspectionPanelReady();
-            initializeInspectionImageViewer();
-
-            requestAnimationFrame(() => {
-                if (window.inspectionImageViewer?.imageCanvas) {
-                    window.inspectionImageViewer.imageCanvas.resize();
-                }
-
-                if (window._lastInspectionResult?.outputImage && window.inspectionImageViewer) {
-                    console.log('[App] 切换到检测视图，加载已保存的检测结果图像');
-                    const imageData = `data:image/png;base64,${window._lastInspectionResult.outputImage}`;
-                    window.inspectionImageViewer.loadImage(imageData);
-                }
-
-                panel?.refresh?.();
-            });
-            break;
-        }
-        case 'results': {
-            resultsViewContainer?.classList.remove('hidden');
-            console.log('[App] 切换到结果视图');
-            const panel = await ensureResultPanel();
-            if (panel) {
-                panel.render();
-                await loadInspectionHistory();
-            }
-            break;
-        }
-        case 'project': {
-            projectViewContainer?.classList.remove('hidden');
-            console.log('[App] 切换到工程视图');
-            const viewInstance = await ensureProjectView();
-            viewInstance?.refresh();
-            break;
-        }
-        case 'ai': {
-            aiViewContainer?.classList.remove('hidden');
-            console.log('[App] 切换到 AI 视图');
-            const panel = await ensureAiPanel();
-            panel?.activate?.();
-            break;
-        }
-        case 'settings':
-            settingsViewContainer?.classList.remove('hidden');
-            console.log('[App] 切换到设置视图');
-            if (window.cvSettingsView) {
-                window.cvSettingsView.refresh();
-            } else if (typeof window.initializeSettingsView === 'function') {
-                window.initializeSettingsView();
-            }
-            break;
-        default:
-            flowEditor?.classList.remove('hidden');
-            break;
-    }
+    return getViewManager().switchView(view);
 }
 
 /**
@@ -495,11 +436,12 @@ function initializeInspectionImageViewer() {
     }
     
     // 如果查看器已存在且已初始化，只需调整大小
-    if (window.inspectionImageViewer) {
+    const existingInspectionImageViewer = serviceRegistry.get('inspectionImageViewer');
+    if (existingInspectionImageViewer) {
         requestAnimationFrame(() => {
-            window.inspectionImageViewer.imageCanvas?.resize();
-            if (window.inspectionImageViewer.imageCanvas?.image) {
-                window.inspectionImageViewer.imageCanvas.resetView();
+            existingInspectionImageViewer.imageCanvas?.resize();
+            if (existingInspectionImageViewer.imageCanvas?.image) {
+                existingInspectionImageViewer.imageCanvas.resetView();
             }
         });
         return;
@@ -508,7 +450,7 @@ function initializeInspectionImageViewer() {
     try {
         // 复用现有的 ImageViewerComponent
         const inspectionImageViewer = new ImageViewerComponent('inspection-image-area');
-        window.inspectionImageViewer = inspectionImageViewer;
+        serviceRegistry.register('inspectionImageViewer', inspectionImageViewer);
         
         // 【关键修复】移除重复的回调设置，避免覆盖 initializeInspectionController 中设置的回调
         // 检测完成逻辑统一在 initializeInspectionController 中处理
@@ -669,7 +611,7 @@ function initializeOperatorLibraryPanel() {
     }
     
     operatorLibraryPanel = new OperatorLibraryPanel('operator-library');
-    window.operatorLibraryPanel = operatorLibraryPanel;
+    serviceRegistry.register('operatorLibraryPanel', operatorLibraryPanel);
     
     // 设置拖拽回调
     operatorLibraryPanel.onOperatorDragStart = (operatorData) => {
@@ -704,7 +646,7 @@ function initializeImageViewer() {
     
     // 清空容器并初始化图像查看器组件
     imageViewer = new ImageViewerComponent('image-viewer');
-    window.imageViewer = imageViewer;
+    serviceRegistry.register('imageViewer', imageViewer);
     
     // 设置图像加载回调
     imageViewer.onImageLoaded = (img) => {
@@ -720,11 +662,12 @@ function initializeImageViewer() {
 }
 
 function openImageViewerFromPreview(imageSource) {
-    if (!imageSource || !window.imageViewer) {
+    const viewer = serviceRegistry.get('imageViewer');
+    if (!imageSource || !viewer) {
         return;
     }
 
-    void window.imageViewer.loadImage(imageSource)
+    void viewer.loadImage(imageSource)
         .then(() => {
             setCurrentView('image');
             syncActiveNavButton('image');
@@ -748,14 +691,14 @@ function initializeNodePreviewExperience() {
             getNodeById: nodeId => flowCanvas.nodes.get(nodeId) || null,
             getOperatorMetadata: type => findOperatorDefinition(type),
             getInputImageBase64: () => {
-                const inspectionResult = window._lastInspectionResult || inspectionController.getLastResult?.();
+                const inspectionResult = serviceRegistry.get('lastInspectionResult') || inspectionController.getLastResult?.();
                 return resolvePreviewInputImageBase64(inspectionResult);
             },
             previewExecutor: (nodeId, options) => inspectionController.previewNode(nodeId, options),
             subscribeStructureState: listener => flowCanvas.subscribeStructureState(listener),
             debounceMs: 500
         });
-        window.nodePreviewCoordinator = nodePreviewCoordinator;
+        serviceRegistry.register('nodePreviewCoordinator', nodePreviewCoordinator);
     }
 
     if (!nodePreviewOverlay) {
@@ -764,7 +707,7 @@ function initializeNodePreviewExperience() {
             nodePreviewOverlay = new NodePreviewOverlay(container, flowCanvas, nodePreviewCoordinator, {
                 onOpenImage: openImageViewerFromPreview
             });
-            window.nodePreviewOverlay = nodePreviewOverlay;
+            serviceRegistry.register('nodePreviewOverlay', nodePreviewOverlay);
         }
     }
 }
@@ -790,18 +733,21 @@ function initializeInspectionController() {
         }
 
         result = normalizedResult;
+        eventBus.emit('inspection:result', result);
         console.log('[App] 检测完成:', result);
 
         // 【关键修复】保存最新的检测结果，以便切换视图时显示
+        serviceRegistry.register('lastInspectionResult', result);
         window._lastInspectionResult = result;
 
         // 如果在检测视图，立即更新检测面板和图像查看器
         if (getCurrentView() === 'inspection') {
             // 显示处理后的图像
             const outputImage = getInlineResultImageBase64(result);
-            if (outputImage && window.inspectionImageViewer) {
+            const inspectionImageViewerService = serviceRegistry.get('inspectionImageViewer');
+            if (outputImage && inspectionImageViewerService) {
                 const imageData = `data:image/png;base64,${outputImage}`;
-                window.inspectionImageViewer.loadImage(imageData);
+                inspectionImageViewerService.loadImage(imageData);
             }
 
 
@@ -877,6 +823,7 @@ function initializeInspectionController() {
     
     // 设置检测错误回调
     inspectionController.onInspectionError((error) => {
+        eventBus.emit('inspection:error', error);
         console.error('[App] 检测错误:', error);
         showToast('检测失败: ' + error.message, 'error');
         
@@ -904,7 +851,7 @@ function initializePropertyPanel() {
         previewCoordinator: nodePreviewCoordinator,
         onOpenPreviewImage: openImageViewerFromPreview
     });
-    window.propertyPanel = propertyPanel;
+    serviceRegistry.register('propertyPanel', propertyPanel);
 
     // 【修复】订阅选中算子变化，使用trackedSubscribe防止内存泄漏
     trackedSubscribe(subscribeSelectedOperator, (operator) => {
@@ -1113,6 +1060,14 @@ function initializeFlowEditor() {
     
     // 使用 FlowCanvas 类初始化
     flowCanvas = new FlowCanvas('flow-canvas');
+    const flowCanvasAdapter = createFlowCanvasAdapter(flowCanvas, { eventBus });
+    serviceRegistry.register('flowCanvas', flowCanvas);
+    serviceRegistry.register('flowCanvasAdapter', flowCanvasAdapter);
+    inspectionController.setFlowProvider?.(() => flowCanvasAdapter.serialize());
+    inspectionController.setImageSinks?.([
+        (imageData) => serviceRegistry.get('inspectionImageViewer')?.loadImage?.(imageData),
+        (imageData) => serviceRegistry.get('imageViewer')?.loadImage?.(imageData)
+    ]);
     initializeNodePreviewExperience();
     
     // 设置节点选中回调
@@ -1140,7 +1095,7 @@ function initializeFlowEditor() {
     };
     
     // 保存到全局以便其他函数使用
-    window.flowCanvas = flowCanvas;
+    serviceRegistry.register('flowCanvas', flowCanvas);
     
     // 【阶段B】支持 ForEach 子图双击进入与退出
     const breadcrumbContainer = document.getElementById('subgraph-breadcrumb');
@@ -1245,7 +1200,7 @@ function initializeFlowEditor() {
     
     // 【阶段B】初始化流程编辑器交互增强（撤销/重做/复制/粘贴/框选）
     flowEditorInteraction = new FlowEditorInteraction(flowCanvas);
-    window.flowEditorInteraction = flowEditorInteraction;
+    serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
     console.log('[App] 流程编辑器交互增强已启用');
     
     // 【阶段B】启动自动保存
@@ -1261,7 +1216,7 @@ function initializeFlowEditor() {
 function addOperatorToFlow(type, x, y, data = null) {
     console.log('[App] 添加算子:', type, '位置:', x, y);
     
-    if (!window.flowCanvas) {
+    if (!flowCanvas) {
         console.error('[App] FlowCanvas 未初始化');
         return;
     }
@@ -1269,29 +1224,20 @@ function addOperatorToFlow(type, x, y, data = null) {
     const nodeConfig = buildOperatorNodeConfig(type, data);
     
     // 添加节点到画布
-    const node = window.flowCanvas.addNode(type, x, y, nodeConfig);
+    const node = flowCanvas.addNode(type, x, y, nodeConfig);
     
     console.log('[App] 算子已添加:', node);
     
     // 选中该节点
-    window.flowCanvas.selectedNode = node.id;
-    window.flowCanvas.render();
+    flowCanvas.selectedNode = node.id;
+    flowCanvas.render();
 }
 
 /**
  * 初始化 WebMessage 通信
  */
 function initializeWebMessage() {
-    // 注册消息处理器
-    webMessageBridge.on('operatorExecuted', (data) => {
-        console.log('[App] 算子执行完成:', data);
-        updateResults(data);
-    });
-    
-    webMessageBridge.on('inspectionCompleted', (data) => {
-        console.log('[App] 检测完成:', data);
-        updateResults(data);
-    });
+    // Legacy no-op. Realtime events are routed through InspectionController and eventBus.
 }
 
 /**
@@ -1351,133 +1297,36 @@ function handleNewProject(options = {}) {
  * 初始化工具栏按钮
  */
 function initializeToolbar() {
-    // 注意："新建"和"导入图片"按钮已移至工程分页
-    // 由 projectView.js 处理
-    
-    
-    // 保存按钮
-    const saveBtn = document.getElementById('btn-save');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', async () => {
-            console.log('[App] 保存工程');
-            try {
-                // 【修复】保存前强制提交当前属性面板的更改
-                if (window.propertyPanel && window.propertyPanel.currentOperator) {
-                    console.log('[App] 强制刷新当前属性面板更改');
-                    window.propertyPanel.applyChanges();
-                }
-
-                const project = getCurrentProject();
-                if (project) {
-                    // 使用 projectManager.saveProject 正确保存工程
-                    // PM 的状态已是最新的，无需手动赋值
-                    
-                    // 将流程数据序列化
-                    if (window.flowCanvas) {
-                        project.flow = window.flowCanvas.serialize();
-                        console.log('[App] 流程数据已序列化:', project.flow);
-                    }
-                    
-                    // 调用 projectManager 的保存方法
-                    await projectManager.saveProject(project);
-                    showToast('工程已保存', 'success');
-                } else if (window.flowCanvas && window.flowCanvas.nodes.size > 0) {
-                    // 没有打开工程但画布上有算子，弹出新建工程对话框（保留画布内容）
-                    handleNewProject({ preserveCanvas: true });
-                } else {
-                    showToast('请先创建或打开工程', 'warning');
-                }
-            } catch (error) {
-                console.error('[App] 保存失败:', error);
-                showToast('保存失败: ' + error.message, 'error');
-            }
-        });
-    }
-    
-    // 运行按钮
-    const runBtn = document.getElementById('btn-run');
-    if (runBtn) {
-        runBtn.addEventListener('click', async () => {
-            console.log('[App] 运行检测');
-            const project = getCurrentProject();
-            
-            if (!project) {
-                showToast('请先打开或创建工程', 'warning');
-                return;
-            }
-            
-            if (!window.flowCanvas || window.flowCanvas.nodes.size === 0) {
-                showToast('请先添加算子到流程', 'warning');
-                return;
-            }
-            
-            try {
-                // 切换到检测视图
-                setCurrentView('inspection');
-                syncActiveNavButton('inspection');
-                await switchView('inspection');
-                
-                // 设置当前工程
-                inspectionController.setProject(project.id);
-                
-                const panel = await ensureInspectionPanelReady();
-                initializeInspectionImageViewer();
-                
-                if (panel) {
-                    panel.updateStatus('running', '运行中...');
-                    panel.setButtonsState(true);
-                }
-                
-                const testImage = imageViewer?.currentTestImage;
-                
-                if (testImage) {
-                    showToast('使用导入图像执行检测...', 'info');
-                    await inspectionController.executeSingle(testImage);
-                } else {
-                    // 【关键修复】即使没有显式加载图像，也允许执行。
-                    // 图像可能由流程内部的"图像采集"算子从文件加载。
-                    showToast('开始执行检测流程...', 'info');
-                    await inspectionController.executeSingle();
-                }
-            } catch (error) {
-                console.error('[App] 运行检测失败:', error);
-                showToast('检测失败: ' + error.message, 'error');
-            }
-        });
+    if (toolbarCommandDisposer) {
+        return;
     }
 
-    // 登出按钮
-    const logoutBtn = document.getElementById('btn-logout');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            console.log('[App] 用户登出');
-            await logout();
-        });
-    }
-
-    // AI 生成按钮
-    const aiGenBtn = document.getElementById('btn-ai-gen');
-    if (aiGenBtn) {
-        aiGenBtn.addEventListener('click', () => {
-            console.log('[App] 切换到 AI 视图');
-            
-            // 切换视图
-            setCurrentView('ai');
-            switchView('ai');
-            
-            // 更新导航按钮激活状态
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.dataset.view === 'ai') btn.classList.add('active');
-            });
-        });
-    }
+    toolbarCommandDisposer = bindToolbarCommands({
+        documentRef: document,
+        serviceRegistry,
+        getPropertyPanel: () => propertyPanel,
+        getCurrentProject,
+        getFlowCanvas: () => flowCanvas,
+        getImageViewer: () => imageViewer,
+        projectManager,
+        inspectionController,
+        showToast,
+        handleNewProject,
+        setCurrentView,
+        syncActiveNavButton,
+        switchView,
+        ensureInspectionPanelReady,
+        initializeInspectionImageViewer,
+        logout,
+        openAi: () => getAiGenerationController().open()
+    });
 }
 
 /**
  * 初始化 AI 生成对话框
  */
 function initializeAiGeneration() {
+    getAiGenerationController();
     console.log('[App] AI 生成功能已升级为独立面板');
 }
 
@@ -1490,13 +1339,13 @@ async function loadProject(projectId) {
         const project = await projectManager.openProject(projectId);
         
         // 加载流程到画布
-        if (project.flow && window.flowCanvas) {
+    if (project.flow && flowCanvas) {
             console.log('[App] 加载流程数据:', project.flow);
-            window.flowCanvas.deserialize(project.flow);
-        } else if (window.flowCanvas) {
+        flowCanvas.deserialize(project.flow);
+    } else if (flowCanvas) {
             // 【修复】如果没有流程数据，清空画布
             console.log('[App] 工程没有流程数据，清空画布');
-            window.flowCanvas.clear();
+        flowCanvas.clear();
         }
         
         // 设置检测控制器和结果页上下文
@@ -1526,15 +1375,15 @@ async function createProject(name, description = '', preserveCanvas = false) {
         
         if (preserveCanvas) {
             // 保留画布内容，直接将当前流程保存到新工程
-            if (window.flowCanvas) {
-                project.flow = window.flowCanvas.serialize();
+    if (flowCanvas) {
+        project.flow = flowCanvas.serialize();
                 await projectManager.saveProject(project);
                 console.log('[App] 画布内容已保存到新工程:', project.name);
             }
         } else {
             // 新建空工程，清空画布
-            if (window.flowCanvas) {
-                window.flowCanvas.clear();
+    if (flowCanvas) {
+        flowCanvas.clear();
             }
         }
         
@@ -1639,10 +1488,10 @@ function startAutoSave() {
     
     autoSaveInterval = setInterval(async () => {
         const project = getCurrentProject();
-        if (project && window.flowCanvas && window.flowCanvas.nodes.size > 0) {
+    if (project && flowCanvas && flowCanvas.nodes.size > 0) {
             try {
                 // 更新流程数据
-                project.flow = window.flowCanvas.serialize();
+        project.flow = flowCanvas.serialize();
                 // 保存到本地存储作为备份
                 localStorage.setItem('cv_autosave_backup', JSON.stringify({
                     projectId: project.id,
@@ -1675,9 +1524,9 @@ function stopAutoSave() {
  */
 async function triggerAutoSave() {
     const project = getCurrentProject();
-    if (project && window.flowCanvas) {
+    if (project && flowCanvas) {
         try {
-            project.flow = window.flowCanvas.serialize();
+        project.flow = flowCanvas.serialize();
             localStorage.setItem('cv_autosave_backup', JSON.stringify({
                 projectId: project.id,
                 timestamp: new Date().toISOString(),
@@ -1713,7 +1562,7 @@ function exportProjectToJson() {
                 description: project.description,
                 createdAt: project.createdAt,
                 updatedAt: new Date().toISOString(),
-                flow: window.flowCanvas ? window.flowCanvas.serialize() : project.flow
+            flow: flowCanvas ? flowCanvas.serialize() : project.flow
             }
         };
         
@@ -1799,10 +1648,10 @@ async function importProjectFromJson(file) {
         const project = await projectManager.createProject(importName, importDesc);
         
         // 加载流程到画布
-        if (window.flowCanvas && importData.project.flow) {
-            window.flowCanvas.deserialize(importData.project.flow);
+        if (flowCanvas && importData.project.flow) {
+            flowCanvas.deserialize(importData.project.flow);
             // 将流程数据保存到后端
-            project.flow = window.flowCanvas.serialize();
+            project.flow = flowCanvas.serialize();
             await projectManager.saveProject(project);
         }
         

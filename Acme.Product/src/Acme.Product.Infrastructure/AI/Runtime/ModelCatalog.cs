@@ -9,7 +9,7 @@ public sealed class ModelCatalogDocument
     public List<ModelCatalogEntry> Models { get; init; } = [];
 }
 
-public sealed class ModelCatalogEntry
+public sealed partial class ModelCatalogEntry
 {
     [JsonPropertyName("id")]
     public string Id { get; init; } = string.Empty;
@@ -29,8 +29,17 @@ public sealed class ModelCatalogEntry
     [JsonPropertyName("source")]
     public string? Source { get; init; }
 
+    [JsonPropertyName("license")]
+    public string? License { get; init; }
+
+    [JsonPropertyName("model_sha256")]
+    public string ModelSha256 { get; init; } = string.Empty;
+
     [JsonPropertyName("input_size")]
     public int[] InputSize { get; init; } = [];
+
+    [JsonPropertyName("input_shape")]
+    public int[] InputShape { get; init; } = [];
 
     [JsonPropertyName("num_classes")]
     public int NumClasses { get; init; }
@@ -38,8 +47,17 @@ public sealed class ModelCatalogEntry
     [JsonPropertyName("class_names")]
     public string[] ClassNames { get; init; } = [];
 
+    [JsonPropertyName("classes")]
+    public string[] Classes { get; init; } = [];
+
     [JsonPropertyName("execution_provider")]
     public string ExecutionProvider { get; init; } = "cpu";
+
+    [JsonPropertyName("preprocess")]
+    public Dictionary<string, JsonElement> Preprocess { get; init; } = [];
+
+    [JsonPropertyName("postprocess")]
+    public Dictionary<string, JsonElement> Postprocess { get; init; } = [];
 }
 
 public sealed class ResolvedModelCatalogEntry
@@ -86,10 +104,15 @@ public sealed class ResolvedModelTarget
         payload["ModelVersion"] = Entry.Version;
         payload["CatalogArtifactPath"] = Entry.ArtifactPath;
         payload["CatalogSource"] = Entry.Source ?? string.Empty;
+        payload["CatalogLicense"] = Entry.License ?? string.Empty;
+        payload["ModelSha256"] = Entry.ModelSha256;
         payload["ExecutionProvider"] = Entry.ExecutionProvider;
         payload["InputSize"] = Entry.InputSize;
+        payload["InputShape"] = Entry.InputShape;
         payload["NumClasses"] = Entry.NumClasses;
-        payload["ClassNames"] = Entry.ClassNames;
+        payload["ClassNames"] = Entry.ResolvedClassNames;
+        payload["Preprocess"] = Entry.Preprocess;
+        payload["Postprocess"] = Entry.Postprocess;
         payload["CatalogEntry"] = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
             ["Id"] = Entry.Id,
@@ -98,14 +121,24 @@ public sealed class ResolvedModelTarget
             ["Version"] = Entry.Version,
             ["ArtifactPath"] = Entry.ArtifactPath,
             ["Source"] = Entry.Source ?? string.Empty,
+            ["License"] = Entry.License ?? string.Empty,
+            ["ModelSha256"] = Entry.ModelSha256,
             ["ExecutionProvider"] = Entry.ExecutionProvider,
             ["InputSize"] = Entry.InputSize,
+            ["InputShape"] = Entry.InputShape,
             ["NumClasses"] = Entry.NumClasses,
-            ["ClassNames"] = Entry.ClassNames
+            ["ClassNames"] = Entry.ResolvedClassNames,
+            ["Preprocess"] = Entry.Preprocess,
+            ["Postprocess"] = Entry.Postprocess
         };
 
         return payload;
     }
+}
+
+public sealed partial class ModelCatalogEntry
+{
+    public string[] ResolvedClassNames => ClassNames.Length > 0 ? ClassNames : Classes;
 }
 
 public static class ModelCatalog

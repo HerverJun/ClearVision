@@ -1,0 +1,437 @@
+{
+  "schemaVersion": "2026-05-01.surface-defect-kolektor-sweep.v2",
+  "generatedAtUtc": "2026-05-01T04:53:25+00:00",
+  "claimBoundary": "准工业公开 KolektorSDD2 validation/test sweep；不是真实产线签核。",
+  "candidateVersion": "v2",
+  "targetTaxonomy": [
+    "texture_noise_false_positive",
+    "low_contrast_defect_miss",
+    "undersegmentation_false_negative"
+  ],
+  "globalThresholdPolicy": "No v2 profile may lower the manual global threshold below baseline 15.0.",
+  "sourceBaseline": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+  "summary": {
+    "profileCount": 9,
+    "validationCaseCount": 480,
+    "selectedProfile": "baseline_default",
+    "selectedValidationScore": 2.45145245,
+    "selectionPolicy": "Fixed gate: texture_noise_false_positive must decrease, low_contrast_defect_miss must not increase, and PixelF1 must not drop below baseline; otherwise hold baseline.",
+    "candidatePixelF1": 0.269226,
+    "candidateImageAuroc": 0.772432,
+    "candidateImageF1": 0.567073,
+    "candidateTargetTaxonomyCaseCount": 184
+  },
+  "profiles": [
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json",
+      "profile": "baseline_default",
+      "caseCount": 480,
+      "pixelF1": 0.320553,
+      "imageAuroc": 0.795984,
+      "pixelAuroc": 0.687859,
+      "imageF1": 0.722628,
+      "falsePositivePerImage": 0.152778,
+      "runtimeMsP95": 4.731,
+      "score": 2.45145245,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 55,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "targetTaxonomyCaseCount": 116,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 4,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 2,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "AreaOnly",
+        "SmallNoiseAreaMax": 0,
+        "MinElongationForSmallComponent": 0,
+        "CompactNoiseAreaMax": 0,
+        "CompactNoiseCircularityMin": 0,
+        "CompactNoiseFillRatioMin": 0,
+        "MinLocalResponseProminence": 0
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "texture_noise_false_positive",
+        "low_contrast_defect_miss",
+        "undersegmentation_false_negative"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_shape_response_area6.json",
+      "profile": "texture_noise_shape_response_area6",
+      "caseCount": 480,
+      "pixelF1": 0.270171,
+      "imageAuroc": 0.803519,
+      "pixelAuroc": 0.664247,
+      "imageF1": 0.414286,
+      "falsePositivePerImage": 0.9,
+      "runtimeMsP95": 7.388,
+      "score": 1.6851487,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 96,
+        "low_contrast_defect_miss": 1,
+        "undersegmentation_false_negative": 19
+      },
+      "targetTaxonomyCaseCount": 116,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 6,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 1.5,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "ShapeAndResponseStats",
+        "SmallNoiseAreaMax": 32,
+        "MinElongationForSmallComponent": 2.5,
+        "CompactNoiseAreaMax": 64,
+        "CompactNoiseCircularityMin": 0.68,
+        "CompactNoiseFillRatioMin": 0.45,
+        "MinLocalResponseProminence": 4
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "texture_noise_false_positive"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json",
+      "profile": "texture_noise_compact_circularity_area8",
+      "caseCount": 480,
+      "pixelF1": 0.21036,
+      "imageAuroc": 0.78169,
+      "pixelAuroc": 0.687859,
+      "imageF1": 0.458599,
+      "falsePositivePerImage": 0.002778,
+      "runtimeMsP95": 4.687,
+      "score": 1.90621195,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 1,
+        "low_contrast_defect_miss": 65,
+        "undersegmentation_false_negative": 7
+      },
+      "targetTaxonomyCaseCount": 73,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 18,
+        "MinArea": 8,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 2,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "ShapeAndResponseStats",
+        "SmallNoiseAreaMax": 48,
+        "MinElongationForSmallComponent": 2.5,
+        "CompactNoiseAreaMax": 96,
+        "CompactNoiseCircularityMin": 0.62,
+        "CompactNoiseFillRatioMin": 0.4,
+        "MinLocalResponseProminence": 3
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "texture_noise_false_positive"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_prominence_guard.json",
+      "profile": "texture_noise_prominence_guard",
+      "caseCount": 480,
+      "pixelF1": 0.083576,
+      "imageAuroc": 0.796227,
+      "pixelAuroc": 0.664247,
+      "imageF1": 0.4,
+      "falsePositivePerImage": 1,
+      "runtimeMsP95": 16.68,
+      "score": 1.0470247,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 0,
+        "low_contrast_defect_miss": 0,
+        "undersegmentation_false_negative": 4
+      },
+      "targetTaxonomyCaseCount": 4,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 4,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 1.5,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "ShapeAndResponseStats",
+        "SmallNoiseAreaMax": 0,
+        "MinElongationForSmallComponent": 0,
+        "CompactNoiseAreaMax": 80,
+        "CompactNoiseCircularityMin": 0.55,
+        "CompactNoiseFillRatioMin": 0.35,
+        "MinLocalResponseProminence": 6
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "texture_noise_false_positive"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_local_mean.json",
+      "profile": "low_contrast_clahe_local_mean",
+      "caseCount": 480,
+      "pixelF1": 0.0831,
+      "imageAuroc": 0.796273,
+      "pixelAuroc": 0.664247,
+      "imageF1": 0.4,
+      "falsePositivePerImage": 1,
+      "runtimeMsP95": 10.556,
+      "score": 1.0578792,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 0,
+        "low_contrast_defect_miss": 0,
+        "undersegmentation_false_negative": 4
+      },
+      "targetTaxonomyCaseCount": 4,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 4,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 1.5,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "AreaOnly",
+        "SmallNoiseAreaMax": 0,
+        "MinElongationForSmallComponent": 0,
+        "CompactNoiseAreaMax": 0,
+        "CompactNoiseCircularityMin": 0,
+        "CompactNoiseFillRatioMin": 0,
+        "MinLocalResponseProminence": 0
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "low_contrast_defect_miss"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json",
+      "profile": "low_contrast_clahe_percentile_stats",
+      "caseCount": 480,
+      "pixelF1": 0.028542,
+      "imageAuroc": 0.716898,
+      "pixelAuroc": 0.648451,
+      "imageF1": 0.4,
+      "falsePositivePerImage": 1,
+      "runtimeMsP95": 15.383,
+      "score": 0.81949135,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 0,
+        "low_contrast_defect_miss": 0,
+        "undersegmentation_false_negative": 0
+      },
+      "targetTaxonomyCaseCount": 0,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 4,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "PercentileClip",
+        "ClaheClipLimit": 2,
+        "ClaheTileGridSize": 12,
+        "ComponentFilterMode": "ResponseStats",
+        "SmallNoiseAreaMax": 0,
+        "MinElongationForSmallComponent": 0,
+        "CompactNoiseAreaMax": 0,
+        "CompactNoiseCircularityMin": 0,
+        "CompactNoiseFillRatioMin": 0,
+        "MinLocalResponseProminence": 0
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "low_contrast_defect_miss"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeopen_kernel3.json",
+      "profile": "undersegmentation_closeopen_kernel3",
+      "caseCount": 480,
+      "pixelF1": 0.387512,
+      "imageAuroc": 0.786493,
+      "pixelAuroc": 0.671442,
+      "imageF1": 0.640264,
+      "falsePositivePerImage": 0.238889,
+      "runtimeMsP95": 4.323,
+      "score": 2.52347285,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 83,
+        "low_contrast_defect_miss": 15,
+        "undersegmentation_false_negative": 39
+      },
+      "targetTaxonomyCaseCount": 137,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 4,
+        "MorphCleanSize": 3,
+        "MorphMode": "CloseOpen",
+        "BackgroundKernelSize": 21,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 2,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "AreaOnly",
+        "SmallNoiseAreaMax": 0,
+        "MinElongationForSmallComponent": 0,
+        "CompactNoiseAreaMax": 0,
+        "CompactNoiseCircularityMin": 0,
+        "CompactNoiseFillRatioMin": 0,
+        "MinLocalResponseProminence": 0
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "undersegmentation_false_negative"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeonly_kernel3.json",
+      "profile": "undersegmentation_closeonly_kernel3",
+      "caseCount": 480,
+      "pixelF1": 0.416153,
+      "imageAuroc": 0.789606,
+      "pixelAuroc": 0.671442,
+      "imageF1": 0.589147,
+      "falsePositivePerImage": 0.425,
+      "runtimeMsP95": 4.596,
+      "score": 2.4856232,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 143,
+        "low_contrast_defect_miss": 5,
+        "undersegmentation_false_negative": 41
+      },
+      "targetTaxonomyCaseCount": 189,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 4,
+        "MorphCleanSize": 3,
+        "MorphMode": "CloseOnly",
+        "BackgroundKernelSize": 21,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 2,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "ResponseStats",
+        "SmallNoiseAreaMax": 0,
+        "MinElongationForSmallComponent": 0,
+        "CompactNoiseAreaMax": 0,
+        "CompactNoiseCircularityMin": 0,
+        "CompactNoiseFillRatioMin": 0,
+        "MinLocalResponseProminence": 0
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "undersegmentation_false_negative"
+      ]
+    },
+    {
+      "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_targeted_combined_v2.json",
+      "profile": "targeted_combined_v2",
+      "caseCount": 480,
+      "pixelF1": 0.270171,
+      "imageAuroc": 0.803519,
+      "pixelAuroc": 0.664247,
+      "imageF1": 0.414286,
+      "falsePositivePerImage": 0.9,
+      "runtimeMsP95": 7.154,
+      "score": 1.6856167,
+      "targetTaxonomyCounts": {
+        "texture_noise_false_positive": 96,
+        "low_contrast_defect_miss": 1,
+        "undersegmentation_false_negative": 19
+      },
+      "targetTaxonomyCaseCount": 116,
+      "parameters": {
+        "Method": "LocalContrast",
+        "ThresholdMode": "Manual",
+        "Threshold": 15,
+        "MinArea": 6,
+        "MorphCleanSize": 1,
+        "MorphMode": "OpenClose",
+        "BackgroundKernelSize": 31,
+        "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 1.5,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "ShapeAndResponseStats",
+        "SmallNoiseAreaMax": 32,
+        "MinElongationForSmallComponent": 2.5,
+        "CompactNoiseAreaMax": 64,
+        "CompactNoiseCircularityMin": 0.68,
+        "CompactNoiseFillRatioMin": 0.45,
+        "MinLocalResponseProminence": 4
+      },
+      "split": "train-validation",
+      "targetTaxonomy": [
+        "texture_noise_false_positive",
+        "low_contrast_defect_miss",
+        "undersegmentation_false_negative"
+      ]
+    }
+  ],
+  "candidate": {
+    "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json",
+    "profile": "baseline_default",
+    "caseCount": 1004,
+    "pixelF1": 0.269226,
+    "imageAuroc": 0.772432,
+    "pixelAuroc": 0.659955,
+    "imageF1": 0.567073,
+    "falsePositivePerImage": 0.139821,
+    "runtimeMsP95": 4.488,
+    "score": 2.12015485,
+    "targetTaxonomyCounts": {
+      "texture_noise_false_positive": 123,
+      "low_contrast_defect_miss": 15,
+      "undersegmentation_false_negative": 46
+    },
+    "targetTaxonomyCaseCount": 184,
+    "parameters": {
+      "Method": "LocalContrast",
+      "ThresholdMode": "Manual",
+      "Threshold": 15,
+      "MinArea": 4,
+      "MorphCleanSize": 1,
+      "MorphMode": "OpenClose",
+      "BackgroundKernelSize": 31,
+      "ResponseNormalizeMode": "RawClamp",
+      "ClaheClipLimit": 2,
+      "ClaheTileGridSize": 8,
+      "ComponentFilterMode": "AreaOnly",
+      "SmallNoiseAreaMax": 0,
+      "MinElongationForSmallComponent": 0,
+      "CompactNoiseAreaMax": 0,
+      "CompactNoiseCircularityMin": 0,
+      "CompactNoiseFillRatioMin": 0,
+      "MinLocalResponseProminence": 0
+    },
+    "split": "test"
+  }
+}

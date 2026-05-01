@@ -24,9 +24,46 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     {
     }
 
+    protected sealed record FeatureMatchCandidateProfile(string Name, bool Enabled, bool Applied = false);
+
+    protected FeatureMatchCandidateProfile ResolveFeatureMatchCandidateProfile(Operator @operator)
+    {
+        return new FeatureMatchCandidateProfile(
+            NormalizeFeatureMatchCandidateProfile(GetStringParam(@operator, "CandidateProfile", "default")),
+            GetBoolParam(@operator, "EnableCandidateProfile", false));
+    }
+
+    protected ValidationResult ValidateFeatureMatchCandidateProfile(Operator @operator, params string[] supportedProfiles)
+    {
+        var profile = ResolveFeatureMatchCandidateProfile(@operator);
+        var supported = supportedProfiles
+            .Append("default")
+            .Select(NormalizeFeatureMatchCandidateProfile)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return supported.Contains(profile.Name)
+            ? ValidationResult.Valid()
+            : ValidationResult.Invalid($"CandidateProfile must be one of: {string.Join(", ", supported.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}.");
+    }
+
+    protected static void AddFeatureMatchCandidateProfileOutputs(
+        Dictionary<string, object> data,
+        FeatureMatchCandidateProfile profile)
+    {
+        data["CandidateProfileEnabled"] = profile.Enabled;
+        data["CandidateProfile"] = profile.Name;
+        data["CandidateProfileApplied"] = profile.Applied;
+    }
+
+    private static string NormalizeFeatureMatchCandidateProfile(string raw)
+    {
+        return string.IsNullOrWhiteSpace(raw)
+            ? "default"
+            : raw.Trim().ToLowerInvariant();
+    }
+
     /// <summary>
     /// 浣跨敤瀵圭О娴嬭瘯鍖归厤鎻忚堪绗?    /// </summary>
-    protected List<DMatch> MatchWithSymmetryTest(Mat templateDesc, Mat sceneDesc)
+    protected List<DMatch> MatchWithSymmetryTest(Mat templateDesc, Mat sceneDesc, double matchRatio = 0.75)
     {
         using var matcher = new BFMatcher(NormTypes.Hamming, crossCheck: false);
 
@@ -39,7 +76,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         var backwardBest = new Dictionary<int, int>();
         foreach (var m in backwardMatches)
         {
-            if (m.Length >= 2 && m[0].Distance < 0.75 * m[1].Distance)
+            if (m.Length >= 2 && m[0].Distance < matchRatio * m[1].Distance)
             {
                 backwardBest[m[0].QueryIdx] = m[0].TrainIdx;
             }
@@ -54,7 +91,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         foreach (var m in forwardMatches)
         {
             if (m.Length < 2) continue;
-            if (m[0].Distance >= 0.75 * m[1].Distance) continue;
+            if (m[0].Distance >= matchRatio * m[1].Distance) continue;
 
             if (backwardBest.TryGetValue(m[0].TrainIdx, out var reverseTemplateIdx) && reverseTemplateIdx == m[0].QueryIdx)
             {
@@ -100,7 +137,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         double ransacThreshold,
         int minMatchCount,
         int minInliers,
-        double minInlierRatio)
+        double minInlierRatio,
+        bool allowCenterOnlyProjection = false)
     {
         if (goodMatches.Count < 4)
         {
@@ -113,6 +151,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
                 MaxReprojectionError: double.PositiveInfinity,
                 AreaRatio: 0,
                 CornersValid: false,
+                CornersInsideCount: 0,
+                ProjectedCenterInside: false,
                 FailureReason: "At least four point correspondences are required."));
         }
 
@@ -127,6 +167,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
             minMatchCount,
             minInliers,
             minInlierRatio,
+            allowCenterOnlyProjection,
             out var homography,
             out var corners,
             out var metrics);

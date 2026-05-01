@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "2026-04-29.dataset-manifest",
+  "datasetId": "surface_defect_detection_kolektorsdd2_v1",
+  "operator": "SurfaceDefectDetection",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "active",
+  "source": {
+    "kind": "public-noncommercial",
+    "name": "KolektorSDD2",
+    "version": "official zip, Last-Modified 2023-09-28",
+    "uri": "https://go.vicos.si/kolektorsdd2",
+    "license": "CC-BY-NC-SA-4.0; commercial use requires author permission",
+    "citation": "Tabernik et al., Mixed supervision for surface-defect detection: from weakly to fully supervised learning",
+    "checksumSha256": "EDCDB486809B24F1D17B785E30C52FAFC5999554DD5FE18DDF77B61CEB6F36A8"
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_DATASET_ROOT",
+    "relativePath": "quality/public_datasets/kolektorsdd2",
+    "gitPolicy": "manifest-only"
+  },
+  "split": {
+    "strategy": "source-defined",
+    "seed": 0,
+    "trainCount": 2331,
+    "validationCount": 0,
+    "testCount": 1004,
+    "caseListPath": "quality/datasets/kolektorsdd2_index.json"
+  },
+  "labels": {
+    "schema": "binary surface defect masks with image-level defect/no-defect labels derived from non-empty masks",
+    "positiveClasses": ["surface_defect_mask", "defect_image"],
+    "negativeClasses": ["normal_surface"],
+    "ignoreRules": ["raw dataset is noncommercial; keep evidence separate from commercial release claims"]
+  },
+  "metrics": {
+    "primary": "PixelF1",
+    "secondary": ["MaskIoU", "Dice", "ImageAuroc", "FalsePositivePerImage", "ConnectedComponentRecall", "RuntimeMsP95"],
+    "thresholds": {
+      "Failed": 0,
+      "ImageAurocMinimum": 0.70,
+      "PixelF1Minimum": 0.20,
+      "PixelF1RegressionTolerance": 0.02
+    }
+  },
+  "runner": {
+    "project": "quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj -- --index quality/datasets/kolektorsdd2_index.json --output quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json --report quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md",
+    "baselineJson": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json",
+    "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["miss_tiny_defect", "false_positive_texture", "illumination_shift", "border_artifact", "mask_fragmentation", "threshold_instability"],
+    "minimumFailureCases": 5
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Public noncommercial dataset; raw files remain under ignored quality/public_datasets."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

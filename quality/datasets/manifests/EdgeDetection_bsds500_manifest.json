@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "2026-04-29.dataset-manifest",
+  "datasetId": "edge_detection_bsds500_v1",
+  "operator": "EdgeDetection",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "active",
+  "source": {
+    "kind": "public",
+    "name": "BSDS500",
+    "version": "BSR_bsds500.tgz, updated Jan 2013",
+    "uri": "https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/BSR/BSR_bsds500.tgz",
+    "license": "research-use/verify-license; official page does not state explicit redistribution license",
+    "citation": "Arbelaez, Maire, Fowlkes, Malik, Contour Detection and Hierarchical Image Segmentation, TPAMI 2011",
+    "checksumSha256": "97E49D31764F3912F0C4122707D53062AC9E783BA0F095E447A4D53C1A41AF8E"
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_DATASET_ROOT",
+    "relativePath": "quality/public_datasets/bsds500",
+    "gitPolicy": "manifest-only"
+  },
+  "split": {
+    "strategy": "source-defined",
+    "seed": 0,
+    "trainCount": 200,
+    "validationCount": 100,
+    "testCount": 200,
+    "caseListPath": "quality/datasets/bsds500_index.json"
+  },
+  "labels": {
+    "schema": "BSDS500 human boundary/segmentation annotations stored as MATLAB .mat files",
+    "positiveClasses": ["boundary_pixel"],
+    "negativeClasses": ["non_boundary_pixel"],
+    "ignoreRules": ["runner must tolerate multiple human annotations per image"]
+  },
+  "metrics": {
+    "primary": "BoundaryF1",
+    "secondary": ["Precision", "Recall", "ODS", "OIS", "PrattFom", "RuntimeMsP95"],
+    "thresholds": {
+      "Failed": 0,
+      "BoundaryF1RegressionTolerance": 0.02
+    }
+  },
+  "runner": {
+    "project": "quality/tools/BsdsEdgeContourDatasetRunner/BsdsEdgeContourDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/BsdsEdgeContourDatasetRunner/BsdsEdgeContourDatasetRunner.csproj -- --index quality/datasets/bsds500_index.json --split test --output quality/evals/reports/EdgeDetection_bsds500_baseline.json --report quality/evals/reports/EdgeDetection_bsds500_baseline.md",
+    "baselineJson": "quality/evals/reports/EdgeDetection_bsds500_baseline.json",
+    "reportMarkdown": "quality/evals/reports/EdgeDetection_bsds500_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["low_contrast_boundary", "high_texture_false_positive", "thin_boundary_miss", "over_smoothing_edge_loss", "mat_annotation_parse_failure"],
+    "minimumFailureCases": 5
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Public research dataset; raw pixels remain under ignored quality/public_datasets."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

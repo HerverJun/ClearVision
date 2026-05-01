@@ -24,6 +24,9 @@ public class AnalysisDataBuilder : IAnalysisDataBuilder
         {
             new OcrRecognitionAnalysisCardMapper(),
             new CodeRecognitionAnalysisCardMapper(),
+            new CommunicationAnalysisCardMapper(),
+            new DetectionAnalysisCardMapper(),
+            new GenericMeasurementAnalysisCardMapper(),
             new WidthMeasurementAnalysisCardMapper()
         }))
     {

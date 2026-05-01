@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "2026-04-29.matching-failure-backlog.v1",
+  "generatedAtUtc": "2026-05-01T03:28:42+00:00",
+  "claimBoundary": "准工业公开 HPatches/replay backlog；不是真实产线签核。",
+  "sourceReports": [
+    "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+    "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+    "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json"
+  ],
+  "summary": {
+    "caseCount": 4,
+    "bothOperatorsFailedCount": 2,
+    "viewpointCaseCount": 3,
+    "illuminationCaseCount": 1,
+    "taxonomyCounts": {
+      "extreme_viewpoint_crop": 3,
+      "insufficient_correspondences": 1
+    }
+  },
+  "items": [
+    {
+      "caseId": "v_astronautis_1_2",
+      "sequenceId": "v_astronautis",
+      "sequenceType": "viewpoint",
+      "pair": "1-2",
+      "taxonomy": "extreme_viewpoint_crop",
+      "severity": "P1",
+      "bestCurrentOperator": "AkazeFeatureMatch",
+      "bothOperatorsFailed": false,
+      "operatorResults": {
+        "AkazeFeatureMatch": {
+          "passed": true,
+          "positionErrorPx": 0.230833,
+          "score": 0.893602,
+          "inliers": 205,
+          "totalMatches": 225,
+          "inlierRatio": 0.911111,
+          "meanReprojectionError": 1.109113,
+          "maxReprojectionError": 3.833682,
+          "areaRatio": 1.901131,
+          "cornersInsideCount": 0,
+          "projectedCenterInside": true,
+          "homographyFailureReason": null,
+          "taxonomy": null
+        },
+        "OrbFeatureMatch": {
+          "passed": false,
+          "positionErrorPx": 307.229725,
+          "score": 0,
+          "inliers": 134,
+          "totalMatches": 134,
+          "inlierRatio": 1,
+          "meanReprojectionError": 1.492776,
+          "maxReprojectionError": 5.211362,
+          "areaRatio": 1.898965,
+          "cornersInsideCount": 0,
+          "projectedCenterInside": true,
+          "homographyFailureReason": "Projected quadrilateral is invalid.",
+          "taxonomy": "extreme_viewpoint_crop"
+        }
+      },
+      "nextAction": "Prototype center-first localization gate: permit heavily cropped projected quadrilaterals only when center, inliers, reprojection, and area remain stable."
+    },
+    {
+      "caseId": "v_charing_1_2",
+      "sequenceId": "v_charing",
+      "sequenceType": "viewpoint",
+      "pair": "1-2",
+      "taxonomy": "extreme_viewpoint_crop",
+      "severity": "P1",
+      "bestCurrentOperator": "AkazeFeatureMatch",
+      "bothOperatorsFailed": false,
+      "operatorResults": {
+        "AkazeFeatureMatch": {
+          "passed": true,
+          "positionErrorPx": 0.913708,
+          "score": 0.854111,
+          "inliers": 20,
+          "totalMatches": 24,
+          "inlierRatio": 0.833333,
+          "meanReprojectionError": 1.045712,
+          "maxReprojectionError": 2.134944,
+          "areaRatio": 2.439398,
+          "cornersInsideCount": 1,
+          "projectedCenterInside": true,
+          "homographyFailureReason": null,
+          "taxonomy": null
+        },
+        "OrbFeatureMatch": {
+          "passed": false,
+          "positionErrorPx": 338.706579,
+          "score": 0,
+          "inliers": 12,
+          "totalMatches": 19,
+          "inlierRatio": 0.631579,
+          "meanReprojectionError": 1.578652,
+          "maxReprojectionError": 6.287805,
+          "areaRatio": 2.130559,
+          "cornersInsideCount": 1,
+          "projectedCenterInside": true,
+          "homographyFailureReason": "Projected quadrilateral is invalid.",
+          "taxonomy": "extreme_viewpoint_crop"
+        }
+      },
+      "nextAction": "Prototype center-first localization gate: permit heavily cropped projected quadrilaterals only when center, inliers, reprojection, and area remain stable."
+    },
+    {
+      "caseId": "v_churchill_1_2",
+      "sequenceId": "v_churchill",
+      "sequenceType": "viewpoint",
+      "pair": "1-2",
+      "taxonomy": "extreme_viewpoint_crop",
+      "severity": "P2",
+      "bestCurrentOperator": "OrbFeatureMatch",
+      "bothOperatorsFailed": true,
+      "operatorResults": {
+        "AkazeFeatureMatch": {
+          "passed": false,
+          "positionErrorPx": 192.562205,
+          "score": 0,
+          "inliers": 241,
+          "totalMatches": 296,
+          "inlierRatio": 0.814189,
+          "meanReprojectionError": 1.279321,
+          "maxReprojectionError": 4.987191,
+          "areaRatio": 1.772745,
+          "cornersInsideCount": 1,
+          "projectedCenterInside": true,
+          "homographyFailureReason": "Projected quadrilateral is invalid.",
+          "taxonomy": "extreme_viewpoint_crop"
+        },
+        "OrbFeatureMatch": {
+          "passed": false,
+          "positionErrorPx": 143.407785,
+          "score": 0,
+          "inliers": 207,
+          "totalMatches": 218,
+          "inlierRatio": 0.949541,
+          "meanReprojectionError": 1.307151,
+          "maxReprojectionError": 5.161662,
+          "areaRatio": 1.772939,
+          "cornersInsideCount": 1,
+          "projectedCenterInside": true,
+          "homographyFailureReason": "Projected quadrilateral is invalid.",
+          "taxonomy": "extreme_viewpoint_crop"
+        }
+      },
+      "nextAction": "Prototype center-first localization gate: permit heavily cropped projected quadrilaterals only when center, inliers, reprojection, and area remain stable."
+    },
+    {
+      "caseId": "i_pool_1_2",
+      "sequenceId": "i_pool",
+      "sequenceType": "illumination",
+      "pair": "1-2",
+      "taxonomy": "insufficient_correspondences",
+      "severity": "P2",
+      "bestCurrentOperator": "OrbFeatureMatch",
+      "bothOperatorsFailed": true,
+      "operatorResults": {
+        "AkazeFeatureMatch": {
+          "passed": false,
+          "positionErrorPx": 230.10704,
+          "score": 0,
+          "inliers": 0,
+          "totalMatches": 2,
+          "inlierRatio": 0,
+          "meanReprojectionError": null,
+          "maxReprojectionError": null,
+          "areaRatio": 0,
+          "cornersInsideCount": 0,
+          "projectedCenterInside": false,
+          "homographyFailureReason": "At least four point correspondences are required.",
+          "taxonomy": "insufficient_correspondences"
+        },
+        "OrbFeatureMatch": {
+          "passed": false,
+          "positionErrorPx": 0.5,
+          "score": 0,
+          "inliers": 0,
+          "totalMatches": 0,
+          "inlierRatio": 0,
+          "meanReprojectionError": null,
+          "maxReprojectionError": null,
+          "areaRatio": 0,
+          "cornersInsideCount": 0,
+          "projectedCenterInside": false,
+          "homographyFailureReason": "At least four point correspondences are required.",
+          "taxonomy": "insufficient_correspondences"
+        }
+      },
+      "nextAction": "Increase texture support or add fallback detector profile only if replay gate remains stable."
+    }
+  ]
+}

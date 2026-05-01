@@ -14,11 +14,11 @@
 > English: Computes the distance from each pixel to the nearest zero pixel. Supports multiple distance metrics and signed distances..
 
 ## 实现策略 / Implementation Strategy
-> 中文：TODO：补充实现策略与方案对比。
-> English: TODO: Add implementation strategy and alternatives comparison.
+> 中文：Converts the input image to single-channel gray, thresholds it to a binary mask, computes OpenCV distance maps for the requested metric, optionally builds a signed foreground/background map, and returns both visualization and float-map statistics.。
+> English: Converts the input image to single-channel gray, thresholds it to a binary mask, computes OpenCV distance maps for the requested metric, optionally builds a signed foreground/background map, and returns both visualization and float-map statistics..
 
 ## 核心 API 调用链 / Core API Call Chain
-- TODO：补充关键 API 调用链
+- `EnsureSingleChannelGray -> Threshold -> Cv2.DistanceTransform -> MinMaxLoc/Normalize/ApplyColorMap`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
@@ -48,18 +48,21 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | O(?) |
-| 典型耗时 (Typical Latency) | ~?ms (1920x1080) |
-| 内存特征 (Memory Profile) | ? |
+| 时间复杂度 (Time Complexity) | O(W*H) |
+| 典型耗时 (Typical Latency) | No dedicated golden benchmark yet; covered by distance-transform unit tests |
+| 内存特征 (Memory Profile) | O(W*H) |
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：TODO
-- 不适合 (Not Suitable)：TODO
+- 适合 (Suitable)：Binary-mask analysis that needs maximum inscribed distance, center candidates, or distance-map visualization.
+- 适合 (Suitable)：Foreground/background signed-distance measurements after a stable threshold has isolated the target.
+- 不适合 (Not Suitable)：Gray-scale distance analysis without first binarizing the image.
+- 不适合 (Not Suitable)：High-throughput signed-distance workloads where the extra foreground/background transform and pixel loop dominate latency.
 
 ## 已知限制 / Known Limitations
-1. TODO
+1. Input is thresholded before distance computation, so result quality depends on Threshold and Invert parameters.
+2. Parameter validation currently accepts standard mask sizes 3 and 5; precise-mask execution is not exposed through validation.
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-18 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.1 | 2026-04-24 | 自动生成文档骨架 / Generated skeleton |

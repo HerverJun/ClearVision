@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "2026-04-29.dataset-manifest",
+  "datasetId": "GeometricFitting_field_v1",
+  "operator": "GeometricFitting",
+  "evidenceKind": "real-dataset",
+  "tier": "A",
+  "status": "blocked-missing-field-data",
+  "legacyEvidenceStatus": "legacy-baseline",
+  "source": {
+    "kind": "licensed-or-customer-field-dataset",
+    "name": "GeometricFitting anonymized field proof dataset v1",
+    "version": "v1",
+    "uri": "CLEARVISION_PRODUCTION_DATASET_ROOT/core20/GeometricFitting/field_v1",
+    "license": "pending-site-data-approval",
+    "citation": "Current GeometricFitting G3 evidence is retained as legacy-baseline only; it is not industrial proof.",
+    "checksumSha256": "",
+    "legacyBaselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json",
+    "legacyCaseCount": 20
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_PRODUCTION_DATASET_ROOT",
+    "relativePath": "core20/GeometricFitting/field_v1",
+    "gitPolicy": "manifest-split-baseline-report-and-redacted-failure-boundaries-only"
+  },
+  "split": {
+    "strategy": "hashed-case-id-60-20-20",
+    "seed": 20260429,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 0,
+    "caseListPath": "quality/datasets/splits/core20/GeometricFitting_field_v1_split.json",
+    "usagePolicy": {
+      "train": "parameter tuning only",
+      "validation": "threshold freeze only",
+      "test": "final proof only; never tune against test results"
+    }
+  },
+  "labels": {
+    "schema": "line/circle/rectangle fitting GT with outlier flags and residual tolerance",
+    "positiveClasses": [
+      "GeometricFitting"
+    ],
+    "negativeClasses": [
+      "ok",
+      "negative",
+      "boundary_negative"
+    ],
+    "ignoreRules": [
+      "ignore regions must be honored by metrics",
+      "missing labels block promotion"
+    ]
+  },
+  "metrics": {
+    "primary": "PassRate",
+    "secondary": [
+      "PassRate",
+      "FitResidualPx",
+      "OutlierRobustness",
+      "RuntimeMsP95"
+    ],
+    "thresholds": {
+      "Failed": 0,
+      "thresholdFreezePolicy": "legacy-baseline-v1: higher-is-better metrics use current * 0.98; lower-is-better metrics use current * 1.02; pass-rate remains 1.0. Field data proof remains blocked until validation/test split is populated.",
+      "PassRate": 1.0,
+      "FitResidualPx": 2.0
+    }
+  },
+  "runner": {
+    "project": "",
+    "command": "python quality/tools/build_core20_proof_assets.py --validate-only --operator GeometricFitting",
+    "baselineJson": "quality/evals/reports/GeometricFitting_field_v1_proof_baseline.json",
+    "reportMarkdown": "quality/evals/reports/GeometricFitting_field_v1_proof_baseline.md",
+    "legacyBaselineJson": "quality/evals/reports/G2P3VisionCore_baseline.json"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": [
+      "line-fit",
+      "circle-fit",
+      "rectangle-fit",
+      "outliers",
+      "degenerate"
+    ],
+    "minimumFailureCases": 20
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": true,
+    "redactionNotes": "Blocked until approved de-identified field samples are registered. Reports may include metrics, taxonomy labels, and hashed ids only."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresAcceptedProofBaseline": true,
+    "requiresFixedHashSplit": true,
+    "requiresNoSplitOverlap": true,
+    "requiresFailureBoundarySection": true,
+    "requiresFieldReplayDrill": true,
+    "requiresZeroPrivacyLeak": true,
+    "requiresRealSiteSignoffForIndustrialStatus": true
+  }
+}

@@ -148,6 +148,11 @@ public class PreviewMetricsAnalyzer : IPreviewMetricsAnalyzer
     {
         var blobStats = new List<BlobStat>();
 
+        if (TryExtractDefectBlobStats(outputData, blobStats))
+        {
+            return blobStats;
+        }
+
         if (detectionSummary.Detections.Count > 0)
         {
             return detectionSummary.Detections
@@ -197,7 +202,9 @@ public class PreviewMetricsAnalyzer : IPreviewMetricsAnalyzer
                         Area = Convert.ToDouble(defectDict.GetValueOrDefault("Area",
                             Convert.ToDouble(defectDict.GetValueOrDefault("Width", 0)) *
                             Convert.ToDouble(defectDict.GetValueOrDefault("Height", 0)))),
-                        RejectReason = defectDict.GetValueOrDefault("RejectReason", null)?.ToString()
+                        RejectReason = defectDict.TryGetValue("RejectReason", out var rejectReason)
+                            ? rejectReason?.ToString()
+                            : null
                     };
 
                     // 计算圆形度（如果有面积和周长）
@@ -226,6 +233,77 @@ public class PreviewMetricsAnalyzer : IPreviewMetricsAnalyzer
         }
 
         return blobStats;
+    }
+
+    private static bool TryExtractDefectBlobStats(
+        Dictionary<string, object>? outputData,
+        List<BlobStat> blobStats)
+    {
+        if (outputData == null ||
+            !outputData.TryGetValue("Defects", out var defectsObj) ||
+            defectsObj is not System.Collections.IList defectsList)
+        {
+            return false;
+        }
+
+        var initialCount = blobStats.Count;
+        var id = 0;
+        foreach (var item in defectsList)
+        {
+            if (item is not System.Collections.IDictionary defectDict)
+            {
+                continue;
+            }
+
+            object? GetValue(string key, object? fallback = null)
+            {
+                foreach (System.Collections.DictionaryEntry entry in defectDict)
+                {
+                    if (entry.Key is string entryKey &&
+                        entryKey.Equals(key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return entry.Value;
+                    }
+                }
+
+                return fallback;
+            }
+
+            var width = Convert.ToDouble(GetValue("Width", 0));
+            var height = Convert.ToDouble(GetValue("Height", 0));
+            var area = Convert.ToDouble(GetValue("Area", width * height));
+            var stat = new BlobStat
+            {
+                Id = id++,
+                CentroidX = Convert.ToDouble(GetValue("X", 0)),
+                CentroidY = Convert.ToDouble(GetValue("Y", 0)),
+                BoundingBox = new BoundingBox
+                {
+                    X = Convert.ToDouble(GetValue("X", 0)),
+                    Y = Convert.ToDouble(GetValue("Y", 0)),
+                    Width = width,
+                    Height = height
+                },
+                Area = area,
+                RejectReason = GetValue("RejectReason")?.ToString()
+            };
+
+            if (GetValue("Perimeter") is double perimeter && perimeter > 0)
+            {
+                stat.Perimeter = perimeter;
+                var expectedPerimeter = 2 * Math.Sqrt(stat.Area * Math.PI);
+                stat.Circularity = expectedPerimeter / perimeter;
+            }
+            else
+            {
+                var aspectRatio = stat.BoundingBox.Width / Math.Max(stat.BoundingBox.Height, 1);
+                stat.Circularity = 1.0 / Math.Max(aspectRatio, 1.0 / aspectRatio);
+            }
+
+            blobStats.Add(stat);
+        }
+
+        return blobStats.Count > initialCount;
     }
 
     /// <summary>

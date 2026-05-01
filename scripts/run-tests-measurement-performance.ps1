@@ -11,7 +11,17 @@ param(
 
     [switch]$NoBuild,
 
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    [string]$ResultsDirectory,
+
+    [string]$LogFileName,
+
+    [int]$MinimumTotalTests = 0,
+
+    [string]$ReportDirectory,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -77,10 +87,15 @@ if ([string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_MEASURE_ITERS)) {
 
 $env:CV_MEASUREMENT_PERF_GATE_PROFILE = $effectiveGateProfile
 
+if (-not [string]::IsNullOrWhiteSpace($ReportDirectory)) {
+    $env:CV_MEASUREMENT_PERF_REPORT_DIR = $ReportDirectory
+}
+
 Write-Host "[measurement-perf] GateProfile=$effectiveGateProfile (reason: $($resolvedProfile.Reason))"
 Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_BUDGET_SCALE=$($env:CV_MEASUREMENT_PERF_BUDGET_SCALE)"
 Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_WARMUP_ITERS=$($env:CV_MEASUREMENT_PERF_WARMUP_ITERS)"
 Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_MEASURE_ITERS=$($env:CV_MEASUREMENT_PERF_MEASURE_ITERS)"
+Write-Host "[measurement-perf] CV_MEASUREMENT_PERF_REPORT_DIR=$($env:CV_MEASUREMENT_PERF_REPORT_DIR)"
 
 $parameters = @{
     Project = $project
@@ -88,6 +103,18 @@ $parameters = @{
         "MeasurementPerformanceBudgetAcceptanceTests"
     )
     Verbosity = $Verbosity
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
+    $parameters.ResultsDirectory = $ResultsDirectory
+}
+
+if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
+    $parameters.LogFileName = $LogFileName
+}
+
+if ($MinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $MinimumTotalTests
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
@@ -102,4 +129,12 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
+if ($ReturnExitCode) {
+    $parameters.ReturnExitCode = $true
+}
+
 & $runner @parameters
+
+if ($ReturnExitCode) {
+    return
+}

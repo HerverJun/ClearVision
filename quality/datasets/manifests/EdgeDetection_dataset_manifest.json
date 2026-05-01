@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest",
+  "datasetId": "edge_detection_bsds_style_protocol_bridge_v1",
+  "operator": "EdgeDetection",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "semi-synthetic-public-protocol",
+    "name": "BSDS-style semi-synthetic edge benchmark protocol bridge",
+    "version": "v1",
+    "uri": "in-repo generated protocol",
+    "license": "repo-local synthetic protocol",
+    "citation": "BSDS-style edge precision, recall, F1, and tolerance boundary-F1 protocol proxy; no external images are stored.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-list",
+    "seed": 20260427,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 36,
+    "caseListPath": "quality/evals/reports/EdgeDetection_dataset_baseline.json"
+  },
+  "labels": {
+    "schema": "binary edge map with benchmark matching at exact and one-pixel tolerance",
+    "positiveClasses": ["edge_pixel"],
+    "negativeClasses": ["non_edge_pixel", "low_contrast_background"],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "F1",
+    "secondary": ["Precision", "Recall", "MeanBoundaryF1", "FalsePositivePixels", "FalseNegativePixels", "RuntimeMs"],
+    "thresholds": {
+      "F1": 0.999,
+      "Precision": 0.999,
+      "Recall": 0.999,
+      "MeanBoundaryF1": 0.999,
+      "Failed": 0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/EdgeDetectionDatasetBenchmarkRunner/EdgeDetectionDatasetBenchmarkRunner.csproj",
+    "command": "dotnet run --project quality/tools/EdgeDetectionDatasetBenchmarkRunner/EdgeDetectionDatasetBenchmarkRunner.csproj -- --output quality/evals/reports/EdgeDetection_dataset_baseline.json --report quality/evals/reports/EdgeDetection_dataset_baseline.md",
+    "baselineJson": "quality/evals/reports/EdgeDetection_dataset_baseline.json",
+    "reportMarkdown": "quality/evals/reports/EdgeDetection_dataset_baseline.md"
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": ["hard_step_shapes", "diagonal_edges", "thin_lines", "low_contrast_auto_threshold", "blurred_noise", "color_input_edges", "auto_threshold_regression", "gaussian_prefilter_regression"],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Generated geometric fixtures only; no public or customer image pixels are stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

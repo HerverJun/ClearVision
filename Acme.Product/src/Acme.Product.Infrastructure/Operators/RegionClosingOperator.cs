@@ -17,7 +17,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Description = "Closing operation (dilation followed by erosion) for filling small holes and connecting nearby regions.",
     Category = "Morphology",
     IconName = "region-closing",
-    Keywords = new[] { "Region", "Closing", "Morphology", "HoleFilling", "Connect" }
+    Keywords = new[] { "Region", "Closing", "Morphology", "HoleFilling", "Connect" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Region morphology closing",
+    CoreApi = "MorphologyKernel.GetOffsets -> Dilate -> Erode -> Region",
+    ImplementationStrategy = "Runs one dilation pass followed by one erosion pass with the same discrete structuring element to bridge small gaps and fill small holes.",
+    TimeComplexity = "O(P*K + P' * K * log Rrow)",
+    TypicalLatency = "Avg 0.963 ms, max 32.974 ms over 100 synthetic golden cases",
+    SpaceComplexity = "O(P+P'+K)",
+    SuitableUseCases = new[] { "Filling small holes, connecting nearby components, and stabilizing fragmented foreground before measurement." },
+    UnsuitableUseCases = new[] { "Maintaining strict separation between adjacent components closer than the selected kernel." },
+    KnownLimitations = new[] { "Closing can bridge nearby components when the gap is within kernel reach.", "The operation uses a single dilation+erosion pair; repeated closing requires explicit workflow repetition." }
 )]
 [InputPort("Region", "Input Region", PortDataType.Any, IsRequired = true)]
 [InputPort("Image", "Reference Image (Optional)", PortDataType.Image, IsRequired = false)]

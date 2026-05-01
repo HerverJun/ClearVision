@@ -1,0 +1,281 @@
+{
+  "schemaVersion": "2026-04-29.anomaly-detection-taxonomy.v1",
+  "generatedAtUtc": "2026-04-29T16:07:57+00:00",
+  "sourceCandidate": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v1.json",
+  "accepted": true,
+  "summary": {
+    "caseCount": 120,
+    "missedAnomalyCount": 32,
+    "detectedAnomalyCount": 55,
+    "falsePositiveGoodCount": 0
+  },
+  "tagCounts": {
+    "anomaly_miss": 32,
+    "below_threshold_anomaly": 22,
+    "zero_score_anomaly": 10,
+    "defect_broken": 9,
+    "defect_defective": 9,
+    "defect_bent": 8,
+    "defect_glue": 5,
+    "defect_metal_contamination": 1
+  },
+  "missedByDefectType": {
+    "broken": 9,
+    "defective": 9,
+    "bent": 8,
+    "glue": 5,
+    "metal_contamination": 1
+  },
+  "topMisses": [
+    {
+      "caseId": "grid/bent/002",
+      "defectType": "bent",
+      "score": 0.2614414691925049,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/003",
+      "defectType": "bent",
+      "score": 0.3000817894935608,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/004",
+      "defectType": "bent",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/005",
+      "defectType": "bent",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/007",
+      "defectType": "bent",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/008",
+      "defectType": "bent",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/009",
+      "defectType": "bent",
+      "score": 0.0336192362010479,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/bent/011",
+      "defectType": "bent",
+      "score": 0.15451140701770782,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_bent"
+      ]
+    },
+    {
+      "caseId": "grid/broken/000",
+      "defectType": "broken",
+      "score": 0.22199329733848572,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/002",
+      "defectType": "broken",
+      "score": 0.01541113294661045,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/004",
+      "defectType": "broken",
+      "score": 0.19458967447280884,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/005",
+      "defectType": "broken",
+      "score": 0.03470131754875183,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/006",
+      "defectType": "broken",
+      "score": 0.12353822588920593,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/007",
+      "defectType": "broken",
+      "score": 0.25385501980781555,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/008",
+      "defectType": "broken",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/010",
+      "defectType": "broken",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/broken/011",
+      "defectType": "broken",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ]
+    },
+    {
+      "caseId": "grid/glue/001",
+      "defectType": "glue",
+      "score": 0.3154788613319397,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ]
+    },
+    {
+      "caseId": "grid/glue/002",
+      "defectType": "glue",
+      "score": 0.01484005618840456,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ]
+    },
+    {
+      "caseId": "grid/glue/003",
+      "defectType": "glue",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ]
+    },
+    {
+      "caseId": "grid/glue/007",
+      "defectType": "glue",
+      "score": 0.22666387259960175,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ]
+    },
+    {
+      "caseId": "grid/glue/008",
+      "defectType": "glue",
+      "score": 0,
+      "taxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ]
+    },
+    {
+      "caseId": "grid/metal_contamination/007",
+      "defectType": "metal_contamination",
+      "score": 0.1530100256204605,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_metal_contamination"
+      ]
+    },
+    {
+      "caseId": "toothbrush/defective/001",
+      "defectType": "defective",
+      "score": 0.014140233397483826,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ]
+    },
+    {
+      "caseId": "toothbrush/defective/002",
+      "defectType": "defective",
+      "score": 0.18046820163726807,
+      "taxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ]
+    }
+  ]
+}

@@ -35,6 +35,9 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<PromptBuilder>();
         services.AddSingleton<IConversationalFlowService, ConversationalFlowService>();
         services.AddSingleton<IFlowTemplateService, FlowTemplateService>();
+        services.AddScoped<IScenarioMatcher, ScenarioMatcher>();
+        services.AddScoped<IRequirementBriefExtractor, RequirementBriefExtractor>();
+        services.AddScoped<ITemplateConstraintValidator, TemplateConstraintValidator>();
         services.AddScoped<IAiFlowValidator, AiFlowValidator>();
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();

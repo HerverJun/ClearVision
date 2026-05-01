@@ -24,7 +24,19 @@ namespace Acme.Product.Infrastructure.Operators;
     Category = "Matching",
     IconName = "planar-match",
     Keywords = new[] { "Planar", "Matching", "Homography", "Perspective", "ORB", "AKAZE", "RANSAC" },
-    Version = "1.1.1"
+    Version = "1.1.2"
+)]
+[AlgorithmInfo(
+    Name = "Feature homography planar matching",
+    CoreApi = "ORB/AKAZE/BRISK DetectAndCompute -> BFMatcher ratio test -> HomographyVerificationHelper -> multi-scale score selection",
+    ImplementationStrategy = "Extracts binary local features from template and search ROI, applies descriptor matching and Lowe ratio filtering, estimates and verifies homography with geometric checks, and reports score, corners, inliers, and diagnostics.",
+    TimeComplexity = "O(S*(F log F + M + R*I))",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by planar matching regression and operator tests",
+    SpaceComplexity = "O(F + M + W*H)",
+    SuitableUseCases = new[] { "Textured planar objects under perspective change where homography is a valid geometric model.", "Inspection flows that need match score, projected corners, inlier metrics, and failure diagnostics." },
+    UnsuitableUseCases = new[] { "Non-planar, strongly deformable, or textureless targets.", "Scenes with many repeated local features unless ROI, detector, and score thresholds are constrained." },
+    KnownLimitations = new[] { "Detector support is limited to ORB, AKAZE, and BRISK.", "Multi-scale search uses a small fixed scale candidate set rather than exhaustive scale-space optimization." },
+    Dependencies = new[] { "OpenCvSharp" }
 )]
 [InputPort("Image", "Search Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Template", "Template Image", PortDataType.Image, IsRequired = false)]
@@ -37,6 +49,12 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("CandidateScore", "Candidate Score", PortDataType.Float)]
 [OutputPort("InlierCount", "Inlier Count", PortDataType.Integer)]
 [OutputPort("InlierRatio", "Inlier Ratio", PortDataType.Float)]
+[OutputPort("MeanReprojectionError", "Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("MaxReprojectionError", "Max Reprojection Error", PortDataType.Float)]
+[OutputPort("AreaRatio", "Area Ratio", PortDataType.Float)]
+[OutputPort("CornersInsideCount", "Corners Inside Count", PortDataType.Integer)]
+[OutputPort("ProjectedCenterInside", "Projected Center Inside", PortDataType.Boolean)]
+[OutputPort("HomographyFailureReason", "Homography Failure Reason", PortDataType.String)]
 [OutputPort("VerificationPassed", "Verification Passed", PortDataType.Boolean)]
 [OutputPort("MatchResult", "Match Result", PortDataType.Any)]
 [OutputPort("Homography", "Homography Matrix", PortDataType.Any)]
@@ -52,6 +70,7 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MinInliers", "Min Inliers", "int", DefaultValue = 8, Min = 4, Max = 100)]
 [OperatorParam("MinInlierRatio", "Min Inlier Ratio", "double", DefaultValue = 0.25, Min = 0.1, Max = 1.0)]
 [OperatorParam("ScoreThreshold", "Score Threshold", "double", DefaultValue = 0.5, Min = 0.0, Max = 1.0)]
+[OperatorParam("AllowCenterOnlyProjection", "Allow Center-Only Projection", "bool", DefaultValue = false)]
 [OperatorParam("UseRoi", "Use ROI", "bool", DefaultValue = false)]
 [OperatorParam("RoiX", "ROI X", "int", DefaultValue = 0)]
 [OperatorParam("RoiY", "ROI Y", "int", DefaultValue = 0)]
@@ -98,6 +117,7 @@ public class PlanarMatchingOperator : OperatorBase
         var minInliers = GetIntParam(@operator, "MinInliers", Math.Min(8, minMatchCount), 4, 100);
         var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25, 0.1, 1.0);
         var scoreThreshold = GetDoubleParam(@operator, "ScoreThreshold", 0.5, 0.0, 1.0);
+        var allowCenterOnlyProjection = GetBoolParam(@operator, "AllowCenterOnlyProjection", false);
         var useRoi = GetBoolParam(@operator, "UseRoi", false);
         var roiX = GetIntParam(@operator, "RoiX", 0);
         var roiY = GetIntParam(@operator, "RoiY", 0);
@@ -176,7 +196,7 @@ public class PlanarMatchingOperator : OperatorBase
                 if (Math.Abs(scale - 1.0) < 0.01)
                 {
                     match = PerformMatching(searchRoi, templateFeatures, detectorType, maxFeatures, scaleFactor, nLevels,
-                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio);
+                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio, allowCenterOnlyProjection);
                 }
                 else
                 {
@@ -184,7 +204,7 @@ public class PlanarMatchingOperator : OperatorBase
                     using var scaledImage = new Mat();
                     Cv2.Resize(searchRoi, scaledImage, new Size(0, 0), 1.0 / scale, 1.0 / scale, InterpolationFlags.Linear);
                     match = PerformMatching(scaledImage, templateFeatures, detectorType, maxFeatures, scaleFactor, nLevels,
-                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio);
+                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio, allowCenterOnlyProjection);
 
                     if (match != null)
                     {
@@ -276,7 +296,7 @@ public class PlanarMatchingOperator : OperatorBase
 
     private MatchResult? PerformMatching(Mat searchImage, TemplateFeatures templateFeatures, string detectorType,
         int maxFeatures, double scaleFactor, int nLevels, double matchRatio, double ransacThreshold,
-        int minMatchCount, int minInliers, double minInlierRatio)
+        int minMatchCount, int minInliers, double minInlierRatio, bool allowCenterOnlyProjection)
     {
         // 提取搜索图像特征
         var method = $"FeatureHomography:{detectorType}";
@@ -328,6 +348,7 @@ public class PlanarMatchingOperator : OperatorBase
             minMatchCount,
             minInliers,
             minInlierRatio,
+            allowCenterOnlyProjection,
             out var homography,
             out var corners,
             out var verificationMetrics);
@@ -358,7 +379,10 @@ public class PlanarMatchingOperator : OperatorBase
             VerificationScore = verificationScore,
             Score = finalScore,
             MeanReprojectionError = verificationMetrics.MeanReprojectionError,
+            MaxReprojectionError = verificationMetrics.MaxReprojectionError,
             AreaRatio = verificationMetrics.AreaRatio,
+            CornersInsideCount = verificationMetrics.CornersInsideCount,
+            ProjectedCenterInside = verificationMetrics.ProjectedCenterInside,
             FailureReason = verificationMetrics.FailureReason,
             TemplateFeatures = templateFeatures.KeyPoints.Length,
             SearchFeatures = searchFeatures.KeyPoints.Length
@@ -690,7 +714,11 @@ public class PlanarMatchingOperator : OperatorBase
             { "TemplateFeatures", match.TemplateFeatures },
             { "SearchFeatures", match.SearchFeatures },
             { "MeanReprojectionError", match.MeanReprojectionError },
+            { "MaxReprojectionError", match.MaxReprojectionError },
             { "AreaRatio", match.AreaRatio },
+            { "CornersInsideCount", match.CornersInsideCount },
+            { "ProjectedCenterInside", match.ProjectedCenterInside },
+            { "HomographyFailureReason", string.Empty },
             { "ProcessingTimeMs", processingTime },
             { "Center", match.Center },
             { "Corners", corners.Select(c => new Position(c.X, c.Y)).ToList() },
@@ -740,7 +768,11 @@ public class PlanarMatchingOperator : OperatorBase
             { "TemplateFeatures", 0 },
             { "SearchFeatures", 0 },
             { "MeanReprojectionError", double.PositiveInfinity },
+            { "MaxReprojectionError", double.PositiveInfinity },
             { "AreaRatio", 0.0 },
+            { "CornersInsideCount", 0 },
+            { "ProjectedCenterInside", false },
+            { "HomographyFailureReason", reason },
             { "DetectorParameterDiagnostics", new Dictionary<string, object>(detectorDiagnostics) },
             { "MatchResult", new Dictionary<string, object>
                 {
@@ -792,7 +824,11 @@ public class PlanarMatchingOperator : OperatorBase
             { "FeatureMatchCount", match?.FeatureMatchCount ?? 0 },
             { "Score", match?.Score ?? 0.0 },
             { "MeanReprojectionError", match?.MeanReprojectionError ?? double.PositiveInfinity },
+            { "MaxReprojectionError", match?.MaxReprojectionError ?? double.PositiveInfinity },
             { "AreaRatio", match?.AreaRatio ?? 0.0 },
+            { "CornersInsideCount", match?.CornersInsideCount ?? 0 },
+            { "ProjectedCenterInside", match?.ProjectedCenterInside ?? false },
+            { "HomographyFailureReason", reason },
             { "DetectorParameterDiagnostics", new Dictionary<string, object>(detectorDiagnostics) },
             { "MatchResult", new Dictionary<string, object>
                 {
@@ -808,6 +844,13 @@ public class PlanarMatchingOperator : OperatorBase
             },
             { "Message", reason }
         };
+
+        if (match?.Corners.Length == 4)
+        {
+            resultData["Center"] = match.Center;
+            resultData["Corners"] = match.Corners.Select(c => new Position(c.X, c.Y)).ToList();
+            resultData["Homography"] = match.Homography.Empty() ? new Mat() : match.Homography.Clone();
+        }
 
         return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, resultData));
     }
@@ -930,7 +973,10 @@ public class PlanarMatchingOperator : OperatorBase
         public double VerificationScore { get; set; }
         public double Score { get; set; }
         public double MeanReprojectionError { get; set; }
+        public double MaxReprojectionError { get; set; }
         public double AreaRatio { get; set; }
+        public int CornersInsideCount { get; set; }
+        public bool ProjectedCenterInside { get; set; }
         public int TemplateFeatures { get; set; }
         public int SearchFeatures { get; set; }
 

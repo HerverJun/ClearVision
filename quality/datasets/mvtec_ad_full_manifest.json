@@ -1,0 +1,47 @@
+{
+  "schema_version": "2026-04-30.public-quality-dataset-manifest.v1",
+  "dataset_id": "mvtec_ad_full",
+  "name": "MVTec AD full",
+  "target_operators": ["AnomalyDetection", "SurfaceDefectDetection"],
+  "download_priority": 1,
+  "local_root": "quality/public_datasets/mvtec_ad_full",
+  "license": {
+    "id": "CC-BY-NC-SA-4.0",
+    "commercial_use": false,
+    "notes": "Research/evaluation only; do not use as production sign-off evidence."
+  },
+  "source": {
+    "url": "https://www.mvtec.com/research-teaching/datasets/mvtec-ad",
+    "publisher": "MVTec Software GmbH",
+    "description": "Industrial anomaly detection benchmark with image-level and pixel-level annotations."
+  },
+  "archives": [
+    {
+      "name": "mvtec_anomaly_detection.tar.xz",
+      "source_url": "https://www.mydrive.ch/shares/38536/3830184030e49fe74747669442f0f283/download/420938113-1629960298/mvtec_anomaly_detection.tar.xz",
+      "archive_type": "tar.xz",
+      "extract_to": "extracted",
+      "size_bytes": 5264982680,
+      "sha256": ""
+    }
+  ],
+  "expected_categories": [
+    "bottle",
+    "cable",
+    "capsule",
+    "carpet",
+    "grid",
+    "hazelnut",
+    "leather",
+    "metal_nut",
+    "pill",
+    "screw",
+    "tile",
+    "toothbrush",
+    "transistor",
+    "wood",
+    "zipper"
+  ],
+  "index_output": "quality/datasets/mvtec_ad_full_index.json",
+  "claim_boundary": "Public benchmark research evidence only; not real production-site validation or sign-off."
+}

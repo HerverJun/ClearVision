@@ -1,0 +1,139 @@
+{
+  "summary": {
+    "generatedAtUtc": "2026-04-29T01:09:07.8697545+00:00",
+    "mode": "smoke",
+    "warmupIterations": 1,
+    "iterations": 3,
+    "caseCount": 4,
+    "passed": 4,
+    "failed": 0,
+    "totalRuntimeMs": 13.486,
+    "totalAllocatedBytes": 749176,
+    "notes": "Synthetic in-process operator benchmark intended for CI smoke and local trend checks."
+  },
+  "operators": [
+    {
+      "operatorName": "CaliperTool",
+      "caseCount": 1,
+      "passed": 1,
+      "failed": 0,
+      "meanRuntimeMs": 1.445,
+      "p95RuntimeMs": 1.555,
+      "allocatedBytesPerIteration": 162512,
+      "scenarios": "measurement"
+    },
+    {
+      "operatorName": "EdgeDetection",
+      "caseCount": 1,
+      "passed": 1,
+      "failed": 0,
+      "meanRuntimeMs": 1.818,
+      "p95RuntimeMs": 1.846,
+      "allocatedBytesPerIteration": 13200,
+      "scenarios": "edge"
+    },
+    {
+      "operatorName": "MeanFilter",
+      "caseCount": 1,
+      "passed": 1,
+      "failed": 0,
+      "meanRuntimeMs": 1.012,
+      "p95RuntimeMs": 1.404,
+      "allocatedBytesPerIteration": 3245,
+      "scenarios": "preprocess"
+    },
+    {
+      "operatorName": "TranslationRotationCalibration",
+      "caseCount": 1,
+      "passed": 1,
+      "failed": 0,
+      "meanRuntimeMs": 0.22,
+      "p95RuntimeMs": 0.285,
+      "allocatedBytesPerIteration": 70768,
+      "scenarios": "calibration_geometry"
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "mean_filter_640x480_k5",
+      "operatorName": "MeanFilter",
+      "scenario": "preprocess",
+      "passed": true,
+      "iterations": 3,
+      "width": 640,
+      "height": 480,
+      "totalRuntimeMs": 3.036,
+      "meanRuntimeMs": 1.012,
+      "minRuntimeMs": 0.815,
+      "maxRuntimeMs": 1.404,
+      "p95RuntimeMs": 1.404,
+      "totalAllocatedBytes": 9736,
+      "allocatedBytesPerIteration": 3245,
+      "outputSignals": {
+        "Width": 640
+      }
+    },
+    {
+      "caseId": "caliper_tool_horizontal_edge_pair",
+      "operatorName": "CaliperTool",
+      "scenario": "measurement",
+      "passed": true,
+      "iterations": 3,
+      "width": 640,
+      "height": 240,
+      "totalRuntimeMs": 4.336,
+      "meanRuntimeMs": 1.445,
+      "minRuntimeMs": 1.351,
+      "maxRuntimeMs": 1.555,
+      "p95RuntimeMs": 1.555,
+      "totalAllocatedBytes": 487536,
+      "allocatedBytesPerIteration": 162512,
+      "outputSignals": {
+        "Width": 119.6499582289056,
+        "PairCount": 1
+      }
+    },
+    {
+      "caseId": "edge_detection_640x480_auto_threshold",
+      "operatorName": "EdgeDetection",
+      "scenario": "edge",
+      "passed": true,
+      "iterations": 3,
+      "width": 640,
+      "height": 480,
+      "totalRuntimeMs": 5.455,
+      "meanRuntimeMs": 1.818,
+      "minRuntimeMs": 1.797,
+      "maxRuntimeMs": 1.846,
+      "p95RuntimeMs": 1.846,
+      "totalAllocatedBytes": 39600,
+      "allocatedBytesPerIteration": 13200,
+      "outputSignals": {
+        "Width": 640,
+        "Threshold1Used": 26.799999999999997,
+        "Threshold2Used": 53.2
+      }
+    },
+    {
+      "caseId": "translation_rotation_calibration_20_points_svd",
+      "operatorName": "TranslationRotationCalibration",
+      "scenario": "calibration_geometry",
+      "passed": true,
+      "iterations": 3,
+      "width": 0,
+      "height": 0,
+      "totalRuntimeMs": 0.659,
+      "meanRuntimeMs": 0.22,
+      "minRuntimeMs": 0.182,
+      "maxRuntimeMs": 0.285,
+      "p95RuntimeMs": 0.285,
+      "totalAllocatedBytes": 212304,
+      "allocatedBytesPerIteration": 70768,
+      "outputSignals": {
+        "CalibrationError": 43.924651393038964,
+        "MaxCalibrationError": 61.224994895875675,
+        "Accepted": false
+      }
+    }
+  ]
+}

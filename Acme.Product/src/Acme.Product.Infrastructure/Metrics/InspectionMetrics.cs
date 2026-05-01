@@ -219,7 +219,7 @@ public static class InspectionLoggingExtensions
         Guid? projectId = null,
         Guid? sessionId = null)
     {
-        return logger.BeginScope(new Dictionary<string, object>
+        return logger.BeginScope(new Dictionary<string, object?>
         {
             ["CorrelationId"] = correlationId,
             ["ProjectId"] = projectId,

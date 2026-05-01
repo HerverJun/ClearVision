@@ -1,0 +1,208 @@
+{
+  "EvidenceKind": "dataset",
+  "Summary": {
+    "GeneratedAtUtc": "2026-05-01T03:23:14.5784701+00:00",
+    "CaseCount": 4,
+    "Passed": 4,
+    "Failed": 0,
+    "RuntimeMs": 1077.494,
+    "MemoryAllocationBytes": 1657784,
+    "Accepted": true,
+    "ReprojectionRmsPx": 0.392596,
+    "MaxReprojectionErrorPx": 0.563355,
+    "DetectedImageCount": 12,
+    "TotalImages": 52,
+    "Dataset": "opencv-calibration-samples-left-right-stereo",
+    "AcceptedCaseCount": 2,
+    "RequiredAcceptedCaseCount": 0,
+    "Thresholds": {
+      "RequireAccepted": false,
+      "MinDetectedImages": 10,
+      "MaxReprojectionRmsPx": 1,
+      "MinStereoPairs": 10,
+      "MaxStereoReprojectionRmsPx": 1,
+      "MaxEpipolarErrorPx": 2.5,
+      "CandidateVersion": "v1",
+      "Profile": "camera_calibration"
+    }
+  },
+  "Operators": [
+    {
+      "Operator": "CameraCalibration",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 315.209,
+      "MemoryAllocationBytesAvg": 642560,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "Dataset": "OpenCV calibration samples"
+    },
+    {
+      "Operator": "StereoCalibration",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 446.37,
+      "MemoryAllocationBytesAvg": 357088,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "Dataset": "OpenCV calibration samples"
+    }
+  ],
+  "Cases": [
+    {
+      "Id": "opencv_calibration_left_camera",
+      "Operator": "CameraCalibration",
+      "Scenario": "OpenCV calibration sample left camera folder",
+      "Passed": true,
+      "RuntimeMs": 354.786,
+      "MemoryAllocationBytes": 1195160,
+      "Accepted": true,
+      "ReprojectionRmsPx": 0.33779,
+      "MaxReprojectionErrorPx": 0.458456,
+      "DetectedImageCount": 12,
+      "TotalImages": 13,
+      "FailureReasonCode": null,
+      "Error": null,
+      "Metrics": {
+        "RejectedDetectionCount": 0,
+        "RejectedOutlierCount": 1,
+        "BundleRoundTripValid": true,
+        "OutputFileWritten": true,
+        "Diagnostics": [
+          "Total images: 13",
+          "Detected valid samples: 12",
+          "Rejected during detection: 0",
+          "Rejected as outliers: 1",
+          "Mean reprojection error: 0.3378 px",
+          "Max reprojection error: 0.4585 px",
+          "Outlier samples: left_02.jpg",
+          "Quality gate passed."
+        ],
+        "Thresholds": {
+          "RequireAccepted": false,
+          "MinDetectedImages": 10,
+          "MaxReprojectionRmsPx": 1,
+          "MinStereoPairs": 10,
+          "MaxStereoReprojectionRmsPx": 1,
+          "MaxEpipolarErrorPx": 2.5,
+          "CandidateVersion": "v1",
+          "Profile": "camera_calibration"
+        }
+      }
+    },
+    {
+      "Id": "opencv_calibration_right_camera",
+      "Operator": "CameraCalibration",
+      "Scenario": "OpenCV calibration sample right camera folder",
+      "Passed": true,
+      "RuntimeMs": 275.632,
+      "MemoryAllocationBytes": 89960,
+      "Accepted": false,
+      "ReprojectionRmsPx": 0.367839,
+      "MaxReprojectionErrorPx": 0.470042,
+      "DetectedImageCount": 13,
+      "TotalImages": 13,
+      "FailureReasonCode": null,
+      "Error": null,
+      "Metrics": {
+        "RejectedDetectionCount": 0,
+        "RejectedOutlierCount": 0,
+        "BundleRoundTripValid": true,
+        "OutputFileWritten": true,
+        "Diagnostics": [
+          "Total images: 13",
+          "Detected valid samples: 13",
+          "Rejected during detection: 0",
+          "Rejected as outliers: 0",
+          "Mean reprojection error: 0.3678 px",
+          "Max reprojection error: 0.4700 px",
+          "Quality gate failed. Thresholds: mean\u003C=0.35, max\u003C=0.60, minSamples\u003E=12."
+        ],
+        "Thresholds": {
+          "RequireAccepted": false,
+          "MinDetectedImages": 10,
+          "MaxReprojectionRmsPx": 1,
+          "MinStereoPairs": 10,
+          "MaxStereoReprojectionRmsPx": 1,
+          "MaxEpipolarErrorPx": 2.5,
+          "CandidateVersion": "v1",
+          "Profile": "camera_calibration"
+        }
+      }
+    },
+    {
+      "Id": "opencv_calibration_stereo_rig",
+      "Operator": "StereoCalibration",
+      "Scenario": "OpenCV calibration sample stereo rig",
+      "Passed": true,
+      "RuntimeMs": 446.37,
+      "MemoryAllocationBytes": 357088,
+      "Accepted": false,
+      "ReprojectionRmsPx": 0.392596,
+      "MaxReprojectionErrorPx": 0.563355,
+      "DetectedImageCount": 13,
+      "TotalImages": 13,
+      "FailureReasonCode": null,
+      "Error": null,
+      "Metrics": {
+        "ReprojectionErrorLeft": 0.315023,
+        "ReprojectionErrorRight": 0.309629,
+        "ReprojectionErrorStereo": 0.392596,
+        "MaxPerViewErrorLeft": 0.563355,
+        "MaxPerViewErrorRight": 0.394314,
+        "EpipolarError": 1.977428,
+        "ExpectedPairsFromManifest": 13,
+        "FailedPairs": 0,
+        "BundleRoundTripValid": true,
+        "OutputFileWritten": true,
+        "Thresholds": {
+          "RequireAccepted": false,
+          "MinDetectedImages": 10,
+          "MaxReprojectionRmsPx": 1,
+          "MinStereoPairs": 10,
+          "MaxStereoReprojectionRmsPx": 1,
+          "MaxEpipolarErrorPx": 2.5,
+          "CandidateVersion": "v1",
+          "Profile": "camera_calibration"
+        }
+      }
+    },
+    {
+      "Id": "opencv_calibration_stereo_metadata",
+      "Operator": "StereoMetadata",
+      "Scenario": "OpenCV calibration sample stereo pair metadata",
+      "Passed": true,
+      "RuntimeMs": 0.706,
+      "MemoryAllocationBytes": 15576,
+      "Accepted": true,
+      "ReprojectionRmsPx": 0,
+      "MaxReprojectionErrorPx": 0,
+      "DetectedImageCount": 13,
+      "TotalImages": 13,
+      "FailureReasonCode": null,
+      "Error": null,
+      "Metrics": {
+        "ExpectedPairsFromManifest": 13,
+        "StereoPairCount": 13,
+        "UniquePairIndexCount": 13,
+        "CalibrationFiles": {
+          "intrinsics": "quality/public_datasets/opencv_calibration_samples/intrinsics.yml",
+          "left_intrinsics": "quality/public_datasets/opencv_calibration_samples/left_intrinsics.yml",
+          "stereo_calib": "quality/public_datasets/opencv_calibration_samples/stereo_calib.xml"
+        },
+        "Thresholds": {
+          "RequireAccepted": false,
+          "MinDetectedImages": 10,
+          "MaxReprojectionRmsPx": 1,
+          "MinStereoPairs": 10,
+          "MaxStereoReprojectionRmsPx": 1,
+          "MaxEpipolarErrorPx": 2.5,
+          "CandidateVersion": "v1",
+          "Profile": "camera_calibration"
+        }
+      }
+    }
+  ]
+}

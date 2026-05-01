@@ -22,13 +22,31 @@ namespace Acme.Product.Infrastructure.Operators;
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = false)]
 [OutputPort("CalibrationData", "Calibration Data", PortDataType.String)]
 [OutputPort("ReprojectionError", "Reprojection Error", PortDataType.Float)]
+[OutputPort("MeanReprojectionError", "Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("MaxReprojectionError", "Max Reprojection Error", PortDataType.Float)]
+[OutputPort("InlierMeanReprojectionError", "Inlier Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("InlierMaxReprojectionError", "Inlier Max Reprojection Error", PortDataType.Float)]
+[OutputPort("AllSampleMeanReprojectionError", "All Sample Mean Reprojection Error", PortDataType.Float)]
+[OutputPort("AllSampleMaxReprojectionError", "All Sample Max Reprojection Error", PortDataType.Float)]
+[OutputPort("ReprojectionErrorScope", "Reprojection Error Scope", PortDataType.String)]
 [OperatorParam("CalibrationMode", "Calibration Mode", "enum", DefaultValue = "Affine", Options = new[] { "Affine|Affine", "Perspective|Perspective" })]
 [OperatorParam("PointPairs", "Point Pairs", "string", DefaultValue = "")]
 [OperatorParam("SavePath", "Save Path", "file", DefaultValue = "")]
+[OperatorParam("RansacReprojectionThreshold", "RANSAC Reprojection Threshold", "double", DefaultValue = 3.0, Min = 0.000001, Max = 100000.0)]
+[OperatorParam("RansacMaxIterations", "RANSAC Max Iterations", "int", DefaultValue = 3000, Min = 1, Max = 100000)]
+[OperatorParam("RansacConfidence", "RANSAC Confidence", "double", DefaultValue = 0.995, Min = 0.001, Max = 0.999999)]
+[OperatorParam("MaxAcceptedReprojectionError", "Max Accepted Reprojection Error", "double", DefaultValue = 3.0, Min = 0.0, Max = 100000.0)]
+[OperatorParam("MinInlierCount", "Minimum Inlier Count", "int", DefaultValue = 0, Min = 0, Max = 1000000)]
+[OperatorParam("MinInlierRatio", "Minimum Inlier Ratio", "double", DefaultValue = 0.5, Min = 0.0, Max = 1.0)]
+[OperatorParam("CalibrationUnit", "Calibration Unit", "string", DefaultValue = "mm")]
 public class NPointCalibrationOperator : OperatorBase
 {
     private const double MinPointDistance = 1e-6;
-    private const double MaxAcceptedReprojectionError = 3.0;
+    private const double DefaultRansacReprojectionThreshold = 3.0;
+    private const int DefaultRansacMaxIterations = 3000;
+    private const double DefaultRansacConfidence = 0.995;
+    private const double DefaultMaxAcceptedReprojectionError = 3.0;
+    private const double DefaultMinInlierRatio = 0.5;
 
     public override OperatorType OperatorType => OperatorType.NPointCalibration;
 
@@ -71,10 +89,12 @@ public class NPointCalibrationOperator : OperatorBase
 
         if (isPerspective)
         {
-            return Task.FromResult(ExecutePerspectiveCalibration(@operator, inputs, pointPairs, srcPoints, dstPoints));
+            var config = ResolveCalibrationConfig(@operator, requiredCount);
+            return Task.FromResult(ExecutePerspectiveCalibration(@operator, inputs, pointPairs, srcPoints, dstPoints, config));
         }
 
-        return Task.FromResult(ExecuteAffineCalibration(@operator, inputs, pointPairs, srcPoints, dstPoints));
+        var affineConfig = ResolveCalibrationConfig(@operator, requiredCount);
+        return Task.FromResult(ExecuteAffineCalibration(@operator, inputs, pointPairs, srcPoints, dstPoints, affineConfig));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -103,6 +123,37 @@ public class NPointCalibrationOperator : OperatorBase
             return ValidationResult.Invalid($"{mode} mode requires at least {requiredCount} point pairs.");
         }
 
+        var config = ResolveCalibrationConfig(@operator, requiredCount);
+        if (config.RansacReprojectionThreshold <= 0 || !double.IsFinite(config.RansacReprojectionThreshold))
+        {
+            return ValidationResult.Invalid("RansacReprojectionThreshold must be a positive finite number.");
+        }
+
+        if (config.RansacMaxIterations < 1)
+        {
+            return ValidationResult.Invalid("RansacMaxIterations must be at least 1.");
+        }
+
+        if (config.RansacConfidence <= 0 || config.RansacConfidence >= 1 || !double.IsFinite(config.RansacConfidence))
+        {
+            return ValidationResult.Invalid("RansacConfidence must be greater than 0 and less than 1.");
+        }
+
+        if (config.MaxAcceptedReprojectionError < 0 || !double.IsFinite(config.MaxAcceptedReprojectionError))
+        {
+            return ValidationResult.Invalid("MaxAcceptedReprojectionError must be a non-negative finite number.");
+        }
+
+        if (config.MinInlierRatio < 0 || config.MinInlierRatio > 1 || !double.IsFinite(config.MinInlierRatio))
+        {
+            return ValidationResult.Invalid("MinInlierRatio must be between 0 and 1.");
+        }
+
+        if (string.IsNullOrWhiteSpace(config.CalibrationUnit))
+        {
+            return ValidationResult.Invalid("CalibrationUnit must not be empty.");
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -111,7 +162,8 @@ public class NPointCalibrationOperator : OperatorBase
         Dictionary<string, object>? inputs,
         IReadOnlyList<PointPair> pointPairs,
         IReadOnlyList<Point2d> srcPoints,
-        IReadOnlyList<Point2d> dstPoints)
+        IReadOnlyList<Point2d> dstPoints,
+        NPointCalibrationConfig config)
     {
         using var srcMat = InputArray.Create(srcPoints.ToArray());
         using var dstMat = InputArray.Create(dstPoints.ToArray());
@@ -121,9 +173,9 @@ public class NPointCalibrationOperator : OperatorBase
             dstMat,
             inlierMask,
             RobustEstimationAlgorithms.RANSAC,
-            3.0,
-            3000,
-            0.995,
+            config.RansacReprojectionThreshold,
+            (ulong)config.RansacMaxIterations,
+            config.RansacConfidence,
             20);
 
         if (affineMatrix is null || affineMatrix.Empty() || affineMatrix.Rows != 2 || affineMatrix.Cols != 3)
@@ -160,19 +212,29 @@ public class NPointCalibrationOperator : OperatorBase
             }
         }
 
-        var accepted = errorStats.MeanError <= MaxAcceptedReprojectionError &&
-                       errorStats.InlierCount >= 3 &&
-                       errorStats.InlierRatio >= 0.5;
+        var accepted = errorStats.InlierMaxError <= config.MaxAcceptedReprojectionError &&
+                       errorStats.InlierCount >= config.MinInlierCount &&
+                       errorStats.InlierRatio >= config.MinInlierRatio;
 
         var diagnostics = new List<string>
         {
             "Affine transform estimated with all points via RANSAC.",
+            $"RansacReprojectionThreshold={config.RansacReprojectionThreshold:F6} {config.CalibrationUnit}",
+            $"RansacMaxIterations={config.RansacMaxIterations}",
+            $"RansacConfidence={config.RansacConfidence:F6}",
+            $"MaxAcceptedReprojectionError={config.MaxAcceptedReprojectionError:F6} {config.CalibrationUnit}",
+            $"MinInlierCount={config.MinInlierCount}",
+            $"MinInlierRatio={config.MinInlierRatio:F3}",
+            $"InlierMeanReprojectionError={errorStats.InlierMeanError:F6} {config.CalibrationUnit}",
+            $"InlierMaxReprojectionError={errorStats.InlierMaxError:F6} {config.CalibrationUnit}",
+            $"AllSampleMeanReprojectionError={errorStats.AllSampleMeanError:F6} {config.CalibrationUnit}",
+            $"AllSampleMaxReprojectionError={errorStats.AllSampleMaxError:F6} {config.CalibrationUnit}",
             $"InlierRatio={errorStats.InlierRatio:F3}",
             $"InlierCount={errorStats.InlierCount}/{pointPairs.Count}"
         };
         if (!accepted)
         {
-            diagnostics.Add($"Mean reprojection error {errorStats.MeanError:F4} exceeds acceptance threshold {MaxAcceptedReprojectionError:F4}.");
+            diagnostics.Add($"Acceptance failed: inlier max error {errorStats.InlierMaxError:F4} {config.CalibrationUnit}, inliers {errorStats.InlierCount}, ratio {errorStats.InlierRatio:F3}.");
         }
 
         var bundle = CreateBundle(
@@ -183,9 +245,10 @@ public class NPointCalibrationOperator : OperatorBase
             accepted,
             diagnostics,
             errorStats,
-            pointPairs.Count);
+            pointPairs.Count,
+            config.CalibrationUnit);
 
-        return BuildSuccessOutput(@operator, inputs, pointPairs, bundle, transform, pixelSize, pixelSizeX, pixelSizeY, errorStats);
+        return BuildSuccessOutput(@operator, inputs, pointPairs, bundle, transform, pixelSize, pixelSizeX, pixelSizeY, errorStats, config);
     }
 
     private OperatorExecutionOutput ExecutePerspectiveCalibration(
@@ -193,7 +256,8 @@ public class NPointCalibrationOperator : OperatorBase
         Dictionary<string, object>? inputs,
         IReadOnlyList<PointPair> pointPairs,
         IReadOnlyList<Point2d> srcPoints,
-        IReadOnlyList<Point2d> dstPoints)
+        IReadOnlyList<Point2d> dstPoints,
+        NPointCalibrationConfig config)
     {
         using var srcMat = InputArray.Create(srcPoints);
         using var dstMat = InputArray.Create(dstPoints);
@@ -202,10 +266,10 @@ public class NPointCalibrationOperator : OperatorBase
             srcMat,
             dstMat,
             HomographyMethods.Ransac,
-            3.0,
+            config.RansacReprojectionThreshold,
             inlierMask,
-            3000,
-            0.995);
+            config.RansacMaxIterations,
+            config.RansacConfidence);
 
         if (homography is null || homography.Empty() || homography.Rows != 3 || homography.Cols != 3)
         {
@@ -235,20 +299,30 @@ public class NPointCalibrationOperator : OperatorBase
             return OperatorExecutionOutput.Failure("Homography estimation failed because inliers are insufficient.");
         }
 
-        var accepted = errorStats.MeanError <= MaxAcceptedReprojectionError &&
-                       errorStats.InlierCount >= 4 &&
-                       errorStats.InlierRatio >= 0.5;
+        var accepted = errorStats.InlierMaxError <= config.MaxAcceptedReprojectionError &&
+                       errorStats.InlierCount >= config.MinInlierCount &&
+                       errorStats.InlierRatio >= config.MinInlierRatio;
 
         var diagnostics = new List<string>
         {
             "Perspective transform estimated with all points via FindHomography(RANSAC).",
+            $"RansacReprojectionThreshold={config.RansacReprojectionThreshold:F6} {config.CalibrationUnit}",
+            $"RansacMaxIterations={config.RansacMaxIterations}",
+            $"RansacConfidence={config.RansacConfidence:F6}",
+            $"MaxAcceptedReprojectionError={config.MaxAcceptedReprojectionError:F6} {config.CalibrationUnit}",
+            $"MinInlierCount={config.MinInlierCount}",
+            $"MinInlierRatio={config.MinInlierRatio:F3}",
+            $"InlierMeanReprojectionError={errorStats.InlierMeanError:F6} {config.CalibrationUnit}",
+            $"InlierMaxReprojectionError={errorStats.InlierMaxError:F6} {config.CalibrationUnit}",
+            $"AllSampleMeanReprojectionError={errorStats.AllSampleMeanError:F6} {config.CalibrationUnit}",
+            $"AllSampleMaxReprojectionError={errorStats.AllSampleMaxError:F6} {config.CalibrationUnit}",
             $"InlierRatio={errorStats.InlierRatio:F3}",
             $"InlierCount={errorStats.InlierCount}/{pointPairs.Count}",
             "PixelSize is intentionally not reported for homography model."
         };
         if (!accepted)
         {
-            diagnostics.Add($"Mean reprojection error {errorStats.MeanError:F4} exceeds acceptance threshold {MaxAcceptedReprojectionError:F4}.");
+            diagnostics.Add($"Acceptance failed: inlier max error {errorStats.InlierMaxError:F4} {config.CalibrationUnit}, inliers {errorStats.InlierCount}, ratio {errorStats.InlierRatio:F3}.");
         }
 
         var bundle = CreateBundle(
@@ -259,9 +333,10 @@ public class NPointCalibrationOperator : OperatorBase
             accepted,
             diagnostics,
             errorStats,
-            pointPairs.Count);
+            pointPairs.Count,
+            config.CalibrationUnit);
 
-        return BuildSuccessOutput(@operator, inputs, pointPairs, bundle, transform, pixelSize: null, pixelSizeX: null, pixelSizeY: null, errorStats);
+        return BuildSuccessOutput(@operator, inputs, pointPairs, bundle, transform, pixelSize: null, pixelSizeX: null, pixelSizeY: null, errorStats, config);
     }
 
     private OperatorExecutionOutput BuildSuccessOutput(
@@ -273,7 +348,8 @@ public class NPointCalibrationOperator : OperatorBase
         double? pixelSize,
         double? pixelSizeX,
         double? pixelSizeY,
-        ReprojectionErrorStats errorStats)
+        ReprojectionErrorStats errorStats,
+        NPointCalibrationConfig config)
     {
         var calibrationJson = CalibrationBundleV2Json.Serialize(bundle);
         var savePath = GetStringParam(@operator, "SavePath", string.Empty);
@@ -288,10 +364,24 @@ public class NPointCalibrationOperator : OperatorBase
             ["CalibrationBundle"] = bundle,
             ["ReprojectionError"] = errorStats.MeanError,
             ["MaxReprojectionError"] = errorStats.MaxError,
+            ["MeanReprojectionError"] = errorStats.MeanError,
+            ["InlierMeanReprojectionError"] = errorStats.InlierMeanError,
+            ["InlierMaxReprojectionError"] = errorStats.InlierMaxError,
+            ["AllSampleMeanReprojectionError"] = errorStats.AllSampleMeanError,
+            ["AllSampleMaxReprojectionError"] = errorStats.AllSampleMaxError,
+            ["ReprojectionErrorScope"] = "Inlier",
             ["InlierCount"] = errorStats.InlierCount,
             ["TotalSampleCount"] = pointPairs.Count,
             ["InlierRatio"] = errorStats.InlierRatio,
-            ["Accepted"] = bundle.Quality.Accepted
+            ["Accepted"] = bundle.Quality.Accepted,
+            ["RansacReprojectionThreshold"] = config.RansacReprojectionThreshold,
+            ["RansacMaxIterations"] = config.RansacMaxIterations,
+            ["RansacConfidence"] = config.RansacConfidence,
+            ["MaxAcceptedReprojectionError"] = config.MaxAcceptedReprojectionError,
+            ["MinInlierCount"] = config.MinInlierCount,
+            ["MinInlierRatio"] = config.MinInlierRatio,
+            ["ReprojectionErrorUnit"] = config.CalibrationUnit,
+            ["CalibrationUnit"] = config.CalibrationUnit
         };
 
 
@@ -317,7 +407,8 @@ public class NPointCalibrationOperator : OperatorBase
         bool accepted,
         IReadOnlyList<string> diagnostics,
         ReprojectionErrorStats errorStats,
-        int sampleCount)
+        int sampleCount,
+        string calibrationUnit)
     {
         return new CalibrationBundleV2
         {
@@ -326,7 +417,7 @@ public class NPointCalibrationOperator : OperatorBase
             TransformModel = model,
             SourceFrame = "image",
             TargetFrame = "world",
-            Unit = "mm",
+            Unit = calibrationUnit,
             Transform2D = new CalibrationTransform2DV2
             {
                 Model = model,
@@ -346,6 +437,30 @@ public class NPointCalibrationOperator : OperatorBase
             GeneratedAtUtc = DateTime.UtcNow,
             ProducerOperator = nameof(NPointCalibrationOperator)
         };
+    }
+
+    private NPointCalibrationConfig ResolveCalibrationConfig(Operator @operator, int requiredPointCount)
+    {
+        var configuredMinInlierCount = GetIntParam(@operator, "MinInlierCount", 0, 0, 1000000);
+        var minInlierCount = configuredMinInlierCount <= 0
+            ? requiredPointCount
+            : configuredMinInlierCount;
+
+        return new NPointCalibrationConfig(
+            GetDoubleParam(@operator, "RansacReprojectionThreshold", DefaultRansacReprojectionThreshold, 0.000001, 100000.0),
+            GetIntParam(@operator, "RansacMaxIterations", DefaultRansacMaxIterations, 1, 100000),
+            GetDoubleParam(@operator, "RansacConfidence", DefaultRansacConfidence, 0.001, 0.999999),
+            GetDoubleParam(@operator, "MaxAcceptedReprojectionError", DefaultMaxAcceptedReprojectionError, 0.0, 100000.0),
+            minInlierCount,
+            GetDoubleParam(@operator, "MinInlierRatio", DefaultMinInlierRatio, 0.0, 1.0),
+            NormalizeCalibrationUnit(GetStringParam(@operator, "CalibrationUnit", "mm")));
+    }
+
+    private static string NormalizeCalibrationUnit(string rawUnit)
+    {
+        return string.IsNullOrWhiteSpace(rawUnit)
+            ? "mm"
+            : rawUnit.Trim();
     }
 
     private void TrySaveCalibration(string savePath, string calibrationJson)
@@ -483,12 +598,7 @@ public class NPointCalibrationOperator : OperatorBase
             }
         }
 
-        var selected = inlierErrors.Count > 0 ? inlierErrors : allErrors;
-        return new ReprojectionErrorStats(
-            selected.Average(),
-            selected.Max(),
-            inlierCount,
-            pairs.Count == 0 ? 0 : inlierCount / (double)pairs.Count);
+        return CreateReprojectionErrorStats(allErrors, inlierErrors, inlierCount, pairs.Count);
     }
 
     private static ReprojectionErrorStats CalculateHomographyReprojectionErrors(
@@ -508,7 +618,14 @@ public class NPointCalibrationOperator : OperatorBase
             var w = matrix[2][0] * x + matrix[2][1] * y + matrix[2][2];
             if (Math.Abs(w) <= 1e-12)
             {
-                allErrors.Add(double.MaxValue / 4);
+                var invalidError = double.MaxValue / 4;
+                allErrors.Add(invalidError);
+                if (inliers[i])
+                {
+                    inlierCount++;
+                    inlierErrors.Add(invalidError);
+                }
+
                 continue;
             }
 
@@ -526,12 +643,23 @@ public class NPointCalibrationOperator : OperatorBase
             }
         }
 
+        return CreateReprojectionErrorStats(allErrors, inlierErrors, inlierCount, pairs.Count);
+    }
+
+    private static ReprojectionErrorStats CreateReprojectionErrorStats(
+        IReadOnlyList<double> allErrors,
+        IReadOnlyList<double> inlierErrors,
+        int inlierCount,
+        int sampleCount)
+    {
         var selected = inlierErrors.Count > 0 ? inlierErrors : allErrors;
         return new ReprojectionErrorStats(
             selected.Average(),
             selected.Max(),
+            allErrors.Average(),
+            allErrors.Max(),
             inlierCount,
-            pairs.Count == 0 ? 0 : inlierCount / (double)pairs.Count);
+            sampleCount == 0 ? 0 : inlierCount / (double)sampleCount);
     }
 
     private static string ResolvePointPairsRaw(Operator @operator, Dictionary<string, object>? inputs)
@@ -849,5 +977,25 @@ public class NPointCalibrationOperator : OperatorBase
 
     private readonly record struct PointPair(Position ImagePoint, Position WorldPoint);
 
-    private readonly record struct ReprojectionErrorStats(double MeanError, double MaxError, int InlierCount, double InlierRatio);
+    private readonly record struct ReprojectionErrorStats(
+        double InlierMeanError,
+        double InlierMaxError,
+        double AllSampleMeanError,
+        double AllSampleMaxError,
+        int InlierCount,
+        double InlierRatio)
+    {
+        public double MeanError => InlierMeanError;
+
+        public double MaxError => InlierMaxError;
+    }
+
+    private readonly record struct NPointCalibrationConfig(
+        double RansacReprojectionThreshold,
+        int RansacMaxIterations,
+        double RansacConfidence,
+        double MaxAcceptedReprojectionError,
+        int MinInlierCount,
+        double MinInlierRatio,
+        string CalibrationUnit);
 }

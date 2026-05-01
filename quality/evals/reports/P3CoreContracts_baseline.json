@@ -1,0 +1,3935 @@
+{
+  "Summary": {
+    "GeneratedAtUtc": "2026-04-29T03:30:19.7431072+00:00",
+    "CaseCount": 386,
+    "Passed": 386,
+    "Failed": 0,
+    "RuntimeMs": 201.438
+  },
+  "Operators": [
+    {
+      "Operator": "ArrayIndexer",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.26,
+      "MemoryAllocationBytesAvg": 15468
+    },
+    {
+      "Operator": "Comparator",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.586,
+      "MemoryAllocationBytesAvg": 26261
+    },
+    {
+      "Operator": "CycleCounter",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.127,
+      "MemoryAllocationBytesAvg": 5032
+    },
+    {
+      "Operator": "Delay",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.895,
+      "MemoryAllocationBytesAvg": 3564
+    },
+    {
+      "Operator": "ForEach",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.716,
+      "MemoryAllocationBytesAvg": 8481
+    },
+    {
+      "Operator": "ImageAcquisition",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.782,
+      "MemoryAllocationBytesAvg": 4921
+    },
+    {
+      "Operator": "JsonExtractor",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.302,
+      "MemoryAllocationBytesAvg": 6861
+    },
+    {
+      "Operator": "LogicGate",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.081,
+      "MemoryAllocationBytesAvg": 3312
+    },
+    {
+      "Operator": "MathOperation",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.132,
+      "MemoryAllocationBytesAvg": 4058
+    },
+    {
+      "Operator": "MitsubishiMcCommunication",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.242,
+      "MemoryAllocationBytesAvg": 11533
+    },
+    {
+      "Operator": "OmronFinsCommunication",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.023,
+      "MemoryAllocationBytesAvg": 6111
+    },
+    {
+      "Operator": "ResultJudgment",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.118,
+      "MemoryAllocationBytesAvg": 4971
+    },
+    {
+      "Operator": "SiemensS7Communication",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.029,
+      "MemoryAllocationBytesAvg": 6949
+    },
+    {
+      "Operator": "StringFormat",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.533,
+      "MemoryAllocationBytesAvg": 5893
+    },
+    {
+      "Operator": "TimerStatistics",
+      "CaseCount": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.202,
+      "MemoryAllocationBytesAvg": 6054
+    },
+    {
+      "Operator": "TypeConvert",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.228,
+      "MemoryAllocationBytesAvg": 3224
+    },
+    {
+      "Operator": "VariableIncrement",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.086,
+      "MemoryAllocationBytesAvg": 6187
+    },
+    {
+      "Operator": "VariableRead",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.106,
+      "MemoryAllocationBytesAvg": 4142
+    },
+    {
+      "Operator": "VariableWrite",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.132,
+      "MemoryAllocationBytesAvg": 5480
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "Array extraction",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.07
+    },
+    {
+      "Scenario": "Boolean conversion",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.035
+    },
+    {
+      "Scenario": "Boolean truth table",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.084
+    },
+    {
+      "Scenario": "Boundary modes",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.092
+    },
+    {
+      "Scenario": "Camera mock acquisition",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.247
+    },
+    {
+      "Scenario": "Cancellation contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 8.146
+    },
+    {
+      "Scenario": "Comparison truth table",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 9.276
+    },
+    {
+      "Scenario": "Condition contract",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.142
+    },
+    {
+      "Scenario": "Confidence gate",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.042
+    },
+    {
+      "Scenario": "Cumulative timing",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.07
+    },
+    {
+      "Scenario": "Cycle increment",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.094
+    },
+    {
+      "Scenario": "Cycle read",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.13
+    },
+    {
+      "Scenario": "Cycle reset",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.084
+    },
+    {
+      "Scenario": "Date mode",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.356
+    },
+    {
+      "Scenario": "Default contract",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.097
+    },
+    {
+      "Scenario": "Default output contract",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.057
+    },
+    {
+      "Scenario": "Empty input contract",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.327
+    },
+    {
+      "Scenario": "Error contract",
+      "CaseCount": 27,
+      "Passed": 27,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.489
+    },
+    {
+      "Scenario": "FailFast contract",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.746
+    },
+    {
+      "Scenario": "File acquisition",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.325
+    },
+    {
+      "Scenario": "Image passthrough",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.34
+    },
+    {
+      "Scenario": "Increment contract",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.107
+    },
+    {
+      "Scenario": "Index mode",
+      "CaseCount": 12,
+      "Passed": 12,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.347
+    },
+    {
+      "Scenario": "Input priority",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.331
+    },
+    {
+      "Scenario": "Join mode",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.078
+    },
+    {
+      "Scenario": "Limit contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.272
+    },
+    {
+      "Scenario": "Math operations",
+      "CaseCount": 11,
+      "Passed": 11,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.139
+    },
+    {
+      "Scenario": "Output contract",
+      "CaseCount": 19,
+      "Passed": 19,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.064
+    },
+    {
+      "Scenario": "PLC parameter validation",
+      "CaseCount": 60,
+      "Passed": 60,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.098
+    },
+    {
+      "Scenario": "Passthrough contract",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.083
+    },
+    {
+      "Scenario": "Path extraction",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.234
+    },
+    {
+      "Scenario": "Range contract",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.07
+    },
+    {
+      "Scenario": "Reset contract",
+      "CaseCount": 6,
+      "Passed": 6,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.066
+    },
+    {
+      "Scenario": "SingleShot timing",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.303
+    },
+    {
+      "Scenario": "Static value fallback",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.105
+    },
+    {
+      "Scenario": "Subgraph aggregation",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 2.356
+    },
+    {
+      "Scenario": "Target conversions",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.44
+    },
+    {
+      "Scenario": "Template mode",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.549
+    },
+    {
+      "Scenario": "Tolerance contract",
+      "CaseCount": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.069
+    },
+    {
+      "Scenario": "Validation contract",
+      "CaseCount": 25,
+      "Passed": 25,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.14
+    },
+    {
+      "Scenario": "Variable context read",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.122
+    },
+    {
+      "Scenario": "Variable context write",
+      "CaseCount": 8,
+      "Passed": 8,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.115
+    }
+  ],
+  "Cases": [
+    {
+      "CaseId": "Comparator_greater_than_0",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 92.414,
+      "MemoryAllocationBytes": 155152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_less_equal_0",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.305,
+      "MemoryAllocationBytes": 3544,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_equal_tolerance_0",
+      "Operator": "Comparator",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 5.312,
+      "MemoryAllocationBytes": 345016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_in_range_0",
+      "Operator": "Comparator",
+      "Scenario": "Range contract",
+      "Passed": true,
+      "RuntimeMs": 0.326,
+      "MemoryAllocationBytes": 4656,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_greater_than_1",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 3496,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_less_equal_1",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3544,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_equal_tolerance_1",
+      "Operator": "Comparator",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 3984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_in_range_1",
+      "Operator": "Comparator",
+      "Scenario": "Range contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_greater_than_2",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 3496,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_less_equal_2",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3544,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_equal_tolerance_2",
+      "Operator": "Comparator",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 3984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_in_range_2",
+      "Operator": "Comparator",
+      "Scenario": "Range contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_greater_than_3",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3496,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_less_equal_3",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3544,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_equal_tolerance_3",
+      "Operator": "Comparator",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 3984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_in_range_3",
+      "Operator": "Comparator",
+      "Scenario": "Range contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_greater_than_4",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 3496,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_less_equal_4",
+      "Operator": "Comparator",
+      "Scenario": "Comparison truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3544,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_equal_tolerance_4",
+      "Operator": "Comparator",
+      "Scenario": "Tolerance contract",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 3984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_in_range_4",
+      "Operator": "Comparator",
+      "Scenario": "Range contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_invalid_value_a_fails",
+      "Operator": "Comparator",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 2.198,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Comparator_invalid_value_b_fails",
+      "Operator": "Comparator",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.24,
+      "MemoryAllocationBytes": 1920,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_and_0",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.784,
+      "MemoryAllocationBytes": 4984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_and_1",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.018,
+      "MemoryAllocationBytes": 3376,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_or_2",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 3360,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_or_3",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3360,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_xor_4",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3376,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_xor_5",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3376,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_nand_6",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3392,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_nand_7",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 3392,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_nor_8",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3376,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_nor_9",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean truth table",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 3376,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_0",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.253,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_1",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_2",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_3",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_4",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_5",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_6",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_not_convertible_7",
+      "Operator": "LogicGate",
+      "Scenario": "Boolean conversion",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3312,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_missing_input_b_fails",
+      "Operator": "LogicGate",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.21,
+      "MemoryAllocationBytes": 2648,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "LogicGate_invalid_operation_validation",
+      "Operator": "LogicGate",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.3,
+      "MemoryAllocationBytes": 1720,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_0",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 5.35,
+      "MemoryAllocationBytes": 23992,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_1",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.061,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_2",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_3",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_4",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_5",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_6",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_7",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_8",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_template_named_9",
+      "Operator": "StringFormat",
+      "Scenario": "Template mode",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_0",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.567,
+      "MemoryAllocationBytes": 4144,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_1",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.024,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_2",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_3",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_4",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_5",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_6",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_join_7",
+      "Operator": "StringFormat",
+      "Scenario": "Join mode",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_date_mode_outputs_text",
+      "Operator": "StringFormat",
+      "Scenario": "Date mode",
+      "Passed": true,
+      "RuntimeMs": 4.356,
+      "MemoryAllocationBytes": 13408,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "StringFormat_invalid_mode_validation",
+      "Operator": "StringFormat",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.188,
+      "MemoryAllocationBytes": 1648,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_0",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 4.052,
+      "MemoryAllocationBytes": 219408,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_1",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.036,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_2",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_3",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_4",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_5",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_6",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_7",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_8",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_9",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_10",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 5208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_index_11",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Index mode",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_first_last_0",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Boundary modes",
+      "Passed": true,
+      "RuntimeMs": 0.3,
+      "MemoryAllocationBytes": 4472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_first_last_1",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Boundary modes",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_first_last_2",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Boundary modes",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_first_last_3",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Boundary modes",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 4472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_first_last_4",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Boundary modes",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_empty_list_returns_not_found",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Boundary modes",
+      "Passed": true,
+      "RuntimeMs": 0.226,
+      "MemoryAllocationBytes": 2200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_out_of_range_fails",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.279,
+      "MemoryAllocationBytes": 3784,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ArrayIndexer_non_enumerable_fails",
+      "Operator": "ArrayIndexer",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.215,
+      "MemoryAllocationBytes": 4536,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_0",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 1.782,
+      "MemoryAllocationBytes": 7104,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_1",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.045,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_2",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_3",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_4",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_5",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_6",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_property_string_7",
+      "Operator": "JsonExtractor",
+      "Scenario": "Path extraction",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5152,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_0",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.47,
+      "MemoryAllocationBytes": 6368,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_1",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.024,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_2",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_3",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_4",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_5",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_6",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_array_integer_7",
+      "Operator": "JsonExtractor",
+      "Scenario": "Array extraction",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_missing_optional_uses_default",
+      "Operator": "JsonExtractor",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.286,
+      "MemoryAllocationBytes": 5488,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_required_missing_fails",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 1.265,
+      "MemoryAllocationBytes": 19856,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_invalid_json_fails",
+      "Operator": "JsonExtractor",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 1.822,
+      "MemoryAllocationBytes": 19008,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "JsonExtractor_invalid_output_type_validation",
+      "Operator": "JsonExtractor",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.243,
+      "MemoryAllocationBytes": 2008,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_add",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 1.17,
+      "MemoryAllocationBytes": 7920,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_subtract",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.03,
+      "MemoryAllocationBytes": 4128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_multiply",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4136,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_divide",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_min",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4056,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_max",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 4064,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_power",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 4072,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_modulo",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4096,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_abs",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.275,
+      "MemoryAllocationBytes": 4024,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_sqrt",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_round",
+      "Operator": "MathOperation",
+      "Scenario": "Math operations",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4032,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_positive_flag_0",
+      "Operator": "MathOperation",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.244,
+      "MemoryAllocationBytes": 4112,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_positive_flag_1",
+      "Operator": "MathOperation",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4112,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_positive_flag_2",
+      "Operator": "MathOperation",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 4112,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_positive_flag_3",
+      "Operator": "MathOperation",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4112,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_positive_flag_4",
+      "Operator": "MathOperation",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4112,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_divide_by_zero_fails",
+      "Operator": "MathOperation",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.272,
+      "MemoryAllocationBytes": 4392,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_missing_value_b_fails",
+      "Operator": "MathOperation",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.204,
+      "MemoryAllocationBytes": 2784,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_non_finite_fails",
+      "Operator": "MathOperation",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.226,
+      "MemoryAllocationBytes": 2808,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MathOperation_invalid_operation_validation",
+      "Operator": "MathOperation",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.139,
+      "MemoryAllocationBytes": 1952,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_integer_0",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 2.791,
+      "MemoryAllocationBytes": 4624,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_float_1",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.655,
+      "MemoryAllocationBytes": 3408,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_string_2",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.032,
+      "MemoryAllocationBytes": 3448,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_boolean_3",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 3448,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_boolean_4",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 3448,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_boolean_5",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3448,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_integer_6",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 3512,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_target_float_7",
+      "Operator": "TypeConvert",
+      "Scenario": "Target conversions",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 3424,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_0",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.628,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_1",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_2",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_3",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_4",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_5",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_6",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_7",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_8",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_all_outputs_9",
+      "Operator": "TypeConvert",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_missing_input_fails",
+      "Operator": "TypeConvert",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.226,
+      "MemoryAllocationBytes": 1624,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TypeConvert_invalid_target_validation",
+      "Operator": "TypeConvert",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.143,
+      "MemoryAllocationBytes": 1536,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_0",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 1.308,
+      "MemoryAllocationBytes": 6064,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_1",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.03,
+      "MemoryAllocationBytes": 6120,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_2",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6224,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_3",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 6072,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_4",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 6184,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_5",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 6120,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_6",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 6056,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_7",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 6040,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_8",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 6064,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_condition_9",
+      "Operator": "ResultJudgment",
+      "Scenario": "Condition contract",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 6120,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_0",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.293,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_1",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_2",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_3",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_4",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_5",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_6",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_confidence_gate_7",
+      "Operator": "ResultJudgment",
+      "Scenario": "Confidence gate",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 4928,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_invalid_min_confidence_validation",
+      "Operator": "ResultJudgment",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.174,
+      "MemoryAllocationBytes": 1552,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_invalid_rel_tolerance_validation",
+      "Operator": "ResultJudgment",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.058,
+      "MemoryAllocationBytes": 1792,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_invalid_condition_validation",
+      "Operator": "ResultJudgment",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.202,
+      "MemoryAllocationBytes": 1872,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ResultJudgment_invalid_condition_execution_fails",
+      "Operator": "ResultJudgment",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.397,
+      "MemoryAllocationBytes": 3648,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_0",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 2.452,
+      "MemoryAllocationBytes": 5136,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_1",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.12,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_2",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_3",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_4",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_5",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_6",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_7",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.406,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_8",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_single_shot_9",
+      "Operator": "TimerStatistics",
+      "Scenario": "SingleShot timing",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_0",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.419,
+      "MemoryAllocationBytes": 9024,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_1",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 8936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_2",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 8936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_3",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 8936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_4",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 8936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_5",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 8936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_6",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.066,
+      "MemoryAllocationBytes": 11688,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_cumulative_7",
+      "Operator": "TimerStatistics",
+      "Scenario": "Cumulative timing",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 8936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_invalid_mode_validation",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.139,
+      "MemoryAllocationBytes": 1416,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_negative_reset_validation",
+      "Operator": "TimerStatistics",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.288,
+      "MemoryAllocationBytes": 1520,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_invalid_mode_execution_fails",
+      "Operator": "TimerStatistics",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.232,
+      "MemoryAllocationBytes": 2632,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "TimerStatistics_negative_reset_execution_fails",
+      "Operator": "TimerStatistics",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.209,
+      "MemoryAllocationBytes": 2728,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_string_0",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.711,
+      "MemoryAllocationBytes": 5360,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_int_0",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.1,
+      "MemoryAllocationBytes": 4160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_double_0",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.076,
+      "MemoryAllocationBytes": 4264,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_bool_0",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.061,
+      "MemoryAllocationBytes": 4208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_string_1",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4192,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_int_1",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4160,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_double_1",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4264,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_existing_bool_1",
+      "Operator": "VariableRead",
+      "Scenario": "Variable context read",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_string_0",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.282,
+      "MemoryAllocationBytes": 4824,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_int_0",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_double_0",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 4768,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_bool_0",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 4744,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_string_1",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 4824,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_int_1",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 4672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_double_1",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 4768,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_default_bool_1",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.14,
+      "MemoryAllocationBytes": 4744,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_empty_variable_validation",
+      "Operator": "VariableRead",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.163,
+      "MemoryAllocationBytes": 1384,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_invalid_type_validation",
+      "Operator": "VariableRead",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.088,
+      "MemoryAllocationBytes": 2496,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_empty_variable_execution_fails",
+      "Operator": "VariableRead",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.208,
+      "MemoryAllocationBytes": 2304,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableRead_invalid_type_execution_defaults_to_string",
+      "Operator": "VariableRead",
+      "Scenario": "Default contract",
+      "Passed": true,
+      "RuntimeMs": 0.213,
+      "MemoryAllocationBytes": 3824,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_string_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.704,
+      "MemoryAllocationBytes": 6480,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_int_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.027,
+      "MemoryAllocationBytes": 5392,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_double_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_bool_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 5424,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_string_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.13,
+      "MemoryAllocationBytes": 5456,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_int_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 5392,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_double_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5472,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_input_bool_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Variable context write",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5424,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_string_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.53,
+      "MemoryAllocationBytes": 6128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_int_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.238,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_double_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.018,
+      "MemoryAllocationBytes": 6000,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_bool_0",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5952,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_string_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5976,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_int_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5904,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_double_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 6000,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_bool_1",
+      "Operator": "VariableWrite",
+      "Scenario": "Static value fallback",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 5952,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_named_input_fallback",
+      "Operator": "VariableWrite",
+      "Scenario": "Input priority",
+      "Passed": true,
+      "RuntimeMs": 0.412,
+      "MemoryAllocationBytes": 5256,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_static_fallback_when_input_missing",
+      "Operator": "VariableWrite",
+      "Scenario": "Input priority",
+      "Passed": true,
+      "RuntimeMs": 0.25,
+      "MemoryAllocationBytes": 5864,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_empty_variable_validation",
+      "Operator": "VariableWrite",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.141,
+      "MemoryAllocationBytes": 2600,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableWrite_invalid_type_validation",
+      "Operator": "VariableWrite",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.067,
+      "MemoryAllocationBytes": 3560,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_0",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.784,
+      "MemoryAllocationBytes": 7712,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_1",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.024,
+      "MemoryAllocationBytes": 6016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_2",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 6000,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_3",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 6016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_4",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 6000,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_5",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 6016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_6",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 6000,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_delta_7",
+      "Operator": "VariableIncrement",
+      "Scenario": "Increment contract",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 6016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_reset_0",
+      "Operator": "VariableIncrement",
+      "Scenario": "Reset contract",
+      "Passed": true,
+      "RuntimeMs": 0.331,
+      "MemoryAllocationBytes": 8968,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_reset_1",
+      "Operator": "VariableIncrement",
+      "Scenario": "Reset contract",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 7776,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_reset_2",
+      "Operator": "VariableIncrement",
+      "Scenario": "Reset contract",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 7728,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_reset_3",
+      "Operator": "VariableIncrement",
+      "Scenario": "Reset contract",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 7832,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_reset_4",
+      "Operator": "VariableIncrement",
+      "Scenario": "Reset contract",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 7816,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_reset_5",
+      "Operator": "VariableIncrement",
+      "Scenario": "Reset contract",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 7752,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_cycle_count_output_0",
+      "Operator": "VariableIncrement",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.257,
+      "MemoryAllocationBytes": 4984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_cycle_count_output_1",
+      "Operator": "VariableIncrement",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.01,
+      "MemoryAllocationBytes": 4984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_cycle_count_output_2",
+      "Operator": "VariableIncrement",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 4984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_cycle_count_output_3",
+      "Operator": "VariableIncrement",
+      "Scenario": "Output contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 4984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_empty_variable_validation",
+      "Operator": "VariableIncrement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.136,
+      "MemoryAllocationBytes": 2608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "VariableIncrement_invalid_reset_validation",
+      "Operator": "VariableIncrement",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.066,
+      "MemoryAllocationBytes": 3552,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_0",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.694,
+      "MemoryAllocationBytes": 5880,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_1",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_2",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_3",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_4",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_5",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_6",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_increment_7",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle increment",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 5200,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_read_progress_0",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle read",
+      "Passed": true,
+      "RuntimeMs": 0.492,
+      "MemoryAllocationBytes": 5784,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_read_progress_1",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle read",
+      "Passed": true,
+      "RuntimeMs": 0.017,
+      "MemoryAllocationBytes": 5128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_read_progress_2",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle read",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 5128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_read_progress_3",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle read",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_reset_0",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle reset",
+      "Passed": true,
+      "RuntimeMs": 0.312,
+      "MemoryAllocationBytes": 5016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_reset_1",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle reset",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_reset_2",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle reset",
+      "Passed": true,
+      "RuntimeMs": 0.007,
+      "MemoryAllocationBytes": 5016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_reset_3",
+      "Operator": "CycleCounter",
+      "Scenario": "Cycle reset",
+      "Passed": true,
+      "RuntimeMs": 0.008,
+      "MemoryAllocationBytes": 5016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_limit_prevents_increment",
+      "Operator": "CycleCounter",
+      "Scenario": "Limit contract",
+      "Passed": true,
+      "RuntimeMs": 0.272,
+      "MemoryAllocationBytes": 6080,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_invalid_action_validation",
+      "Operator": "CycleCounter",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.29,
+      "MemoryAllocationBytes": 3072,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_negative_max_validation",
+      "Operator": "CycleCounter",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.082,
+      "MemoryAllocationBytes": 3720,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "CycleCounter_negative_max_execution_fails",
+      "Operator": "CycleCounter",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.285,
+      "MemoryAllocationBytes": 4248,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_0",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.783,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_1",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.017,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_2",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_3",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_4",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_5",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_6",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.006,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_7",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_8",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_passthrough_9",
+      "Operator": "Delay",
+      "Scenario": "Passthrough contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 3016,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_without_input_0",
+      "Operator": "Delay",
+      "Scenario": "Default output contract",
+      "Passed": true,
+      "RuntimeMs": 0.21,
+      "MemoryAllocationBytes": 2560,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_without_input_1",
+      "Operator": "Delay",
+      "Scenario": "Default output contract",
+      "Passed": true,
+      "RuntimeMs": 0.009,
+      "MemoryAllocationBytes": 2560,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_without_input_2",
+      "Operator": "Delay",
+      "Scenario": "Default output contract",
+      "Passed": true,
+      "RuntimeMs": 0.005,
+      "MemoryAllocationBytes": 2560,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_zero_without_input_3",
+      "Operator": "Delay",
+      "Scenario": "Default output contract",
+      "Passed": true,
+      "RuntimeMs": 0.003,
+      "MemoryAllocationBytes": 2560,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_negative_validation",
+      "Operator": "Delay",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.11,
+      "MemoryAllocationBytes": 1752,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_too_large_validation",
+      "Operator": "Delay",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.05,
+      "MemoryAllocationBytes": 1856,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_negative_execution_fails",
+      "Operator": "Delay",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.196,
+      "MemoryAllocationBytes": 2376,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_too_large_execution_fails",
+      "Operator": "Delay",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.192,
+      "MemoryAllocationBytes": 2480,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_pre_canceled_token_throws",
+      "Operator": "Delay",
+      "Scenario": "Cancellation contract",
+      "Passed": true,
+      "RuntimeMs": 0.661,
+      "MemoryAllocationBytes": 13264,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "Delay_delay_canceled_token_throws",
+      "Operator": "Delay",
+      "Scenario": "Cancellation contract",
+      "Passed": true,
+      "RuntimeMs": 15.632,
+      "MemoryAllocationBytes": 9144,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_empty_items_0",
+      "Operator": "ForEach",
+      "Scenario": "Empty input contract",
+      "Passed": true,
+      "RuntimeMs": 1.922,
+      "MemoryAllocationBytes": 4128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_empty_items_1",
+      "Operator": "ForEach",
+      "Scenario": "Empty input contract",
+      "Passed": true,
+      "RuntimeMs": 0.021,
+      "MemoryAllocationBytes": 2968,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_empty_items_2",
+      "Operator": "ForEach",
+      "Scenario": "Empty input contract",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 2992,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_empty_items_3",
+      "Operator": "ForEach",
+      "Scenario": "Empty input contract",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 2936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_empty_items_4",
+      "Operator": "ForEach",
+      "Scenario": "Empty input contract",
+      "Passed": true,
+      "RuntimeMs": 0.002,
+      "MemoryAllocationBytes": 2992,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_empty_items_5",
+      "Operator": "ForEach",
+      "Scenario": "Empty input contract",
+      "Passed": true,
+      "RuntimeMs": 0.004,
+      "MemoryAllocationBytes": 2936,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_null_inputs_fail",
+      "Operator": "ForEach",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.216,
+      "MemoryAllocationBytes": 1536,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_missing_items_fail",
+      "Operator": "ForEach",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.176,
+      "MemoryAllocationBytes": 1704,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_non_enumerable_items_fail",
+      "Operator": "ForEach",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.185,
+      "MemoryAllocationBytes": 1984,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_missing_subgraph_fails",
+      "Operator": "ForEach",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.54,
+      "MemoryAllocationBytes": 4776,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_invalid_iomode_validation",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.187,
+      "MemoryAllocationBytes": 18968,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_min_parallelism_validation",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.06,
+      "MemoryAllocationBytes": 1768,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_max_parallelism_validation",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.041,
+      "MemoryAllocationBytes": 1784,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_timeout_validation",
+      "Operator": "ForEach",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.035,
+      "MemoryAllocationBytes": 1784,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_parallel_success_0",
+      "Operator": "ForEach",
+      "Scenario": "Subgraph aggregation",
+      "Passed": true,
+      "RuntimeMs": 8.943,
+      "MemoryAllocationBytes": 19048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_parallel_success_1",
+      "Operator": "ForEach",
+      "Scenario": "Subgraph aggregation",
+      "Passed": true,
+      "RuntimeMs": 0.189,
+      "MemoryAllocationBytes": 14304,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_parallel_success_2",
+      "Operator": "ForEach",
+      "Scenario": "Subgraph aggregation",
+      "Passed": true,
+      "RuntimeMs": 0.212,
+      "MemoryAllocationBytes": 30136,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_parallel_success_3",
+      "Operator": "ForEach",
+      "Scenario": "Subgraph aggregation",
+      "Passed": true,
+      "RuntimeMs": 0.082,
+      "MemoryAllocationBytes": 14456,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_sequential_failfast_0",
+      "Operator": "ForEach",
+      "Scenario": "FailFast contract",
+      "Passed": true,
+      "RuntimeMs": 1.451,
+      "MemoryAllocationBytes": 28680,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ForEach_sequential_failfast_1",
+      "Operator": "ForEach",
+      "Scenario": "FailFast contract",
+      "Passed": true,
+      "RuntimeMs": 0.042,
+      "MemoryAllocationBytes": 9744,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_null_inputs_fail",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 1.653,
+      "MemoryAllocationBytes": 1960,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_empty_inputs_fail",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.217,
+      "MemoryAllocationBytes": 2128,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_file_mode_without_path_fails",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.203,
+      "MemoryAllocationBytes": 2864,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_missing_file_fails",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.799,
+      "MemoryAllocationBytes": 5552,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_png_bytes_0",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Image passthrough",
+      "Passed": true,
+      "RuntimeMs": 1.925,
+      "MemoryAllocationBytes": 6504,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_png_bytes_1",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Image passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.053,
+      "MemoryAllocationBytes": 3856,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_png_bytes_2",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Image passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.02,
+      "MemoryAllocationBytes": 3864,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_png_bytes_3",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Image passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.015,
+      "MemoryAllocationBytes": 3864,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_png_bytes_4",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Image passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 3880,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_png_bytes_5",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Image passthrough",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 3880,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_file_path_0",
+      "Operator": "ImageAcquisition",
+      "Scenario": "File acquisition",
+      "Passed": true,
+      "RuntimeMs": 2.209,
+      "MemoryAllocationBytes": 5992,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_file_path_1",
+      "Operator": "ImageAcquisition",
+      "Scenario": "File acquisition",
+      "Passed": true,
+      "RuntimeMs": 0.86,
+      "MemoryAllocationBytes": 5888,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_file_path_2",
+      "Operator": "ImageAcquisition",
+      "Scenario": "File acquisition",
+      "Passed": true,
+      "RuntimeMs": 0.764,
+      "MemoryAllocationBytes": 5888,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_file_path_3",
+      "Operator": "ImageAcquisition",
+      "Scenario": "File acquisition",
+      "Passed": true,
+      "RuntimeMs": 5.467,
+      "MemoryAllocationBytes": 5888,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_camera_mock_0",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Camera mock acquisition",
+      "Passed": true,
+      "RuntimeMs": 0.907,
+      "MemoryAllocationBytes": 7480,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_camera_mock_1",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Camera mock acquisition",
+      "Passed": true,
+      "RuntimeMs": 0.045,
+      "MemoryAllocationBytes": 7424,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_camera_mock_2",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Camera mock acquisition",
+      "Passed": true,
+      "RuntimeMs": 0.018,
+      "MemoryAllocationBytes": 7424,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_camera_mock_3",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Camera mock acquisition",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 7424,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_camera_without_id_fails",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Error contract",
+      "Passed": true,
+      "RuntimeMs": 0.326,
+      "MemoryAllocationBytes": 6136,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "ImageAcquisition_validation_is_stable",
+      "Operator": "ImageAcquisition",
+      "Scenario": "Validation contract",
+      "Passed": true,
+      "RuntimeMs": 0.113,
+      "MemoryAllocationBytes": 528,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_0",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.762,
+      "MemoryAllocationBytes": 6192,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_1",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.059,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_2",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_3",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_4",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_5",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_6",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_datatype_7",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 6208,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_empty_address_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.093,
+      "MemoryAllocationBytes": 5960,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_missing_ip_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 3.004,
+      "MemoryAllocationBytes": 104840,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_missing_port_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.152,
+      "MemoryAllocationBytes": 8288,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_high_port_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.098,
+      "MemoryAllocationBytes": 8240,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_invalid_polling_mode",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.087,
+      "MemoryAllocationBytes": 6280,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_write_operation",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.076,
+      "MemoryAllocationBytes": 6648,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_valid_polling_wait",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.058,
+      "MemoryAllocationBytes": 6064,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_negative_port_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.079,
+      "MemoryAllocationBytes": 8304,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_global_fallback_missing_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.101,
+      "MemoryAllocationBytes": 8216,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_lower_case_polling_valid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.061,
+      "MemoryAllocationBytes": 6064,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_length_zero_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.064,
+      "MemoryAllocationBytes": 6048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "MitsubishiMcCommunication_length_high_invalid",
+      "Operator": "MitsubishiMcCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.055,
+      "MemoryAllocationBytes": 6064,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_0",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.163,
+      "MemoryAllocationBytes": 5592,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_1",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.015,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_2",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_3",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_4",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_5",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_6",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_datatype_7",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5608,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_empty_address_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5432,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_missing_ip_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.029,
+      "MemoryAllocationBytes": 7656,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_missing_port_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 7768,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_high_port_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.02,
+      "MemoryAllocationBytes": 7712,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_invalid_polling_mode",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5384,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_write_operation",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6048,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_valid_polling_wait",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5416,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_negative_port_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.019,
+      "MemoryAllocationBytes": 7784,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_global_fallback_missing_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 7696,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_lower_case_polling_valid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 5416,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_length_zero_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.013,
+      "MemoryAllocationBytes": 5520,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "OmronFinsCommunication_length_high_invalid",
+      "Operator": "OmronFinsCommunication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.011,
+      "MemoryAllocationBytes": 5536,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_0",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.206,
+      "MemoryAllocationBytes": 6656,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_1",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.019,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_2",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_3",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.015,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_4",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_5",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_6",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_7",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_datatype_8",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.015,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_cpu_0",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.07,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_cpu_1",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6688,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_cpu_2",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_cpu_3",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.012,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_cpu_4",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_valid_cpu_5",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.014,
+      "MemoryAllocationBytes": 6672,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_empty_address_invalid",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6320,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_missing_ip_invalid",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.03,
+      "MemoryAllocationBytes": 8584,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_missing_port_invalid",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 8696,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_high_port_invalid",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.022,
+      "MemoryAllocationBytes": 8648,
+      "ErrorMessage": null
+    },
+    {
+      "CaseId": "SiemensS7Communication_invalid_polling_mode",
+      "Operator": "SiemensS7Communication",
+      "Scenario": "PLC parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.016,
+      "MemoryAllocationBytes": 6656,
+      "ErrorMessage": null
+    }
+  ]
+}

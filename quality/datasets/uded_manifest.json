@@ -1,0 +1,30 @@
+{
+  "schema_version": "2026-04-30.public-quality-dataset-manifest.v1",
+  "dataset_id": "uded",
+  "name": "UDED",
+  "target_operators": ["EdgeDetection"],
+  "download_priority": 4,
+  "local_root": "quality/public_datasets/uded",
+  "license": {
+    "id": "upstream-research-terms",
+    "commercial_use": false,
+    "notes": "Verify upstream license before publishing metrics or redistributing artifacts."
+  },
+  "source": {
+    "url": "https://github.com/xavysp/UDED",
+    "publisher": "UDED authors",
+    "description": "Unstructured edge detection dataset used as an advisory candidate-calibration set."
+  },
+  "archives": [
+    {
+      "name": "uded-main.zip",
+      "source_url": "https://github.com/xavysp/UDED/archive/refs/heads/main.zip",
+      "archive_type": "zip",
+      "extract_to": "extracted",
+      "size_bytes": 0,
+      "sha256": ""
+    }
+  ],
+  "index_output": "quality/datasets/uded_index.json",
+  "claim_boundary": "Advisory edge candidate calibration only; not a replacement for BSDS500 frozen replay."
+}

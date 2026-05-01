@@ -9,7 +9,15 @@ param(
 
     [switch]$NoBuild,
 
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    [string]$ResultsDirectory,
+
+    [string]$LogFileName,
+
+    [int]$MinimumTotalTests = 0,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,9 +26,9 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "Acme.Product\tests\Acme.Product.Tests\Acme.Product.Tests.csproj"
-$resultsDirectory = Join-Path $repoRoot "test_results"
+$defaultResultsDirectory = Join-Path $repoRoot "test_results"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$logFileName = "detection-$Gate-$timestamp.trx"
+$defaultLogFileName = "detection-$Gate-$timestamp.trx"
 $repoDotnetHome = Join-Path $repoRoot ".dotnet-home"
 $repoNuGetPackages = Join-Path $repoRoot ".dotnet\.nuget\packages"
 
@@ -92,8 +100,12 @@ $parameters = @{
     Project = $project
     FullyQualifiedName = $selectedTestClasses
     Verbosity = $Verbosity
-    ResultsDirectory = $resultsDirectory
-    LogFileName = $logFileName
+    ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
+    LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
+}
+
+if ($MinimumTotalTests -gt 0) {
+    $parameters.MinimumTotalTests = $MinimumTotalTests
 }
 
 if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
@@ -108,4 +120,12 @@ if ($NoRestore) {
     $parameters.NoRestore = $true
 }
 
+if ($ReturnExitCode) {
+    $parameters.ReturnExitCode = $true
+}
+
 & $runner @parameters
+
+if ($ReturnExitCode) {
+    return
+}

@@ -1,0 +1,207 @@
+{
+  "schemaVersion": "2026-04-27.g3-dataset-tier-freeze",
+  "generatedAtUtc": "2026-04-29T00:00:00Z",
+  "scope": "Frozen G3 dataset-tier candidate set fully closed: all 20 operators have dataset-tier manifests, source baselines, metric thresholds, and failure/boundary taxonomy.",
+  "tierDefinitions": {
+    "A": "Public or licensed dataset evidence: fixed source/version, checksum or citation, deterministic split, metrics, and reproducible runner.",
+    "B": "Semi-synthetic dataset evidence: generated or transformed samples with fixed seed/recipe, boundary cases, metrics, and manifest.",
+    "C": "Dataset-adjacent smoke evidence: small curated fixture pack or field-substitute set with manifest and failure taxonomy; not counted as full dataset evidence until promoted."
+  },
+  "frozenOperators": [
+    {
+      "operator": "TemplateMatching",
+      "tier": "A",
+      "datasetMode": "public-bridge",
+      "initialManifest": "quality/datasets/manifests/TemplateMatching_public_bridge_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "AnomalyDetection",
+      "tier": "A",
+      "datasetMode": "public-dataset",
+      "initialManifest": "quality/datasets/manifests/AnomalyDetection_mvtec_lite_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "DeepLearning",
+      "tier": "A",
+      "datasetMode": "coco-style-detection-protocol-bridge",
+      "initialManifest": "quality/datasets/manifests/DeepLearning_detection_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "SemanticSegmentation",
+      "tier": "A",
+      "datasetMode": "voc-style-segmentation-protocol-bridge",
+      "initialManifest": "quality/datasets/manifests/SemanticSegmentation_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "EdgeDetection",
+      "tier": "A",
+      "datasetMode": "bsds-style-edge-benchmark-protocol-bridge",
+      "initialManifest": "quality/datasets/manifests/EdgeDetection_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "ShapeMatching",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-geometric-scenes",
+      "initialManifest": "quality/datasets/manifests/ShapeMatching_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "GradientShapeMatch",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-template-scenes",
+      "initialManifest": "quality/datasets/manifests/GradientShapeMatch_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "PyramidShapeMatch",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-multiscale-scenes",
+      "initialManifest": "quality/datasets/manifests/PyramidShapeMatch_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "AkazeFeatureMatch",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-feature-scenes",
+      "initialManifest": "quality/datasets/manifests/AkazeFeatureMatch_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-feature-scenes",
+      "initialManifest": "quality/datasets/manifests/OrbFeatureMatch_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "PlanarMatching",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-homography-scenes",
+      "initialManifest": "quality/datasets/manifests/PlanarMatching_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "LocalDeformableMatching",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-deformation-scenes",
+      "initialManifest": "quality/datasets/manifests/LocalDeformableMatching_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "CaliperTool",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-edge-caliper-scenes",
+      "initialManifest": "quality/datasets/manifests/CaliperTool_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "ArcCaliper",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-arc-edge-scenes",
+      "initialManifest": "quality/datasets/manifests/ArcCaliper_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "ContourDetection",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-contour-scenes",
+      "initialManifest": "quality/datasets/manifests/ContourDetection_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "BlobAnalysis",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-blob-scenes",
+      "initialManifest": "quality/datasets/manifests/BlobAnalysis_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "LineMeasurement",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-line-metrology-scenes",
+      "initialManifest": "quality/datasets/manifests/LineMeasurement_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "CircleMeasurement",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-circle-metrology-scenes",
+      "initialManifest": "quality/datasets/manifests/CircleMeasurement_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "GeometricFitting",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-fitting-scenes",
+      "initialManifest": "quality/datasets/manifests/GeometricFitting_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    },
+    {
+      "operator": "SurfaceDefectDetection",
+      "tier": "B",
+      "datasetMode": "semi-synthetic-surface-defect-scenes",
+      "initialManifest": "quality/datasets/manifests/SurfaceDefectDetection_dataset_manifest.json",
+      "status": "promoted-closure",
+      "baselineJson": "quality/evals/reports/QualityFlywheel_G3_dataset_closure_baseline.json",
+      "reportMarkdown": "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+    }
+  ],
+  "executionPolicy": {
+    "currentRound": "Promote existing dataset-kind baselines into manifest/report form; do not run new dataset scoring in this round.",
+    "promotionGate": "A frozen operator can become dataset evidence only after a concrete manifest, runner, metrics, and failure/boundary report exist.",
+    "matrixMapping": "Only completed dataset reports should set EvidenceKind=dataset in baseline JSON."
+  },
+  "manifestTemplate": "quality/datasets/QualityFlywheel_dataset_manifest_template.json",
+  "suiteManifests": {
+    "quick": "quality/evals/suites/quick_contract_suite.json",
+    "golden": "quality/evals/suites/golden_core50_suite.json",
+    "dataset": "quality/evals/suites/dataset_heavy_suite.json"
+  },
+  "batchReports": [
+    "quality/evals/reports/QualityFlywheel_G3_dataset_batch1.md",
+    "quality/evals/reports/QualityFlywheel_G3_dataset_closure.md"
+  ]
+}

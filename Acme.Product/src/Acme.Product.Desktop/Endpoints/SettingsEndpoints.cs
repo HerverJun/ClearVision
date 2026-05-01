@@ -9,6 +9,7 @@ using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.Buffers.Binary;
 using System.Text.Json;
@@ -78,7 +79,7 @@ public static class SettingsEndpoints
             {
                 message = "系统配置和 AI 模型配置已恢复默认值",
                 config = defaultConfig,
-                aiModels = defaultModels,
+                aiModels = defaultModels.Select(ToAiModelResponse),
                 resetScope = new[] { "appConfig", "aiModels" }
             });
         });
@@ -146,7 +147,7 @@ public static class SettingsEndpoints
             {
                 var model = new AiModelConfig
                 {
-                    Id = $"model_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                    Id = $"model_{Guid.NewGuid():N}",
                     Name = request.Name ?? "新建模型",
                     Provider = request.Provider ?? AiModelConfig.GetLegacyProviderByProtocol(request.Protocol),
                     ApiKey = request.ApiKey ?? "",
@@ -413,6 +414,7 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/cameras/continuous-preview/start", async (
             CameraContinuousPreviewStartRequest request,
+            [FromServices]
             ICameraFrameStreamCoordinator streamCoordinator) =>
         {
             if (string.IsNullOrWhiteSpace(request.CameraBindingId))
@@ -440,6 +442,7 @@ public static class SettingsEndpoints
         app.MapGet("/api/cameras/continuous-preview/frame/{sessionId}", async (
             string sessionId,
             HttpContext context,
+            [FromServices]
             ICameraFrameStreamCoordinator streamCoordinator,
             CancellationToken cancellationToken) =>
         {
@@ -469,6 +472,7 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/cameras/continuous-preview/stop", async (
             CameraContinuousPreviewStopRequest request,
+            [FromServices]
             ICameraFrameStreamCoordinator streamCoordinator) =>
         {
             if (string.IsNullOrWhiteSpace(request.SessionId))
@@ -482,6 +486,29 @@ public static class SettingsEndpoints
 
         return app;
     }
+
+    private static object ToAiModelResponse(AiModelConfig m) => new
+    {
+        m.Id,
+        m.Name,
+        m.Provider,
+        hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey),
+        m.Model,
+        baseUrl = m.BaseUrl ?? "",
+        m.TimeoutMs,
+        m.IsActive,
+        m.Protocol,
+        m.AuthMode,
+        m.AuthHeaderName,
+        m.ExtraHeaders,
+        m.ExtraQuery,
+        m.ExtraBody,
+        m.RoleBindings,
+        m.Priority,
+        m.Capabilities,
+        m.Reasoning,
+        ReasoningSupport = m.GetReasoningSupport()
+    };
 
     private static IEnumerable<CameraInfo> MapDiscoveredDevices(
         IEnumerable<CameraDeviceInfo> devices,

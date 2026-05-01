@@ -275,10 +275,33 @@ public class DeepLearningOperatorTests
         detections.Add(CreateInnerDetectionResult(12f, 12f, 40f, 40f, 0.85f, 0));
         detections.Add(CreateInnerDetectionResult(80f, 80f, 20f, 20f, 0.80f, 0));
 
-        var result = method!.Invoke(_operator, new object?[] { detections, 0.05f, false });
+        var result = method!.Invoke(_operator, new object?[] { detections, 0.05f, false, 0.45f });
 
         result.Should().BeAssignableTo<System.Collections.IEnumerable>();
         result.As<System.Collections.IEnumerable>().Cast<object>().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void PostprocessYoloV8V11_ShouldUseConfiguredNmsIouThreshold()
+    {
+        var method = typeof(DeepLearningOperator).GetMethod(
+            "PostprocessYoloV8V11",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        method.Should().NotBeNull();
+
+        var tensor = new DenseTensor<float>(new float[1 * 6 * 8], new[] { 1, 6, 8 });
+        WriteYoloV8Candidate(tensor, 0, x: 100f, y: 100f, w: 80f, h: 80f, class0: 0.95f, class1: 0.05f);
+        WriteYoloV8Candidate(tensor, 1, x: 110f, y: 110f, w: 80f, h: 80f, class0: 0.90f, class1: 0.05f);
+        WriteYoloV8Candidate(tensor, 2, x: 240f, y: 240f, w: 40f, h: 40f, class0: 0.10f, class1: 0.92f);
+
+        var strict = method!.Invoke(_operator, new object?[] { tensor, 0.5f, 320, 320, 320, true, 0.45f });
+        var permissive = method.Invoke(_operator, new object?[] { tensor, 0.5f, 320, 320, 320, true, 0.95f });
+
+        strict.Should().BeAssignableTo<System.Collections.IEnumerable>();
+        permissive.Should().BeAssignableTo<System.Collections.IEnumerable>();
+        strict.As<System.Collections.IEnumerable>().Cast<object>().Should().HaveCount(2);
+        permissive.As<System.Collections.IEnumerable>().Cast<object>().Should().HaveCount(3);
     }
 
     [Fact]
@@ -607,7 +630,7 @@ public class DeepLearningOperatorTests
         tensor[0, 5, 0] = 0.1f;
         tensor[0, 6, 0] = 0.95f;
 
-        var result = method!.Invoke(_operator, new object?[] { tensor, 0.5f, 200, 200, 200, false });
+        var result = method!.Invoke(_operator, new object?[] { tensor, 0.5f, 200, 200, 200, false, 0.45f });
 
         result.Should().BeAssignableTo<System.Collections.IEnumerable>();
         var detections = result.As<System.Collections.IEnumerable>().Cast<object>().ToList();
@@ -830,6 +853,24 @@ public class DeepLearningOperatorTests
         type.GetProperty("Confidence")!.SetValue(instance, confidence);
         type.GetProperty("ClassId")!.SetValue(instance, classId);
         return instance!;
+    }
+
+    private static void WriteYoloV8Candidate(
+        DenseTensor<float> tensor,
+        int anchor,
+        float x,
+        float y,
+        float w,
+        float h,
+        float class0,
+        float class1)
+    {
+        tensor[0, 0, anchor] = x;
+        tensor[0, 1, anchor] = y;
+        tensor[0, 2, anchor] = w;
+        tensor[0, 3, anchor] = h;
+        tensor[0, 4, anchor] = class0;
+        tensor[0, 5, anchor] = class1;
     }
 
     private static object CreateLabelSourceInfo(string[] labels, string source, string path, bool isFileBacked)

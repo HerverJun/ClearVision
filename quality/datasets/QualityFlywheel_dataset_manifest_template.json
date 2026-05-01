@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "2026-04-27.dataset-manifest-template",
+  "datasetId": "",
+  "operator": "",
+  "evidenceKind": "dataset",
+  "tier": "A|B|C",
+  "status": "draft|frozen|executed|promoted",
+  "source": {
+    "kind": "public|licensed|semi-synthetic|field-substitute",
+    "name": "",
+    "version": "",
+    "uri": "",
+    "license": "",
+    "citation": "",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "CLEARVISION_DATASET_ROOT",
+    "relativePath": "",
+    "gitPolicy": "manifest-only"
+  },
+  "split": {
+    "strategy": "fixed-list|seeded-random|source-defined",
+    "seed": 0,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 0,
+    "caseListPath": ""
+  },
+  "labels": {
+    "schema": "",
+    "positiveClasses": [],
+    "negativeClasses": [],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "",
+    "secondary": [],
+    "thresholds": {}
+  },
+  "runner": {
+    "project": "",
+    "command": "",
+    "baselineJson": "",
+    "reportMarkdown": ""
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": [],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": ""
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true
+  }
+}

@@ -4,6 +4,7 @@ using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
+using Acme.Product.Core.ValueObjects;
 using FluentAssertions;
 
 namespace Acme.Product.Tests.Services;
@@ -130,6 +131,51 @@ public class AnalysisDataBuilderTests
             .Select(field => ReadString(field, "key"))
             .Should()
             .Contain(new[] { "width", "minWidth", "maxWidth" });
+    }
+
+    [Fact]
+    public async Task Build_Should_Tag_Generic_Measurement_Geometry_And_Skip_Unsupported_Objects()
+    {
+        var flow = new OperatorFlow("generic-measurement");
+        var circle = new Operator("Circle", OperatorType.CircleMeasurement, 0, 0);
+        flow.AddOperator(circle);
+
+        var operatorResults = new List<OperatorExecutionResult>
+        {
+            new()
+            {
+                OperatorId = circle.Id,
+                OperatorName = circle.Name,
+                IsSuccess = true,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["Radius"] = 12.5,
+                    ["Center"] = new Position(10, 20),
+                    ["Circle"] = new CircleData(10, 20, 12.5f),
+                    ["CircleDataList"] = new List<CircleData> { new(10, 20, 12.5f) },
+                    ["Method"] = "HoughCircle"
+                }
+            }
+        };
+
+        var analysisData = await BuildAnalysisDataAsync(flow, operatorResults, InspectionStatus.OK);
+        var json = JsonDocument.Parse(JsonSerializer.Serialize(analysisData));
+        var cards = ReadArray(json.RootElement, "cards");
+
+        var card = cards.EnumerateArray().Single();
+        ReadString(card, "sourceOperatorType").Should().Be("CircleMeasurement");
+        ReadString(card, "category").Should().Be("measurement");
+
+        var fields = ReadArray(card, "fields").EnumerateArray().ToList();
+        var fieldTypes = fields.ToDictionary(
+            field => ReadString(field, "key"),
+            field => ReadString(field, "dataType"),
+            StringComparer.OrdinalIgnoreCase);
+
+        fieldTypes.Should().Contain("Radius", "Float");
+        fieldTypes.Should().Contain("Center", "Point");
+        fieldTypes.Should().Contain("Circle", "CircleData");
+        fieldTypes.Keys.Should().NotContain(new[] { "CircleDataList", "Method" });
     }
 
     [Fact]

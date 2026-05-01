@@ -1,5 +1,6 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
+import serviceRegistry from '../../core/app/serviceRegistry.js';
 import inspectionController from '../inspection/inspectionController.js';
 import PreviewPanel from './previewPanel.js';
 import RoiEditorPanel from './roiEditorPanel.js';
@@ -1011,7 +1012,7 @@ class PropertyPanel {
     }
 
     async resolveInputImageBase64() {
-        const inspectionResult = window._lastInspectionResult || inspectionController.getLastResult?.();
+        const inspectionResult = serviceRegistry.get('lastInspectionResult') || inspectionController.getLastResult?.();
         return resolvePreviewInputImageBase64(inspectionResult);
     }
 
@@ -1038,7 +1039,7 @@ class PropertyPanel {
             missingResources: result?.missingResources || []
         });
         if (hint) {
-            window.aiPanel?.queueParameterOnlyFollowupHint?.({
+            serviceRegistry.get('aiPanel')?.queueParameterOnlyFollowupHint?.({
                 scenarioKey: 'wire-sequence-terminal',
                 diagnosticCodes: result?.diagnosticCodes || [],
                 suggestions: result?.suggestions || [],
@@ -1061,7 +1062,7 @@ class PropertyPanel {
         });
 
         const patch = createWireSequenceParameterPatch(
-            window.flowCanvas?.serialize?.() || null,
+            serviceRegistry.get('flowCanvasAdapter')?.serialize?.() || serviceRegistry.get('flowCanvas')?.serialize?.() || null,
             operator.id,
             result?.finalParameters || {}
         );
@@ -1070,7 +1071,7 @@ class PropertyPanel {
             this.applyWireSequenceParameterPatch(patch);
         }
 
-        window.aiPanel?.queueParameterOnlyFollowupHint?.({
+        serviceRegistry.get('aiPanel')?.queueParameterOnlyFollowupHint?.({
             scenarioKey: 'wire-sequence-terminal',
             diagnosticCodes: result?.diagnosticCodes || [],
             finalParameters: result?.finalParameters || {},
@@ -1099,7 +1100,7 @@ class PropertyPanel {
             return false;
         }
 
-        const node = window.flowCanvas?.nodes?.get?.(patch.operatorId);
+        const node = serviceRegistry.get('flowCanvas')?.nodes?.get?.(patch.operatorId);
         if (!node) {
             return false;
         }
@@ -1129,7 +1130,12 @@ class PropertyPanel {
         });
 
         node.parameters = parameters;
-        window.flowCanvas?.markFlowStructureChanged?.('wire-sequence-autotune');
+        const flowCanvasAdapter = serviceRegistry.get('flowCanvasAdapter');
+        if (flowCanvasAdapter?.markFlowStructureChanged) {
+            flowCanvasAdapter.markFlowStructureChanged('wire-sequence-autotune');
+        } else {
+            serviceRegistry.get('flowCanvas')?.markFlowStructureChanged?.('wire-sequence-autotune');
+        }
         return true;
     }
 

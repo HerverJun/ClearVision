@@ -46,8 +46,22 @@ public class FrequencyFilterOperator : OperatorBase
         }
 
         var filterType = GetString(inputs, "FilterType", "lowpass").Trim().ToLowerInvariant();
-        var cutoffLow = NormalizeCutoff(GetDouble(inputs, "CutoffLow", 0.1));
-        var cutoffHigh = NormalizeCutoff(GetDouble(inputs, "CutoffHigh", 0.3));
+        if (!IsSupportedFilterType(filterType))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(
+                "FilterType must be one of: lowpass, highpass, bandpass, bandstop."));
+        }
+
+        var requestedCutoffLow = GetDouble(inputs, "CutoffLow", 0.1);
+        var requestedCutoffHigh = GetDouble(inputs, "CutoffHigh", 0.3);
+        if (!double.IsFinite(requestedCutoffLow) || !double.IsFinite(requestedCutoffHigh))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("CutoffLow and CutoffHigh must be finite numbers."));
+        }
+
+        var cutoffLow = NormalizeCutoff(requestedCutoffLow);
+        var cutoffHigh = NormalizeCutoff(requestedCutoffHigh);
+        var wasClamped = cutoffLow != requestedCutoffLow || cutoffHigh != requestedCutoffHigh;
         var order = Math.Max(1, GetInt(inputs, "Order", 2));
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -69,6 +83,9 @@ public class FrequencyFilterOperator : OperatorBase
                 { "FilteredSpectrum", filtered },
                 { "FilterMask", mask },
                 { "SpectrumKind", "1DSignal" },
+                { "EffectiveCutoffLow", cutoffLow },
+                { "EffectiveCutoffHigh", cutoffHigh },
+                { "WasClamped", wasClamped },
                 { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
             })));
         }
@@ -90,6 +107,9 @@ public class FrequencyFilterOperator : OperatorBase
             { "FilterMask", new ImageWrapper(mask2D) },
             { "SpectrumKind", "2DComplexImage" },
             { "IsShifted", false },
+            { "EffectiveCutoffLow", cutoffLow },
+            { "EffectiveCutoffHigh", cutoffHigh },
+            { "WasClamped", wasClamped },
             { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
         })));
     }
@@ -182,8 +202,13 @@ public class FrequencyFilterOperator : OperatorBase
             "highpass" or "high" => ButterworthHighpass(normalizedFrequency, cutoffLow, order),
             "bandpass" or "band" => ButterworthHighpass(normalizedFrequency, cutoffLow, order) * ButterworthLowpass(normalizedFrequency, cutoffHigh, order),
             "bandstop" or "notch" => 1.0 - (ButterworthHighpass(normalizedFrequency, cutoffLow, order) * ButterworthLowpass(normalizedFrequency, cutoffHigh, order)),
-            _ => 1.0
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported frequency filter type.")
         };
+    }
+
+    private static bool IsSupportedFilterType(string type)
+    {
+        return type is "lowpass" or "low" or "highpass" or "high" or "bandpass" or "band" or "bandstop" or "notch";
     }
 
     private static double ButterworthLowpass(double normalizedFrequency, double cutoff, int order)

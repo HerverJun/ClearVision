@@ -1,0 +1,269 @@
+{
+  "schemaVersion": "2026-05-01.candidate-profile-governance.v1",
+  "generatedAtUtc": "2026-05-01T06:09:06+00:00",
+  "claimBoundary": "Candidate profile governance over current public benchmark evidence only; not production sign-off.",
+  "productDefaultChange": false,
+  "mainlineValidationPolicy": "Default-off/advisory/paused profiles may pass governance; blocked external model work is tracked separately from mainline algorithm validation.",
+  "releaseFieldReplayGate": {
+    "sourceReport": "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json",
+    "gateStatus": "standards-signed-replay-required",
+    "standardsSigned": true,
+    "currentPublicEvidenceWithinSignedStandards": true,
+    "releaseFieldReplayEvidenceStatus": "required_not_attached",
+    "defaultOnReady": false
+  },
+  "statusCounts": {
+    "default_off_candidate_ready_with_fp_tradeoff": 1,
+    "hold-current-no-targeted-improvement": 1,
+    "paused": 1,
+    "blocked_external_model": 1,
+    "stable_smoke": 1,
+    "default_off_ready_no_accuracy_delta": 1,
+    "default_off_ready_metric_gain_runtime_tradeoff": 1
+  },
+  "entries": [
+    {
+      "operator": "AnomalyDetection",
+      "profile": "mvtec_lite_v2",
+      "status": "default_off_candidate_ready_with_fp_tradeoff",
+      "defaultOff": true,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/mvtec_ad_lite",
+      "evidence": [
+        "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+        "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+        "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json",
+        "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json"
+      ],
+      "profileParameters": {
+        "EvidenceProfileName": "max192_dense_stride8_threshold_010",
+        "MaxSide": 192,
+        "PatchSize": 16,
+        "PatchStride": 8,
+        "CoresetRatio": 0.02,
+        "Threshold": 0.1,
+        "FeatureExtractorId": "lab_gradient_stats"
+      },
+      "metrics": {
+        "imageAuroc": 0.917799,
+        "imageAurocDelta": 0.256879,
+        "pixelAuroc": 0.869249,
+        "pixelAurocDelta": 0.198397,
+        "imageF1": 0.867925,
+        "imageF1Delta": 0.780013,
+        "imageRecall": 0.793103,
+        "imageRecallDelta": 0.747126,
+        "imagePrecision": 0.958333,
+        "imagePrecisionDelta": -0.041667,
+        "falsePositiveDelta": 3.0
+      },
+      "releaseFieldReplayGate": {
+        "sourceReport": "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json",
+        "status": "standards-signed-replay-required",
+        "standardId": "anomaly_mvtec_lite_v2_fp_acceptance_2026_05_01",
+        "currentEvidenceWithinSignedStandard": true,
+        "defaultOnReady": false
+      },
+      "promotionGate": "Default-off candidate only. Promotion requires release/field replay to meet the signed FP standard and compatible feature-bank fallback/Fail behavior.",
+      "blockers": [
+        "MVTec lite is advisory only; not MVTec AD full sign-off.",
+        "Signed FP standard accepts at most +3 FP delta, <=10% normal FPR, and image precision >=0.95; release/field replay packet is still required.",
+        "MaxSide=192 is runner/evidence preprocessing; product profile enforces PatchSize/PatchStride/Coreset/Threshold but not MaxSide."
+      ]
+    },
+    {
+      "operator": "SurfaceDefectDetection",
+      "profile": "taxonomy_v2",
+      "status": "hold-current-no-targeted-improvement",
+      "defaultOff": true,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/kolektorsdd2",
+      "evidence": [
+        "quality/evals/reports/QualityFlywheel_surface_defect_algorithm_improvement_v2.json"
+      ],
+      "targetTaxonomy": [
+        "texture_noise_false_positive",
+        "low_contrast_defect_miss",
+        "undersegmentation_false_negative"
+      ],
+      "metrics": {
+        "candidateProfile": "baseline_default",
+        "pixelF1": 0.269226,
+        "imageAuroc": 0.772432,
+        "targetTaxonomyCaseCount": 184
+      },
+      "promotionGate": "Target taxonomy cases must drop while PixelF1/ImageAUROC do not regress; global threshold lowering is forbidden.",
+      "blockers": [
+        "No targeted taxonomy improvement has beaten baseline under the no-global-threshold-lowering policy."
+      ]
+    },
+    {
+      "operator": "EdgeDetection",
+      "profile": "recall_not_lower_v2",
+      "status": "paused",
+      "defaultOff": true,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/bsds500",
+      "evidence": [
+        "quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v2.json"
+      ],
+      "metrics": {
+        "decision": "promotion-paused-recall-not-lower-required",
+        "selectedProfile": null,
+        "recallSafeNextRoundProfiles": []
+      },
+      "promotionGate": "Boundary recall and consensus boundary recall must not drop versus canny_l2_50_150; F1 alone is insufficient.",
+      "blockers": [
+        "No recall-safe profile is currently selected."
+      ]
+    },
+    {
+      "operator": "DeepLearning",
+      "profile": "coco_yolo_external_onnx",
+      "status": "blocked_external_model",
+      "defaultOff": true,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/coco2017",
+      "evidence": [],
+      "metrics": {},
+      "promotionGate": "Real ONNX candidate must provide AnnotationSeeded=false, model artifact manifest, AP50 >= 0.45, Precision@50 >= 0.45, Recall@50 >= 0.35.",
+      "blockers": [
+        "Real ONNX model artifact is not present; mainline validation treats this as blocked, not failed."
+      ]
+    },
+    {
+      "operator": "CameraCalibration",
+      "profile": "opencv_samples_smoke",
+      "status": "stable_smoke",
+      "defaultOff": false,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/opencv_calibration_samples",
+      "evidence": [
+        "quality/evals/reports/CameraCalibration_opencv_samples_baseline.json"
+      ],
+      "metrics": {
+        "GeneratedAtUtc": "2026-05-01T03:23:14.5784701+00:00",
+        "CaseCount": 4,
+        "Passed": 4,
+        "Failed": 0,
+        "RuntimeMs": 1077.494,
+        "MemoryAllocationBytes": 1657784,
+        "Accepted": true,
+        "ReprojectionRmsPx": 0.392596,
+        "MaxReprojectionErrorPx": 0.563355,
+        "DetectedImageCount": 12,
+        "TotalImages": 52,
+        "Dataset": "opencv-calibration-samples-left-right-stereo",
+        "AcceptedCaseCount": 2,
+        "RequiredAcceptedCaseCount": 0,
+        "Thresholds": {
+          "RequireAccepted": false,
+          "MinDetectedImages": 10,
+          "MaxReprojectionRmsPx": 1,
+          "MinStereoPairs": 10,
+          "MaxStereoReprojectionRmsPx": 1,
+          "MaxEpipolarErrorPx": 2.5,
+          "CandidateVersion": "v1",
+          "Profile": "camera_calibration"
+        }
+      },
+      "promotionGate": "Keep geometry smoke green; do not treat OpenCV samples as production calibration sign-off.",
+      "blockers": []
+    },
+    {
+      "operator": "AkazeFeatureMatch",
+      "profile": "default_v3",
+      "status": "default_off_ready_no_accuracy_delta",
+      "defaultOff": true,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/hpatches",
+      "evidence": [
+        "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v5.json",
+        "quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json"
+      ],
+      "metrics": {
+        "fullPassRate": 0.8375,
+        "fullPassDelta": 0,
+        "p95PositionErrorPxDelta": 0.0,
+        "p95CornerErrorPxDelta": 0.0,
+        "runtimeMsDelta": -2489.317,
+        "hasAccuracyGain": false,
+        "validationPassRate": 0.610169,
+        "replayPassRate": 0.65,
+        "holdoutPassRate": 0.627119,
+        "replayP95PositionErrorPx": 378.273983
+      },
+      "profileParameters": {
+        "MaxFeatures": 1200,
+        "MinInliers": 6,
+        "MatchRatio": 0.75,
+        "RansacThreshold": 5,
+        "MinInlierRatio": 0.25,
+        "FastThreshold": 20,
+        "EdgeThreshold": 15,
+        "AkazeThreshold": 0.001,
+        "AllowCenterOnlyProjection": false
+      },
+      "releaseFieldReplayGate": {
+        "sourceReport": null,
+        "status": null,
+        "standardId": null,
+        "currentEvidenceWithinSignedStandard": null,
+        "defaultOnReady": null
+      },
+      "promotionGate": "Keep default-off. Full HPatches pass count and P95 errors must not regress; default-on requires release/field replay and runtime acceptance.",
+      "blockers": [
+        "Release/field replay is still required before any default-on promotion.",
+        "Accuracy delta is neutral; keep this as an opt-in evidence/observability profile."
+      ]
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "replay_safe_dense_strict",
+      "status": "default_off_ready_metric_gain_runtime_tradeoff",
+      "defaultOff": true,
+      "productDefaultChange": false,
+      "dataset": "quality/public_datasets/hpatches",
+      "evidence": [
+        "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v5.json",
+        "quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json",
+        "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json"
+      ],
+      "metrics": {
+        "fullPassRate": 0.85,
+        "fullPassDelta": 0,
+        "p95PositionErrorPxDelta": -32.336761,
+        "p95CornerErrorPxDelta": -16.951902,
+        "runtimeMsDelta": 377.073,
+        "hasAccuracyGain": true,
+        "validationPassRate": 0.59322,
+        "replayPassRate": 0.8,
+        "holdoutPassRate": 0.627119,
+        "replayP95PositionErrorPx": 279.156349
+      },
+      "profileParameters": {
+        "MaxFeatures": 2000,
+        "MinInliers": 6,
+        "MatchRatio": 0.7,
+        "RansacThreshold": 7,
+        "MinInlierRatio": 0.25,
+        "FastThreshold": 16,
+        "EdgeThreshold": 10,
+        "AkazeThreshold": 0.001,
+        "AllowCenterOnlyProjection": false
+      },
+      "releaseFieldReplayGate": {
+        "sourceReport": "quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json",
+        "status": "standards-signed-replay-required",
+        "standardId": "orb_replay_safe_dense_strict_runtime_budget_2026_05_01",
+        "currentEvidenceWithinSignedStandard": true,
+        "defaultOnReady": false
+      },
+      "promotionGate": "Keep default-off. Full HPatches pass count and P95 errors must not regress; default-on requires release/field replay and runtime acceptance.",
+      "blockers": [
+        "Release/field replay is still required before any default-on promotion.",
+        "Signed runtime budget must be met by release/field replay before default-on."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "2026-04-29.quality-suite.v1",
+  "suiteId": "full155_quality_suite",
+  "description": "Full 155-operator quasi-industrial evidence gate; runs validations and keeps gaps explicit.",
+  "ciBudgetMinutes": 180,
+  "execution": {
+    "mode": "serial",
+    "runner": "quality/tools/run_quality_suite.py"
+  },
+  "stages": [
+    {
+      "id": "registry-and-audit",
+      "entries": [
+        {
+          "id": "quasi_industrial_registry_validate",
+          "status": "active",
+          "evidenceKind": "quasi-industrial-registry",
+          "command": [
+            "python",
+            "quality/tools/build_quasi_industrial_proof_assets.py",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "quasi_industrial_audit",
+          "status": "active",
+          "evidenceKind": "quasi-industrial-audit",
+          "command": [
+            "python",
+            "quality/tools/audit_quasi_industrial_proof.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_audit.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_audit.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "public_benchmark_proof_validate",
+          "status": "active",
+          "evidenceKind": "public-benchmark-proof",
+          "command": [
+            "python",
+            "quality/tools/run_public_benchmark_proof.py",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.md",
+          "estimatedSeconds": 30
+        }
+      ]
+    },
+    {
+      "id": "existing-suite-validation",
+      "entries": [
+        {
+          "id": "quick_contract_suite_validate",
+          "status": "active",
+          "evidenceKind": "contract-suite-validation",
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "quick_contract_suite",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "golden_core50_suite_validate",
+          "status": "active",
+          "evidenceKind": "golden-suite-validation",
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "golden_core50_suite",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "dataset_heavy_suite_validate",
+          "status": "active",
+          "evidenceKind": "dataset-suite-validation",
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "dataset_heavy_suite",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "core20_proof_suite_validate",
+          "status": "active",
+          "evidenceKind": "core20-suite-validation",
+          "command": [
+            "python",
+            "quality/tools/run_quality_suite.py",
+            "--suite",
+            "core20_proof_suite",
+            "--validate-only"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_core20_proof_baseline.md",
+          "estimatedSeconds": 30
+        }
+      ]
+    }
+  ]
+}
