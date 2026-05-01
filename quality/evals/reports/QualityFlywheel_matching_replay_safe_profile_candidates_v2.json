@@ -1,0 +1,515 @@
+{
+  "schemaVersion": "2026-04-30.matching-replay-safe-profile-candidates.v2",
+  "generatedAtUtc": "2026-04-30T11:24:57+00:00",
+  "claimBoundary": "Public HPatches profile triage only; no default profile is promoted unless replay, pass count, P95 position, and P95 corner all avoid regression.",
+  "baselines": {
+    "AkazeFeatureMatch": {
+      "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v4.json",
+      "operator": "AkazeFeatureMatch",
+      "caseCount": 116,
+      "passed": 90,
+      "failed": 26,
+      "passRate": 0.775862,
+      "meanPositionErrorPx": 54.341248,
+      "p95PositionErrorPx": 321.631671,
+      "p95CornerErrorPx": 9.246627,
+      "runtimeMs": 6867.832,
+      "viewpointPassed": 36,
+      "viewpointCaseCount": 59,
+      "parameters": {
+        "MaxFeatures": 1200,
+        "MinInliers": 6,
+        "MatchRatio": 0.75,
+        "RansacThreshold": 5,
+        "MinInlierRatio": 0.25,
+        "FastThreshold": 20,
+        "EdgeThreshold": 15,
+        "AkazeThreshold": 0.001,
+        "AllowCenterOnlyProjection": null
+      }
+    },
+    "OrbFeatureMatch": {
+      "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v4.json",
+      "operator": "OrbFeatureMatch",
+      "caseCount": 116,
+      "passed": 90,
+      "failed": 26,
+      "passRate": 0.775862,
+      "meanPositionErrorPx": 45.005668,
+      "p95PositionErrorPx": 267.972396,
+      "p95CornerErrorPx": 8.454432,
+      "runtimeMs": 2962.178,
+      "viewpointPassed": 35,
+      "viewpointCaseCount": 59,
+      "parameters": {
+        "MaxFeatures": 2000,
+        "MinInliers": 6,
+        "MatchRatio": 0.7,
+        "RansacThreshold": 7,
+        "MinInlierRatio": 0.25,
+        "FastThreshold": 16,
+        "EdgeThreshold": 10,
+        "AkazeThreshold": 0.001,
+        "AllowCenterOnlyProjection": null
+      }
+    }
+  },
+  "rows": [
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "center_only_projection_v1",
+      "source": "default-off geometry gate candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 116,
+        "passed": 112,
+        "failed": 4,
+        "passRate": 0.965517,
+        "meanPositionErrorPx": 7.270331,
+        "p95PositionErrorPx": 2.561756,
+        "p95CornerErrorPx": 8.454432,
+        "runtimeMs": 2954.6,
+        "viewpointPassed": 56,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.7,
+          "RansacThreshold": 7,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_center_only_v1.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 20,
+        "passed": 18,
+        "failed": 2,
+        "passRate": 0.9,
+        "meanPositionErrorPx": 16.048727,
+        "p95PositionErrorPx": 2.779783,
+        "p95CornerErrorPx": 16.100909,
+        "runtimeMs": 849.079,
+        "viewpointPassed": 3,
+        "viewpointCaseCount": 4,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.7,
+          "RansacThreshold": 7,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
+        }
+      },
+      "deltas": {
+        "fullPassDelta": 22,
+        "replayPassDelta": 2,
+        "p95PositionErrorPxDelta": -265.41064,
+        "p95CornerErrorPxDelta": 0.0,
+        "runtimeMsDelta": -7.578
+      },
+      "decision": "promote-candidate",
+      "promotionReady": true
+    },
+    {
+      "operator": "AkazeFeatureMatch",
+      "profile": "center_only_projection_v1",
+      "source": "default-off geometry gate candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+        "operator": "AkazeFeatureMatch",
+        "caseCount": 116,
+        "passed": 114,
+        "failed": 2,
+        "passRate": 0.982759,
+        "meanPositionErrorPx": 4.176081,
+        "p95PositionErrorPx": 2.014785,
+        "p95CornerErrorPx": 9.246627,
+        "runtimeMs": 6786.379,
+        "viewpointPassed": 58,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 1200,
+          "MinInliers": 6,
+          "MatchRatio": 0.75,
+          "RansacThreshold": 5,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 20,
+          "EdgeThreshold": 15,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_replay_center_only_v1.json",
+        "operator": "AkazeFeatureMatch",
+        "caseCount": 20,
+        "passed": 19,
+        "failed": 1,
+        "passRate": 0.95,
+        "meanPositionErrorPx": 13.100564,
+        "p95PositionErrorPx": 17.052355,
+        "p95CornerErrorPx": 382.627471,
+        "runtimeMs": 1467.697,
+        "viewpointPassed": 7,
+        "viewpointCaseCount": 7,
+        "parameters": {
+          "MaxFeatures": 1200,
+          "MinInliers": 6,
+          "MatchRatio": 0.75,
+          "RansacThreshold": 5,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 20,
+          "EdgeThreshold": 15,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
+        }
+      },
+      "deltas": {
+        "fullPassDelta": 24,
+        "replayPassDelta": 6,
+        "p95PositionErrorPxDelta": -319.616886,
+        "p95CornerErrorPxDelta": 0.0,
+        "runtimeMsDelta": -81.453
+      },
+      "decision": "promote-candidate",
+      "promotionReady": true
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "replay_safe_high_ratio",
+      "source": "sweep replay-safe candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_replay_safe_high_ratio_profile.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 116,
+        "passed": 90,
+        "failed": 26,
+        "passRate": 0.775862,
+        "meanPositionErrorPx": 47.690887,
+        "p95PositionErrorPx": 283.267841,
+        "p95CornerErrorPx": 6.696254,
+        "runtimeMs": 3003.023,
+        "viewpointPassed": 35,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.78,
+          "RansacThreshold": 5,
+          "MinInlierRatio": 0.2,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v4.json",
+        "caseCount": 20,
+        "passed": 16,
+        "failed": 4,
+        "passRate": 0.8,
+        "meanPositionErrorPx": 45.610944,
+        "p95PositionErrorPx": 259.28841,
+        "p95CornerErrorPx": 8.240909,
+        "runtimeMs": 597.282
+      },
+      "deltas": {
+        "fullPassDelta": 0,
+        "replayPassDelta": 0,
+        "p95PositionErrorPxDelta": 15.295445,
+        "p95CornerErrorPxDelta": -1.758178,
+        "runtimeMsDelta": 40.845
+      },
+      "decision": "hold-position-regression",
+      "promotionReady": false
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "high_ratio_ransac6",
+      "source": "ad-hoc full+replay candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_profile_high_ratio_ransac6.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 116,
+        "passed": 90,
+        "failed": 26,
+        "passRate": 0.775862,
+        "meanPositionErrorPx": 47.725144,
+        "p95PositionErrorPx": 283.267841,
+        "p95CornerErrorPx": 8.240909,
+        "runtimeMs": 2960.315,
+        "viewpointPassed": 35,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.78,
+          "RansacThreshold": 6,
+          "MinInlierRatio": 0.2,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_profile_high_ratio_ransac6_replay.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 20,
+        "passed": 16,
+        "failed": 4,
+        "passRate": 0.8,
+        "meanPositionErrorPx": 45.661883,
+        "p95PositionErrorPx": 259.28841,
+        "p95CornerErrorPx": 9.803736,
+        "runtimeMs": 605.555,
+        "viewpointPassed": 2,
+        "viewpointCaseCount": 4,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.78,
+          "RansacThreshold": 6,
+          "MinInlierRatio": 0.2,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "deltas": {
+        "fullPassDelta": 0,
+        "replayPassDelta": 0,
+        "p95PositionErrorPxDelta": 15.295445,
+        "p95CornerErrorPxDelta": -0.213523,
+        "runtimeMsDelta": -1.863
+      },
+      "decision": "hold-position-regression",
+      "promotionReady": false
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "dense_ransac5",
+      "source": "ad-hoc full+replay candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_profile_dense_ransac5.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 116,
+        "passed": 89,
+        "failed": 27,
+        "passRate": 0.767241,
+        "meanPositionErrorPx": 46.697983,
+        "p95PositionErrorPx": 267.972396,
+        "p95CornerErrorPx": 9.427713,
+        "runtimeMs": 2959.422,
+        "viewpointPassed": 35,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.7,
+          "RansacThreshold": 5,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_profile_dense_ransac5_replay.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 20,
+        "passed": 15,
+        "failed": 5,
+        "passRate": 0.75,
+        "meanPositionErrorPx": 52.715003,
+        "p95PositionErrorPx": 279.156349,
+        "p95CornerErrorPx": 16.100909,
+        "runtimeMs": 601.724,
+        "viewpointPassed": 2,
+        "viewpointCaseCount": 4,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.7,
+          "RansacThreshold": 5,
+          "MinInlierRatio": 0.25,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "deltas": {
+        "fullPassDelta": -1,
+        "replayPassDelta": -1,
+        "p95PositionErrorPxDelta": 0.0,
+        "p95CornerErrorPxDelta": 0.973281,
+        "runtimeMsDelta": -2.756
+      },
+      "decision": "reject-replay-regression",
+      "promotionReady": false
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "mid_ratio_ransac6",
+      "source": "ad-hoc full+replay candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_profile_mid_ratio_ransac6.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 116,
+        "passed": 89,
+        "failed": 27,
+        "passRate": 0.767241,
+        "meanPositionErrorPx": 50.099256,
+        "p95PositionErrorPx": 279.156349,
+        "p95CornerErrorPx": 10.895538,
+        "runtimeMs": 2956.952,
+        "viewpointPassed": 35,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.74,
+          "RansacThreshold": 6,
+          "MinInlierRatio": 0.22,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_profile_mid_ratio_ransac6_replay.json",
+        "operator": "OrbFeatureMatch",
+        "caseCount": 20,
+        "passed": 15,
+        "failed": 5,
+        "passRate": 0.75,
+        "meanPositionErrorPx": 65.197169,
+        "p95PositionErrorPx": 279.156349,
+        "p95CornerErrorPx": 12.133521,
+        "runtimeMs": 595.507,
+        "viewpointPassed": 2,
+        "viewpointCaseCount": 4,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 6,
+          "MatchRatio": 0.74,
+          "RansacThreshold": 6,
+          "MinInlierRatio": 0.22,
+          "FastThreshold": 16,
+          "EdgeThreshold": 10,
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "deltas": {
+        "fullPassDelta": -1,
+        "replayPassDelta": -1,
+        "p95PositionErrorPxDelta": 11.183953,
+        "p95CornerErrorPxDelta": 2.441106,
+        "runtimeMsDelta": -5.226
+      },
+      "decision": "reject-replay-regression",
+      "promotionReady": false
+    },
+    {
+      "operator": "AkazeFeatureMatch",
+      "profile": "partial_plane_low_detector_threshold",
+      "source": "sweep risk candidate",
+      "full": {
+        "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_partial_plane_low_detector_profile.json",
+        "operator": "AkazeFeatureMatch",
+        "caseCount": 116,
+        "passed": 89,
+        "failed": 27,
+        "passRate": 0.767241,
+        "meanPositionErrorPx": 55.951549,
+        "p95PositionErrorPx": 317.261701,
+        "p95CornerErrorPx": 5.208369,
+        "runtimeMs": 7505.647,
+        "viewpointPassed": 35,
+        "viewpointCaseCount": 59,
+        "parameters": {
+          "MaxFeatures": 2000,
+          "MinInliers": 4,
+          "MatchRatio": 0.88,
+          "RansacThreshold": 10,
+          "MinInlierRatio": 0.1,
+          "FastThreshold": 20,
+          "EdgeThreshold": 15,
+          "AkazeThreshold": 0.0005,
+          "AllowCenterOnlyProjection": null
+        }
+      },
+      "replay": {
+        "sourceReport": "quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v4.json",
+        "caseCount": 20,
+        "passed": 13,
+        "failed": 7,
+        "passRate": 0.65,
+        "meanPositionErrorPx": 97.450267,
+        "p95PositionErrorPx": 331.063816,
+        "p95CornerErrorPx": 20.392433,
+        "runtimeMs": 1291.261
+      },
+      "deltas": {
+        "fullPassDelta": -1,
+        "replayPassDelta": 0,
+        "p95PositionErrorPxDelta": -4.36997,
+        "p95CornerErrorPxDelta": -4.038258,
+        "runtimeMsDelta": 637.815
+      },
+      "decision": "reject-full-pass-regression",
+      "promotionReady": false
+    }
+  ],
+  "summary": {
+    "candidateCount": 7,
+    "promotionCount": 2,
+    "holdOrRejectCount": 5,
+    "promotionReadyProfiles": [
+      {
+        "operator": "OrbFeatureMatch",
+        "profile": "center_only_projection_v1",
+        "fullPass": 112,
+        "fullCaseCount": 116,
+        "replayPass": 18,
+        "replayCaseCount": 20
+      },
+      {
+        "operator": "AkazeFeatureMatch",
+        "profile": "center_only_projection_v1",
+        "fullPass": 114,
+        "fullCaseCount": 116,
+        "replayPass": 19,
+        "replayCaseCount": 20
+      }
+    ]
+  },
+  "profileGate": {
+    "status": "promotion-ready-default-off",
+    "productDefaultChange": false,
+    "primaryCandidate": "OrbFeatureMatch/center_only_projection_v1",
+    "fallbackCandidate": "AkazeFeatureMatch/center_only_projection_v1",
+    "releaseGateStatus": "blocked-missing-field-replay",
+    "requiredBeforeDefaultOn": [
+      "run release/field replay with product default enabled in a separate candidate profile",
+      "show zero matching regressions and no P95 position/corner regression against the pinned default-off baseline",
+      "attach runtime budget and field owner sign-off"
+    ]
+  },
+  "promotionCount": 2
+}

@@ -1,6 +1,6 @@
 {
   "Summary": {
-    "GeneratedAtUtc": "2026-04-29T16:13:33.1625186+00:00",
+    "GeneratedAtUtc": "2026-04-30T11:52:33.3988275+00:00",
     "IndexPath": "quality/datasets/mvtec_ad_lite_index.json",
     "CandidateVersion": "v1",
     "ProfileName": "max192_dense_stride8",
@@ -28,8 +28,8 @@
     "MinCategoryImageAuroc": 0,
     "MinCategoryPixelAuroc": 0,
     "Failed": 0,
-    "RuntimeMs": 22042.717,
-    "MemoryAllocationBytes": 83646008
+    "RuntimeMs": 19056.19,
+    "MemoryAllocationBytes": 83657152
   },
   "Operators": [
     {
@@ -37,8 +37,8 @@
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 1102.136,
-      "MemoryAllocationBytesAvg": 83646008,
+      "RuntimeMsAvg": 952.809,
+      "MemoryAllocationBytesAvg": 83657152,
       "HasPublicDataset": true
     }
   ],
@@ -49,8 +49,8 @@
       "TestCount": 20,
       "TestAnomalyCount": 20,
       "FeatureBankCount": 2793,
-      "TrainRuntimeMs": 17745.901,
-      "InferenceRuntimeMs": 1562.732,
+      "TrainRuntimeMs": 15429.799,
+      "InferenceRuntimeMs": 1350.793,
       "ImageAuroc": 0,
       "PixelAuroc": 0.621241
     }

@@ -1,0 +1,471 @@
+{
+  "schemaVersion": "2026-04-30.shape-matching-precision.v2",
+  "evidenceKind": "shape-matching-precision",
+  "generatedAtUtc": "2026-04-30T08:11:24+00:00",
+  "accepted": true,
+  "summary": {
+    "operatorCount": 4,
+    "totalCaseCount": 209,
+    "totalPassed": 209,
+    "totalFailed": 0,
+    "overallPassRate": 1.0,
+    "primaryProfile": {
+      "operator": "ShapeMatching",
+      "profile": "geometric_dataset_precision_v2",
+      "reason": "Best current source for pose labels with position, angle, scale, multi-target, origin, and blank-negative checks."
+    },
+    "conservativeFallbackProfile": {
+      "operator": "GradientShapeMatch",
+      "profile": "contract_baseline",
+      "reason": "Best current fallback evidence for rotation and occlusion-style shape scenes while ShapeMatching remains the scale-aware precision profile."
+    },
+    "claimBoundary": "This is reproducible public-protocol and semi-synthetic precision evidence, not real production field sign-off."
+  },
+  "gates": {
+    "accepted": true,
+    "errors": []
+  },
+  "operatorLeaderboard": [
+    {
+      "operator": "TemplateMatching",
+      "family": "template-matching",
+      "source": "quality/evals/reports/TemplateMatching_public_bridge_candidate_replay_v2.json",
+      "profile": "homography_bridge_precision_v2",
+      "candidateVersion": "v2",
+      "caseCount": 32,
+      "passed": 32,
+      "failed": 0,
+      "passRate": 1.0,
+      "positionMetricCaseCount": 32,
+      "meanPositionErrorPx": 0.033784,
+      "p95PositionErrorPx": 0.166175,
+      "maxPositionErrorPx": 0.2562,
+      "angleMetricCaseCount": 32,
+      "meanAngleErrorDeg": 0.0,
+      "p95AngleErrorDeg": 0.0,
+      "scaleMetricCaseCount": 32,
+      "meanScaleError": 0.0,
+      "p95ScaleError": 0.0,
+      "scoreThreshold": 0.75,
+      "minScoreMargin": 0.249922,
+      "meanScoreMargin": 0.24999,
+      "falsePositive": {
+        "negativeCaseCount": 0,
+        "falsePositiveCaseCount": 0,
+        "falsePositiveRate": null
+      },
+      "occlusionSensitivity": {
+        "caseCount": 0,
+        "passRate": null,
+        "deltaFromOverallPassRate": null,
+        "coverage": "not-covered"
+      },
+      "poseReplayCoverage": {
+        "rotationCaseCount": 6,
+        "rotationPassRate": 1.0,
+        "scaleCaseCount": 4,
+        "scalePassRate": 1.0,
+        "pyramidLevelCaseCount": 8,
+        "maxPyramidLevels": 3
+      },
+      "scenarioSummaries": [
+        {
+          "scenario": "homography_perspective",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.01285,
+          "p95PositionErrorPx": 0.0316
+        },
+        {
+          "scenario": "homography_shear",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.013233,
+          "p95PositionErrorPx": 0.025975
+        },
+        {
+          "scenario": "illumination_translation",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.00845,
+          "p95PositionErrorPx": 0.0257
+        },
+        {
+          "scenario": "pose_medium_rotation",
+          "caseCount": 2,
+          "passed": 2,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.15195,
+          "p95PositionErrorPx": 0.245775
+        },
+        {
+          "scenario": "pose_rotation_scale",
+          "caseCount": 2,
+          "passed": 2,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.0732,
+          "p95PositionErrorPx": 0.13683
+        },
+        {
+          "scenario": "pose_scale",
+          "caseCount": 2,
+          "passed": 2,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.0734,
+          "p95PositionErrorPx": 0.09401
+        },
+        {
+          "scenario": "pose_small_rotation",
+          "caseCount": 2,
+          "passed": 2,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.11375,
+          "p95PositionErrorPx": 0.185435
+        },
+        {
+          "scenario": "viewpoint_translation",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.008217,
+          "p95PositionErrorPx": 0.02605
+        }
+      ],
+      "notes": [
+        "Homography bridge plus bounded pose-search evidence for small/medium rotation and 0.9..1.1 scale replay."
+      ]
+    },
+    {
+      "operator": "ShapeMatching",
+      "family": "shape-family",
+      "source": "quality/evals/reports/ShapeMatching_geometric_dataset_candidate_replay_v2.json",
+      "profile": "geometric_dataset_precision_v2",
+      "candidateVersion": "v2",
+      "caseCount": 36,
+      "passed": 36,
+      "failed": 0,
+      "passRate": 1.0,
+      "positionMetricCaseCount": 36,
+      "meanPositionErrorPx": 0.025387,
+      "p95PositionErrorPx": 0.183315,
+      "maxPositionErrorPx": 0.256371,
+      "angleMetricCaseCount": 36,
+      "meanAngleErrorDeg": 0.055556,
+      "p95AngleErrorDeg": 0.0,
+      "scaleMetricCaseCount": 36,
+      "meanScaleError": 0.0,
+      "p95ScaleError": 0.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "scoreThreshold": 0.4,
+      "minScoreMargin": 0.551032,
+      "meanScoreMargin": 0.597916,
+      "falsePositive": {
+        "negativeCaseCount": 6,
+        "falsePositiveCaseCount": 0,
+        "falsePositiveRate": 0.0
+      },
+      "occlusionSensitivity": {
+        "caseCount": 0,
+        "passRate": null,
+        "deltaFromOverallPassRate": null,
+        "coverage": "not-covered"
+      },
+      "poseReplayCoverage": {
+        "rotationCaseCount": 6,
+        "rotationPassRate": 1.0,
+        "scaleCaseCount": 6,
+        "scalePassRate": 1.0
+      },
+      "scenarioSummaries": [
+        {
+          "scenario": "blank_negative",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.0,
+          "p95PositionErrorPx": 0.0
+        },
+        {
+          "scenario": "direct_pose",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.000601,
+          "p95PositionErrorPx": 0.002562
+        },
+        {
+          "scenario": "multi_target",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.000663,
+          "p95PositionErrorPx": 0.001417
+        },
+        {
+          "scenario": "rotated_pose",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.001029,
+          "p95PositionErrorPx": 0.002526
+        },
+        {
+          "scenario": "scaled_pose",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.148995,
+          "p95PositionErrorPx": 0.24727
+        },
+        {
+          "scenario": "top_left_origin",
+          "caseCount": 6,
+          "passed": 6,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.000368,
+          "p95PositionErrorPx": 0.001574
+        }
+      ],
+      "notes": [
+        "Primary pose-search profile for rotation, scale, multi-target, top-left origin, and blank-negative replay."
+      ]
+    },
+    {
+      "operator": "GradientShapeMatch",
+      "family": "shape-family",
+      "source": "quality/evals/reports/GradientShapeMatch_baseline.json",
+      "profile": "contract_baseline",
+      "candidateVersion": "control",
+      "caseCount": 117,
+      "passed": 117,
+      "failed": 0,
+      "passRate": 1.0,
+      "positionMetricCaseCount": 117,
+      "meanPositionErrorPx": 0.284125,
+      "p95PositionErrorPx": 1.082843,
+      "maxPositionErrorPx": 2.0,
+      "angleMetricCaseCount": 117,
+      "meanAngleErrorDeg": 0.564103,
+      "p95AngleErrorDeg": 3.0,
+      "scaleMetricCaseCount": 0,
+      "meanScaleError": null,
+      "p95ScaleError": null,
+      "scoreThreshold": 80.0,
+      "minScoreMargin": 1.730769,
+      "meanScoreMargin": 19.65131,
+      "falsePositive": {
+        "negativeCaseCount": 13,
+        "falsePositiveCaseCount": 0,
+        "falsePositiveRate": 0.0
+      },
+      "occlusionSensitivity": {
+        "caseCount": 13,
+        "passRate": 1.0,
+        "deltaFromOverallPassRate": 0.0,
+        "coverage": "covered"
+      },
+      "poseReplayCoverage": {
+        "rotationCaseCount": 26,
+        "rotationPassRate": 1.0,
+        "scaleCaseCount": 0,
+        "scalePassRate": null
+      },
+      "scenarioSummaries": [
+        {
+          "scenario": "blurred_edge",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 1.140648,
+          "p95PositionErrorPx": 2.0
+        },
+        {
+          "scenario": "low_contrast",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.076923,
+          "p95PositionErrorPx": 0.4
+        },
+        {
+          "scenario": "low_feature",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.0,
+          "p95PositionErrorPx": 0.0
+        },
+        {
+          "scenario": "partial_occlusion",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.108786,
+          "p95PositionErrorPx": 0.565685
+        },
+        {
+          "scenario": "roi_search",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.153846,
+          "p95PositionErrorPx": 1.0
+        },
+        {
+          "scenario": "rotation_large",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.153846,
+          "p95PositionErrorPx": 1.0
+        },
+        {
+          "scenario": "rotation_small",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.461538,
+          "p95PositionErrorPx": 1.0
+        },
+        {
+          "scenario": "strong_background",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.307692,
+          "p95PositionErrorPx": 1.0
+        },
+        {
+          "scenario": "translation",
+          "caseCount": 13,
+          "passed": 13,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.153846,
+          "p95PositionErrorPx": 1.0
+        }
+      ],
+      "notes": [
+        "Contract baseline included for family comparison; missing angle/scale fields are reported as null rather than inferred."
+      ]
+    },
+    {
+      "operator": "PyramidShapeMatch",
+      "family": "shape-family",
+      "source": "quality/evals/reports/PyramidShapeMatch_contract_baseline.json",
+      "profile": "contract_baseline",
+      "candidateVersion": "control",
+      "caseCount": 24,
+      "passed": 24,
+      "failed": 0,
+      "passRate": 1.0,
+      "positionMetricCaseCount": 14,
+      "meanPositionErrorPx": 6.703726,
+      "p95PositionErrorPx": 12.806248,
+      "maxPositionErrorPx": 12.806248,
+      "angleMetricCaseCount": 0,
+      "meanAngleErrorDeg": null,
+      "p95AngleErrorDeg": null,
+      "scaleMetricCaseCount": 0,
+      "meanScaleError": null,
+      "p95ScaleError": null,
+      "scoreThreshold": 80.0,
+      "minScoreMargin": 16.839348,
+      "meanScoreMargin": 18.97575,
+      "falsePositive": {
+        "negativeCaseCount": 5,
+        "falsePositiveCaseCount": 0,
+        "falsePositiveRate": 0.0
+      },
+      "occlusionSensitivity": {
+        "caseCount": 0,
+        "passRate": null,
+        "deltaFromOverallPassRate": null,
+        "coverage": "not-covered"
+      },
+      "poseReplayCoverage": {
+        "rotationCaseCount": 0,
+        "rotationPassRate": null,
+        "scaleCaseCount": 0,
+        "scalePassRate": null
+      },
+      "scenarioSummaries": [
+        {
+          "scenario": "Failure contract",
+          "caseCount": 4,
+          "passed": 4,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 0.0,
+          "p95PositionErrorPx": 0.0
+        },
+        {
+          "scenario": "Input formats",
+          "caseCount": 1,
+          "passed": 1,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 8.246211,
+          "p95PositionErrorPx": 8.246211
+        },
+        {
+          "scenario": "ShapeDescriptor mode",
+          "caseCount": 5,
+          "passed": 5,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 10.244998,
+          "p95PositionErrorPx": 12.806248
+        },
+        {
+          "scenario": "Template mode",
+          "caseCount": 4,
+          "passed": 4,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": 8.595242,
+          "p95PositionErrorPx": 8.944272
+        },
+        {
+          "scenario": "Validation contract",
+          "caseCount": 10,
+          "passed": 10,
+          "failed": 0,
+          "passRate": 1.0,
+          "meanPositionErrorPx": null,
+          "p95PositionErrorPx": null
+        }
+      ],
+      "notes": [
+        "Contract baseline included for family comparison; missing angle/scale fields are reported as null rather than inferred."
+      ]
+    }
+  ]
+}

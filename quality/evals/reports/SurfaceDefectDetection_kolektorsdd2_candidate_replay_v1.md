@@ -1,6 +1,6 @@
 # SurfaceDefectDetection KolektorSDD2 Baseline
 
-GeneratedAtUtc: `2026-04-29T16:13:09.0015134+00:00`
+GeneratedAtUtc: `2026-04-30T12:54:11.0203218+00:00`
 Index: `quality/datasets/kolektorsdd2_index.json`
 CandidateVersion: `v1`
 Profile: `balanced_floor_14_area7`
@@ -23,7 +23,7 @@ Profile: `balanced_floor_14_area7`
 | Image recall | 0.0000 |
 | Image F1 | 0.0000 |
 | False positive per normal image | 0.4444 |
-| Runtime p95 ms | 7.049 |
+| Runtime p95 ms | 5.636 |
 | Method | LocalContrast |
 | Threshold mode | Manual |
 | Threshold | 14.000 |

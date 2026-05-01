@@ -1,41 +1,57 @@
 {
   "schemaVersion": "2026-04-29.matching-algorithm-improvement.v1",
-  "generatedAtUtc": "2026-04-29T15:20:42+00:00",
+  "generatedAtUtc": "2026-04-30T11:24:58+00:00",
   "accepted": true,
   "claimBoundary": "准工业公开/替代证明；不声明真实产线工业验证完成。",
   "sourceReports": [
     "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
     "quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v4.json",
     "quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.json",
-    "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v4.json",
-    "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v4.json",
+    "quality/evals/reports/QualityFlywheel_matching_replay_safe_profile_candidates_v2.json",
+    "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+    "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
     "quality/evals/reports/QualityFlywheel_matching_failure_backlog_v1.json"
   ],
   "summary": {
     "abReplayCaseCount": 183,
-    "executedCandidateCaseCount": 40,
-    "fixedCaseCount": 29,
+    "executedCandidateCaseCount": 160,
+    "fixedCaseCount": 37,
     "regressedCaseCount": 0,
-    "matchingViewpointFixedCaseCount": 5,
+    "matchingViewpointFixedCaseCount": 10,
+    "replaySafePromotionCount": 2,
+    "releaseGateStatus": "blocked-missing-field-replay",
     "recommendedPrimaryOperator": "OrbFeatureMatch",
-    "remainingBacklogCaseCount": 27,
-    "remainingBothOperatorsFailedCount": 25
+    "remainingBacklogCaseCount": 4,
+    "remainingBothOperatorsFailedCount": 2
+  },
+  "replaySafeProfileGate": {
+    "status": "promotion-ready-default-off",
+    "productDefaultChange": false,
+    "primaryCandidate": "OrbFeatureMatch/center_only_projection_v1",
+    "fallbackCandidate": "AkazeFeatureMatch/center_only_projection_v1",
+    "releaseGateStatus": "blocked-missing-field-replay",
+    "requiredBeforeDefaultOn": [
+      "run release/field replay with product default enabled in a separate candidate profile",
+      "show zero matching regressions and no P95 position/corner regression against the pinned default-off baseline",
+      "attach runtime budget and field owner sign-off"
+    ]
   },
   "operators": {
     "AkazeFeatureMatch": {
       "candidate": {
-        "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v4.json",
+        "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
         "operator": "AkazeFeatureMatch",
-        "candidateVersion": "v4",
-        "selectedProfile": "default_v3",
+        "candidateVersion": null,
+        "selectedProfile": "center_only_projection_v1",
         "caseCount": 116,
-        "passed": 90,
-        "failed": 26,
-        "passRate": 0.775862,
-        "meanPositionErrorPx": 54.341248,
-        "p95PositionErrorPx": 321.631671,
-        "runtimeMs": 8568.21,
-        "memoryAllocationBytes": 58631800,
+        "passed": 114,
+        "failed": 2,
+        "passRate": 0.982759,
+        "meanPositionErrorPx": 4.176081,
+        "p95PositionErrorPx": 2.014785,
+        "p95CornerErrorPx": 9.246627,
+        "runtimeMs": 6786.379,
+        "memoryAllocationBytes": 58695368,
         "parameters": {
           "MaxFeatures": 1200,
           "MinInliers": 6,
@@ -44,23 +60,24 @@
           "MinInlierRatio": 0.25,
           "FastThreshold": 20,
           "EdgeThreshold": 15,
-          "AkazeThreshold": 0.001
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
         },
         "viewpoint": {
           "caseCount": 59,
-          "passed": 36,
-          "failed": 23,
-          "passRate": 0.610169,
-          "meanPositionErrorPx": 91.859213,
-          "runtimeMsAvg": 77.826
+          "passed": 58,
+          "failed": 1,
+          "passRate": 0.983051,
+          "meanPositionErrorPx": 3.553514,
+          "runtimeMsAvg": 61.224
         },
         "illumination": {
           "caseCount": 57,
-          "passed": 54,
-          "failed": 3,
-          "passRate": 0.947368,
-          "meanPositionErrorPx": 15.506863,
-          "runtimeMsAvg": 69.763
+          "passed": 56,
+          "failed": 1,
+          "passRate": 0.982456,
+          "meanPositionErrorPx": 4.820493,
+          "runtimeMsAvg": 55.687
         }
       },
       "abReplay": {
@@ -73,96 +90,43 @@
         },
         "candidateMetrics": {
           "caseCount": 20,
-          "passed": 13,
-          "failed": 7,
-          "passRate": 0.65,
-          "meanPositionErrorPx": 104.581523
+          "passed": 19,
+          "failed": 1,
+          "passRate": 0.95,
+          "meanPositionErrorPx": 13.100564
         },
-        "fixedCaseCount": 13,
+        "fixedCaseCount": 19,
         "regressedCaseCount": 0,
-        "candidateBaseline": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_replay_v4.json"
+        "candidateBaseline": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_replay_center_only_v1.json"
       },
       "selectedProfile": {
-        "selectedProfile": "default_v3",
+        "selectedProfile": "center_only_projection_v1",
         "validation": {
-          "operator": "AkazeFeatureMatch",
-          "profile": "default_v3",
-          "pair": "1-2",
-          "maxFeatures": 1200,
-          "minInliers": 6,
-          "matchRatio": 0.75,
-          "ransacThreshold": 5.0,
-          "minInlierRatio": 0.25,
-          "fastThreshold": 20,
-          "edgeThreshold": 15,
-          "akazeThreshold": 0.001,
-          "caseCount": 59,
-          "passed": 36,
-          "failed": 23,
-          "passRate": 0.610169,
-          "meanPositionErrorPx": 91.859213,
-          "p95PositionErrorPx": 378.273983,
-          "runtimeMs": 4680.569,
-          "viewpointFixedProxyCount": 36
+          "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+          "passed": 114,
+          "caseCount": 116,
+          "p95PositionErrorPx": 2.014785,
+          "p95CornerErrorPx": 9.246627
         },
-        "replay": {
-          "operator": "AkazeFeatureMatch",
-          "profile": "default_v3",
-          "pair": "replay",
-          "maxFeatures": 1200,
-          "minInliers": 6,
-          "matchRatio": 0.75,
-          "ransacThreshold": 5.0,
-          "minInlierRatio": 0.25,
-          "fastThreshold": 20,
-          "edgeThreshold": 15,
-          "akazeThreshold": 0.001,
-          "caseCount": 20,
-          "passed": 13,
-          "failed": 7,
-          "passRate": 0.65,
-          "meanPositionErrorPx": 104.581523,
-          "p95PositionErrorPx": 378.273983,
-          "runtimeMs": 1443.82,
-          "viewpointFixedProxyCount": 3
-        },
-        "holdout": {
-          "operator": "AkazeFeatureMatch",
-          "profile": "default_v3",
-          "pair": "1-3",
-          "maxFeatures": 1200,
-          "minInliers": 6,
-          "matchRatio": 0.75,
-          "ransacThreshold": 5.0,
-          "minInlierRatio": 0.25,
-          "fastThreshold": 20,
-          "edgeThreshold": 15,
-          "akazeThreshold": 0.001,
-          "caseCount": 59,
-          "passed": 37,
-          "failed": 22,
-          "passRate": 0.627119,
-          "meanPositionErrorPx": 87.640303,
-          "p95PositionErrorPx": 387.886571,
-          "runtimeMs": 4849.847,
-          "viewpointFixedProxyCount": 37
-        }
+        "replay": null,
+        "holdout": null
       }
     },
     "OrbFeatureMatch": {
       "candidate": {
-        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v4.json",
+        "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
         "operator": "OrbFeatureMatch",
-        "candidateVersion": "v4",
-        "selectedProfile": "replay_safe_dense_strict",
+        "candidateVersion": null,
+        "selectedProfile": "center_only_projection_v1",
         "caseCount": 116,
-        "passed": 90,
-        "failed": 26,
-        "passRate": 0.775862,
-        "meanPositionErrorPx": 45.005668,
-        "p95PositionErrorPx": 267.972396,
-        "runtimeMs": 3572.659,
-        "memoryAllocationBytes": 68029416,
+        "passed": 112,
+        "failed": 4,
+        "passRate": 0.965517,
+        "meanPositionErrorPx": 7.270331,
+        "p95PositionErrorPx": 2.561756,
+        "p95CornerErrorPx": 8.454432,
+        "runtimeMs": 2954.6,
+        "memoryAllocationBytes": 68163288,
         "parameters": {
           "MaxFeatures": 2000,
           "MinInliers": 6,
@@ -171,23 +135,24 @@
           "MinInlierRatio": 0.25,
           "FastThreshold": 16,
           "EdgeThreshold": 10,
-          "AkazeThreshold": 0.001
+          "AkazeThreshold": 0.001,
+          "AllowCenterOnlyProjection": true
         },
         "viewpoint": {
           "caseCount": 59,
-          "passed": 35,
-          "failed": 24,
-          "passRate": 0.59322,
-          "meanPositionErrorPx": 83.520672,
-          "runtimeMsAvg": 31.127
+          "passed": 56,
+          "failed": 3,
+          "passRate": 0.949153,
+          "meanPositionErrorPx": 13.719773,
+          "runtimeMsAvg": 25.757
         },
         "illumination": {
           "caseCount": 57,
-          "passed": 55,
-          "failed": 2,
-          "passRate": 0.964912,
-          "meanPositionErrorPx": 5.13926,
-          "runtimeMsAvg": 30.459
+          "passed": 56,
+          "failed": 1,
+          "passRate": 0.982456,
+          "meanPositionErrorPx": 0.594593,
+          "runtimeMsAvg": 25.174
         }
       },
       "abReplay": {
@@ -200,80 +165,26 @@
         },
         "candidateMetrics": {
           "caseCount": 20,
-          "passed": 16,
-          "failed": 4,
-          "passRate": 0.8,
-          "meanPositionErrorPx": 42.956602
+          "passed": 18,
+          "failed": 2,
+          "passRate": 0.9,
+          "meanPositionErrorPx": 16.048727
         },
-        "fixedCaseCount": 16,
+        "fixedCaseCount": 18,
         "regressedCaseCount": 0,
-        "candidateBaseline": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_v4.json"
+        "candidateBaseline": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_center_only_v1.json"
       },
       "selectedProfile": {
-        "selectedProfile": "replay_safe_dense_strict",
+        "selectedProfile": "center_only_projection_v1",
         "validation": {
-          "operator": "OrbFeatureMatch",
-          "profile": "replay_safe_dense_strict",
-          "pair": "1-2",
-          "maxFeatures": 2000,
-          "minInliers": 6,
-          "matchRatio": 0.7,
-          "ransacThreshold": 7.0,
-          "minInlierRatio": 0.25,
-          "fastThreshold": 16,
-          "edgeThreshold": 10,
-          "akazeThreshold": 0.001,
-          "caseCount": 59,
-          "passed": 35,
-          "failed": 24,
-          "passRate": 0.59322,
-          "meanPositionErrorPx": 83.520672,
-          "p95PositionErrorPx": 307.229725,
-          "runtimeMs": 2300.596,
-          "viewpointFixedProxyCount": 35
+          "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+          "passed": 112,
+          "caseCount": 116,
+          "p95PositionErrorPx": 2.561756,
+          "p95CornerErrorPx": 8.454432
         },
-        "replay": {
-          "operator": "OrbFeatureMatch",
-          "profile": "replay_safe_dense_strict",
-          "pair": "replay",
-          "maxFeatures": 2000,
-          "minInliers": 6,
-          "matchRatio": 0.7,
-          "ransacThreshold": 7.0,
-          "minInlierRatio": 0.25,
-          "fastThreshold": 16,
-          "edgeThreshold": 10,
-          "akazeThreshold": 0.001,
-          "caseCount": 20,
-          "passed": 16,
-          "failed": 4,
-          "passRate": 0.8,
-          "meanPositionErrorPx": 42.956602,
-          "p95PositionErrorPx": 279.156349,
-          "runtimeMs": 784.24,
-          "viewpointFixedProxyCount": 2
-        },
-        "holdout": {
-          "operator": "OrbFeatureMatch",
-          "profile": "replay_safe_dense_strict",
-          "pair": "1-3",
-          "maxFeatures": 2000,
-          "minInliers": 6,
-          "matchRatio": 0.7,
-          "ransacThreshold": 7.0,
-          "minInlierRatio": 0.25,
-          "fastThreshold": 16,
-          "edgeThreshold": 10,
-          "akazeThreshold": 0.001,
-          "caseCount": 59,
-          "passed": 37,
-          "failed": 22,
-          "passRate": 0.627119,
-          "meanPositionErrorPx": 98.143773,
-          "p95PositionErrorPx": 361.471132,
-          "runtimeMs": 2124.6,
-          "viewpointFixedProxyCount": 37
-        }
+        "replay": null,
+        "holdout": null
       }
     }
   },
@@ -282,22 +193,23 @@
       "label": "AkazeFeatureMatch",
       "operator": "AkazeFeatureMatch",
       "detectorType": "ORB",
-      "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v4.json",
-      "candidateVersion": "v4",
-      "selectedProfile": "default_v3",
+      "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_center_only_v1.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
       "accepted": true,
       "caseCount": 116,
-      "passed": 90,
-      "passRate": 0.775862,
+      "passed": 114,
+      "passRate": 0.982759,
       "viewpointCaseCount": 59,
-      "viewpointPassed": 36,
-      "viewpointPassRate": 0.610169,
+      "viewpointPassed": 58,
+      "viewpointPassRate": 0.983051,
       "illuminationCaseCount": 57,
-      "illuminationPassed": 54,
-      "illuminationPassRate": 0.947368,
-      "meanPositionErrorPx": 54.341248,
-      "p95PositionErrorPx": 321.631671,
-      "runtimeMs": 8568.21,
+      "illuminationPassed": 56,
+      "illuminationPassRate": 0.982456,
+      "meanPositionErrorPx": 4.176081,
+      "p95PositionErrorPx": 2.014785,
+      "p95CornerErrorPx": 9.246627,
+      "runtimeMs": 6786.379,
       "maxFeatures": 1200,
       "matchRatio": 0.75,
       "ransacThreshold": 5,
@@ -305,14 +217,15 @@
       "fastThreshold": 20,
       "edgeThreshold": 15,
       "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": true,
       "scoreThreshold": 0.5,
       "topFailures": [
         {
-          "reason": "Projected quadrilateral is invalid.",
-          "count": 25
+          "reason": "At least four point correspondences are required.",
+          "count": 1
         },
         {
-          "reason": "At least four point correspondences are required.",
+          "reason": "Projected quadrilateral is invalid.",
           "count": 1
         }
       ]
@@ -321,22 +234,23 @@
       "label": "OrbFeatureMatch",
       "operator": "OrbFeatureMatch",
       "detectorType": "ORB",
-      "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v4.json",
-      "candidateVersion": "v4",
-      "selectedProfile": "replay_safe_dense_strict",
+      "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_center_only_v1.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
       "accepted": true,
       "caseCount": 116,
-      "passed": 90,
-      "passRate": 0.775862,
+      "passed": 112,
+      "passRate": 0.965517,
       "viewpointCaseCount": 59,
-      "viewpointPassed": 35,
-      "viewpointPassRate": 0.59322,
+      "viewpointPassed": 56,
+      "viewpointPassRate": 0.949153,
       "illuminationCaseCount": 57,
-      "illuminationPassed": 55,
-      "illuminationPassRate": 0.964912,
-      "meanPositionErrorPx": 45.005668,
-      "p95PositionErrorPx": 267.972396,
-      "runtimeMs": 3572.659,
+      "illuminationPassed": 56,
+      "illuminationPassRate": 0.982456,
+      "meanPositionErrorPx": 7.270331,
+      "p95PositionErrorPx": 2.561756,
+      "p95CornerErrorPx": 8.454432,
+      "runtimeMs": 2954.6,
       "maxFeatures": 2000,
       "matchRatio": 0.7,
       "ransacThreshold": 7,
@@ -344,11 +258,12 @@
       "fastThreshold": 16,
       "edgeThreshold": 10,
       "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": true,
       "scoreThreshold": 0.5,
       "topFailures": [
         {
           "reason": "Projected quadrilateral is invalid.",
-          "count": 25
+          "count": 3
         },
         {
           "reason": "At least four point correspondences are required.",
@@ -375,14 +290,16 @@
       "illuminationPassRate": 0.947368,
       "meanPositionErrorPx": 8648.600934,
       "p95PositionErrorPx": 118.723182,
-      "runtimeMs": 25042.919,
+      "p95CornerErrorPx": 8.253566,
+      "runtimeMs": 20655.251,
       "maxFeatures": 1600,
       "matchRatio": 0.75,
       "ransacThreshold": 5,
       "minInlierRatio": 0.2,
       "fastThreshold": 20,
-      "edgeThreshold": null,
-      "akazeThreshold": null,
+      "edgeThreshold": 15,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": null,
       "scoreThreshold": 0.5,
       "topFailures": [
         {
@@ -426,14 +343,16 @@
       "illuminationPassRate": 0.964912,
       "meanPositionErrorPx": 8653.275972,
       "p95PositionErrorPx": 114.786099,
-      "runtimeMs": 8795.378,
+      "p95CornerErrorPx": 10.309544,
+      "runtimeMs": 7330.209,
       "maxFeatures": 1600,
       "matchRatio": 0.75,
       "ransacThreshold": 5,
       "minInlierRatio": 0.2,
       "fastThreshold": 20,
-      "edgeThreshold": null,
-      "akazeThreshold": null,
+      "edgeThreshold": 15,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": null,
       "scoreThreshold": 0.5,
       "topFailures": [
         {
@@ -460,20 +379,20 @@
     }
   ],
   "backlogSummary": {
-    "caseCount": 27,
-    "bothOperatorsFailedCount": 25,
-    "viewpointCaseCount": 24,
-    "illuminationCaseCount": 3,
+    "caseCount": 4,
+    "bothOperatorsFailedCount": 2,
+    "viewpointCaseCount": 3,
+    "illuminationCaseCount": 1,
     "taxonomyCounts": {
-      "extreme_viewpoint_crop": 24,
-      "illumination_residual": 2,
+      "extreme_viewpoint_crop": 3,
       "insufficient_correspondences": 1
     }
   },
   "nextActions": [
-    "Use OrbFeatureMatch v4 as the next primary matching candidate.",
-    "Prototype center-first localization for extreme viewpoint crop failures.",
-    "Keep AkazeFeatureMatch v4 as a stable fallback candidate.",
+    "Use OrbFeatureMatch center_only_v1 as the next primary matching candidate profile.",
+    "Keep AllowCenterOnlyProjection default-off in product paths until release/field replay gate signs off.",
+    "Keep AkazeFeatureMatch center_only_v1 as a stable fallback candidate profile.",
+    "Treat QualityFlywheel_matching_replay_safe_profile_candidates_v2 as the promotion-ready profile gate; do not use it as product-default approval.",
     "After backlog triage, move Phase C SurfaceDefectDetection/AnomalyDetection into candidate execution."
   ]
 }

@@ -1,6 +1,6 @@
 # AnomalyDetection MVTec AD Lite Candidate v1
 
-GeneratedAtUtc: `2026-04-29T16:13:33.1625186+00:00`
+GeneratedAtUtc: `2026-04-30T11:52:33.3988275+00:00`
 Index: `quality/datasets/mvtec_ad_lite_index.json`
 CandidateVersion: `v1`
 Profile: `max192_dense_stride8`
@@ -28,13 +28,13 @@ Profile: `max192_dense_stride8`
 | Patch size / stride | 16 / 8 |
 | Pixel sample stride | 2 |
 | Coreset ratio | 0.0200 |
-| Runtime ms | 22042.717 |
+| Runtime ms | 19056.190 |
 
 ## Categories
 
 | Category | Train | Test | Anomaly | Bank features | Train ms | Infer ms | Image AUROC | Pixel AUROC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| grid | 264 | 20 | 20 | 2793 | 17745.901 | 1562.732 | 0.0000 | 0.6212 |
+| grid | 264 | 20 | 20 | 2793 | 15429.799 | 1350.793 | 0.0000 | 0.6212 |
 
 ## Failure Taxonomy
 

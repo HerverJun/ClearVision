@@ -1,18 +1,18 @@
 # Quality Flywheel Algorithm A/B Replay Report
 
-GeneratedAtUtc: `2026-04-30T04:24:47+00:00`
+GeneratedAtUtc: `2026-04-30T12:54:35+00:00`
 Accepted: `Yes`
 
 ## Summary
 
 - Operators: 10
 - Replay cases compared: 183
-- Executed candidate cases: 183
-- Control cases: 0
-- Fixed cases: 29
+- Executed candidate cases: 160
+- Control cases: 23
+- Fixed cases: 37
 - Regressed cases: 0
 - Matching viewpoint cases: 11
-- Matching viewpoint fixed: 5
+- Matching viewpoint fixed: 10
 - Surface defect replay cases: 20
 - Surface defect improved cases: 10
 - Surface defect regressed cases: 0
@@ -21,8 +21,8 @@ Accepted: `Yes`
 - Anomaly detection improved cases: 14
 - Anomaly detection regressed cases: 0
 - Anomaly detection worse metric cases: 0
-- Anomaly detection image-correct cases: 5
-- Anomaly detection detected anomaly cases: 5
+- Anomaly detection image-correct cases: 11
+- Anomaly detection detected anomaly cases: 11
 - EdgeDetection replay cases: 20
 - EdgeDetection improved cases: 12
 - EdgeDetection regressed cases: 0
@@ -33,7 +33,7 @@ Accepted: `Yes`
 - SemanticSegmentation regressed cases: 0
 - SemanticSegmentation worse metric cases: 0
 - CameraCalibration replay cases: 3
-- CameraCalibration executed cases: 3
+- CameraCalibration executed cases: 0
 - CameraCalibration regressed cases: 0
 - CameraCalibration worse metric cases: 0
 - TemplateMatching replay cases: 20
@@ -45,19 +45,19 @@ Accepted: `Yes`
 - ShapeMatching regressed cases: 0
 - ShapeMatching worse metric cases: 0
 - DeepLearning replay cases: 20
-- DeepLearning real-model candidate cases: 20
+- DeepLearning real-model candidate cases: 0
 - DeepLearning processing-error cases: 0
 
 ## Operators
 
 | Operator | Dataset | Status | Replay | Old Pass | New Pass | Fixed | Regressed | Worse metric | Candidate |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|
-| AkazeFeatureMatch | hpatches | candidate-executed | 20 | 0.0 | 0.65 | 13 | 0 | 0 | quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_replay_v4.json |
-| AnomalyDetection | mvtec_ad_lite | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/AnomalyDetection_mvtec_candidate_replay_v1.json |
-| CameraCalibration | opencv_calibration_samples | candidate-executed | 3 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/CameraCalibration_opencv_samples_candidate_replay_v1.json |
-| DeepLearning | coco2017 | candidate-executed | 20 | 0.0 | 0.0 | 0 | 0 | 0 | quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json |
+| AkazeFeatureMatch | hpatches | candidate-executed | 20 | 0.0 | 0.95 | 19 | 0 | 0 | quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_replay_center_only_v1.json |
+| AnomalyDetection | mvtec_ad_lite | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/AnomalyDetection_mvtec_candidate_replay_v2.json |
+| CameraCalibration | opencv_calibration_samples | unchanged-baseline-control | 3 | 1.0 | 1.0 | 0 | 0 | 0 | same-as-old-control |
+| DeepLearning | coco2017 | unchanged-baseline-control | 20 | 0.0 | 0.0 | 0 | 0 | 0 | same-as-old-control |
 | EdgeDetection | bsds500 | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 8 | quality/evals/reports/EdgeDetection_bsds500_candidate_replay_v1.json |
-| OrbFeatureMatch | hpatches | candidate-executed | 20 | 0.0 | 0.8 | 16 | 0 | 1 | quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_v4.json |
+| OrbFeatureMatch | hpatches | candidate-executed | 20 | 0.0 | 0.9 | 18 | 0 | 1 | quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_center_only_v1.json |
 | SemanticSegmentation | voc-style-protocol-bridge | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/SemanticSegmentation_dataset_candidate_replay_v1.json |
 | ShapeMatching | semisynthetic-geometric-shape-scenes | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/ShapeMatching_geometric_dataset_candidate_replay_v1.json |
 | SurfaceDefectDetection | kolektorsdd2 | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 8 | quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_replay_v1.json |
@@ -67,15 +67,15 @@ Accepted: `Yes`
 
 | Operator | Case | Status | New pass | Old error | New error | Inlier ratio | Mean reproj | Area ratio | Corners in | Center in | Homography failure |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---|---|
-| AkazeFeatureMatch | v_abstract_1_2 | unchanged | False | 378.274 | 378.274 | 0.986 | 0.956 | 1.014 | 0 | True | Projected quadrilateral is invalid. |
-| AkazeFeatureMatch | v_astronautis_1_2 | unchanged | False | 400.798 | 400.798 | 0.911 | 1.109 | 1.901 | 0 | True | Projected quadrilateral is invalid. |
-| AkazeFeatureMatch | v_azzola_1_2 | unchanged | False | 254.382 | 254.382 | 0.928 | 1.465 | 1.013 | 1 | True | Projected quadrilateral is invalid. |
-| AkazeFeatureMatch | v_bark_1_2 | unchanged | False | 187.998 | 187.998 | 1 | 0.762 | 0.666 | 1 | True | Projected quadrilateral is invalid. |
-| OrbFeatureMatch | v_abstract_1_2 | improved | False | 391.906 | 279.156 | 0.973 | 1.04 | 1.014 | 0 | True | Projected quadrilateral is invalid. |
 | OrbFeatureMatch | v_astronautis_1_2 | worse-metric | False | 108.405 | 307.23 | 1 | 1.493 | 1.899 | 0 | True | Projected quadrilateral is invalid. |
+| AkazeFeatureMatch | v_abstract_1_2 | fixed | True | 378.274 | 0.31 | 0.986 | 0.956 | 1.014 | 0 | True | - |
 | AkazeFeatureMatch | v_adam_1_2 | fixed | True | 230.146 | 0.47 | 0.978 | 0.874 | 0.615 | 2 | True | - |
 | AkazeFeatureMatch | v_apprentices_1_2 | fixed | True | 127.844 | 0.081 | 1 | 0.451 | 0.868 | 2 | True | - |
+| AkazeFeatureMatch | v_astronautis_1_2 | fixed | True | 400.798 | 0.231 | 0.911 | 1.109 | 1.901 | 0 | True | - |
+| AkazeFeatureMatch | v_azzola_1_2 | fixed | True | 254.382 | 0.286 | 0.928 | 1.465 | 1.013 | 1 | True | - |
+| AkazeFeatureMatch | v_bark_1_2 | fixed | True | 187.998 | 0.129 | 1 | 0.762 | 0.666 | 1 | True | - |
 | AkazeFeatureMatch | v_bees_1_2 | fixed | True | 134.503 | 0.082 | 0.995 | 0.751 | 1.095 | 2 | True | - |
+| OrbFeatureMatch | v_abstract_1_2 | fixed | True | 391.906 | 0.045 | 0.973 | 1.04 | 1.014 | 0 | True | - |
 | OrbFeatureMatch | v_adam_1_2 | fixed | True | 166.291 | 0.151 | 0.991 | 1.061 | 0.619 | 2 | True | - |
 | OrbFeatureMatch | v_apprentices_1_2 | fixed | True | 172.499 | 0.088 | 1 | 0.955 | 0.868 | 2 | True | - |
 
@@ -110,7 +110,7 @@ Accepted: `Yes`
 |---|---|---|---|---:|---:|---|---|
 | grid/bent/000 | improved | True | True | 0 | 0.398 | True | - |
 | grid/bent/001 | improved | True | True | 0 | 0.756 | True | - |
-| grid/bent/003 | improved | True | False | 0 | 0.3 | False | anomaly_miss, below_threshold_anomaly, defect_bent |
+| grid/bent/003 | improved | True | True | 0 | 0.3 | True | - |
 | grid/bent/004 | unchanged | True | False | 0 | 0 | False | anomaly_miss, zero_score_anomaly, defect_bent |
 | grid/bent/005 | unchanged | True | False | 0 | 0 | False | anomaly_miss, zero_score_anomaly, defect_bent |
 | grid/bent/006 | improved | True | True | 0 | 0.541 | True | - |
@@ -118,13 +118,13 @@ Accepted: `Yes`
 | grid/bent/008 | unchanged | True | False | 0 | 0 | False | anomaly_miss, zero_score_anomaly, defect_bent |
 | grid/bent/009 | improved | True | False | 0 | 0.034 | False | anomaly_miss, below_threshold_anomaly, defect_bent |
 | grid/bent/010 | improved | True | True | 0 | 0.385 | True | - |
-| grid/bent/011 | improved | True | False | 0 | 0.155 | False | anomaly_miss, below_threshold_anomaly, defect_bent |
-| grid/broken/000 | improved | True | False | 0 | 0.222 | False | anomaly_miss, below_threshold_anomaly, defect_broken |
+| grid/bent/011 | improved | True | True | 0 | 0.155 | True | - |
+| grid/broken/000 | improved | True | True | 0 | 0.222 | True | - |
 | grid/broken/002 | improved | True | False | 0 | 0.015 | False | anomaly_miss, below_threshold_anomaly, defect_broken |
-| grid/broken/004 | improved | True | False | 0 | 0.195 | False | anomaly_miss, below_threshold_anomaly, defect_broken |
+| grid/broken/004 | improved | True | True | 0 | 0.195 | True | - |
 | grid/broken/005 | improved | True | False | 0 | 0.035 | False | anomaly_miss, below_threshold_anomaly, defect_broken |
-| grid/broken/006 | improved | True | False | 0 | 0.124 | False | anomaly_miss, below_threshold_anomaly, defect_broken |
-| grid/broken/007 | improved | True | False | 0 | 0.254 | False | anomaly_miss, below_threshold_anomaly, defect_broken |
+| grid/broken/006 | improved | True | True | 0 | 0.124 | True | - |
+| grid/broken/007 | improved | True | True | 0 | 0.254 | True | - |
 | grid/broken/008 | unchanged | True | False | 0 | 0 | False | anomaly_miss, zero_score_anomaly, defect_broken |
 | grid/broken/009 | improved | True | True | 0 | 0.398 | True | - |
 | grid/broken/010 | unchanged | True | False | 0 | 0 | False | anomaly_miss, zero_score_anomaly, defect_broken |
@@ -233,34 +233,34 @@ Accepted: `Yes`
 
 | Case | Status | New pass | Accepted | Old RMS | New RMS | Old max error | New max error | Old detected | New detected | Total | Failure reason |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| opencv_calibration_left_camera | unchanged | True | True | 0.338 | 0.338 | 0.458 | 0.458 | 12 | 12 | 13 | - |
+| opencv_calibration_left_camera | unchanged | True | False | 0.338 | 0.338 | 0.458 | 0.458 | 12 | 12 | 13 | - |
 | opencv_calibration_right_camera | unchanged | True | False | 0.368 | 0.368 | 0.47 | 0.47 | 13 | 13 | 13 | - |
-| opencv_calibration_stereo_rig | unchanged | True | True | 0 | 0 | 0 | 0 | 13 | 13 | 13 | - |
+| opencv_calibration_stereo_rig | unchanged | True | False | 0 | 0 | 0 | 0 | 13 | 13 | 13 | - |
 
 ## DeepLearning Real Model Focus
 
 | Case | Status | Execution | Old pass | New pass | New detections | TP | FP | FN | Processing error | Output shape |
 |---|---|---|---|---|---:|---:|---:|---:|---|---|
-| coco2017_val_139 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 2 | False | 1x7x32 |
-| coco2017_val_724 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 1 | False | 1x7x32 |
-| coco2017_val_785 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 1 | False | 1x7x32 |
-| coco2017_val_872 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 2 | False | 1x7x32 |
-| coco2017_val_885 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 8 | False | 1x7x32 |
-| coco2017_val_1000 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 12 | False | 1x7x32 |
-| coco2017_val_1268 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 4 | False | 1x7x32 |
-| coco2017_val_1296 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 2 | False | 1x7x32 |
-| coco2017_val_1353 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 6 | False | 1x7x32 |
-| coco2017_val_1490 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 1 | False | 1x7x32 |
-| coco2017_val_1532 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 7 | False | 1x7x32 |
-| coco2017_val_1584 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 11 | False | 1x7x32 |
-| coco2017_val_1761 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 5 | False | 1x7x32 |
-| coco2017_val_2006 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 3 | False | 1x7x32 |
-| coco2017_val_2153 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 4 | False | 1x7x32 |
-| coco2017_val_2261 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 1 | False | 1x7x32 |
-| coco2017_val_2299 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 13 | False | 1x7x32 |
-| coco2017_val_2431 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 2 | False | 1x7x32 |
-| coco2017_val_2473 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 4 | False | 1x7x32 |
-| coco2017_val_2532 | unchanged | candidate-executed | False | False | 1 | 0 | 1 | 1 | False | 1x7x32 |
+| coco2017_val_139 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 2 | - | - |
+| coco2017_val_724 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 1 | - | - |
+| coco2017_val_785 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 1 | - | - |
+| coco2017_val_872 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 2 | - | - |
+| coco2017_val_885 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 8 | - | - |
+| coco2017_val_1000 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 12 | - | - |
+| coco2017_val_1268 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 4 | - | - |
+| coco2017_val_1296 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 2 | - | - |
+| coco2017_val_1353 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 6 | - | - |
+| coco2017_val_1490 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 1 | - | - |
+| coco2017_val_1532 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 7 | - | - |
+| coco2017_val_1584 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 11 | - | - |
+| coco2017_val_1761 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 5 | - | - |
+| coco2017_val_2006 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 3 | - | - |
+| coco2017_val_2153 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 4 | - | - |
+| coco2017_val_2261 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 1 | - | - |
+| coco2017_val_2299 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 13 | - | - |
+| coco2017_val_2431 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 2 | - | - |
+| coco2017_val_2473 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 4 | - | - |
+| coco2017_val_2532 | unchanged | unchanged-baseline-control | False | False | 1 | 0 | 1 | 1 | - | - |
 
 ## Policy
 

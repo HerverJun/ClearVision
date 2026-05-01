@@ -1,0 +1,1038 @@
+{
+  "schemaVersion": "2026-04-30.matching-tail-error-reduction.v2",
+  "generatedAtUtc": "2026-04-30T08:29:18+00:00",
+  "claimBoundary": "Public HPatches tail-error triage only; this is not production-line signoff.",
+  "sourceReports": [
+    "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v4.json",
+    "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v4.json",
+    "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
+    "quality/evals/reports/PlanarMatching_hpatches_akaze_baseline.json",
+    "quality/evals/reports/QualityFlywheel_matching_failure_backlog_v1.json"
+  ],
+  "thresholds": {
+    "positionTailPx": 60.0,
+    "centerGateMinInlierRatio": 0.9,
+    "centerGateMaxMeanReprojectionError": 1.5,
+    "centerGateMaxReprojectionError": 6.0,
+    "centerGateAreaRatioRange": [
+      0.5,
+      2.5
+    ]
+  },
+  "backlogSummary": {
+    "caseCount": 27,
+    "bothOperatorsFailedCount": 25,
+    "viewpointCaseCount": 24,
+    "illuminationCaseCount": 3,
+    "taxonomyCounts": {
+      "extreme_viewpoint_crop": 24,
+      "illumination_residual": 2,
+      "insufficient_correspondences": 1
+    }
+  },
+  "rows": [
+    {
+      "label": "AkazeFeatureMatch",
+      "operator": "AkazeFeatureMatch",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v4.json",
+      "caseCount": 116,
+      "passed": 90,
+      "failed": 26,
+      "passRate": 0.775862,
+      "meanPositionErrorPx": 54.341248,
+      "p95PositionErrorPx": 321.631671,
+      "p95CornerErrorPx": 9.246627,
+      "viewpointCaseCount": 59,
+      "viewpointFailedCount": 23,
+      "largeViewpointFailureCount": 22,
+      "centerGateCandidateCount": 16,
+      "tailBucketCounts": {
+        "illumination_residual": 2,
+        "insufficient_correspondences": 1,
+        "extreme_viewpoint_crop": 22,
+        "projected_area_drift": 1
+      },
+      "tailBuckets": [
+        {
+          "caseCount": 22,
+          "meanPositionErrorPx": 227.576937,
+          "p95PositionErrorPx": 378.273983,
+          "maxPositionErrorPx": 400.797501,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.937213,
+          "meanReprojectionError": 0.808831,
+          "maxReprojectionError": 5.088856,
+          "meanAreaRatio": 1.067816,
+          "meanCornersInsideCount": 0.636364,
+          "bucket": "extreme_viewpoint_crop",
+          "samples": [
+            {
+              "caseId": "v_astronautis_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 400.797501,
+              "inlierRatio": 0.911111,
+              "meanReprojectionError": 1.109113,
+              "maxReprojectionError": 3.833682,
+              "areaRatio": 1.901131,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_abstract_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 378.273983,
+              "inlierRatio": 0.985542,
+              "meanReprojectionError": 0.955722,
+              "maxReprojectionError": 3.775078,
+              "areaRatio": 1.013952,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_weapons_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 332.042282,
+              "inlierRatio": 0.964789,
+              "meanReprojectionError": 0.592445,
+              "maxReprojectionError": 4.761041,
+              "areaRatio": 1.004912,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_tabletop_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 321.631671,
+              "inlierRatio": 0.943396,
+              "meanReprojectionError": 0.791395,
+              "maxReprojectionError": 2.819545,
+              "areaRatio": 0.875707,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_colors_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 318.251043,
+              "inlierRatio": 0.901961,
+              "meanReprojectionError": 1.045754,
+              "maxReprojectionError": 3.622206,
+              "areaRatio": 1.137903,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 2,
+          "meanPositionErrorPx": 305.726375,
+          "p95PositionErrorPx": 376.316618,
+          "maxPositionErrorPx": 376.316618,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.936042,
+          "meanReprojectionError": 0.328041,
+          "maxReprojectionError": 3.189876,
+          "meanAreaRatio": 1.000957,
+          "meanCornersInsideCount": 1,
+          "bucket": "illumination_residual",
+          "samples": [
+            {
+              "caseId": "i_leuven_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 376.316618,
+              "inlierRatio": 0.983871,
+              "meanReprojectionError": 0.258411,
+              "maxReprojectionError": 2.633682,
+              "areaRatio": 1.000733,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "i_londonbridge_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 235.136131,
+              "inlierRatio": 0.888214,
+              "meanReprojectionError": 0.397671,
+              "maxReprojectionError": 3.189876,
+              "areaRatio": 1.00118,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 230.10704,
+          "p95PositionErrorPx": 230.10704,
+          "maxPositionErrorPx": 230.10704,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.0,
+          "meanReprojectionError": null,
+          "maxReprojectionError": null,
+          "meanAreaRatio": 0.0,
+          "meanCornersInsideCount": 0,
+          "bucket": "insufficient_correspondences",
+          "samples": [
+            {
+              "caseId": "i_pool_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 230.10704,
+              "inlierRatio": 0,
+              "meanReprojectionError": null,
+              "maxReprojectionError": null,
+              "areaRatio": 0,
+              "cornersInsideCount": 0
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 402.336312,
+          "p95PositionErrorPx": 402.336312,
+          "maxPositionErrorPx": 402.336312,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.833333,
+          "meanReprojectionError": 1.045712,
+          "maxReprojectionError": 2.134944,
+          "meanAreaRatio": 2.439398,
+          "meanCornersInsideCount": 1,
+          "bucket": "projected_area_drift",
+          "samples": [
+            {
+              "caseId": "v_charing_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 402.336312,
+              "inlierRatio": 0.833333,
+              "meanReprojectionError": 1.045712,
+              "maxReprojectionError": 2.134944,
+              "areaRatio": 2.439398,
+              "cornersInsideCount": 1
+            }
+          ]
+        }
+      ],
+      "tailSummary": {
+        "caseCount": 26,
+        "meanPositionErrorPx": 240.407258,
+        "p95PositionErrorPx": 400.797501,
+        "maxPositionErrorPx": 402.336312,
+        "p95MaxCornerErrorPx": null,
+        "meanInlierRatio": 0.897081,
+        "meanReprojectionError": 0.779843,
+        "maxReprojectionError": 5.088856,
+        "meanAreaRatio": 1.074356,
+        "meanCornersInsideCount": 0.653846
+      }
+    },
+    {
+      "label": "OrbFeatureMatch",
+      "operator": "OrbFeatureMatch",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v4.json",
+      "caseCount": 116,
+      "passed": 90,
+      "failed": 26,
+      "passRate": 0.775862,
+      "meanPositionErrorPx": 45.005668,
+      "p95PositionErrorPx": 267.972396,
+      "p95CornerErrorPx": 8.454432,
+      "viewpointCaseCount": 59,
+      "viewpointFailedCount": 24,
+      "largeViewpointFailureCount": 23,
+      "centerGateCandidateCount": 19,
+      "tailBucketCounts": {
+        "illumination_residual": 1,
+        "insufficient_correspondences": 1,
+        "extreme_viewpoint_crop": 22,
+        "projected_area_drift": 1,
+        "reprojection_outlier": 1
+      },
+      "tailBuckets": [
+        {
+          "caseCount": 22,
+          "meanPositionErrorPx": 191.666963,
+          "p95PositionErrorPx": 279.156349,
+          "maxPositionErrorPx": 307.229725,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.957362,
+          "meanReprojectionError": 1.11469,
+          "maxReprojectionError": 5.599963,
+          "meanAreaRatio": 1.068666,
+          "meanCornersInsideCount": 0.636364,
+          "bucket": "extreme_viewpoint_crop",
+          "samples": [
+            {
+              "caseId": "v_astronautis_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 307.229725,
+              "inlierRatio": 1,
+              "meanReprojectionError": 1.492776,
+              "maxReprojectionError": 5.211362,
+              "areaRatio": 1.898965,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_abstract_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 279.156349,
+              "inlierRatio": 0.972678,
+              "meanReprojectionError": 1.039843,
+              "maxReprojectionError": 4.893167,
+              "areaRatio": 1.014147,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_yuri_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 276.367316,
+              "inlierRatio": 0.973597,
+              "meanReprojectionError": 0.99649,
+              "maxReprojectionError": 4.948004,
+              "areaRatio": 1.008683,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_soldiers_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 267.972396,
+              "inlierRatio": 0.956522,
+              "meanReprojectionError": 1.093066,
+              "maxReprojectionError": 4.371301,
+              "areaRatio": 1.11468,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_bark_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 260.983704,
+              "inlierRatio": 0.908297,
+              "meanReprojectionError": 1.270747,
+              "maxReprojectionError": 4.132745,
+              "areaRatio": 0.661949,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 259.28841,
+          "p95PositionErrorPx": 259.28841,
+          "maxPositionErrorPx": 259.28841,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.939675,
+          "meanReprojectionError": 0.874073,
+          "maxReprojectionError": 5.043082,
+          "meanAreaRatio": 1.000781,
+          "meanCornersInsideCount": 1,
+          "bucket": "illumination_residual",
+          "samples": [
+            {
+              "caseId": "i_leuven_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 259.28841,
+              "inlierRatio": 0.939675,
+              "meanReprojectionError": 0.874073,
+              "maxReprojectionError": 5.043082,
+              "areaRatio": 1.000781,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 0.5,
+          "p95PositionErrorPx": 0.5,
+          "maxPositionErrorPx": 0.5,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.0,
+          "meanReprojectionError": null,
+          "maxReprojectionError": null,
+          "meanAreaRatio": 0.0,
+          "meanCornersInsideCount": 0,
+          "bucket": "insufficient_correspondences",
+          "samples": [
+            {
+              "caseId": "i_pool_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 0.5,
+              "inlierRatio": 0,
+              "meanReprojectionError": null,
+              "maxReprojectionError": null,
+              "areaRatio": 0,
+              "cornersInsideCount": 0
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 338.706579,
+          "p95PositionErrorPx": 338.706579,
+          "maxPositionErrorPx": 338.706579,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.631579,
+          "meanReprojectionError": 1.578652,
+          "maxReprojectionError": 6.287805,
+          "meanAreaRatio": 2.130559,
+          "meanCornersInsideCount": 1,
+          "bucket": "projected_area_drift",
+          "samples": [
+            {
+              "caseId": "v_charing_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 338.706579,
+              "inlierRatio": 0.631579,
+              "meanReprojectionError": 1.578652,
+              "maxReprojectionError": 6.287805,
+              "areaRatio": 2.130559,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 358.203005,
+          "p95PositionErrorPx": 358.203005,
+          "maxPositionErrorPx": 358.203005,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.902326,
+          "meanReprojectionError": 0.98767,
+          "maxReprojectionError": 8.913454,
+          "meanAreaRatio": 1.008251,
+          "meanCornersInsideCount": 0,
+          "bucket": "reprojection_outlier",
+          "samples": [
+            {
+              "caseId": "v_weapons_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 358.203005,
+              "inlierRatio": 0.902326,
+              "meanReprojectionError": 0.98767,
+              "maxReprojectionError": 8.913454,
+              "areaRatio": 1.008251,
+              "cornersInsideCount": 0
+            }
+          ]
+        }
+      ],
+      "tailSummary": {
+        "caseCount": 26,
+        "meanPositionErrorPx": 198.975814,
+        "p95PositionErrorPx": 338.706579,
+        "maxPositionErrorPx": 358.203005,
+        "p95MaxCornerErrorPx": null,
+        "meanInlierRatio": 0.905213,
+        "meanReprojectionError": 1.118543,
+        "maxReprojectionError": 8.913454,
+        "meanAreaRatio": 1.06347,
+        "meanCornersInsideCount": 0.615385
+      }
+    },
+    {
+      "label": "PlanarMatching(ORB)",
+      "operator": "PlanarMatching",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
+      "caseCount": 116,
+      "passed": 70,
+      "failed": 46,
+      "passRate": 0.603448,
+      "meanPositionErrorPx": 8653.275972,
+      "p95PositionErrorPx": 114.786099,
+      "p95CornerErrorPx": 10.309544,
+      "viewpointCaseCount": 59,
+      "viewpointFailedCount": 44,
+      "largeViewpointFailureCount": 21,
+      "centerGateCandidateCount": 13,
+      "tailBucketCounts": {
+        "illumination_residual": 1,
+        "insufficient_correspondences": 1,
+        "extreme_viewpoint_crop": 23,
+        "partial_viewpoint_crop": 16,
+        "localization_tail": 2,
+        "projected_area_drift": 3
+      },
+      "tailBuckets": [
+        {
+          "caseCount": 23,
+          "meanPositionErrorPx": 44.13584,
+          "p95PositionErrorPx": 88.11317,
+          "maxPositionErrorPx": 117.416336,
+          "p95MaxCornerErrorPx": 10.309544,
+          "meanInlierRatio": 0.916822,
+          "meanReprojectionError": 1.051558,
+          "maxReprojectionError": 4.966666,
+          "meanAreaRatio": 1.024328,
+          "meanCornersInsideCount": 0.608696,
+          "bucket": "extreme_viewpoint_crop",
+          "samples": [
+            {
+              "caseId": "v_churchill_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 117.416336,
+              "inlierRatio": 0.98556,
+              "meanReprojectionError": 1.212557,
+              "maxReprojectionError": 4.879229,
+              "areaRatio": 1.229785,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_fest_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 88.11317,
+              "inlierRatio": 0.99,
+              "meanReprojectionError": 1.216066,
+              "maxReprojectionError": 4.059805,
+              "areaRatio": 1.689413,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_azzola_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 81.583123,
+              "inlierRatio": 0.858757,
+              "meanReprojectionError": 1.388217,
+              "maxReprojectionError": 4.938076,
+              "areaRatio": 0.834987,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_grace_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 67.35499,
+              "inlierRatio": 0.803333,
+              "meanReprojectionError": 0.944615,
+              "maxReprojectionError": 3.773246,
+              "areaRatio": 1.157054,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_abstract_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 66.274011,
+              "inlierRatio": 0.983333,
+              "meanReprojectionError": 0.953402,
+              "maxReprojectionError": 3.287265,
+              "areaRatio": 0.703081,
+              "cornersInsideCount": 0
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 1.214768,
+          "p95PositionErrorPx": 1.214768,
+          "maxPositionErrorPx": 1.214768,
+          "p95MaxCornerErrorPx": 3.477164,
+          "meanInlierRatio": 0.953333,
+          "meanReprojectionError": 0.603468,
+          "maxReprojectionError": 2.871587,
+          "meanAreaRatio": 0.999871,
+          "meanCornersInsideCount": 1,
+          "bucket": "illumination_residual",
+          "samples": [
+            {
+              "caseId": "i_leuven_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 1.214768,
+              "inlierRatio": 0.953333,
+              "meanReprojectionError": 0.603468,
+              "maxReprojectionError": 2.871587,
+              "areaRatio": 0.999871,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 1000000.0,
+          "p95PositionErrorPx": 1000000.0,
+          "maxPositionErrorPx": 1000000.0,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.0,
+          "meanReprojectionError": 0.0,
+          "maxReprojectionError": 0.0,
+          "meanAreaRatio": 0.0,
+          "meanCornersInsideCount": 0,
+          "bucket": "insufficient_correspondences",
+          "samples": [
+            {
+              "caseId": "i_pool_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 1000000,
+              "inlierRatio": 0,
+              "meanReprojectionError": 0,
+              "maxReprojectionError": 0,
+              "areaRatio": 0,
+              "cornersInsideCount": 0
+            }
+          ]
+        },
+        {
+          "caseCount": 2,
+          "meanPositionErrorPx": 103.482867,
+          "p95PositionErrorPx": 109.780194,
+          "maxPositionErrorPx": 109.780194,
+          "p95MaxCornerErrorPx": 4.574707,
+          "meanInlierRatio": 0.981488,
+          "meanReprojectionError": 0.876448,
+          "maxReprojectionError": 4.968386,
+          "meanAreaRatio": 0.73584,
+          "meanCornersInsideCount": 4,
+          "bucket": "localization_tail",
+          "samples": [
+            {
+              "caseId": "v_talent_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 109.780194,
+              "inlierRatio": 0.968627,
+              "meanReprojectionError": 0.759252,
+              "maxReprojectionError": 4.968386,
+              "areaRatio": 0.740709,
+              "cornersInsideCount": 4
+            },
+            {
+              "caseId": "v_artisans_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 97.185541,
+              "inlierRatio": 0.99435,
+              "meanReprojectionError": 0.993645,
+              "maxReprojectionError": 4.656046,
+              "areaRatio": 0.730971,
+              "cornersInsideCount": 4
+            }
+          ]
+        },
+        {
+          "caseCount": 16,
+          "meanPositionErrorPx": 80.757073,
+          "p95PositionErrorPx": 157.52611,
+          "maxPositionErrorPx": 157.52611,
+          "p95MaxCornerErrorPx": 10.48263,
+          "meanInlierRatio": 0.978442,
+          "meanReprojectionError": 1.108166,
+          "maxReprojectionError": 5.5861,
+          "meanAreaRatio": 0.75599,
+          "meanCornersInsideCount": 2.25,
+          "bucket": "partial_viewpoint_crop",
+          "samples": [
+            {
+              "caseId": "v_gardens_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 157.52611,
+              "inlierRatio": 0.984127,
+              "meanReprojectionError": 1.067132,
+              "maxReprojectionError": 5.08808,
+              "areaRatio": 0.887891,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_dogman_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 149.821248,
+              "inlierRatio": 0.966216,
+              "meanReprojectionError": 1.180299,
+              "maxReprojectionError": 4.201365,
+              "areaRatio": 1.092983,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_man_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 114.786099,
+              "inlierRatio": 0.973913,
+              "meanReprojectionError": 1.178728,
+              "maxReprojectionError": 4.99417,
+              "areaRatio": 0.868084,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_war_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 105.671382,
+              "inlierRatio": 0.975309,
+              "meanReprojectionError": 1.02764,
+              "maxReprojectionError": 4.262835,
+              "areaRatio": 0.530763,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_wormhole_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 89.57663,
+              "inlierRatio": 0.982906,
+              "meanReprojectionError": 1.163129,
+              "maxReprojectionError": 4.482518,
+              "areaRatio": 0.687801,
+              "cornersInsideCount": 2
+            }
+          ]
+        },
+        {
+          "caseCount": 3,
+          "meanPositionErrorPx": 321.318141,
+          "p95PositionErrorPx": 890.565933,
+          "maxPositionErrorPx": 890.565933,
+          "p95MaxCornerErrorPx": 3668.533155,
+          "meanInlierRatio": 0.774034,
+          "meanReprojectionError": 0.974809,
+          "maxReprojectionError": 3.126659,
+          "meanAreaRatio": 2.198164,
+          "meanCornersInsideCount": 2.333333,
+          "bucket": "projected_area_drift",
+          "samples": [
+            {
+              "caseId": "v_charing_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 890.565933,
+              "inlierRatio": 0.35,
+              "meanReprojectionError": 1.191585,
+              "maxReprojectionError": 2.364593,
+              "areaRatio": 5.9385,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_woman_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 37.368224,
+              "inlierRatio": 0.97561,
+              "meanReprojectionError": 0.820847,
+              "maxReprojectionError": 2.412432,
+              "areaRatio": 0.304668,
+              "cornersInsideCount": 4
+            },
+            {
+              "caseId": "v_bird_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 36.020267,
+              "inlierRatio": 0.996491,
+              "meanReprojectionError": 0.911996,
+              "maxReprojectionError": 3.126659,
+              "areaRatio": 0.351323,
+              "cornersInsideCount": 3
+            }
+          ]
+        }
+      ],
+      "tailSummary": {
+        "caseCount": 46,
+        "meanPositionErrorPx": 21814.768966,
+        "p95PositionErrorPx": 157.52611,
+        "maxPositionErrorPx": 1000000.0,
+        "p95MaxCornerErrorPx": 10.48263,
+        "meanInlierRatio": 0.912617,
+        "meanReprojectionError": 1.026028,
+        "maxReprojectionError": 5.5861,
+        "meanAreaRatio": 0.972205,
+        "meanCornersInsideCount": 1.434783
+      }
+    },
+    {
+      "label": "PlanarMatching(AKAZE)",
+      "operator": "PlanarMatching",
+      "detectorType": "AKAZE",
+      "sourceReport": "quality/evals/reports/PlanarMatching_hpatches_akaze_baseline.json",
+      "caseCount": 116,
+      "passed": 70,
+      "failed": 46,
+      "passRate": 0.603448,
+      "meanPositionErrorPx": 8648.600934,
+      "p95PositionErrorPx": 118.723182,
+      "p95CornerErrorPx": 8.253566,
+      "viewpointCaseCount": 59,
+      "viewpointFailedCount": 43,
+      "largeViewpointFailureCount": 20,
+      "centerGateCandidateCount": 16,
+      "tailBucketCounts": {
+        "illumination_residual": 2,
+        "insufficient_correspondences": 1,
+        "extreme_viewpoint_crop": 22,
+        "partial_viewpoint_crop": 16,
+        "localization_tail": 3,
+        "projected_area_drift": 2
+      },
+      "tailBuckets": [
+        {
+          "caseCount": 22,
+          "meanPositionErrorPx": 46.017613,
+          "p95PositionErrorPx": 87.943728,
+          "maxPositionErrorPx": 118.723182,
+          "p95MaxCornerErrorPx": 7.811111,
+          "meanInlierRatio": 0.949368,
+          "meanReprojectionError": 0.717588,
+          "maxReprojectionError": 6.425538,
+          "meanAreaRatio": 0.913595,
+          "meanCornersInsideCount": 0.590909,
+          "bucket": "extreme_viewpoint_crop",
+          "samples": [
+            {
+              "caseId": "v_churchill_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 118.723182,
+              "inlierRatio": 0.89,
+              "meanReprojectionError": 1.008982,
+              "maxReprojectionError": 4.458858,
+              "areaRatio": 1.226718,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_fest_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 87.943728,
+              "inlierRatio": 0.993333,
+              "meanReprojectionError": 0.588783,
+              "maxReprojectionError": 3.909997,
+              "areaRatio": 0.948281,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_azzola_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 77.886936,
+              "inlierRatio": 0.936667,
+              "meanReprojectionError": 1.372549,
+              "maxReprojectionError": 6.425538,
+              "areaRatio": 0.705825,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_abstract_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 66.459261,
+              "inlierRatio": 0.996667,
+              "meanReprojectionError": 0.680502,
+              "maxReprojectionError": 4.312051,
+              "areaRatio": 0.704108,
+              "cornersInsideCount": 0
+            },
+            {
+              "caseId": "v_grace_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 65.384603,
+              "inlierRatio": 0.876667,
+              "meanReprojectionError": 0.576623,
+              "maxReprojectionError": 4.864767,
+              "areaRatio": 0.810517,
+              "cornersInsideCount": 0
+            }
+          ]
+        },
+        {
+          "caseCount": 2,
+          "meanPositionErrorPx": 77.366987,
+          "p95PositionErrorPx": 153.709964,
+          "maxPositionErrorPx": 153.709964,
+          "p95MaxCornerErrorPx": 361.61696,
+          "meanInlierRatio": 0.997984,
+          "meanReprojectionError": 0.350177,
+          "maxReprojectionError": 3.843598,
+          "meanAreaRatio": 0.726225,
+          "meanCornersInsideCount": 1.5,
+          "bucket": "illumination_residual",
+          "samples": [
+            {
+              "caseId": "i_tools_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 153.709964,
+              "inlierRatio": 1,
+              "meanReprojectionError": 0.420854,
+              "maxReprojectionError": 0.920752,
+              "areaRatio": 0.453032,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "i_leuven_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 1.024009,
+              "inlierRatio": 0.995968,
+              "meanReprojectionError": 0.2795,
+              "maxReprojectionError": 3.843598,
+              "areaRatio": 0.999419,
+              "cornersInsideCount": 1
+            }
+          ]
+        },
+        {
+          "caseCount": 1,
+          "meanPositionErrorPx": 1000000.0,
+          "p95PositionErrorPx": 1000000.0,
+          "maxPositionErrorPx": 1000000.0,
+          "p95MaxCornerErrorPx": null,
+          "meanInlierRatio": 0.0,
+          "meanReprojectionError": 0.0,
+          "maxReprojectionError": 0.0,
+          "meanAreaRatio": 0.0,
+          "meanCornersInsideCount": 0,
+          "bucket": "insufficient_correspondences",
+          "samples": [
+            {
+              "caseId": "i_pool_1_2",
+              "sequenceType": "illumination",
+              "positionErrorPx": 1000000,
+              "inlierRatio": 0,
+              "meanReprojectionError": 0,
+              "maxReprojectionError": 0,
+              "areaRatio": 0,
+              "cornersInsideCount": 0
+            }
+          ]
+        },
+        {
+          "caseCount": 3,
+          "meanPositionErrorPx": 80.61797,
+          "p95PositionErrorPx": 108.150455,
+          "maxPositionErrorPx": 108.150455,
+          "p95MaxCornerErrorPx": 1.55946,
+          "meanInlierRatio": 0.988778,
+          "meanReprojectionError": 0.643641,
+          "maxReprojectionError": 4.571189,
+          "meanAreaRatio": 0.682014,
+          "meanCornersInsideCount": 4,
+          "bucket": "localization_tail",
+          "samples": [
+            {
+              "caseId": "v_talent_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 108.150455,
+              "inlierRatio": 0.992126,
+              "meanReprojectionError": 0.580637,
+              "maxReprojectionError": 2.91733,
+              "areaRatio": 0.740816,
+              "cornersInsideCount": 4
+            },
+            {
+              "caseId": "v_artisans_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 97.086024,
+              "inlierRatio": 0.996139,
+              "meanReprojectionError": 0.603887,
+              "maxReprojectionError": 3.846808,
+              "areaRatio": 0.729171,
+              "cornersInsideCount": 4
+            },
+            {
+              "caseId": "v_woman_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 36.617432,
+              "inlierRatio": 0.97807,
+              "meanReprojectionError": 0.746399,
+              "maxReprojectionError": 4.571189,
+              "areaRatio": 0.576056,
+              "cornersInsideCount": 4
+            }
+          ]
+        },
+        {
+          "caseCount": 16,
+          "meanPositionErrorPx": 79.023618,
+          "p95PositionErrorPx": 158.0763,
+          "maxPositionErrorPx": 158.0763,
+          "p95MaxCornerErrorPx": 8.354836,
+          "meanInlierRatio": 0.979032,
+          "meanReprojectionError": 0.8684,
+          "maxReprojectionError": 5.405025,
+          "meanAreaRatio": 0.78799,
+          "meanCornersInsideCount": 2.25,
+          "bucket": "partial_viewpoint_crop",
+          "samples": [
+            {
+              "caseId": "v_gardens_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 158.0763,
+              "inlierRatio": 0.982684,
+              "meanReprojectionError": 0.992918,
+              "maxReprojectionError": 4.271724,
+              "areaRatio": 1.054387,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_dogman_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 149.490283,
+              "inlierRatio": 0.98,
+              "meanReprojectionError": 0.860121,
+              "maxReprojectionError": 5.405025,
+              "areaRatio": 0.920222,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_man_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 113.897419,
+              "inlierRatio": 0.946667,
+              "meanReprojectionError": 0.823954,
+              "maxReprojectionError": 5.071618,
+              "areaRatio": 0.731144,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_war_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 101.534743,
+              "inlierRatio": 0.894231,
+              "meanReprojectionError": 1.300617,
+              "maxReprojectionError": 4.288608,
+              "areaRatio": 0.532761,
+              "cornersInsideCount": 2
+            },
+            {
+              "caseId": "v_wormhole_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 89.716809,
+              "inlierRatio": 0.993333,
+              "meanReprojectionError": 0.920415,
+              "maxReprojectionError": 4.668018,
+              "areaRatio": 0.566468,
+              "cornersInsideCount": 2
+            }
+          ]
+        },
+        {
+          "caseCount": 2,
+          "meanPositionErrorPx": 138.869596,
+          "p95PositionErrorPx": 221.662625,
+          "maxPositionErrorPx": 221.662625,
+          "p95MaxCornerErrorPx": 6.867339,
+          "meanInlierRatio": 0.966832,
+          "meanReprojectionError": 0.905749,
+          "maxReprojectionError": 4.836414,
+          "meanAreaRatio": 1.4713,
+          "meanCornersInsideCount": 2,
+          "bucket": "projected_area_drift",
+          "samples": [
+            {
+              "caseId": "v_charing_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 221.662625,
+              "inlierRatio": 0.956522,
+              "meanReprojectionError": 0.984291,
+              "maxReprojectionError": 2.434394,
+              "areaRatio": 2.453235,
+              "cornersInsideCount": 1
+            },
+            {
+              "caseId": "v_home_1_2",
+              "sequenceType": "viewpoint",
+              "positionErrorPx": 56.076566,
+              "inlierRatio": 0.977143,
+              "meanReprojectionError": 0.827208,
+              "maxReprojectionError": 4.836414,
+              "areaRatio": 0.489366,
+              "cornersInsideCount": 3
+            }
+          ]
+        }
+      ],
+      "tailSummary": {
+        "caseCount": 46,
+        "meanPositionErrorPx": 21803.284619,
+        "p95PositionErrorPx": 158.0763,
+        "maxPositionErrorPx": 1000000.0,
+        "p95MaxCornerErrorPx": 8.354836,
+        "meanInlierRatio": 0.944491,
+        "meanReprojectionError": 0.741829,
+        "maxReprojectionError": 6.425538,
+        "meanAreaRatio": 0.851044,
+        "meanCornersInsideCount": 1.478261
+      }
+    }
+  ],
+  "recommendedNextActions": [
+    "Use the populated P95CornerErrorPx and bucket-level max-corner evidence to evaluate replay-safe profile candidates.",
+    "Treat extreme_viewpoint_crop as geometry-tail triage first; current center-gate candidates need replay regression checks before any relaxed pass gate.",
+    "Keep replay regression at zero before promoting stricter ratio, looser RANSAC, or multi-hypothesis homography profiles."
+  ]
+}
