@@ -100,7 +100,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         double ransacThreshold,
         int minMatchCount,
         int minInliers,
-        double minInlierRatio)
+        double minInlierRatio,
+        bool allowCenterOnlyProjection = false)
     {
         if (goodMatches.Count < 4)
         {
@@ -129,6 +130,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
             minMatchCount,
             minInliers,
             minInlierRatio,
+            allowCenterOnlyProjection,
             out var homography,
             out var corners,
             out var metrics);

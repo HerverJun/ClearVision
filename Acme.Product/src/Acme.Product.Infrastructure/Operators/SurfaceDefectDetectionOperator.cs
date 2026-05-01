@@ -33,12 +33,15 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MorphCleanSize", "Morph Clean Size", "int", DefaultValue = 3, Min = 1, Max = 301)]
 [OperatorParam("MorphMode", "Morph Mode", "enum", DefaultValue = "OpenClose", Options = new[] { "None|None", "OpenClose|Open then close", "CloseOpen|Close then open", "CloseOnly|Close only" })]
 [OperatorParam("AlignmentMode", "Alignment Mode", "enum", DefaultValue = "PhaseCorrelation", Options = new[] { "None|None", "PhaseCorrelation|PhaseCorrelation" })]
-[OperatorParam("NormalizationMode", "Normalization Mode", "enum", DefaultValue = "LocalMean", Options = new[] { "None|None", "LocalMean|LocalMean" })]
+[OperatorParam("NormalizationMode", "Normalization Mode", "enum", DefaultValue = "LocalMean", Options = new[] { "None|None", "LocalMean|LocalMean", "ClaheLocalMean|CLAHE + LocalMean" })]
 [OperatorParam("ThresholdMode", "Threshold Mode", "enum", DefaultValue = "Auto", Options = new[] { "Auto|Auto", "Manual|Manual", "Otsu|Otsu", "ReferenceStats|ReferenceStats" })]
 [OperatorParam("BackgroundKernelSize", "Background Kernel Size", "int", DefaultValue = 31, Min = 3, Max = 301)]
+[OperatorParam("ClaheClipLimit", "CLAHE Clip Limit", "double", DefaultValue = 2.0, Min = 0.1, Max = 40.0)]
+[OperatorParam("ClaheTileGridSize", "CLAHE Tile Grid Size", "int", DefaultValue = 8, Min = 2, Max = 64)]
 [OperatorParam("ReferenceStatsSigma", "Reference Stats Sigma", "double", DefaultValue = 2.5, Min = 0.1, Max = 10.0)]
 [OperatorParam("RobustReferenceStats", "Robust Reference Stats", "bool", DefaultValue = false)]
 [OperatorParam("ResponseNormalizeMode", "Response Normalize Mode", "enum", DefaultValue = "RawClamp", Options = new[] { "RawClamp|Raw clamp", "MinMax|Min/max", "PercentileClip|Percentile clip" })]
+[OperatorParam("ComponentFilterMode", "Component Filter Mode", "enum", DefaultValue = "AreaOnly", Options = new[] { "AreaOnly|Area only", "ResponseStats|Response statistics" })]
 public class SurfaceDefectDetectionOperator : OperatorBase
 {
     private const double MinAcceptedPhaseCorrelationResponse = 0.02;
@@ -77,9 +80,12 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         var normalizationMode = GetStringParam(@operator, "NormalizationMode", "LocalMean");
         var thresholdMode = GetStringParam(@operator, "ThresholdMode", "Auto");
         var backgroundKernelSize = GetIntParam(@operator, "BackgroundKernelSize", 31, 3, 301);
+        var claheClipLimit = GetDoubleParam(@operator, "ClaheClipLimit", 2.0, 0.1, 40.0);
+        var claheTileGridSize = GetIntParam(@operator, "ClaheTileGridSize", 8, 2, 64);
         var referenceStatsSigma = GetDoubleParam(@operator, "ReferenceStatsSigma", 2.5, 0.1, 10.0);
         var robustReferenceStats = GetBoolParam(@operator, "RobustReferenceStats", false);
         var responseNormalizeMode = GetStringParam(@operator, "ResponseNormalizeMode", "RawClamp");
+        var componentFilterMode = GetStringParam(@operator, "ComponentFilterMode", "AreaOnly");
 
         using var gray = OperatorImageDepthHelper.EnsureSingleChannelGray(src);
 
@@ -91,6 +97,8 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             normalizationMode,
             responseNormalizeMode,
             backgroundKernelSize,
+            claheClipLimit,
+            claheTileGridSize,
             out var alignmentScore,
             out var alignmentShift,
             out var rejectedReason);
@@ -127,12 +135,28 @@ public class SurfaceDefectDetectionOperator : OperatorBase
 
         var defectCount = 0;
         var defectArea = 0.0;
+        var componentRejectedCount = 0;
+        Cv2.MeanStdDev(response, out var responseMean, out var responseStdDev);
+        var responseStatsFilter = componentFilterMode.Equals("ResponseStats", StringComparison.OrdinalIgnoreCase);
+        var componentMeanGate = responseStatsFilter
+            ? Math.Max(appliedThreshold * 0.55, responseMean.Val0 + responseStdDev.Val0 * 0.10)
+            : 0.0;
+        var componentPeakGate = responseStatsFilter
+            ? Math.Max(appliedThreshold, responseMean.Val0 + responseStdDev.Val0 * 0.35)
+            : 0.0;
 
         foreach (var contour in contours)
         {
             var area = Cv2.ContourArea(contour);
             if (area < minArea || area > maxArea)
             {
+                continue;
+            }
+
+            if (responseStatsFilter &&
+                !AcceptComponentByResponseStats(response, contour, componentMeanGate, componentPeakGate, out _, out _))
+            {
+                componentRejectedCount++;
                 continue;
             }
 
@@ -147,15 +171,17 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         Cv2.PutText(resultImage, $"Defects:{defectCount} Area:{defectArea:F1}", new Point(8, 24), HersheyFonts.HersheySimplex, 0.6, new Scalar(0, 255, 255), 2);
         Cv2.PutText(resultImage, $"Thr:{appliedThreshold:F1} Align:{alignmentScore:F2}", new Point(8, 48), HersheyFonts.HersheySimplex, 0.5, new Scalar(255, 255, 0), 1);
 
-        Cv2.MeanStdDev(response, out var responseMean, out var responseStdDev);
         var diagnostics = new Dictionary<string, object>
         {
             { "Method", method },
             { "AlignmentMode", alignmentMode },
             { "NormalizationMode", normalizationMode },
             { "ResponseNormalizeMode", responseNormalizeMode },
+            { "ComponentFilterMode", componentFilterMode },
             { "ThresholdMode", ResolveThresholdMode(method, thresholdMode) },
             { "AppliedThreshold", appliedThreshold },
+            { "ClaheClipLimit", claheClipLimit },
+            { "ClaheTileGridSize", claheTileGridSize },
             { "RobustReferenceStats", robustReferenceStats },
             { "MorphMode", morphMode },
             { "CandidateAreaBeforeMorph", candidateAreaBeforeMorph },
@@ -165,6 +191,9 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             { "AlignmentShiftY", alignmentShift.Y },
             { "CandidateCount", contours.Length },
             { "AcceptedCount", defectCount },
+            { "ComponentRejectedCount", componentRejectedCount },
+            { "ComponentMeanGate", componentMeanGate },
+            { "ComponentPeakGate", componentPeakGate },
             { "RejectedReason", rejectedReason },
             { "ResponseMean", responseMean.Val0 },
             { "ResponseStdDev", responseStdDev.Val0 }
@@ -208,10 +237,10 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         }
 
         var normalizationMode = GetStringParam(@operator, "NormalizationMode", "LocalMean");
-        var validNormalizationModes = new[] { "None", "LocalMean" };
+        var validNormalizationModes = new[] { "None", "LocalMean", "ClaheLocalMean" };
         if (!validNormalizationModes.Contains(normalizationMode, StringComparer.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("NormalizationMode must be None or LocalMean");
+            return ValidationResult.Invalid("NormalizationMode must be None, LocalMean or ClaheLocalMean");
         }
 
         var thresholdMode = GetStringParam(@operator, "ThresholdMode", "Auto");
@@ -235,6 +264,25 @@ public class SurfaceDefectDetectionOperator : OperatorBase
             return ValidationResult.Invalid("ResponseNormalizeMode must be RawClamp, MinMax or PercentileClip");
         }
 
+        var componentFilterMode = GetStringParam(@operator, "ComponentFilterMode", "AreaOnly");
+        var validComponentFilterModes = new[] { "AreaOnly", "ResponseStats" };
+        if (!validComponentFilterModes.Contains(componentFilterMode, StringComparer.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("ComponentFilterMode must be AreaOnly or ResponseStats");
+        }
+
+        var claheClipLimit = GetDoubleParam(@operator, "ClaheClipLimit", 2.0);
+        if (claheClipLimit <= 0 || claheClipLimit > 40)
+        {
+            return ValidationResult.Invalid("ClaheClipLimit must be in (0, 40].");
+        }
+
+        var claheTileGridSize = GetIntParam(@operator, "ClaheTileGridSize", 8);
+        if (claheTileGridSize < 2 || claheTileGridSize > 64)
+        {
+            return ValidationResult.Invalid("ClaheTileGridSize must be between 2 and 64.");
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -246,6 +294,8 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         string normalizationMode,
         string responseNormalizeMode,
         int backgroundKernelSize,
+        double claheClipLimit,
+        int claheTileGridSize,
         out double alignmentScore,
         out Point2d alignmentShift,
         out string rejectedReason)
@@ -258,7 +308,7 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         {
             case "gradientmagnitude":
             {
-                using var normalized = NormalizeForComparison(gray, normalizationMode, backgroundKernelSize);
+                using var normalized = NormalizeForComparison(gray, normalizationMode, backgroundKernelSize, claheClipLimit, claheTileGridSize);
                 using var gradX = new Mat();
                 using var gradY = new Mat();
                 using var magnitude = new Mat();
@@ -285,8 +335,8 @@ public class SurfaceDefectDetectionOperator : OperatorBase
 
                 using var resized = EnsureSize(referenceGray, gray.Size());
                 using var aligned = AlignReferenceToSource(gray, resized, alignmentMode, out alignmentScore, out alignmentShift, out rejectedReason);
-                using var normalizedSource = NormalizeForComparison(gray, normalizationMode, backgroundKernelSize);
-                using var normalizedReference = NormalizeForComparison(aligned, normalizationMode, backgroundKernelSize);
+                using var normalizedSource = NormalizeForComparison(gray, normalizationMode, backgroundKernelSize, claheClipLimit, claheTileGridSize);
+                using var normalizedReference = NormalizeForComparison(aligned, normalizationMode, backgroundKernelSize, claheClipLimit, claheTileGridSize);
 
                 var result = new Mat();
                 Cv2.Absdiff(normalizedSource, normalizedReference, result);
@@ -295,7 +345,10 @@ public class SurfaceDefectDetectionOperator : OperatorBase
 
             case "localcontrast":
             {
-                return NormalizeForComparison(gray, "LocalMean", backgroundKernelSize);
+                var localNormalizationMode = normalizationMode.Equals("None", StringComparison.OrdinalIgnoreCase)
+                    ? "LocalMean"
+                    : normalizationMode;
+                return NormalizeForComparison(gray, localNormalizationMode, backgroundKernelSize, claheClipLimit, claheTileGridSize);
             }
 
             default:
@@ -397,22 +450,66 @@ public class SurfaceDefectDetectionOperator : OperatorBase
         return (int)Math.Clamp(Math.Round((count - 1) * percentile), 0, count - 1);
     }
 
-    private static Mat NormalizeForComparison(Mat gray, string normalizationMode, int backgroundKernelSize)
+    private static Mat NormalizeForComparison(
+        Mat gray,
+        string normalizationMode,
+        int backgroundKernelSize,
+        double claheClipLimit,
+        int claheTileGridSize)
     {
         if (normalizationMode.Equals("None", StringComparison.OrdinalIgnoreCase))
         {
             return gray.Clone();
         }
 
+        var comparisonSource = CreateComparisonSource(gray, normalizationMode, claheClipLimit, claheTileGridSize);
         var kernelSize = backgroundKernelSize % 2 == 0 ? backgroundKernelSize + 1 : backgroundKernelSize;
         kernelSize = Math.Max(3, kernelSize);
 
-        using var background = new Mat();
-        Cv2.GaussianBlur(gray, background, new Size(kernelSize, kernelSize), 0);
+        try
+        {
+            using var background = new Mat();
+            Cv2.GaussianBlur(comparisonSource, background, new Size(kernelSize, kernelSize), 0);
 
-        var normalized = new Mat();
-        Cv2.Absdiff(gray, background, normalized);
-        return normalized;
+            var normalized = new Mat();
+            Cv2.Absdiff(comparisonSource, background, normalized);
+            return normalized;
+        }
+        finally
+        {
+            comparisonSource.Dispose();
+        }
+    }
+
+    private static Mat CreateComparisonSource(Mat gray, string normalizationMode, double claheClipLimit, int claheTileGridSize)
+    {
+        if (!normalizationMode.Equals("ClaheLocalMean", StringComparison.OrdinalIgnoreCase))
+        {
+            return gray.Clone();
+        }
+
+        using var gray8 = OperatorImageDepthHelper.ConvertSingleChannelToByte(gray, out _, out _);
+        using var clahe = Cv2.CreateCLAHE(
+            Math.Clamp(claheClipLimit, 0.1, 40.0),
+            new Size(Math.Clamp(claheTileGridSize, 2, 64), Math.Clamp(claheTileGridSize, 2, 64)));
+        var enhanced = new Mat();
+        clahe.Apply(gray8, enhanced);
+        return enhanced;
+    }
+
+    private static bool AcceptComponentByResponseStats(
+        Mat response,
+        Point[] contour,
+        double componentMeanGate,
+        double componentPeakGate,
+        out double componentMean,
+        out double componentPeak)
+    {
+        using var mask = new Mat(response.Size(), MatType.CV_8UC1, Scalar.Black);
+        Cv2.DrawContours(mask, new[] { contour }, -1, Scalar.White, -1);
+        componentMean = Cv2.Mean(response, mask).Val0;
+        Cv2.MinMaxLoc(response, out _, out componentPeak, out _, out _, mask);
+        return componentMean >= componentMeanGate || componentPeak >= componentPeakGate;
     }
 
     private static Mat AlignReferenceToSource(

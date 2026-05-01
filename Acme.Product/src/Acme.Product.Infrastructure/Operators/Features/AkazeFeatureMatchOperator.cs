@@ -32,10 +32,12 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("AreaRatio", "Projected Area Ratio", PortDataType.Float)]
 [OutputPort("CornersInsideCount", "Projected Corners Inside", PortDataType.Integer)]
 [OutputPort("ProjectedCenterInside", "Projected Center Inside", PortDataType.Boolean)]
+[OutputPort("Corners", "Projected Corners", PortDataType.PointList)]
 [OutputPort("HomographyFailureReason", "Homography Failure Reason", PortDataType.String)]
 [OperatorParam("MatchRatio", "Match Ratio (Lowe's)", "double", DefaultValue = 0.75, Min = 0.5, Max = 0.95)]
 [OperatorParam("RansacThreshold", "RANSAC Threshold (px)", "double", DefaultValue = 5.0, Min = 0.5, Max = 10.0)]
 [OperatorParam("MinInlierRatio", "Min Inlier Ratio", "double", DefaultValue = 0.25, Min = 0.1, Max = 1.0)]
+[OperatorParam("AllowCenterOnlyProjection", "Allow Center-Only Projection", "bool", DefaultValue = false)]
 [OperatorParam("OriginMode", "Origin Mode", "enum", DefaultValue = "Center", Options = new[] { "Center|Center", "TopLeft|TopLeft", "Custom|Custom" })]
 [OperatorParam("OriginX", "Origin X", "double", DefaultValue = 0.0)]
 [OperatorParam("OriginY", "Origin Y", "double", DefaultValue = 0.0)]
@@ -92,6 +94,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
         var matchRatio = GetDoubleParam(@operator, "MatchRatio", 0.75, min: 0.5, max: 0.95);
         var ransacThreshold = GetDoubleParam(@operator, "RansacThreshold", 5.0, min: 0.5, max: 10.0);
         var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25, min: 0.1, max: 1.0);
+        var allowCenterOnlyProjection = GetBoolParam(@operator, "AllowCenterOnlyProjection", false);
 
         var srcImage = imageWrapper.GetMat();
         using var srcGray = ToGray(srcImage);
@@ -176,7 +179,8 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
                 ransacThreshold,
                 minMatchCount,
                 minInliers: minMatchCount,
-                minInlierRatio);
+                minInlierRatio,
+                allowCenterOnlyProjection);
             var origin = ResolveReferenceOrigin(@operator, templateImage.Size());
 
             var verificationScore = HomographyVerificationHelper.ComputeVerificationScore(metrics, ransacThreshold);
@@ -245,6 +249,7 @@ public class AkazeFeatureMatchOperator : FeatureMatchOperatorBase
                 { "AreaRatio", metrics.AreaRatio },
                 { "CornersInsideCount", metrics.CornersInsideCount },
                 { "ProjectedCenterInside", metrics.ProjectedCenterInside },
+                { "Corners", corners.Select(c => new Position(c.X, c.Y)).ToList() },
                 { "OriginMode", GetStringParam(@operator, "OriginMode", "Center") }
             })));
         }

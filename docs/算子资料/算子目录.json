@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T08:08:30.0876185+08:00",
+  "generatedAt": "2026-05-01T10:19:56.3600494+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -692,13 +692,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
+        "totalScore": 100,
         "level": "A",
         "documentationScore": 100,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "errorHandlingScore": 100,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/EdgeDetection.md"
     },

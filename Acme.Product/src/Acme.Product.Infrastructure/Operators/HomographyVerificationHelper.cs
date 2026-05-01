@@ -4,6 +4,10 @@ namespace Acme.Product.Infrastructure.Operators;
 
 internal static class HomographyVerificationHelper
 {
+    private const double CenterOnlyMaxAreaRatio = 1.5;
+    private const double CenterOnlyMaxMeanReprojectionErrorPx = 1.2;
+    private const double CenterOnlyMinInlierRatio = 0.75;
+
     internal readonly record struct HomographyVerificationMetrics(
         bool VerificationPassed,
         int MatchCount,
@@ -26,6 +30,35 @@ internal static class HomographyVerificationHelper
         int minMatchCount,
         int minInliers,
         double minInlierRatio,
+        out Mat? homography,
+        out Point2f[] corners,
+        out HomographyVerificationMetrics metrics)
+    {
+        return TryEstimateAndVerify(
+            templatePoints,
+            searchPoints,
+            templateSize,
+            searchImageSize,
+            ransacThreshold,
+            minMatchCount,
+            minInliers,
+            minInlierRatio,
+            allowCenterOnlyProjection: false,
+            out homography,
+            out corners,
+            out metrics);
+    }
+
+    public static bool TryEstimateAndVerify(
+        Point2f[] templatePoints,
+        Point2f[] searchPoints,
+        Size templateSize,
+        Size searchImageSize,
+        double ransacThreshold,
+        int minMatchCount,
+        int minInliers,
+        double minInlierRatio,
+        bool allowCenterOnlyProjection,
         out Mat? homography,
         out Point2f[] corners,
         out HomographyVerificationMetrics metrics)
@@ -88,6 +121,9 @@ internal static class HomographyVerificationHelper
         var projectedCenter = projectedCenters.Length == 1 ? projectedCenters[0] : new Point2f(float.NaN, float.NaN);
         var (cornersValid, cornersInsideCount, projectedCenterInside) =
             EvaluateProjectedQuadrilateral(corners, projectedCenter, areaRatio, searchImageSize);
+        var centerOnlyAccepted = allowCenterOnlyProjection &&
+            projectedCenterInside &&
+            IsCenterOnlyProjectionAcceptable(corners, areaRatio, inlierRatio, meanReprojectionError);
         var maxMeanReprojectionError = Math.Max(1.0, ransacThreshold * 1.35);
         var maxPeakReprojectionError = Math.Max(2.0, ransacThreshold * 2.5);
 
@@ -108,7 +144,7 @@ internal static class HomographyVerificationHelper
         {
             failureReason = $"Reprojection error too large (mean={meanReprojectionError:F2}px, max={maxReprojectionError:F2}px).";
         }
-        else if (!cornersValid)
+        else if (!cornersValid && !centerOnlyAccepted)
         {
             failureReason = "Projected quadrilateral is invalid.";
         }
@@ -122,7 +158,7 @@ internal static class HomographyVerificationHelper
             MeanReprojectionError: meanReprojectionError,
             MaxReprojectionError: maxReprojectionError,
             AreaRatio: areaRatio,
-            CornersValid: cornersValid,
+            CornersValid: cornersValid || centerOnlyAccepted,
             CornersInsideCount: cornersInsideCount,
             ProjectedCenterInside: projectedCenterInside,
             FailureReason: verificationPassed ? string.Empty : failureReason);
@@ -277,6 +313,24 @@ internal static class HomographyVerificationHelper
         // for localization operators that report a reference point rather than a
         // full in-frame quadrilateral.
         return (insideCount >= 2 && projectedCenterInside, insideCount, projectedCenterInside);
+    }
+
+    private static bool IsCenterOnlyProjectionAcceptable(
+        Point2f[] corners,
+        double areaRatio,
+        double inlierRatio,
+        double meanReprojectionError)
+    {
+        return corners.Length == 4 &&
+               corners.All(point => float.IsFinite(point.X) && float.IsFinite(point.Y)) &&
+               Math.Abs(SignedArea(corners)) >= 1e-3 &&
+               inlierRatio >= CenterOnlyMinInlierRatio &&
+               double.IsFinite(meanReprojectionError) &&
+               areaRatio is >= 0.1 and <= 8.0 &&
+               (areaRatio <= CenterOnlyMaxAreaRatio ||
+                meanReprojectionError <= CenterOnlyMaxMeanReprojectionErrorPx) &&
+               IsConvexQuadrilateral(corners) &&
+               !HasSelfIntersection(corners);
     }
 
     private static bool IsPointInsideSearchImage(Point2f point, Size searchImageSize)

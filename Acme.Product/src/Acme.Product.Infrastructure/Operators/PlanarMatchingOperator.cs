@@ -70,6 +70,7 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("MinInliers", "Min Inliers", "int", DefaultValue = 8, Min = 4, Max = 100)]
 [OperatorParam("MinInlierRatio", "Min Inlier Ratio", "double", DefaultValue = 0.25, Min = 0.1, Max = 1.0)]
 [OperatorParam("ScoreThreshold", "Score Threshold", "double", DefaultValue = 0.5, Min = 0.0, Max = 1.0)]
+[OperatorParam("AllowCenterOnlyProjection", "Allow Center-Only Projection", "bool", DefaultValue = false)]
 [OperatorParam("UseRoi", "Use ROI", "bool", DefaultValue = false)]
 [OperatorParam("RoiX", "ROI X", "int", DefaultValue = 0)]
 [OperatorParam("RoiY", "ROI Y", "int", DefaultValue = 0)]
@@ -116,6 +117,7 @@ public class PlanarMatchingOperator : OperatorBase
         var minInliers = GetIntParam(@operator, "MinInliers", Math.Min(8, minMatchCount), 4, 100);
         var minInlierRatio = GetDoubleParam(@operator, "MinInlierRatio", 0.25, 0.1, 1.0);
         var scoreThreshold = GetDoubleParam(@operator, "ScoreThreshold", 0.5, 0.0, 1.0);
+        var allowCenterOnlyProjection = GetBoolParam(@operator, "AllowCenterOnlyProjection", false);
         var useRoi = GetBoolParam(@operator, "UseRoi", false);
         var roiX = GetIntParam(@operator, "RoiX", 0);
         var roiY = GetIntParam(@operator, "RoiY", 0);
@@ -194,7 +196,7 @@ public class PlanarMatchingOperator : OperatorBase
                 if (Math.Abs(scale - 1.0) < 0.01)
                 {
                     match = PerformMatching(searchRoi, templateFeatures, detectorType, maxFeatures, scaleFactor, nLevels,
-                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio);
+                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio, allowCenterOnlyProjection);
                 }
                 else
                 {
@@ -202,7 +204,7 @@ public class PlanarMatchingOperator : OperatorBase
                     using var scaledImage = new Mat();
                     Cv2.Resize(searchRoi, scaledImage, new Size(0, 0), 1.0 / scale, 1.0 / scale, InterpolationFlags.Linear);
                     match = PerformMatching(scaledImage, templateFeatures, detectorType, maxFeatures, scaleFactor, nLevels,
-                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio);
+                        matchRatio, ransacThreshold, minMatchCount, minInliers, minInlierRatio, allowCenterOnlyProjection);
 
                     if (match != null)
                     {
@@ -294,7 +296,7 @@ public class PlanarMatchingOperator : OperatorBase
 
     private MatchResult? PerformMatching(Mat searchImage, TemplateFeatures templateFeatures, string detectorType,
         int maxFeatures, double scaleFactor, int nLevels, double matchRatio, double ransacThreshold,
-        int minMatchCount, int minInliers, double minInlierRatio)
+        int minMatchCount, int minInliers, double minInlierRatio, bool allowCenterOnlyProjection)
     {
         // 提取搜索图像特征
         var method = $"FeatureHomography:{detectorType}";
@@ -346,6 +348,7 @@ public class PlanarMatchingOperator : OperatorBase
             minMatchCount,
             minInliers,
             minInlierRatio,
+            allowCenterOnlyProjection,
             out var homography,
             out var corners,
             out var verificationMetrics);

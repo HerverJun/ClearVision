@@ -153,7 +153,7 @@ public class ArcCaliperOperator : OperatorBase
         var start = new Point2d(px - (dx * searchHalfLength), py - (dy * searchHalfLength));
         var end = new Point2d(px + (dx * searchHalfLength), py + (dy * searchHalfLength));
         var profile = IndustrialCaliperKernel.SampleBandProfile(gray, start, end, averagingThickness, sampleCount);
-        var threshold = Math.Max(20.0, IndustrialCaliperKernel.EstimateEdgeThreshold(profile, minimumThreshold: 8.0));
+        var threshold = Math.Max(6.0, IndustrialCaliperKernel.EstimateEdgeThreshold(profile, minimumThreshold: 4.0));
         var polarity = transition switch
         {
             "positive" => "DarkToLight",
