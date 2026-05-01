@@ -68,6 +68,7 @@ public class AiFlowGenerationResult
     public const string CompletionStatusCancelled = "cancelled";
     public const string CompletionStatusTimedOut = "timed_out";
     public const string CompletionStatusFailed = "failed";
+    public const string CompletionStatusClarificationRequired = "clarification_required";
 
     public const string FailureTypeUserCancelled = "user_cancelled";
     public const string FailureTypeTimeout = "timeout";
@@ -180,6 +181,11 @@ public class AiFlowGenerationResult
     /// Structured generation timeline for workbench diagnostics.
     /// </summary>
     public List<AiGenerationStageDiagnostic> StageTimeline { get; set; } = new();
+
+    /// <summary>
+    /// When CompletionStatus is "clarification_required", contains the questions to ask.
+    /// </summary>
+    public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
 }
 
 public class AiFailureSummary
@@ -306,6 +312,19 @@ public class AiRequirementBrief
     public List<string> MeasurementTargets { get; set; } = new();
     public List<string> RequiredResources { get; set; } = new();
     public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
+
+    public string Industry { get; set; } = string.Empty;
+    public string ObjectName { get; set; } = string.Empty;
+    public string ImageSource { get; set; } = string.Empty;
+    public string TriggerMode { get; set; } = string.Empty;
+    public string OutputTarget { get; set; } = string.Empty;
+    public bool? AiModelRequired { get; set; }
+    public string ModelResource { get; set; } = string.Empty;
+    public string RoiRequirement { get; set; } = string.Empty;
+    public string CalibrationRequirement { get; set; } = string.Empty;
+    public string DecisionRule { get; set; } = string.Empty;
+    public double Confidence { get; set; }
+    public List<string> MissingFields { get; set; } = new();
 }
 
 public class AiClarificationQuestion
@@ -313,6 +332,10 @@ public class AiClarificationQuestion
     public string Field { get; set; } = string.Empty;
     public string Question { get; set; } = string.Empty;
     public bool Required { get; set; }
+    public List<string> Options { get; set; } = new();
+    public string DefaultValue { get; set; } = string.Empty;
+    public string Reason { get; set; } = string.Empty;
+    public string Level { get; set; } = "required";
 }
 
 public class AiTemplateCandidateInfo

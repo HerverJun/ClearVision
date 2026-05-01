@@ -33,6 +33,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IFlowTemplateService _templateService;
     private readonly IScenarioMatcher _scenarioMatcher;
     private readonly IRequirementBriefExtractor _requirementBriefExtractor;
+    private readonly IClarificationEngine _clarificationEngine;
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
@@ -57,6 +58,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IFlowTemplateService templateService,
         IScenarioMatcher scenarioMatcher,
         IRequirementBriefExtractor requirementBriefExtractor,
+        IClarificationEngine clarificationEngine,
         ITemplateConstraintValidator templateConstraintValidator,
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
@@ -71,6 +73,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateService = templateService;
         _scenarioMatcher = scenarioMatcher;
         _requirementBriefExtractor = requirementBriefExtractor;
+        _clarificationEngine = clarificationEngine;
         _templateConstraintValidator = templateConstraintValidator;
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
@@ -127,6 +130,44 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ["intentType"] = brief.IntentType,
                 ["clarificationCount"] = brief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture)
             });
+
+        // --- Clarification gate: return early if critical fields are missing ---
+        var clarificationResult = pipeline.Measure(
+            "clarification",
+            () => _clarificationEngine.Evaluate(requirementBrief, templatePriority.PrimaryMatch),
+            eval => eval.ClarificationRequired
+                ? $"clarification required: {eval.Questions.Count} questions, level={eval.Level}"
+                : "no clarification needed",
+            eval => new Dictionary<string, string>
+            {
+                ["clarificationRequired"] = eval.ClarificationRequired.ToString(),
+                ["level"] = eval.Level,
+                ["questionCount"] = eval.Questions.Count.ToString(CultureInfo.InvariantCulture)
+            });
+
+        if (clarificationResult.ClarificationRequired)
+        {
+            ReportProgress("需要补充关键信息才能生成准确方案...");
+            requirementBrief.ClarificationQuestions = clarificationResult.Questions;
+            requirementBrief.MissingFields = clarificationResult.StillMissingFields;
+
+            return new AiFlowGenerationResult
+            {
+                Success = false,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                RequirementBrief = requirementBrief,
+                ClarificationQuestions = clarificationResult.Questions,
+                TemplateCandidates = BuildTemplateCandidates(templatePriority),
+                StageTimeline = pipeline.Timeline.ToList(),
+                SessionId = conversationContext.SessionId
+            };
+        }
+
+        if (clarificationResult.Level == "recommended")
+        {
+            requirementBrief.ClarificationQuestions = clarificationResult.Questions;
+        }
+
         if (templatePriority.IsTemplateFirst)
         {
             ReportProgress($"已命中模板优先场景：{templatePriority.Template?.Name ?? templatePriority.ScenarioName}，进入 {templatePriority.GenerationMode} 模式...");

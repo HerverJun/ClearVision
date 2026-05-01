@@ -103,7 +103,9 @@ public class GenerateFlowMessageHandler
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace
+                PromptTrace = result.PromptTrace,
+                ClarificationQuestions = MapClarificationQuestions(result.ClarificationQuestions),
+                RequirementBrief = result.RequirementBrief
             };
 
             return SerializeResponse(response, result.FailureType);
@@ -187,6 +189,8 @@ public class GenerateFlowMessageHandler
                 response.MissingResources,
                 response.ManualRetry,
                 response.PromptTrace,
+                response.ClarificationQuestions,
+                response.RequirementBrief,
                 FailureType = failureType
             }, _jsonOptions);
     }
@@ -279,5 +283,25 @@ public class GenerateFlowMessageHandler
             LastOutputSummary = manualRetry.LastOutputSummary,
             Diagnostics = manualRetry.Diagnostics.Cast<object>().ToList()
         };
+    }
+
+    private static List<GenerateFlowClarificationQuestion> MapClarificationQuestions(
+        IReadOnlyCollection<AiClarificationQuestion>? questions)
+    {
+        if (questions == null || questions.Count == 0)
+        {
+            return new List<GenerateFlowClarificationQuestion>();
+        }
+
+        return questions.Select(q => new GenerateFlowClarificationQuestion
+        {
+            Field = q.Field,
+            Question = q.Question,
+            Required = q.Required,
+            Options = q.Options,
+            DefaultValue = q.DefaultValue,
+            Reason = q.Reason,
+            Level = q.Level
+        }).ToList();
     }
 }

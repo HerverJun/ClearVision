@@ -1199,6 +1199,153 @@
     margin-bottom: 10px;
 }
 
+/* ---- Requirement Card (Clarification) ---- */
+
+.result-card.requirement-card {
+    border-color: rgba(231, 76, 60, 0.3);
+    background: linear-gradient(135deg, var(--glass-card), rgba(231, 76, 60, 0.04));
+}
+
+.ai-requirement-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ai-requirement-field {
+    padding: 6px 8px;
+    border-radius: var(--radius-sm, 8px);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.ai-requirement-field.is-missing {
+    background: rgba(231, 76, 60, 0.08);
+    border: 1px dashed rgba(231, 76, 60, 0.3);
+}
+
+.ai-requirement-field-label {
+    font-size: 11px;
+    color: #8b7355;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ai-requirement-field-value {
+    font-size: 13px;
+    color: var(--paper-white);
+}
+
+.ai-clarification-questions {
+    margin-top: 12px;
+}
+
+.ai-clarification-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cinnabar);
+    margin-bottom: 8px;
+}
+
+.ai-clarification-question {
+    padding: 10px;
+    border-radius: var(--radius-sm, 8px);
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ai-clarification-question.is-required {
+    border-color: rgba(231, 76, 60, 0.25);
+}
+
+.ai-clarification-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--cinnabar);
+    color: white;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.ai-clarification-badge.optional {
+    background: rgba(139, 115, 85, 0.5);
+}
+
+.ai-clarification-question-text {
+    font-size: 13px;
+    color: var(--paper-white);
+    margin-bottom: 4px;
+}
+
+.ai-clarification-reason {
+    font-size: 11px;
+    color: rgba(139, 115, 85, 0.8);
+    margin-bottom: 6px;
+}
+
+.ai-clarification-select,
+.ai-clarification-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm, 8px);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--paper-white);
+    font-size: 13px;
+    font-family: var(--font-display);
+    box-sizing: border-box;
+}
+
+.ai-clarification-select:focus,
+.ai-clarification-input:focus {
+    outline: none;
+    border-color: var(--cinnabar);
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.15);
+}
+
+.ai-requirement-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ai-requirement-submit-btn {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius-sm, 8px);
+    background: var(--cinnabar);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.ai-requirement-submit-btn:hover {
+    opacity: 0.85;
+}
+
+.ai-requirement-skip-btn {
+    padding: 8px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-sm, 8px);
+    background: transparent;
+    color: rgba(139, 115, 85, 0.8);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.ai-requirement-skip-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ---- End Requirement Card ---- */
+
 .prompt-trace-card {
     border-color: rgba(231, 76, 60, 0.12);
     background: rgba(231, 76, 60, 0.05);

@@ -126,6 +126,21 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         session.History.Last().Payload!.ManualRetry!.Stage.Should().Be("validation");
     }
 
+    private static IClarificationEngine CreateMockClarificationEngine()
+    {
+        var engine = Substitute.For<IClarificationEngine>();
+        engine.Evaluate(
+                Arg.Any<AiRequirementBrief>(),
+                Arg.Any<ScenarioMatchResult?>(),
+                Arg.Any<IReadOnlyList<string>?>())
+            .Returns(new ClarificationEvaluationResult
+            {
+                ClarificationRequired = false,
+                Level = "none"
+            });
+        return engine;
+    }
+
     private static AiFlowGenerationService CreateService(
         IAiConnector connector,
         IAiFlowValidator validator,
@@ -184,6 +199,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             templateService,
             scenarioMatcher,
             requirementBriefExtractor,
+            CreateMockClarificationEngine(),
             templateConstraintValidator,
             new DryRunService(flowExecutionService),
             hostEnvironment,

@@ -77,6 +77,8 @@ public record GenerateFlowResponse
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
+    public List<GenerateFlowClarificationQuestion> ClarificationQuestions { get; init; } = new();
+    public object? RequirementBrief { get; init; }
 }
 
 /// <summary>
@@ -140,6 +142,17 @@ public record GenerateFlowManualRetry
     public string RepairTarget { get; init; } = string.Empty;
     public string LastOutputSummary { get; init; } = string.Empty;
     public List<object> Diagnostics { get; init; } = new();
+}
+
+public record GenerateFlowClarificationQuestion
+{
+    public string Field { get; init; } = string.Empty;
+    public string Question { get; init; } = string.Empty;
+    public bool Required { get; init; }
+    public List<string> Options { get; init; } = new();
+    public string DefaultValue { get; init; } = string.Empty;
+    public string Reason { get; init; } = string.Empty;
+    public string Level { get; init; } = "required";
 }
 
 

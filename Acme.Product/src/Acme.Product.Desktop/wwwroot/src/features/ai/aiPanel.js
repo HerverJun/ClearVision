@@ -50,7 +50,8 @@ export class AiPanel {
         this._streamFlushPending = false;
         this.activeAssistantTurn = null;
         this.pendingManualRetry = null;
-        
+        this._clarificationMemory = new Map();
+
         // 绑定方法
         this._handleGenerate = this._handleGenerate.bind(this);
         this._handleApplyFlow = this._handleApplyFlow.bind(this);
@@ -688,6 +689,19 @@ export class AiPanel {
             return;
         }
 
+        // Handle clarification_required: show requirement card instead of failing
+        const normalizedStatus = this._normalizeGenerateStatus(payload);
+        if (normalizedStatus === 'clarification_required') {
+            this._clearActiveRequestState();
+            this._setAssistantTurnStatus(activeTurn, '需要补充信息', 'warning');
+            this._setAssistantSectionText(activeTurn, 'reply',
+                '检测到关键信息缺失，请补充以下信息后再生成。');
+            this._setCurrentResult(payload);
+            this._displayClarificationRequired(payload);
+            this.activeAssistantTurn = null;
+            return;
+        }
+
         if (!payload.success) {
             this._clearActiveRequestState();
             const manualRetry = payload.manualRetry || payload.ManualRetry || null;
@@ -1090,6 +1104,185 @@ export class AiPanel {
             });
         });
     }
+
+    // ---- Clarification / Requirement Card ----
+
+    _displayClarificationRequired(payload) {
+        const brief = payload.requirementBrief || payload.RequirementBrief || {};
+        const questions = payload.clarificationQuestions || payload.ClarificationQuestions || [];
+
+        this._renderRequirementCard(brief, questions);
+        this._addMessage('ai', `需要补充 ${questions.filter(q => q.required !== false).length} 项关键信息后才能生成准确方案。请在右侧需求卡片中填写。`);
+        this._setResultStatusNote('信息不完整，请在需求卡片中补充关键信息后再生成。', 'warning');
+    }
+
+    _renderRequirementCard(brief, questions) {
+        const scrollContainer = this.container?.querySelector('#ai-results-scroll');
+        if (!scrollContainer) return;
+
+        const existingCard = scrollContainer.querySelector('.result-card.requirement-card');
+        if (existingCard) existingCard.remove();
+
+        const card = document.createElement('div');
+        card.className = 'result-card requirement-card';
+        card.innerHTML = `
+            <div class="card-title">需求卡片 Requirement Card</div>
+            <div class="ai-requirement-card-content">
+                ${this._renderBriefSummary(brief)}
+                ${this._renderClarificationQuestions(questions)}
+                <div class="ai-requirement-actions">
+                    <button class="ai-requirement-submit-btn" type="button" id="ai-btn-submit-clarification">
+                        补充完成，重新生成
+                    </button>
+                    <button class="ai-requirement-skip-btn" type="button" id="ai-btn-skip-clarification">
+                        跳过，直接生成（可能不准确）
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const overviewCard = scrollContainer.querySelector('.result-card.overview');
+        if (overviewCard) {
+            scrollContainer.insertBefore(card, overviewCard);
+        } else {
+            scrollContainer.prepend(card);
+        }
+
+        this._bindClarificationEvents(card, brief, questions);
+    }
+
+    _renderBriefSummary(brief) {
+        const fields = [
+            { label: '场景', value: brief.scenarioName || brief.ScenarioName || '--' },
+            { label: '行业', value: brief.industry || brief.Industry || '--', missing: !(brief.industry || brief.Industry) },
+            { label: '检测对象', value: (brief.objectTypes || brief.ObjectTypes || []).join('、') || '--', missing: (brief.objectTypes || brief.ObjectTypes || []).length === 0 },
+            { label: '缺陷类型', value: (brief.defectTypes || brief.DefectTypes || []).join('、') || '--' },
+            { label: '意图', value: brief.intentType || brief.IntentType || '--' },
+            { label: '输出目标', value: brief.outputTarget || brief.OutputTarget || '--', missing: !(brief.outputTarget || brief.OutputTarget) || (brief.outputTarget || brief.OutputTarget) === 'unknown' },
+        ];
+        return `
+            <div class="ai-requirement-summary-grid">
+                ${fields.map(f => `
+                    <div class="ai-requirement-field ${f.missing ? 'is-missing' : ''}">
+                        <div class="ai-requirement-field-label">${f.label}</div>
+                        <div class="ai-requirement-field-value">${this._escapeHtml(f.value)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    _renderClarificationQuestions(questions) {
+        if (!questions || questions.length === 0) return '';
+        return `
+            <div class="ai-clarification-questions">
+                <div class="ai-clarification-header">需要补充的信息</div>
+                ${questions.map((q, i) => `
+                    <div class="ai-clarification-question ${(q.required !== false) ? 'is-required' : 'is-optional'}" data-field="${this._escapeHtml(q.field || q.Field || '')}">
+                        <div class="ai-clarification-question-text">
+                            ${(q.required !== false)
+                                ? '<span class="ai-clarification-badge">必填</span>'
+                                : '<span class="ai-clarification-badge optional">推荐</span>'}
+                            ${this._escapeHtml(q.question || q.Question || '')}
+                        </div>
+                        ${(q.reason || q.Reason) ? `<div class="ai-clarification-reason">${this._escapeHtml(q.reason || q.Reason)}</div>` : ''}
+                        <div class="ai-clarification-input-area">
+                            ${this._renderClarificationInput(q, i)}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    _renderClarificationInput(question, index) {
+        const field = question.field || question.Field || '';
+        const options = question.options || question.Options || [];
+        const defaultValue = question.defaultValue || question.DefaultValue || '';
+        const fieldId = `ai-clarification-${field}-${index}`;
+        const rememberedValue = this._clarificationMemory.get(field) || defaultValue;
+
+        if (options.length > 0) {
+            return `
+                <select class="ai-clarification-select" id="${fieldId}" data-field="${this._escapeHtml(field)}">
+                    <option value="">-- 请选择 --</option>
+                    ${options.map(opt => `
+                        <option value="${this._escapeHtml(opt)}" ${opt === rememberedValue ? 'selected' : ''}>${this._escapeHtml(opt)}</option>
+                    `).join('')}
+                </select>
+            `;
+        }
+        return `
+            <input type="text" class="ai-clarification-input" id="${fieldId}"
+                data-field="${this._escapeHtml(field)}"
+                placeholder="${this._escapeHtml(question.question || question.Question || '')}"
+                value="${this._escapeHtml(rememberedValue)}" />
+        `;
+    }
+
+    _bindClarificationEvents(card, brief, questions) {
+        const submitBtn = card.querySelector('#ai-btn-submit-clarification');
+        const skipBtn = card.querySelector('#ai-btn-skip-clarification');
+
+        if (submitBtn) {
+            submitBtn.addEventListener('click', () => {
+                const answers = {};
+                card.querySelectorAll('.ai-clarification-select, .ai-clarification-input').forEach(el => {
+                    const field = el.dataset.field;
+                    const value = el.value.trim();
+                    if (field && value) {
+                        answers[field] = value;
+                    }
+                });
+
+                const requiredQuestions = (questions || []).filter(q => q.required !== false);
+                const missingRequired = requiredQuestions.filter(q => {
+                    const f = q.field || q.Field || '';
+                    return !answers[f];
+                });
+                if (missingRequired.length > 0) {
+                    this._addMessage('system', `请填写所有必填项：${missingRequired.map(q => q.question || q.Question || '').join('；')}`);
+                    return;
+                }
+
+                Object.entries(answers).forEach(([field, value]) => {
+                    this._clarificationMemory.set(field, value);
+                });
+
+                const answerText = Object.entries(answers)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join('；');
+                const basePrompt = this.lastUserPrompt || '';
+                const enhancedDescription = answerText
+                    ? `${basePrompt}\n\n[补充信息] ${answerText}`
+                    : basePrompt;
+
+                this._dispatchGenerateRequest({
+                    description: enhancedDescription,
+                    hint: '',
+                    userMessage: enhancedDescription,
+                    attachmentPaths: [],
+                    explicitMode: '',
+                    clearInput: false
+                });
+            });
+        }
+
+        if (skipBtn) {
+            skipBtn.addEventListener('click', () => {
+                this._dispatchGenerateRequest({
+                    description: this.lastUserPrompt || '',
+                    hint: '',
+                    userMessage: this.lastUserPrompt || '',
+                    attachmentPaths: [],
+                    explicitMode: '',
+                    clearInput: false
+                });
+            });
+        }
+    }
+
+    // ---- End Clarification / Requirement Card ----
 
     _renderParameterDraftEditor(data, flow = null) {
         const container = this.container?.querySelector('#ai-result-parameter-editor');
