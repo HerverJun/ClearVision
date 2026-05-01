@@ -32,6 +32,8 @@ public static class AiGenerationServiceExtensions
         });
 
         // 注册核心组件
+        services.AddSingleton<IOperatorKnowledgeGraphService, OperatorKnowledgeGraphService>();
+        services.AddScoped<IOperatorKnowledgeRetriever, OperatorKnowledgeRetriever>();
         services.AddScoped<PromptBuilder>();
         services.AddSingleton<IConversationalFlowService, ConversationalFlowService>();
         services.AddSingleton<IFlowTemplateService, FlowTemplateService>();

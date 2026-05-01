@@ -11,7 +11,8 @@
       "Bash(dotnet build *)",
       "Bash(dotnet restore *)",
       "Bash(python *)",
-      "Bash(dotnet run *)"
+      "Bash(dotnet run *)",
+      "Bash(powershell -ExecutionPolicy Bypass -File scripts/dotnet-env-fix.ps1 -SkipNetworkCheck)"
     ]
   }
 }

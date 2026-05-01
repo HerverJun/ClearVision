@@ -3,6 +3,7 @@
 // 闂佸搫绉烽～澶婄暤娴ｅ湱鈻旀慨姗嗗墮椤倕鈽夐幘绛规缂佹鎳樺顒勫炊閵娿儺浼濋柣鐔剁閹冲繗鍟梺鎼炲妼椤戝牓鎯冮悢鍏煎仺闁靛绠戦。鏌ユ⒒閸ワ絽浜鹃梺鍦帛閸旀濡靛杈ㄥ珰鐎广儱鎳庨弫鍫曟倵?
 // 婵炶揪绲剧划蹇涘焵椤掆偓閹锋垹妲愭导瀛樻儚闁告稒婢橀～姘舵煕?
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Acme.Product.Core.Enums;
@@ -16,14 +17,19 @@ namespace Acme.Product.Infrastructure.AI;
 public class PromptBuilder
 {
     private readonly IOperatorFactory _operatorFactory;
+    private readonly IOperatorKnowledgeRetriever? _operatorKnowledgeRetriever;
     private static readonly JsonSerializerOptions _catalogJsonOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    public PromptBuilder(IOperatorFactory operatorFactory)
+    public PromptBuilder(
+        IOperatorFactory operatorFactory,
+        IOperatorKnowledgeRetriever? operatorKnowledgeRetriever = null)
     {
         _operatorFactory = operatorFactory;
+        _operatorKnowledgeRetriever = operatorKnowledgeRetriever;
     }
 
     /// <summary>
@@ -267,18 +273,39 @@ public class PromptBuilder
 
     private string GetOperatorCatalog(string? userDescription)
     {
-        // 婵?OperatorFactory 闂佸吋鍎抽崲鑼躲亹閸ヮ剙绠ラ柍褜鍓熷鍨緞婵犲倸娈ュ┑鐐差槶閸斿矂宕悾宀€涓嶆俊銈傚亾闁烩剝鐟╅幆鍐礋椤愩垹绗氶梺杞拌兌婢ф鐣垫笟鈧弫宥囦沪閽樺－妤呮煙椤戣儻鍏岄柡浣规崌楠炲骞囬鐐瘓闁诲孩绋掗崝妤€煤閹峰被浜?
-        // 閻熸粎澧楅幐楣冨极閵堝绠ｉ梺鍨儏娴煎酣寮堕埡鍐暭婵″弶鍨瑰☉鐢割敊閼恒儺妲梺鎸庣☉閼活垵銇愯閳绘棃濡搁妷銉ユ辈婵°倕鍊归…鍥规径鎰鐎规洖娲ㄩ弳顒勬倵濞戞瑥濮屾い鏇熺洴楠炲棝宕崘顏嗩槷濡ょ姷鍋炲﹢鍦崲濮樿埖鍋╂繛鍡楃箰瀵潡姊洪幓鎺旂闁稿被鍔岄锝夊即濮樿京鈻曟繛?fallback
         var allMetadata = _operatorFactory
             .GetAllMetadata()
-            .OrderBy(m => m.Type.ToString())
+            .OrderBy(m => m.Type.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var relevantMetadata = string.IsNullOrWhiteSpace(userDescription)
-            ? allMetadata
-            : GetRelevantOperators(userDescription)
-                .OrderBy(m => m.Type.ToString())
-                .ToList();
+        OperatorKnowledgeSlice? slice = null;
+        List<OperatorMetadata> relevantMetadata;
+        if (_operatorKnowledgeRetriever == null)
+        {
+            relevantMetadata = string.IsNullOrWhiteSpace(userDescription)
+                ? allMetadata
+                : GetRelevantOperators(userDescription)
+                    .OrderBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+        }
+        else
+        {
+            slice = _operatorKnowledgeRetriever.RetrieveAsync(new OperatorKnowledgeQuery
+                {
+                    Description = userDescription,
+                    TopN = string.IsNullOrWhiteSpace(userDescription) ? allMetadata.Count : 28
+                })
+                .GetAwaiter()
+                .GetResult();
+            slice = FilterValidatedKnowledgeSlice(slice, allMetadata);
+
+            relevantMetadata = slice.PrioritizedOperatorTypes.Count == 0
+                ? allMetadata
+                : allMetadata
+                    .Where(meta => slice.PrioritizedOperatorTypes.Contains(meta.Type.ToString(), StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+        }
 
         var sb = new StringBuilder();
 
@@ -288,15 +315,32 @@ public class PromptBuilder
         }
         else
         {
-            sb.AppendLine("# Relevant Operator Catalog");
-            sb.AppendLine("This section keeps operators most relevant to the current request.");
-            sb.AppendLine("If the pruned catalog is insufficient, consult the compact fallback catalog below.");
+            sb.AppendLine("# 优先算子目录（根据当前需求动态裁剪）");
+            sb.AppendLine("这部分优先列出与当前需求相关度高的算子。");
+            if (!string.IsNullOrWhiteSpace(slice?.RetrievalSummary))
+                sb.AppendLine($"检索摘要：{slice.RetrievalSummary}");
+            sb.AppendLine("如果需要的算子不在列表中，仍可使用其他已注册算子。");
         }
 
         sb.AppendLine();
         sb.AppendLine("```json");
         sb.AppendLine(SerializeOperatorCatalog(relevantMetadata, includeFullDetails: true));
         sb.AppendLine("```");
+
+        if (slice is { Cards.Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("# Operator Knowledge Slice");
+            sb.AppendLine("以下知识卡片来自 operator_knowledge_graph 场景检索切片，可用于约束生成：");
+            sb.AppendLine("- requiredResources: 必须补齐的模型/标定/配置资源");
+            sb.AppendLine("- antiPatterns: 应避免的误用组合");
+            sb.AppendLine("- typicalUpstream/typicalDownstream: 常见工业拓扑关系");
+            sb.AppendLine("- knownLimitations/evidence: 风险边界与证据状态");
+            sb.AppendLine();
+            sb.AppendLine("```json");
+            sb.AppendLine(SerializeKnowledgeSlice(slice));
+            sb.AppendLine("```");
+        }
 
         if (!string.IsNullOrWhiteSpace(userDescription))
         {
@@ -310,6 +354,164 @@ public class PromptBuilder
         }
 
         return sb.ToString();
+    }
+
+    private static OperatorKnowledgeSlice FilterValidatedKnowledgeSlice(
+        OperatorKnowledgeSlice slice,
+        IReadOnlyCollection<OperatorMetadata> metadata)
+    {
+        var metadataByType = metadata
+            .ToDictionary(item => item.Type.ToString(), StringComparer.OrdinalIgnoreCase);
+
+        var validCards = slice.Cards
+            .Where(card => IsValidatedKnowledgeCard(card, metadataByType))
+            .OrderBy(card => card.OperatorType, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var validTypes = validCards
+            .Select(card => card.OperatorType)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return new OperatorKnowledgeSlice
+        {
+            PrioritizedOperatorTypes = slice.PrioritizedOperatorTypes
+                .Where(type => validTypes.Contains(type))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Cards = validCards,
+            MatchedScenarioKeys = slice.MatchedScenarioKeys
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            RetrievalSummary = slice.RetrievalSummary
+        };
+    }
+
+    private static bool IsValidatedKnowledgeCard(
+        OperatorKnowledgeCard card,
+        IReadOnlyDictionary<string, OperatorMetadata> metadataByType)
+    {
+        if (string.IsNullOrWhiteSpace(card.OperatorType))
+            return false;
+
+        if (!Enum.TryParse<OperatorType>(card.OperatorType, ignoreCase: true, out var parsedType) ||
+            !Enum.IsDefined(parsedType))
+        {
+            return false;
+        }
+
+        if (!metadataByType.TryGetValue(card.OperatorType, out var metadata))
+            return false;
+
+        return HaveSameNameSet(
+                   card.Inputs.Select(item => item.Name),
+                   metadata.InputPorts.Select(item => item.Name))
+               && HaveSameNameSet(
+                   card.Outputs.Select(item => item.Name),
+                   metadata.OutputPorts.Select(item => item.Name))
+               && HaveSameNameSet(
+                   card.Parameters.Select(item => item.Name),
+                   metadata.Parameters.Select(item => item.Name));
+    }
+
+    private static bool HaveSameNameSet(IEnumerable<string> left, IEnumerable<string> right)
+    {
+        var leftSet = left
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rightSet = right
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return leftSet.SetEquals(rightSet);
+    }
+
+    private static string SerializeKnowledgeSlice(OperatorKnowledgeSlice slice)
+    {
+        var payload = new
+        {
+            retrievalSummary = slice.RetrievalSummary,
+            matchedScenarioKeys = slice.MatchedScenarioKeys,
+            cards = slice.Cards
+                .OrderBy(card => card.OperatorType, StringComparer.OrdinalIgnoreCase)
+                .Select(card => new
+                {
+                    operatorType = card.OperatorType,
+                    displayName = card.DisplayName,
+                    category = card.Category,
+                    intentTags = card.IntentTags,
+                    scenarioTags = card.ScenarioTags,
+                    requiredResources = card.RequiredResources,
+                    typicalUpstream = card.TypicalUpstream,
+                    typicalDownstream = card.TypicalDownstream,
+                    antiPatterns = card.AntiPatterns,
+                    knownLimitations = card.KnownLimitations,
+                    evidence = new
+                    {
+                        contract = card.Evidence.Contract,
+                        golden = card.Evidence.Golden,
+                        dataset = card.Evidence.Dataset,
+                        fieldReplay = card.Evidence.FieldReplay,
+                        precisionClaim = card.Evidence.PrecisionClaim,
+                        industrialStatus = card.Evidence.IndustrialStatus,
+                        qScore = card.Evidence.QScore
+                    }
+                })
+                .ToList()
+        };
+
+        return JsonSerializer.Serialize(payload, _catalogJsonOptions);
+    }
+
+    private static string SerializeOperatorCatalog(IEnumerable<OperatorMetadata> metadata, bool includeFullDetails)
+    {
+        if (!includeFullDetails)
+        {
+            var fallbackCatalog = metadata.Select(m => new
+            {
+                operator_id = m.Type.ToString(),
+                name = m.DisplayName,
+                category = m.Category
+            });
+
+            return JsonSerializer.Serialize(fallbackCatalog, _catalogJsonOptions);
+        }
+
+        var detailedCatalog = metadata.Select(m => new
+        {
+            operator_id = m.Type.ToString(),
+            name = m.DisplayName,
+            category = m.Category,
+            description = m.Description,
+            keywords = m.Keywords ?? Array.Empty<string>(),
+            inputs = m.InputPorts.Select(p => new
+            {
+                port_name = p.Name,
+                display_name = p.DisplayName,
+                data_type = p.DataType.ToString(),
+                required = p.IsRequired
+            }),
+            outputs = m.OutputPorts.Select(p => new
+            {
+                port_name = p.Name,
+                display_name = p.DisplayName,
+                data_type = p.DataType.ToString()
+            }),
+            parameters = m.Parameters.Select(p => new
+            {
+                param_name = p.Name,
+                display_name = p.DisplayName,
+                type = p.DataType,
+                default_value = p.DefaultValue?.ToString(),
+                required = p.IsRequired,
+                description = p.Description ?? string.Empty,
+                min_value = p.MinValue?.ToString(),
+                max_value = p.MaxValue?.ToString(),
+                options = p.Options?.Select(o => new { label = o.Label, value = o.Value })
+            })
+        });
+
+        return JsonSerializer.Serialize(detailedCatalog, _catalogJsonOptions);
     }
 
     private List<OperatorMetadata> GetRelevantOperators(string userDescription)
@@ -462,57 +664,6 @@ public class PromptBuilder
         return allMetadata
             .Where(metadata => coreTypes.Contains(metadata.Type))
             .ToList();
-    }
-
-    private static string SerializeOperatorCatalog(IEnumerable<OperatorMetadata> metadata, bool includeFullDetails)
-    {
-        if (!includeFullDetails)
-        {
-            var fallbackCatalog = metadata.Select(m => new
-            {
-                operator_id = m.Type.ToString(),
-                name = m.DisplayName,
-                category = m.Category
-            });
-
-            return JsonSerializer.Serialize(fallbackCatalog, _catalogJsonOptions);
-        }
-
-        var detailedCatalog = metadata.Select(m => new
-        {
-            operator_id = m.Type.ToString(),
-            name = m.DisplayName,
-            category = m.Category,
-            description = m.Description,
-            keywords = m.Keywords ?? Array.Empty<string>(),
-            inputs = m.InputPorts.Select(p => new
-            {
-                port_name = p.Name,
-                display_name = p.DisplayName,
-                data_type = p.DataType.ToString(),
-                required = p.IsRequired
-            }),
-            outputs = m.OutputPorts.Select(p => new
-            {
-                port_name = p.Name,
-                display_name = p.DisplayName,
-                data_type = p.DataType.ToString()
-            }),
-            parameters = m.Parameters.Select(p => new
-            {
-                param_name = p.Name,
-                display_name = p.DisplayName,
-                type = p.DataType,
-                default_value = p.DefaultValue?.ToString(),
-                required = p.IsRequired,
-                description = p.Description ?? string.Empty,
-                min_value = p.MinValue?.ToString(),
-                max_value = p.MaxValue?.ToString(),
-                options = p.Options?.Select(o => new { label = o.Label, value = o.Value })
-            })
-        });
-
-        return JsonSerializer.Serialize(detailedCatalog, _catalogJsonOptions);
     }
 
     private string GetConnectionRules() => """

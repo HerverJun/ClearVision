@@ -1,8 +1,5 @@
 ﻿// AiFlowValidator.cs
-// AI 流程校验器
-// 对 AI 生成流程进行结构与规则校验
-// 作者：蘅芜君
-using Acme.Product.Core.DTOs;
+// AI 娴佺▼鏍￠獙鍣?// 瀵?AI 鐢熸垚娴佺▼杩涜缁撴瀯涓庤鍒欐牎楠?// 浣滆€咃細铇呰姕鍚?using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using System.Globalization;
@@ -12,7 +9,7 @@ using System.Text.RegularExpressions;
 namespace Acme.Product.Infrastructure.AI;
 
 /// <summary>
-/// 校验 AI 生成的工作流是否满足所有约束
+/// 鏍￠獙 AI 鐢熸垚鐨勫伐浣滄祦鏄惁婊¤冻鎵€鏈夌害鏉?
 /// </summary>
 public class AiFlowValidator : IAiFlowValidator
 {
@@ -38,18 +35,18 @@ public class AiFlowValidator : IAiFlowValidator
         "without",
         "missing",
         "lack",
-        "缺少",
-        "未配置",
-        "未提供",
-        "无"
+        "\u7f3a\u5c11",      // 缺少
+        "\u672a\u914d\u7f6e",// 未配置
+        "\u672a\u63d0\u4f9b",// 未提供
+        "\u65e0"             // 无
     ];
     private static readonly string[] AntiPatternConjunctionMarkers =
     [
         " and ",
         " + ",
         " together ",
-        "同时",
-        "并且"
+        "\u540c\u65f6",      // 同时
+        "\u5e76\u4e14"       // 并且
     ];
 
     public AiFlowValidator(
@@ -67,40 +64,40 @@ public class AiFlowValidator : IAiFlowValidator
         if (generatedFlow.Operators == null || generatedFlow.Operators.Count == 0)
         {
             result.AddError(
-                "AI 未生成任何算子",
+                "AI 鏈敓鎴愪换浣曠畻瀛?,
                 code: "empty_workflow",
                 category: "structure",
                 relatedFields: ["operators"],
-                repairHint: "请至少生成一个有效算子，并补齐 operators 数组。");
+                repairHint: "璇疯嚦灏戠敓鎴愪竴涓湁鏁堢畻瀛愶紝骞惰ˉ榻?operators 鏁扮粍銆?);
             return result;
         }
 
-        // 建立 tempId → 算子元数据 的映射，用于后续校验
+        // 寤虹珛 tempId 鈫?绠楀瓙鍏冩暟鎹?鐨勬槧灏勶紝鐢ㄤ簬鍚庣画鏍￠獙
         var operatorMetaMap = new Dictionary<string, OperatorMetadata>();
 
-        // 1. 校验算子类型合法性
+        // 1. 鏍￠獙绠楀瓙绫诲瀷鍚堟硶鎬?
         ValidateOperatorTypes(generatedFlow, result, operatorMetaMap);
 
-        // 如果算子类型校验失败，后续校验意义不大
+        // 濡傛灉绠楀瓙绫诲瀷鏍￠獙澶辫触锛屽悗缁牎楠屾剰涔変笉澶?
         if (!result.IsValid)
             return result;
 
-        // 2. 校验端口名合法性和类型兼容性
+        // 2. 鏍￠獙绔彛鍚嶅悎娉曟€у拰绫诲瀷鍏煎鎬?
         ValidateConnections(generatedFlow, result, operatorMetaMap);
 
-        // 3. 校验无环路
+        // 3. 鏍￠獙鏃犵幆璺?
         ValidateNoCycles(generatedFlow, result);
 
-        // 4. 校验输入端口不重复占用
+        // 4. 鏍￠獙杈撳叆绔彛涓嶉噸澶嶅崰鐢?
         ValidateNoDuplicateInputs(generatedFlow, result);
 
-        // 5. 校验参数合法性（数值范围、枚举类型）
+        // 5. 鏍￠獙鍙傛暟鍚堟硶鎬э紙鏁板€艰寖鍥淬€佹灇涓剧被鍨嬶級
         ValidateParameters(generatedFlow, result, operatorMetaMap);
 
-        // 6. 基于知识图谱的 requiredResources/antiPatterns 校验
+        // 6. 鍩轰簬 operator_knowledge_graph.json 鐨勮祫婧愪笌鍙嶆ā寮忔牎楠屽叆鍙?
         ValidateKnowledgeGraphRules(generatedFlow, result);
 
-        // 7. 警告（不阻止生成，但记录）
+        // 7. 璀﹀憡锛堜笉闃绘鐢熸垚锛屼絾璁板綍锛?
         ValidateHasSourceAndOutput(generatedFlow, result, operatorMetaMap);
 
         return result;
@@ -118,55 +115,53 @@ public class AiFlowValidator : IAiFlowValidator
             var op = flow.Operators[index];
             var operatorField = $"operators[{index}]";
 
-            // 检查 tempId 格式
+            // 妫€鏌?tempId 鏍煎紡
             if (string.IsNullOrWhiteSpace(op.TempId))
             {
                 result.AddError(
-                    "存在算子的 tempId 为空",
+                    "瀛樺湪绠楀瓙鐨?tempId 涓虹┖",
                     code: "missing_temp_id",
                     category: "structure",
                     relatedFields: [$"{operatorField}.tempId"],
-                    repairHint: "为每个算子补充唯一 tempId，例如 op_1、op_2。");
+                    repairHint: "涓烘瘡涓畻瀛愯ˉ鍏呭敮涓€ tempId锛屼緥濡?op_1銆乷p_2銆?);
                 continue;
             }
 
             if (allTempIds.Contains(op.TempId))
             {
                 result.AddError(
-                    $"tempId 重复：{op.TempId}",
+                    $"tempId 閲嶅锛歿op.TempId}",
                     code: "duplicate_temp_id",
                     category: "structure",
                     relatedFields: [$"{operatorField}.tempId"],
                     operatorId: op.TempId,
-                    repairHint: "确保每个算子都使用唯一 tempId。");
+                    repairHint: "纭繚姣忎釜绠楀瓙閮戒娇鐢ㄥ敮涓€ tempId銆?);
                 continue;
             }
             allTempIds.Add(op.TempId);
 
-            // 检查算子类型是否在枚举中
-            if (!Enum.TryParse<OperatorType>(op.OperatorType, out var operatorType))
+            // 妫€鏌ョ畻瀛愮被鍨嬫槸鍚﹀湪鏋氫妇涓?            if (!Enum.TryParse<OperatorType>(op.OperatorType, out var operatorType))
             {
                 result.AddError(
-                    $"算子类型不存在：{op.OperatorType}（tempId={op.TempId}）。请使用算子目录中的 operator_id 值。",
+                    $"绠楀瓙绫诲瀷涓嶅瓨鍦細{op.OperatorType}锛坱empId={op.TempId}锛夈€傝浣跨敤绠楀瓙鐩綍涓殑 operator_id 鍊笺€?,
                     code: "unknown_operator_type",
                     category: "operator",
                     relatedFields: [$"{operatorField}.operatorType"],
                     operatorId: op.TempId,
-                    repairHint: "把 operatorType 改成已注册的 OperatorType 枚举名。");
+                    repairHint: "鎶?operatorType 鏀规垚宸叉敞鍐岀殑 OperatorType 鏋氫妇鍚嶃€?);
                 continue;
             }
 
-            // 检查算子元数据是否已注册
-            var metadata = _operatorFactory.GetMetadata(operatorType);
+            // 妫€鏌ョ畻瀛愬厓鏁版嵁鏄惁宸叉敞鍐?            var metadata = _operatorFactory.GetMetadata(operatorType);
             if (metadata == null)
             {
                 result.AddError(
-                    $"算子 {op.OperatorType} 未在算子工厂中注册",
+                    $"绠楀瓙 {op.OperatorType} 鏈湪绠楀瓙宸ュ巶涓敞鍐?,
                     code: "operator_not_registered",
                     category: "operator",
                     relatedFields: [$"{operatorField}.operatorType"],
                     operatorId: op.TempId,
-                    repairHint: "请改用已经注册的算子类型，或移除该无效算子。");
+                    repairHint: "璇锋敼鐢ㄥ凡缁忔敞鍐岀殑绠楀瓙绫诲瀷锛屾垨绉婚櫎璇ユ棤鏁堢畻瀛愩€?);
                 continue;
             }
 
@@ -187,11 +182,11 @@ public class AiFlowValidator : IAiFlowValidator
             var conn = flow.Connections[index];
             var connectionField = $"connections[{index}]";
 
-            // 检查源算子存在
+            // 妫€鏌ユ簮绠楀瓙瀛樺湪
             if (!metaMap.TryGetValue(conn.SourceTempId, out var sourceMeta))
             {
                 result.AddError(
-                    $"连线引用了不存在的源算子 tempId：{conn.SourceTempId}",
+                    $"杩炵嚎寮曠敤浜嗕笉瀛樺湪鐨勬簮绠楀瓙 tempId锛歿conn.SourceTempId}",
                     code: "missing_source_operator",
                     category: "connection",
                     relatedFields:
@@ -199,15 +194,14 @@ public class AiFlowValidator : IAiFlowValidator
                         $"{connectionField}.sourceTempId"
                     ],
                     sourceTempId: conn.SourceTempId,
-                    repairHint: "修正 sourceTempId，确保它引用已定义的算子 tempId。");
+                    repairHint: "淇 sourceTempId锛岀‘淇濆畠寮曠敤宸插畾涔夌殑绠楀瓙 tempId銆?);
                 continue;
             }
 
-            // 检查目标算子存在
-            if (!metaMap.TryGetValue(conn.TargetTempId, out var targetMeta))
+            // 妫€鏌ョ洰鏍囩畻瀛愬瓨鍦?            if (!metaMap.TryGetValue(conn.TargetTempId, out var targetMeta))
             {
                 result.AddError(
-                    $"连线引用了不存在的目标算子 tempId：{conn.TargetTempId}",
+                    $"杩炵嚎寮曠敤浜嗕笉瀛樺湪鐨勭洰鏍囩畻瀛?tempId锛歿conn.TargetTempId}",
                     code: "missing_target_operator",
                     category: "connection",
                     relatedFields:
@@ -215,17 +209,17 @@ public class AiFlowValidator : IAiFlowValidator
                         $"{connectionField}.targetTempId"
                     ],
                     targetTempId: conn.TargetTempId,
-                    repairHint: "修正 targetTempId，确保它引用已定义的算子 tempId。");
+                    repairHint: "淇 targetTempId锛岀‘淇濆畠寮曠敤宸插畾涔夌殑绠楀瓙 tempId銆?);
                 continue;
             }
 
-            // 检查源端口存在
+            // 妫€鏌ユ簮绔彛瀛樺湪
             var sourcePort = sourceMeta.OutputPorts.FirstOrDefault(p => p.Name == conn.SourcePortName);
             if (sourcePort == null)
             {
                 result.AddError(
-                    $"算子 {conn.SourceTempId}({sourceMeta.DisplayName}) 没有名为 '{conn.SourcePortName}' 的输出端口。" +
-                    $"可用输出端口：{string.Join(", ", sourceMeta.OutputPorts.Select(p => p.Name))}",
+                    $"绠楀瓙 {conn.SourceTempId}({sourceMeta.DisplayName}) 娌℃湁鍚嶄负 '{conn.SourcePortName}' 鐨勮緭鍑虹鍙ｃ€? +
+                    $"鍙敤杈撳嚭绔彛锛歿string.Join(", ", sourceMeta.OutputPorts.Select(p => p.Name))}",
                     code: "missing_output_port",
                     category: "connection",
                     relatedFields:
@@ -235,17 +229,16 @@ public class AiFlowValidator : IAiFlowValidator
                     ],
                     sourceTempId: conn.SourceTempId,
                     sourcePortName: conn.SourcePortName,
-                    repairHint: "把 sourcePortName 改成该源算子的有效输出端口名。");
+                    repairHint: "鎶?sourcePortName 鏀规垚璇ユ簮绠楀瓙鐨勬湁鏁堣緭鍑虹鍙ｅ悕銆?);
                 continue;
             }
 
-            // 检查目标端口存在
-            var targetPort = targetMeta.InputPorts.FirstOrDefault(p => p.Name == conn.TargetPortName);
+            // 妫€鏌ョ洰鏍囩鍙ｅ瓨鍦?            var targetPort = targetMeta.InputPorts.FirstOrDefault(p => p.Name == conn.TargetPortName);
             if (targetPort == null)
             {
                 result.AddError(
-                    $"算子 {conn.TargetTempId}({targetMeta.DisplayName}) 没有名为 '{conn.TargetPortName}' 的输入端口。" +
-                    $"可用输入端口：{string.Join(", ", targetMeta.InputPorts.Select(p => p.Name))}",
+                    $"绠楀瓙 {conn.TargetTempId}({targetMeta.DisplayName}) 娌℃湁鍚嶄负 '{conn.TargetPortName}' 鐨勮緭鍏ョ鍙ｃ€? +
+                    $"鍙敤杈撳叆绔彛锛歿string.Join(", ", targetMeta.InputPorts.Select(p => p.Name))}",
                     code: "missing_input_port",
                     category: "connection",
                     relatedFields:
@@ -255,15 +248,14 @@ public class AiFlowValidator : IAiFlowValidator
                     ],
                     targetTempId: conn.TargetTempId,
                     targetPortName: conn.TargetPortName,
-                    repairHint: "把 targetPortName 改成该目标算子的有效输入端口名。");
+                    repairHint: "鎶?targetPortName 鏀规垚璇ョ洰鏍囩畻瀛愮殑鏈夋晥杈撳叆绔彛鍚嶃€?);
                 continue;
             }
 
-            // 检查类型兼容性
-            if (!AreTypesCompatible(sourcePort.DataType, targetPort.DataType))
+            // 妫€鏌ョ被鍨嬪吋瀹规€?            if (!AreTypesCompatible(sourcePort.DataType, targetPort.DataType))
             {
                 result.AddError(
-                    $"端口类型不兼容：{conn.SourceTempId}.{conn.SourcePortName}({sourcePort.DataType}) → " +
+                    $"绔彛绫诲瀷涓嶅吋瀹癸細{conn.SourceTempId}.{conn.SourcePortName}({sourcePort.DataType}) 鈫?" +
                     $"{conn.TargetTempId}.{conn.TargetPortName}({targetPort.DataType})",
                     code: "incompatible_port_type",
                     category: "connection",
@@ -276,35 +268,35 @@ public class AiFlowValidator : IAiFlowValidator
                     sourcePortName: conn.SourcePortName,
                     targetTempId: conn.TargetTempId,
                     targetPortName: conn.TargetPortName,
-                    repairHint: "请改用类型兼容的端口连线，或补充中间转换算子。");
+                    repairHint: "璇锋敼鐢ㄧ被鍨嬪吋瀹圭殑绔彛杩炵嚎锛屾垨琛ュ厖涓棿杞崲绠楀瓙銆?);
             }
         }
     }
 
     private bool AreTypesCompatible(PortDataType source, PortDataType target)
     {
-        // Any 类型与任何类型兼容
+        // Any 绫诲瀷涓庝换浣曠被鍨嬪吋瀹?
         if (source == PortDataType.Any || target == PortDataType.Any)
             return true;
-        // 相同类型兼容
+        // 鐩稿悓绫诲瀷鍏煎
         if (source == target)
             return true;
 
-        // 数值类型互通（Integer ↔ Float）
+        // 鏁板€肩被鍨嬩簰閫氾紙Integer 鈫?Float锛?
         var numericTypes = new[] { PortDataType.Integer, PortDataType.Float };
         if (numericTypes.Contains(source) && numericTypes.Contains(target))
             return true;
 
-        // 几何类型互通（Point ↔ Rectangle）
+        // 鍑犱綍绫诲瀷浜掗€氾紙Point 鈫?Rectangle锛?
         var geometryTypes = new[] { PortDataType.Point, PortDataType.Rectangle };
         if (geometryTypes.Contains(source) && geometryTypes.Contains(target))
             return true;
 
-        // String 可以作为数值类型的输入（运行时转换）
+        // String 鍙互浣滀负鏁板€肩被鍨嬬殑杈撳叆锛堣繍琛屾椂杞崲锛?
         if (source == PortDataType.String && numericTypes.Contains(target))
             return true;
 
-        // Boolean 可以作为 Integer 的输入（true=1, false=0）
+        // Boolean 鍙互浣滀负 Integer 鐨勮緭鍏ワ紙true=1, false=0锛?
         if (source == PortDataType.Boolean && target == PortDataType.Integer)
             return true;
 
@@ -316,7 +308,7 @@ public class AiFlowValidator : IAiFlowValidator
         if (flow.Connections == null || flow.Connections.Count == 0)
             return;
 
-        // 构建邻接表
+        // 鏋勫缓閭绘帴琛?
         var adjacency = new Dictionary<string, List<string>>();
         foreach (var op in flow.Operators)
             adjacency[op.TempId] = new List<string>();
@@ -327,7 +319,7 @@ public class AiFlowValidator : IAiFlowValidator
                 adjacency[conn.SourceTempId].Add(conn.TargetTempId);
         }
 
-        // DFS 检测环路
+        // DFS 妫€娴嬬幆璺?
         var visited = new HashSet<string>();
         var inStack = new HashSet<string>();
 
@@ -336,11 +328,11 @@ public class AiFlowValidator : IAiFlowValidator
             if (HasCycle(node, adjacency, visited, inStack))
             {
                 result.AddError(
-                    "工作流中存在环路（循环依赖），请重新设计流程结构",
+                    "宸ヤ綔娴佷腑瀛樺湪鐜矾锛堝惊鐜緷璧栵級锛岃閲嶆柊璁捐娴佺▼缁撴瀯",
                     code: "cycle_detected",
                     category: "graph",
                     relatedFields: ["connections"],
-                    repairHint: "移除形成回路的连线，保持流程为 DAG。");
+                    repairHint: "绉婚櫎褰㈡垚鍥炶矾鐨勮繛绾匡紝淇濇寔娴佺▼涓?DAG銆?);
                 return;
             }
         }
@@ -383,7 +375,7 @@ public class AiFlowValidator : IAiFlowValidator
             if (!inputPortUsage.Add(key))
             {
                 result.AddError(
-                    $"输入端口被重复连接：算子 {conn.TargetTempId} 的 {conn.TargetPortName} 端口只能接收一条连线",
+                    $"杈撳叆绔彛琚噸澶嶈繛鎺ワ細绠楀瓙 {conn.TargetTempId} 鐨?{conn.TargetPortName} 绔彛鍙兘鎺ユ敹涓€鏉¤繛绾?,
                     code: "duplicate_input_connection",
                     category: "connection",
                     relatedFields:
@@ -393,7 +385,7 @@ public class AiFlowValidator : IAiFlowValidator
                     ],
                     targetTempId: conn.TargetTempId,
                     targetPortName: conn.TargetPortName,
-                    repairHint: "删除重复连线，确保每个输入端口最多接收一条连接。");
+                    repairHint: "鍒犻櫎閲嶅杩炵嚎锛岀‘淇濇瘡涓緭鍏ョ鍙ｆ渶澶氭帴鏀朵竴鏉¤繛鎺ャ€?);
             }
         }
     }
@@ -418,13 +410,13 @@ public class AiFlowValidator : IAiFlowValidator
                 if (!op.Parameters.ContainsKey(requiredParam.Name))
                 {
                     result.AddWarning(
-                        $"算子 {op.TempId}({metadata.DisplayName}) 缺少必填参数 '{requiredParam.Name}'，且无可用默认值",
+                        $"绠楀瓙 {op.TempId}({metadata.DisplayName}) 缂哄皯蹇呭～鍙傛暟 '{requiredParam.Name}'锛屼笖鏃犲彲鐢ㄩ粯璁ゅ€?,
                         code: "missing_required_parameter",
                         category: "parameter",
                         relatedFields: [$"{operatorField}.parameters.{requiredParam.Name}"],
                         operatorId: op.TempId,
                         parameterName: requiredParam.Name,
-                        repairHint: $"请为算子 {op.TempId} 补齐参数 {requiredParam.Name}。");
+                        repairHint: $"璇蜂负绠楀瓙 {op.TempId} 琛ラ綈鍙傛暟 {requiredParam.Name}銆?);
                 }
             }
 
@@ -436,19 +428,18 @@ public class AiFlowValidator : IAiFlowValidator
                 var paramDef = metadata.Parameters.FirstOrDefault(p => p.Name == paramName);
                 if (paramDef == null)
                 {
-                    // 参数不存在，仅作为警告
-                    result.AddWarning(
-                        $"算子 {op.TempId}({metadata.DisplayName}) 生成了未知的参数 '{paramName}'",
+                    // 鍙傛暟涓嶅瓨鍦紝浠呬綔涓鸿鍛?                    result.AddWarning(
+                        $"绠楀瓙 {op.TempId}({metadata.DisplayName}) 鐢熸垚浜嗘湭鐭ョ殑鍙傛暟 '{paramName}'",
                         code: "unknown_parameter",
                         category: "parameter",
                         relatedFields: [$"{operatorField}.parameters.{paramName}"],
                         operatorId: op.TempId,
                         parameterName: paramName,
-                        repairHint: "请移除未知参数，或改成该算子定义中存在的参数名。");
+                        repairHint: "璇风Щ闄ゆ湭鐭ュ弬鏁帮紝鎴栨敼鎴愯绠楀瓙瀹氫箟涓瓨鍦ㄧ殑鍙傛暟鍚嶃€?);
                     continue;
                 }
 
-                // 数值范围校验 + 自动 Clamp
+                // 鏁板€艰寖鍥存牎楠?+ 鑷姩 Clamp
                 if (TryParseDouble(paramValueStr, out var numValue))
                 {
                     var hasMin = TryParseDouble(paramDef.MinValue, out var minValue);
@@ -465,30 +456,30 @@ public class AiFlowValidator : IAiFlowValidator
                         var clampedValue = FormatNumericValue(clamped, paramDef.DataType);
                         op.Parameters[paramName] = clampedValue;
                         result.AddWarning(
-                            $"算子 {op.TempId}({metadata.DisplayName}) 的参数 '{paramName}' 值 {numValue} 超出范围，已自动调整为 {clampedValue}",
+                            $"绠楀瓙 {op.TempId}({metadata.DisplayName}) 鐨勫弬鏁?'{paramName}' 鍊?{numValue} 瓒呭嚭鑼冨洿锛屽凡鑷姩璋冩暣涓?{clampedValue}",
                             code: "parameter_clamped",
                             category: "parameter",
                             relatedFields: [$"{operatorField}.parameters.{paramName}"],
                             operatorId: op.TempId,
                             parameterName: paramName,
-                            repairHint: $"请在下一轮直接生成 {paramName} 的合法范围值。");
+                            repairHint: $"璇峰湪涓嬩竴杞洿鎺ョ敓鎴?{paramName} 鐨勫悎娉曡寖鍥村€笺€?);
                     }
                 }
 
-                // 枚举值校验
+                // 鏋氫妇鍊兼牎楠?
                 if (paramDef.DataType.Equals("enum", StringComparison.OrdinalIgnoreCase) && paramDef.Options != null && paramDef.Options.Count > 0)
                 {
                     var validValues = paramDef.Options.Select(o => o.Value).ToList();
                     if (!validValues.Contains(paramValueStr))
                     {
                         result.AddWarning(
-                            $"算子 {op.TempId}({metadata.DisplayName}) 的枚举参数 '{paramName}' 值为 '{paramValueStr}' 不合法，有效值为: {string.Join(", ", validValues)}",
+                            $"绠楀瓙 {op.TempId}({metadata.DisplayName}) 鐨勬灇涓惧弬鏁?'{paramName}' 鍊间负 '{paramValueStr}' 涓嶅悎娉曪紝鏈夋晥鍊间负: {string.Join(", ", validValues)}",
                             code: "invalid_enum_value",
                             category: "parameter",
                             relatedFields: [$"{operatorField}.parameters.{paramName}"],
                             operatorId: op.TempId,
                             parameterName: paramName,
-                            repairHint: $"请把 {paramName} 改成有效枚举值之一：{string.Join(", ", validValues)}。");
+                            repairHint: $"璇锋妸 {paramName} 鏀规垚鏈夋晥鏋氫妇鍊间箣涓€锛歿string.Join(", ", validValues)}銆?);
                     }
                 }
             }
@@ -515,13 +506,13 @@ public class AiFlowValidator : IAiFlowValidator
 
             op.Parameters[paramDef.Name] = defaultValue;
             result.AddWarning(
-                $"算子 {op.TempId}({metadata.DisplayName}) 的必填参数 '{paramDef.Name}' 缺失，已自动填充默认值 {defaultValue}",
+                $"绠楀瓙 {op.TempId}({metadata.DisplayName}) 鐨勫繀濉弬鏁?'{paramDef.Name}' 缂哄け锛屽凡鑷姩濉厖榛樿鍊?{defaultValue}",
                 code: "default_parameter_applied",
                 category: "parameter",
                 relatedFields: [$"{operatorField}.parameters.{paramDef.Name}"],
                 operatorId: op.TempId,
                 parameterName: paramDef.Name,
-                repairHint: $"如默认值不符合场景，请在下一轮明确给出 {paramDef.Name}。");
+                repairHint: $"濡傞粯璁ゅ€间笉绗﹀悎鍦烘櫙锛岃鍦ㄤ笅涓€杞槑纭粰鍑?{paramDef.Name}銆?);
         }
     }
 
@@ -608,7 +599,7 @@ public class AiFlowValidator : IAiFlowValidator
                         continue;
 
                     result.AddWarning(
-                        $"算子 {item.Operator.TempId}({item.Operator.OperatorType}) 缺少知识图谱要求资源 {requiredResource}。",
+                        $"绠楀瓙 {item.Operator.TempId}({item.Operator.OperatorType}) 缂哄皯鐭ヨ瘑鍥捐氨瑕佹眰璧勬簮 {requiredResource}銆?,
                         code: "knowledge_required_resource_missing",
                         category: "knowledge",
                         relatedFields:
@@ -618,7 +609,7 @@ public class AiFlowValidator : IAiFlowValidator
                         ],
                         operatorId: item.Operator.TempId,
                         parameterName: requiredResource,
-                        repairHint: $"请补齐资源 {requiredResource}，或在 missingResources/pendingParameters 中声明待提供。");
+                        repairHint: $"璇疯ˉ榻愯祫婧?{requiredResource}锛屾垨鍦?missingResources/pendingParameters 涓槑纭０鏄庤璧勬簮寰呮彁渚涖€?);
                 }
             }
         }
@@ -664,12 +655,12 @@ public class AiFlowValidator : IAiFlowValidator
                     : new[] { $"operators[{index}].{relatedField}" };
 
                 result.AddWarning(
-                    $"算子 {op.TempId}({op.OperatorType}) 命中知识图谱反模式：{antiPattern}",
+                    $"绠楀瓙 {op.TempId}({op.OperatorType}) 鍛戒腑鐭ヨ瘑鍥捐氨鍙嶆ā寮忥細{antiPattern}",
                     code: "knowledge_anti_pattern_detected",
                     category: "knowledge",
                     relatedFields: relatedFields,
                     operatorId: op.TempId,
-                    repairHint: "请调整算子拓扑或参数，避免触发已知反模式。");
+                    repairHint: "璇疯皟鏁寸畻瀛愭嫇鎵戞垨鍙傛暟锛岄伩鍏嶈Е鍙戝凡鐭ュ弽妯″紡銆?);
             }
         }
     }
@@ -690,7 +681,9 @@ public class AiFlowValidator : IAiFlowValidator
             var source = connectionMatch.Groups["source"].Value;
             var target = connectionMatch.Groups["target"].Value;
             if (connectionPairs.Contains($"{source}->{target}"))
+            {
                 return true;
+            }
         }
 
         foreach (Match paramMatch in AntiPatternParameterRegex.Matches(antiPattern))
@@ -775,7 +768,9 @@ public class AiFlowValidator : IAiFlowValidator
         string resourceKey)
     {
         if (TryResolveResourceParameterKeys(op.OperatorType, resourceKey, out var parameterKeys))
+        {
             return IsParameterValueMissing(op.Parameters, parameterKeys);
+        }
 
         return (flow.MissingResources ?? new List<AiMissingResourceInfo>()).Any(item =>
             string.Equals(item.ResourceKey, resourceKey, StringComparison.OrdinalIgnoreCase));
@@ -927,7 +922,7 @@ public class AiFlowValidator : IAiFlowValidator
         AiValidationResult result,
         Dictionary<string, OperatorMetadata> metaMap)
     {
-        // 警告：没有源算子
+        // 璀﹀憡锛氭病鏈夋簮绠楀瓙
         var hasSource = flow.Operators.Any(op =>
             metaMap.TryGetValue(op.TempId, out var meta) &&
             meta.InputPorts.Count == 0);
@@ -935,27 +930,26 @@ public class AiFlowValidator : IAiFlowValidator
         if (!hasSource)
         {
             result.AddWarning(
-                "工作流没有图像源算子（无输入端口的算子），建议添加 ImageAcquisition",
+                "宸ヤ綔娴佹病鏈夊浘鍍忔簮绠楀瓙锛堟棤杈撳叆绔彛鐨勭畻瀛愶級锛屽缓璁坊鍔?ImageAcquisition",
                 code: "missing_image_source",
                 category: "completeness",
                 relatedFields: ["operators"],
-                repairHint: "请补充图像源算子，例如 ImageAcquisition。");
+                repairHint: "璇疯ˉ鍏呭浘鍍忔簮绠楀瓙锛屼緥濡?ImageAcquisition銆?);
         }
 
-        // 警告：没有 ResultOutput
+        // 璀﹀憡锛氭病鏈?ResultOutput
         var hasOutput = flow.Operators.Any(op =>
             op.OperatorType == "ResultOutput" ||
-            (metaMap.TryGetValue(op.TempId, out var meta) && meta.Category == "输出"));
+            (metaMap.TryGetValue(op.TempId, out var meta) && meta.Category == "杈撳嚭"));
 
         if (!hasOutput)
         {
             result.AddWarning(
-                "工作流没有结果输出算子，建议添加 ResultOutput",
+                "宸ヤ綔娴佹病鏈夌粨鏋滆緭鍑虹畻瀛愶紝寤鸿娣诲姞 ResultOutput",
                 code: "missing_result_output",
                 category: "completeness",
                 relatedFields: ["operators"],
-                repairHint: "请补充 ResultOutput 或其他输出类算子，保证结果可消费。");
+                repairHint: "璇疯ˉ鍏?ResultOutput 鎴栧叾浠栬緭鍑虹被绠楀瓙锛屼繚璇佺粨鏋滃彲娑堣垂銆?);
         }
     }
 }
-

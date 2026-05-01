@@ -323,17 +323,17 @@ ClearVision 的算子体系已经很强：155 个正式算子、端口、参数�
 
 TODO：
 
-- [ ] 从 `OperatorMetadata` 生成基础字段：类型、显示名、分类、输入端口、输出端口、参数、默认值、范围、是否必填。
-- [ ] 从算子名片补充：算法摘要、已知限制、适用场景、误用场景。
-- [ ] 从 `operator_quality_matrix.md` 补充证据状态、QScore、工业验证状态。
-- [ ] 每个算子至少具备：`intentTags`、`requiredResources`、`typicalUpstream`、`typicalDownstream`。
-- [ ] 对 AI 相关算子优先补齐：`DeepLearning`、`SemanticSegmentation`、`AnomalyDetection`、`SurfaceDefectDetection`、`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
+- [x] 从 `OperatorMetadata` 生成基础字段：类型、显示名、分类、输入端口、输出端口、参数、默认值、范围、是否必填。
+- [x] 从算子名片补充：算法摘要、已知限制、适用场景、误用场景。
+- [x] 从 `operator_quality_matrix.md` 补充证据状态、QScore、工业验证状态。
+- [x] 每个算子至少具备：`intentTags`、`requiredResources`、`typicalUpstream`、`typicalDownstream`。
+- [x] 对 AI 相关算子优先补齐：`DeepLearning`、`SemanticSegmentation`、`AnomalyDetection`、`SurfaceDefectDetection`、`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
 
 验收标准：
 
-- [ ] 155 个正式算子都有 Knowledge Card。
-- [ ] 生成工具能检查卡片与运行时元数据是否一致。
-- [ ] 缺端口、缺参数、未知算子会导致生成工具失败。
+- [x] 155 个正式算子都有 Knowledge Card。
+- [x] 生成工具能检查卡片与运行时元数据是否一致。（已落地：`OperatorKnowledgeGraphTests` 覆盖 operatorType 可解析、端口/参数一致性、缺卡失败）
+- [x] 缺端口、缺参数、未知算子会导致生成工具失败。（由一致性门禁测试覆盖：枚举不可解析、集合不等价即失败）
 
 ---
 
@@ -355,17 +355,17 @@ TODO：
 
 TODO：
 
-- [ ] 由端口类型自动生成基础 `PRODUCES/CONSUMES`。
-- [ ] 由模板 JSON 自动生成 `COMMONLY_PRECEDES/COMMONLY_FOLLOWS`。
-- [ ] 由 `ScenarioPackageBinding.RequiredResources` 生成 `REQUIRES_RESOURCE`。
-- [ ] 由质量矩阵生成 `HAS_EVIDENCE`。
-- [ ] 输出 `operator_knowledge_graph.json`。
+- [x] 由端口类型自动生成基础 `PRODUCES/CONSUMES`。
+- [x] 由模板 JSON 自动生成 `COMMONLY_PRECEDES/COMMONLY_FOLLOWS`。
+- [x] 由 `ScenarioPackageBinding.RequiredResources` 生成 `REQUIRES_RESOURCE`。
+- [x] 由质量矩阵生成 `HAS_EVIDENCE`。
+- [x] 输出 `operator_knowledge_graph.json`。
 
 验收标准：
 
-- [ ] 查询 `DeepLearning` 能返回常见下游：`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
-- [ ] 查询 `GapMeasurement` 能返回上游：`EdgeDetection`，下游：`ResultJudgment`、`ResultOutput`。
-- [ ] 查询某模板能返回其核心算子链。
+- [x] 查询 `DeepLearning` 能返回常见下游：`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
+- [x] 查询 `GapMeasurement` 能返回上游：`EdgeDetection`，下游：`ResultJudgment`、`ResultOutput`。
+- [x] 查询某模板能返回其核心算子链。
 
 ---
 
@@ -375,16 +375,16 @@ TODO：
 
 TODO：
 
-- [ ] `PromptBuilder.BuildSystemPrompt(userDescription)` 内部调用 `OperatorKnowledgeRetriever`。
+- [x] `PromptBuilder.BuildSystemPrompt(userDescription)` 内部调用 `OperatorKnowledgeRetriever`。
 - [ ] 检索输入包括：场景候选、意图、模板、当前流程、用户附件元信息。
-- [ ] 返回相关算子子集，而不是默认塞入全部 155 个算子。
-- [ ] 高置信度模板场景只发送模板涉及算子 + 少量备选算子。
-- [ ] 低置信度自由生成场景才发送更大的候选集。
+- [x] 返回相关算子子集，而不是默认塞入全部 155 个算子。
+- [x] 高置信度模板场景只发送模板涉及算子 + 少量备选算子。
+- [x] 低置信度自由生成场景才发送更大的候选集。
 
 验收标准：
 
-- [ ] 线序场景 Prompt 中优先出现 `DeepLearning`、`BoxFilter`、`BoxNms`、`DetectionSequenceJudge`、`ResultOutput`。
-- [ ] 铜孔间距场景 Prompt 中优先出现 `Filtering`、`EdgeDetection`、`GapMeasurement`、`ResultJudgment`、`ResultOutput`。
+- [x] 线序场景 Prompt 中优先出现 `DeepLearning`、`BoxFilter`、`BoxNms`、`DetectionSequenceJudge`、`ResultOutput`。
+- [x] 铜孔间距场景 Prompt 中优先出现 `Filtering`、`EdgeDetection`、`GapMeasurement`、`ResultJudgment`、`ResultOutput`。
 - [ ] 与当前全量目录相比，模板场景 Prompt 中算子目录 token 体量明显下降。
 
 ---
@@ -395,14 +395,14 @@ TODO：
 
 TODO：
 
-- [ ] `AiFlowValidator` 在端口/参数校验之外，读取知识图谱中的 `antiPatterns` 与 `requiredResources`。
+- [x] `AiFlowValidator` 在端口/参数校验之外，读取知识图谱中的 `antiPatterns` 与 `requiredResources`。
 - [ ] `AiPanel` 的算子清单卡片展示：算子角色、证据等级、已知限制、缺资源。
 - [ ] 工作台中点击某算子，显示“为什么选择它”和“它通常接在哪些算子后面”。
 - [ ] 对质量矩阵中“未完成现场工业验证”的算子显示风险提示。
 
 验收标准：
 
-- [ ] 用户能在工作台中看到 DeepLearning 缺 `ModelPath` 的资源提示。
+- [x] 用户能在工作台中看到 DeepLearning 缺 `ModelPath` 的资源提示。（后端诊断已产出；UI 面板展示待完成）
 - [ ] 用户能看到 TemplateMatching/CaliperTool 等算子的证据状态与现场验证边界。
 - [ ] UI 展示的参数范围与 Validator 使用的参数范围一致。
 
@@ -414,17 +414,17 @@ TODO：
 
 TODO：
 
-- [ ] 新增 `OperatorKnowledgeGraphGenerator`。
-- [ ] 新增 `OperatorKnowledgeGraphTests`。
-- [ ] CI 检查：155 个正式算子必须都有卡片。
-- [ ] CI 检查：卡片中的端口/参数必须与 `OperatorMetadata` 一致。
-- [ ] CI 检查：卡片中的 `operatorType` 必须可被 `Enum.TryParse<OperatorType>` 解析。
+- [x] 新增 `OperatorKnowledgeGraphGenerator`。
+- [x] 新增 `OperatorKnowledgeGraphTests`。
+- [x] CI 检查：155 个正式算子必须都有卡片。（已落地：`Artifact_ShouldCoverAllOperators_AndOperatorTypeShouldBeParseable`）
+- [x] CI 检查：卡片中的端口/参数必须与 `OperatorMetadata` 一致。（已落地：`Artifact_ShouldAlignPortsAndParametersWithOperatorMetadata`）
+- [x] CI 检查：卡片中的 `operatorType` 必须可被 `Enum.TryParse<OperatorType>` 解析。（已落地：`Artifact_ShouldCoverAllOperators_AndOperatorTypeShouldBeParseable`）
 
 验收标准：
 
-- [ ] 新增算子但未生成知识卡片时，测试失败。
-- [ ] 修改参数名但未更新知识卡片时，测试失败。
-- [ ] PromptBuilder 只能使用通过校验的知识卡片。
+- [x] 新增算子但未生成知识卡片时，测试失败。（由 cards/operator types 集合等价断言保障）
+- [x] 修改参数名但未更新知识卡片时，测试失败。（由端口/参数名称集合一致性断言保障）
+- [x] PromptBuilder 只能使用通过校验的知识卡片。（已落地：`PromptBuilder` 对知识卡片执行 operatorType 可解析 + 端口/参数与 `OperatorMetadata` 集合一致性校验；`PromptBuilderKnowledgeSliceTests.BuildSystemPrompt_WithInvalidKnowledgeCards_ShouldDropThem` 覆盖未通过卡片剔除）
 
 ---
 

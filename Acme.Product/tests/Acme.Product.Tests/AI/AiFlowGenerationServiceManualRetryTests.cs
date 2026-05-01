@@ -1,5 +1,6 @@
 using Acme.Product.Contracts.Messages;
 using Acme.Product.Core.DTOs;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Services;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.AI.DryRun;
@@ -146,6 +147,29 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         operatorFactory.GetAllMetadata().Returns(Array.Empty<OperatorMetadata>());
 
         var templateService = Substitute.For<IFlowTemplateService>();
+        var scenarioMatcher = Substitute.For<IScenarioMatcher>();
+        scenarioMatcher.MatchAsync(
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<IReadOnlyList<string>?>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<ScenarioMatchResult>>(Array.Empty<ScenarioMatchResult>()));
+
+        var requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
+        requirementBriefExtractor.Extract(
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<ScenarioMatchResult?>())
+            .Returns(new AiRequirementBrief());
+
+        var templateConstraintValidator = Substitute.For<ITemplateConstraintValidator>();
+        templateConstraintValidator.Validate(
+                Arg.Any<AiGeneratedFlowJson>(),
+                Arg.Any<FlowTemplate?>(),
+                Arg.Any<bool>())
+            .Returns(new AiValidationResult());
+
         var flowExecutionService = Substitute.For<IFlowExecutionService>();
         var hostEnvironment = Substitute.For<IHostEnvironment>();
         hostEnvironment.EnvironmentName.Returns("Production");
@@ -158,6 +182,9 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             new AutoLayoutService(),
             operatorFactory,
             templateService,
+            scenarioMatcher,
+            requirementBriefExtractor,
+            templateConstraintValidator,
             new DryRunService(flowExecutionService),
             hostEnvironment,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>());

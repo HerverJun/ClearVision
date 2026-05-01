@@ -1062,6 +1062,177 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return string.Empty;
     }
 
+    private static List<AiTemplateCandidateInfo> BuildTemplateCandidates(TemplatePriorityContext templatePriority)
+    {
+        var candidateMatches = templatePriority.Candidates.Count > 0
+            ? templatePriority.Candidates
+            : templatePriority.PrimaryMatch == null
+                ? Array.Empty<ScenarioMatchResult>()
+                : new[] { templatePriority.PrimaryMatch };
+
+        var candidates = new List<AiTemplateCandidateInfo>();
+        var dedup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var match in candidateMatches
+                     .Where(static item => item != null)
+                     .OrderByDescending(item => item.Confidence))
+        {
+            var template = match.Template;
+            var templateId = template?.Id == Guid.Empty ? null : template?.Id.ToString();
+            var scenarioKey = !string.IsNullOrWhiteSpace(template?.ScenarioKey)
+                ? template!.ScenarioKey
+                : match.Scenario.ScenarioKey;
+            var templateName = !string.IsNullOrWhiteSpace(template?.Name)
+                ? template!.Name
+                : !string.IsNullOrWhiteSpace(match.Scenario.TemplateName)
+                    ? match.Scenario.TemplateName
+                    : match.Scenario.ScenarioName;
+            var dedupKey = $"{templateId}|{scenarioKey}|{templateName}";
+            if (!dedup.Add(dedupKey))
+                continue;
+
+            candidates.Add(new AiTemplateCandidateInfo
+            {
+                TemplateId = templateId,
+                TemplateName = templateName,
+                TemplateVersion = !string.IsNullOrWhiteSpace(template?.TemplateVersion)
+                    ? template!.TemplateVersion
+                    : match.Scenario.TemplateVersion,
+                ScenarioKey = scenarioKey,
+                Industry = !string.IsNullOrWhiteSpace(template?.Industry)
+                    ? template!.Industry
+                    : match.Scenario.Industry,
+                Confidence = match.Confidence,
+                MatchReason = string.IsNullOrWhiteSpace(match.MatchReason)
+                    ? "deterministic scenario match"
+                    : match.MatchReason,
+                MatchedFields = match.MatchedFields
+                    .Where(field => !string.IsNullOrWhiteSpace(field))
+                    .Select(field => field.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                MissingSignals = match.MissingSignals
+                    .Where(field => !string.IsNullOrWhiteSpace(field))
+                    .Select(field => field.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            });
+        }
+
+        if (candidates.Count == 0 && templatePriority.Template != null)
+        {
+            candidates.Add(new AiTemplateCandidateInfo
+            {
+                TemplateId = templatePriority.Template.Id == Guid.Empty
+                    ? null
+                    : templatePriority.Template.Id.ToString(),
+                TemplateName = templatePriority.Template.Name,
+                TemplateVersion = templatePriority.Template.TemplateVersion,
+                ScenarioKey = templatePriority.ScenarioKey,
+                Industry = templatePriority.Template.Industry,
+                Confidence = templatePriority.Confidence,
+                MatchReason = templatePriority.MatchReason,
+                MatchedFields = templatePriority.MatchedFields
+                    .Where(field => !string.IsNullOrWhiteSpace(field))
+                    .Select(field => field.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                MissingSignals = templatePriority.MissingSignals
+                    .Where(field => !string.IsNullOrWhiteSpace(field))
+                    .Select(field => field.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            });
+        }
+
+        return candidates;
+    }
+
+    private static void ApplyTemplateMetadata(AiGeneratedFlowJson generatedFlow, TemplatePriorityContext templatePriority)
+    {
+        if (string.IsNullOrWhiteSpace(generatedFlow.GenerationMode))
+            generatedFlow.GenerationMode = templatePriority.GenerationMode;
+        if (string.IsNullOrWhiteSpace(generatedFlow.TemplateLockLevel))
+            generatedFlow.TemplateLockLevel = templatePriority.TemplateLockLevel;
+
+        if (!templatePriority.IsTemplateFirst)
+            return;
+
+        generatedFlow.RecommendedTemplate ??= new AiRecommendedTemplateInfo();
+        var recommended = generatedFlow.RecommendedTemplate;
+        recommended.TemplateId ??= templatePriority.Template?.Id == Guid.Empty
+            ? null
+            : templatePriority.Template?.Id.ToString();
+        if (string.IsNullOrWhiteSpace(recommended.TemplateName))
+        {
+            recommended.TemplateName = templatePriority.Template?.Name
+                ?? templatePriority.ScenarioName
+                ?? "模板候选";
+        }
+        recommended.TemplateVersion ??= templatePriority.Template?.TemplateVersion;
+        recommended.ScenarioKey ??= string.IsNullOrWhiteSpace(templatePriority.ScenarioKey)
+            ? null
+            : templatePriority.ScenarioKey;
+        if (string.IsNullOrWhiteSpace(recommended.Industry))
+            recommended.Industry = templatePriority.Template?.Industry;
+        if (string.IsNullOrWhiteSpace(recommended.MatchReason))
+            recommended.MatchReason = templatePriority.MatchReason;
+        if (string.IsNullOrWhiteSpace(recommended.MatchMode))
+            recommended.MatchMode = templatePriority.MatchMode;
+        if (recommended.Confidence <= 0 && templatePriority.Confidence > 0)
+            recommended.Confidence = templatePriority.Confidence;
+
+        if (recommended.MatchedFields.Count == 0 && templatePriority.MatchedFields.Count > 0)
+        {
+            recommended.MatchedFields = templatePriority.MatchedFields
+                .Where(field => !string.IsNullOrWhiteSpace(field))
+                .Select(field => field.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        if (recommended.MissingSignals.Count == 0 && templatePriority.MissingSignals.Count > 0)
+        {
+            recommended.MissingSignals = templatePriority.MissingSignals
+                .Where(field => !string.IsNullOrWhiteSpace(field))
+                .Select(field => field.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+    }
+
+    private static void MergeValidationResult(AiValidationResult target, AiValidationResult source)
+    {
+        foreach (var error in source.Errors)
+        {
+            if (!target.Errors.Contains(error, StringComparer.Ordinal))
+                target.Errors.Add(error);
+        }
+
+        foreach (var warning in source.Warnings)
+        {
+            if (!target.Warnings.Contains(warning, StringComparer.Ordinal))
+                target.Warnings.Add(warning);
+        }
+
+        foreach (var diagnostic in source.Diagnostics)
+        {
+            var exists = target.Diagnostics.Any(existing =>
+                string.Equals(existing.Severity, diagnostic.Severity, StringComparison.Ordinal) &&
+                string.Equals(existing.Category, diagnostic.Category, StringComparison.Ordinal) &&
+                string.Equals(existing.Code, diagnostic.Code, StringComparison.Ordinal) &&
+                string.Equals(existing.Message, diagnostic.Message, StringComparison.Ordinal) &&
+                string.Equals(existing.OperatorId, diagnostic.OperatorId, StringComparison.Ordinal) &&
+                string.Equals(existing.ParameterName, diagnostic.ParameterName, StringComparison.Ordinal) &&
+                string.Equals(existing.SourceTempId, diagnostic.SourceTempId, StringComparison.Ordinal) &&
+                string.Equals(existing.SourcePortName, diagnostic.SourcePortName, StringComparison.Ordinal) &&
+                string.Equals(existing.TargetTempId, diagnostic.TargetTempId, StringComparison.Ordinal) &&
+                string.Equals(existing.TargetPortName, diagnostic.TargetPortName, StringComparison.Ordinal));
+            if (!exists)
+                target.Diagnostics.Add(CloneDiagnostic(diagnostic));
+        }
+    }
+
     private static List<AiMissingResourceInfo> BuildMissingResources(
         AiGeneratedFlowJson generatedFlow,
         TemplatePriorityContext templatePriority)
@@ -1156,10 +1327,32 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         string MatchReason,
         string MatchMode,
         double Confidence,
-        IReadOnlyList<string> MatchedKeywords)
+        IReadOnlyList<string> MatchedKeywords,
+        string ScenarioKey,
+        string ScenarioName,
+        string GenerationMode,
+        string TemplateLockLevel,
+        IReadOnlyList<string> MatchedFields,
+        IReadOnlyList<string> MissingSignals,
+        ScenarioMatchResult? PrimaryMatch,
+        IReadOnlyList<ScenarioMatchResult> Candidates)
     {
         public static TemplatePriorityContext None { get; } =
-            new(false, null, string.Empty, string.Empty, 0, Array.Empty<string>());
+            new(
+                false,
+                null,
+                string.Empty,
+                string.Empty,
+                0,
+                Array.Empty<string>(),
+                string.Empty,
+                string.Empty,
+                "free_generate",
+                "none",
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                null,
+                Array.Empty<ScenarioMatchResult>());
     }
 
     private string BuildRetryMessage(string originalMessage, AiValidationResult failedValidation, string? lastRawResponse)
@@ -1249,7 +1442,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         List<AiAttemptDiagnostic> diagnostics,
         string? lastRawResponse,
         object? promptTrace,
-        IReadOnlyList<string> progressMessages)
+        IReadOnlyList<string> progressMessages,
+        AiRequirementBrief? requirementBrief,
+        List<AiTemplateCandidateInfo> templateCandidates,
+        IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline)
     {
         var failureSummary = BuildFailureSummary(
             validation,
@@ -1291,7 +1487,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             LastAttemptDiagnostics = diagnostics,
             ManualRetry = manualRetry,
             SessionId = sessionId,
-            PromptTrace = promptTrace
+            PromptTrace = promptTrace,
+            RequirementBrief = requirementBrief,
+            TemplateCandidates = templateCandidates,
+            StageTimeline = stageTimeline.ToList()
         };
     }
 

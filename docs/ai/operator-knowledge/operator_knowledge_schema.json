@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clearvision/operator_knowledge_schema.v1.json",
+  "title": "ClearVision Operator Knowledge Card",
+  "type": "object",
+  "required": [
+    "operatorType",
+    "displayName",
+    "category",
+    "aliases",
+    "intentTags",
+    "scenarioTags",
+    "inputs",
+    "outputs",
+    "parameters",
+    "requiredResources",
+    "typicalUpstream",
+    "typicalDownstream",
+    "antiPatterns",
+    "knownLimitations",
+    "evidence"
+  ],
+  "properties": {
+    "operatorType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "intentTags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenarioTags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/portDefinition"
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/portDefinition"
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/parameterDefinition"
+      }
+    },
+    "requiredResources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "typicalUpstream": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "typicalDownstream": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "antiPatterns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "knownLimitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "$ref": "#/$defs/evidenceDefinition"
+    }
+  },
+  "$defs": {
+    "portDefinition": {
+      "type": "object",
+      "required": [
+        "name",
+        "displayName",
+        "dataType",
+        "isRequired"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "dataType": {
+          "type": "string"
+        },
+        "isRequired": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "parameterDefinition": {
+      "type": "object",
+      "required": [
+        "name",
+        "displayName",
+        "dataType",
+        "isRequired",
+        "allowedValues"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "dataType": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "defaultValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isRequired": {
+          "type": "boolean"
+        },
+        "allowedValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidenceDefinition": {
+      "type": "object",
+      "required": [
+        "contract",
+        "golden",
+        "dataset",
+        "fieldReplay",
+        "precisionClaim",
+        "industrialStatus"
+      ],
+      "properties": {
+        "contract": {
+          "type": "string"
+        },
+        "golden": {
+          "type": "string"
+        },
+        "dataset": {
+          "type": "string"
+        },
+        "fieldReplay": {
+          "type": "string"
+        },
+        "precisionClaim": {
+          "type": "string"
+        },
+        "industrialStatus": {
+          "type": "string"
+        },
+        "qScore": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
