@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-04-29.matching-algorithm-improvement.v1",
-  "generatedAtUtc": "2026-04-30T11:24:58+00:00",
+  "generatedAtUtc": "2026-05-01T03:28:42+00:00",
   "accepted": true,
   "claimBoundary": "准工业公开/替代证明；不声明真实产线工业验证完成。",
   "sourceReports": [
@@ -272,6 +272,59 @@
       ]
     },
     {
+      "label": "PlanarMatching(ORB)",
+      "operator": "PlanarMatching",
+      "detectorType": "ORB",
+      "sourceReport": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
+      "candidateVersion": null,
+      "selectedProfile": null,
+      "accepted": true,
+      "caseCount": 80,
+      "passed": 60,
+      "passRate": 0.75,
+      "viewpointCaseCount": 23,
+      "viewpointPassed": 7,
+      "viewpointPassRate": 0.304348,
+      "illuminationCaseCount": 57,
+      "illuminationPassed": 53,
+      "illuminationPassRate": 0.929825,
+      "meanPositionErrorPx": 25022.378956,
+      "p95PositionErrorPx": 101.637356,
+      "p95CornerErrorPx": 35.477532,
+      "runtimeMs": 4408.856,
+      "maxFeatures": 1200,
+      "matchRatio": 0.75,
+      "ransacThreshold": 5,
+      "minInlierRatio": 0.25,
+      "fastThreshold": 20,
+      "edgeThreshold": 15,
+      "akazeThreshold": 0.001,
+      "allowCenterOnlyProjection": false,
+      "scoreThreshold": 0.5,
+      "topFailures": [
+        {
+          "reason": "Projected quadrilateral is invalid.",
+          "count": 10
+        },
+        {
+          "reason": "Insufficient feature matches (4 < 6).",
+          "count": 1
+        },
+        {
+          "reason": "Insufficient feature matches (3 < 6).",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.63, inliers=7, totalMatches=10, error=101.637, tolerance=35",
+          "count": 1
+        },
+        {
+          "reason": "isMatch=True, score=0.769, inliers=148, totalMatches=149, error=44.549, tolerance=35",
+          "count": 1
+        }
+      ]
+    },
+    {
       "label": "PlanarMatching(AKAZE)",
       "operator": "PlanarMatching",
       "detectorType": "AKAZE",
@@ -320,59 +373,6 @@
         },
         {
           "reason": "isMatch=True, score=0.795, inliers=258, totalMatches=259, error=97.086, tolerance=35",
-          "count": 1
-        }
-      ]
-    },
-    {
-      "label": "PlanarMatching(ORB)",
-      "operator": "PlanarMatching",
-      "detectorType": "ORB",
-      "sourceReport": "quality/evals/reports/PlanarMatching_hpatches_baseline.json",
-      "candidateVersion": null,
-      "selectedProfile": null,
-      "accepted": true,
-      "caseCount": 116,
-      "passed": 70,
-      "passRate": 0.603448,
-      "viewpointCaseCount": 59,
-      "viewpointPassed": 15,
-      "viewpointPassRate": 0.254237,
-      "illuminationCaseCount": 57,
-      "illuminationPassed": 55,
-      "illuminationPassRate": 0.964912,
-      "meanPositionErrorPx": 8653.275972,
-      "p95PositionErrorPx": 114.786099,
-      "p95CornerErrorPx": 10.309544,
-      "runtimeMs": 7330.209,
-      "maxFeatures": 1600,
-      "matchRatio": 0.75,
-      "ransacThreshold": 5,
-      "minInlierRatio": 0.2,
-      "fastThreshold": 20,
-      "edgeThreshold": 15,
-      "akazeThreshold": 0.001,
-      "allowCenterOnlyProjection": null,
-      "scoreThreshold": 0.5,
-      "topFailures": [
-        {
-          "reason": "Projected quadrilateral is invalid.",
-          "count": 25
-        },
-        {
-          "reason": "Insufficient feature matches (3 < 6).",
-          "count": 1
-        },
-        {
-          "reason": "isMatch=True, score=0.773, inliers=154, totalMatches=154, error=44.731, tolerance=35",
-          "count": 1
-        },
-        {
-          "reason": "isMatch=True, score=0.748, inliers=176, totalMatches=177, error=97.186, tolerance=35",
-          "count": 1
-        },
-        {
-          "reason": "isMatch=True, score=0.775, inliers=299, totalMatches=300, error=68.79, tolerance=35",
           "count": 1
         }
       ]

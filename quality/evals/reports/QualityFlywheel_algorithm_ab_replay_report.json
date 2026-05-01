@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-04-29.algorithm-ab-replay.v2",
-  "generatedAtUtc": "2026-04-30T12:54:35+00:00",
+  "generatedAtUtc": "2026-05-01T03:33:32+00:00",
   "accepted": true,
   "sourceProofBaseline": "quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json",
   "sourceReplayManifest": "quality/evals/reports/QualityFlywheel_public_benchmark_replay_manifest.json",
@@ -13,15 +13,15 @@
     "controlCaseCount": 23,
     "fixedCaseCount": 37,
     "regressedCaseCount": 0,
-    "improvedMetricCaseCount": 74,
+    "improvedMetricCaseCount": 64,
     "readyForABCount": 10,
     "matchingViewpointCaseCount": 11,
     "matchingViewpointFixedCaseCount": 10,
     "matchingViewpointRegressedCaseCount": 0,
     "surfaceDefectCaseCount": 20,
-    "surfaceDefectImprovedCaseCount": 10,
+    "surfaceDefectImprovedCaseCount": 0,
     "surfaceDefectRegressedCaseCount": 0,
-    "surfaceDefectWorseMetricCaseCount": 8,
+    "surfaceDefectWorseMetricCaseCount": 0,
     "anomalyDetectionCaseCount": 20,
     "anomalyDetectionImprovedCaseCount": 14,
     "anomalyDetectionRegressedCaseCount": 0,
@@ -79,13 +79,13 @@
       "sourceCandidate": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
       "parameters": {
         "CandidateVersion": "v1",
-        "ProfileName": "balanced_floor_14_area7",
+        "ProfileName": "baseline_default",
         "MaxSide": 256,
         "Method": "LocalContrast",
         "ThresholdMode": "Manual",
         "NormalizationMode": "LocalMean",
-        "Threshold": 14,
-        "MinArea": 7,
+        "Threshold": 15,
+        "MinArea": 4,
         "MaxArea": 1000000,
         "MorphCleanSize": 1,
         "MorphMode": "OpenClose",
@@ -93,6 +93,9 @@
         "ReferenceStatsSigma": 2.5,
         "RobustReferenceStats": false,
         "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 2,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "AreaOnly",
         "PixelSampleStride": 4,
         "MinImageAuroc": 0.7,
         "MinPixelF1": 0.2
@@ -7429,8 +7432,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 22.797,
-              "MemoryAllocationBytes": 39505512.0,
+              "RuntimeMs": 21.79,
+              "MemoryAllocationBytes": 39507488.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -7581,9 +7584,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 39505824.0,
-              "new": 39505512.0,
-              "delta": -312.0,
-              "improved": true
+              "new": 39507488.0,
+              "delta": 1664.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 21842.0,
@@ -7593,8 +7596,8 @@
             },
             "RuntimeMs": {
               "old": 19.555,
-              "new": 22.797,
-              "delta": 3.242,
+              "new": 21.79,
+              "delta": 2.235,
               "improved": false
             },
             "Threshold1Used": {
@@ -7694,8 +7697,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 22.757,
-              "MemoryAllocationBytes": 39568624.0,
+              "RuntimeMs": 22.31,
+              "MemoryAllocationBytes": 39570576.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -7846,8 +7849,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39578624.0,
-              "new": 39568624.0,
-              "delta": -10000.0,
+              "new": 39570576.0,
+              "delta": -8048.0,
               "improved": true
             },
             "PredictedEdgePixels": {
@@ -7858,8 +7861,8 @@
             },
             "RuntimeMs": {
               "old": 15.629,
-              "new": 22.757,
-              "delta": 7.128,
+              "new": 22.31,
+              "delta": 6.681,
               "improved": false
             },
             "Threshold1Used": {
@@ -7965,8 +7968,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 17.85,
-              "MemoryAllocationBytes": 39615920.0,
+              "RuntimeMs": 17.482,
+              "MemoryAllocationBytes": 39634512.0,
               "Width": 321.0,
               "Height": 481.0,
               "AnnotationCount": 5.0,
@@ -8117,8 +8120,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39609616.0,
-              "new": 39615920.0,
-              "delta": 6304.0,
+              "new": 39634512.0,
+              "delta": 24896.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -8129,8 +8132,8 @@
             },
             "RuntimeMs": {
               "old": 23.709,
-              "new": 17.85,
-              "delta": -5.859,
+              "new": 17.482,
+              "delta": -6.227,
               "improved": true
             },
             "Threshold1Used": {
@@ -8237,8 +8240,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 15.933,
-              "MemoryAllocationBytes": 39627704.0,
+              "RuntimeMs": 20.069,
+              "MemoryAllocationBytes": 39620080.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -8389,8 +8392,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39616272.0,
-              "new": 39627704.0,
-              "delta": 11432.0,
+              "new": 39620080.0,
+              "delta": 3808.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -8401,9 +8404,9 @@
             },
             "RuntimeMs": {
               "old": 16.421,
-              "new": 15.933,
-              "delta": -0.488,
-              "improved": true
+              "new": 20.069,
+              "delta": 3.648,
+              "improved": false
             },
             "Threshold1Used": {
               "old": 50.0,
@@ -8502,8 +8505,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 18.208,
-              "MemoryAllocationBytes": 39613304.0,
+              "RuntimeMs": 18.281,
+              "MemoryAllocationBytes": 39626144.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -8654,9 +8657,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 39623960.0,
-              "new": 39613304.0,
-              "delta": -10656.0,
-              "improved": true
+              "new": 39626144.0,
+              "delta": 2184.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 16291.0,
@@ -8666,8 +8669,8 @@
             },
             "RuntimeMs": {
               "old": 13.808,
-              "new": 18.208,
-              "delta": 4.4,
+              "new": 18.281,
+              "delta": 4.473,
               "improved": false
             },
             "Threshold1Used": {
@@ -8767,8 +8770,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 24.117,
-              "MemoryAllocationBytes": 45832296.0,
+              "RuntimeMs": 26.716,
+              "MemoryAllocationBytes": 45834728.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 6.0,
@@ -8919,8 +8922,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 45832112.0,
-              "new": 45832296.0,
-              "delta": 184.0,
+              "new": 45834728.0,
+              "delta": 2616.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -8931,8 +8934,8 @@
             },
             "RuntimeMs": {
               "old": 16.938,
-              "new": 24.117,
-              "delta": 7.179,
+              "new": 26.716,
+              "delta": 9.778,
               "improved": false
             },
             "Threshold1Used": {
@@ -9032,8 +9035,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 22.711,
-              "MemoryAllocationBytes": 39623168.0,
+              "RuntimeMs": 20.575,
+              "MemoryAllocationBytes": 39625120.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -9184,8 +9187,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39621608.0,
-              "new": 39623168.0,
-              "delta": 1560.0,
+              "new": 39625120.0,
+              "delta": 3512.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -9196,9 +9199,9 @@
             },
             "RuntimeMs": {
               "old": 22.481,
-              "new": 22.711,
-              "delta": 0.23,
-              "improved": false
+              "new": 20.575,
+              "delta": -1.906,
+              "improved": true
             },
             "Threshold1Used": {
               "old": 50.0,
@@ -9304,8 +9307,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 21.812,
-              "MemoryAllocationBytes": 39776272.0,
+              "RuntimeMs": 22.892,
+              "MemoryAllocationBytes": 39778272.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -9456,8 +9459,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39790008.0,
-              "new": 39776272.0,
-              "delta": -13736.0,
+              "new": 39778272.0,
+              "delta": -11736.0,
               "improved": true
             },
             "PredictedEdgePixels": {
@@ -9468,8 +9471,8 @@
             },
             "RuntimeMs": {
               "old": 15.85,
-              "new": 21.812,
-              "delta": 5.962,
+              "new": 22.892,
+              "delta": 7.042,
               "improved": false
             },
             "Threshold1Used": {
@@ -9575,8 +9578,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 21.721,
-              "MemoryAllocationBytes": 39618664.0,
+              "RuntimeMs": 17.196,
+              "MemoryAllocationBytes": 39633376.0,
               "Width": 321.0,
               "Height": 481.0,
               "AnnotationCount": 5.0,
@@ -9727,9 +9730,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 39618912.0,
-              "new": 39618664.0,
-              "delta": -248.0,
-              "improved": true
+              "new": 39633376.0,
+              "delta": 14464.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 22728.0,
@@ -9739,9 +9742,9 @@
             },
             "RuntimeMs": {
               "old": 17.531,
-              "new": 21.721,
-              "delta": 4.19,
-              "improved": false
+              "new": 17.196,
+              "delta": -0.335,
+              "improved": true
             },
             "Threshold1Used": {
               "old": 50.0,
@@ -9840,8 +9843,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 20.414,
-              "MemoryAllocationBytes": 39579064.0,
+              "RuntimeMs": 19.104,
+              "MemoryAllocationBytes": 39596680.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -9992,9 +9995,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 39588928.0,
-              "new": 39579064.0,
-              "delta": -9864.0,
-              "improved": true
+              "new": 39596680.0,
+              "delta": 7752.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 14597.0,
@@ -10004,8 +10007,8 @@
             },
             "RuntimeMs": {
               "old": 15.132,
-              "new": 20.414,
-              "delta": 5.282,
+              "new": 19.104,
+              "delta": 3.972,
               "improved": false
             },
             "Threshold1Used": {
@@ -10105,8 +10108,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 18.701,
-              "MemoryAllocationBytes": 39587864.0,
+              "RuntimeMs": 19.382,
+              "MemoryAllocationBytes": 39585768.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -10257,8 +10260,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39581064.0,
-              "new": 39587864.0,
-              "delta": 6800.0,
+              "new": 39585768.0,
+              "delta": 4704.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -10269,8 +10272,8 @@
             },
             "RuntimeMs": {
               "old": 17.19,
-              "new": 18.701,
-              "delta": 1.511,
+              "new": 19.382,
+              "delta": 2.192,
               "improved": false
             },
             "Threshold1Used": {
@@ -10376,8 +10379,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 16.956,
-              "MemoryAllocationBytes": 39730088.0,
+              "RuntimeMs": 22.488,
+              "MemoryAllocationBytes": 39727400.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -10528,8 +10531,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39715600.0,
-              "new": 39730088.0,
-              "delta": 14488.0,
+              "new": 39727400.0,
+              "delta": 11800.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -10540,9 +10543,9 @@
             },
             "RuntimeMs": {
               "old": 17.87,
-              "new": 16.956,
-              "delta": -0.914,
-              "improved": true
+              "new": 22.488,
+              "delta": 4.618,
+              "improved": false
             },
             "Threshold1Used": {
               "old": 50.0,
@@ -10646,8 +10649,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 21.89,
-              "MemoryAllocationBytes": 39612792.0,
+              "RuntimeMs": 20.73,
+              "MemoryAllocationBytes": 39614768.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -10798,8 +10801,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39610904.0,
-              "new": 39612792.0,
-              "delta": 1888.0,
+              "new": 39614768.0,
+              "delta": 3864.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -10810,8 +10813,8 @@
             },
             "RuntimeMs": {
               "old": 17.864,
-              "new": 21.89,
-              "delta": 4.026,
+              "new": 20.73,
+              "delta": 2.866,
               "improved": false
             },
             "Threshold1Used": {
@@ -10917,8 +10920,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 23.425,
-              "MemoryAllocationBytes": 39657272.0,
+              "RuntimeMs": 22.761,
+              "MemoryAllocationBytes": 39659248.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -11069,8 +11072,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39665088.0,
-              "new": 39657272.0,
-              "delta": -7816.0,
+              "new": 39659248.0,
+              "delta": -5840.0,
               "improved": true
             },
             "PredictedEdgePixels": {
@@ -11081,8 +11084,8 @@
             },
             "RuntimeMs": {
               "old": 18.279,
-              "new": 23.425,
-              "delta": 5.146,
+              "new": 22.761,
+              "delta": 4.482,
               "improved": false
             },
             "Threshold1Used": {
@@ -11182,8 +11185,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 22.309,
-              "MemoryAllocationBytes": 39551648.0,
+              "RuntimeMs": 21.736,
+              "MemoryAllocationBytes": 39553624.0,
               "Width": 321.0,
               "Height": 481.0,
               "AnnotationCount": 5.0,
@@ -11334,9 +11337,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 39552272.0,
-              "new": 39551648.0,
-              "delta": -624.0,
-              "improved": true
+              "new": 39553624.0,
+              "delta": 1352.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 12129.0,
@@ -11346,8 +11349,8 @@
             },
             "RuntimeMs": {
               "old": 16.755,
-              "new": 22.309,
-              "delta": 5.554,
+              "new": 21.736,
+              "delta": 4.981,
               "improved": false
             },
             "Threshold1Used": {
@@ -11447,8 +11450,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 74.863,
-              "MemoryAllocationBytes": 40380696.0,
+              "RuntimeMs": 76.48,
+              "MemoryAllocationBytes": 40385960.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -11599,8 +11602,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39681104.0,
-              "new": 40380696.0,
-              "delta": 699592.0,
+              "new": 40385960.0,
+              "delta": 704856.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -11611,8 +11614,8 @@
             },
             "RuntimeMs": {
               "old": 21.561,
-              "new": 74.863,
-              "delta": 53.302,
+              "new": 76.48,
+              "delta": 54.919,
               "improved": false
             },
             "Threshold1Used": {
@@ -11712,8 +11715,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 21.248,
-              "MemoryAllocationBytes": 39606208.0,
+              "RuntimeMs": 21.271,
+              "MemoryAllocationBytes": 39608208.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -11864,8 +11867,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39613488.0,
-              "new": 39606208.0,
-              "delta": -7280.0,
+              "new": 39608208.0,
+              "delta": -5280.0,
               "improved": true
             },
             "PredictedEdgePixels": {
@@ -11876,8 +11879,8 @@
             },
             "RuntimeMs": {
               "old": 17.406,
-              "new": 21.248,
-              "delta": 3.842,
+              "new": 21.271,
+              "delta": 3.865,
               "improved": false
             },
             "Threshold1Used": {
@@ -11984,8 +11987,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 24.397,
-              "MemoryAllocationBytes": 45931776.0,
+              "RuntimeMs": 24.936,
+              "MemoryAllocationBytes": 45938264.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 6.0,
@@ -12136,9 +12139,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 45934624.0,
-              "new": 45931776.0,
-              "delta": -2848.0,
-              "improved": true
+              "new": 45938264.0,
+              "delta": 3640.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 20672.0,
@@ -12148,8 +12151,8 @@
             },
             "RuntimeMs": {
               "old": 18.103,
-              "new": 24.397,
-              "delta": 6.294,
+              "new": 24.936,
+              "delta": 6.833,
               "improved": false
             },
             "Threshold1Used": {
@@ -12249,8 +12252,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 21.732,
-              "MemoryAllocationBytes": 39652664.0,
+              "RuntimeMs": 21.556,
+              "MemoryAllocationBytes": 39654640.0,
               "Width": 321.0,
               "Height": 481.0,
               "AnnotationCount": 5.0,
@@ -12401,9 +12404,9 @@
             },
             "MemoryAllocationBytes": {
               "old": 39652760.0,
-              "new": 39652664.0,
-              "delta": -96.0,
-              "improved": true
+              "new": 39654640.0,
+              "delta": 1880.0,
+              "improved": false
             },
             "PredictedEdgePixels": {
               "old": 22874.0,
@@ -12413,8 +12416,8 @@
             },
             "RuntimeMs": {
               "old": 18.294,
-              "new": 21.732,
-              "delta": 3.438,
+              "new": 21.556,
+              "delta": 3.262,
               "improved": false
             },
             "Threshold1Used": {
@@ -12514,8 +12517,8 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "RuntimeMs": 23.029,
-              "MemoryAllocationBytes": 39757504.0,
+              "RuntimeMs": 22.314,
+              "MemoryAllocationBytes": 39759504.0,
               "Width": 481.0,
               "Height": 321.0,
               "AnnotationCount": 5.0,
@@ -12666,8 +12669,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 39756808.0,
-              "new": 39757504.0,
-              "delta": 696.0,
+              "new": 39759504.0,
+              "delta": 2696.0,
               "improved": false
             },
             "PredictedEdgePixels": {
@@ -12678,8 +12681,8 @@
             },
             "RuntimeMs": {
               "old": 17.93,
-              "new": 23.029,
-              "delta": 5.099,
+              "new": 22.314,
+              "delta": 4.384,
               "improved": false
             },
             "Threshold1Used": {
@@ -21637,8 +21640,8 @@
       "replayCaseCount": 20,
       "fixedCaseCount": 0,
       "regressedCaseCount": 0,
-      "worseMetricCaseCount": 8,
-      "improvedMetricCaseCount": 10,
+      "worseMetricCaseCount": 0,
+      "improvedMetricCaseCount": 0,
       "replayCases": [
         {
           "operator": "SurfaceDefectDetection",
@@ -21677,28 +21680,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 40.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 42.80336,
+              "DefectCount": 1.0,
+              "DefectArea": 4.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 11.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23296.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 465.0,
-              "Diagnostics.CandidateAreaAfterMorph": 465.0,
+              "PixelTotals.TrueNegative": 23285.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 350.0,
+              "Diagnostics.CandidateAreaAfterMorph": 350.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 295.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 231.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.377404,
               "Diagnostics.ResponseStdDev": 3.680094,
-              "RuntimeMs": 38.223,
-              "MemoryAllocationBytes": 82512.0
+              "RuntimeMs": 39.447,
+              "MemoryAllocationBytes": 74176.0
             },
             "diagnostics": {
               "Error": null,
@@ -21707,59 +21715,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 465,
-                "CandidateAreaAfterMorph": 465,
+                "CandidateAreaBeforeMorph": 350,
+                "CandidateAreaAfterMorph": 350,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 295,
-                "AcceptedCount": 0,
+                "CandidateCount": 231,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.377403846153847,
                 "ResponseStdDev": 3.680093986435156
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 40
+              "PredictedDefect": true,
+              "Score": 42.80336
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 4.5,
-              "new": 0.0,
-              "delta": -4.5,
+              "new": 4.5,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 54544.0,
-              "new": 82512.0,
-              "delta": 27968.0,
+              "new": 74176.0,
+              "delta": 19632.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -21769,21 +21787,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 11.0,
-              "new": 0.0,
-              "delta": -11.0,
-              "improved": true
+              "new": 11.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23285.0,
-              "new": 23296.0,
-              "delta": 11.0,
-              "improved": true
+              "new": 23285.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -21793,18 +21811,18 @@
             },
             "RuntimeMs": {
               "old": 6.834,
-              "new": 38.223,
-              "delta": 31.389,
+              "new": 39.447,
+              "delta": 32.613,
               "improved": false
             },
             "Score": {
               "old": 42.80336,
-              "new": 40.0,
-              "delta": -2.80336,
+              "new": 42.80336,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -21844,28 +21862,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 60.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 62.70805,
+              "DefectCount": 1.0,
+              "DefectArea": 4.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 10.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23552.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 670.0,
-              "Diagnostics.CandidateAreaAfterMorph": 670.0,
+              "PixelTotals.TrueNegative": 23542.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 520.0,
+              "Diagnostics.CandidateAreaAfterMorph": 520.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 435.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 362.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.763757,
               "Diagnostics.ResponseStdDev": 4.188664,
-              "RuntimeMs": 4.939,
-              "MemoryAllocationBytes": 90736.0
+              "RuntimeMs": 5.171,
+              "MemoryAllocationBytes": 80256.0
             },
             "diagnostics": {
               "Error": null,
@@ -21874,59 +21897,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 670,
-                "CandidateAreaAfterMorph": 670,
+                "CandidateAreaBeforeMorph": 520,
+                "CandidateAreaAfterMorph": 520,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 435,
-                "AcceptedCount": 0,
+                "CandidateCount": 362,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.763756793478261,
                 "ResponseStdDev": 4.188663565218591
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 60
+              "PredictedDefect": true,
+              "Score": 62.70805
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 4.0,
-              "new": 0.0,
-              "delta": -4.0,
+              "new": 4.0,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 75544.0,
-              "new": 90736.0,
-              "delta": 15192.0,
+              "new": 80256.0,
+              "delta": 4712.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -21936,21 +21969,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 10.0,
-              "new": 0.0,
-              "delta": -10.0,
-              "improved": true
+              "new": 10.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23542.0,
-              "new": 23552.0,
-              "delta": 10.0,
-              "improved": true
+              "new": 23542.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -21960,18 +21993,18 @@
             },
             "RuntimeMs": {
               "old": 6.235,
-              "new": 4.939,
-              "delta": -1.296,
+              "new": 5.171,
+              "delta": -1.064,
               "improved": true
             },
             "Score": {
               "old": 62.70805,
-              "new": 60.0,
-              "delta": -2.70805,
+              "new": 62.70805,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -22011,28 +22044,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 41.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 43.80336,
+              "DefectCount": 1.0,
+              "DefectArea": 4.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 11.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 24064.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 315.0,
-              "Diagnostics.CandidateAreaAfterMorph": 315.0,
+              "PixelTotals.TrueNegative": 24053.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 225.0,
+              "Diagnostics.CandidateAreaAfterMorph": 225.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 219.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 158.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.091298,
               "Diagnostics.ResponseStdDev": 3.406914,
-              "RuntimeMs": 4.279,
-              "MemoryAllocationBytes": 54008.0
+              "RuntimeMs": 4.633,
+              "MemoryAllocationBytes": 46248.0
             },
             "diagnostics": {
               "Error": null,
@@ -22041,59 +22079,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 315,
-                "CandidateAreaAfterMorph": 315,
+                "CandidateAreaBeforeMorph": 225,
+                "CandidateAreaAfterMorph": 225,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 219,
-                "AcceptedCount": 0,
+                "CandidateCount": 158,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.091298204787234,
                 "ResponseStdDev": 3.4069143276881624
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 41
+              "PredictedDefect": true,
+              "Score": 43.80336
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 4.5,
-              "new": 0.0,
-              "delta": -4.5,
+              "new": 4.5,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 41448.0,
-              "new": 54008.0,
-              "delta": 12560.0,
+              "new": 46248.0,
+              "delta": 4800.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -22103,21 +22151,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 11.0,
-              "new": 0.0,
-              "delta": -11.0,
-              "improved": true
+              "new": 11.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 24053.0,
-              "new": 24064.0,
-              "delta": 11.0,
-              "improved": true
+              "new": 24053.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -22127,18 +22175,18 @@
             },
             "RuntimeMs": {
               "old": 4.446,
-              "new": 4.279,
-              "delta": -0.167,
-              "improved": true
+              "new": 4.633,
+              "delta": 0.187,
+              "improved": false
             },
             "Score": {
               "old": 43.80336,
-              "new": 41.0,
-              "delta": -2.80336,
+              "new": 43.80336,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -22178,28 +22226,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 55.295837,
+              "Score": 55.218876,
               "DefectCount": 1.0,
-              "DefectArea": 8.0,
+              "DefectArea": 7.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 18.0,
+              "PixelTotals.FalsePositive": 17.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 21998.0,
+              "PixelTotals.TrueNegative": 21999.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 453.0,
-              "Diagnostics.CandidateAreaAfterMorph": 453.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 315.0,
+              "Diagnostics.CandidateAreaAfterMorph": 315.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 292.0,
+              "Diagnostics.CandidateCount": 208.0,
               "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.5506,
               "Diagnostics.ResponseStdDev": 3.762634,
-              "RuntimeMs": 5.636,
-              "MemoryAllocationBytes": 67224.0
+              "RuntimeMs": 4.652,
+              "MemoryAllocationBytes": 54600.0
             },
             "diagnostics": {
               "Error": null,
@@ -22208,17 +22261,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 453,
-                "CandidateAreaAfterMorph": 453,
+                "CandidateAreaBeforeMorph": 315,
+                "CandidateAreaAfterMorph": 315,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 292,
+                "CandidateCount": 208,
                 "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.550599563953488,
                 "ResponseStdDev": 3.762633950848953
@@ -22229,7 +22288,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 55.295837
+              "Score": 55.218876
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -22238,9 +22297,9 @@
           "delta": {
             "DefectArea": {
               "old": 7.0,
-              "new": 8.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 7.0,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 1.0,
@@ -22250,8 +22309,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 50800.0,
-              "new": 67224.0,
-              "delta": 16424.0,
+              "new": 54600.0,
+              "delta": 3800.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -22274,8 +22333,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 17.0,
-              "new": 18.0,
-              "delta": 1.0,
+              "new": 17.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -22286,8 +22345,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 21999.0,
-              "new": 21998.0,
-              "delta": -1.0,
+              "new": 21999.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -22298,18 +22357,18 @@
             },
             "RuntimeMs": {
               "old": 4.494,
-              "new": 5.636,
-              "delta": 1.142,
+              "new": 4.652,
+              "delta": 0.158,
               "improved": false
             },
             "Score": {
               "old": 55.218876,
-              "new": 55.295837,
-              "delta": 0.076961,
-              "improved": true
+              "new": 55.218876,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -22349,28 +22408,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 104.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 106.970414,
+              "DefectCount": 1.0,
+              "DefectArea": 5.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 13.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23552.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 554.0,
-              "Diagnostics.CandidateAreaAfterMorph": 554.0,
+              "PixelTotals.TrueNegative": 23539.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 428.0,
+              "Diagnostics.CandidateAreaAfterMorph": 428.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 368.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 298.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.662152,
               "Diagnostics.ResponseStdDev": 4.004619,
-              "RuntimeMs": 4.6,
-              "MemoryAllocationBytes": 78480.0
+              "RuntimeMs": 4.406,
+              "MemoryAllocationBytes": 68800.0
             },
             "diagnostics": {
               "Error": null,
@@ -22379,59 +22443,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 554,
-                "CandidateAreaAfterMorph": 554,
+                "CandidateAreaBeforeMorph": 428,
+                "CandidateAreaAfterMorph": 428,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 368,
-                "AcceptedCount": 0,
+                "CandidateCount": 298,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.66215183423913,
                 "ResponseStdDev": 4.004618714554138
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 104
+              "PredictedDefect": true,
+              "Score": 106.970414
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 5.5,
-              "new": 0.0,
-              "delta": -5.5,
+              "new": 5.5,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 64760.0,
-              "new": 78480.0,
-              "delta": 13720.0,
+              "new": 68800.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -22441,21 +22515,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 13.0,
-              "new": 0.0,
-              "delta": -13.0,
-              "improved": true
+              "new": 13.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23539.0,
-              "new": 23552.0,
-              "delta": 13.0,
-              "improved": true
+              "new": 23539.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -22465,18 +22539,18 @@
             },
             "RuntimeMs": {
               "old": 4.566,
-              "new": 4.6,
-              "delta": 0.034,
-              "improved": false
+              "new": 4.406,
+              "delta": -0.16,
+              "improved": true
             },
             "Score": {
               "old": 106.970414,
-              "new": 104.0,
-              "delta": -2.970414,
+              "new": 106.970414,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -22516,28 +22590,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 50.960813,
+              "Score": 50.871201,
               "DefectCount": 2.0,
-              "DefectArea": 15.5,
+              "DefectArea": 13.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 36.0,
+              "PixelTotals.FalsePositive": 34.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23516.0,
+              "PixelTotals.TrueNegative": 23518.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 610.0,
-              "Diagnostics.CandidateAreaAfterMorph": 610.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 457.0,
+              "Diagnostics.CandidateAreaAfterMorph": 457.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 369.0,
+              "Diagnostics.CandidateCount": 277.0,
               "Diagnostics.AcceptedCount": 2.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.724652,
               "Diagnostics.ResponseStdDev": 3.929098,
-              "RuntimeMs": 4.448,
-              "MemoryAllocationBytes": 79848.0
+              "RuntimeMs": 4.484,
+              "MemoryAllocationBytes": 66312.0
             },
             "diagnostics": {
               "Error": null,
@@ -22546,17 +22625,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 610,
-                "CandidateAreaAfterMorph": 610,
+                "CandidateAreaBeforeMorph": 457,
+                "CandidateAreaAfterMorph": 457,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 369,
+                "CandidateCount": 277,
                 "AcceptedCount": 2,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.72465183423913,
                 "ResponseStdDev": 3.9290982175777938
@@ -22567,7 +22652,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 50.960813
+              "Score": 50.871201
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -22576,9 +22661,9 @@
           "delta": {
             "DefectArea": {
               "old": 13.0,
-              "new": 15.5,
-              "delta": 2.5,
-              "improved": true
+              "new": 13.0,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 2.0,
@@ -22588,8 +22673,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 62272.0,
-              "new": 79848.0,
-              "delta": 17576.0,
+              "new": 66312.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -22612,8 +22697,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 34.0,
-              "new": 36.0,
-              "delta": 2.0,
+              "new": 34.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -22624,8 +22709,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 23518.0,
-              "new": 23516.0,
-              "delta": -2.0,
+              "new": 23518.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -22636,18 +22721,18 @@
             },
             "RuntimeMs": {
               "old": 4.874,
-              "new": 4.448,
-              "delta": -0.426,
+              "new": 4.484,
+              "delta": -0.39,
               "improved": true
             },
             "Score": {
               "old": 50.871201,
-              "new": 50.960813,
-              "delta": 0.089612,
-              "improved": true
+              "new": 50.871201,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -22687,28 +22772,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 110.616771,
+              "Score": 110.605802,
               "DefectCount": 1.0,
-              "DefectArea": 90.0,
+              "DefectArea": 89.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 184.0,
+              "PixelTotals.FalsePositive": 182.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23624.0,
+              "PixelTotals.TrueNegative": 23626.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 538.0,
-              "Diagnostics.CandidateAreaAfterMorph": 538.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 427.0,
+              "Diagnostics.CandidateAreaAfterMorph": 427.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 263.0,
+              "Diagnostics.CandidateCount": 196.0,
               "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.721186,
               "Diagnostics.ResponseStdDev": 4.124395,
-              "RuntimeMs": 4.321,
-              "MemoryAllocationBytes": 61992.0
+              "RuntimeMs": 4.644,
+              "MemoryAllocationBytes": 52440.0
             },
             "diagnostics": {
               "Error": null,
@@ -22717,17 +22807,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 538,
-                "CandidateAreaAfterMorph": 538,
+                "CandidateAreaBeforeMorph": 427,
+                "CandidateAreaAfterMorph": 427,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 263,
+                "CandidateCount": 196,
                 "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.721186155913979,
                 "ResponseStdDev": 4.12439528855564
@@ -22738,7 +22834,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 110.616771
+              "Score": 110.605802
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -22747,9 +22843,9 @@
           "delta": {
             "DefectArea": {
               "old": 89.0,
-              "new": 90.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 89.0,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 1.0,
@@ -22759,8 +22855,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 47544.0,
-              "new": 61992.0,
-              "delta": 14448.0,
+              "new": 52440.0,
+              "delta": 4896.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -22783,8 +22879,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 182.0,
-              "new": 184.0,
-              "delta": 2.0,
+              "new": 182.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -22795,8 +22891,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 23626.0,
-              "new": 23624.0,
-              "delta": -2.0,
+              "new": 23626.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -22807,18 +22903,18 @@
             },
             "RuntimeMs": {
               "old": 4.795,
-              "new": 4.321,
-              "delta": -0.474,
+              "new": 4.644,
+              "delta": -0.151,
               "improved": true
             },
             "Score": {
               "old": 110.605802,
-              "new": 110.616771,
-              "delta": 0.010969,
-              "improved": true
+              "new": 110.605802,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -22858,28 +22954,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 64.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 67.569533,
+              "DefectCount": 2.0,
+              "DefectArea": 10.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 24.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23552.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 538.0,
-              "Diagnostics.CandidateAreaAfterMorph": 538.0,
+              "PixelTotals.TrueNegative": 23528.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 394.0,
+              "Diagnostics.CandidateAreaAfterMorph": 394.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 321.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 254.0,
+              "Diagnostics.AcceptedCount": 2.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.584706,
               "Diagnostics.ResponseStdDev": 3.883597,
-              "RuntimeMs": 4.445,
-              "MemoryAllocationBytes": 71344.0
+              "RuntimeMs": 4.247,
+              "MemoryAllocationBytes": 62440.0
             },
             "diagnostics": {
               "Error": null,
@@ -22888,59 +22989,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 538,
-                "CandidateAreaAfterMorph": 538,
+                "CandidateAreaBeforeMorph": 394,
+                "CandidateAreaAfterMorph": 394,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 321,
-                "AcceptedCount": 0,
+                "CandidateCount": 254,
+                "AcceptedCount": 2,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.584706182065217,
                 "ResponseStdDev": 3.883597422340129
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 64
+              "PredictedDefect": true,
+              "Score": 67.569533
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 10.5,
-              "new": 0.0,
-              "delta": -10.5,
+              "new": 10.5,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 2.0,
-              "new": 0.0,
-              "delta": -2.0,
+              "new": 2.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 58400.0,
-              "new": 71344.0,
-              "delta": 12944.0,
+              "new": 62440.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -22950,21 +23061,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 24.0,
-              "new": 0.0,
-              "delta": -24.0,
-              "improved": true
+              "new": 24.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23528.0,
-              "new": 23552.0,
-              "delta": 24.0,
-              "improved": true
+              "new": 23528.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -22974,18 +23085,18 @@
             },
             "RuntimeMs": {
               "old": 4.473,
-              "new": 4.445,
-              "delta": -0.028,
+              "new": 4.247,
+              "delta": -0.226,
               "improved": true
             },
             "Score": {
               "old": 67.569533,
-              "new": 64.0,
-              "delta": -3.569533,
+              "new": 67.569533,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -23025,28 +23136,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 101.758902,
-              "DefectCount": 2.0,
-              "DefectArea": 124.0,
+              "Score": 101.20675,
+              "DefectCount": 3.0,
+              "DefectArea": 61.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 192.0,
+              "PixelTotals.FalsePositive": 120.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 22848.0,
+              "PixelTotals.TrueNegative": 22920.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 581.0,
-              "Diagnostics.CandidateAreaAfterMorph": 581.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 395.0,
+              "Diagnostics.CandidateAreaAfterMorph": 395.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 268.0,
-              "Diagnostics.AcceptedCount": 2.0,
+              "Diagnostics.CandidateCount": 212.0,
+              "Diagnostics.AcceptedCount": 3.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.640885,
               "Diagnostics.ResponseStdDev": 3.899523,
-              "RuntimeMs": 4.409,
-              "MemoryAllocationBytes": 64208.0
+              "RuntimeMs": 4.313,
+              "MemoryAllocationBytes": 56584.0
             },
             "diagnostics": {
               "Error": null,
@@ -23055,17 +23171,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 581,
-                "CandidateAreaAfterMorph": 581,
+                "CandidateAreaBeforeMorph": 395,
+                "CandidateAreaAfterMorph": 395,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 268,
-                "AcceptedCount": 2,
+                "CandidateCount": 212,
+                "AcceptedCount": 3,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.640885416666666,
                 "ResponseStdDev": 3.8995230184719882
@@ -23076,7 +23198,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 101.758902
+              "Score": 101.20675
             },
             "failureTaxonomy": [
               "oversegmentation_false_positive"
@@ -23085,20 +23207,20 @@
           "delta": {
             "DefectArea": {
               "old": 61.5,
-              "new": 124.0,
-              "delta": 62.5,
-              "improved": true
+              "new": 61.5,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 3.0,
-              "new": 2.0,
-              "delta": -1.0,
+              "new": 3.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 52544.0,
-              "new": 64208.0,
-              "delta": 11664.0,
+              "new": 56584.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -23121,8 +23243,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 120.0,
-              "new": 192.0,
-              "delta": 72.0,
+              "new": 120.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -23133,8 +23255,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 22920.0,
-              "new": 22848.0,
-              "delta": -72.0,
+              "new": 22920.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -23145,18 +23267,18 @@
             },
             "RuntimeMs": {
               "old": 4.419,
-              "new": 4.409,
-              "delta": -0.01,
+              "new": 4.313,
+              "delta": -0.106,
               "improved": true
             },
             "Score": {
               "old": 101.20675,
-              "new": 101.758902,
-              "delta": 0.552152,
-              "improved": true
+              "new": 101.20675,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -23206,18 +23328,23 @@
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 240.0,
-              "Diagnostics.CandidateAreaAfterMorph": 240.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 182.0,
+              "Diagnostics.CandidateAreaAfterMorph": 182.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 167.0,
+              "Diagnostics.CandidateCount": 125.0,
               "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 3.449261,
               "Diagnostics.ResponseStdDev": 3.14531,
-              "RuntimeMs": 4.194,
-              "MemoryAllocationBytes": 44616.0
+              "RuntimeMs": 4.31,
+              "MemoryAllocationBytes": 39576.0
             },
             "diagnostics": {
               "Error": null,
@@ -23226,17 +23353,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 240,
-                "CandidateAreaAfterMorph": 240,
+                "CandidateAreaBeforeMorph": 182,
+                "CandidateAreaAfterMorph": 182,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 167,
+                "CandidateCount": 125,
                 "AcceptedCount": 0,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 3.4492612092391304,
                 "ResponseStdDev": 3.145310135241238
@@ -23268,8 +23401,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 35536.0,
-              "new": 44616.0,
-              "delta": 9080.0,
+              "new": 39576.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -23316,8 +23449,8 @@
             },
             "RuntimeMs": {
               "old": 3.953,
-              "new": 4.194,
-              "delta": 0.241,
+              "new": 4.31,
+              "delta": 0.357,
               "improved": false
             },
             "Score": {
@@ -23367,28 +23500,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 102.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 104.639057,
+              "DefectCount": 1.0,
+              "DefectArea": 4.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 9.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23808.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 593.0,
-              "Diagnostics.CandidateAreaAfterMorph": 593.0,
+              "PixelTotals.TrueNegative": 23799.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 433.0,
+              "Diagnostics.CandidateAreaAfterMorph": 433.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 429.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 319.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.918095,
               "Diagnostics.ResponseStdDev": 4.091959,
-              "RuntimeMs": 4.594,
-              "MemoryAllocationBytes": 88000.0
+              "RuntimeMs": 4.224,
+              "MemoryAllocationBytes": 71968.0
             },
             "diagnostics": {
               "Error": null,
@@ -23397,59 +23535,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 593,
-                "CandidateAreaAfterMorph": 593,
+                "CandidateAreaBeforeMorph": 433,
+                "CandidateAreaAfterMorph": 433,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 429,
-                "AcceptedCount": 0,
+                "CandidateCount": 319,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.918094758064517,
                 "ResponseStdDev": 4.091959382142854
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 102
+              "PredictedDefect": true,
+              "Score": 104.639057
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 4.0,
-              "new": 0.0,
-              "delta": -4.0,
+              "new": 4.0,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 67928.0,
-              "new": 88000.0,
-              "delta": 20072.0,
+              "new": 71968.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -23459,21 +23607,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 9.0,
-              "new": 0.0,
-              "delta": -9.0,
-              "improved": true
+              "new": 9.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23799.0,
-              "new": 23808.0,
-              "delta": 9.0,
-              "improved": true
+              "new": 23799.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -23483,18 +23631,18 @@
             },
             "RuntimeMs": {
               "old": 4.724,
-              "new": 4.594,
-              "delta": -0.13,
+              "new": 4.224,
+              "delta": -0.5,
               "improved": true
             },
             "Score": {
               "old": 104.639057,
-              "new": 102.0,
-              "delta": -2.639057,
+              "new": 104.639057,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -23534,28 +23682,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 87.198673,
+              "Score": 86.970414,
               "DefectCount": 1.0,
-              "DefectArea": 7.5,
+              "DefectArea": 5.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 16.0,
+              "PixelTotals.FalsePositive": 13.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23024.0,
+              "PixelTotals.TrueNegative": 23027.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 372.0,
-              "Diagnostics.CandidateAreaAfterMorph": 372.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 274.0,
+              "Diagnostics.CandidateAreaAfterMorph": 274.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 263.0,
+              "Diagnostics.CandidateCount": 200.0,
               "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.170747,
               "Diagnostics.ResponseStdDev": 3.539253,
-              "RuntimeMs": 4.381,
-              "MemoryAllocationBytes": 61008.0
+              "RuntimeMs": 4.274,
+              "MemoryAllocationBytes": 52416.0
             },
             "diagnostics": {
               "Error": null,
@@ -23564,17 +23717,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 372,
-                "CandidateAreaAfterMorph": 372,
+                "CandidateAreaBeforeMorph": 274,
+                "CandidateAreaAfterMorph": 274,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 263,
+                "CandidateCount": 200,
                 "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.170746527777778,
                 "ResponseStdDev": 3.539253363811615
@@ -23585,7 +23744,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 87.198673
+              "Score": 86.970414
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -23594,9 +23753,9 @@
           "delta": {
             "DefectArea": {
               "old": 5.5,
-              "new": 7.5,
-              "delta": 2.0,
-              "improved": true
+              "new": 5.5,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 1.0,
@@ -23606,8 +23765,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 48376.0,
-              "new": 61008.0,
-              "delta": 12632.0,
+              "new": 52416.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -23630,8 +23789,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 13.0,
-              "new": 16.0,
-              "delta": 3.0,
+              "new": 13.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -23642,8 +23801,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 23027.0,
-              "new": 23024.0,
-              "delta": -3.0,
+              "new": 23027.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -23654,18 +23813,18 @@
             },
             "RuntimeMs": {
               "old": 4.788,
-              "new": 4.381,
-              "delta": -0.407,
+              "new": 4.274,
+              "delta": -0.514,
               "improved": true
             },
             "Score": {
               "old": 86.970414,
-              "new": 87.198673,
-              "delta": 0.228259,
-              "improved": true
+              "new": 86.970414,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -23705,28 +23864,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 49.198497,
+              "Score": 49.003946,
               "DefectCount": 1.0,
-              "DefectArea": 73.0,
+              "DefectArea": 60.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 107.0,
+              "PixelTotals.FalsePositive": 88.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 22933.0,
+              "PixelTotals.TrueNegative": 22952.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 624.0,
-              "Diagnostics.CandidateAreaAfterMorph": 624.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 452.0,
+              "Diagnostics.CandidateAreaAfterMorph": 452.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 339.0,
+              "Diagnostics.CandidateCount": 257.0,
               "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.728429,
               "Diagnostics.ResponseStdDev": 3.955875,
-              "RuntimeMs": 4.398,
-              "MemoryAllocationBytes": 74704.0
+              "RuntimeMs": 4.421,
+              "MemoryAllocationBytes": 62208.0
             },
             "diagnostics": {
               "Error": null,
@@ -23735,17 +23899,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 624,
-                "CandidateAreaAfterMorph": 624,
+                "CandidateAreaBeforeMorph": 452,
+                "CandidateAreaAfterMorph": 452,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 339,
+                "CandidateCount": 257,
                 "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.728428819444445,
                 "ResponseStdDev": 3.9558752187941217
@@ -23756,7 +23926,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 49.198497
+              "Score": 49.003946
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -23765,9 +23935,9 @@
           "delta": {
             "DefectArea": {
               "old": 60.0,
-              "new": 73.0,
-              "delta": 13.0,
-              "improved": true
+              "new": 60.0,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 1.0,
@@ -23777,8 +23947,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 58168.0,
-              "new": 74704.0,
-              "delta": 16536.0,
+              "new": 62208.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -23801,8 +23971,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 88.0,
-              "new": 107.0,
-              "delta": 19.0,
+              "new": 88.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -23813,8 +23983,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 22952.0,
-              "new": 22933.0,
-              "delta": -19.0,
+              "new": 22952.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -23825,18 +23995,18 @@
             },
             "RuntimeMs": {
               "old": 4.55,
-              "new": 4.398,
-              "delta": -0.152,
+              "new": 4.421,
+              "delta": -0.129,
               "improved": true
             },
             "Score": {
               "old": 49.003946,
-              "new": 49.198497,
-              "delta": 0.194551,
-              "improved": true
+              "new": 49.003946,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -23876,28 +24046,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 60.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 62.917771,
+              "DefectCount": 1.0,
+              "DefectArea": 5.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 12.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23552.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 571.0,
-              "Diagnostics.CandidateAreaAfterMorph": 571.0,
+              "PixelTotals.TrueNegative": 23540.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 458.0,
+              "Diagnostics.CandidateAreaAfterMorph": 458.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 404.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 338.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.449304,
               "Diagnostics.ResponseStdDev": 3.932199,
-              "RuntimeMs": 4.448,
-              "MemoryAllocationBytes": 84032.0
+              "RuntimeMs": 4.375,
+              "MemoryAllocationBytes": 75216.0
             },
             "diagnostics": {
               "Error": null,
@@ -23906,59 +24081,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 571,
-                "CandidateAreaAfterMorph": 571,
+                "CandidateAreaBeforeMorph": 458,
+                "CandidateAreaAfterMorph": 458,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 404,
-                "AcceptedCount": 0,
+                "CandidateCount": 338,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.449303668478261,
                 "ResponseStdDev": 3.9321989666714443
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 60
+              "PredictedDefect": true,
+              "Score": 62.917771
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 5.5,
-              "new": 0.0,
-              "delta": -5.5,
+              "new": 5.5,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 71176.0,
-              "new": 84032.0,
-              "delta": 12856.0,
+              "new": 75216.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -23968,21 +24153,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 12.0,
-              "new": 0.0,
-              "delta": -12.0,
-              "improved": true
+              "new": 12.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23540.0,
-              "new": 23552.0,
-              "delta": 12.0,
-              "improved": true
+              "new": 23540.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -23992,18 +24177,18 @@
             },
             "RuntimeMs": {
               "old": 4.525,
-              "new": 4.448,
-              "delta": -0.077,
+              "new": 4.375,
+              "delta": -0.15,
               "improved": true
             },
             "Score": {
               "old": 62.917771,
-              "new": 60.0,
-              "delta": -2.917771,
+              "new": 62.917771,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -24043,28 +24228,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 62.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 64.70805,
+              "DefectCount": 1.0,
+              "DefectArea": 4.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 10.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23808.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 378.0,
-              "Diagnostics.CandidateAreaAfterMorph": 378.0,
+              "PixelTotals.TrueNegative": 23798.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 269.0,
+              "Diagnostics.CandidateAreaAfterMorph": 269.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 266.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 191.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.416877,
               "Diagnostics.ResponseStdDev": 3.636335,
-              "RuntimeMs": 4.462,
-              "MemoryAllocationBytes": 60816.0
+              "RuntimeMs": 4.264,
+              "MemoryAllocationBytes": 50704.0
             },
             "diagnostics": {
               "Error": null,
@@ -24073,59 +24263,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 378,
-                "CandidateAreaAfterMorph": 378,
+                "CandidateAreaBeforeMorph": 269,
+                "CandidateAreaAfterMorph": 269,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 266,
-                "AcceptedCount": 0,
+                "CandidateCount": 191,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.416876680107527,
                 "ResponseStdDev": 3.636334586278809
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 62
+              "PredictedDefect": true,
+              "Score": 64.70805
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 4.0,
-              "new": 0.0,
-              "delta": -4.0,
+              "new": 4.0,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 46664.0,
-              "new": 60816.0,
-              "delta": 14152.0,
+              "new": 50704.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -24135,21 +24335,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 10.0,
-              "new": 0.0,
-              "delta": -10.0,
-              "improved": true
+              "new": 10.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23798.0,
-              "new": 23808.0,
-              "delta": 10.0,
-              "improved": true
+              "new": 23798.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -24159,18 +24359,18 @@
             },
             "RuntimeMs": {
               "old": 5.613,
-              "new": 4.462,
-              "delta": -1.151,
+              "new": 4.264,
+              "delta": -1.349,
               "improved": true
             },
             "Score": {
               "old": 64.70805,
-              "new": 62.0,
-              "delta": -2.70805,
+              "new": 64.70805,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -24210,28 +24410,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 88.779123,
+              "Score": 88.644391,
               "DefectCount": 1.0,
-              "DefectArea": 14.0,
+              "DefectArea": 8.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 104.0,
+              "PixelTotals.FalsePositive": 95.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 24728.0,
+              "PixelTotals.TrueNegative": 24737.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 653.0,
-              "Diagnostics.CandidateAreaAfterMorph": 653.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 531.0,
+              "Diagnostics.CandidateAreaAfterMorph": 531.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 368.0,
+              "Diagnostics.CandidateCount": 313.0,
               "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.474267,
               "Diagnostics.ResponseStdDev": 4.08979,
-              "RuntimeMs": 4.642,
-              "MemoryAllocationBytes": 80648.0
+              "RuntimeMs": 4.376,
+              "MemoryAllocationBytes": 72328.0
             },
             "diagnostics": {
               "Error": null,
@@ -24240,17 +24445,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 653,
-                "CandidateAreaAfterMorph": 653,
+                "CandidateAreaBeforeMorph": 531,
+                "CandidateAreaAfterMorph": 531,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 368,
+                "CandidateCount": 313,
                 "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.474267074742268,
                 "ResponseStdDev": 4.08979016136285
@@ -24261,7 +24472,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 88.779123
+              "Score": 88.644391
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -24270,9 +24481,9 @@
           "delta": {
             "DefectArea": {
               "old": 8.0,
-              "new": 14.0,
-              "delta": 6.0,
-              "improved": true
+              "new": 8.0,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 1.0,
@@ -24282,8 +24493,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 68288.0,
-              "new": 80648.0,
-              "delta": 12360.0,
+              "new": 72328.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -24306,8 +24517,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 95.0,
-              "new": 104.0,
-              "delta": 9.0,
+              "new": 95.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -24318,8 +24529,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 24737.0,
-              "new": 24728.0,
-              "delta": -9.0,
+              "new": 24737.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -24330,18 +24541,18 @@
             },
             "RuntimeMs": {
               "old": 4.593,
-              "new": 4.642,
-              "delta": 0.049,
-              "improved": false
+              "new": 4.376,
+              "delta": -0.217,
+              "improved": true
             },
             "Score": {
               "old": 88.644391,
-              "new": 88.779123,
-              "delta": 0.134732,
-              "improved": true
+              "new": 88.644391,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -24381,28 +24592,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 34.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 37.417727,
+              "DefectCount": 2.0,
+              "DefectArea": 9.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 20.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23552.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 522.0,
-              "Diagnostics.CandidateAreaAfterMorph": 522.0,
+              "PixelTotals.TrueNegative": 23532.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 378.0,
+              "Diagnostics.CandidateAreaAfterMorph": 378.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 355.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 262.0,
+              "Diagnostics.AcceptedCount": 2.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.793818,
               "Diagnostics.ResponseStdDev": 3.841506,
-              "RuntimeMs": 4.384,
-              "MemoryAllocationBytes": 75744.0
+              "RuntimeMs": 4.404,
+              "MemoryAllocationBytes": 63112.0
             },
             "diagnostics": {
               "Error": null,
@@ -24411,59 +24627,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 522,
-                "CandidateAreaAfterMorph": 522,
+                "CandidateAreaBeforeMorph": 378,
+                "CandidateAreaAfterMorph": 378,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 355,
-                "AcceptedCount": 0,
+                "CandidateCount": 262,
+                "AcceptedCount": 2,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.793817934782608,
                 "ResponseStdDev": 3.841505728977285
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 34
+              "PredictedDefect": true,
+              "Score": 37.417727
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 9.5,
-              "new": 0.0,
-              "delta": -9.5,
+              "new": 9.5,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 2.0,
-              "new": 0.0,
-              "delta": -2.0,
+              "new": 2.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 59072.0,
-              "new": 75744.0,
-              "delta": 16672.0,
+              "new": 63112.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -24473,21 +24699,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 20.0,
-              "new": 0.0,
-              "delta": -20.0,
-              "improved": true
+              "new": 20.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23532.0,
-              "new": 23552.0,
-              "delta": 20.0,
-              "improved": true
+              "new": 23532.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -24497,18 +24723,18 @@
             },
             "RuntimeMs": {
               "old": 4.218,
-              "new": 4.384,
-              "delta": 0.166,
+              "new": 4.404,
+              "delta": 0.186,
               "improved": false
             },
             "Score": {
               "old": 37.417727,
-              "new": 34.0,
-              "delta": -3.417727,
+              "new": 37.417727,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -24548,28 +24774,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 117.295837,
+              "Score": 116.970414,
               "DefectCount": 1.0,
-              "DefectArea": 8.0,
+              "DefectArea": 6.5,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 18.0,
+              "PixelTotals.FalsePositive": 12.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23534.0,
+              "PixelTotals.TrueNegative": 23540.0,
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 754.0,
-              "Diagnostics.CandidateAreaAfterMorph": 754.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 584.0,
+              "Diagnostics.CandidateAreaAfterMorph": 584.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 492.0,
+              "Diagnostics.CandidateCount": 393.0,
               "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 5.062712,
               "Diagnostics.ResponseStdDev": 4.245164,
-              "RuntimeMs": 4.835,
-              "MemoryAllocationBytes": 100048.0
+              "RuntimeMs": 4.676,
+              "MemoryAllocationBytes": 84896.0
             },
             "diagnostics": {
               "Error": null,
@@ -24578,17 +24809,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 754,
-                "CandidateAreaAfterMorph": 754,
+                "CandidateAreaBeforeMorph": 584,
+                "CandidateAreaAfterMorph": 584,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 492,
+                "CandidateCount": 393,
                 "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 5.062712296195652,
                 "ResponseStdDev": 4.245163758168433
@@ -24599,7 +24836,7 @@
               "ImageCorrect": false,
               "IsDefect": false,
               "PredictedDefect": true,
-              "Score": 117.295837
+              "Score": 116.970414
             },
             "failureTaxonomy": [
               "texture_noise_false_positive"
@@ -24608,9 +24845,9 @@
           "delta": {
             "DefectArea": {
               "old": 6.5,
-              "new": 8.0,
-              "delta": 1.5,
-              "improved": true
+              "new": 6.5,
+              "delta": 0.0,
+              "improved": false
             },
             "DefectCount": {
               "old": 1.0,
@@ -24620,8 +24857,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 80856.0,
-              "new": 100048.0,
-              "delta": 19192.0,
+              "new": 84896.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -24644,8 +24881,8 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 12.0,
-              "new": 18.0,
-              "delta": 6.0,
+              "new": 12.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.IoU": {
@@ -24656,8 +24893,8 @@
             },
             "PixelTotals.TrueNegative": {
               "old": 23540.0,
-              "new": 23534.0,
-              "delta": -6.0,
+              "new": 23540.0,
+              "delta": 0.0,
               "improved": false
             },
             "PixelTotals.TruePositive": {
@@ -24668,18 +24905,18 @@
             },
             "RuntimeMs": {
               "old": 4.377,
-              "new": 4.835,
-              "delta": 0.458,
+              "new": 4.676,
+              "delta": 0.299,
               "improved": false
             },
             "Score": {
               "old": 116.970414,
-              "new": 117.295837,
-              "delta": 0.325423,
-              "improved": true
+              "new": 116.970414,
+              "delta": 0.0,
+              "improved": false
             }
           },
-          "status": "worse-metric",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -24719,28 +24956,33 @@
             "passed": true,
             "accepted": false,
             "metrics": {
-              "Score": 69.0,
-              "DefectCount": 0.0,
-              "DefectArea": 0.0,
+              "Score": 71.639057,
+              "DefectCount": 1.0,
+              "DefectArea": 4.0,
               "PixelTotals.TruePositive": 0.0,
-              "PixelTotals.FalsePositive": 0.0,
+              "PixelTotals.FalsePositive": 9.0,
               "PixelTotals.FalseNegative": 0.0,
-              "PixelTotals.TrueNegative": 23808.0,
-              "PixelTotals.IoU": 1.0,
-              "PixelTotals.Dice": 1.0,
-              "PixelTotals.F1": 1.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 374.0,
-              "Diagnostics.CandidateAreaAfterMorph": 374.0,
+              "PixelTotals.TrueNegative": 23799.0,
+              "PixelTotals.IoU": 0.0,
+              "PixelTotals.Dice": 0.0,
+              "PixelTotals.F1": 0.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 252.0,
+              "Diagnostics.CandidateAreaAfterMorph": 252.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 257.0,
-              "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.CandidateCount": 178.0,
+              "Diagnostics.AcceptedCount": 1.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.52495,
               "Diagnostics.ResponseStdDev": 3.656824,
-              "RuntimeMs": 4.807,
-              "MemoryAllocationBytes": 59536.0
+              "RuntimeMs": 4.348,
+              "MemoryAllocationBytes": 48672.0
             },
             "diagnostics": {
               "Error": null,
@@ -24749,59 +24991,69 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 374,
-                "CandidateAreaAfterMorph": 374,
+                "CandidateAreaBeforeMorph": 252,
+                "CandidateAreaAfterMorph": 252,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 257,
-                "AcceptedCount": 0,
+                "CandidateCount": 178,
+                "AcceptedCount": 1,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.524949596774194,
                 "ResponseStdDev": 3.6568239482628293
               },
-              "FailureTaxonomy": [],
-              "ImageCorrect": true,
+              "FailureTaxonomy": [
+                "texture_noise_false_positive"
+              ],
+              "ImageCorrect": false,
               "IsDefect": false,
-              "PredictedDefect": false,
-              "Score": 69
+              "PredictedDefect": true,
+              "Score": 71.639057
             },
-            "failureTaxonomy": []
+            "failureTaxonomy": [
+              "texture_noise_false_positive"
+            ]
           },
           "delta": {
             "DefectArea": {
               "old": 4.0,
-              "new": 0.0,
-              "delta": -4.0,
+              "new": 4.0,
+              "delta": 0.0,
               "improved": false
             },
             "DefectCount": {
               "old": 1.0,
-              "new": 0.0,
-              "delta": -1.0,
+              "new": 1.0,
+              "delta": 0.0,
               "improved": false
             },
             "MemoryAllocationBytes": {
               "old": 44632.0,
-              "new": 59536.0,
-              "delta": 14904.0,
+              "new": 48672.0,
+              "delta": 4040.0,
               "improved": false
             },
             "PixelTotals.Dice": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.F1": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.FalseNegative": {
               "old": 0.0,
@@ -24811,21 +25063,21 @@
             },
             "PixelTotals.FalsePositive": {
               "old": 9.0,
-              "new": 0.0,
-              "delta": -9.0,
-              "improved": true
+              "new": 9.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.IoU": {
               "old": 0.0,
-              "new": 1.0,
-              "delta": 1.0,
-              "improved": true
+              "new": 0.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TrueNegative": {
               "old": 23799.0,
-              "new": 23808.0,
-              "delta": 9.0,
-              "improved": true
+              "new": 23799.0,
+              "delta": 0.0,
+              "improved": false
             },
             "PixelTotals.TruePositive": {
               "old": 0.0,
@@ -24835,18 +25087,18 @@
             },
             "RuntimeMs": {
               "old": 4.028,
-              "new": 4.807,
-              "delta": 0.779,
+              "new": 4.348,
+              "delta": 0.32,
               "improved": false
             },
             "Score": {
               "old": 71.639057,
-              "new": 69.0,
-              "delta": -2.639057,
+              "new": 71.639057,
+              "delta": 0.0,
               "improved": false
             }
           },
-          "status": "improved",
+          "status": "unchanged",
           "executionMode": "candidate-executed"
         },
         {
@@ -24896,18 +25148,23 @@
               "PixelTotals.IoU": 0.0,
               "PixelTotals.Dice": 0.0,
               "PixelTotals.F1": 0.0,
-              "Diagnostics.AppliedThreshold": 14.0,
-              "Diagnostics.CandidateAreaBeforeMorph": 362.0,
-              "Diagnostics.CandidateAreaAfterMorph": 362.0,
+              "Diagnostics.AppliedThreshold": 15.0,
+              "Diagnostics.ClaheClipLimit": 2.0,
+              "Diagnostics.ClaheTileGridSize": 8.0,
+              "Diagnostics.CandidateAreaBeforeMorph": 258.0,
+              "Diagnostics.CandidateAreaAfterMorph": 258.0,
               "Diagnostics.AlignmentScore": 0.0,
               "Diagnostics.AlignmentShiftX": 0.0,
               "Diagnostics.AlignmentShiftY": 0.0,
-              "Diagnostics.CandidateCount": 245.0,
+              "Diagnostics.CandidateCount": 178.0,
               "Diagnostics.AcceptedCount": 0.0,
+              "Diagnostics.ComponentRejectedCount": 0.0,
+              "Diagnostics.ComponentMeanGate": 0.0,
+              "Diagnostics.ComponentPeakGate": 0.0,
               "Diagnostics.ResponseMean": 4.42114,
               "Diagnostics.ResponseStdDev": 3.752062,
-              "RuntimeMs": 5.398,
-              "MemoryAllocationBytes": 63584.0
+              "RuntimeMs": 5.149,
+              "MemoryAllocationBytes": 54080.0
             },
             "diagnostics": {
               "Error": null,
@@ -24916,17 +25173,23 @@
                 "AlignmentMode": "PhaseCorrelation",
                 "NormalizationMode": "LocalMean",
                 "ResponseNormalizeMode": "RawClamp",
+                "ComponentFilterMode": "AreaOnly",
                 "ThresholdMode": "Manual",
-                "AppliedThreshold": 14,
+                "AppliedThreshold": 15,
+                "ClaheClipLimit": 2,
+                "ClaheTileGridSize": 8,
                 "RobustReferenceStats": false,
                 "MorphMode": "OpenClose",
-                "CandidateAreaBeforeMorph": 362,
-                "CandidateAreaAfterMorph": 362,
+                "CandidateAreaBeforeMorph": 258,
+                "CandidateAreaAfterMorph": 258,
                 "AlignmentScore": 0,
                 "AlignmentShiftX": 0,
                 "AlignmentShiftY": 0,
-                "CandidateCount": 245,
+                "CandidateCount": 178,
                 "AcceptedCount": 0,
+                "ComponentRejectedCount": 0,
+                "ComponentMeanGate": 0,
+                "ComponentPeakGate": 0,
                 "RejectedReason": "",
                 "ResponseMean": 4.421139705882353,
                 "ResponseStdDev": 3.752062396933488
@@ -24958,8 +25221,8 @@
             },
             "MemoryAllocationBytes": {
               "old": 44384.0,
-              "new": 63584.0,
-              "delta": 19200.0,
+              "new": 54080.0,
+              "delta": 9696.0,
               "improved": false
             },
             "PixelTotals.Dice": {
@@ -25006,8 +25269,8 @@
             },
             "RuntimeMs": {
               "old": 3.93,
-              "new": 5.398,
-              "delta": 1.468,
+              "new": 5.149,
+              "delta": 1.219,
               "improved": false
             },
             "Score": {

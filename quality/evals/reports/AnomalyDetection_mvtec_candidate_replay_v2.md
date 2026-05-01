@@ -1,6 +1,6 @@
 # AnomalyDetection MVTec AD Lite Candidate v2
 
-GeneratedAtUtc: `2026-04-30T12:54:32.9810472+00:00`
+GeneratedAtUtc: `2026-05-01T03:33:30.6648559+00:00`
 Index: `quality/datasets/mvtec_ad_lite_index.json`
 CandidateVersion: `v2`
 Profile: `max192_dense_stride8_threshold_010`
@@ -28,13 +28,17 @@ Profile: `max192_dense_stride8_threshold_010`
 | Patch size / stride | 16 / 8 |
 | Pixel sample stride | 2 |
 | Coreset ratio | 0.0200 |
-| Runtime ms | 20424.296 |
+| Feature extractor | lab_gradient_stats |
+| Embedding model id |  |
+| Embedding model source | None |
+| Embedding model configured | False |
+| Runtime ms | 20476.626 |
 
 ## Categories
 
 | Category | Train | Test | Anomaly | Bank features | Train ms | Infer ms | Image AUROC | Pixel AUROC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| grid | 264 | 20 | 20 | 2793 | 16712.029 | 1433.290 | 0.0000 | 0.6212 |
+| grid | 264 | 20 | 20 | 2793 | 16684.970 | 1458.000 | 0.0000 | 0.6212 |
 
 ## Failure Taxonomy
 
@@ -62,7 +66,7 @@ Profile: `max192_dense_stride8_threshold_010`
 
 ## Notes
 
-- Baseline uses the current SimplePatchCore-Lite implementation with `lab_gradient_stats` features.
+- Baseline uses the current SimplePatchCore-Lite implementation; `onnx_embedding` is an explicit candidate path and keeps model artifacts outside git.
 - Images and masks are resized to the configured max side before evaluation.
 - Pixel AUROC is computed from the normalized float `ScoreMap`, not from the thresholded mask.
 - Current AUROC is recorded as baseline evidence for SimplePatchCore-Lite; it is not a claim of production-grade anomaly accuracy.

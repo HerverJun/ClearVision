@@ -1,6 +1,6 @@
 # Matching Failure Backlog v1
 
-GeneratedAtUtc: `2026-04-30T11:24:58+00:00`
+GeneratedAtUtc: `2026-05-01T03:28:42+00:00`
 ClaimBoundary: `准工业公开 HPatches/replay backlog；不是真实产线签核。`
 
 ## Summary

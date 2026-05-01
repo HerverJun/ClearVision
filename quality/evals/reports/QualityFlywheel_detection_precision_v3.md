@@ -1,6 +1,6 @@
-# Quality Flywheel Detection Precision v2
+# Quality Flywheel Detection Precision v3
 
-GeneratedAtUtc: `2026-04-30T14:47:41+00:00`
+GeneratedAtUtc: `2026-05-01T06:09:10+00:00`
 Accepted: `True`
 ClaimBoundary: `Public benchmark and replay evidence only; no report in this flywheel represents real production-site sign-off.`
 
@@ -8,7 +8,7 @@ ClaimBoundary: `Public benchmark and replay evidence only; no report in this fly
 
 | Family | Decision | Replay improved | Replay worse | Key delta | Next action |
 |---|---|---:|---:|---:|---|
-| SurfaceDefectDetection | candidate-ready-with-low-contrast-backlog | 10 | 8 | PixelF1 0.0137 | Do not lower the global threshold further; target low-contrast and undersegmentation misses with guarded local normalization or component filtering. |
+| SurfaceDefectDetection | candidate-ready-with-low-contrast-backlog | 0 | 0 | PixelF1 0 | Do not lower the global threshold further; target low-contrast and undersegmentation misses with guarded local normalization or component filtering. |
 | AnomalyDetection | candidate-ready-threshold-calibrated-runtime-heavy | 14 | 0 | ImageF1 0.78 | Keep v2 as a promotion-ready candidate and require field replay before any default threshold promotion. |
 | EdgeDetection | hold-recall-tuning | 12 | 8 | BoundaryRecall -0.0566 | Keep EdgeDetection in hold status until recall-guard replay has a profile that restores recall without losing the F1/precision gain. |
 
@@ -16,9 +16,9 @@ ClaimBoundary: `Public benchmark and replay evidence only; no report in this fly
 
 | Metric | Baseline | Candidate | Delta |
 |---|---:|---:|---:|
-| Pixel F1 | 0.2692 | 0.2829 | 0.0137 |
+| Pixel F1 | 0.2692 | 0.2692 | 0 |
 | Recall at fixed FPR | 0.5182 | 0.5182 | 0 |
-| FP/normal | 0.1398 | 0.0515 | -0.0884 |
+| FP/normal | 0.1398 | 0.1398 | 0 |
 
 ## AnomalyDetection
 
@@ -71,11 +71,13 @@ Decision: `hold-current-no-recall-safe-profile`; SelectedProfile: `None`
 
 | Profile | Precision | Recall | F1 | B->P px |
 |---|---:|---:|---:|---:|
-| fixed_50_150_no_l2 | 0.1691 | 0.6858 | 0.2714 | 11.1145 |
-| fixed_50_150_l2 | 0.1811 | 0.6292 | 0.2812 | 12.85 |
-| recall_guard_45_135_l2 | 0.1765 | 0.663 | 0.2788 | 11.641 |
-| recall_guard_40_120_l2 | 0.1703 | 0.6911 | 0.2733 | 10.8675 |
-| recall_guard_35_105_l2 | 0.1659 | 0.721 | 0.2698 | 7.3376 |
+| canny_default_50_150 | 0.1691 | 0.6858 | 0.2714 | 11.1145 |
+| canny_l2_50_150 | 0.1811 | 0.6292 | 0.2812 | 12.85 |
+| canny_fixed_low_45_135 | 0.1765 | 0.663 | 0.2788 | 11.641 |
+| canny_fixed_low_40_120 | 0.1703 | 0.6911 | 0.2733 | 10.8675 |
+| canny_fixed_low_35_105 | 0.1659 | 0.721 | 0.2698 | 7.3376 |
+| canny_recall_guard_percentile | 0.1643 | 0.754 | 0.2698 | 5.1874 |
+| canny_otsu_gradient | 0.1568 | 0.8307 | 0.2638 | 3.1043 |
 
 ## Gates
 
@@ -108,3 +110,41 @@ Decision: `hold-current-no-recall-safe-profile`; SelectedProfile: `None`
 - `quality/evals/reports/EdgeDetection_bsds500_baseline.json`
 - `quality/evals/reports/EdgeDetection_bsds500_candidate_replay_v1.json`
 - `quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v1.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v2.json`
+- `quality/evals/reports/AnomalyDetection_mvtec_baseline.json`
+- `quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json`
+- `quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json`
+- `quality/evals/reports/DeepLearning_coco_image_inference_baseline.json`
+- `quality/evals/reports/DeepLearning_coco_real_model_baseline.json`
+- `quality/evals/reports/EdgeDetection_bsds500_baseline.json`
+- `quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v2.json`
+- `quality/evals/reports/AkazeFeatureMatch_hpatches_baseline.json`
+- `quality/evals/reports/AkazeFeatureMatch_hpatches_candidate_v5.json`
+- `quality/evals/reports/OrbFeatureMatch_hpatches_baseline.json`
+- `quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v5.json`
+- `quality/evals/reports/QualityFlywheel_hpatches_matching_sweep_v5.json`
+- `quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json`
+- `quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.json`
+- `quality/evals/reports/CameraCalibration_opencv_samples_baseline.json`
+- `quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json`
+- `quality/evals/reports/QualityFlywheel_candidate_profile_governance_v1.json`
+
+## 2026-05-01 Dataset Scope
+
+| Dataset | Status |
+|---|---|
+| `quality/public_datasets/hpatches` | included |
+| `quality/public_datasets/coco2017` | included |
+| `quality/public_datasets/kolektorsdd2` | included |
+| `quality/public_datasets/mvtec_ad_lite` | included |
+| `quality/public_datasets/bsds500` | included |
+| `quality/public_datasets/opencv_calibration_samples` | included |
+
+## Default-Off Policy
+
+- Product defaults are unchanged.
+- Candidate profiles remain default-off/advisory until their per-dataset gates pass.
+- Anomaly FP and ORB runtime budgets are signed standards, but release/field replay evidence is still required.
+- Raw datasets and external model artifacts are not evidence files for git.

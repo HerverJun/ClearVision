@@ -1,16 +1,16 @@
 {
   "schemaVersion": "2026-04-29.surface-defect-failure-taxonomy.v1",
-  "generatedAtUtc": "2026-04-29T15:39:12+00:00",
+  "generatedAtUtc": "2026-05-01T03:24:21+00:00",
   "claimBoundary": "准工业公开 KolektorSDD2 failure taxonomy；不是真实产线签核。",
   "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json",
   "summary": {
-    "caseCount": 110,
+    "caseCount": 189,
     "taxonomyCounts": {
-      "texture_noise_false_positive": 45,
-      "oversegmentation_false_positive": 1,
-      "low_contrast_defect_miss": 19,
-      "undersegmentation_false_negative": 37,
-      "small_defect_miss": 7,
+      "texture_noise_false_positive": 123,
+      "oversegmentation_false_positive": 2,
+      "low_contrast_defect_miss": 15,
+      "undersegmentation_false_negative": 46,
+      "small_defect_miss": 2,
       "mask_overgrowth_false_positive": 1
     }
   },
@@ -121,21 +121,6 @@
       "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
     },
     {
-      "caseId": "20523",
-      "isDefect": true,
-      "predictedDefect": false,
-      "imageCorrect": false,
-      "taxonomy": [
-        "low_contrast_defect_miss"
-      ],
-      "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 155,
-      "defectArea": 0,
-      "score": 95,
-      "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
-    },
-    {
       "caseId": "20564",
       "isDefect": true,
       "predictedDefect": false,
@@ -148,36 +133,6 @@
       "falseNegativePixels": 107,
       "defectArea": 0,
       "score": 41,
-      "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
-    },
-    {
-      "caseId": "20625",
-      "isDefect": true,
-      "predictedDefect": false,
-      "imageCorrect": false,
-      "taxonomy": [
-        "low_contrast_defect_miss"
-      ],
-      "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 516,
-      "defectArea": 0,
-      "score": 58,
-      "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
-    },
-    {
-      "caseId": "20632",
-      "isDefect": true,
-      "predictedDefect": false,
-      "imageCorrect": false,
-      "taxonomy": [
-        "low_contrast_defect_miss"
-      ],
-      "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 148,
-      "defectArea": 0,
-      "score": 110,
       "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
     },
     {
@@ -241,21 +196,6 @@
       "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
     },
     {
-      "caseId": "20772",
-      "isDefect": true,
-      "predictedDefect": false,
-      "imageCorrect": false,
-      "taxonomy": [
-        "low_contrast_defect_miss"
-      ],
-      "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 680,
-      "defectArea": 0,
-      "score": 72,
-      "nextAction": "Compare local background kernel sizes and response normalization for low-contrast positives."
-    },
-    {
       "caseId": "20821",
       "isDefect": true,
       "predictedDefect": false,
@@ -308,11 +248,11 @@
       "taxonomy": [
         "mask_overgrowth_false_positive"
       ],
-      "pixelF1": 0.2955665024630542,
-      "falsePositivePixels": 120,
-      "falseNegativePixels": 23,
-      "defectArea": 48,
-      "score": 123.293305,
+      "pixelF1": 0.3005181347150259,
+      "falsePositivePixels": 111,
+      "falseNegativePixels": 24,
+      "defectArea": 40,
+      "score": 123.198497,
       "nextAction": "Tighten cleanup or postprocess boundaries; prefer shape filters over global threshold increases."
     },
     {
@@ -324,26 +264,26 @@
         "oversegmentation_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 192,
+      "falsePositivePixels": 120,
       "falseNegativePixels": 0,
-      "defectArea": 124,
-      "score": 101.758902,
+      "defectArea": 61.5,
+      "score": 101.20675,
       "nextAction": "Tune morphology and max-area handling; inspect whether broad response bands should be suppressed."
     },
     {
-      "caseId": "20228",
-      "isDefect": true,
-      "predictedDefect": false,
+      "caseId": "20462",
+      "isDefect": false,
+      "predictedDefect": true,
       "imageCorrect": false,
       "taxonomy": [
-        "small_defect_miss"
+        "oversegmentation_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 14,
-      "defectArea": 0,
-      "score": 65,
-      "nextAction": "Use lower local-contrast floor on validation positives and protect with replay false-positive gate."
+      "falsePositivePixels": 83,
+      "falseNegativePixels": 0,
+      "defectArea": 34.5,
+      "score": 51.774913,
+      "nextAction": "Tune morphology and max-area handling; inspect whether broad response bands should be suppressed."
     },
     {
       "caseId": "20236",
@@ -376,64 +316,49 @@
       "nextAction": "Use lower local-contrast floor on validation positives and protect with replay false-positive gate."
     },
     {
-      "caseId": "20544",
-      "isDefect": true,
-      "predictedDefect": false,
+      "caseId": "20006",
+      "isDefect": false,
+      "predictedDefect": true,
       "imageCorrect": false,
       "taxonomy": [
-        "small_defect_miss"
+        "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 31,
-      "defectArea": 0,
-      "score": 109,
-      "nextAction": "Use lower local-contrast floor on validation positives and protect with replay false-positive gate."
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 42.80336,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
-      "caseId": "20754",
-      "isDefect": true,
-      "predictedDefect": false,
+      "caseId": "20008",
+      "isDefect": false,
+      "predictedDefect": true,
       "imageCorrect": false,
       "taxonomy": [
-        "small_defect_miss"
+        "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 74,
-      "defectArea": 0,
-      "score": 50,
-      "nextAction": "Use lower local-contrast floor on validation positives and protect with replay false-positive gate."
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 62.70805,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
-      "caseId": "20801",
-      "isDefect": true,
-      "predictedDefect": false,
+      "caseId": "20015",
+      "isDefect": false,
+      "predictedDefect": true,
       "imageCorrect": false,
       "taxonomy": [
-        "small_defect_miss"
+        "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 70,
-      "defectArea": 0,
-      "score": 141,
-      "nextAction": "Use lower local-contrast floor on validation positives and protect with replay false-positive gate."
-    },
-    {
-      "caseId": "20816",
-      "isDefect": true,
-      "predictedDefect": false,
-      "imageCorrect": false,
-      "taxonomy": [
-        "small_defect_miss"
-      ],
-      "pixelF1": 0,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 30,
-      "defectArea": 0,
-      "score": 48,
-      "nextAction": "Use lower local-contrast floor on validation positives and protect with replay false-positive gate."
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 43.80336,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
       "caseId": "20017",
@@ -444,10 +369,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 18,
+      "falsePositivePixels": 17,
       "falseNegativePixels": 0,
-      "defectArea": 8,
-      "score": 55.295837,
+      "defectArea": 7,
+      "score": 55.218876,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20018",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 106.970414,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -459,10 +399,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 36,
+      "falsePositivePixels": 34,
       "falseNegativePixels": 0,
-      "defectArea": 15.5,
-      "score": 50.960813,
+      "defectArea": 13,
+      "score": 50.871201,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -474,10 +414,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 184,
+      "falsePositivePixels": 182,
       "falseNegativePixels": 0,
-      "defectArea": 90,
-      "score": 110.616771,
+      "defectArea": 89,
+      "score": 110.605802,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20027",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 24,
+      "falseNegativePixels": 0,
+      "defectArea": 10.5,
+      "score": 67.569533,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20080",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 104.639057,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -489,10 +459,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 16,
+      "falsePositivePixels": 13,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 87.198673,
+      "defectArea": 5.5,
+      "score": 86.970414,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -504,10 +474,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 107,
+      "falsePositivePixels": 88,
       "falseNegativePixels": 0,
-      "defectArea": 73,
-      "score": 49.198497,
+      "defectArea": 60,
+      "score": 49.003946,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20105",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 62.917771,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20109",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 64.70805,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -519,10 +519,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 104,
+      "falsePositivePixels": 95,
       "falseNegativePixels": 0,
-      "defectArea": 14,
-      "score": 88.779123,
+      "defectArea": 8,
+      "score": 88.644391,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20112",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 20,
+      "falseNegativePixels": 0,
+      "defectArea": 9.5,
+      "score": 37.417727,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -534,10 +549,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 18,
+      "falsePositivePixels": 12,
       "falseNegativePixels": 0,
-      "defectArea": 8,
-      "score": 117.295837,
+      "defectArea": 6.5,
+      "score": 116.970414,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20134",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 71.639057,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20156",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 8,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 49.564949,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -549,10 +594,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 20,
+      "falsePositivePixels": 18,
       "falseNegativePixels": 0,
-      "defectArea": 8.5,
-      "score": 36.38439,
+      "defectArea": 7,
+      "score": 36.258097,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20162",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 132.772589,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -564,10 +624,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 94,
+      "falsePositivePixels": 99,
       "falseNegativePixels": 0,
       "defectArea": 25.5,
-      "score": 50.79165,
+      "score": 50.832306,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -579,10 +639,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 24,
+      "falsePositivePixels": 17,
       "falseNegativePixels": 0,
-      "defectArea": 8,
-      "score": 71.496508,
+      "defectArea": 7,
+      "score": 71.218876,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20183",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 74.890372,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -594,10 +669,55 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 52,
+      "falsePositivePixels": 45,
       "falseNegativePixels": 0,
-      "defectArea": 24,
-      "score": 49.343805,
+      "defectArea": 19,
+      "score": 49.174387,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20192",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 101.639057,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20198",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 38,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 42.795489,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20201",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 25,
+      "falseNegativePixels": 0,
+      "defectArea": 10.5,
+      "score": 77.597312,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -609,10 +729,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 23,
+      "falsePositivePixels": 15,
       "falseNegativePixels": 0,
-      "defectArea": 9,
-      "score": 39.496508,
+      "defectArea": 7,
+      "score": 39.135494,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -624,10 +744,70 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 31,
+      "falsePositivePixels": 10,
       "falseNegativePixels": 0,
-      "defectArea": 15.5,
-      "score": 49.86073,
+      "defectArea": 5,
+      "score": 48.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20229",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 141.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20233",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 76.970414,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20235",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 97.639057,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20237",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 40.772589,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -639,10 +819,70 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 19,
+      "falsePositivePixels": 28,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 72.314186,
+      "defectArea": 9,
+      "score": 72.637586,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20241",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 94.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20257",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 154.70805,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20262",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 18,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 80.198673,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20263",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 49.639057,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -654,10 +894,55 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 19,
+      "falsePositivePixels": 25,
       "falseNegativePixels": 0,
-      "defectArea": 10,
-      "score": 61.401197,
+      "defectArea": 11,
+      "score": 61.610918,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20267",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 23,
+      "falseNegativePixels": 0,
+      "defectArea": 9.5,
+      "score": 114.511545,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20269",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 68.995732,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20273",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 51.890372,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -669,10 +954,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 42,
+      "falsePositivePixels": 31,
       "falseNegativePixels": 0,
-      "defectArea": 17.5,
-      "score": 109.102643,
+      "defectArea": 13,
+      "score": 108.806662,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -684,10 +969,100 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 17,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 6,
+      "score": 50.044522,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20304",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 26,
+      "falseNegativePixels": 0,
+      "defectArea": 10.5,
+      "score": 71.624341,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20310",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 6.5,
+      "score": 80.068053,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20312",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 37,
+      "falseNegativePixels": 0,
+      "defectArea": 13,
+      "score": 42.931826,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20322",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 150.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20340",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 20,
       "falseNegativePixels": 0,
       "defectArea": 8.5,
-      "score": 50.277145,
+      "score": 146.38439,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20353",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 42.862201,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -706,6 +1081,51 @@
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
+      "caseId": "20366",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 41.970414,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20368",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 70.639057,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20372",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 17,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 105.157,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
       "caseId": "20401",
       "isDefect": false,
       "predictedDefect": true,
@@ -714,14 +1134,14 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 15,
+      "falsePositivePixels": 24,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 50.157,
+      "defectArea": 9.5,
+      "score": 50.540959,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
-      "caseId": "20462",
+      "caseId": "20405",
       "isDefect": false,
       "predictedDefect": true,
       "imageCorrect": false,
@@ -729,10 +1149,100 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 76,
+      "falsePositivePixels": 9,
       "falseNegativePixels": 0,
-      "defectArea": 40.5,
-      "score": 51.766438,
+      "defectArea": 4,
+      "score": 52.639057,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20411",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 65.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20415",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 95.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20435",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 37.833213,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20437",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 74.70805,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20441",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 22,
+      "falseNegativePixels": 0,
+      "defectArea": 8.5,
+      "score": 47.449988,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20443",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 89.917771,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -744,10 +1254,70 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 27,
+      "falsePositivePixels": 11,
       "falseNegativePixels": 0,
-      "defectArea": 9,
-      "score": 37.610918,
+      "defectArea": 4.5,
+      "score": 36.80336,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20476",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 73.70805,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20492",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 48.917771,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20495",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 52.944439,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20498",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 47.772589,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -759,10 +1329,70 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 17,
+      "falsePositivePixels": 25,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 47.238678,
+      "defectArea": 10.5,
+      "score": 47.597312,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20511",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 120.995732,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20512",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 48.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20522",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 41.020425,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20541",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 22,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 49.332205,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -774,10 +1404,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 18,
+      "falsePositivePixels": 17,
       "falseNegativePixels": 0,
-      "defectArea": 7,
-      "score": 165.258097,
+      "defectArea": 6,
+      "score": 165.178054,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -796,6 +1426,81 @@
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
+      "caseId": "20551",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 68.917771,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20554",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 49,
+      "falseNegativePixels": 0,
+      "defectArea": 20.5,
+      "score": 112.255613,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20562",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 16,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 60.113515,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20563",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 53.862201,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20566",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 62.890372,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
       "caseId": "20573",
       "isDefect": false,
       "predictedDefect": true,
@@ -804,14 +1509,14 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 26,
+      "falsePositivePixels": 19,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 49.540959,
+      "defectArea": 5,
+      "score": 49.218876,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
-      "caseId": "20606",
+      "caseId": "20574",
       "isDefect": false,
       "predictedDefect": true,
       "imageCorrect": false,
@@ -819,10 +1524,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 24,
+      "falsePositivePixels": 11,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 37.48124,
+      "defectArea": 4,
+      "score": 52.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20578",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 66.970414,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -834,10 +1554,55 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 19,
+      "falsePositivePixels": 18,
       "falseNegativePixels": 0,
-      "defectArea": 9.5,
-      "score": 66.38439,
+      "defectArea": 8.5,
+      "score": 66.314186,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20615",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 13,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 70.970414,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20616",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 0,
+      "defectArea": 6.5,
+      "score": 93.970414,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20623",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 79.020425,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -849,10 +1614,85 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 19,
+      "falsePositivePixels": 54,
       "falseNegativePixels": 0,
-      "defectArea": 8,
-      "score": 44.332205,
+      "defectArea": 17,
+      "score": 45.276666,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20636",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 61.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20637",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 38.74084,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20645",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 167.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20652",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 110.74084,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20655",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 92.639057,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -864,25 +1704,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 18,
+      "falsePositivePixels": 17,
       "falseNegativePixels": 0,
-      "defectArea": 8,
-      "score": 100.295837,
-      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
-    },
-    {
-      "caseId": "20673",
-      "isDefect": false,
-      "predictedDefect": true,
-      "imageCorrect": false,
-      "taxonomy": [
-        "texture_noise_false_positive"
-      ],
-      "pixelF1": 0,
-      "falsePositivePixels": 18,
-      "falseNegativePixels": 0,
-      "defectArea": 7,
-      "score": 66.258097,
+      "defectArea": 7.5,
+      "score": 100.238678,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -894,10 +1719,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 20,
+      "falsePositivePixels": 29,
       "falseNegativePixels": 0,
-      "defectArea": 9.5,
-      "score": 58.417727,
+      "defectArea": 12.5,
+      "score": 58.749504,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20684",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 19,
+      "falseNegativePixels": 0,
+      "defectArea": 6,
+      "score": 42.258097,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20695",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 33.833213,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -909,10 +1764,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 24,
+      "falsePositivePixels": 22,
       "falseNegativePixels": 0,
-      "defectArea": 9.5,
-      "score": 55.540959,
+      "defectArea": 7,
+      "score": 55.401197,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -924,10 +1779,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 19,
+      "falsePositivePixels": 18,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 77.314186,
+      "defectArea": 6,
+      "score": 77.218876,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -939,10 +1794,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 15,
+      "falsePositivePixels": 13,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 40.157,
+      "defectArea": 6,
+      "score": 39.995732,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20717",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 51.70805,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -954,10 +1824,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 16,
+      "falsePositivePixels": 15,
       "falseNegativePixels": 0,
-      "defectArea": 9,
-      "score": 62.258097,
+      "defectArea": 8.5,
+      "score": 62.198673,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20729",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 71.970414,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20735",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 90.862201,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -969,10 +1869,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 15,
+      "falsePositivePixels": 13,
       "falseNegativePixels": 0,
-      "defectArea": 7,
-      "score": 66.135494,
+      "defectArea": 4.5,
+      "score": 65.917771,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -984,10 +1884,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 63,
+      "falsePositivePixels": 60,
       "falseNegativePixels": 0,
-      "defectArea": 23,
-      "score": 67.465908,
+      "defectArea": 20,
+      "score": 67.394449,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20758",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 11,
+      "falseNegativePixels": 0,
+      "defectArea": 5.5,
+      "score": 73.862201,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20768",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 123.639057,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -999,10 +1929,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 41,
+      "falsePositivePixels": 63,
       "falseNegativePixels": 0,
-      "defectArea": 19,
-      "score": 99.110874,
+      "defectArea": 27,
+      "score": 99.51086,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20770",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 17,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 57.135494,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20791",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 26,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 66.433987,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1014,10 +1974,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 20,
+      "falsePositivePixels": 15,
       "falseNegativePixels": 0,
-      "defectArea": 11,
-      "score": 88.465736,
+      "defectArea": 5.5,
+      "score": 88.068053,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1029,10 +1989,25 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 26,
+      "falsePositivePixels": 21,
       "falseNegativePixels": 0,
-      "defectArea": 12.5,
-      "score": 38.676301,
+      "defectArea": 7,
+      "score": 38.367296,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20811",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 113.944439,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1044,14 +2019,14 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 16,
+      "falsePositivePixels": 14,
       "falseNegativePixels": 0,
-      "defectArea": 7,
-      "score": 79.178054,
+      "defectArea": 5.5,
+      "score": 79.020425,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
-      "caseId": "20879",
+      "caseId": "20861",
       "isDefect": false,
       "predictedDefect": true,
       "imageCorrect": false,
@@ -1059,10 +2034,55 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 15,
+      "falsePositivePixels": 13,
       "falseNegativePixels": 0,
-      "defectArea": 7,
-      "score": 63.135494,
+      "defectArea": 5,
+      "score": 61.944439,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20868",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 88.772589,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20906",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 72.639057,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20917",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 0,
+      "defectArea": 5,
+      "score": 60.995732,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1074,10 +2094,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 24,
+      "falsePositivePixels": 14,
       "falseNegativePixels": 0,
-      "defectArea": 7.5,
-      "score": 77.48124,
+      "defectArea": 5,
+      "score": 76.995732,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1089,10 +2109,40 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 16,
+      "falsePositivePixels": 14,
       "falseNegativePixels": 0,
-      "defectArea": 9,
-      "score": 101.258097,
+      "defectArea": 7,
+      "score": 101.091042,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20944",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 0,
+      "defectArea": 4.5,
+      "score": 114.74084,
+      "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
+    },
+    {
+      "caseId": "20946",
+      "isDefect": false,
+      "predictedDefect": true,
+      "imageCorrect": false,
+      "taxonomy": [
+        "texture_noise_false_positive"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 0,
+      "defectArea": 4,
+      "score": 144.639057,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1104,10 +2154,10 @@
         "texture_noise_false_positive"
       ],
       "pixelF1": 0,
-      "falsePositivePixels": 23,
+      "falsePositivePixels": 41,
       "falseNegativePixels": 0,
-      "defectArea": 7,
-      "score": 67.433987,
+      "defectArea": 15,
+      "score": 68.043051,
       "nextAction": "Raise area/noise guard or add connected-component shape filtering while preserving defect recall."
     },
     {
@@ -1118,11 +2168,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.08255659121171771,
+      "pixelF1": 0.0748663101604278,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 689,
-      "defectArea": 14.5,
-      "score": 59.839452,
+      "falseNegativePixels": 692,
+      "defectArea": 12.5,
+      "score": 59.725693,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1133,11 +2183,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.05793742757821553,
+      "pixelF1": 0.08457142857142858,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 813,
-      "defectArea": 12.5,
-      "score": 133.650658,
+      "falseNegativePixels": 801,
+      "defectArea": 16.5,
+      "score": 133.998201,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1148,11 +2198,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.20051413881748073,
+      "pixelF1": 0.18181818181818182,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 933,
-      "defectArea": 75.5,
-      "score": 55.265278,
+      "falseNegativePixels": 945,
+      "defectArea": 58.5,
+      "score": 55.102911,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1163,11 +2213,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.22564102564102564,
+      "pixelF1": 0.20725388601036268,
       "falsePositivePixels": 6,
-      "falseNegativePixels": 145,
-      "defectArea": 14,
-      "score": 132.7612,
+      "falseNegativePixels": 147,
+      "defectArea": 12.5,
+      "score": 132.676301,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1178,11 +2228,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.06747826086956522,
-      "falsePositivePixels": 26,
-      "falseNegativePixels": 2655,
-      "defectArea": 56,
-      "score": 53.192957,
+      "pixelF1": 0.06234676007005254,
+      "falsePositivePixels": 14,
+      "falseNegativePixels": 2663,
+      "defectArea": 44,
+      "score": 52.997212,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1193,11 +2243,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.10526315789473684,
+      "pixelF1": 0.10050251256281408,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 357,
-      "defectArea": 11.5,
-      "score": 41.511545,
+      "falseNegativePixels": 358,
+      "defectArea": 10.5,
+      "score": 41.449988,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1208,11 +2258,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.01447424435930183,
+      "pixelF1": 0.01278227524499361,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 6945,
-      "defectArea": 32,
-      "score": 50.430817,
+      "falseNegativePixels": 6951,
+      "defectArea": 27,
+      "score": 50.290459,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1223,11 +2273,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.2662302236770322,
+      "pixelF1": 0.23444444444444446,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 1345,
-      "defectArea": 138.5,
-      "score": 79.94934,
+      "falseNegativePixels": 1378,
+      "defectArea": 118.5,
+      "score": 79.800607,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1238,11 +2288,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.07913669064748201,
+      "pixelF1": 0.16494845360824742,
       "falsePositivePixels": 7,
-      "falseNegativePixels": 249,
-      "defectArea": 8.5,
-      "score": 111.314186,
+      "falseNegativePixels": 236,
+      "defectArea": 14.5,
+      "score": 111.839452,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1253,11 +2303,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.1649269311064718,
+      "pixelF1": 0.1475237091675448,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 800,
-      "defectArea": 43.5,
-      "score": 108.816241,
+      "falseNegativePixels": 809,
+      "defectArea": 37,
+      "score": 108.682131,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1268,11 +2318,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.24242424242424243,
-      "falsePositivePixels": 20,
-      "falseNegativePixels": 455,
-      "defectArea": 35.5,
-      "score": 65.886583,
+      "pixelF1": 0.1267123287671233,
+      "falsePositivePixels": 16,
+      "falseNegativePixels": 494,
+      "defectArea": 22,
+      "score": 65.330733,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1283,11 +2333,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.0545308740978348,
+      "pixelF1": 0.11792086889061287,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 1179,
-      "defectArea": 14.5,
-      "score": 129.901973,
+      "falseNegativePixels": 1137,
+      "defectArea": 27.5,
+      "score": 130.649187,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1298,11 +2348,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.04472843450479233,
+      "pixelF1": 0.05173099880620772,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 2392,
-      "defectArea": 25,
-      "score": 57.406719,
+      "falseNegativePixels": 2383,
+      "defectArea": 29,
+      "score": 57.553877,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1313,11 +2363,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.26551226551226553,
-      "falsePositivePixels": 60,
-      "falseNegativePixels": 1976,
-      "defectArea": 282,
-      "score": 138.566672,
+      "pixelF1": 0.24064563462949376,
+      "falsePositivePixels": 54,
+      "falseNegativePixels": 2016,
+      "defectArea": 216.5,
+      "score": 138.396096,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1328,11 +2378,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.3076923076923077,
-      "falsePositivePixels": 4,
-      "falseNegativePixels": 176,
-      "defectArea": 14,
-      "score": 120.077537,
+      "pixelF1": 0.24096385542168675,
+      "falsePositivePixels": 3,
+      "falseNegativePixels": 186,
+      "defectArea": 11,
+      "score": 119.806662,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1343,11 +2393,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.08904109589041095,
+      "pixelF1": 0.08027522935779817,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 798,
-      "defectArea": 20,
-      "score": 59.094345,
+      "falseNegativePixels": 802,
+      "defectArea": 18,
+      "score": 58.988984,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1358,11 +2408,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.30564784053156147,
-      "falsePositivePixels": 1,
-      "falseNegativePixels": 208,
-      "defectArea": 29.5,
-      "score": 101.350278,
+      "pixelF1": 0.2671009771986971,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 213,
+      "defectArea": 30,
+      "score": 101.430817,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1373,11 +2423,41 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.02640722724113968,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 2802,
-      "defectArea": 15,
-      "score": 72.988984,
+      "pixelF1": 0.025632144094215447,
+      "falsePositivePixels": 10,
+      "falseNegativePixels": 2803,
+      "defectArea": 18.5,
+      "score": 73.197202,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20523",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 15,
+      "falseNegativePixels": 155,
+      "defectArea": 4.5,
+      "score": 98.020425,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20544",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 31,
+      "defectArea": 4.5,
+      "score": 111.674149,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1388,11 +2468,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.33815028901734107,
-      "falsePositivePixels": 18,
-      "falseNegativePixels": 440,
-      "defectArea": 88.5,
-      "score": 194.413876,
+      "pixelF1": 0.3372093023255814,
+      "falsePositivePixels": 15,
+      "falseNegativePixels": 441,
+      "defectArea": 85.5,
+      "score": 194.382199,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1403,11 +2483,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.22521008403361345,
+      "pixelF1": 0.21621621621621623,
       "falsePositivePixels": 24,
-      "falseNegativePixels": 437,
-      "defectArea": 62,
-      "score": 113.036953,
+      "falseNegativePixels": 440,
+      "defectArea": 57.5,
+      "score": 112.987025,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1418,11 +2498,41 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.06167400881057269,
+      "pixelF1": 0.058823529411764705,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 639,
-      "defectArea": 11,
-      "score": 45.496508,
+      "falseNegativePixels": 640,
+      "defectArea": 10.5,
+      "score": 45.449988,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20625",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0,
+      "falsePositivePixels": 9,
+      "falseNegativePixels": 516,
+      "defectArea": 4,
+      "score": 60.639057,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20632",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0.1728395061728395,
+      "falsePositivePixels": 0,
+      "falseNegativePixels": 134,
+      "defectArea": 4.5,
+      "score": 112.970414,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1433,11 +2543,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.11267605633802817,
-      "falsePositivePixels": 1,
-      "falseNegativePixels": 566,
-      "defectArea": 16.5,
-      "score": 131.998201,
+      "pixelF1": 0.15220700152207,
+      "falsePositivePixels": 5,
+      "falseNegativePixels": 552,
+      "defectArea": 25,
+      "score": 132.394449,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1448,11 +2558,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.1757526444263629,
-      "falsePositivePixels": 10,
-      "falseNegativePixels": 1003,
-      "defectArea": 57,
-      "score": 56.170484,
+      "pixelF1": 0.16246953696181965,
+      "falsePositivePixels": 20,
+      "falseNegativePixels": 1011,
+      "defectArea": 48,
+      "score": 56.129899,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1463,11 +2573,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.06,
-      "falsePositivePixels": 0,
-      "falseNegativePixels": 1692,
-      "defectArea": 25.5,
-      "score": 68.388257,
+      "pixelF1": 0.05530973451327434,
+      "falsePositivePixels": 12,
+      "falseNegativePixels": 1696,
+      "defectArea": 26.5,
+      "score": 68.494239,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1478,11 +2588,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.25384615384615383,
+      "pixelF1": 0.20789473684210527,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 582,
-      "defectArea": 36,
-      "score": 94.912655,
+      "falseNegativePixels": 602,
+      "defectArea": 30,
+      "score": 94.70048,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1493,11 +2603,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.2608695652173913,
-      "falsePositivePixels": 1,
-      "falseNegativePixels": 186,
-      "defectArea": 15,
-      "score": 71.912023,
+      "pixelF1": 0.12017167381974249,
+      "falsePositivePixels": 0,
+      "falseNegativePixels": 205,
+      "defectArea": 6,
+      "score": 71.044522,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1508,11 +2618,41 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.32,
+      "pixelF1": 0.3148148148148148,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 221,
-      "defectArea": 29.5,
-      "score": 74.412798,
+      "falseNegativePixels": 222,
+      "defectArea": 29,
+      "score": 74.394449,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20754",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0.2988505747126437,
+      "falsePositivePixels": 0,
+      "falseNegativePixels": 61,
+      "defectArea": 4.5,
+      "score": 52.917771,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20772",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0.031746031746031744,
+      "falsePositivePixels": 2,
+      "falseNegativePixels": 669,
+      "defectArea": 5.5,
+      "score": 74.970414,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1531,6 +2671,21 @@
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
+      "caseId": "20801",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0.24390243902439024,
+      "falsePositivePixels": 2,
+      "falseNegativePixels": 60,
+      "defectArea": 4,
+      "score": 143.833213,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
       "caseId": "20829",
       "isDefect": true,
       "predictedDefect": true,
@@ -1538,11 +2693,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.31496062992125984,
+      "pixelF1": 0.27419354838709675,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 87,
-      "defectArea": 7.5,
-      "score": 95.349904,
+      "falseNegativePixels": 90,
+      "defectArea": 5,
+      "score": 95.135494,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1553,11 +2708,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.17509727626459143,
+      "pixelF1": 0.14073339940535184,
       "falsePositivePixels": 1,
-      "falseNegativePixels": 847,
-      "defectArea": 33.5,
-      "score": 75.832306,
+      "falseNegativePixels": 866,
+      "defectArea": 26.5,
+      "score": 75.600158,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1568,11 +2723,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.05819730305180979,
+      "pixelF1": 0.0893854748603352,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 1327,
-      "defectArea": 22,
-      "score": 92.158883,
+      "falseNegativePixels": 1304,
+      "defectArea": 25,
+      "score": 92.49981,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1583,11 +2738,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.015369458128078817,
+      "pixelF1": 0.012628255722178374,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 4997,
-      "defectArea": 21.5,
-      "score": 51.119037,
+      "falseNegativePixels": 5004,
+      "defectArea": 15,
+      "score": 50.871201,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1598,11 +2753,26 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.19387755102040816,
+      "pixelF1": 0.2731707317073171,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 158,
-      "defectArea": 11.5,
-      "score": 54.449988,
+      "falseNegativePixels": 149,
+      "defectArea": 15,
+      "score": 54.78419,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20912",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0.3250883392226148,
+      "falsePositivePixels": 21,
+      "falseNegativePixels": 170,
+      "defectArea": 32.5,
+      "score": 133.610158,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1613,11 +2783,26 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.13360323886639677,
+      "pixelF1": 0.10204081632653061,
+      "falsePositivePixels": 4,
+      "falseNegativePixels": 436,
+      "defectArea": 9.5,
+      "score": 72.676301,
+      "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
+    },
+    {
+      "caseId": "20941",
+      "isDefect": true,
+      "predictedDefect": true,
+      "imageCorrect": true,
+      "taxonomy": [
+        "undersegmentation_false_negative"
+      ],
+      "pixelF1": 0.3464052287581699,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 428,
-      "defectArea": 12,
-      "score": 72.828641,
+      "falseNegativePixels": 200,
+      "defectArea": 33,
+      "score": 57.465908,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1628,11 +2813,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.1572002294893861,
+      "pixelF1": 0.1518987341772152,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 1469,
-      "defectArea": 70.5,
-      "score": 82.339939,
+      "falseNegativePixels": 1474,
+      "defectArea": 69.5,
+      "score": 82.31074,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1643,11 +2828,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.20754716981132076,
+      "pixelF1": 0.04627249357326478,
       "falsePositivePixels": 0,
-      "falseNegativePixels": 336,
-      "defectArea": 15.5,
-      "score": 56.102643,
+      "falseNegativePixels": 371,
+      "defectArea": 4,
+      "score": 54.639057,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     },
     {
@@ -1658,11 +2843,11 @@
       "taxonomy": [
         "undersegmentation_false_negative"
       ],
-      "pixelF1": 0.3248730964467005,
-      "falsePositivePixels": 7,
-      "falseNegativePixels": 259,
-      "defectArea": 38.5,
-      "score": 50.705016,
+      "pixelF1": 0.3251231527093596,
+      "falsePositivePixels": 17,
+      "falseNegativePixels": 257,
+      "defectArea": 37,
+      "score": 50.795791,
       "nextAction": "Relax threshold or morphology only for validation positives with stable false-positive budget."
     }
   ]

@@ -1,6 +1,6 @@
 {
   "Summary": {
-    "GeneratedAtUtc": "2026-04-30T12:54:32.9810472+00:00",
+    "GeneratedAtUtc": "2026-05-01T03:33:30.6648559+00:00",
     "IndexPath": "quality/datasets/mvtec_ad_lite_index.json",
     "CandidateVersion": "v2",
     "ProfileName": "max192_dense_stride8_threshold_010",
@@ -10,6 +10,10 @@
     "PixelSampleStride": 2,
     "CoresetRatio": 0.02,
     "Threshold": 0.1,
+    "FeatureExtractorId": "lab_gradient_stats",
+    "EmbeddingModelId": "",
+    "EmbeddingModelSource": "None",
+    "EmbeddingModelConfigured": false,
     "TrainCount": 264,
     "TestCount": 20,
     "TestAnomalyCount": 20,
@@ -28,8 +32,8 @@
     "MinCategoryImageAuroc": 0,
     "MinCategoryPixelAuroc": 0,
     "Failed": 0,
-    "RuntimeMs": 20424.296,
-    "MemoryAllocationBytes": 83639168
+    "RuntimeMs": 20476.626,
+    "MemoryAllocationBytes": 83643680
   },
   "Operators": [
     {
@@ -37,8 +41,8 @@
       "CaseCount": 20,
       "Passed": 20,
       "Failed": 0,
-      "RuntimeMsAvg": 1021.215,
-      "MemoryAllocationBytesAvg": 83639168,
+      "RuntimeMsAvg": 1023.831,
+      "MemoryAllocationBytesAvg": 83643680,
       "HasPublicDataset": true
     }
   ],
@@ -49,8 +53,8 @@
       "TestCount": 20,
       "TestAnomalyCount": 20,
       "FeatureBankCount": 2793,
-      "TrainRuntimeMs": 16712.029,
-      "InferenceRuntimeMs": 1433.29,
+      "TrainRuntimeMs": 16684.97,
+      "InferenceRuntimeMs": 1458,
       "ImageAuroc": 0,
       "PixelAuroc": 0.621241
     }

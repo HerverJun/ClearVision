@@ -1,7 +1,7 @@
 {
   "EvidenceKind": "dataset",
   "Summary": {
-    "GeneratedAtUtc": "2026-04-29T12:54:08.6580523+00:00",
+    "GeneratedAtUtc": "2026-05-01T03:16:25.1441373+00:00",
     "DatasetName": "COCO 2017 real validation images",
     "DatasetKind": "COCO real-image inference protocol: image pixels pass through product preprocessing and YOLO postprocessing; tensor candidates are annotation-seeded because no trained COCO model is bundled.",
     "IndexPath": "quality/datasets/coco2017_index.json",
@@ -21,8 +21,8 @@
     "ConfidenceThreshold": 0.44999998807907104,
     "NmsIouThreshold": 0.44999998807907104,
     "MatchIouThreshold": 0.5,
-    "RuntimeMs": 2144.76,
-    "MemoryAllocationBytes": 2278179920
+    "RuntimeMs": 2447.621,
+    "MemoryAllocationBytes": 2278193688
   },
   "Operators": [
     {
@@ -30,8 +30,8 @@
       "CaseCount": 120,
       "Passed": 113,
       "Failed": 7,
-      "RuntimeMsAvg": 17.873,
-      "MemoryAllocationBytesAvg": 18984833,
+      "RuntimeMsAvg": 20.397,
+      "MemoryAllocationBytesAvg": 18984947,
       "HasPublicDataset": true,
       "EvidenceKind": "dataset",
       "DatasetName": "COCO 2017 real validation images"
@@ -48,7 +48,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 17.229
+      "RuntimeMsAvg": 29.369
     },
     {
       "Scenario": "c0\u002Bc1\u002Bc2\u002Bc3",
@@ -60,7 +60,7 @@
       "TruePositiveCount": 20,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 58.605
+      "RuntimeMsAvg": 390.268
     },
     {
       "Scenario": "c0\u002Bc2\u002Bc31\u002Bc32",
@@ -72,7 +72,7 @@
       "TruePositiveCount": 6,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.33
+      "RuntimeMsAvg": 14.248
     },
     {
       "Scenario": "c0\u002Bc2\u002Bc50",
@@ -84,7 +84,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.15
+      "RuntimeMsAvg": 16.16
     },
     {
       "Scenario": "c0\u002Bc2\u002Bc71",
@@ -96,7 +96,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.407
+      "RuntimeMsAvg": 16.09
     },
     {
       "Scenario": "c0\u002Bc3\u002Bc55",
@@ -108,7 +108,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.727
+      "RuntimeMsAvg": 15.28
     },
     {
       "Scenario": "c0\u002Bc30\u002Bc31\u002Bc32",
@@ -120,7 +120,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 17.163
+      "RuntimeMsAvg": 29.118
     },
     {
       "Scenario": "c0\u002Bc30\u002Bc34",
@@ -132,7 +132,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.919
+      "RuntimeMsAvg": 16.868
     },
     {
       "Scenario": "c1\u002Bc2\u002Bc22\u002Bc30",
@@ -144,7 +144,7 @@
       "TruePositiveCount": 15,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.784
+      "RuntimeMsAvg": 15.11
     },
     {
       "Scenario": "c1\u002Bc2\u002Bc28\u002Bc44",
@@ -156,7 +156,7 @@
       "TruePositiveCount": 20,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.167
+      "RuntimeMsAvg": 15.244
     },
     {
       "Scenario": "c1\u002Bc2\u002Bc3\u002Bc38",
@@ -168,7 +168,7 @@
       "TruePositiveCount": 20,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.548
+      "RuntimeMsAvg": 17.008
     },
     {
       "Scenario": "c1\u002Bc2\u002Bc42\u002Bc43",
@@ -180,7 +180,7 @@
       "TruePositiveCount": 9,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 32.226
+      "RuntimeMsAvg": 15.849
     },
     {
       "Scenario": "c1\u002Bc27\u002Bc28\u002Bc42",
@@ -192,7 +192,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.218
+      "RuntimeMsAvg": 15.269
     },
     {
       "Scenario": "c1\u002Bc27\u002Bc42",
@@ -204,7 +204,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 17.281
+      "RuntimeMsAvg": 17.586
     },
     {
       "Scenario": "c1\u002Bc3\u002Bc11",
@@ -216,7 +216,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 24.472
+      "RuntimeMsAvg": 15.915
     },
     {
       "Scenario": "c1\u002Bc3\u002Bc11\u002Bc24",
@@ -228,7 +228,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.712
+      "RuntimeMsAvg": 15.463
     },
     {
       "Scenario": "c1\u002Bc3\u002Bc4\u002Bc42",
@@ -240,7 +240,7 @@
       "TruePositiveCount": 11,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.304
+      "RuntimeMsAvg": 15.62
     },
     {
       "Scenario": "c1\u002Bc41\u002Bc42\u002Bc43",
@@ -252,7 +252,7 @@
       "TruePositiveCount": 14,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 2,
-      "RuntimeMsAvg": 23.481
+      "RuntimeMsAvg": 15.759
     },
     {
       "Scenario": "c1\u002Bc42\u002Bc44",
@@ -264,7 +264,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 27.182
+      "RuntimeMsAvg": 15.013
     },
     {
       "Scenario": "c1\u002Bc44\u002Bc45\u002Bc51",
@@ -276,7 +276,7 @@
       "TruePositiveCount": 12,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.879
+      "RuntimeMsAvg": 15.307
     },
     {
       "Scenario": "c10",
@@ -288,7 +288,7 @@
       "TruePositiveCount": 1,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 20.926
+      "RuntimeMsAvg": 22.308
     },
     {
       "Scenario": "c11",
@@ -300,7 +300,7 @@
       "TruePositiveCount": 1,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.215
+      "RuntimeMsAvg": 14.978
     },
     {
       "Scenario": "c11\u002Bc15",
@@ -312,7 +312,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 1,
-      "RuntimeMsAvg": 19.717
+      "RuntimeMsAvg": 21.424
     },
     {
       "Scenario": "c12",
@@ -324,7 +324,7 @@
       "TruePositiveCount": 1,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.216
+      "RuntimeMsAvg": 16.051
     },
     {
       "Scenario": "c12\u002Bc13\u002Bc14",
@@ -336,7 +336,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 20.842
+      "RuntimeMsAvg": 21.773
     },
     {
       "Scenario": "c13",
@@ -348,7 +348,7 @@
       "TruePositiveCount": 1,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.997
+      "RuntimeMsAvg": 14.992
     },
     {
       "Scenario": "c13\u002Bc14",
@@ -360,7 +360,7 @@
       "TruePositiveCount": 8,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 23.629
+      "RuntimeMsAvg": 33.568
     },
     {
       "Scenario": "c13\u002Bc14\u002Bc33",
@@ -372,7 +372,7 @@
       "TruePositiveCount": 6,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.69
+      "RuntimeMsAvg": 15.697
     },
     {
       "Scenario": "c13\u002Bc58\u002Bc66\u002Bc67",
@@ -384,7 +384,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.661
+      "RuntimeMsAvg": 14.724
     },
     {
       "Scenario": "c14\u002Bc34\u002Bc48\u002Bc58",
@@ -396,7 +396,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.268
+      "RuntimeMsAvg": 13.655
     },
     {
       "Scenario": "c14\u002Bc37",
@@ -408,7 +408,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 12.578
+      "RuntimeMsAvg": 13.121
     },
     {
       "Scenario": "c19\u002Bc59",
@@ -420,7 +420,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.981
+      "RuntimeMsAvg": 15.632
     },
     {
       "Scenario": "c2\u002Bc13\u002Bc14\u002Bc26",
@@ -432,7 +432,7 @@
       "TruePositiveCount": 12,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 16.298
+      "RuntimeMsAvg": 15.48
     },
     {
       "Scenario": "c2\u002Bc13\u002Bc14\u002Bc64",
@@ -444,7 +444,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.273
+      "RuntimeMsAvg": 17.479
     },
     {
       "Scenario": "c2\u002Bc13\u002Bc70",
@@ -456,7 +456,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.067
+      "RuntimeMsAvg": 15.561
     },
     {
       "Scenario": "c2\u002Bc14\u002Bc22\u002Bc37",
@@ -468,7 +468,7 @@
       "TruePositiveCount": 16,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.584
+      "RuntimeMsAvg": 16.3
     },
     {
       "Scenario": "c2\u002Bc14\u002Bc22\u002Bc38",
@@ -480,7 +480,7 @@
       "TruePositiveCount": 13,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.57
+      "RuntimeMsAvg": 14.439
     },
     {
       "Scenario": "c2\u002Bc14\u002Bc33",
@@ -492,7 +492,7 @@
       "TruePositiveCount": 10,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.598
+      "RuntimeMsAvg": 15.696
     },
     {
       "Scenario": "c2\u002Bc16",
@@ -504,7 +504,7 @@
       "TruePositiveCount": 11,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 23.882
+      "RuntimeMsAvg": 16.949
     },
     {
       "Scenario": "c2\u002Bc16\u002Bc22",
@@ -516,7 +516,7 @@
       "TruePositiveCount": 10,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 24.046
+      "RuntimeMsAvg": 15.612
     },
     {
       "Scenario": "c2\u002Bc18",
@@ -528,7 +528,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 31.251
+      "RuntimeMsAvg": 31.735
     },
     {
       "Scenario": "c2\u002Bc18\u002Bc19",
@@ -540,7 +540,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 1,
-      "RuntimeMsAvg": 20.787
+      "RuntimeMsAvg": 21.828
     },
     {
       "Scenario": "c2\u002Bc18\u002Bc40\u002Bc48",
@@ -552,7 +552,7 @@
       "TruePositiveCount": 16,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.578
+      "RuntimeMsAvg": 14.906
     },
     {
       "Scenario": "c2\u002Bc20",
@@ -564,7 +564,7 @@
       "TruePositiveCount": 23,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.645
+      "RuntimeMsAvg": 16.92
     },
     {
       "Scenario": "c2\u002Bc20\u002Bc21\u002Bc22",
@@ -576,7 +576,7 @@
       "TruePositiveCount": 17,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 20.542
+      "RuntimeMsAvg": 20.937
     },
     {
       "Scenario": "c2\u002Bc21\u002Bc22\u002Bc23",
@@ -588,7 +588,7 @@
       "TruePositiveCount": 11,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 18.285
+      "RuntimeMsAvg": 19.952
     },
     {
       "Scenario": "c2\u002Bc21\u002Bc43\u002Bc44",
@@ -600,7 +600,7 @@
       "TruePositiveCount": 18,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 1,
-      "RuntimeMsAvg": 30.306
+      "RuntimeMsAvg": 17.111
     },
     {
       "Scenario": "c2\u002Bc21\u002Bc57\u002Bc58",
@@ -612,7 +612,7 @@
       "TruePositiveCount": 17,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.684
+      "RuntimeMsAvg": 15.732
     },
     {
       "Scenario": "c2\u002Bc21\u002Bc60\u002Bc66",
@@ -624,7 +624,7 @@
       "TruePositiveCount": 10,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.396
+      "RuntimeMsAvg": 16.418
     },
     {
       "Scenario": "c2\u002Bc21\u002Bc71",
@@ -636,7 +636,7 @@
       "TruePositiveCount": 6,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.31
+      "RuntimeMsAvg": 16.112
     },
     {
       "Scenario": "c2\u002Bc22\u002Bc68",
@@ -648,7 +648,7 @@
       "TruePositiveCount": 16,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.257
+      "RuntimeMsAvg": 15.891
     },
     {
       "Scenario": "c2\u002Bc25",
@@ -660,7 +660,7 @@
       "TruePositiveCount": 10,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 1,
-      "RuntimeMsAvg": 18.998
+      "RuntimeMsAvg": 18.094
     },
     {
       "Scenario": "c2\u002Bc26",
@@ -672,7 +672,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 16.803
+      "RuntimeMsAvg": 19.04
     },
     {
       "Scenario": "c2\u002Bc29",
@@ -684,7 +684,7 @@
       "TruePositiveCount": 10,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 17.524
+      "RuntimeMsAvg": 18.827
     },
     {
       "Scenario": "c2\u002Bc29\u002Bc48",
@@ -696,7 +696,7 @@
       "TruePositiveCount": 9,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.244
+      "RuntimeMsAvg": 14.196
     },
     {
       "Scenario": "c2\u002Bc3\u002Bc20",
@@ -708,7 +708,7 @@
       "TruePositiveCount": 20,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.785
+      "RuntimeMsAvg": 16.16
     },
     {
       "Scenario": "c2\u002Bc3\u002Bc58\u002Bc66",
@@ -720,7 +720,7 @@
       "TruePositiveCount": 6,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.514
+      "RuntimeMsAvg": 15.319
     },
     {
       "Scenario": "c2\u002Bc30\u002Bc31\u002Bc32",
@@ -732,7 +732,7 @@
       "TruePositiveCount": 19,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 1,
-      "RuntimeMsAvg": 13.368
+      "RuntimeMsAvg": 13.522
     },
     {
       "Scenario": "c2\u002Bc33",
@@ -744,7 +744,7 @@
       "TruePositiveCount": 14,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 23.062
+      "RuntimeMsAvg": 32.542
     },
     {
       "Scenario": "c2\u002Bc33\u002Bc37\u002Bc38",
@@ -756,7 +756,7 @@
       "TruePositiveCount": 8,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 24.702
+      "RuntimeMsAvg": 16.275
     },
     {
       "Scenario": "c2\u002Bc35",
@@ -768,7 +768,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 21.674
+      "RuntimeMsAvg": 31.581
     },
     {
       "Scenario": "c2\u002Bc38",
@@ -780,7 +780,7 @@
       "TruePositiveCount": 27,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 17.934
+      "RuntimeMsAvg": 14.887
     },
     {
       "Scenario": "c2\u002Bc38\u002Bc48",
@@ -792,7 +792,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.1
+      "RuntimeMsAvg": 15.776
     },
     {
       "Scenario": "c2\u002Bc40",
@@ -804,7 +804,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 23.374
+      "RuntimeMsAvg": 16.578
     },
     {
       "Scenario": "c2\u002Bc43\u002Bc44\u002Bc55",
@@ -816,7 +816,7 @@
       "TruePositiveCount": 14,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.08
+      "RuntimeMsAvg": 14.727
     },
     {
       "Scenario": "c2\u002Bc46",
@@ -828,7 +828,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.246
+      "RuntimeMsAvg": 13.864
     },
     {
       "Scenario": "c2\u002Bc49\u002Bc50",
@@ -840,7 +840,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 24.903
+      "RuntimeMsAvg": 15.423
     },
     {
       "Scenario": "c2\u002Bc52",
@@ -852,7 +852,7 @@
       "TruePositiveCount": 8,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 20.01
+      "RuntimeMsAvg": 15.955
     },
     {
       "Scenario": "c2\u002Bc58\u002Bc66",
@@ -864,7 +864,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.586
+      "RuntimeMsAvg": 15.093
     },
     {
       "Scenario": "c2\u002Bc59",
@@ -876,7 +876,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.399
+      "RuntimeMsAvg": 14.98
     },
     {
       "Scenario": "c2\u002Bc62",
@@ -888,7 +888,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.898
+      "RuntimeMsAvg": 15.71
     },
     {
       "Scenario": "c2\u002Bc63",
@@ -900,7 +900,7 @@
       "TruePositiveCount": 17,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.36
+      "RuntimeMsAvg": 14.941
     },
     {
       "Scenario": "c2\u002Bc64",
@@ -912,7 +912,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.882
+      "RuntimeMsAvg": 17.326
     },
     {
       "Scenario": "c2\u002Bc65",
@@ -924,7 +924,7 @@
       "TruePositiveCount": 12,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.634
+      "RuntimeMsAvg": 14.514
     },
     {
       "Scenario": "c2\u002Bc66",
@@ -936,7 +936,7 @@
       "TruePositiveCount": 11,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.194
+      "RuntimeMsAvg": 14.89
     },
     {
       "Scenario": "c2\u002Bc8\u002Bc25",
@@ -948,7 +948,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 18.094
+      "RuntimeMsAvg": 20.473
     },
     {
       "Scenario": "c23\u002Bc24",
@@ -960,7 +960,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 24.972
+      "RuntimeMsAvg": 14.992
     },
     {
       "Scenario": "c27\u002Bc28",
@@ -972,7 +972,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 18.36
+      "RuntimeMsAvg": 19.598
     },
     {
       "Scenario": "c28\u002Bc39",
@@ -984,7 +984,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 23.12
+      "RuntimeMsAvg": 15.552
     },
     {
       "Scenario": "c28\u002Bc45",
@@ -996,7 +996,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.586
+      "RuntimeMsAvg": 14.844
     },
     {
       "Scenario": "c28\u002Bc51",
@@ -1008,7 +1008,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 25.432
+      "RuntimeMsAvg": 16.263
     },
     {
       "Scenario": "c28\u002Bc51\u002Bc53",
@@ -1020,7 +1020,7 @@
       "TruePositiveCount": 13,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.348
+      "RuntimeMsAvg": 16.178
     },
     {
       "Scenario": "c3\u002Bc30",
@@ -1032,7 +1032,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.469
+      "RuntimeMsAvg": 14.716
     },
     {
       "Scenario": "c3\u002Bc6\u002Bc7\u002Bc11",
@@ -1044,7 +1044,7 @@
       "TruePositiveCount": 17,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 20.186
+      "RuntimeMsAvg": 21.789
     },
     {
       "Scenario": "c31\u002Bc34",
@@ -1056,7 +1056,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 22.627
+      "RuntimeMsAvg": 32.151
     },
     {
       "Scenario": "c31\u002Bc44\u002Bc46",
@@ -1068,7 +1068,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 18.126
+      "RuntimeMsAvg": 14.759
     },
     {
       "Scenario": "c35",
@@ -1080,7 +1080,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.815
+      "RuntimeMsAvg": 15.149
     },
     {
       "Scenario": "c36",
@@ -1092,7 +1092,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 1,
-      "RuntimeMsAvg": 19.458
+      "RuntimeMsAvg": 23.89
     },
     {
       "Scenario": "c39\u002Bc61",
@@ -1104,7 +1104,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.108
+      "RuntimeMsAvg": 14.827
     },
     {
       "Scenario": "c4\u002Bc5\u002Bc9\u002Bc17",
@@ -1116,7 +1116,7 @@
       "TruePositiveCount": 12,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.083
+      "RuntimeMsAvg": 15.18
     },
     {
       "Scenario": "c42\u002Bc54",
@@ -1128,7 +1128,7 @@
       "TruePositiveCount": 3,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.238
+      "RuntimeMsAvg": 14.875
     },
     {
       "Scenario": "c46",
@@ -1140,7 +1140,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 16.419
+      "RuntimeMsAvg": 15.491
     },
     {
       "Scenario": "c46\u002Bc47",
@@ -1152,7 +1152,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 24.799
+      "RuntimeMsAvg": 15.062
     },
     {
       "Scenario": "c49",
@@ -1164,7 +1164,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.345
+      "RuntimeMsAvg": 14.706
     },
     {
       "Scenario": "c49\u002Bc50",
@@ -1176,7 +1176,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 12.125
+      "RuntimeMsAvg": 13.356
     },
     {
       "Scenario": "c5\u002Bc17",
@@ -1188,7 +1188,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 36.304
+      "RuntimeMsAvg": 22.028
     },
     {
       "Scenario": "c50",
@@ -1200,7 +1200,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.931
+      "RuntimeMsAvg": 15.09
     },
     {
       "Scenario": "c53\u002Bc69",
@@ -1212,7 +1212,7 @@
       "TruePositiveCount": 7,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 15.32
+      "RuntimeMsAvg": 16.542
     },
     {
       "Scenario": "c58\u002Bc70",
@@ -1224,7 +1224,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.67
+      "RuntimeMsAvg": 15.841
     },
     {
       "Scenario": "c59",
@@ -1236,7 +1236,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.43
+      "RuntimeMsAvg": 15.854
     },
     {
       "Scenario": "c62",
@@ -1248,7 +1248,7 @@
       "TruePositiveCount": 5,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.175
+      "RuntimeMsAvg": 19.153
     },
     {
       "Scenario": "c68",
@@ -1260,7 +1260,7 @@
       "TruePositiveCount": 1,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 13.529
+      "RuntimeMsAvg": 13.719
     },
     {
       "Scenario": "c8",
@@ -1272,7 +1272,7 @@
       "TruePositiveCount": 2,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.024
+      "RuntimeMsAvg": 15.39
     },
     {
       "Scenario": "c8\u002Bc11\u002Bc56",
@@ -1284,7 +1284,7 @@
       "TruePositiveCount": 4,
       "FalsePositiveCount": 0,
       "FalseNegativeCount": 0,
-      "RuntimeMsAvg": 14.166
+      "RuntimeMsAvg": 15.084
     }
   ],
   "Cases": [
@@ -1292,7 +1292,7 @@
       "CaseId": "coco2017_val_139",
       "CategorySet": "c0\u002Bc1\u002Bc2\u002Bc3",
       "Passed": true,
-      "RuntimeMs": 58.605,
+      "RuntimeMs": 390.268,
       "MemoryAllocationBytes": 19068904,
       "Width": 640,
       "Height": 426,
@@ -1574,7 +1574,7 @@
       "CaseId": "coco2017_val_285",
       "CategorySet": "c10",
       "Passed": true,
-      "RuntimeMs": 20.926,
+      "RuntimeMs": 22.308,
       "MemoryAllocationBytes": 18976016,
       "Width": 586,
       "Height": 640,
@@ -1609,7 +1609,7 @@
       "CaseId": "coco2017_val_632",
       "CategorySet": "c3\u002Bc6\u002Bc7\u002Bc11",
       "Passed": true,
-      "RuntimeMs": 20.186,
+      "RuntimeMs": 21.789,
       "MemoryAllocationBytes": 18998448,
       "Width": 640,
       "Height": 483,
@@ -1852,7 +1852,7 @@
       "CaseId": "coco2017_val_724",
       "CategorySet": "c12\u002Bc13\u002Bc14",
       "Passed": true,
-      "RuntimeMs": 20.842,
+      "RuntimeMs": 21.773,
       "MemoryAllocationBytes": 18977256,
       "Width": 375,
       "Height": 500,
@@ -1926,7 +1926,7 @@
       "CaseId": "coco2017_val_776",
       "CategorySet": "c11\u002Bc15",
       "Passed": false,
-      "RuntimeMs": 19.717,
+      "RuntimeMs": 21.424,
       "MemoryAllocationBytes": 18976272,
       "Width": 428,
       "Height": 640,
@@ -1987,7 +1987,7 @@
       "CaseId": "coco2017_val_785",
       "CategorySet": "c2\u002Bc16",
       "Passed": true,
-      "RuntimeMs": 19.709,
+      "RuntimeMs": 20.522,
       "MemoryAllocationBytes": 18974616,
       "Width": 640,
       "Height": 425,
@@ -2035,8 +2035,8 @@
       "CaseId": "coco2017_val_802",
       "CategorySet": "c5\u002Bc17",
       "Passed": true,
-      "RuntimeMs": 36.304,
-      "MemoryAllocationBytes": 18975272,
+      "RuntimeMs": 22.028,
+      "MemoryAllocationBytes": 18975256,
       "Width": 424,
       "Height": 640,
       "GroundTruthCount": 2,
@@ -2083,7 +2083,7 @@
       "CaseId": "coco2017_val_872",
       "CategorySet": "c2\u002Bc18\u002Bc19",
       "Passed": false,
-      "RuntimeMs": 20.787,
+      "RuntimeMs": 21.828,
       "MemoryAllocationBytes": 18976088,
       "Width": 621,
       "Height": 640,
@@ -2144,7 +2144,7 @@
       "CaseId": "coco2017_val_885",
       "CategorySet": "c2\u002Bc20",
       "Passed": true,
-      "RuntimeMs": 18.173,
+      "RuntimeMs": 19.696,
       "MemoryAllocationBytes": 18981024,
       "Width": 640,
       "Height": 427,
@@ -2283,7 +2283,7 @@
       "CaseId": "coco2017_val_1000",
       "CategorySet": "c2\u002Bc20\u002Bc21\u002Bc22",
       "Passed": true,
-      "RuntimeMs": 20.542,
+      "RuntimeMs": 20.937,
       "MemoryAllocationBytes": 18991136,
       "Width": 640,
       "Height": 480,
@@ -2526,7 +2526,7 @@
       "CaseId": "coco2017_val_1268",
       "CategorySet": "c2\u002Bc21\u002Bc22\u002Bc23",
       "Passed": true,
-      "RuntimeMs": 18.285,
+      "RuntimeMs": 19.952,
       "MemoryAllocationBytes": 18985592,
       "Width": 640,
       "Height": 427,
@@ -2691,7 +2691,7 @@
       "CaseId": "coco2017_val_1296",
       "CategorySet": "c2\u002Bc8\u002Bc25",
       "Passed": true,
-      "RuntimeMs": 18.094,
+      "RuntimeMs": 20.473,
       "MemoryAllocationBytes": 18976296,
       "Width": 427,
       "Height": 640,
@@ -2765,7 +2765,7 @@
       "CaseId": "coco2017_val_1353",
       "CategorySet": "c2\u002Bc26",
       "Passed": true,
-      "RuntimeMs": 16.803,
+      "RuntimeMs": 19.04,
       "MemoryAllocationBytes": 18980304,
       "Width": 375,
       "Height": 500,
@@ -2878,8 +2878,8 @@
       "CaseId": "coco2017_val_1425",
       "CategorySet": "c27\u002Bc28",
       "Passed": true,
-      "RuntimeMs": 18.36,
-      "MemoryAllocationBytes": 18974544,
+      "RuntimeMs": 19.598,
+      "MemoryAllocationBytes": 18974640,
       "Width": 640,
       "Height": 512,
       "GroundTruthCount": 2,
@@ -2926,8 +2926,8 @@
       "CaseId": "coco2017_val_1490",
       "CategorySet": "c2\u002Bc29",
       "Passed": true,
-      "RuntimeMs": 17.379,
-      "MemoryAllocationBytes": 18975080,
+      "RuntimeMs": 30.526,
+      "MemoryAllocationBytes": 18975176,
       "Width": 640,
       "Height": 315,
       "GroundTruthCount": 2,
@@ -2974,8 +2974,8 @@
       "CaseId": "coco2017_val_1503",
       "CategorySet": "c0\u002Bc30\u002Bc31\u002Bc32",
       "Passed": true,
-      "RuntimeMs": 17.163,
-      "MemoryAllocationBytes": 18978784,
+      "RuntimeMs": 29.118,
+      "MemoryAllocationBytes": 18978880,
       "Width": 320,
       "Height": 240,
       "GroundTruthCount": 5,
@@ -3061,8 +3061,8 @@
       "CaseId": "coco2017_val_1532",
       "CategorySet": "c13\u002Bc14",
       "Passed": true,
-      "RuntimeMs": 23.629,
-      "MemoryAllocationBytes": 18981152,
+      "RuntimeMs": 33.568,
+      "MemoryAllocationBytes": 18981248,
       "Width": 640,
       "Height": 480,
       "GroundTruthCount": 8,
@@ -3187,8 +3187,8 @@
       "CaseId": "coco2017_val_1584",
       "CategorySet": "c2\u002Bc33",
       "Passed": true,
-      "RuntimeMs": 23.062,
-      "MemoryAllocationBytes": 18986776,
+      "RuntimeMs": 32.542,
+      "MemoryAllocationBytes": 18986872,
       "Width": 612,
       "Height": 612,
       "GroundTruthCount": 14,
@@ -3391,8 +3391,8 @@
       "CaseId": "coco2017_val_1675",
       "CategorySet": "c31\u002Bc34",
       "Passed": true,
-      "RuntimeMs": 22.627,
-      "MemoryAllocationBytes": 18974760,
+      "RuntimeMs": 32.151,
+      "MemoryAllocationBytes": 18974856,
       "Width": 640,
       "Height": 480,
       "GroundTruthCount": 2,
@@ -3439,8 +3439,8 @@
       "CaseId": "coco2017_val_1761",
       "CategorySet": "c2\u002Bc35",
       "Passed": true,
-      "RuntimeMs": 21.674,
-      "MemoryAllocationBytes": 18979240,
+      "RuntimeMs": 31.581,
+      "MemoryAllocationBytes": 18979336,
       "Width": 427,
       "Height": 640,
       "GroundTruthCount": 7,
@@ -3552,8 +3552,8 @@
       "CaseId": "coco2017_val_1818",
       "CategorySet": "c36",
       "Passed": false,
-      "RuntimeMs": 24.687,
-      "MemoryAllocationBytes": 18974160,
+      "RuntimeMs": 32.01,
+      "MemoryAllocationBytes": 18974352,
       "Width": 640,
       "Height": 425,
       "GroundTruthCount": 2,
@@ -3587,8 +3587,8 @@
       "CaseId": "coco2017_val_1993",
       "CategorySet": "c1\u002Bc3\u002Bc11",
       "Passed": true,
-      "RuntimeMs": 24.472,
-      "MemoryAllocationBytes": 18976760,
+      "RuntimeMs": 15.915,
+      "MemoryAllocationBytes": 18976856,
       "Width": 640,
       "Height": 419,
       "GroundTruthCount": 4,
@@ -3661,8 +3661,8 @@
       "CaseId": "coco2017_val_2006",
       "CategorySet": "c2\u002Bc33\u002Bc37\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 24.702,
-      "MemoryAllocationBytes": 18981064,
+      "RuntimeMs": 16.275,
+      "MemoryAllocationBytes": 18981160,
       "Width": 640,
       "Height": 480,
       "GroundTruthCount": 8,
@@ -3787,8 +3787,8 @@
       "CaseId": "coco2017_val_2149",
       "CategorySet": "c28\u002Bc39",
       "Passed": true,
-      "RuntimeMs": 23.12,
-      "MemoryAllocationBytes": 18975080,
+      "RuntimeMs": 15.552,
+      "MemoryAllocationBytes": 18975176,
       "Width": 640,
       "Height": 427,
       "GroundTruthCount": 2,
@@ -3835,8 +3835,8 @@
       "CaseId": "coco2017_val_2153",
       "CategorySet": "c2\u002Bc40",
       "Passed": true,
-      "RuntimeMs": 23.374,
-      "MemoryAllocationBytes": 18977608,
+      "RuntimeMs": 16.578,
+      "MemoryAllocationBytes": 18977704,
       "Width": 640,
       "Height": 480,
       "GroundTruthCount": 5,
@@ -3922,8 +3922,8 @@
       "CaseId": "coco2017_val_2157",
       "CategorySet": "c1\u002Bc41\u002Bc42\u002Bc43",
       "Passed": false,
-      "RuntimeMs": 23.481,
-      "MemoryAllocationBytes": 18987888,
+      "RuntimeMs": 15.759,
+      "MemoryAllocationBytes": 18988080,
       "Width": 640,
       "Height": 427,
       "GroundTruthCount": 16,
@@ -4126,8 +4126,8 @@
       "CaseId": "coco2017_val_2261",
       "CategorySet": "c2\u002Bc29",
       "Passed": true,
-      "RuntimeMs": 24.006,
-      "MemoryAllocationBytes": 18975080,
+      "RuntimeMs": 16.305,
+      "MemoryAllocationBytes": 18975176,
       "Width": 640,
       "Height": 427,
       "GroundTruthCount": 2,
@@ -4174,8 +4174,8 @@
       "CaseId": "coco2017_val_2299",
       "CategorySet": "c2\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 32.233,
-      "MemoryAllocationBytes": 18992312,
+      "RuntimeMs": 15.181,
+      "MemoryAllocationBytes": 18992408,
       "Width": 500,
       "Height": 302,
       "GroundTruthCount": 20,
@@ -4456,8 +4456,8 @@
       "CaseId": "coco2017_val_2431",
       "CategorySet": "c1\u002Bc2\u002Bc42\u002Bc43",
       "Passed": true,
-      "RuntimeMs": 32.226,
-      "MemoryAllocationBytes": 18984088,
+      "RuntimeMs": 15.849,
+      "MemoryAllocationBytes": 18984184,
       "Width": 457,
       "Height": 640,
       "GroundTruthCount": 9,
@@ -4595,8 +4595,8 @@
       "CaseId": "coco2017_val_2473",
       "CategorySet": "c2\u002Bc16",
       "Passed": true,
-      "RuntimeMs": 31.678,
-      "MemoryAllocationBytes": 18978184,
+      "RuntimeMs": 15.22,
+      "MemoryAllocationBytes": 18978280,
       "Width": 640,
       "Height": 427,
       "GroundTruthCount": 5,
@@ -4682,7 +4682,7 @@
       "CaseId": "coco2017_val_2532",
       "CategorySet": "c2\u002Bc16",
       "Passed": true,
-      "RuntimeMs": 29.1,
+      "RuntimeMs": 16.411,
       "MemoryAllocationBytes": 18974568,
       "Width": 480,
       "Height": 640,
@@ -4730,7 +4730,7 @@
       "CaseId": "coco2017_val_2587",
       "CategorySet": "c46\u002Bc47",
       "Passed": true,
-      "RuntimeMs": 24.799,
+      "RuntimeMs": 15.062,
       "MemoryAllocationBytes": 18975032,
       "Width": 500,
       "Height": 375,
@@ -4778,7 +4778,7 @@
       "CaseId": "coco2017_val_2592",
       "CategorySet": "c1\u002Bc42\u002Bc44",
       "Passed": true,
-      "RuntimeMs": 27.182,
+      "RuntimeMs": 15.013,
       "MemoryAllocationBytes": 18976368,
       "Width": 640,
       "Height": 366,
@@ -4839,7 +4839,7 @@
       "CaseId": "coco2017_val_2685",
       "CategorySet": "c2\u002Bc21\u002Bc43\u002Bc44",
       "Passed": false,
-      "RuntimeMs": 30.306,
+      "RuntimeMs": 17.111,
       "MemoryAllocationBytes": 18992416,
       "Width": 640,
       "Height": 555,
@@ -5095,7 +5095,7 @@
       "CaseId": "coco2017_val_2923",
       "CategorySet": "c23\u002Bc24",
       "Passed": true,
-      "RuntimeMs": 24.972,
+      "RuntimeMs": 14.992,
       "MemoryAllocationBytes": 18980952,
       "Width": 500,
       "Height": 375,
@@ -5208,7 +5208,7 @@
       "CaseId": "coco2017_val_3156",
       "CategorySet": "c2\u002Bc49\u002Bc50",
       "Passed": true,
-      "RuntimeMs": 24.903,
+      "RuntimeMs": 15.423,
       "MemoryAllocationBytes": 18976296,
       "Width": 443,
       "Height": 640,
@@ -5269,8 +5269,8 @@
       "CaseId": "coco2017_val_3255",
       "CategorySet": "c2\u002Bc16\u002Bc22",
       "Passed": true,
-      "RuntimeMs": 24.046,
-      "MemoryAllocationBytes": 18983560,
+      "RuntimeMs": 15.612,
+      "MemoryAllocationBytes": 18983464,
       "Width": 640,
       "Height": 363,
       "GroundTruthCount": 10,
@@ -5421,8 +5421,8 @@
       "CaseId": "coco2017_val_3501",
       "CategorySet": "c28\u002Bc51",
       "Passed": true,
-      "RuntimeMs": 25.432,
-      "MemoryAllocationBytes": 18976576,
+      "RuntimeMs": 16.263,
+      "MemoryAllocationBytes": 18976480,
       "Width": 612,
       "Height": 612,
       "GroundTruthCount": 3,
@@ -5482,8 +5482,8 @@
       "CaseId": "coco2017_val_3553",
       "CategorySet": "c2\u002Bc52",
       "Passed": true,
-      "RuntimeMs": 25.117,
-      "MemoryAllocationBytes": 18974640,
+      "RuntimeMs": 15.633,
+      "MemoryAllocationBytes": 18974544,
       "Width": 640,
       "Height": 427,
       "GroundTruthCount": 2,
@@ -5530,8 +5530,8 @@
       "CaseId": "coco2017_val_3661",
       "CategorySet": "c31\u002Bc44\u002Bc46",
       "Passed": true,
-      "RuntimeMs": 18.126,
-      "MemoryAllocationBytes": 18975688,
+      "RuntimeMs": 14.759,
+      "MemoryAllocationBytes": 18975592,
       "Width": 640,
       "Height": 384,
       "GroundTruthCount": 3,
@@ -5591,7 +5591,7 @@
       "CaseId": "coco2017_val_3845",
       "CategorySet": "c1\u002Bc44\u002Bc45\u002Bc51",
       "Passed": true,
-      "RuntimeMs": 15.879,
+      "RuntimeMs": 15.307,
       "MemoryAllocationBytes": 18985288,
       "Width": 500,
       "Height": 375,
@@ -5769,7 +5769,7 @@
       "CaseId": "coco2017_val_3934",
       "CategorySet": "c2\u002Bc43\u002Bc44\u002Bc55",
       "Passed": true,
-      "RuntimeMs": 14.08,
+      "RuntimeMs": 14.727,
       "MemoryAllocationBytes": 18988448,
       "Width": 375,
       "Height": 500,
@@ -5973,7 +5973,7 @@
       "CaseId": "coco2017_val_4134",
       "CategorySet": "c1\u002Bc2\u002Bc3\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 13.548,
+      "RuntimeMs": 17.008,
       "MemoryAllocationBytes": 18993072,
       "Width": 640,
       "Height": 425,
@@ -6255,7 +6255,7 @@
       "CaseId": "coco2017_val_4395",
       "CategorySet": "c2\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 13.142,
+      "RuntimeMs": 15.453,
       "MemoryAllocationBytes": 18975080,
       "Width": 425,
       "Height": 640,
@@ -6303,7 +6303,7 @@
       "CaseId": "coco2017_val_4495",
       "CategorySet": "c0\u002Bc3\u002Bc55",
       "Passed": true,
-      "RuntimeMs": 13.727,
+      "RuntimeMs": 15.28,
       "MemoryAllocationBytes": 18975592,
       "Width": 500,
       "Height": 375,
@@ -6364,7 +6364,7 @@
       "CaseId": "coco2017_val_4765",
       "CategorySet": "c2\u002Bc29",
       "Passed": true,
-      "RuntimeMs": 14.914,
+      "RuntimeMs": 15.844,
       "MemoryAllocationBytes": 18975144,
       "Width": 612,
       "Height": 612,
@@ -6412,7 +6412,7 @@
       "CaseId": "coco2017_val_4795",
       "CategorySet": "c0\u002Bc30\u002Bc34",
       "Passed": true,
-      "RuntimeMs": 13.919,
+      "RuntimeMs": 16.868,
       "MemoryAllocationBytes": 18976272,
       "Width": 640,
       "Height": 480,
@@ -6473,7 +6473,7 @@
       "CaseId": "coco2017_val_5001",
       "CategorySet": "c2\u002Bc21\u002Bc57\u002Bc58",
       "Passed": true,
-      "RuntimeMs": 13.684,
+      "RuntimeMs": 15.732,
       "MemoryAllocationBytes": 18990064,
       "Width": 640,
       "Height": 480,
@@ -6716,7 +6716,7 @@
       "CaseId": "coco2017_val_5037",
       "CategorySet": "c2\u002Bc14\u002Bc33",
       "Passed": true,
-      "RuntimeMs": 14.598,
+      "RuntimeMs": 15.696,
       "MemoryAllocationBytes": 18982544,
       "Width": 640,
       "Height": 425,
@@ -6868,7 +6868,7 @@
       "CaseId": "coco2017_val_5060",
       "CategorySet": "c2\u002Bc25",
       "Passed": true,
-      "RuntimeMs": 20.75,
+      "RuntimeMs": 21.716,
       "MemoryAllocationBytes": 18990072,
       "Width": 480,
       "Height": 640,
@@ -6916,7 +6916,7 @@
       "CaseId": "coco2017_val_5193",
       "CategorySet": "c2\u002Bc29\u002Bc48",
       "Passed": true,
-      "RuntimeMs": 13.244,
+      "RuntimeMs": 14.196,
       "MemoryAllocationBytes": 18982688,
       "Width": 640,
       "Height": 425,
@@ -7055,7 +7055,7 @@
       "CaseId": "coco2017_val_5477",
       "CategorySet": "c35",
       "Passed": true,
-      "RuntimeMs": 13.815,
+      "RuntimeMs": 15.149,
       "MemoryAllocationBytes": 18989152,
       "Width": 640,
       "Height": 349,
@@ -7103,7 +7103,7 @@
       "CaseId": "coco2017_val_5503",
       "CategorySet": "c49",
       "Passed": true,
-      "RuntimeMs": 12.914,
+      "RuntimeMs": 14.648,
       "MemoryAllocationBytes": 18973664,
       "Width": 333,
       "Height": 500,
@@ -7138,7 +7138,7 @@
       "CaseId": "coco2017_val_5529",
       "CategorySet": "c2\u002Bc16",
       "Passed": true,
-      "RuntimeMs": 15.043,
+      "RuntimeMs": 15.644,
       "MemoryAllocationBytes": 18989544,
       "Width": 444,
       "Height": 640,
@@ -7186,7 +7186,7 @@
       "CaseId": "coco2017_val_5586",
       "CategorySet": "c2\u002Bc20",
       "Passed": true,
-      "RuntimeMs": 13.117,
+      "RuntimeMs": 14.144,
       "MemoryAllocationBytes": 18986920,
       "Width": 320,
       "Height": 240,
@@ -7390,7 +7390,7 @@
       "CaseId": "coco2017_val_5600",
       "CategorySet": "c28\u002Bc45",
       "Passed": true,
-      "RuntimeMs": 13.586,
+      "RuntimeMs": 14.844,
       "MemoryAllocationBytes": 18975344,
       "Width": 640,
       "Height": 361,
@@ -7451,7 +7451,7 @@
       "CaseId": "coco2017_val_5992",
       "CategorySet": "c59",
       "Passed": true,
-      "RuntimeMs": 14.43,
+      "RuntimeMs": 15.854,
       "MemoryAllocationBytes": 18992168,
       "Width": 640,
       "Height": 428,
@@ -7538,7 +7538,7 @@
       "CaseId": "coco2017_val_6012",
       "CategorySet": "c46",
       "Passed": true,
-      "RuntimeMs": 16.419,
+      "RuntimeMs": 15.491,
       "MemoryAllocationBytes": 18974440,
       "Width": 640,
       "Height": 531,
@@ -7586,7 +7586,7 @@
       "CaseId": "coco2017_val_6040",
       "CategorySet": "c2\u002Bc13\u002Bc14\u002Bc26",
       "Passed": true,
-      "RuntimeMs": 16.298,
+      "RuntimeMs": 15.48,
       "MemoryAllocationBytes": 19000936,
       "Width": 640,
       "Height": 351,
@@ -7764,7 +7764,7 @@
       "CaseId": "coco2017_val_6213",
       "CategorySet": "c50",
       "Passed": true,
-      "RuntimeMs": 14.931,
+      "RuntimeMs": 15.09,
       "MemoryAllocationBytes": 18975008,
       "Width": 640,
       "Height": 425,
@@ -7812,7 +7812,7 @@
       "CaseId": "coco2017_val_6460",
       "CategorySet": "c2\u002Bc29",
       "Passed": true,
-      "RuntimeMs": 15.397,
+      "RuntimeMs": 15.527,
       "MemoryAllocationBytes": 18989616,
       "Width": 640,
       "Height": 427,
@@ -7860,7 +7860,7 @@
       "CaseId": "coco2017_val_6471",
       "CategorySet": "c2\u002Bc18\u002Bc40\u002Bc48",
       "Passed": true,
-      "RuntimeMs": 13.578,
+      "RuntimeMs": 14.906,
       "MemoryAllocationBytes": 18989992,
       "Width": 500,
       "Height": 333,
@@ -8090,7 +8090,7 @@
       "CaseId": "coco2017_val_6614",
       "CategorySet": "c39\u002Bc61",
       "Passed": true,
-      "RuntimeMs": 14.108,
+      "RuntimeMs": 14.827,
       "MemoryAllocationBytes": 18989216,
       "Width": 500,
       "Height": 396,
@@ -8138,7 +8138,7 @@
       "CaseId": "coco2017_val_6723",
       "CategorySet": "c13\u002Bc14\u002Bc33",
       "Passed": true,
-      "RuntimeMs": 13.69,
+      "RuntimeMs": 15.697,
       "MemoryAllocationBytes": 18979528,
       "Width": 640,
       "Height": 361,
@@ -8238,8 +8238,8 @@
       "CaseId": "coco2017_val_6763",
       "CategorySet": "c0\u002Bc1\u002Bc2\u002Bc25",
       "Passed": true,
-      "RuntimeMs": 17.229,
-      "MemoryAllocationBytes": 18996136,
+      "RuntimeMs": 29.369,
+      "MemoryAllocationBytes": 18996144,
       "Width": 375,
       "Height": 500,
       "GroundTruthCount": 7,
@@ -8351,7 +8351,7 @@
       "CaseId": "coco2017_val_6771",
       "CategorySet": "c2\u002Bc25",
       "Passed": false,
-      "RuntimeMs": 17.245,
+      "RuntimeMs": 14.473,
       "MemoryAllocationBytes": 18980272,
       "Width": 640,
       "Height": 427,
@@ -8477,7 +8477,7 @@
       "CaseId": "coco2017_val_6818",
       "CategorySet": "c49",
       "Passed": true,
-      "RuntimeMs": 13.776,
+      "RuntimeMs": 14.763,
       "MemoryAllocationBytes": 18973520,
       "Width": 427,
       "Height": 640,
@@ -8512,7 +8512,7 @@
       "CaseId": "coco2017_val_6894",
       "CategorySet": "c2\u002Bc62",
       "Passed": true,
-      "RuntimeMs": 13.898,
+      "RuntimeMs": 15.71,
       "MemoryAllocationBytes": 18989936,
       "Width": 640,
       "Height": 480,
@@ -8560,7 +8560,7 @@
       "CaseId": "coco2017_val_6954",
       "CategorySet": "c2\u002Bc63",
       "Passed": true,
-      "RuntimeMs": 15.355,
+      "RuntimeMs": 16.518,
       "MemoryAllocationBytes": 18979176,
       "Width": 640,
       "Height": 480,
@@ -8673,7 +8673,7 @@
       "CaseId": "coco2017_val_7088",
       "CategorySet": "c2\u002Bc13\u002Bc14\u002Bc64",
       "Passed": true,
-      "RuntimeMs": 15.273,
+      "RuntimeMs": 17.479,
       "MemoryAllocationBytes": 18993000,
       "Width": 478,
       "Height": 640,
@@ -8747,7 +8747,7 @@
       "CaseId": "coco2017_val_7108",
       "CategorySet": "c62",
       "Passed": true,
-      "RuntimeMs": 14.175,
+      "RuntimeMs": 19.153,
       "MemoryAllocationBytes": 18991424,
       "Width": 640,
       "Height": 426,
@@ -8834,7 +8834,7 @@
       "CaseId": "coco2017_val_7278",
       "CategorySet": "c2\u002Bc29",
       "Passed": true,
-      "RuntimeMs": 15.924,
+      "RuntimeMs": 15.931,
       "MemoryAllocationBytes": 18974896,
       "Width": 640,
       "Height": 482,
@@ -8882,7 +8882,7 @@
       "CaseId": "coco2017_val_7281",
       "CategorySet": "c2\u002Bc65",
       "Passed": true,
-      "RuntimeMs": 13.634,
+      "RuntimeMs": 14.514,
       "MemoryAllocationBytes": 19001208,
       "Width": 640,
       "Height": 361,
@@ -9060,7 +9060,7 @@
       "CaseId": "coco2017_val_7386",
       "CategorySet": "c13\u002Bc58\u002Bc66\u002Bc67",
       "Passed": true,
-      "RuntimeMs": 13.661,
+      "RuntimeMs": 14.724,
       "MemoryAllocationBytes": 18978568,
       "Width": 600,
       "Height": 400,
@@ -9147,8 +9147,8 @@
       "CaseId": "coco2017_val_7511",
       "CategorySet": "c2\u002Bc22\u002Bc68",
       "Passed": true,
-      "RuntimeMs": 15.257,
-      "MemoryAllocationBytes": 19002976,
+      "RuntimeMs": 15.891,
+      "MemoryAllocationBytes": 19002944,
       "Width": 640,
       "Height": 480,
       "GroundTruthCount": 16,
@@ -9377,7 +9377,7 @@
       "CaseId": "coco2017_val_7574",
       "CategorySet": "c4\u002Bc5\u002Bc9\u002Bc17",
       "Passed": true,
-      "RuntimeMs": 15.083,
+      "RuntimeMs": 15.18,
       "MemoryAllocationBytes": 18990232,
       "Width": 640,
       "Height": 480,
@@ -9555,7 +9555,7 @@
       "CaseId": "coco2017_val_7784",
       "CategorySet": "c68",
       "Passed": true,
-      "RuntimeMs": 13.529,
+      "RuntimeMs": 13.719,
       "MemoryAllocationBytes": 18979136,
       "Width": 500,
       "Height": 375,
@@ -9590,7 +9590,7 @@
       "CaseId": "coco2017_val_7795",
       "CategorySet": "c8\u002Bc11\u002Bc56",
       "Passed": true,
-      "RuntimeMs": 14.166,
+      "RuntimeMs": 15.084,
       "MemoryAllocationBytes": 18991080,
       "Width": 640,
       "Height": 427,
@@ -9664,7 +9664,7 @@
       "CaseId": "coco2017_val_7816",
       "CategorySet": "c2\u002Bc66",
       "Passed": true,
-      "RuntimeMs": 14.194,
+      "RuntimeMs": 14.89,
       "MemoryAllocationBytes": 18983696,
       "Width": 640,
       "Height": 427,
@@ -9829,7 +9829,7 @@
       "CaseId": "coco2017_val_7818",
       "CategorySet": "c1\u002Bc3\u002Bc4\u002Bc42",
       "Passed": true,
-      "RuntimeMs": 14.304,
+      "RuntimeMs": 15.62,
       "MemoryAllocationBytes": 19001160,
       "Width": 640,
       "Height": 427,
@@ -9994,7 +9994,7 @@
       "CaseId": "coco2017_val_7888",
       "CategorySet": "c8",
       "Passed": true,
-      "RuntimeMs": 14.024,
+      "RuntimeMs": 15.39,
       "MemoryAllocationBytes": 18974648,
       "Width": 638,
       "Height": 640,
@@ -10042,7 +10042,7 @@
       "CaseId": "coco2017_val_7977",
       "CategorySet": "c2\u002Bc52",
       "Passed": true,
-      "RuntimeMs": 14.904,
+      "RuntimeMs": 16.278,
       "MemoryAllocationBytes": 18993048,
       "Width": 429,
       "Height": 640,
@@ -10142,7 +10142,7 @@
       "CaseId": "coco2017_val_7991",
       "CategorySet": "c42\u002Bc54",
       "Passed": true,
-      "RuntimeMs": 14.238,
+      "RuntimeMs": 14.875,
       "MemoryAllocationBytes": 18975488,
       "Width": 640,
       "Height": 359,
@@ -10203,7 +10203,7 @@
       "CaseId": "coco2017_val_8021",
       "CategorySet": "c2\u002Bc38\u002Bc48",
       "Passed": true,
-      "RuntimeMs": 15.1,
+      "RuntimeMs": 15.776,
       "MemoryAllocationBytes": 18994576,
       "Width": 640,
       "Height": 480,
@@ -10316,7 +10316,7 @@
       "CaseId": "coco2017_val_8211",
       "CategorySet": "c2\u002Bc3\u002Bc58\u002Bc66",
       "Passed": true,
-      "RuntimeMs": 14.514,
+      "RuntimeMs": 15.319,
       "MemoryAllocationBytes": 18980408,
       "Width": 640,
       "Height": 459,
@@ -10416,7 +10416,7 @@
       "CaseId": "coco2017_val_8277",
       "CategorySet": "c28\u002Bc51\u002Bc53",
       "Passed": true,
-      "RuntimeMs": 15.348,
+      "RuntimeMs": 16.178,
       "MemoryAllocationBytes": 18999688,
       "Width": 612,
       "Height": 612,
@@ -10607,7 +10607,7 @@
       "CaseId": "coco2017_val_8532",
       "CategorySet": "c2\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 12.879,
+      "RuntimeMs": 13.112,
       "MemoryAllocationBytes": 18974760,
       "Width": 640,
       "Height": 426,
@@ -10655,7 +10655,7 @@
       "CaseId": "coco2017_val_8629",
       "CategorySet": "c53\u002Bc69",
       "Passed": true,
-      "RuntimeMs": 15.32,
+      "RuntimeMs": 16.542,
       "MemoryAllocationBytes": 18993960,
       "Width": 640,
       "Height": 640,
@@ -10768,7 +10768,7 @@
       "CaseId": "coco2017_val_8690",
       "CategorySet": "c2\u002Bc59",
       "Passed": true,
-      "RuntimeMs": 14.399,
+      "RuntimeMs": 14.98,
       "MemoryAllocationBytes": 18992144,
       "Width": 640,
       "Height": 480,
@@ -10855,7 +10855,7 @@
       "CaseId": "coco2017_val_8762",
       "CategorySet": "c14\u002Bc37",
       "Passed": true,
-      "RuntimeMs": 12.578,
+      "RuntimeMs": 13.121,
       "MemoryAllocationBytes": 18982120,
       "Width": 640,
       "Height": 427,
@@ -10968,7 +10968,7 @@
       "CaseId": "coco2017_val_8844",
       "CategorySet": "c2\u002Bc46",
       "Passed": true,
-      "RuntimeMs": 13.246,
+      "RuntimeMs": 13.864,
       "MemoryAllocationBytes": 18994256,
       "Width": 640,
       "Height": 426,
@@ -11081,7 +11081,7 @@
       "CaseId": "coco2017_val_8899",
       "CategorySet": "c58\u002Bc70",
       "Passed": true,
-      "RuntimeMs": 14.67,
+      "RuntimeMs": 15.841,
       "MemoryAllocationBytes": 18974760,
       "Width": 640,
       "Height": 539,
@@ -11129,7 +11129,7 @@
       "CaseId": "coco2017_val_9378",
       "CategorySet": "c2\u002Bc63",
       "Passed": true,
-      "RuntimeMs": 13.365,
+      "RuntimeMs": 13.364,
       "MemoryAllocationBytes": 18998024,
       "Width": 600,
       "Height": 400,
@@ -11281,7 +11281,7 @@
       "CaseId": "coco2017_val_9400",
       "CategorySet": "c2\u002Bc30\u002Bc31\u002Bc32",
       "Passed": false,
-      "RuntimeMs": 13.368,
+      "RuntimeMs": 13.522,
       "MemoryAllocationBytes": 18992984,
       "Width": 640,
       "Height": 480,
@@ -11550,7 +11550,7 @@
       "CaseId": "coco2017_val_9448",
       "CategorySet": "c2\u002Bc64",
       "Passed": true,
-      "RuntimeMs": 15.882,
+      "RuntimeMs": 17.326,
       "MemoryAllocationBytes": 18990080,
       "Width": 551,
       "Height": 640,
@@ -11598,7 +11598,7 @@
       "CaseId": "coco2017_val_9483",
       "CategorySet": "c0\u002Bc2\u002Bc31\u002Bc32",
       "Passed": true,
-      "RuntimeMs": 14.33,
+      "RuntimeMs": 14.248,
       "MemoryAllocationBytes": 18980448,
       "Width": 640,
       "Height": 480,
@@ -11698,8 +11698,8 @@
       "CaseId": "coco2017_val_9590",
       "CategorySet": "c1\u002Bc2\u002Bc28\u002Bc44",
       "Passed": true,
-      "RuntimeMs": 15.167,
-      "MemoryAllocationBytes": 19008976,
+      "RuntimeMs": 15.244,
+      "MemoryAllocationBytes": 19021344,
       "Width": 640,
       "Height": 427,
       "GroundTruthCount": 20,
@@ -11980,7 +11980,7 @@
       "CaseId": "coco2017_val_9769",
       "CategorySet": "c2\u002Bc13\u002Bc70",
       "Passed": true,
-      "RuntimeMs": 15.067,
+      "RuntimeMs": 15.561,
       "MemoryAllocationBytes": 18978672,
       "Width": 640,
       "Height": 480,
@@ -12067,7 +12067,7 @@
       "CaseId": "coco2017_val_9772",
       "CategorySet": "c0\u002Bc2\u002Bc50",
       "Passed": true,
-      "RuntimeMs": 15.15,
+      "RuntimeMs": 16.16,
       "MemoryAllocationBytes": 18977048,
       "Width": 550,
       "Height": 640,
@@ -12141,7 +12141,7 @@
       "CaseId": "coco2017_val_9891",
       "CategorySet": "c2\u002Bc14\u002Bc22\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 13.57,
+      "RuntimeMs": 14.439,
       "MemoryAllocationBytes": 19002776,
       "Width": 640,
       "Height": 480,
@@ -12332,7 +12332,7 @@
       "CaseId": "coco2017_val_9914",
       "CategorySet": "c1\u002Bc27\u002Bc28\u002Bc42",
       "Passed": true,
-      "RuntimeMs": 14.218,
+      "RuntimeMs": 15.269,
       "MemoryAllocationBytes": 18981496,
       "Width": 640,
       "Height": 480,
@@ -12445,7 +12445,7 @@
       "CaseId": "coco2017_val_10092",
       "CategorySet": "c1\u002Bc3\u002Bc11\u002Bc24",
       "Passed": true,
-      "RuntimeMs": 13.712,
+      "RuntimeMs": 15.463,
       "MemoryAllocationBytes": 18994344,
       "Width": 640,
       "Height": 426,
@@ -12532,7 +12532,7 @@
       "CaseId": "coco2017_val_10363",
       "CategorySet": "c14\u002Bc34\u002Bc48\u002Bc58",
       "Passed": true,
-      "RuntimeMs": 14.268,
+      "RuntimeMs": 13.655,
       "MemoryAllocationBytes": 18977400,
       "Width": 640,
       "Height": 361,
@@ -12606,7 +12606,7 @@
       "CaseId": "coco2017_val_10583",
       "CategorySet": "c1\u002Bc27\u002Bc42",
       "Passed": true,
-      "RuntimeMs": 17.281,
+      "RuntimeMs": 17.586,
       "MemoryAllocationBytes": 18992752,
       "Width": 612,
       "Height": 612,
@@ -12680,7 +12680,7 @@
       "CaseId": "coco2017_val_10707",
       "CategorySet": "c1\u002Bc2\u002Bc22\u002Bc30",
       "Passed": true,
-      "RuntimeMs": 13.784,
+      "RuntimeMs": 15.11,
       "MemoryAllocationBytes": 18990696,
       "Width": 640,
       "Height": 480,
@@ -12897,7 +12897,7 @@
       "CaseId": "coco2017_val_10764",
       "CategorySet": "c2\u002Bc18",
       "Passed": true,
-      "RuntimeMs": 31.251,
+      "RuntimeMs": 31.735,
       "MemoryAllocationBytes": 18990672,
       "Width": 640,
       "Height": 424,
@@ -12945,7 +12945,7 @@
       "CaseId": "coco2017_val_10977",
       "CategorySet": "c49\u002Bc50",
       "Passed": true,
-      "RuntimeMs": 12.125,
+      "RuntimeMs": 13.356,
       "MemoryAllocationBytes": 18975288,
       "Width": 500,
       "Height": 375,
@@ -12993,7 +12993,7 @@
       "CaseId": "coco2017_val_10995",
       "CategorySet": "c11",
       "Passed": true,
-      "RuntimeMs": 13.215,
+      "RuntimeMs": 14.978,
       "MemoryAllocationBytes": 18979280,
       "Width": 640,
       "Height": 480,
@@ -13028,7 +13028,7 @@
       "CaseId": "coco2017_val_11051",
       "CategorySet": "c2\u002Bc38",
       "Passed": true,
-      "RuntimeMs": 13.484,
+      "RuntimeMs": 15.803,
       "MemoryAllocationBytes": 18991336,
       "Width": 640,
       "Height": 536,
@@ -13089,7 +13089,7 @@
       "CaseId": "coco2017_val_11122",
       "CategorySet": "c12",
       "Passed": true,
-      "RuntimeMs": 15.216,
+      "RuntimeMs": 16.051,
       "MemoryAllocationBytes": 18973664,
       "Width": 640,
       "Height": 480,
@@ -13124,7 +13124,7 @@
       "CaseId": "coco2017_val_11149",
       "CategorySet": "c2\u002Bc58\u002Bc66",
       "Passed": true,
-      "RuntimeMs": 14.586,
+      "RuntimeMs": 15.093,
       "MemoryAllocationBytes": 18977896,
       "Width": 500,
       "Height": 375,
@@ -13211,7 +13211,7 @@
       "CaseId": "coco2017_val_11197",
       "CategorySet": "c2\u002Bc14\u002Bc22\u002Bc37",
       "Passed": true,
-      "RuntimeMs": 13.584,
+      "RuntimeMs": 16.3,
       "MemoryAllocationBytes": 19005680,
       "Width": 640,
       "Height": 427,
@@ -13441,7 +13441,7 @@
       "CaseId": "coco2017_val_11511",
       "CategorySet": "c2\u002Bc21\u002Bc60\u002Bc66",
       "Passed": true,
-      "RuntimeMs": 14.396,
+      "RuntimeMs": 16.418,
       "MemoryAllocationBytes": 18984584,
       "Width": 640,
       "Height": 464,
@@ -13593,7 +13593,7 @@
       "CaseId": "coco2017_val_11615",
       "CategorySet": "c13",
       "Passed": true,
-      "RuntimeMs": 13.997,
+      "RuntimeMs": 14.992,
       "MemoryAllocationBytes": 18979280,
       "Width": 480,
       "Height": 640,
@@ -13628,7 +13628,7 @@
       "CaseId": "coco2017_val_11699",
       "CategorySet": "c2\u002Bc21\u002Bc71",
       "Passed": true,
-      "RuntimeMs": 14.31,
+      "RuntimeMs": 16.112,
       "MemoryAllocationBytes": 18993808,
       "Width": 480,
       "Height": 640,
@@ -13728,7 +13728,7 @@
       "CaseId": "coco2017_val_11760",
       "CategorySet": "c36",
       "Passed": true,
-      "RuntimeMs": 14.229,
+      "RuntimeMs": 15.771,
       "MemoryAllocationBytes": 18974992,
       "Width": 640,
       "Height": 425,
@@ -13789,7 +13789,7 @@
       "CaseId": "coco2017_val_11813",
       "CategorySet": "c3\u002Bc30",
       "Passed": true,
-      "RuntimeMs": 13.469,
+      "RuntimeMs": 14.716,
       "MemoryAllocationBytes": 18989400,
       "Width": 333,
       "Height": 500,
@@ -13837,7 +13837,7 @@
       "CaseId": "coco2017_val_12062",
       "CategorySet": "c19\u002Bc59",
       "Passed": true,
-      "RuntimeMs": 14.981,
+      "RuntimeMs": 15.632,
       "MemoryAllocationBytes": 18975944,
       "Width": 640,
       "Height": 427,
@@ -13911,7 +13911,7 @@
       "CaseId": "coco2017_val_12120",
       "CategorySet": "c2\u002Bc3\u002Bc20",
       "Passed": true,
-      "RuntimeMs": 14.785,
+      "RuntimeMs": 16.16,
       "MemoryAllocationBytes": 19011280,
       "Width": 640,
       "Height": 428,
@@ -14193,7 +14193,7 @@
       "CaseId": "coco2017_val_12280",
       "CategorySet": "c0\u002Bc2\u002Bc71",
       "Passed": true,
-      "RuntimeMs": 14.407,
+      "RuntimeMs": 16.09,
       "MemoryAllocationBytes": 18979176,
       "Width": 480,
       "Height": 640,

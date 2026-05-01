@@ -5,9 +5,9 @@ Accepted: `Yes`
 
 ## Summary
 
-- Replay cases: 183
+- Replay cases: 184
 - Operators: 10
-- Class counts: `{'boundary': 123, 'failure': 60}`
+- Class counts: `{'boundary': 139, 'failure': 45}`
 
 ## Cases
 
@@ -73,9 +73,10 @@ Accepted: `Yes`
 | EdgeDetection | bsds500 | 223060 | boundary | worst-BoundaryF1 | BoundaryF1 | 0.323807 |
 | EdgeDetection | bsds500 | 33044 | boundary | worst-BoundaryF1 | BoundaryF1 | 0.32963 |
 | EdgeDetection | bsds500 | 196088 | boundary | worst-BoundaryF1 | BoundaryF1 | 0.33714 |
+| CameraCalibration | opencv_calibration_samples | opencv_calibration_stereo_rig | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.392596 |
 | CameraCalibration | opencv_calibration_samples | opencv_calibration_right_camera | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.367839 |
 | CameraCalibration | opencv_calibration_samples | opencv_calibration_left_camera | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.33779 |
-| CameraCalibration | opencv_calibration_samples | opencv_calibration_stereo_rig | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.0 |
+| CameraCalibration | opencv_calibration_samples | opencv_calibration_stereo_metadata | boundary | worst-ReprojectionRmsPx | ReprojectionRmsPx | 0.0 |
 | DeepLearning | coco2017 | coco2017_val_139 | failure | threshold-failed | BestMatchedIou | 0.0 |
 | DeepLearning | coco2017 | coco2017_val_724 | failure | threshold-failed | BestMatchedIou | 0.0 |
 | DeepLearning | coco2017 | coco2017_val_785 | failure | threshold-failed | BestMatchedIou | 0.0 |
@@ -156,43 +157,43 @@ Accepted: `Yes`
 | TemplateMatching | hpatches-style-homography-bridge | TemplateMatching_homography_shear_0005 | boundary | worst-PositionErrorPx | PositionErrorPx | 0.0 |
 | TemplateMatching | hpatches-style-homography-bridge | TemplateMatching_homography_perspective_0000 | boundary | worst-PositionErrorPx | PositionErrorPx | 0.0 |
 | TemplateMatching | hpatches-style-homography-bridge | TemplateMatching_homography_perspective_0001 | boundary | worst-PositionErrorPx | PositionErrorPx | 0.0 |
-| AkazeFeatureMatch | hpatches | i_bologna_1_2 | failure | threshold-failed | PositionErrorPx | 228.980349 |
-| AkazeFeatureMatch | hpatches | i_castle_1_2 | failure | threshold-failed | PositionErrorPx | 91.586025 |
-| AkazeFeatureMatch | hpatches | i_fenis_1_2 | failure | threshold-failed | PositionErrorPx | 321.309819 |
 | AkazeFeatureMatch | hpatches | i_leuven_1_2 | failure | threshold-failed | PositionErrorPx | 376.316618 |
-| AkazeFeatureMatch | hpatches | i_lionday_1_2 | failure | threshold-failed | PositionErrorPx | 232.142198 |
 | AkazeFeatureMatch | hpatches | i_londonbridge_1_2 | failure | threshold-failed | PositionErrorPx | 235.136131 |
-| AkazeFeatureMatch | hpatches | i_nijmegen_1_2 | failure | threshold-failed | PositionErrorPx | 367.763511 |
-| AkazeFeatureMatch | hpatches | i_nuts_1_2 | failure | threshold-failed | PositionErrorPx | 254.017716 |
-| AkazeFeatureMatch | hpatches | i_pencils_1_2 | failure | threshold-failed | PositionErrorPx | 241.267486 |
 | AkazeFeatureMatch | hpatches | i_pool_1_2 | failure | threshold-failed | PositionErrorPx | 230.10704 |
-| AkazeFeatureMatch | hpatches | i_santuario_1_2 | failure | threshold-failed | PositionErrorPx | 303.641647 |
-| AkazeFeatureMatch | hpatches | i_tools_1_2 | failure | threshold-failed | PositionErrorPx | 219.92044 |
-| AkazeFeatureMatch | hpatches | i_village_1_2 | failure | threshold-failed | PositionErrorPx | 129.495174 |
 | AkazeFeatureMatch | hpatches | v_abstract_1_2 | failure | threshold-failed | PositionErrorPx | 378.273983 |
-| AkazeFeatureMatch | hpatches | v_adam_1_2 | failure | threshold-failed | PositionErrorPx | 230.145805 |
-| AkazeFeatureMatch | hpatches | v_apprentices_1_2 | failure | threshold-failed | PositionErrorPx | 127.844366 |
 | AkazeFeatureMatch | hpatches | v_astronautis_1_2 | failure | threshold-failed | PositionErrorPx | 400.797501 |
 | AkazeFeatureMatch | hpatches | v_azzola_1_2 | failure | threshold-failed | PositionErrorPx | 254.382484 |
 | AkazeFeatureMatch | hpatches | v_bark_1_2 | failure | threshold-failed | PositionErrorPx | 187.998106 |
-| AkazeFeatureMatch | hpatches | v_bees_1_2 | failure | threshold-failed | PositionErrorPx | 134.503337 |
-| OrbFeatureMatch | hpatches | i_autannes_1_2 | failure | threshold-failed | PositionErrorPx | 187.771137 |
-| OrbFeatureMatch | hpatches | i_bologna_1_2 | failure | threshold-failed | PositionErrorPx | 95.425364 |
-| OrbFeatureMatch | hpatches | i_books_1_2 | failure | threshold-failed | PositionErrorPx | 150.426062 |
-| OrbFeatureMatch | hpatches | i_castle_1_2 | failure | threshold-failed | PositionErrorPx | 232.398365 |
-| OrbFeatureMatch | hpatches | i_dc_1_2 | failure | threshold-failed | PositionErrorPx | 160.795678 |
-| OrbFeatureMatch | hpatches | i_fenis_1_2 | failure | threshold-failed | PositionErrorPx | 109.562767 |
-| OrbFeatureMatch | hpatches | i_kions_1_2 | failure | threshold-failed | PositionErrorPx | 107.856386 |
+| AkazeFeatureMatch | hpatches | v_boat_1_2 | failure | threshold-failed | PositionErrorPx | 196.691884 |
+| AkazeFeatureMatch | hpatches | v_bricks_1_2 | failure | threshold-failed | PositionErrorPx | 221.668085 |
+| AkazeFeatureMatch | hpatches | v_busstop_1_2 | failure | threshold-failed | PositionErrorPx | 150.087361 |
+| AkazeFeatureMatch | hpatches | v_charing_1_2 | failure | threshold-failed | PositionErrorPx | 402.336312 |
+| AkazeFeatureMatch | hpatches | v_churchill_1_2 | failure | threshold-failed | PositionErrorPx | 192.562205 |
+| AkazeFeatureMatch | hpatches | v_colors_1_2 | failure | threshold-failed | PositionErrorPx | 318.251043 |
+| AkazeFeatureMatch | hpatches | i_tools_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 17.052355 |
+| AkazeFeatureMatch | hpatches | i_lionday_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 3.377624 |
+| AkazeFeatureMatch | hpatches | i_santuario_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 2.049038 |
+| AkazeFeatureMatch | hpatches | i_nijmegen_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.413999 |
+| AkazeFeatureMatch | hpatches | i_troulos_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.301589 |
+| AkazeFeatureMatch | hpatches | i_kions_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.268936 |
+| AkazeFeatureMatch | hpatches | i_bologna_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.113518 |
 | OrbFeatureMatch | hpatches | i_leuven_1_2 | failure | threshold-failed | PositionErrorPx | 358.139701 |
-| OrbFeatureMatch | hpatches | i_lionday_1_2 | failure | threshold-failed | PositionErrorPx | 258.141434 |
-| OrbFeatureMatch | hpatches | i_lionnight_1_2 | failure | threshold-failed | PositionErrorPx | 22.203603 |
-| OrbFeatureMatch | hpatches | i_londonbridge_1_2 | failure | threshold-failed | PositionErrorPx | 130.816666 |
-| OrbFeatureMatch | hpatches | i_nijmegen_1_2 | failure | threshold-failed | PositionErrorPx | 160.822884 |
 | OrbFeatureMatch | hpatches | i_pool_1_2 | failure | threshold-failed | PositionErrorPx | 241.446164 |
-| OrbFeatureMatch | hpatches | i_santuario_1_2 | failure | threshold-failed | PositionErrorPx | 154.3543 |
-| OrbFeatureMatch | hpatches | i_veggies_1_2 | failure | threshold-failed | PositionErrorPx | 321.908372 |
-| OrbFeatureMatch | hpatches | i_village_1_2 | failure | threshold-failed | PositionErrorPx | 132.378246 |
 | OrbFeatureMatch | hpatches | v_abstract_1_2 | failure | threshold-failed | PositionErrorPx | 391.905789 |
-| OrbFeatureMatch | hpatches | v_adam_1_2 | failure | threshold-failed | PositionErrorPx | 166.290687 |
-| OrbFeatureMatch | hpatches | v_apprentices_1_2 | failure | threshold-failed | PositionErrorPx | 172.499197 |
 | OrbFeatureMatch | hpatches | v_astronautis_1_2 | failure | threshold-failed | PositionErrorPx | 108.405272 |
+| OrbFeatureMatch | hpatches | v_azzola_1_2 | failure | threshold-failed | PositionErrorPx | 210.717561 |
+| OrbFeatureMatch | hpatches | v_bark_1_2 | failure | threshold-failed | PositionErrorPx | 290.880317 |
+| OrbFeatureMatch | hpatches | v_boat_1_2 | failure | threshold-failed | PositionErrorPx | 79.05124 |
+| OrbFeatureMatch | hpatches | v_bricks_1_2 | failure | threshold-failed | PositionErrorPx | 299.729975 |
+| OrbFeatureMatch | hpatches | v_busstop_1_2 | failure | threshold-failed | PositionErrorPx | 291.625171 |
+| OrbFeatureMatch | hpatches | v_charing_1_2 | failure | threshold-failed | PositionErrorPx | 310.929828 |
+| OrbFeatureMatch | hpatches | v_churchill_1_2 | failure | threshold-failed | PositionErrorPx | 255.466091 |
+| OrbFeatureMatch | hpatches | v_colors_1_2 | failure | threshold-failed | PositionErrorPx | 243.874766 |
+| OrbFeatureMatch | hpatches | v_beyus_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 4.952967 |
+| OrbFeatureMatch | hpatches | i_castle_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 4.857597 |
+| OrbFeatureMatch | hpatches | i_tools_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 4.168836 |
+| OrbFeatureMatch | hpatches | i_londonbridge_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 2.024709 |
+| OrbFeatureMatch | hpatches | i_santuario_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.926692 |
+| OrbFeatureMatch | hpatches | i_kions_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.879087 |
+| OrbFeatureMatch | hpatches | i_dc_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.863585 |
+| OrbFeatureMatch | hpatches | i_pencils_1_2 | boundary | worst-PositionErrorPx | PositionErrorPx | 1.634537 |

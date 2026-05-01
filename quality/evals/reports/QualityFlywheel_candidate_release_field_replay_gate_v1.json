@@ -1,0 +1,195 @@
+{
+  "schemaVersion": "2026-05-01.candidate-release-field-replay-gate.v1",
+  "generatedAtUtc": "2026-05-01T06:09:01+00:00",
+  "claimBoundary": "Signed candidate gate standards only; no real release/field replay packet is attached and no product default changes are made.",
+  "productDefaultChange": false,
+  "standardsSigned": true,
+  "currentPublicEvidenceWithinSignedStandards": true,
+  "releaseFieldReplayEvidenceStatus": "required_not_attached",
+  "defaultOnReady": false,
+  "gateStatus": "standards-signed-replay-required",
+  "sourceReports": [
+    "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+    "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+    "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json",
+    "quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json"
+  ],
+  "candidateGates": [
+    {
+      "operator": "AnomalyDetection",
+      "profile": "mvtec_lite_v2",
+      "standard": {
+        "standardId": "anomaly_mvtec_lite_v2_fp_acceptance_2026_05_01",
+        "signoffStatus": "signed_standard",
+        "signedAtDate": "2026-05-01",
+        "scope": "Release/field replay gate for default-on consideration only; product default remains unchanged.",
+        "maxFalsePositiveDeltaVsPinnedBaseline": 3,
+        "maxNormalFalsePositiveRate": 0.1,
+        "minImagePrecision": 0.95,
+        "minImageRecallDeltaVsPinnedBaseline": 0.1,
+        "maxCriticalFalsePositiveCount": 0,
+        "requiresFalsePositiveCaseReview": true,
+        "requiresCompatibleFeatureBankFallbackCheck": true
+      },
+      "evidence": {
+        "baselineReport": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+        "candidateReport": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+        "calibrationReport": "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json",
+        "profileName": "max192_dense_stride8_threshold_010",
+        "imageFalsePositiveBaseline": 0,
+        "imageFalsePositiveCandidate": 3,
+        "imageFalsePositiveDelta": 3.0,
+        "normalImageCount": 33,
+        "normalFalsePositiveRate": 0.090909,
+        "imagePrecision": 0.958333,
+        "imageRecall": 0.793103,
+        "imageRecallDelta": 0.747126,
+        "imageF1": 0.867925
+      },
+      "checks": [
+        {
+          "id": "fp_delta_within_signed_budget",
+          "actual": 3.0,
+          "operator": "<=",
+          "threshold": 3,
+          "passed": true
+        },
+        {
+          "id": "normal_false_positive_rate_within_signed_budget",
+          "actual": 0.090909,
+          "operator": "<=",
+          "threshold": 0.1,
+          "passed": true
+        },
+        {
+          "id": "precision_floor",
+          "actual": 0.958333,
+          "operator": ">=",
+          "threshold": 0.95,
+          "passed": true
+        },
+        {
+          "id": "recall_delta_floor",
+          "actual": 0.747126,
+          "operator": ">=",
+          "threshold": 0.1,
+          "passed": true
+        },
+        {
+          "id": "critical_false_positive_review_required",
+          "actual": 0,
+          "operator": "<=",
+          "threshold": 0,
+          "passed": true,
+          "note": "Current public-lite evidence has no criticality labels; release/field replay must classify FP severity."
+        }
+      ],
+      "currentEvidenceWithinSignedStandard": true,
+      "fieldReplayRequired": true,
+      "defaultOnReady": false
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "profile": "replay_safe_dense_strict",
+      "standard": {
+        "standardId": "orb_replay_safe_dense_strict_runtime_budget_2026_05_01",
+        "signoffStatus": "signed_standard",
+        "signedAtDate": "2026-05-01",
+        "scope": "Release/field replay gate for default-on consideration only; product default remains unchanged.",
+        "maxRuntimeDeltaMsPerCase": 5.0,
+        "maxRuntimeDeltaPercent": 25.0,
+        "maxCandidateMeanRuntimeMsPerCase": 30.0,
+        "requiresFullPassDeltaAtLeast": 0,
+        "requiresP95PositionDeltaAtMost": 0.0,
+        "requiresP95CornerDeltaAtMost": 0.0,
+        "requiresPinnedHardwareProfile": true
+      },
+      "evidence": {
+        "matchingProfileReport": "quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json",
+        "baselineReport": "quality/evals/reports/OrbFeatureMatch_hpatches_baseline.json",
+        "candidateReport": "quality/evals/reports/OrbFeatureMatch_hpatches_candidate_v5.json",
+        "baselineMeanRuntimeMsPerCase": 21.609312,
+        "candidateMeanRuntimeMsPerCase": 26.322725,
+        "runtimeDeltaMsPerCase": 4.713413,
+        "runtimeDeltaPercent": 21.811953,
+        "fullPassDelta": 0,
+        "p95PositionErrorPxDelta": -32.336761,
+        "p95CornerErrorPxDelta": -16.951902,
+        "replayPassRate": 0.8
+      },
+      "checks": [
+        {
+          "id": "runtime_delta_ms_per_case_within_budget",
+          "actual": 4.713413,
+          "operator": "<=",
+          "threshold": 5.0,
+          "passed": true
+        },
+        {
+          "id": "runtime_delta_percent_within_budget",
+          "actual": 21.811953,
+          "operator": "<=",
+          "threshold": 25.0,
+          "passed": true
+        },
+        {
+          "id": "candidate_mean_runtime_within_budget",
+          "actual": 26.322725,
+          "operator": "<=",
+          "threshold": 30.0,
+          "passed": true
+        },
+        {
+          "id": "full_pass_delta_not_negative",
+          "actual": 0,
+          "operator": ">=",
+          "threshold": 0,
+          "passed": true
+        },
+        {
+          "id": "p95_position_delta_not_worse",
+          "actual": -32.336761,
+          "operator": "<=",
+          "threshold": 0.0,
+          "passed": true
+        },
+        {
+          "id": "p95_corner_delta_not_worse",
+          "actual": -16.951902,
+          "operator": "<=",
+          "threshold": 0.0,
+          "passed": true
+        }
+      ],
+      "currentEvidenceWithinSignedStandard": true,
+      "fieldReplayRequired": true,
+      "defaultOnReady": false
+    }
+  ],
+  "requiredReplayPacket": {
+    "minimumScope": [
+      "candidate profile explicitly enabled",
+      "pinned baseline replay from the same build and hardware class",
+      "sanitized release/field manifest without raw customer paths",
+      "per-case pass/fail, FP/FN, runtime, and fallback diagnostics"
+    ],
+    "anomalyRequiredFields": [
+      "normalImageCount",
+      "imageFalsePositive",
+      "criticalFalsePositiveCount",
+      "imagePrecision",
+      "imageRecall",
+      "fallbackModeResult"
+    ],
+    "orbRequiredFields": [
+      "hardwareProfileId",
+      "caseCount",
+      "baselineMeanRuntimeMsPerCase",
+      "candidateMeanRuntimeMsPerCase",
+      "runtimeDeltaMsPerCase",
+      "runtimeDeltaPercent",
+      "p95PositionErrorPxDelta",
+      "p95CornerErrorPxDelta"
+    ]
+  }
+}

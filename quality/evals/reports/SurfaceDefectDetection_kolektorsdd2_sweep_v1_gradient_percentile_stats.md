@@ -1,6 +1,6 @@
 # SurfaceDefectDetection KolektorSDD2 Baseline
 
-GeneratedAtUtc: `2026-04-29T15:38:44.0264089+00:00`
+GeneratedAtUtc: `2026-05-01T03:24:14.7376951+00:00`
 Index: `quality/datasets/kolektorsdd2_index.json`
 CandidateVersion: `v1`
 Profile: `gradient_percentile_stats`
@@ -23,7 +23,7 @@ Profile: `gradient_percentile_stats`
 | Image recall | 1.0000 |
 | Image F1 | 0.4000 |
 | False positive per normal image | 1.0000 |
-| Runtime p95 ms | 32.193 |
+| Runtime p95 ms | 6.979 |
 | Method | GradientMagnitude |
 | Threshold mode | ReferenceStats |
 | Threshold | 12.000 |
@@ -32,6 +32,8 @@ Profile: `gradient_percentile_stats`
 | Morph mode | OpenClose |
 | Background kernel | 31 |
 | Response normalize mode | PercentileClip |
+| CLAHE clip / tile | 2 / 8 |
+| Component filter mode | ResponseStats |
 | Max side | 256 |
 
 ## Image Confusion

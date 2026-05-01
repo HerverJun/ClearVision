@@ -1,6 +1,6 @@
 # Quality Flywheel Algorithm A/B Replay Report
 
-GeneratedAtUtc: `2026-04-30T12:54:35+00:00`
+GeneratedAtUtc: `2026-05-01T03:33:32+00:00`
 Accepted: `Yes`
 
 ## Summary
@@ -14,9 +14,9 @@ Accepted: `Yes`
 - Matching viewpoint cases: 11
 - Matching viewpoint fixed: 10
 - Surface defect replay cases: 20
-- Surface defect improved cases: 10
+- Surface defect improved cases: 0
 - Surface defect regressed cases: 0
-- Surface defect worse metric cases: 8
+- Surface defect worse metric cases: 0
 - Anomaly detection replay cases: 20
 - Anomaly detection improved cases: 14
 - Anomaly detection regressed cases: 0
@@ -60,7 +60,7 @@ Accepted: `Yes`
 | OrbFeatureMatch | hpatches | candidate-executed | 20 | 0.0 | 0.9 | 18 | 0 | 1 | quality/evals/reports/OrbFeatureMatch_hpatches_candidate_replay_center_only_v1.json |
 | SemanticSegmentation | voc-style-protocol-bridge | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/SemanticSegmentation_dataset_candidate_replay_v1.json |
 | ShapeMatching | semisynthetic-geometric-shape-scenes | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/ShapeMatching_geometric_dataset_candidate_replay_v1.json |
-| SurfaceDefectDetection | kolektorsdd2 | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 8 | quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_replay_v1.json |
+| SurfaceDefectDetection | kolektorsdd2 | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_replay_v1.json |
 | TemplateMatching | hpatches-style-homography-bridge | candidate-executed | 20 | 1.0 | 1.0 | 0 | 0 | 0 | quality/evals/reports/TemplateMatching_public_bridge_candidate_replay_v1.json |
 
 ## Matching Viewpoint Focus
@@ -83,25 +83,25 @@ Accepted: `Yes`
 
 | Case | Status | Is defect | Predicted | Old F1 | New F1 | Old FP | New FP | Old FN | New FN | Taxonomy |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| 20017 | worse-metric | False | True | 0 | 0 | 17 | 18 | 0 | 0 | texture_noise_false_positive |
-| 20021 | worse-metric | False | True | 0 | 0 | 34 | 36 | 0 | 0 | texture_noise_false_positive |
-| 20023 | worse-metric | False | True | 0 | 0 | 182 | 184 | 0 | 0 | texture_noise_false_positive |
-| 20054 | worse-metric | False | True | 0 | 0 | 120 | 192 | 0 | 0 | oversegmentation_false_positive |
-| 20083 | worse-metric | False | True | 0 | 0 | 13 | 16 | 0 | 0 | texture_noise_false_positive |
-| 20091 | worse-metric | False | True | 0 | 0 | 88 | 107 | 0 | 0 | texture_noise_false_positive |
-| 20111 | worse-metric | False | True | 0 | 0 | 95 | 104 | 0 | 0 | texture_noise_false_positive |
-| 20113 | worse-metric | False | True | 0 | 0 | 12 | 18 | 0 | 0 | texture_noise_false_positive |
-| 20006 | improved | False | False | 0 | 1 | 11 | 0 | 0 | 0 | - |
-| 20008 | improved | False | False | 0 | 1 | 10 | 0 | 0 | 0 | - |
-| 20015 | improved | False | False | 0 | 1 | 11 | 0 | 0 | 0 | - |
-| 20018 | improved | False | False | 0 | 1 | 13 | 0 | 0 | 0 | - |
-| 20027 | improved | False | False | 0 | 1 | 24 | 0 | 0 | 0 | - |
+| 20006 | unchanged | False | True | 0 | 0 | 11 | 11 | 0 | 0 | texture_noise_false_positive |
+| 20008 | unchanged | False | True | 0 | 0 | 10 | 10 | 0 | 0 | texture_noise_false_positive |
+| 20015 | unchanged | False | True | 0 | 0 | 11 | 11 | 0 | 0 | texture_noise_false_positive |
+| 20017 | unchanged | False | True | 0 | 0 | 17 | 17 | 0 | 0 | texture_noise_false_positive |
+| 20018 | unchanged | False | True | 0 | 0 | 13 | 13 | 0 | 0 | texture_noise_false_positive |
+| 20021 | unchanged | False | True | 0 | 0 | 34 | 34 | 0 | 0 | texture_noise_false_positive |
+| 20023 | unchanged | False | True | 0 | 0 | 182 | 182 | 0 | 0 | texture_noise_false_positive |
+| 20027 | unchanged | False | True | 0 | 0 | 24 | 24 | 0 | 0 | texture_noise_false_positive |
+| 20054 | unchanged | False | True | 0 | 0 | 120 | 120 | 0 | 0 | oversegmentation_false_positive |
 | 20068 | unchanged | True | False | 0 | 0 | 0 | 0 | 369 | 369 | low_contrast_defect_miss |
-| 20080 | improved | False | False | 0 | 1 | 9 | 0 | 0 | 0 | - |
-| 20105 | improved | False | False | 0 | 1 | 12 | 0 | 0 | 0 | - |
-| 20109 | improved | False | False | 0 | 1 | 10 | 0 | 0 | 0 | - |
-| 20112 | improved | False | False | 0 | 1 | 20 | 0 | 0 | 0 | - |
-| 20134 | improved | False | False | 0 | 1 | 9 | 0 | 0 | 0 | - |
+| 20080 | unchanged | False | True | 0 | 0 | 9 | 9 | 0 | 0 | texture_noise_false_positive |
+| 20083 | unchanged | False | True | 0 | 0 | 13 | 13 | 0 | 0 | texture_noise_false_positive |
+| 20091 | unchanged | False | True | 0 | 0 | 88 | 88 | 0 | 0 | texture_noise_false_positive |
+| 20105 | unchanged | False | True | 0 | 0 | 12 | 12 | 0 | 0 | texture_noise_false_positive |
+| 20109 | unchanged | False | True | 0 | 0 | 10 | 10 | 0 | 0 | texture_noise_false_positive |
+| 20111 | unchanged | False | True | 0 | 0 | 95 | 95 | 0 | 0 | texture_noise_false_positive |
+| 20112 | unchanged | False | True | 0 | 0 | 20 | 20 | 0 | 0 | texture_noise_false_positive |
+| 20113 | unchanged | False | True | 0 | 0 | 12 | 12 | 0 | 0 | texture_noise_false_positive |
+| 20134 | unchanged | False | True | 0 | 0 | 9 | 9 | 0 | 0 | texture_noise_false_positive |
 | 20139 | unchanged | True | False | 0 | 0 | 0 | 0 | 98 | 98 | low_contrast_defect_miss |
 
 ## Anomaly Detection Focus

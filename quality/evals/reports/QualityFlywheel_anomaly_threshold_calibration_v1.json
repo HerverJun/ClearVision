@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-04-30.anomaly-threshold-calibration.v1",
-  "generatedAtUtc": "2026-04-30T12:53:41+00:00",
+  "generatedAtUtc": "2026-05-01T03:34:55+00:00",
   "accepted": true,
   "claimBoundary": "MVTec AD Lite score-threshold calibration only; no product default promotion and no field sign-off claim.",
   "sourceCandidate": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v1.json",

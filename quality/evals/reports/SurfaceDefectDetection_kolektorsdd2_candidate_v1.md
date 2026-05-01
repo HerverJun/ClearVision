@@ -1,9 +1,9 @@
 # SurfaceDefectDetection KolektorSDD2 Baseline
 
-GeneratedAtUtc: `2026-04-29T15:38:51.5030065+00:00`
+GeneratedAtUtc: `2026-05-01T03:24:20.9002557+00:00`
 Index: `quality/datasets/kolektorsdd2_index.json`
 CandidateVersion: `v1`
-Profile: `balanced_floor_14_area7`
+Profile: `baseline_default`
 
 ## Summary
 
@@ -14,42 +14,44 @@ Profile: `balanced_floor_14_area7`
 | Failed gates | 0 |
 | Defect images | 110 |
 | Normal images | 894 |
-| Pixel IoU | 0.1648 |
-| Dice | 0.2829 |
-| Pixel F1 | 0.2829 |
-| Image AUROC | 0.7728 |
+| Pixel IoU | 0.1556 |
+| Dice | 0.2692 |
+| Pixel F1 | 0.2692 |
+| Image AUROC | 0.7724 |
 | Pixel AUROC | 0.6600 |
-| Image precision | 0.6462 |
-| Image recall | 0.7636 |
-| Image F1 | 0.7000 |
-| False positive per normal image | 0.0515 |
-| Runtime p95 ms | 6.295 |
+| Image precision | 0.4266 |
+| Image recall | 0.8455 |
+| Image F1 | 0.5671 |
+| False positive per normal image | 0.1398 |
+| Runtime p95 ms | 4.575 |
 | Method | LocalContrast |
 | Threshold mode | Manual |
-| Threshold | 14.000 |
-| Min area | 7 |
+| Threshold | 15.000 |
+| Min area | 4 |
 | Morph clean size | 1 |
 | Morph mode | OpenClose |
 | Background kernel | 31 |
 | Response normalize mode | RawClamp |
+| CLAHE clip / tile | 2 / 8 |
+| Component filter mode | AreaOnly |
 | Max side | 256 |
 
 ## Image Confusion
 
 | TP | FP | FN | TN |
 | ---: | ---: | ---: | ---: |
-| 84 | 46 | 26 | 848 |
+| 93 | 125 | 17 | 769 |
 
 ## Failure Taxonomy
 
 | Taxonomy | Count |
 | --- | ---: |
-| texture_noise_false_positive | 45 |
-| undersegmentation_false_negative | 37 |
-| low_contrast_defect_miss | 19 |
-| small_defect_miss | 7 |
+| texture_noise_false_positive | 123 |
+| undersegmentation_false_negative | 46 |
+| low_contrast_defect_miss | 15 |
+| oversegmentation_false_positive | 2 |
+| small_defect_miss | 2 |
 | mask_overgrowth_false_positive | 1 |
-| oversegmentation_false_positive | 1 |
 
 ## Notes
 

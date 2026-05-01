@@ -1,6 +1,6 @@
 # SurfaceDefectDetection KolektorSDD2 Baseline
 
-GeneratedAtUtc: `2026-04-29T15:38:25.7883890+00:00`
+GeneratedAtUtc: `2026-05-01T03:24:10.2176505+00:00`
 Index: `quality/datasets/kolektorsdd2_index.json`
 CandidateVersion: `v1`
 Profile: `tight_background_12_area4`
@@ -23,7 +23,7 @@ Profile: `tight_background_12_area4`
 | Image recall | 0.8833 |
 | Image F1 | 0.6523 |
 | False positive per normal image | 0.2750 |
-| Runtime p95 ms | 6.405 |
+| Runtime p95 ms | 4.682 |
 | Method | LocalContrast |
 | Threshold mode | Manual |
 | Threshold | 12.000 |
@@ -32,6 +32,8 @@ Profile: `tight_background_12_area4`
 | Morph mode | OpenClose |
 | Background kernel | 21 |
 | Response normalize mode | RawClamp |
+| CLAHE clip / tile | 2 / 8 |
+| Component filter mode | AreaOnly |
 | Max side | 256 |
 
 ## Image Confusion

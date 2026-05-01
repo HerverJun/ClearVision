@@ -1,0 +1,755 @@
+{
+  "schemaVersion": "2026-05-01.surface-defect-component-rule-selector.v2",
+  "generatedAtUtc": "2026-05-01T04:56:01+00:00",
+  "claimBoundary": "KolektorSDD2 validation-only component rule selector; no product default change.",
+  "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json",
+  "telemetryCsv": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_component_telemetry_v2.csv",
+  "distributionCsv": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_component_distribution_v2.csv",
+  "promotionGate": {
+    "textureNoiseFalsePositiveMustDecrease": true,
+    "lowContrastDefectMissMustNotIncrease": true,
+    "pixelF1MustNotDropBelowBaseline": true
+  },
+  "baseline": {
+    "profile": "baseline_default",
+    "pixelF1": 0.320553,
+    "targetTaxonomyCounts": {
+      "texture_noise_false_positive": 55,
+      "low_contrast_defect_miss": 14,
+      "undersegmentation_false_negative": 47
+    }
+  },
+  "status": "accepted-rule-found",
+  "selectedRule": {
+    "rule": {
+      "areaMax": 8,
+      "circularityMin": 0.55,
+      "fillRatioMin": 0.4,
+      "elongationMax": 2.0,
+      "ringProminenceMax": 24.0
+    },
+    "accepted": true,
+    "pixelF1": 0.320672,
+    "pixelF1Delta": 0.000119,
+    "taxonomyCounts": {
+      "texture_noise_false_positive": 53,
+      "low_contrast_defect_miss": 14,
+      "undersegmentation_false_negative": 47
+    },
+    "textureNoiseDelta": -2,
+    "lowContrastDelta": 0,
+    "rejectedComponentCount": 3,
+    "rejectedTruePositiveComponents": 0,
+    "rejectedFalsePositiveComponents": 3,
+    "pixelTotals": {
+      "truePositive": 13394,
+      "falsePositive": 4880,
+      "falseNegative": 51869,
+      "trueNegative": 11258113
+    }
+  },
+  "acceptedRuleCount": 1088,
+  "evaluatedRuleCount": 11520,
+  "topRules": [
+    {
+      "rule": {
+        "areaMax": 8,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 8,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 8,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 8,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 8,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 8,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 12,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 12,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 12,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 12,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 12,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 12,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 16,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 16,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 16,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 16,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 16,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 16,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 24,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 24,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 24,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 24,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 24,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.5,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 24,
+        "circularityMin": 0.6,
+        "fillRatioMin": 0.4,
+        "elongationMax": 3.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    },
+    {
+      "rule": {
+        "areaMax": 32,
+        "circularityMin": 0.55,
+        "fillRatioMin": 0.4,
+        "elongationMax": 2.0,
+        "ringProminenceMax": 24.0
+      },
+      "accepted": true,
+      "pixelF1": 0.320672,
+      "pixelF1Delta": 0.000119,
+      "taxonomyCounts": {
+        "texture_noise_false_positive": 53,
+        "low_contrast_defect_miss": 14,
+        "undersegmentation_false_negative": 47
+      },
+      "textureNoiseDelta": -2,
+      "lowContrastDelta": 0,
+      "rejectedComponentCount": 3,
+      "rejectedTruePositiveComponents": 0,
+      "rejectedFalsePositiveComponents": 3,
+      "pixelTotals": {
+        "truePositive": 13394,
+        "falsePositive": 4880,
+        "falseNegative": 51869,
+        "trueNegative": 11258113
+      }
+    }
+  ]
+}

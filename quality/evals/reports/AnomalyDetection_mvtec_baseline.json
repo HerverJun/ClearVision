@@ -1,26 +1,39 @@
 {
   "Summary": {
-    "GeneratedAtUtc": "2026-04-29T03:29:10.1062841+00:00",
+    "GeneratedAtUtc": "2026-05-01T03:16:15.1408476+00:00",
     "IndexPath": "quality/datasets/mvtec_ad_lite_index.json",
+    "CandidateVersion": "baseline",
+    "ProfileName": "baseline_default",
     "MaxSide": 128,
     "PatchSize": 16,
     "PatchStride": 16,
     "PixelSampleStride": 2,
     "CoresetRatio": 0.02,
     "Threshold": 0.35,
+    "FeatureExtractorId": "lab_gradient_stats",
+    "EmbeddingModelId": "",
+    "EmbeddingModelSource": "None",
+    "EmbeddingModelConfigured": false,
     "TrainCount": 324,
     "TestCount": 120,
     "TestAnomalyCount": 87,
     "TestGoodCount": 33,
     "ImageAuroc": 0.66092,
     "PixelAuroc": 0.670852,
+    "ImageTruePositive": 4,
+    "ImageFalsePositive": 0,
+    "ImageFalseNegative": 83,
+    "ImageTrueNegative": 33,
+    "ImagePrecision": 1,
+    "ImageRecall": 0.045977,
+    "ImageF1": 0.087912,
     "MinImageAuroc": 0.5,
     "MinPixelAuroc": 0.5,
     "MinCategoryImageAuroc": 0.5,
     "MinCategoryPixelAuroc": 0.5,
     "Failed": 0,
-    "RuntimeMs": 4897.301,
-    "MemoryAllocationBytes": 55230256
+    "RuntimeMs": 5731.224,
+    "MemoryAllocationBytes": 55303488
   },
   "Operators": [
     {
@@ -28,8 +41,8 @@
       "CaseCount": 120,
       "Passed": 120,
       "Failed": 0,
-      "RuntimeMsAvg": 40.811,
-      "MemoryAllocationBytesAvg": 55230256,
+      "RuntimeMsAvg": 47.76,
+      "MemoryAllocationBytesAvg": 55303488,
       "HasPublicDataset": true
     }
   ],
@@ -40,8 +53,8 @@
       "TestCount": 78,
       "TestAnomalyCount": 57,
       "FeatureBankCount": 338,
-      "TrainRuntimeMs": 374.791,
-      "InferenceRuntimeMs": 772.996,
+      "TrainRuntimeMs": 409.422,
+      "InferenceRuntimeMs": 902.908,
       "ImageAuroc": 0.614035,
       "PixelAuroc": 0.560461
     },
@@ -51,8 +64,8 @@
       "TestCount": 42,
       "TestAnomalyCount": 30,
       "FeatureBankCount": 77,
-      "TrainRuntimeMs": 20.637,
-      "InferenceRuntimeMs": 710.374,
+      "TrainRuntimeMs": 22.736,
+      "InferenceRuntimeMs": 791.145,
       "ImageAuroc": 0.75,
       "PixelAuroc": 0.763036
     }
@@ -60,6 +73,7 @@
   "MetricFailures": [],
   "Images": [
     {
+      "CaseId": "grid/bent/000",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/000.png",
@@ -68,9 +82,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/001",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/001.png",
@@ -79,9 +101,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/002",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/002.png",
@@ -90,9 +120,17 @@
       "Score": 0.027044421061873436,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/003",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/003.png",
@@ -101,9 +139,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/004",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/004.png",
@@ -112,9 +158,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/005",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/005.png",
@@ -123,9 +177,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/006",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/006.png",
@@ -134,9 +196,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/007",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/007.png",
@@ -145,9 +215,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/008",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/008.png",
@@ -156,9 +234,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/009",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/009.png",
@@ -167,9 +253,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/010",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/010.png",
@@ -178,9 +272,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/bent/011",
       "Category": "grid",
       "DefectType": "bent",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/bent/011.png",
@@ -189,9 +291,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_bent"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/000",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/000.png",
@@ -200,9 +310,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/001",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/001.png",
@@ -211,9 +329,17 @@
       "Score": 0.03855437785387039,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/002",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/002.png",
@@ -222,9 +348,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/003",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/003.png",
@@ -233,9 +367,17 @@
       "Score": 0.12266553193330765,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/004",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/004.png",
@@ -244,9 +386,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/005",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/005.png",
@@ -255,9 +405,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/006",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/006.png",
@@ -266,9 +424,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/007",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/007.png",
@@ -277,9 +443,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/008",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/008.png",
@@ -288,9 +462,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/009",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/009.png",
@@ -299,9 +481,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/010",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/010.png",
@@ -310,9 +500,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/broken/011",
       "Category": "grid",
       "DefectType": "broken",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/broken/011.png",
@@ -321,9 +519,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_broken"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/000",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/000.png",
@@ -332,9 +538,13 @@
       "Score": 0.45580536127090454,
       "PredictedAnomaly": true,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/001",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/001.png",
@@ -343,9 +553,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/002",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/002.png",
@@ -354,9 +572,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/003",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/003.png",
@@ -365,9 +591,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/004",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/004.png",
@@ -376,9 +610,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/005",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/005.png",
@@ -387,9 +629,17 @@
       "Score": 0.1008945032954216,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/006",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/006.png",
@@ -398,9 +648,17 @@
       "Score": 0.05647633969783783,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/007",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/007.png",
@@ -409,9 +667,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/008",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/008.png",
@@ -420,9 +686,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/009",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/009.png",
@@ -431,9 +705,17 @@
       "Score": 0.003719039959833026,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/glue/010",
       "Category": "grid",
       "DefectType": "glue",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/glue/010.png",
@@ -442,240 +724,332 @@
       "Score": 0.3080081343650818,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_glue"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/000",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/000.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/001",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/001.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/002",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/002.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/003",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/003.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/004",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/004.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/005",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/005.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/006",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/006.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/007",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/007.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/008",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/008.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/009",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/009.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/010",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/010.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/011",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/011.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/012",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/012.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/013",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/013.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/014",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/014.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/015",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/015.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/016",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/016.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/017",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/017.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/018",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/018.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/019",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/019.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/good/020",
       "Category": "grid",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/good/020.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/000",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/000.png",
@@ -684,9 +1058,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/001",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/001.png",
@@ -695,9 +1077,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/002",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/002.png",
@@ -706,9 +1096,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/003",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/003.png",
@@ -717,9 +1115,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/004",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/004.png",
@@ -728,9 +1134,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/005",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/005.png",
@@ -739,9 +1153,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/006",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/006.png",
@@ -750,9 +1172,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/007",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/007.png",
@@ -761,9 +1191,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/008",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/008.png",
@@ -772,9 +1210,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/009",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/009.png",
@@ -783,9 +1229,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/metal_contamination/010",
       "Category": "grid",
       "DefectType": "metal_contamination",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/metal_contamination/010.png",
@@ -794,9 +1248,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_metal_contamination"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/000",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/000.png",
@@ -805,9 +1267,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/001",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/001.png",
@@ -816,9 +1286,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/002",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/002.png",
@@ -827,9 +1305,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/003",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/003.png",
@@ -838,9 +1324,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/004",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/004.png",
@@ -849,9 +1343,13 @@
       "Score": 0.3994705080986023,
       "PredictedAnomaly": true,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/005",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/005.png",
@@ -860,9 +1358,17 @@
       "Score": 0.0954897552728653,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/006",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/006.png",
@@ -871,9 +1377,17 @@
       "Score": 0.06917619705200195,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/007",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/007.png",
@@ -882,9 +1396,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/008",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/008.png",
@@ -893,9 +1415,17 @@
       "Score": 0.24989722669124603,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/009",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/009.png",
@@ -904,9 +1434,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "grid/thread/010",
       "Category": "grid",
       "DefectType": "thread",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/grid/test/thread/010.png",
@@ -915,9 +1453,17 @@
       "Score": 0.29953035712242126,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_thread"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/000",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/000.png",
@@ -926,9 +1472,17 @@
       "Score": 0.10995345562696457,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/001",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/001.png",
@@ -937,9 +1491,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/002",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/002.png",
@@ -948,9 +1510,17 @@
       "Score": 0.07017871737480164,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/003",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/003.png",
@@ -959,9 +1529,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/004",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/004.png",
@@ -970,9 +1548,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/005",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/005.png",
@@ -981,9 +1567,17 @@
       "Score": 0.24233287572860718,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/006",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/006.png",
@@ -992,9 +1586,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/007",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/007.png",
@@ -1003,9 +1605,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/008",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/008.png",
@@ -1014,9 +1624,17 @@
       "Score": 0.258207231760025,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/009",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/009.png",
@@ -1025,9 +1643,17 @@
       "Score": 0.018190233036875725,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/010",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/010.png",
@@ -1036,9 +1662,13 @@
       "Score": 0.6693516373634338,
       "PredictedAnomaly": true,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/011",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/011.png",
@@ -1047,9 +1677,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/012",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/012.png",
@@ -1058,9 +1696,17 @@
       "Score": 0.005962267052382231,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/013",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/013.png",
@@ -1069,9 +1715,13 @@
       "Score": 0.4355657398700714,
       "PredictedAnomaly": true,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/014",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/014.png",
@@ -1080,9 +1730,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/015",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/015.png",
@@ -1091,9 +1749,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/016",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/016.png",
@@ -1102,9 +1768,17 @@
       "Score": 0.24191638827323914,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/017",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/017.png",
@@ -1113,9 +1787,17 @@
       "Score": 0.3325220048427582,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/018",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/018.png",
@@ -1124,9 +1806,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/019",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/019.png",
@@ -1135,9 +1825,17 @@
       "Score": 0.012112689204514027,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/020",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/020.png",
@@ -1146,9 +1844,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/021",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/021.png",
@@ -1157,9 +1863,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/022",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/022.png",
@@ -1168,9 +1882,17 @@
       "Score": 0.15614262223243713,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/023",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/023.png",
@@ -1179,9 +1901,17 @@
       "Score": 0.3199795186519623,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/024",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/024.png",
@@ -1190,9 +1920,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/025",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/025.png",
@@ -1201,9 +1939,17 @@
       "Score": 0.004235902335494757,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/026",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/026.png",
@@ -1212,9 +1958,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/027",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/027.png",
@@ -1223,9 +1977,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/028",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/028.png",
@@ -1234,9 +1996,17 @@
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "zero_score_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/defective/029",
       "Category": "toothbrush",
       "DefectType": "defective",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/defective/029.png",
@@ -1245,138 +2015,193 @@
       "Score": 0.2055676430463791,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": false,
+      "FailureTaxonomy": [
+        "anomaly_miss",
+        "below_threshold_anomaly",
+        "defect_defective"
+      ],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/000",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/000.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/001",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/001.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/002",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/002.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/003",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/003.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/004",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/004.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/005",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/005.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/006",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/006.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/007",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/007.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/008",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/008.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/009",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/009.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/010",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/010.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     },
     {
+      "CaseId": "toothbrush/good/011",
       "Category": "toothbrush",
       "DefectType": "good",
       "ImagePath": "quality/public_datasets/mvtec_ad_lite/toothbrush/test/good/011.png",
-      "MaskPath": null,
+      "MaskPath": "",
       "IsAnomaly": false,
       "Score": 0,
       "PredictedAnomaly": false,
       "PatchCount": 64,
+      "ImageCorrect": true,
+      "FailureTaxonomy": [],
+      "Passed": true,
       "Error": null
     }
   ]

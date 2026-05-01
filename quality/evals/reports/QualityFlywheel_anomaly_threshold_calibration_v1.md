@@ -1,6 +1,6 @@
 # AnomalyDetection Threshold Calibration v1
 
-GeneratedAtUtc: `2026-04-30T12:53:41+00:00`
+GeneratedAtUtc: `2026-05-01T03:34:55+00:00`
 Accepted: `True`
 TargetCandidateVersion: `v2`
 TargetProfile: `max192_dense_stride8_threshold_010`
