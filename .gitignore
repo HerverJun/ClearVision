@@ -122,6 +122,8 @@ test_zxing.cs
 
 # Local public datasets used by quality evals; keep large downloaded data out of git.
 /quality/public_datasets/
+__pycache__/
+*.pyc
 
 # Local production/field datasets; repo stores only manifests, splits, and reports.
 /quality/production_datasets/
