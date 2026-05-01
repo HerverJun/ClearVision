@@ -16,7 +16,8 @@ public record AiFlowGenerationRequest(
     string? ExistingFlowJson = null,
     IReadOnlyList<string>? Attachments = null,
     GenerateFlowMode Mode = GenerateFlowMode.Auto,
-    bool DebugPrompt = false
+    bool DebugPrompt = false,
+    AiTemplateSelectionInfo? TemplateSelection = null
 );
 
 public enum GenerateFlowMode
@@ -164,6 +165,21 @@ public class AiFlowGenerationResult
     /// </summary>
     public AiManualRetryInfo? ManualRetry { get; set; }
     public object? PromptTrace { get; set; }
+
+    /// <summary>
+    /// Parsed requirement summary used by the AI workbench before and after generation.
+    /// </summary>
+    public AiRequirementBrief? RequirementBrief { get; set; }
+
+    /// <summary>
+    /// Template candidates produced by the deterministic scenario matcher.
+    /// </summary>
+    public List<AiTemplateCandidateInfo> TemplateCandidates { get; set; } = new();
+
+    /// <summary>
+    /// Structured generation timeline for workbench diagnostics.
+    /// </summary>
+    public List<AiGenerationStageDiagnostic> StageTimeline { get; set; } = new();
 }
 
 public class AiFailureSummary
@@ -201,6 +217,21 @@ public class AiManualRetryInfo
 /// </summary>
 public class AiGeneratedFlowJson
 {
+    /// <summary>
+    /// Schema version for the generated draft contract.
+    /// </summary>
+    public string SchemaVersion { get; set; } = "1.0";
+
+    /// <summary>
+    /// template_fill / template_adapt / free_generate.
+    /// </summary>
+    public string GenerationMode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// strict / relaxed / none.
+    /// </summary>
+    public string TemplateLockLevel { get; set; } = string.Empty;
+
     /// <summary>
     /// AI 对生成结果的解释说明
     /// </summary>
@@ -241,9 +272,14 @@ public class AiRecommendedTemplateInfo
 {
     public string? TemplateId { get; set; }
     public string TemplateName { get; set; } = string.Empty;
+    public string? TemplateVersion { get; set; }
+    public string? ScenarioKey { get; set; }
+    public string? Industry { get; set; }
     public string MatchReason { get; set; } = string.Empty;
     public string MatchMode { get; set; } = string.Empty;
     public double Confidence { get; set; }
+    public List<string> MatchedFields { get; set; } = new();
+    public List<string> MissingSignals { get; set; } = new();
 }
 
 public class AiPendingParameterInfo
@@ -258,6 +294,54 @@ public class AiMissingResourceInfo
     public string ResourceType { get; set; } = string.Empty;
     public string ResourceKey { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+}
+
+public class AiRequirementBrief
+{
+    public string ScenarioKey { get; set; } = string.Empty;
+    public string ScenarioName { get; set; } = string.Empty;
+    public string IntentType { get; set; } = string.Empty;
+    public List<string> ObjectTypes { get; set; } = new();
+    public List<string> DefectTypes { get; set; } = new();
+    public List<string> MeasurementTargets { get; set; } = new();
+    public List<string> RequiredResources { get; set; } = new();
+    public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
+}
+
+public class AiClarificationQuestion
+{
+    public string Field { get; set; } = string.Empty;
+    public string Question { get; set; } = string.Empty;
+    public bool Required { get; set; }
+}
+
+public class AiTemplateCandidateInfo
+{
+    public string? TemplateId { get; set; }
+    public string TemplateName { get; set; } = string.Empty;
+    public string? TemplateVersion { get; set; }
+    public string? ScenarioKey { get; set; }
+    public string? Industry { get; set; }
+    public double Confidence { get; set; }
+    public string MatchReason { get; set; } = string.Empty;
+    public List<string> MatchedFields { get; set; } = new();
+    public List<string> MissingSignals { get; set; } = new();
+}
+
+public class AiTemplateSelectionInfo
+{
+    public string Mode { get; set; } = string.Empty;
+    public string? TemplateId { get; set; }
+    public string? ScenarioKey { get; set; }
+}
+
+public class AiGenerationStageDiagnostic
+{
+    public string Stage { get; set; } = string.Empty;
+    public string Status { get; set; } = "completed";
+    public string Summary { get; set; } = string.Empty;
+    public long DurationMs { get; set; }
+    public Dictionary<string, string> Metadata { get; set; } = new();
 }
 
 public class AiGeneratedOperator

@@ -17,6 +17,7 @@ using OpenCvSharp;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 
 namespace Acme.Product.Infrastructure.AI;
@@ -30,6 +31,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly AutoLayoutService _layoutService;
     private readonly IOperatorFactory _operatorFactory;
     private readonly IFlowTemplateService _templateService;
+    private readonly IScenarioMatcher _scenarioMatcher;
+    private readonly IRequirementBriefExtractor _requirementBriefExtractor;
+    private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
@@ -43,16 +47,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
     };
     private const int DefaultMaxMultimodalAttachmentCount = 4;
-    private static readonly string[] _templateFirstKeywords =
-    [
-        "线序", "端子", "接线顺序", "排针顺序",
-        "wire sequence", "terminal order", "connector order", "wiring order"
-    ];
-    private static readonly string[] _wireTemplateHints =
-    [
-        "线序", "端子", "接线", "connector", "terminal", "wire"
-    ];
-
     public AiFlowGenerationService(
         AiGenerationOrchestrator aiOrchestrator,
         PromptBuilder promptBuilder,
@@ -61,6 +55,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         AutoLayoutService layoutService,
         IOperatorFactory operatorFactory,
         IFlowTemplateService templateService,
+        IScenarioMatcher scenarioMatcher,
+        IRequirementBriefExtractor requirementBriefExtractor,
+        ITemplateConstraintValidator templateConstraintValidator,
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
@@ -72,6 +69,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _layoutService = layoutService;
         _operatorFactory = operatorFactory;
         _templateService = templateService;
+        _scenarioMatcher = scenarioMatcher;
+        _requirementBriefExtractor = requirementBriefExtractor;
+        _templateConstraintValidator = templateConstraintValidator;
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
         _logger = logger;
@@ -94,16 +94,48 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             onProgress?.Invoke(message);
         }
 
+        var pipeline = new AiGenerationPipelineContext();
+
         // 推送：构建提示词
         ReportProgress("正在分析需求并构建提示词...");
-        var conversationContext = _conversationalFlowService.PrepareContext(request);
-        var templatePriority = await BuildTemplatePriorityContextAsync(request, cancellationToken);
+        var conversationContext = pipeline.Measure(
+            "conversation",
+            () => _conversationalFlowService.PrepareContext(request),
+            context => $"session={context.SessionId}, mode={context.Mode.ToWireValue()}");
+        var templatePriority = await pipeline.MeasureAsync(
+            "scenario_match",
+            () => BuildTemplatePriorityContextAsync(request, cancellationToken),
+            context => context.IsTemplateFirst
+                ? $"matched {context.Template?.Name ?? context.ScenarioName} ({context.Confidence:P0})"
+                : "no confident template match",
+            context => new Dictionary<string, string>
+            {
+                ["matchMode"] = context.MatchMode,
+                ["scenarioKey"] = context.ScenarioKey,
+                ["templateName"] = context.Template?.Name ?? string.Empty,
+                ["confidence"] = context.Confidence.ToString("F4", CultureInfo.InvariantCulture)
+            });
+        var requirementBrief = pipeline.Measure(
+            "requirement_brief",
+            () => _requirementBriefExtractor.Extract(request.Description, request.AdditionalContext, templatePriority.PrimaryMatch),
+            brief => string.IsNullOrWhiteSpace(brief.ScenarioName)
+                ? "requirement brief extracted without a scenario"
+                : $"scenario={brief.ScenarioName}, clarifications={brief.ClarificationQuestions.Count}",
+            brief => new Dictionary<string, string>
+            {
+                ["scenarioKey"] = brief.ScenarioKey,
+                ["intentType"] = brief.IntentType,
+                ["clarificationCount"] = brief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture)
+            });
         if (templatePriority.IsTemplateFirst)
         {
-            ReportProgress("检测到线序高频场景，已切换模板优先生成模式...");
+            ReportProgress($"已命中模板优先场景：{templatePriority.Template?.Name ?? templatePriority.ScenarioName}，进入 {templatePriority.GenerationMode} 模式...");
         }
 
-        var systemPrompt = _promptBuilder.BuildSystemPrompt(request.Description);
+        var systemPrompt = pipeline.Measure(
+            "prompt_context",
+            () => _promptBuilder.BuildSystemPrompt(request.Description),
+            prompt => $"system prompt chars={prompt.Length}");
         var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(conversationContext.Mode)
             ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
             : string.Empty;
@@ -185,12 +217,25 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 var messages = new List<ChatMessage> { currentUserMessage };
 
                 // 调用 API（使用流式接口）
+                var llmStopwatch = Stopwatch.StartNew();
                 var completionResult = await _aiOrchestrator.StreamCompleteAsync(
                     systemPrompt,
                     messages,
                     chunk => onStreamChunk?.Invoke(chunk),
                     activeModel,
                     cancellationToken);
+                pipeline.AddStage(
+                    "llm",
+                    "completed",
+                    $"model={activeModel.Model}, responseChars={completionResult.Content?.Length ?? 0}",
+                    llmStopwatch.Elapsed,
+                    new Dictionary<string, string>
+                    {
+                        ["provider"] = options.Provider,
+                        ["model"] = options.Model,
+                        ["supportsVision"] = capabilities.SupportsVisionInput.ToString(CultureInfo.InvariantCulture),
+                        ["supportsJsonMode"] = capabilities.SupportsJsonMode.ToString(CultureInfo.InvariantCulture)
+                    });
                 var rawResponse = completionResult.Content;
                 lastRawResponse = rawResponse;
                 _logger.LogDebug("AI 原始响应长度：{Length}", rawResponse.Length);
@@ -207,7 +252,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 // 推送：解析结果
                 ReportProgress("收到 AI 响应，正在解析 JSON 数据...");
                 // 解析 AI 输出的 JSON
-                generatedFlow = ParseAiResponse(rawResponse);
+                generatedFlow = pipeline.Measure(
+                    "parse",
+                    () => ParseAiResponse(rawResponse),
+                    flow => flow == null ? "parse failed" : $"operators={flow.Operators?.Count ?? 0}, connections={flow.Connections?.Count ?? 0}");
                 if (generatedFlow == null)
                 {
                     lastValidation = new AiValidationResult();
@@ -230,13 +278,36 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         lastAttemptDiagnostics,
                         lastRawResponse,
                         promptTrace,
-                        progressMessages);
+                        progressMessages,
+                        requirementBrief,
+                        BuildTemplateCandidates(templatePriority),
+                        pipeline.Timeline.ToList());
                 }
+
+                ApplyTemplateMetadata(generatedFlow, templatePriority);
 
                 // 推送：校验结果
                 ReportProgress("正在校验生成的算子和参数有效性...");
                 // 校验
-                lastValidation = _validator.Validate(generatedFlow);
+                lastValidation = pipeline.Measure(
+                    "validator",
+                    () => _validator.Validate(generatedFlow),
+                    validation => validation.IsValid
+                        ? $"valid with warnings={validation.Warnings.Count}"
+                        : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+                if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
+                {
+                    var templateGate = pipeline.Measure(
+                        "template_gate",
+                        () => _templateConstraintValidator.Validate(
+                            generatedFlow,
+                            templatePriority.Template,
+                            string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
+                        validation => validation.IsValid
+                            ? $"template gate passed with warnings={validation.Warnings.Count}"
+                            : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+                    MergeValidationResult(lastValidation, templateGate);
+                }
                 lastAttemptDiagnostics = BuildAttemptDiagnostics(
                     attempt + 1,
                     "validation",
@@ -254,12 +325,18 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     object? dryRunReport = null;
                     try
                     {
+                        var dryRunStopwatch = Stopwatch.StartNew();
                         var flowEntity = ConvertDtoToEntity(flowDto); // 暂时需转换为 Entity 供仿真使用
                         var drResult = await _dryRunService.RunAsync(
                             flowEntity,
                             new Dictionary<string, object>(), // 空输入
                             new DryRunStubRegistry(),
                             cancellationToken);
+                        pipeline.AddStage(
+                            "dryrun",
+                            "completed",
+                            $"success={drResult.IsSuccess}, coverage={drResult.CoveragePercentage:F1}%",
+                            dryRunStopwatch.Elapsed);
 
                         dryRunReport = new
                         {
@@ -271,6 +348,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     }
                     catch (Exception ex)
                     {
+                        pipeline.AddStage("dryrun", "warning", ex.Message, TimeSpan.Zero);
                         _logger.LogWarning(ex, "DryRun 预演阶段异常，跳过覆盖率采集");
                     }
 
@@ -310,7 +388,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         RecommendedTemplate = recommendedTemplate,
                         PendingParameters = pendingParameters,
                         MissingResources = missingResources,
-                        PromptTrace = promptTrace
+                        PromptTrace = promptTrace,
+                        RequirementBrief = requirementBrief,
+                        TemplateCandidates = BuildTemplateCandidates(templatePriority),
+                        StageTimeline = pipeline.Timeline.ToList()
                     };
                 }
 
@@ -322,9 +403,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     request.Description,
                     lastValidation,
                     lastAttemptDiagnostics,
-                    lastRawResponse,
-                    promptTrace,
-                    progressMessages);
+                        lastRawResponse,
+                        promptTrace,
+                        progressMessages,
+                        requirementBrief,
+                        BuildTemplateCandidates(templatePriority),
+                        pipeline.Timeline.ToList());
             }
             catch (OperationCanceledException)
             {
@@ -382,7 +466,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     FailureType = failureType,
                     FailureSummary = failureSummary,
                     LastAttemptDiagnostics = lastAttemptDiagnostics,
-                    PromptTrace = promptTrace
+                    PromptTrace = promptTrace,
+                    RequirementBrief = requirementBrief,
+                    TemplateCandidates = BuildTemplateCandidates(templatePriority),
+                    StageTimeline = pipeline.Timeline.ToList()
                 };
             }
             catch (Exception ex)
@@ -447,7 +534,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     FailureType = AiFlowGenerationResult.FailureTypeSystemError,
                     FailureSummary = failureSummary,
                     LastAttemptDiagnostics = lastAttemptDiagnostics,
-                    PromptTrace = promptTrace
+                    PromptTrace = promptTrace,
+                    RequirementBrief = requirementBrief,
+                    TemplateCandidates = BuildTemplateCandidates(templatePriority),
+                    StageTimeline = pipeline.Timeline.ToList()
                 };
             }
         }
@@ -479,7 +569,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
             FailureSummary = finalFailureSummary,
             LastAttemptDiagnostics = lastAttemptDiagnostics,
-            PromptTrace = promptTrace
+            PromptTrace = promptTrace,
+            RequirementBrief = requirementBrief,
+            TemplateCandidates = BuildTemplateCandidates(templatePriority),
+            StageTimeline = pipeline.Timeline.ToList()
         };
     }
 
@@ -501,14 +594,23 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var sb = new StringBuilder();
         sb.AppendLine("templateFirst=true");
         sb.AppendLine($"matchMode={templatePriority.MatchMode}");
+        sb.AppendLine($"generationMode={templatePriority.GenerationMode}");
+        sb.AppendLine($"templateLockLevel={templatePriority.TemplateLockLevel}");
+        if (!string.IsNullOrWhiteSpace(templatePriority.ScenarioKey))
+            sb.AppendLine($"scenarioKey={templatePriority.ScenarioKey}");
         sb.AppendLine($"matchReason={templatePriority.MatchReason}");
         if (templatePriority.Confidence > 0)
             sb.AppendLine($"confidence={templatePriority.Confidence:F2}");
+        if (templatePriority.MatchedFields.Count > 0)
+            sb.AppendLine($"matchedFields={string.Join(",", templatePriority.MatchedFields)}");
+        if (templatePriority.MissingSignals.Count > 0)
+            sb.AppendLine($"missingSignals={string.Join(",", templatePriority.MissingSignals)}");
 
         if (templatePriority.Template != null)
         {
             sb.AppendLine($"templateId={templatePriority.Template.Id}");
             sb.AppendLine($"templateName={templatePriority.Template.Name}");
+            sb.AppendLine($"templateVersion={templatePriority.Template.TemplateVersion}");
             sb.AppendLine($"templateIndustry={templatePriority.Template.Industry}");
 
             if (!string.IsNullOrWhiteSpace(templatePriority.Template.FlowJson))
@@ -517,7 +619,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 sb.AppendLine("```json");
                 sb.AppendLine(TrimTemplateFlowJson(templatePriority.Template.FlowJson));
                 sb.AppendLine("```");
-                sb.AppendLine("Reuse the template skeleton as the starting point unless the request explicitly asks to replace it.");
+                if (string.Equals(templatePriority.GenerationMode, "template_fill", StringComparison.OrdinalIgnoreCase))
+                {
+                    sb.AppendLine("Strict template_fill rules: do not remove required template operators, do not replace the core topology, and do not invent operators outside the template skeleton. Only fill parameters, explanation, pendingParameters, missingResources, and user-facing notes.");
+                }
+                else
+                {
+                    sb.AppendLine("Reuse the template skeleton as the starting point unless the request explicitly asks to replace it.");
+                }
             }
         }
         else
@@ -791,99 +900,55 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         AiFlowGenerationRequest request,
         CancellationToken cancellationToken)
     {
-        var mergedText = $"{request.Description} {request.AdditionalContext}".Trim();
-        if (!TryMatchTemplateFirstScenario(mergedText, out var matchedKeywords))
-            return TemplatePriorityContext.None;
+        var matches = await _scenarioMatcher.MatchAsync(
+            request.Description,
+            request.AdditionalContext,
+            request.Attachments,
+            topN: 3,
+            cancellationToken);
+        var top = matches.FirstOrDefault();
+        if (top == null || top.Confidence < 0.35)
+            return TemplatePriorityContext.None with { Candidates = matches.ToList() };
 
-        IReadOnlyList<FlowTemplate> templates;
-        try
+        var explicitFreeGenerate = IsExplicitFreeGenerateRequest(request);
+        var generationMode = explicitFreeGenerate
+            ? "free_generate"
+            : top.Confidence >= 0.75 ? "template_fill" : "template_adapt";
+        var lockLevel = generationMode switch
         {
-            templates = await _templateService.GetTemplatesAsync(cancellationToken: cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load templates for template-first routing.");
-            templates = Array.Empty<FlowTemplate>();
-        }
-
-        var selectedTemplate = SelectTemplateForWireScenario(templates, matchedKeywords);
-        var reason = matchedKeywords.Count == 0
-            ? "命中高频场景关键词"
-            : $"命中关键词：{string.Join("、", matchedKeywords)}";
-        var confidence = Math.Min(0.99, 0.62 + (matchedKeywords.Count * 0.08) + (selectedTemplate != null ? 0.1 : 0));
+            "template_fill" => "strict",
+            "template_adapt" => "relaxed",
+            _ => "none"
+        };
 
         return new TemplatePriorityContext(
-            IsTemplateFirst: true,
-            Template: selectedTemplate,
-            MatchReason: reason,
-            MatchMode: "template-first",
-            Confidence: confidence,
-            MatchedKeywords: matchedKeywords);
+            IsTemplateFirst: !explicitFreeGenerate,
+            Template: top.Template,
+            MatchReason: top.MatchReason,
+            MatchMode: "scenario-matcher",
+            Confidence: top.Confidence,
+            MatchedKeywords: top.MatchedFields,
+            ScenarioKey: top.Scenario.ScenarioKey,
+            ScenarioName: top.Scenario.ScenarioName,
+            GenerationMode: generationMode,
+            TemplateLockLevel: lockLevel,
+            MatchedFields: top.MatchedFields,
+            MissingSignals: top.MissingSignals,
+            PrimaryMatch: top,
+            Candidates: matches.ToList());
     }
 
-    private static bool TryMatchTemplateFirstScenario(string text, out List<string> matchedKeywords)
+    private static bool IsExplicitFreeGenerateRequest(AiFlowGenerationRequest request)
     {
-        matchedKeywords = new List<string>();
+        var text = $"{request.Description} {request.AdditionalContext}".Trim();
         if (string.IsNullOrWhiteSpace(text))
             return false;
 
-        var normalized = text.Trim().ToLowerInvariant();
-        foreach (var keyword in _templateFirstKeywords)
-        {
-            if (normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-            {
-                matchedKeywords.Add(keyword);
-            }
-        }
-
-        return matchedKeywords.Count > 0;
-    }
-
-    private static FlowTemplate? SelectTemplateForWireScenario(
-        IReadOnlyList<FlowTemplate> templates,
-        IReadOnlyCollection<string> matchedKeywords)
-    {
-        if (templates.Count == 0)
-            return null;
-
-        FlowTemplate? bestTemplate = null;
-        var bestScore = int.MinValue;
-        foreach (var template in templates)
-        {
-            var score = 0;
-            foreach (var hint in _wireTemplateHints)
-            {
-                if (ContainsIgnoreCase(template.Name, hint))
-                    score += 4;
-                if (ContainsIgnoreCase(template.Description, hint))
-                    score += 2;
-                if ((template.Tags ?? new List<string>()).Any(tag => ContainsIgnoreCase(tag, hint)))
-                    score += 3;
-            }
-
-            foreach (var keyword in matchedKeywords)
-            {
-                if (ContainsIgnoreCase(template.Name, keyword))
-                    score += 2;
-                if ((template.Tags ?? new List<string>()).Any(tag => ContainsIgnoreCase(tag, keyword)))
-                    score += 2;
-            }
-
-            if (score > bestScore)
-            {
-                bestScore = score;
-                bestTemplate = template;
-            }
-        }
-
-        return bestScore > 0 ? bestTemplate : null;
-    }
-
-    private static bool ContainsIgnoreCase(string? value, string? expected)
-    {
-        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(expected))
-            return false;
-        return value.Contains(expected, StringComparison.OrdinalIgnoreCase);
+        return text.Contains("不要用模板", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("不用模板", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("自由生成", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("换一种方案", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("free generate", StringComparison.OrdinalIgnoreCase);
     }
 
     private static AiRecommendedTemplateInfo? ResolveRecommendedTemplate(
