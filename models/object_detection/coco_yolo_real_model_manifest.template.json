@@ -2,9 +2,9 @@
   "schemaVersion": "2026-04-30.deep-learning-model-manifest.v1",
   "modelId": "coco_yolo_external_onnx",
   "modelSha256": "<fill-after-installing-external-model>",
-  "artifactPath": "models/object_detection/coco_yolo_external.onnx",
-  "source": "External ONNX YOLO-family object detection model; model artifact is not committed to git.",
-  "license": "Attach the upstream model license before publishing accuracy claims.",
+  "artifactPath": "quality/public_datasets/models/object_detection/yolo11n.onnx",
+  "source": "YOLO11n COCO pretrained model exported to ONNX with Ultralytics tooling; model artifact is not committed to git.",
+  "license": "YOLO11n upstream license: AGPL-3.0 or Ultralytics Enterprise. Do not bundle or enable by default in commercial product distributions without a compatible license.",
   "classes": [
     "person",
     "bicycle",
@@ -95,7 +95,7 @@
     "padValue": 114
   },
   "postprocess": {
-    "yoloVersion": "Auto",
+    "yoloVersion": "YOLOv11",
     "confidenceThreshold": 0.25,
     "nmsIouThreshold": 0.45,
     "classAwareNms": true

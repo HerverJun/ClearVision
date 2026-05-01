@@ -22,14 +22,36 @@
       "source": "repo-testdata"
     },
     {
-      "id": "coco_yolo_external_onnx",
-      "name": "COCO YOLO External ONNX",
-      "type": "object_detection",
-      "path": "models/object_detection/coco_yolo_external.onnx",
+      "id": "resnet18_avgpool_embedding_external_onnx",
+      "name": "ResNet18 AvgPool Embedding External ONNX",
+      "type": "anomaly_embedding",
+      "path": "quality/public_datasets/models/anomaly_detection/resnet18_avgpool_embedding.onnx",
       "version": "external",
       "execution_provider": "cpu",
       "source": "external-artifact-not-committed",
-      "license": "attach-upstream-license-before-accuracy-claims",
+      "license": "verify-upstream-framework-and-pretrained-weight-terms",
+      "model_sha256": "",
+      "input_shape": [1, 3, 224, 224],
+      "preprocess": {
+        "resize": "center-crop-or-letterbox-by-runner",
+        "colorOrder": "RGB",
+        "normalization": "float32_0_1"
+      },
+      "postprocess": {
+        "embeddingLayer": "avgpool",
+        "embeddingDimension": 512,
+        "embeddingNormalization": "l2"
+      }
+    },
+    {
+      "id": "coco_yolo_external_onnx",
+      "name": "COCO YOLO11n External ONNX",
+      "type": "object_detection",
+      "path": "quality/public_datasets/models/object_detection/yolo11n.onnx",
+      "version": "external",
+      "execution_provider": "cpu",
+      "source": "external-artifact-not-committed",
+      "license": "AGPL-3.0-or-Ultralytics-Enterprise",
       "model_sha256": "",
       "input_shape": [1, 3, 640, 640],
       "num_classes": 80,
@@ -41,7 +63,7 @@
         "padValue": 114
       },
       "postprocess": {
-        "yoloVersion": "Auto",
+        "yoloVersion": "YOLOv11",
         "confidenceThreshold": 0.25,
         "nmsIouThreshold": 0.45,
         "classAwareNms": true

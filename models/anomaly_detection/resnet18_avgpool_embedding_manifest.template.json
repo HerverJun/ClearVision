@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "2026-04-30.anomaly-embedding-model-manifest.v1",
+  "modelId": "resnet18_avgpool_embedding_external_onnx",
+  "modelSha256": "<fill-after-installing-external-model>",
+  "artifactPath": "quality/public_datasets/models/anomaly_detection/resnet18_avgpool_embedding.onnx",
+  "source": "ResNet18 ImageNet-pretrained avgpool embedding exported to ONNX for PatchCore-style anomaly evaluation; model artifact is not committed to git.",
+  "license": "Verify upstream framework and pretrained-weight terms before publishing metrics or redistribution.",
+  "inputShape": [1, 3, 224, 224],
+  "outputShape": [1, 512],
+  "preprocess": {
+    "resize": "center-crop-or-letterbox-by-runner",
+    "colorOrder": "RGB",
+    "normalization": "float32_0_1"
+  },
+  "embedding": {
+    "featureExtractorId": "onnx_embedding",
+    "layer": "avgpool",
+    "dimension": 512,
+    "normalization": "l2"
+  },
+  "claimBoundary": {
+    "fieldSignoff": "MVTec public benchmark evidence is not real production-site validation.",
+    "modelArtifactPolicy": "The ONNX model file stays outside git; commit only this manifest, hash, license, and IO schema.",
+    "thresholdPolicy": "Thresholds may be calibrated only on train/validation replay; test splits are single-pass reporting."
+  }
+}
