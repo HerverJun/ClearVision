@@ -34,6 +34,43 @@
           "estimatedSeconds": 360
         },
         {
+          "id": "anomaly_detection_mvtec_ad_full_onnx_embedding",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-candidate",
+          "operators": ["AnomalyDetection"],
+          "datasetManifest": "quality/datasets/mvtec_ad_full_manifest.json",
+          "modelManifest": "models/anomaly_detection/resnet18_avgpool_embedding_manifest.template.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj", "--", "--index", "quality/datasets/mvtec_ad_full_index.json", "--output", "quality/evals/reports/AnomalyDetection_mvtec_ad_full_onnx_embedding.json", "--report", "quality/evals/reports/AnomalyDetection_mvtec_ad_full_onnx_embedding.md", "--candidate-version", "onnx_embedding_resnet18_avgpool", "--profile", "mvtec_ad_full_test_single_pass", "--feature-extractor-id", "onnx_embedding", "--embedding-model-id", "resnet18_avgpool_embedding_external_onnx", "--min-image-auroc", "0.90", "--min-pixel-auroc", "0.85"],
+          "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_ad_full_onnx_embedding.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_mvtec_ad_full_onnx_embedding.md",
+          "estimatedSeconds": 7200,
+          "notes": "MVTec AD full candidate gate. Thresholds must be calibrated only from train/validation replay; test split is single-pass reporting and not field sign-off."
+        },
+        {
+          "id": "anomaly_detection_mvtec_loco_ad_advisory",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-advisory",
+          "operators": ["AnomalyDetection"],
+          "datasetManifest": "quality/datasets/mvtec_loco_ad_manifest.json",
+          "modelManifest": "models/anomaly_detection/resnet18_avgpool_embedding_manifest.template.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/AnomalyDetectionMvtecRunner/AnomalyDetectionMvtecRunner.csproj", "--", "--index", "quality/datasets/mvtec_loco_ad_index.json", "--output", "quality/evals/reports/AnomalyDetection_mvtec_loco_ad_advisory.json", "--report", "quality/evals/reports/AnomalyDetection_mvtec_loco_ad_advisory.md", "--candidate-version", "onnx_embedding_resnet18_avgpool", "--profile", "mvtec_loco_advisory", "--feature-extractor-id", "onnx_embedding", "--embedding-model-id", "resnet18_avgpool_embedding_external_onnx"],
+          "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_loco_ad_advisory.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_mvtec_loco_ad_advisory.md",
+          "estimatedSeconds": 7200,
+          "notes": "LOCO AD is advisory in this phase and must not change default thresholds directly."
+        },
+        {
+          "id": "anomaly_detection_mvtec_ad2_public_manifest_only",
+          "status": "planned",
+          "evidenceKind": "public-benchmark-manifest",
+          "operators": ["AnomalyDetection"],
+          "datasetManifest": "quality/datasets/mvtec_ad2_public_manifest.json",
+          "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_ad2_public_advisory.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_mvtec_ad2_public_advisory.md",
+          "estimatedSeconds": 7200,
+          "notes": "AD2 public-part local replay waits for official archive URL/hash/size; private test server results are outside this local suite."
+        },
+        {
           "id": "deep_learning_detection_dataset",
           "status": "active",
           "evidenceKind": "dataset",
@@ -57,30 +94,43 @@
           "notes": "Real COCO 2017 validation images through product DeepLearning preprocessing and YOLO postprocessing; tensor candidates are annotation-seeded until a trained COCO model is supplied."
         },
         {
-          "id": "deep_learning_coco_real_model_baseline",
+          "id": "deep_learning_coco_real_model_smoke_120",
           "status": "manual",
           "evidenceKind": "public-benchmark-real-model",
           "operators": ["DeepLearning"],
           "datasetManifest": "quality/datasets/coco2017_index.json",
           "modelManifest": "models/object_detection/coco_yolo_real_model_manifest.template.json",
-          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_baseline.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_baseline.md", "--profile", "real_model_hard_nms_045", "--max-cases", "120"],
-          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
-          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_baseline.md",
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_smoke_120.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_smoke_120.md", "--profile", "real_model_smoke_120", "--max-cases", "120"],
+          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_smoke_120.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_smoke_120.md",
           "estimatedSeconds": 600,
           "notes": "Real ONNX Runtime model outputs on COCO public images. The model artifact stays outside git; reports must keep AnnotationSeeded=false and must not claim field sign-off."
         },
         {
-          "id": "deep_learning_coco_real_model_candidate_v2",
+          "id": "deep_learning_coco_real_model_candidate_500",
           "status": "manual",
           "evidenceKind": "public-benchmark-real-model-candidate",
           "operators": ["DeepLearning"],
           "datasetManifest": "quality/datasets/coco2017_index.json",
           "modelManifest": "models/object_detection/coco_yolo_real_model_manifest.template.json",
-          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.md", "--candidate-version", "v2", "--profile", "real_model_hard_nms_045", "--max-cases", "120"],
-          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.json",
-          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_candidate_v2.md",
-          "estimatedSeconds": 600,
-          "notes": "Candidate lane for real-model postprocess/NMS A/B. AP deltas are valid only between real-model outputs, never against annotation-seeded reports."
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_candidate_500.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_candidate_500.md", "--candidate-version", "yolo11n_external", "--profile", "real_model_candidate_500_hard_nms_045", "--max-cases", "500", "--min-ap50", "0.45", "--min-precision-at-50", "0.45", "--min-recall-at-50", "0.35"],
+          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_candidate_500.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_candidate_500.md",
+          "estimatedSeconds": 1800,
+          "notes": "Candidate lane for real YOLO11n ONNX outputs. Required gates: AP50>=0.45, Precision@50>=0.45, Recall@50>=0.35, AnnotationSeeded=false, label order verified by COCO annotation mapping."
+        },
+        {
+          "id": "deep_learning_coco_real_model_manual_full_5000",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-real-model-full",
+          "operators": ["DeepLearning"],
+          "datasetManifest": "quality/datasets/coco2017_index.json",
+          "modelManifest": "models/object_detection/coco_yolo_real_model_manifest.template.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/DeepLearningCocoRealModelRunner/DeepLearningCocoRealModelRunner.csproj", "--", "--index", "quality/datasets/coco2017_index.json", "--model-manifest", "models/object_detection/coco_yolo_real_model_manifest.template.json", "--model", "<external-onnx-model>", "--output", "quality/evals/reports/DeepLearning_coco_real_model_manual_full_5000.json", "--report", "quality/evals/reports/DeepLearning_coco_real_model_manual_full_5000.md", "--candidate-version", "yolo11n_external", "--profile", "real_model_manual_full_5000_hard_nms_045", "--max-cases", "5000", "--min-ap50", "0.45", "--min-precision-at-50", "0.45", "--min-recall-at-50", "0.35"],
+          "baselineJson": "quality/evals/reports/DeepLearning_coco_real_model_manual_full_5000.json",
+          "reportMarkdown": "quality/evals/reports/DeepLearning_coco_real_model_manual_full_5000.md",
+          "estimatedSeconds": 14400,
+          "notes": "Manual full COCO val replay for release review. Public benchmark only; not production-site sign-off."
         },
         {
           "id": "semantic_segmentation_dataset",
@@ -187,6 +237,40 @@
           "notes": "Real BSDS500 test-split boundary evidence using product EdgeDetection/Canny and a local MATLAB v5 annotation reader."
         },
         {
+          "id": "edge_detection_bsds500_recall_guard_candidate",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-candidate",
+          "operators": ["EdgeDetection"],
+          "datasetManifest": "quality/datasets/manifests/EdgeDetection_bsds500_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/BsdsEdgeContourDatasetRunner/BsdsEdgeContourDatasetRunner.csproj", "--", "--index", "quality/datasets/bsds500_index.json", "--split", "test", "--auto-threshold", "true", "--auto-threshold-strategy", "RecallGuardPercentile", "--candidate-version", "recall_guard_percentile", "--profile", "canny_recall_guard_percentile", "--output", "quality/evals/reports/EdgeDetection_bsds500_recall_guard_candidate.json", "--report", "quality/evals/reports/EdgeDetection_bsds500_recall_guard_candidate.md"],
+          "baselineJson": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_candidate.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_bsds500_recall_guard_candidate.md",
+          "estimatedSeconds": 600,
+          "notes": "Canny recall-safe candidate. Promotion requires BSDS recall drop <=0.01 versus frozen baseline."
+        },
+        {
+          "id": "edge_detection_biped_v2_candidate_calibration",
+          "status": "planned",
+          "evidenceKind": "public-benchmark-candidate-calibration",
+          "operators": ["EdgeDetection"],
+          "datasetManifest": "quality/datasets/biped_v2_manifest.json",
+          "baselineJson": "quality/evals/reports/EdgeDetection_biped_v2_candidate.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_biped_v2_candidate.md",
+          "estimatedSeconds": 1800,
+          "notes": "BIPED v2 is used for edge candidate calibration/training support. BSDS500 remains the frozen test gate."
+        },
+        {
+          "id": "edge_detection_uded_candidate_calibration",
+          "status": "planned",
+          "evidenceKind": "public-benchmark-candidate-calibration",
+          "operators": ["EdgeDetection"],
+          "datasetManifest": "quality/datasets/uded_manifest.json",
+          "baselineJson": "quality/evals/reports/EdgeDetection_uded_candidate.json",
+          "reportMarkdown": "quality/evals/reports/EdgeDetection_uded_candidate.md",
+          "estimatedSeconds": 1800,
+          "notes": "UDED is advisory calibration evidence for ONNX edge candidates; it is not a replacement for BSDS500."
+        },
+        {
           "id": "camera_calibration_opencv_samples",
           "status": "active",
           "evidenceKind": "dataset",
@@ -209,6 +293,18 @@
           "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.md",
           "estimatedSeconds": 1200,
           "notes": "Public noncommercial industrial defect smoke gate over the current product SurfaceDefectDetectionOperator; keep separate from commercial release evidence."
+        },
+        {
+          "id": "surface_defect_detection_kolektorsdd2_clahe_response_stats_candidate",
+          "status": "manual",
+          "evidenceKind": "public-benchmark-candidate",
+          "operators": ["SurfaceDefectDetection"],
+          "datasetManifest": "quality/datasets/manifests/SurfaceDefectDetection_kolektorsdd2_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/KolektorSurfaceDefectDatasetRunner/KolektorSurfaceDefectDatasetRunner.csproj", "--", "--index", "quality/datasets/kolektorsdd2_index.json", "--candidate-version", "clahe_response_stats", "--profile", "localcontrast_clahe_response_stats", "--normalization-mode", "ClaheLocalMean", "--clahe-clip-limit", "2.0", "--clahe-tile-grid-size", "8", "--component-filter-mode", "ResponseStats", "--output", "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_clahe_response_stats_candidate.json", "--report", "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_clahe_response_stats_candidate.md"],
+          "baselineJson": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_clahe_response_stats_candidate.json",
+          "reportMarkdown": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_clahe_response_stats_candidate.md",
+          "estimatedSeconds": 1200,
+          "notes": "Default-off candidate. Promotion gate: KSDD2 PixelF1 improves >=0.03, FP/normal<=0.06, low-contrast misses decline, fixed-FPR recall is not reduced."
         },
         {
           "id": "akaze_feature_match_hpatches",

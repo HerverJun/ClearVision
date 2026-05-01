@@ -1,6 +1,7 @@
 param(
     [string[]]$Dataset = @("bsds500", "opencv_calibration_samples", "kolektorsdd2"),
     [string]$Proxy = "",
+    [double]$BudgetGB = 20.0,
     [switch]$Force,
     [switch]$SkipExtract
 )
@@ -66,6 +67,51 @@ function Test-Command {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Get-DirectorySizeBytes {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return [int64]0
+    }
+
+    $sum = [int64]0
+    Get-ChildItem -LiteralPath $Path -Recurse -File -Force | ForEach-Object {
+        $sum += [int64]$_.Length
+    }
+
+    return $sum
+}
+
+function Assert-PublicDatasetBudget {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Destination,
+        [long]$ExpectedSize = 0
+    )
+
+    if ($BudgetGB -le 0 -or $ExpectedSize -le 0) {
+        return
+    }
+
+    $publicRoot = Resolve-RepoPath "quality/public_datasets"
+    $budgetBytes = [int64]($BudgetGB * 1024 * 1024 * 1024)
+    $usedBytes = Get-DirectorySizeBytes -Path $publicRoot
+    $existingBytes = [int64]0
+    if (Test-Path -LiteralPath $Destination) {
+        $existingBytes = [int64](Get-Item -LiteralPath $Destination).Length
+    }
+
+    $projectedBytes = $usedBytes - $existingBytes + $ExpectedSize
+    if ($projectedBytes -gt $budgetBytes) {
+        $usedGb = [math]::Round($usedBytes / 1GB, 2)
+        $projectedGb = [math]::Round($projectedBytes / 1GB, 2)
+        throw "Refusing download because it would exceed the public dataset budget. Used=${usedGb}GB, projected=${projectedGb}GB, budget=${BudgetGB}GB. Increase -BudgetGB or download in smaller phases."
+    }
+}
+
 function Get-ConfiguredProxy {
     if ($Proxy) {
         return $Proxy
@@ -100,6 +146,7 @@ function Invoke-CurlDownload {
     )
 
     Assert-PathInsidePublicDatasets -Path $Destination
+    Assert-PublicDatasetBudget -Destination $Destination -ExpectedSize $ExpectedSize
 
     $destinationDir = Split-Path -Parent $Destination
     New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
@@ -150,6 +197,24 @@ function Invoke-CurlDownload {
     Write-Host "  sha256: $hash"
 }
 
+function Assert-ArchiveHash {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Archive,
+        [string]$ExpectedSha256 = ""
+    )
+
+    if (-not $ExpectedSha256) {
+        return
+    }
+
+    $normalizedExpected = $ExpectedSha256.ToLowerInvariant().Replace("sha256:", "")
+    $actual = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $normalizedExpected) {
+        throw "SHA256 mismatch for $Archive. Expected $normalizedExpected, got $actual."
+    }
+}
+
 function Expand-TarGz {
     param(
         [Parameter(Mandatory = $true)]
@@ -168,6 +233,29 @@ function Expand-TarGz {
     Write-Host "  -> $Destination"
 
     & tar.exe -xzf $Archive -C $Destination
+    if ($LASTEXITCODE -ne 0) {
+        throw "tar.exe failed with exit code $LASTEXITCODE for $Archive"
+    }
+}
+
+function Expand-TarXz {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Archive,
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    if ($SkipExtract) {
+        return
+    }
+
+    Assert-PathInsidePublicDatasets -Path $Destination
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    Write-Host "Extracting $Archive"
+    Write-Host "  -> $Destination"
+
+    & tar.exe -xJf $Archive -C $Destination
     if ($LASTEXITCODE -ne 0) {
         throw "tar.exe failed with exit code $LASTEXITCODE for $Archive"
     }
@@ -274,6 +362,100 @@ function Download-HPatches {
     }
 }
 
+function Download-ManifestDataset {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DatasetId,
+        [Parameter(Mandatory = $true)]
+        [string]$ManifestPath,
+        [switch]$ManifestOnly
+    )
+
+    $resolvedManifest = Resolve-RepoPath $ManifestPath
+    if (-not (Test-Path -LiteralPath $resolvedManifest)) {
+        throw "Dataset manifest not found: $resolvedManifest"
+    }
+
+    $manifest = Get-Content -LiteralPath $resolvedManifest -Raw | ConvertFrom-Json
+    $root = Resolve-RepoPath $manifest.local_root
+    Assert-PathInsidePublicDatasets -Path $root
+    New-Item -ItemType Directory -Force -Path $root | Out-Null
+
+    Write-Host "Manifest: $resolvedManifest"
+    Write-Host "Local root: $root"
+    Write-Host "License: $($manifest.license.id)"
+    Write-Host "Source: $($manifest.source.url)"
+
+    if ($ManifestOnly) {
+        Write-Host "Manifest-only registration complete; no archive download requested."
+        return
+    }
+
+    if (-not $manifest.archives -or $manifest.archives.Count -eq 0) {
+        Write-Warning "Manifest $ManifestPath has no scriptable archive. Registered manifest only; download manually under $root if the upstream host requires authentication or click-through terms."
+        return
+    }
+
+    foreach ($archiveSpec in $manifest.archives) {
+        if (-not $archiveSpec.source_url -or $archiveSpec.source_url -match "^<") {
+            throw "Archive '$($archiveSpec.name)' in $ManifestPath has no concrete source_url."
+        }
+
+        $archiveName = if ($archiveSpec.name) { $archiveSpec.name } else { [System.IO.Path]::GetFileName($archiveSpec.source_url) }
+        $archive = Join-Path $root "_downloads/$archiveName"
+        $expectedSize = [int64]0
+        if ($archiveSpec.PSObject.Properties.Name -contains "size_bytes" -and $null -ne $archiveSpec.size_bytes) {
+            $expectedSize = [int64]$archiveSpec.size_bytes
+        }
+
+        Invoke-CurlDownload -Url $archiveSpec.source_url -Destination $archive -ExpectedSize $expectedSize
+        $expectedHash = ""
+        if ($archiveSpec.PSObject.Properties.Name -contains "sha256" -and $null -ne $archiveSpec.sha256) {
+            $expectedHash = [string]$archiveSpec.sha256
+        }
+
+        Assert-ArchiveHash -Archive $archive -ExpectedSha256 $expectedHash
+
+        $extractTo = if ($archiveSpec.extract_to) { $archiveSpec.extract_to } else { "extracted" }
+        $destination = Join-Path $root $extractTo
+        $archiveType = "$($archiveSpec.archive_type)".ToLowerInvariant()
+        if ($archiveType -eq "tar.xz" -or $archiveName.EndsWith(".tar.xz", [System.StringComparison]::OrdinalIgnoreCase)) {
+            Expand-TarXz -Archive $archive -Destination $destination
+        }
+        elseif ($archiveType -eq "tar.gz" -or $archiveName.EndsWith(".tgz", [System.StringComparison]::OrdinalIgnoreCase) -or $archiveName.EndsWith(".tar.gz", [System.StringComparison]::OrdinalIgnoreCase)) {
+            Expand-TarGz -Archive $archive -Destination $destination
+        }
+        elseif ($archiveType -eq "zip" -or $archiveName.EndsWith(".zip", [System.StringComparison]::OrdinalIgnoreCase)) {
+            Expand-Zip -Archive $archive -Destination $destination
+        }
+        else {
+            Write-Warning "Downloaded $archiveName but did not extract it because archive_type is '$archiveType'."
+        }
+    }
+
+    Write-Host "Dataset $DatasetId downloaded from manifest."
+}
+
+function Download-MvtecAdFull {
+    Download-ManifestDataset -DatasetId "mvtec_ad_full" -ManifestPath "quality/datasets/mvtec_ad_full_manifest.json"
+}
+
+function Download-MvtecLocoAd {
+    Download-ManifestDataset -DatasetId "mvtec_loco_ad" -ManifestPath "quality/datasets/mvtec_loco_ad_manifest.json"
+}
+
+function Download-BipedV2 {
+    Download-ManifestDataset -DatasetId "biped_v2" -ManifestPath "quality/datasets/biped_v2_manifest.json"
+}
+
+function Download-Uded {
+    Download-ManifestDataset -DatasetId "uded" -ManifestPath "quality/datasets/uded_manifest.json"
+}
+
+function Register-MvtecAd2PublicPart {
+    Download-ManifestDataset -DatasetId "mvtec_ad2_public" -ManifestPath "quality/datasets/mvtec_ad2_public_manifest.json" -ManifestOnly
+}
+
 if (-not (Test-Command "curl.exe")) {
     throw "curl.exe is required."
 }
@@ -286,6 +468,8 @@ $script:RepoRoot = Get-RepoRoot
 $script:EffectiveProxy = Get-ConfiguredProxy
 
 Write-Host "Repository: $script:RepoRoot"
+Write-Host "Public dataset root: $(Resolve-RepoPath "quality/public_datasets")"
+Write-Host "Budget: $BudgetGB GB"
 if ($script:EffectiveProxy) {
     Write-Host "Using proxy: $script:EffectiveProxy"
 }
@@ -297,11 +481,23 @@ foreach ($datasetId in $Dataset) {
     Write-Host ""
     Write-Host "Dataset: $datasetId"
     switch ($datasetId.ToLowerInvariant()) {
+        "industrial_detection_priority" {
+            Download-MvtecAdFull
+            Download-MvtecLocoAd
+            Download-BipedV2
+            Download-Uded
+            Register-MvtecAd2PublicPart
+        }
         "bsds500" { Download-Bsds500 }
         "opencv_calibration_samples" { Download-OpenCvCalibrationSamples }
         "kolektorsdd2" { Download-KolektorSdd2 }
         "coco2017" { Download-Coco2017 }
         "hpatches" { Download-HPatches }
+        "mvtec_ad_full" { Download-MvtecAdFull }
+        "mvtec_loco_ad" { Download-MvtecLocoAd }
+        "biped_v2" { Download-BipedV2 }
+        "uded" { Download-Uded }
+        "mvtec_ad2_public" { Register-MvtecAd2PublicPart }
         default { throw "Unknown dataset id: $datasetId" }
     }
 }

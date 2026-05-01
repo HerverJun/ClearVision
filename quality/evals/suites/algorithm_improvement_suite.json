@@ -33,11 +33,200 @@
           "command": [
             "python",
             "quality/tools/run_algorithm_ab_replay.py",
-            "--execute-candidates"
+            "--execute-matching",
+            "--candidate-version",
+            "center_only_v1",
+            "--validation-scope",
+            "matching"
           ],
           "baselineJson": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
           "reportMarkdown": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.md",
           "estimatedSeconds": 180
+        },
+        {
+          "id": "matching_replay_safe_profile_gate",
+          "status": "active",
+          "evidenceKind": "matching-replay-safe-profile",
+          "command": [
+            "python",
+            "quality/tools/build_matching_replay_safe_profile_report.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_matching_replay_safe_profile_candidates_v2.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_matching_replay_safe_profile_candidates_v2.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "matching_leaderboard_build",
+          "status": "active",
+          "evidenceKind": "matching-hpatches-leaderboard",
+          "command": [
+            "python",
+            "quality/tools/build_hpatches_matching_family_leaderboard.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_hpatches_matching_family_leaderboard.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "matching_algorithm_improvement_report_build",
+          "status": "active",
+          "evidenceKind": "matching-algorithm-improvement-report",
+          "command": [
+            "python",
+            "quality/tools/build_matching_algorithm_improvement_report.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_matching_algorithm_improvement_v1.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_matching_algorithm_improvement_v1.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "measurement_precision_stress_v2_execute",
+          "status": "active",
+          "evidenceKind": "measurement-precision-stress",
+          "operators": [
+            "CaliperTool",
+            "ArcCaliper",
+            "LineMeasurement",
+            "CircleMeasurement",
+            "GeometricFitting"
+          ],
+          "command": [
+            "dotnet",
+            "run",
+            "--project",
+            "quality/tools/MeasurementGeometryOracleRunner/MeasurementGeometryOracleRunner.csproj",
+            "--",
+            "--profile",
+            "stress-v2"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_measurement_precision_stress_v2.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_measurement_precision_stress_v2.md",
+          "estimatedSeconds": 120
+        },
+        {
+          "id": "shape_matching_precision_v2_execute",
+          "status": "active",
+          "evidenceKind": "shape-matching-precision",
+          "operators": [
+            "TemplateMatching",
+            "ShapeMatching",
+            "GradientShapeMatch",
+            "PyramidShapeMatch"
+          ],
+          "command": [
+            "python",
+            "quality/tools/build_shape_matching_precision_v2.py",
+            "--execute-candidates"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_shape_matching_precision_v2.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_shape_matching_precision_v2.md",
+          "estimatedSeconds": 180
+        },
+        {
+          "id": "anomaly_detection_threshold_calibration_v1",
+          "status": "active",
+          "evidenceKind": "anomaly-threshold-calibration",
+          "operators": [
+            "AnomalyDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/build_anomaly_threshold_calibration_v1.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_anomaly_threshold_calibration_v1.md",
+          "estimatedSeconds": 15
+        },
+        {
+          "id": "anomaly_detection_candidate_v2_execute",
+          "status": "active",
+          "evidenceKind": "anomaly-candidate-v2",
+          "operators": [
+            "AnomalyDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/build_anomaly_threshold_calibration_v1.py",
+            "--execute-candidate"
+          ],
+          "baselineJson": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.json",
+          "reportMarkdown": "quality/evals/reports/AnomalyDetection_mvtec_candidate_v2.md",
+          "estimatedSeconds": 75
+        },
+        {
+          "id": "detection_ab_replay_execute",
+          "status": "active",
+          "evidenceKind": "detection-ab-replay",
+          "operators": [
+            "SurfaceDefectDetection",
+            "AnomalyDetection",
+            "EdgeDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_algorithm_ab_replay.py",
+            "--execute-surface-defect",
+            "--execute-anomaly-detection",
+            "--execute-edge-detection",
+            "--anomaly-detection-candidate-version",
+            "v2",
+            "--validation-scope",
+            "detection"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.md",
+          "estimatedSeconds": 180
+        },
+        {
+          "id": "edge_detection_recall_guard_sweep",
+          "status": "active",
+          "evidenceKind": "edge-detection-recall-guard-sweep",
+          "operators": [
+            "EdgeDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/run_edge_detection_bsds_recall_guard_sweep.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v1.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_edge_detection_recall_guard_sweep_v1.md",
+          "estimatedSeconds": 90
+        },
+        {
+          "id": "detection_precision_v2_build",
+          "status": "active",
+          "evidenceKind": "detection-precision-v2",
+          "operators": [
+            "SurfaceDefectDetection",
+            "AnomalyDetection",
+            "EdgeDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/build_detection_precision_v2.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_detection_precision_v2.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_detection_precision_v2.md",
+          "estimatedSeconds": 30
+        },
+        {
+          "id": "detection_precision_v3_build",
+          "status": "manual",
+          "evidenceKind": "detection-precision-v3",
+          "operators": [
+            "SurfaceDefectDetection",
+            "AnomalyDetection",
+            "DeepLearning",
+            "EdgeDetection"
+          ],
+          "command": [
+            "python",
+            "quality/tools/build_detection_precision_v3.py"
+          ],
+          "baselineJson": "quality/evals/reports/QualityFlywheel_detection_precision_v3.json",
+          "reportMarkdown": "quality/evals/reports/QualityFlywheel_detection_precision_v3.md",
+          "estimatedSeconds": 30,
+          "notes": "V3 aggregates the public-dataset backfill plan and explicitly keeps all candidate algorithms default-off. It does not represent real production-site sign-off."
         }
       ]
     },

@@ -11,6 +11,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "quality" / "public_datasets"
 OUTPUT_ROOT = REPO_ROOT / "quality" / "datasets"
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
 def repo_rel(path: Path) -> str:
@@ -356,12 +357,236 @@ def build_hpatches_index() -> None:
     )
 
 
+def find_mvtec_payload_root(root: Path) -> Path:
+    candidates = [root / "extracted", root]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+
+        category_dirs = [
+            path
+            for path in candidate.iterdir()
+            if path.is_dir() and (path / "train").is_dir() and (path / "test").is_dir()
+        ]
+        if category_dirs:
+            return candidate
+
+        for child in sorted(path for path in candidate.iterdir() if path.is_dir()):
+            category_dirs = [
+                path
+                for path in child.iterdir()
+                if path.is_dir() and (path / "train").is_dir() and (path / "test").is_dir()
+            ]
+            if category_dirs:
+                return child
+
+    raise FileNotFoundError(f"MVTec-style extracted root not found under: {root}")
+
+
+def find_mvtec_mask(category_dir: Path, defect_type: str, image_stem: str) -> Path | None:
+    mask_dir = category_dir / "ground_truth" / defect_type
+    if not mask_dir.exists():
+        return None
+
+    candidates = [
+        mask_dir / f"{image_stem}_mask.png",
+        mask_dir / f"{image_stem}.png",
+        mask_dir / f"{image_stem}_mask.bmp",
+        mask_dir / f"{image_stem}.bmp",
+    ]
+    return next((path for path in candidates if path.exists()), None)
+
+
+def build_mvtec_style_index(
+    dataset_id: str,
+    display_name: str,
+    source_dataset: str,
+    output_name: str,
+    license_id: str,
+) -> None:
+    root = DATA_ROOT / dataset_id
+    payload_root = find_mvtec_payload_root(root)
+    records: list[dict[str, Any]] = []
+    split_counts: dict[str, dict[str, int]] = {}
+    category_counts: dict[str, dict[str, int]] = {}
+
+    for category_dir in sorted(path for path in payload_root.iterdir() if path.is_dir()):
+        if not (category_dir / "train").is_dir() or not (category_dir / "test").is_dir():
+            continue
+
+        category = category_dir.name
+        category_counts[category] = {"train": 0, "test": 0, "anomaly": 0, "normal": 0}
+        for split_dir in sorted(path for path in category_dir.iterdir() if path.is_dir() and path.name in {"train", "test", "val"}):
+            split = split_dir.name
+            for defect_dir in sorted(path for path in split_dir.iterdir() if path.is_dir()):
+                defect_type = defect_dir.name
+                for image in sorted(path for path in defect_dir.iterdir() if path.suffix.lower() in IMAGE_EXTENSIONS):
+                    is_anomaly = split != "train" and defect_type.lower() not in {"good", "normal", "ok"}
+                    mask = find_mvtec_mask(category_dir, defect_type, image.stem) if is_anomaly else None
+                    records.append(
+                        {
+                            "id": f"{category}/{split}/{defect_type}/{image.stem}",
+                            "category": category,
+                            "split": split,
+                            "defect_type": defect_type,
+                            "image_path": repo_rel(image),
+                            "mask_path": repo_rel(mask) if mask is not None else "",
+                            "is_anomaly": is_anomaly,
+                            "has_mask": mask is not None,
+                        }
+                    )
+
+                    split_counts.setdefault(split, {"images": 0, "anomaly": 0, "normal": 0})
+                    split_counts[split]["images"] += 1
+                    split_counts[split]["anomaly" if is_anomaly else "normal"] += 1
+                    category_counts[category][split] = category_counts[category].get(split, 0) + 1
+                    category_counts[category]["anomaly" if is_anomaly else "normal"] += 1
+
+    if not records:
+        raise FileNotFoundError(f"No MVTec-style image records found under: {payload_root}")
+
+    write_json(
+        OUTPUT_ROOT / output_name,
+        {
+            "name": display_name,
+            "source_dataset": source_dataset,
+            "created_at": "2026-04-30",
+            "local_root": repo_rel(root),
+            "payload_root": repo_rel(payload_root),
+            "license": license_id,
+            "split_counts": split_counts,
+            "category_counts": category_counts,
+            "record_count": len(records),
+            "records": records,
+            "claim_boundary": "Public benchmark research evidence only; not real production-site validation or sign-off.",
+        },
+    )
+
+
+def infer_split(path: Path) -> str:
+    parts = {part.lower() for part in path.parts}
+    if "train" in parts or "training" in parts:
+        return "train"
+    if "val" in parts or "validation" in parts:
+        return "val"
+    if "test" in parts or "testing" in parts:
+        return "test"
+    return "unknown"
+
+
+def is_edge_label_path(path: Path) -> bool:
+    parts = {part.lower() for part in path.parts}
+    return any(
+        token in part
+        for part in parts
+        for token in ("edge", "edges", "label", "labels", "gt", "mask", "groundtruth", "ground_truth", "annotation")
+    )
+
+
+def candidate_edge_label_paths(image: Path, dataset_root: Path) -> list[Path]:
+    relative = image.relative_to(dataset_root)
+    parts = list(relative.parts)
+    replacements = {
+        "imgs": "edge_maps",
+        "images": "edges",
+        "image": "edge",
+        "rgb": "edge",
+        "rgbr": "edge",
+        "data": "labels",
+    }
+
+    candidates: list[Path] = []
+    for index, part in enumerate(parts[:-1]):
+        lower = part.lower()
+        if lower in replacements:
+            replaced = parts.copy()
+            replaced[index] = replacements[lower]
+            for suffix in (".png", ".jpg", ".jpeg", ".bmp"):
+                replaced[-1] = f"{image.stem}{suffix}"
+                candidates.append(dataset_root / Path(*replaced))
+
+    for name in (
+        f"{image.stem}.png",
+        f"{image.stem}_edge.png",
+        f"{image.stem}_edges.png",
+        f"{image.stem}_gt.png",
+        f"{image.stem}_label.png",
+    ):
+        candidates.append(image.with_name(name))
+
+    return candidates
+
+
+def build_generic_edge_index(dataset_id: str, display_name: str, source_dataset: str, output_name: str, license_id: str) -> None:
+    root = DATA_ROOT / dataset_id
+    dataset_root = root / "extracted" if (root / "extracted").exists() else root
+    if not dataset_root.exists():
+        raise FileNotFoundError(f"{display_name} root not found: {dataset_root}")
+
+    images = [
+        path
+        for path in sorted(dataset_root.rglob("*"))
+        if path.is_file()
+        and path.suffix.lower() in IMAGE_EXTENSIONS
+        and "_downloads" not in path.parts
+        and not is_edge_label_path(path)
+    ]
+    records: list[dict[str, Any]] = []
+    split_counts: dict[str, dict[str, int]] = {}
+    for image in images:
+        label = next((path for path in candidate_edge_label_paths(image, dataset_root) if path.exists()), None)
+        split = infer_split(image.relative_to(dataset_root))
+        records.append(
+            {
+                "id": image.relative_to(dataset_root).with_suffix("").as_posix(),
+                "split": split,
+                "image_path": repo_rel(image),
+                "edge_path": repo_rel(label) if label is not None else "",
+                "has_ground_truth": label is not None,
+            }
+        )
+        split_counts.setdefault(split, {"images": 0, "with_ground_truth": 0})
+        split_counts[split]["images"] += 1
+        if label is not None:
+            split_counts[split]["with_ground_truth"] += 1
+
+    if not records:
+        raise FileNotFoundError(f"No edge image records found under: {dataset_root}")
+
+    write_json(
+        OUTPUT_ROOT / output_name,
+        {
+            "name": display_name,
+            "source_dataset": source_dataset,
+            "created_at": "2026-04-30",
+            "local_root": repo_rel(root),
+            "payload_root": repo_rel(dataset_root),
+            "license": license_id,
+            "split_counts": split_counts,
+            "record_count": len(records),
+            "records": records,
+            "claim_boundary": "Public edge benchmark research evidence only; not real production-site validation or sign-off.",
+        },
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build manifest-only indexes for downloaded public quality datasets.")
     parser.add_argument(
         "--dataset",
         action="append",
-        choices=("bsds500", "opencv_calibration_samples", "kolektorsdd2", "coco2017", "hpatches"),
+        choices=(
+            "bsds500",
+            "opencv_calibration_samples",
+            "kolektorsdd2",
+            "coco2017",
+            "hpatches",
+            "mvtec_ad_full",
+            "mvtec_loco_ad",
+            "mvtec_ad2_public",
+            "biped_v2",
+            "uded",
+        ),
         help="Dataset to index. Repeatable. Defaults to all supported datasets.",
     )
     args = parser.parse_args()
@@ -378,6 +603,16 @@ def main() -> int:
             build_coco2017_index()
         elif dataset == "hpatches":
             build_hpatches_index()
+        elif dataset == "mvtec_ad_full":
+            build_mvtec_style_index("mvtec_ad_full", "MVTec AD full", "MVTec AD", "mvtec_ad_full_index.json", "CC-BY-NC-SA-4.0")
+        elif dataset == "mvtec_loco_ad":
+            build_mvtec_style_index("mvtec_loco_ad", "MVTec LOCO AD", "MVTec LOCO AD", "mvtec_loco_ad_index.json", "CC-BY-NC-SA-4.0")
+        elif dataset == "mvtec_ad2_public":
+            build_mvtec_style_index("mvtec_ad2_public", "MVTec AD 2 public part", "MVTec AD 2", "mvtec_ad2_public_index.json", "MVTec-AD2-dataset-terms")
+        elif dataset == "biped_v2":
+            build_generic_edge_index("biped_v2", "BIPED v2", "BIPED v2", "biped_v2_index.json", "non-commercial-research")
+        elif dataset == "uded":
+            build_generic_edge_index("uded", "UDED", "UDED", "uded_index.json", "upstream-research-terms")
         print(f"indexed {dataset}")
 
     return 0

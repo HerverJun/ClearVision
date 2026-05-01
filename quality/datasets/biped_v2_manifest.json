@@ -1,0 +1,21 @@
+{
+  "schema_version": "2026-04-30.public-quality-dataset-manifest.v1",
+  "dataset_id": "biped_v2",
+  "name": "BIPED v2",
+  "target_operators": ["EdgeDetection"],
+  "download_priority": 3,
+  "local_root": "quality/public_datasets/biped_v2",
+  "license": {
+    "id": "non-commercial-research",
+    "commercial_use": false,
+    "notes": "Use only for research/evaluation; verify upstream terms before redistributing derived reports."
+  },
+  "source": {
+    "url": "https://xavysp.github.io/MBIPED/",
+    "publisher": "BIPED authors",
+    "description": "High-resolution edge detection benchmark; 200 train / 50 test split."
+  },
+  "archives": [],
+  "index_output": "quality/datasets/biped_v2_index.json",
+  "claim_boundary": "Calibration/training support for edge candidates; BSDS500 remains the frozen public test gate."
+}
