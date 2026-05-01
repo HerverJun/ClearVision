@@ -1,6 +1,6 @@
 # 第5批 SurfaceDefectDetection 准工业算法调优报告
 
-**生成时间**：2026-04-29T15:39:12+00:00
+**生成时间**：2026-05-01T04:56:01+00:00
 
 ## 1. 结论
 
@@ -10,33 +10,36 @@
 
 | Metric | Baseline | Candidate |
 |---|---:|---:|
-| Pixel F1 | 0.2692 | 0.2829 |
-| Image AUROC | 0.7724 | 0.7728 |
-| Image F1 | 0.5671 | 0.7000 |
-| FP/normal | 0.1398 | 0.0515 |
+| Pixel F1 | 0.2692 | 0.2692 |
+| Image AUROC | 0.7724 | 0.7724 |
+| Image F1 | 0.5671 | 0.5671 |
+| FP/normal | 0.1398 | 0.1398 |
 
 ## 3. A/B replay
 
 - Replay cases: 20
-- Improved metric cases: 10
+- Improved metric cases: 0
 - Regressed cases: 0
-- Worse metric cases: 8
+- Worse metric cases: 0
 
 ## 4. 失败 taxonomy
 
 | Taxonomy | Count |
 |---|---:|
-| low_contrast_defect_miss | 19 |
+| low_contrast_defect_miss | 15 |
 | mask_overgrowth_false_positive | 1 |
-| oversegmentation_false_positive | 1 |
-| small_defect_miss | 7 |
-| texture_noise_false_positive | 45 |
-| undersegmentation_false_negative | 37 |
+| oversegmentation_false_positive | 2 |
+| small_defect_miss | 2 |
+| texture_noise_false_positive | 123 |
+| undersegmentation_false_negative | 46 |
 
 ## 5. 证据文件
 
 - `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_baseline.json`
-- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v1.json`
-- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v1.json`
-- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v1.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_failure_taxonomy_v2.json`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_component_telemetry_v2.csv`
+- `quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_component_distribution_v2.csv`
+- `quality/evals/reports/QualityFlywheel_surface_defect_component_rule_selector_v2.json`
 - `quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json`

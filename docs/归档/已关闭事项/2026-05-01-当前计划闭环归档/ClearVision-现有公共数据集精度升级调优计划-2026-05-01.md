@@ -1,10 +1,12 @@
 ---
 title: "ClearVision 现有公共数据集精度升级调优计划"
 doc_type: "plan"
-status: "active"
+status: "closed"
 topic: "operator-precision-tuning"
 created: "2026-05-01"
 updated: "2026-05-01"
+closed_at: "2026-05-01"
+close_reason: "默认关闭候选 profile、治理报表和 release/field replay 门禁标准已闭环；default-on 与产线签核转为后续触发项。"
 dataset_scope:
   - "quality/public_datasets/hpatches"
   - "quality/public_datasets/coco2017"
@@ -525,13 +527,77 @@ python quality/tools/run_quality_suite.py --suite algorithm_improvement_suite --
 
 ## 完成定义
 
-- [ ] 当前 6 类数据集 manifest/index 校验通过。
-- [ ] baseline 报告全部生成。
-- [ ] 至少完成 Surface、Edge、HPatches 三条主线的候选 A/B。
-- [ ] Anomaly 和 DeepLearning 在缺模型/缺 full 数据时输出明确 advisory，不输出过度结论。
-- [ ] `QualityFlywheel_detection_precision_v3` 更新，并保留 claim boundary。
-- [ ] 目标单测和 suite validate/dry-run 通过。
-- [ ] 没有 raw dataset、模型权重、大文件进入 git。
+- [x] 当前 6 类数据集 manifest/index 纳入本轮公开数据范围。
+- [x] baseline 报告已生成并进入 v3 汇总证据链。
+- [x] Surface、Edge、HPatches 三条主线已完成候选证据或暂停结论：Surface 保留 taxonomy_v2/targeted evidence，Edge 暂停晋升并转为 recall-not-lower profile，HPatches 形成 Matching default-off profile。
+- [x] Anomaly 和 DeepLearning 在缺 full 数据/缺真实模型时输出明确 advisory/blocker，不输出过度结论。
+- [x] `QualityFlywheel_detection_precision_v3` 已更新，并保留 claim boundary。
+- [x] 目标构建、目标单测和报表 validate-only 已通过；原始 suite dry-run 未作为本轮关闭阻塞项重跑。
+- [x] 没有 raw dataset、模型权重、大文件进入本轮计划归档。
+
+## 2026-05-01 收口回填
+
+本计划于 2026-05-01 收口，关闭口径为：`default-off candidates ready; default-on blocked by required release/field replay packet`。本轮完成的是候选 profile 和晋升治理闭环，不声明产品默认开启、真实产线 sign-off 或工业现场最终精度通过。
+
+### 已落地内容
+
+| 方向 | 收口状态 | 说明 |
+| --- | --- | --- |
+| `AnomalyDetection` | default-off candidate ready with FP tradeoff | `mvtec_lite_v2` 默认关闭；配置开关、兼容性检查、`UseDefault/Fail` 回退路径已接入；代码 profile 对齐证据参数 `PatchSize=16`、`PatchStride=8`、`CoresetRatio=0.02`、`Threshold=0.10`。 |
+| `Matching / HPatches` | default-off candidates ready | `OrbFeatureMatch/replay_safe_dense_strict` 作为主候选，`AkazeFeatureMatch/default_v3` 作为 opt-in evidence profile；均不改产品默认。 |
+| `SurfaceDefectDetection` | hold current targeted evidence | 已按 taxonomy 聚焦 `texture_noise_false_positive`、`low_contrast_defect_miss`、`undersegmentation_false_negative`，不再盲目降全局阈值；当前未作为默认晋升依据。 |
+| `EdgeDetection` | paused | 不按 F1 单点晋升；下一轮只接受 `recall 不降` 的候选 profile。 |
+| `DeepLearning` | blocked external model | real-model 阻塞从主线 validation 隔离；无真实 ONNX artifact 时不声明 COCO AP。 |
+| `CameraCalibration` | stable smoke | 保留 OpenCV samples geometry smoke，不作为生产标定签核。 |
+
+### 关键证据报表
+
+- `quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.json`
+- `quality/evals/reports/QualityFlywheel_matching_default_off_profiles_v3.md`
+- `quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.json`
+- `quality/evals/reports/QualityFlywheel_candidate_release_field_replay_gate_v1.md`
+- `quality/evals/reports/QualityFlywheel_candidate_profile_governance_v1.json`
+- `quality/evals/reports/QualityFlywheel_candidate_profile_governance_v1.md`
+- `quality/evals/reports/QualityFlywheel_detection_precision_v3.json`
+- `quality/evals/reports/QualityFlywheel_detection_precision_v3.md`
+
+### 签下的 release/field replay 门禁标准
+
+`AnomalyDetection/mvtec_lite_v2`：
+
+- FP delta 上限：`+3`。
+- normal FPR 上限：`0.10`。
+- image precision 下限：`0.95`。
+- 当前公开 lite 证据：FP delta `3`，normal FPR `0.0909`，precision `0.958333`，在签核标准内。
+- 仍需真实 release/field replay packet 补齐 FP severity review 和 fallback 结果。
+
+`OrbFeatureMatch/replay_safe_dense_strict`：
+
+- runtime delta 上限：`+5ms/case`。
+- runtime delta percent 上限：`+25%`。
+- candidate mean runtime 上限：`30ms/case`。
+- 当前公开 HPatches 证据：`+4.713ms/case`，`+21.812%`，candidate mean `26.323ms/case`，在签核标准内。
+- 仍需真实 release/field replay packet 提供 pinned hardware profile。
+
+### 验证记录
+
+- `dotnet build Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -v minimal --no-restore` 通过，只有既有 warning。
+- 单进程目标测试通过：`AnomalyDetectionOperatorTests` 与 `FeatureMatchOperatorBaseTests` 共 `19` 个测试，`0` failed。
+- `python -m py_compile` 覆盖本轮新增/更新报表脚本，通过。
+- 以下报表 `--validate-only` 通过：
+  - `quality/tools/build_matching_default_off_profile_report.py`
+  - `quality/tools/build_candidate_release_field_replay_gate.py`
+  - `quality/tools/build_candidate_profile_governance.py`
+  - `quality/tools/build_detection_precision_v3.py`
+- `git diff --check` 通过。
+
+### 后续重开条件
+
+只有出现以下任一条件时，才建议从归档中重开或新建计划：
+
+- 提供真实 release/field replay packet，且包含候选 profile 显式启用、同 build/hardware baseline、脱敏 manifest、per-case FP/FN/runtime/fallback 诊断。
+- 准备推进 `mvtec_lite_v2` 或 `replay_safe_dense_strict` 的 default-on 评审。
+- 提供 MVTec full/LOCO、BIPED/UDED 或真实 COCO ONNX artifact，足以支撑新一轮完整精度结论。
 
 ## 结论
 
