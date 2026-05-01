@@ -37,7 +37,7 @@ TEMPLATE_MATCHING_OPERATORS = {"TemplateMatching"}
 SHAPE_MATCHING_OPERATORS = {"ShapeMatching"}
 CAMERA_CALIBRATION_OPERATORS = {"CameraCalibration"}
 DEFAULT_MATCHING_CANDIDATE_VERSION = "center_only_v1"
-DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION = "v1"
+DEFAULT_SURFACE_DEFECT_CANDIDATE_VERSION = "v2"
 DEFAULT_ANOMALY_DETECTION_CANDIDATE_VERSION = "v2"
 DEFAULT_DEEP_LEARNING_CANDIDATE_VERSION = "v2"
 DEFAULT_EDGE_DETECTION_CANDIDATE_VERSION = "v1"
@@ -571,6 +571,9 @@ def surface_candidate_parameters(candidate_version: str) -> dict[str, Any]:
         "ReferenceStatsSigma": 2.5,
         "RobustReferenceStats": False,
         "ResponseNormalizeMode": "RawClamp",
+        "ClaheClipLimit": 2.0,
+        "ClaheTileGridSize": 8,
+        "ComponentFilterMode": "AreaOnly",
         "PixelSampleStride": 4,
         "MinImageAuroc": 0.70,
         "MinPixelF1": 0.20,
@@ -766,6 +769,12 @@ def execute_surface_defect_candidate(case_ids: list[str], candidate_version: str
         str(parameters["RobustReferenceStats"]).lower(),
         "--response-normalize-mode",
         str(parameters["ResponseNormalizeMode"]),
+        "--clahe-clip-limit",
+        str(parameters["ClaheClipLimit"]),
+        "--clahe-tile-grid-size",
+        str(parameters["ClaheTileGridSize"]),
+        "--component-filter-mode",
+        str(parameters["ComponentFilterMode"]),
         "--pixel-sample-stride",
         str(parameters["PixelSampleStride"]),
         "--min-image-auroc",
@@ -1498,6 +1507,35 @@ def build_report(
     }
 
 
+def resolve_report_reference(value: str | None) -> Path | None:
+    if not value or value == "same-as-old-control":
+        return None
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def is_surface_defect_hold_current(report: dict[str, Any]) -> bool:
+    for row in report.get("operators", []):
+        if row.get("operator") != "SurfaceDefectDetection":
+            continue
+        baseline_path = resolve_report_reference(row.get("oldBaseline"))
+        candidate_path = resolve_report_reference(row.get("candidateBaseline"))
+        if baseline_path is None or candidate_path is None:
+            return False
+        if not baseline_path.exists() or not candidate_path.exists():
+            return False
+        baseline = read_json(baseline_path).get("Summary", {})
+        candidate = read_json(candidate_path).get("Summary", {})
+        return (
+            baseline.get("ProfileName") == candidate.get("ProfileName") and
+            baseline.get("Method") == candidate.get("Method") and
+            baseline.get("ThresholdMode") == candidate.get("ThresholdMode") and
+            float(baseline.get("Threshold", -1)) == float(candidate.get("Threshold", -2)) and
+            int(baseline.get("MinArea", -1)) == int(candidate.get("MinArea", -2))
+        )
+    return False
+
+
 def validate(report: dict[str, Any], validation_scope: str = "full") -> list[str]:
     errors: list[str] = []
     rows = report.get("operators")
@@ -1552,12 +1590,38 @@ def validate(report: dict[str, Any], validation_scope: str = "full") -> list[str
             errors.append("detection-scoped A/B replay cases must include old/new/delta")
         if sum(1 for case in detection_cases if case.get("status") == "regressed") != 0:
             errors.append("detection-scoped A/B replay must have zero pass/fail regressions")
-        if summary.get("surfaceDefectImprovedCaseCount", 0) <= 0:
+        if summary.get("surfaceDefectImprovedCaseCount", 0) <= 0 and not is_surface_defect_hold_current(report):
             errors.append("detection-scoped A/B replay must improve at least one SurfaceDefectDetection replay case")
         if summary.get("anomalyDetectionImprovedCaseCount", 0) <= 0:
             errors.append("detection-scoped A/B replay must improve at least one AnomalyDetection replay case")
         if summary.get("edgeDetectionImprovedCaseCount", 0) <= 0:
             errors.append("detection-scoped A/B replay must improve at least one EdgeDetection replay case")
+        if RAW_PATH_RE.search(json.dumps(report, ensure_ascii=False)):
+            errors.append("A/B replay report contains raw path pattern")
+        return errors
+
+    if validation_scope == "mainline":
+        if summary.get("replayCaseCount", 0) < 100:
+            errors.append("mainline A/B replay report must include the full replay set")
+        if summary.get("candidatePendingCount") != 0:
+            errors.append("mainline A/B replay report must not contain candidate-pending rows")
+        if summary.get("comparedCaseCount") != summary.get("replayCaseCount"):
+            errors.append("mainline A/B replay report must compare every replay case")
+        if summary.get("regressedCaseCount", 0) != 0:
+            errors.append("mainline A/B replay report must have zero pass/fail regressions")
+        for row in rows:
+            operator = row.get("operator")
+            cases = row.get("replayCases", [])
+            if row.get("replayCaseCount", 0) <= 0 or not cases:
+                errors.append(f"{operator} missing replay comparisons")
+            if row.get("comparisonStatus") == "candidate-pending":
+                errors.append(f"{operator} still candidate-pending")
+            if operator == "DeepLearning" and row.get("comparisonStatus") != "candidate-executed":
+                if row.get("candidateBaseline") != "same-as-old-control":
+                    errors.append("DeepLearning blocked real-model row must use same-as-old-control until a real ONNX candidate is supplied")
+            for case in cases:
+                if not case.get("old") or not case.get("new") or case.get("delta") is None:
+                    errors.append(f"{operator} {case.get('caseId')} missing old/new/delta")
         if RAW_PATH_RE.search(json.dumps(report, ensure_ascii=False)):
             errors.append("A/B replay report contains raw path pattern")
         return errors
@@ -2040,7 +2104,7 @@ def main() -> int:
     parser.add_argument("--deep-learning-model-manifest", default="models/object_detection/coco_yolo_real_model_manifest.template.json", help="DeepLearning real-model manifest path.")
     parser.add_argument("--deep-learning-model", default=None, help="Optional DeepLearning ONNX model artifact path. Model files must not be committed.")
     parser.add_argument("--validate-only", action="store_true", help="Validate the existing generated A/B replay report.")
-    parser.add_argument("--validation-scope", choices=("full", "matching", "detection"), default="full", help="Validation scope. Use matching or detection for focused replay gates.")
+    parser.add_argument("--validation-scope", choices=("mainline", "full", "matching", "detection"), default="mainline", help="Validation scope. mainline excludes blocked external-model work; full requires DeepLearning real-model evidence.")
     args = parser.parse_args()
 
     execute_matching = args.execute_matching or args.execute_candidates

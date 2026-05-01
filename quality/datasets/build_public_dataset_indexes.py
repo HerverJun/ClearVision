@@ -12,6 +12,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "quality" / "public_datasets"
 OUTPUT_ROOT = REPO_ROOT / "quality" / "datasets"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+PLAN_SCOPE_DATASETS = (
+    "hpatches",
+    "coco2017",
+    "kolektorsdd2",
+    "mvtec_ad_lite",
+    "bsds500",
+    "opencv_calibration_samples",
+)
+SUPPORTED_DATASETS = (
+    *PLAN_SCOPE_DATASETS,
+    "mvtec_ad_full",
+    "mvtec_loco_ad",
+    "mvtec_ad2_public",
+    "biped_v2",
+    "uded",
+)
 
 
 def repo_rel(path: Path) -> str:
@@ -571,27 +587,26 @@ def build_generic_edge_index(dataset_id: str, display_name: str, source_dataset:
 
 
 def main() -> int:
+    global DATA_ROOT
+
     parser = argparse.ArgumentParser(description="Build manifest-only indexes for downloaded public quality datasets.")
+    parser.add_argument(
+        "--root",
+        default=str(DATA_ROOT.relative_to(REPO_ROOT)),
+        help="Public dataset root. Defaults to quality/public_datasets.",
+    )
     parser.add_argument(
         "--dataset",
         action="append",
-        choices=(
-            "bsds500",
-            "opencv_calibration_samples",
-            "kolektorsdd2",
-            "coco2017",
-            "hpatches",
-            "mvtec_ad_full",
-            "mvtec_loco_ad",
-            "mvtec_ad2_public",
-            "biped_v2",
-            "uded",
-        ),
-        help="Dataset to index. Repeatable. Defaults to all supported datasets.",
+        choices=SUPPORTED_DATASETS,
+        help="Dataset to index. Repeatable. Defaults to the six-dataset 2026-05-01 plan scope.",
     )
     args = parser.parse_args()
 
-    datasets = args.dataset or ["bsds500", "opencv_calibration_samples", "kolektorsdd2"]
+    root = Path(args.root)
+    DATA_ROOT = root if root.is_absolute() else (REPO_ROOT / root)
+
+    datasets = args.dataset or list(PLAN_SCOPE_DATASETS)
     for dataset in datasets:
         if dataset == "bsds500":
             build_bsds500_index()
@@ -603,6 +618,8 @@ def main() -> int:
             build_coco2017_index()
         elif dataset == "hpatches":
             build_hpatches_index()
+        elif dataset == "mvtec_ad_lite":
+            build_mvtec_style_index("mvtec_ad_lite", "MVTec AD Lite", "MVTec AD Lite subset", "mvtec_ad_lite_index.json", "CC-BY-NC-SA-4.0")
         elif dataset == "mvtec_ad_full":
             build_mvtec_style_index("mvtec_ad_full", "MVTec AD full", "MVTec AD", "mvtec_ad_full_index.json", "CC-BY-NC-SA-4.0")
         elif dataset == "mvtec_loco_ad":

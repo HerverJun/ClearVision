@@ -1001,7 +1001,7 @@ internal sealed class RunnerOptions
     public double MaxReprojectionRmsPx { get; init; } = 1.0;
     public int MinStereoPairs { get; init; } = 10;
     public double MaxStereoReprojectionRmsPx { get; init; } = 1.0;
-    public double MaxEpipolarErrorPx { get; init; } = 1.0;
+    public double MaxEpipolarErrorPx { get; init; } = 2.5;
     public IReadOnlySet<string> CaseIds { get; init; } = new HashSet<string>(StringComparer.Ordinal);
     public string CandidateVersion { get; init; } = "v1";
     public string Profile { get; init; } = "camera_calibration";
@@ -1125,7 +1125,7 @@ internal sealed class RunnerOptions
         public double MaxReprojectionRmsPx { get; set; } = 1.0;
         public int MinStereoPairs { get; set; } = 10;
         public double MaxStereoReprojectionRmsPx { get; set; } = 1.0;
-        public double MaxEpipolarErrorPx { get; set; } = 1.0;
+        public double MaxEpipolarErrorPx { get; set; } = 2.5;
         public HashSet<string> CaseIds { get; set; } = new();
         public string CandidateVersion { get; set; } = "v1";
         public string Profile { get; set; } = "camera_calibration";

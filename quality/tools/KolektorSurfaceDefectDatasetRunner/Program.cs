@@ -113,6 +113,12 @@ internal static class KolektorRunner
                 options.ClaheClipLimit,
                 options.ClaheTileGridSize,
                 options.ComponentFilterMode,
+                options.SmallNoiseAreaMax,
+                options.MinElongationForSmallComponent,
+                options.CompactNoiseAreaMax,
+                options.CompactNoiseCircularityMin,
+                options.CompactNoiseFillRatioMin,
+                options.MinLocalResponseProminence,
                 records.Count,
                 results.Count(item => item.Passed),
                 metricFailures.Count,
@@ -190,6 +196,7 @@ internal static class KolektorRunner
             using var response = NormalizeResponse(responseWrapper.MatReadOnly, image.Size());
 
             var totals = EvaluateMask(predictedMask, groundTruthMask);
+            var components = ExtractComponentTelemetry(record, predictedMask, groundTruthMask, response);
             CollectPixelScores(response, groundTruthMask, options.PixelSampleStride, pixelScores);
             var score = ImageScore(response, predictedMask, output);
             var predictedDefect = Convert.ToDouble(output.OutputData?["DefectArea"] ?? 0.0) > 0.0 ||
@@ -210,6 +217,7 @@ internal static class KolektorRunner
                 totals,
                 record.IsDefect == predictedDefect,
                 taxonomy,
+                components,
                 diagnostics,
                 true,
                 Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
@@ -232,6 +240,7 @@ internal static class KolektorRunner
                 PixelTotals.Empty,
                 !record.IsDefect,
                 ClassifyImage(record, false, PixelTotals.Empty, 0, 0, ex.GetBaseException().Message),
+                [],
                 new Dictionary<string, object?>(),
                 false,
                 Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
@@ -410,6 +419,119 @@ internal static class KolektorRunner
         return new PixelTotals(tp, fp, fn, tn);
     }
 
+    private static List<ComponentTelemetry> ExtractComponentTelemetry(
+        KolektorRecord record,
+        Mat predictedMask,
+        Mat groundTruthMask,
+        Mat response)
+    {
+        var rows = new List<ComponentTelemetry>();
+        AddComponentTelemetryRows(record, predictedMask, groundTruthMask, response, "predicted", rows);
+        AddComponentTelemetryRows(record, groundTruthMask, predictedMask, response, "ground_truth", rows);
+        return rows;
+    }
+
+    private static void AddComponentTelemetryRows(
+        KolektorRecord record,
+        Mat sourceMask,
+        Mat overlapMask,
+        Mat response,
+        string source,
+        List<ComponentTelemetry> destination)
+    {
+        using var contourInput = sourceMask.Clone();
+        Cv2.FindContours(contourInput, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+        var componentIndex = 0;
+        foreach (var contour in contours)
+        {
+            using var componentMask = new Mat(sourceMask.Size(), MatType.CV_8UC1, Scalar.Black);
+            Cv2.DrawContours(componentMask, new[] { contour }, -1, Scalar.White, -1);
+            var pixelArea = Cv2.CountNonZero(componentMask);
+            if (pixelArea <= 0)
+            {
+                continue;
+            }
+
+            using var overlap = new Mat();
+            Cv2.BitwiseAnd(componentMask, overlapMask, overlap);
+            var overlapPixels = Cv2.CountNonZero(overlap);
+
+            string kind;
+            long truePositivePixels;
+            long falsePositivePixels;
+            long falseNegativePixels;
+            if (source == "predicted")
+            {
+                kind = overlapPixels > 0 ? "true_positive" : "false_positive";
+                truePositivePixels = overlapPixels;
+                falsePositivePixels = Math.Max(0, pixelArea - overlapPixels);
+                falseNegativePixels = 0;
+            }
+            else
+            {
+                if (overlapPixels > 0)
+                {
+                    continue;
+                }
+
+                kind = "false_negative";
+                truePositivePixels = 0;
+                falsePositivePixels = 0;
+                falseNegativePixels = pixelArea;
+            }
+
+            var rect = Cv2.BoundingRect(contour);
+            var shorterSide = Math.Max(1, Math.Min(rect.Width, rect.Height));
+            var longerSide = Math.Max(1, Math.Max(rect.Width, rect.Height));
+            var area = Cv2.ContourArea(contour);
+            var fillRatio = rect.Width <= 0 || rect.Height <= 0
+                ? 0.0
+                : area / (rect.Width * rect.Height);
+            var perimeter = Cv2.ArcLength(contour, true);
+            var circularity = perimeter <= 1e-6
+                ? 0.0
+                : Math.Clamp((4.0 * Math.PI * area) / (perimeter * perimeter), 0.0, 1.0);
+            Cv2.MinMaxLoc(response, out _, out var componentPeak, out _, out _, componentMask);
+            var componentMean = Cv2.Mean(response, componentMask).Val0;
+            var ringMean = ComputeRingMean(response, componentMask);
+
+            destination.Add(new ComponentTelemetry(
+                record.Id,
+                source,
+                kind,
+                componentIndex++,
+                record.IsDefect,
+                overlapPixels > 0,
+                Math.Round(area, 6),
+                pixelArea,
+                rect.X,
+                rect.Y,
+                rect.Width,
+                rect.Height,
+                Math.Round(longerSide / (double)shorterSide, 6),
+                Math.Round(fillRatio, 6),
+                Math.Round(circularity, 6),
+                Math.Round(componentMean, 6),
+                Math.Round(componentPeak, 6),
+                Math.Round(ringMean, 6),
+                Math.Round(componentPeak - ringMean, 6),
+                overlapPixels,
+                truePositivePixels,
+                falsePositivePixels,
+                falseNegativePixels));
+        }
+    }
+
+    private static double ComputeRingMean(Mat response, Mat componentMask)
+    {
+        using var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(3, 3));
+        using var dilated = new Mat();
+        using var ring = new Mat();
+        Cv2.Dilate(componentMask, dilated, kernel);
+        Cv2.Subtract(dilated, componentMask, ring);
+        return Cv2.CountNonZero(ring) == 0 ? 0.0 : Cv2.Mean(response, ring).Val0;
+    }
+
     private static void CollectPixelScores(Mat response, Mat mask, int sampleStride, List<ScoredLabel> destination)
     {
         var stride = Math.Max(1, sampleStride);
@@ -448,7 +570,13 @@ internal static class KolektorRunner
             ("ResponseNormalizeMode", options.ResponseNormalizeMode),
             ("ClaheClipLimit", options.ClaheClipLimit),
             ("ClaheTileGridSize", options.ClaheTileGridSize),
-            ("ComponentFilterMode", options.ComponentFilterMode));
+            ("ComponentFilterMode", options.ComponentFilterMode),
+            ("SmallNoiseAreaMax", options.SmallNoiseAreaMax),
+            ("MinElongationForSmallComponent", options.MinElongationForSmallComponent),
+            ("CompactNoiseAreaMax", options.CompactNoiseAreaMax),
+            ("CompactNoiseCircularityMin", options.CompactNoiseCircularityMin),
+            ("CompactNoiseFillRatioMin", options.CompactNoiseFillRatioMin),
+            ("MinLocalResponseProminence", options.MinLocalResponseProminence));
     }
 
     private static Operator CreateOperator(OperatorType type, params (string Name, object Value)[] parameters)
@@ -663,6 +791,12 @@ internal sealed record RunnerOptions(
     double ClaheClipLimit,
     int ClaheTileGridSize,
     string ComponentFilterMode,
+    int SmallNoiseAreaMax,
+    double MinElongationForSmallComponent,
+    int CompactNoiseAreaMax,
+    double CompactNoiseCircularityMin,
+    double CompactNoiseFillRatioMin,
+    double MinLocalResponseProminence,
     int PixelSampleStride,
     int MaxErrors,
     double MinImageAuroc,
@@ -697,6 +831,12 @@ internal sealed record RunnerOptions(
             ClaheClipLimit: 2.0,
             ClaheTileGridSize: 8,
             ComponentFilterMode: "AreaOnly",
+            SmallNoiseAreaMax: 0,
+            MinElongationForSmallComponent: 0.0,
+            CompactNoiseAreaMax: 0,
+            CompactNoiseCircularityMin: 0.0,
+            CompactNoiseFillRatioMin: 0.0,
+            MinLocalResponseProminence: 0.0,
             PixelSampleStride: 4,
             MaxErrors: 0,
             MinImageAuroc: 0.70,
@@ -750,6 +890,12 @@ internal sealed record RunnerOptions(
                     "--clahe-clip-limit" => options with { ClaheClipLimit = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--clahe-tile-grid-size" => options with { ClaheTileGridSize = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--component-filter-mode" => options with { ComponentFilterMode = NextValue() },
+                    "--small-noise-area-max" => options with { SmallNoiseAreaMax = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-elongation-for-small-component" => options with { MinElongationForSmallComponent = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--compact-noise-area-max" => options with { CompactNoiseAreaMax = int.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--compact-noise-circularity-min" => options with { CompactNoiseCircularityMin = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--compact-noise-fill-ratio-min" => options with { CompactNoiseFillRatioMin = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
+                    "--min-local-response-prominence" => options with { MinLocalResponseProminence = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
                     "--pixel-sample-stride" => options with { PixelSampleStride = int.Parse(NextValue()) },
                     "--max-errors" => options with { MaxErrors = int.Parse(NextValue()) },
                     "--min-image-auroc" => options with { MinImageAuroc = double.Parse(NextValue(), CultureInfo.InvariantCulture) },
@@ -866,6 +1012,12 @@ internal static class MarkdownReport
             $"| Response normalize mode | {result.Summary.ResponseNormalizeMode} |",
             $"| CLAHE clip / tile | {result.Summary.ClaheClipLimit:0.###} / {result.Summary.ClaheTileGridSize} |",
             $"| Component filter mode | {result.Summary.ComponentFilterMode} |",
+            $"| Small noise area max | {result.Summary.SmallNoiseAreaMax} |",
+            $"| Min elongation small component | {result.Summary.MinElongationForSmallComponent:0.###} |",
+            $"| Compact noise area max | {result.Summary.CompactNoiseAreaMax} |",
+            $"| Compact noise circularity min | {result.Summary.CompactNoiseCircularityMin:0.###} |",
+            $"| Compact noise fill ratio min | {result.Summary.CompactNoiseFillRatioMin:0.###} |",
+            $"| Min local response prominence | {result.Summary.MinLocalResponseProminence:0.###} |",
             $"| Max side | {result.Summary.MaxSide} |"
         };
 
@@ -993,6 +1145,12 @@ internal sealed record BaselineSummary(
     double ClaheClipLimit,
     int ClaheTileGridSize,
     string ComponentFilterMode,
+    int SmallNoiseAreaMax,
+    double MinElongationForSmallComponent,
+    int CompactNoiseAreaMax,
+    double CompactNoiseCircularityMin,
+    double CompactNoiseFillRatioMin,
+    double MinLocalResponseProminence,
     int CaseCount,
     int Passed,
     int Failed,
@@ -1052,11 +1210,37 @@ internal sealed record ImageResult(
     PixelTotals PixelTotals,
     bool ImageCorrect,
     List<string> FailureTaxonomy,
+    List<ComponentTelemetry> Components,
     IReadOnlyDictionary<string, object?> Diagnostics,
     bool Passed,
     double RuntimeMs,
     long MemoryAllocationBytes,
     string? Error);
+
+internal sealed record ComponentTelemetry(
+    string CaseId,
+    string Source,
+    string Kind,
+    int ComponentIndex,
+    bool IsDefectImage,
+    bool HasOverlap,
+    double Area,
+    int PixelArea,
+    int RectX,
+    int RectY,
+    int RectWidth,
+    int RectHeight,
+    double Elongation,
+    double FillRatio,
+    double Circularity,
+    double ComponentMean,
+    double ComponentPeak,
+    double RingMean,
+    double RingProminence,
+    int OverlapPixels,
+    long TruePositivePixels,
+    long FalsePositivePixels,
+    long FalseNegativePixels);
 
 internal readonly record struct PixelTotals(long TruePositive, long FalsePositive, long FalseNegative, long TrueNegative)
 {
