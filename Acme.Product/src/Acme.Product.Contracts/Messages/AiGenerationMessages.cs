@@ -96,6 +96,12 @@ public record GenerateFlowResponse
     public string? CompletionStatus { get; init; }
     public int RetryCount { get; init; }
     public List<GenerateFlowKnowledgeDiagnostic>? KnowledgeDiagnostics { get; init; }
+
+    /// <summary>Active prompt template version ID at generation time.</summary>
+    public string? PromptVersionId { get; init; }
+
+    /// <summary>Active prompt template version name.</summary>
+    public string? PromptVersionName { get; init; }
 }
 
 /// <summary>

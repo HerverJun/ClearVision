@@ -82,6 +82,11 @@ public class AiApiClient
         if (stream)
         {
             body["stream"] = true;
+            // Anthropic uses message_start/message_delta for usage, not stream_options
+            if (!string.Equals(options.Protocol, "anthropic", StringComparison.OrdinalIgnoreCase))
+            {
+                body["stream_options"] = CreateObjectMap(("include_usage", true));
+            }
         }
 
         MergeAdditionalBody(body, options.ExtraBody);
@@ -534,10 +539,21 @@ public class AiApiClient
             }
         }
 
+        AiTokenUsage? tokenUsage = null;
+        if (doc.RootElement.TryGetProperty("usage", out var anthropicUsage))
+        {
+            tokenUsage = new AiTokenUsage
+            {
+                InputTokens = anthropicUsage.TryGetProperty("input_tokens", out var it) ? it.GetInt32() : 0,
+                OutputTokens = anthropicUsage.TryGetProperty("output_tokens", out var ot) ? ot.GetInt32() : 0
+            };
+        }
+
         return new AiCompletionResult
         {
             Content = content ?? throw new InvalidOperationException("AI 返回了空响应"),
-            Reasoning = reasoning
+            Reasoning = reasoning,
+            TokenUsage = tokenUsage
         };
     }
 
@@ -570,6 +586,7 @@ public class AiApiClient
 
         var fullContent = new StringBuilder();
         var fullReasoning = new StringBuilder();
+        AiTokenUsage? tokenUsage = null;
 
         while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
         {
@@ -605,12 +622,24 @@ public class AiApiClient
                         onChunk(new AiStreamChunk(AiStreamChunkType.Content, chunk));
                     }
                 }
+                // Anthropic sends usage in message_start (input_tokens) and message_delta (output_tokens)
+                else if (type == "message_start" && root.TryGetProperty("message", out var msgEl)
+                    && msgEl.TryGetProperty("usage", out var startUsage))
+                {
+                    tokenUsage ??= new AiTokenUsage();
+                    tokenUsage.InputTokens = startUsage.TryGetProperty("input_tokens", out var it) ? it.GetInt32() : 0;
+                }
+                else if (type == "message_delta" && root.TryGetProperty("usage", out var deltaUsage))
+                {
+                    tokenUsage ??= new AiTokenUsage();
+                    tokenUsage.OutputTokens = deltaUsage.TryGetProperty("output_tokens", out var ot) ? ot.GetInt32() : 0;
+                }
             }
             catch (JsonException) { }
         }
 
         onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
-        return new AiCompletionResult { Content = fullContent.ToString(), Reasoning = fullReasoning.ToString() };
+        return new AiCompletionResult { Content = fullContent.ToString(), Reasoning = fullReasoning.ToString(), TokenUsage = tokenUsage };
     }
 
     private async Task<AiCompletionResult> CallOpenAiAsync(
@@ -700,10 +729,21 @@ public class AiApiClient
             reasoning = reasoningEl.GetString();
         }
 
+        AiTokenUsage? tokenUsage = null;
+        if (doc.RootElement.TryGetProperty("usage", out var openAiUsage))
+        {
+            tokenUsage = new AiTokenUsage
+            {
+                InputTokens = openAiUsage.TryGetProperty("prompt_tokens", out var pt) ? pt.GetInt32() : 0,
+                OutputTokens = openAiUsage.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : 0
+            };
+        }
+
         return new AiCompletionResult
         {
             Content = content ?? throw new InvalidOperationException("AI 返回了空响应"),
-            Reasoning = reasoning
+            Reasoning = reasoning,
+            TokenUsage = tokenUsage
         };
     }
 
@@ -755,6 +795,7 @@ public class AiApiClient
         var fullReasoning = new StringBuilder();
         var nonSseBuffer = new StringBuilder();
         var sawSsePayload = false;
+        AiTokenUsage? tokenUsage = null;
 
         while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
         {
@@ -792,6 +833,16 @@ public class AiApiClient
                 {
                     fullContent.Append(contentChunk);
                     onChunk(new AiStreamChunk(AiStreamChunkType.Content, contentChunk));
+                }
+
+                // Extract token usage from streaming chunks (sent in last chunk when stream_options.include_usage=true)
+                if (doc.RootElement.TryGetProperty("usage", out var streamUsage))
+                {
+                    tokenUsage = new AiTokenUsage
+                    {
+                        InputTokens = streamUsage.TryGetProperty("prompt_tokens", out var spt) ? spt.GetInt32() : 0,
+                        OutputTokens = streamUsage.TryGetProperty("completion_tokens", out var sct) ? sct.GetInt32() : 0
+                    };
                 }
             }
             catch (JsonException) { }
@@ -843,7 +894,7 @@ public class AiApiClient
         }
 
         onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
-        return new AiCompletionResult { Content = fullContent.ToString(), Reasoning = fullReasoning.ToString() };
+        return new AiCompletionResult { Content = fullContent.ToString(), Reasoning = fullReasoning.ToString(), TokenUsage = tokenUsage };
     }
 
     // 保留旧方法以兼容

@@ -19,4 +19,20 @@ public class AiCompletionResult
     /// 可能为空，取决于模型是否支持
     /// </summary>
     public string? Reasoning { get; set; }
+
+    /// <summary>
+    /// Token usage reported by the API (null if not available).
+    /// </summary>
+    public AiTokenUsage? TokenUsage { get; set; }
+}
+
+/// <summary>
+/// Token usage statistics from an API response.
+/// </summary>
+public class AiTokenUsage
+{
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public int? CacheReadTokens { get; set; }
+    public int? CacheWriteTokens { get; set; }
 }

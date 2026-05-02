@@ -689,6 +689,15 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var hostEnvironment = Substitute.For<IHostEnvironment>();
         hostEnvironment.EnvironmentName.Returns("Production");
 
+        var promptVersionManager = Substitute.For<Acme.Product.Infrastructure.AI.IPromptVersionManager>();
+        promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Version",
+            Description = "Test",
+            Content = "test prompt"
+        }));
+
         return new AiFlowGenerationService(
             new AiGenerationOrchestrator(modelSelector, connectorFactory),
             new PromptBuilder(operatorFactory),
@@ -702,6 +711,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             templateConstraintValidator,
             new DryRunService(flowExecutionService),
             hostEnvironment,
+            promptVersionManager,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>());
     }
 

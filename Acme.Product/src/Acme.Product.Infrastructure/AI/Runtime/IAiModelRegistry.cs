@@ -10,4 +10,9 @@ namespace Acme.Product.Infrastructure.AI.Runtime;
 public interface IAiModelRegistry
 {
     AiModelConfig GetActiveModel();
+
+    /// <summary>
+    /// Returns all configured model profiles.
+    /// </summary>
+    IReadOnlyList<AiModelConfig> GetAllModels();
 }

@@ -114,11 +114,13 @@ public class GenerateFlowMessageHandler
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace,
+                PromptTrace = result.PromptTrace is AiPromptTrace trace ? trace.Desensitize() : result.PromptTrace,
                 StageTimeline = MapStageTimeline(result.StageTimeline),
                 CompletionStatus = result.CompletionStatus,
                 RetryCount = result.RetryCount,
-                KnowledgeDiagnostics = MapKnowledgeDiagnostics(result.KnowledgeDiagnostics)
+                KnowledgeDiagnostics = MapKnowledgeDiagnostics(result.KnowledgeDiagnostics),
+                PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
+                PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
 
             return SerializeResponse(response, result.FailureType);
@@ -211,6 +213,8 @@ public class GenerateFlowMessageHandler
                 response.CompletionStatus,
                 response.RetryCount,
                 response.KnowledgeDiagnostics,
+                response.PromptVersionId,
+                response.PromptVersionName,
                 FailureType = failureType
             }, _jsonOptions);
     }

@@ -9,6 +9,12 @@ public sealed class AiGenerationPipelineContext
 
     public IReadOnlyList<AiGenerationStageDiagnostic> Timeline => _timeline;
 
+    /// <summary>Estimated input tokens for the generation request.</summary>
+    public int EstimatedInputTokens { get; set; }
+
+    /// <summary>Estimated output tokens from the LLM response.</summary>
+    public int EstimatedOutputTokens { get; set; }
+
     public void AddStage(
         string stage,
         string status,

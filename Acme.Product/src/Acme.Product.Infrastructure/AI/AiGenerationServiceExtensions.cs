@@ -48,7 +48,7 @@ public static class AiGenerationServiceExtensions
 
         // Stage A: unified AI runtime pipeline
         services.AddScoped<IAiModelRegistry, AiModelRegistry>();
-        services.AddScoped<IAiModelSelector, ActiveAiModelSelector>();
+        services.AddScoped<IAiModelSelector, RoleAwareAiModelSelector>();
         services.AddScoped<IAiConnectorFactory, AiConnectorFactory>();
         services.AddScoped<AiGenerationOrchestrator>();
 

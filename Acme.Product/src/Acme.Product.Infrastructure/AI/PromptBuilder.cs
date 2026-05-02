@@ -35,7 +35,7 @@ public class PromptBuilder
     /// <summary>
     /// 闂佸搫顑呯€氼剛绱撻幘鍨涘亾閻熺増婀伴柡鍡秮閹?System Prompt
     /// </summary>
-    public string BuildSystemPrompt(string? userDescription = null)
+    public string BuildSystemPrompt(string? userDescription = null, bool supportsJsonMode = true)
     {
         var sb = new StringBuilder();
 
@@ -48,7 +48,7 @@ public class PromptBuilder
         AppendSection(sb, "Section 7 - Operator Catalog", GetOperatorCatalog(userDescription));
         AppendSection(sb, "Section 8 - Connection Rules", GetConnectionRules());
         AppendSection(sb, "Section 9 - Parameter Inference Guide", GetParameterInferenceGuide());
-        AppendSection(sb, "Section 10 - Output Format", GetOutputFormatSpec());
+        AppendSection(sb, "Section 10 - Output Format", GetOutputFormatSpec(supportsJsonMode));
         AppendSection(sb, "Section 11 - Few Shot Examples", GetFewShotExamples());
 
         return sb.ToString();
@@ -685,7 +685,9 @@ public class PromptBuilder
         - 婵炴垶鎸哥粔鎾箖閹惧墎灏甸悹鍥皺閳ь剛鍏橀幆鍐礋椤撗傜磽闂佸憡鐟辩徊鑲╃箔婢舵劕鐭楁い鏍ㄧ箘缁犻箖鏌熼幁鎺戝姷缂佽鲸鐟╁浠嬪Χ婢跺顫￠梺绋跨箲濠€褰掓嚈閹寸偟鈻旈柍褜鍓熷顒傛喆閸曨儷?Any闂?
         """;
 
-    private string GetOutputFormatSpec() => """
+    private string GetOutputFormatSpec(bool supportsJsonMode = true)
+    {
+        var baseSpec = """
         # 闁哄鐗婇幐鎼佸吹椤撱垹鍐€闁绘挸娴风涵鈧柣鐔哥懃鐎氼垳鈧灚鐗犻弫宥夊醇濠婂啰鑸归梺鍝勭Т閵堝憡瀵奸幒鏂哄亾閻熸壆澧崇紒?
 
         婵炶揪绲挎慨瀵告崲閳ь剙顪冮妶鍫殭鐟滄妸鍕秶闁规儳鍟垮В澶娾槈閹绢垰浜炬繛鎴炴惄娴滄粓骞冩惔鈾€鏋栭柡鍥╁У閻?JSON 闁诲海鏁搁、濠囨寘閸曨垱鏅悘鐐跺亹閻熸繈鏌涢弽褎鍣归柟顖氱墛缁傛帞鎷嬪畷鍥┬?Markdown 婵炲濯寸徊鍧楁偉濠婂牆閿ゆ俊銈勮兌閸ㄥジ鎮规担钘夌劷闁?
@@ -774,6 +776,24 @@ public class PromptBuilder
         ## 闂佺绻愰崢鏍姳椤掑倻鍗氭い鏍ㄨ壘缂嶆捇鏌?
         闂婎偄娲ら幊姗€濡磋箛鏃傗枖閹艰揪绲块弳顒勬倵濞戞瑥濮夋繛鍙夊閵囨劙寮村鍐插箑闂?port_name 闁诲孩绋掗〃鍡涱敊瀹€鈧埀顒傛嚀閼活垶宕ｈ箛鏃傗枖闁逞屽墴閹虫稒娼忛崜褏顦╂繝銏犵垻閸愵亝鐦撻梺鍛婂姈閻燂箓寮查柆宥呯疀闁绘洖鍊荤粈鍡涙煏?
         """;
+
+        if (!supportsJsonMode)
+        {
+            return baseSpec + """
+                
+                ## strict JSON output (model does not support JSON Mode)
+                Your response MUST satisfy the following, otherwise the system cannot parse it:
+                1. Do NOT use Markdown code block markers.
+                2. Do NOT add any explanatory text before or after the JSON.
+                3. The first character must be { and the last must be }.
+                4. All string values must use double quotes.
+                5. Do NOT add comments in JSON.
+                6. Ensure all brackets and braces are properly paired.
+                """;
+        }
+
+        return baseSpec;
+    }
 
     private string GetFewShotExamples() => """
         # 缂備讲鍋撻弶鐐村娴兼劙鏌ㄥ☉妯煎妞ゆ帞鍠愮粙濠囨偐閾忓湱顔愭繛瀛樼矋缁嬫捇濡靛顓犵懝閻庯綆鍓氶悾閬嶆煛瀹ュ洤甯剁紒鎲嬬節瀹曨亞浠﹂柨顖氫壕婵犻潧锕﹂悢鍛存煥?

@@ -39,7 +39,8 @@ const STAGE_DIAGNOSTIC_LABELS = {
     parse: '结果解析',
     validator: '流程校验',
     template_gate: '模板约束',
-    dryrun: 'DryRun 预演'
+    dryrun: 'DryRun 预演',
+    layout: '自动布局'
 };
 
 /**

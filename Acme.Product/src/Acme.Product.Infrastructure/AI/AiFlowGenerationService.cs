@@ -37,6 +37,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
+    private readonly IPromptVersionManager _promptVersionManager;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -61,6 +62,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         ITemplateConstraintValidator templateConstraintValidator,
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
+        IPromptVersionManager promptVersionManager,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
     {
         _aiOrchestrator = aiOrchestrator;
@@ -75,6 +77,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateConstraintValidator = templateConstraintValidator;
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
+        _promptVersionManager = promptVersionManager;
         _logger = logger;
     }
 
@@ -96,6 +99,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         var pipeline = new AiGenerationPipelineContext();
+
+        // 获取当前活跃 Prompt 版本
+        var activePromptVersion = await _promptVersionManager.GetActiveVersionAsync();
 
         // 推送：构建提示词
         ReportProgress("正在分析需求并构建提示词...");
@@ -191,9 +197,15 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 pipeline.Timeline.ToList());
         }
 
+        // 读取当前激活模型快照（需在 BuildSystemPrompt 之前，以便传入 supportsJsonMode）
+        var activeModel = _aiOrchestrator.ResolveGenerationModel();
+        var selectionReason = _aiOrchestrator.ResolveSelectionReason();
+        var options = activeModel.ToGenerationOptions();
+        var capabilities = _aiOrchestrator.ResolveCapabilities(activeModel);
+
         var systemPrompt = pipeline.Measure(
             "prompt_context",
-            () => _promptBuilder.BuildSystemPrompt(request.Description),
+            () => _promptBuilder.BuildSystemPrompt(request.Description, capabilities.SupportsJsonMode),
             prompt => $"system prompt chars={prompt.Length}");
         var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(conversationContext.Mode)
             ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
@@ -207,11 +219,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             SessionSummary: conversationContext.SessionSummary,
             ReferenceFlowSummary: referenceFlowSummary,
             RequirementBriefSection: BuildRequirementBriefPromptSection(requirementBrief)));
-
-        // 读取当前激活模型快照
-        var activeModel = _aiOrchestrator.ResolveGenerationModel();
-        var options = activeModel.ToGenerationOptions();
-        var capabilities = _aiOrchestrator.ResolveCapabilities(activeModel);
         GenerateFlowAttachmentReport promptTraceAttachmentReport = new();
         var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
             ? new AiPromptTrace
@@ -223,7 +230,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 Capabilities = capabilities.Clone(),
                 SystemPrompt = systemPrompt,
                 UserPrompt = userMessage,
-                UsedReferenceFlowSummary = referenceFlowSummary
+                UsedReferenceFlowSummary = referenceFlowSummary,
+                PromptVersionId = activePromptVersion.Id.ToString(),
+                PromptVersionName = activePromptVersion.Name,
+                SelectionReason = selectionReason
             }
             : null;
 
@@ -290,8 +300,68 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 catch (Exception llmEx)
                 {
                     pipeline.AddStage("llm", "failed", llmEx.Message, llmStopwatch.Elapsed);
-                    throw;
+                    try
+                    {
+                        await _promptVersionManager.RecordMetricsAsync(
+                            activePromptVersion.Id,
+                            success: false,
+                            tokenUsage: 0,
+                            latencyMs: (long)llmStopwatch.Elapsed.TotalMilliseconds);
+                    }
+                    catch
+                    {
+                        // Never let metrics recording mask the original LLM exception
+                    }
+
+                    // 尝试备用模型（仅当存在独立的 fallback 绑定时）
+                    var fallbackModel = _aiOrchestrator.ResolveFallbackModel();
+                    if (fallbackModel.Id != activeModel.Id)
+                    {
+                        _logger.LogWarning(llmEx,
+                            "Primary model {PrimaryModel} failed, attempting fallback model {FallbackModel}",
+                            activeModel.Model, fallbackModel.Model);
+                        ReportProgress($"主模型调用失败，正在切换到备用模型 {fallbackModel.Name}...");
+                        try
+                        {
+                            completionResult = await _aiOrchestrator.StreamCompleteAsync(
+                                systemPrompt,
+                                messages,
+                                chunk => onStreamChunk?.Invoke(chunk),
+                                fallbackModel,
+                                cancellationToken);
+                            // 备用模型成功，切换后续上下文
+                            activeModel = fallbackModel;
+                            options = fallbackModel.ToGenerationOptions();
+                            capabilities = _aiOrchestrator.ResolveCapabilities(fallbackModel);
+                            selectionReason = "fallback";
+                            if (promptTrace != null)
+                            {
+                                promptTrace.Model = fallbackModel.Model;
+                                promptTrace.Provider = options.Provider;
+                                promptTrace.SelectionReason = "fallback";
+                            }
+                            pipeline.AddStage("llm_fallback", "completed",
+                                $"fallback_model={fallbackModel.Model}", llmStopwatch.Elapsed);
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            _logger.LogError(fallbackEx, "Fallback model {FallbackModel} also failed", fallbackModel.Model);
+                            pipeline.AddStage("llm_fallback", "failed", fallbackEx.Message, llmStopwatch.Elapsed);
+                            throw; // 主模型和备用模型都失败，抛出原始异常
+                        }
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
+                var estimatedInputTokens = completionResult.TokenUsage?.InputTokens
+                    ?? EstimateTokens(systemPrompt) + EstimateTokens(userMessage);
+                var estimatedOutputTokens = completionResult.TokenUsage?.OutputTokens
+                    ?? EstimateTokens(completionResult.Content);
+                pipeline.EstimatedInputTokens = estimatedInputTokens;
+                pipeline.EstimatedOutputTokens = estimatedOutputTokens;
+
                 pipeline.AddStage(
                     "llm",
                     "completed",
@@ -302,8 +372,29 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         ["provider"] = options.Provider,
                         ["model"] = options.Model,
                         ["supportsVision"] = capabilities.SupportsVisionInput.ToString(CultureInfo.InvariantCulture),
-                        ["supportsJsonMode"] = capabilities.SupportsJsonMode.ToString(CultureInfo.InvariantCulture)
+                        ["supportsJsonMode"] = capabilities.SupportsJsonMode.ToString(CultureInfo.InvariantCulture),
+                        ["estimatedInputTokens"] = estimatedInputTokens.ToString(CultureInfo.InvariantCulture),
+                        ["estimatedOutputTokens"] = estimatedOutputTokens.ToString(CultureInfo.InvariantCulture)
                     });
+
+                _logger.LogInformation(
+                    "LLM call completed. Model={Model}, InputTokens={InputTokens}, OutputTokens={OutputTokens}, LatencyMs={LatencyMs}",
+                    activeModel.Model, estimatedInputTokens, estimatedOutputTokens, (long)llmStopwatch.Elapsed.TotalMilliseconds);
+
+                // 记录 Prompt 版本指标
+                await _promptVersionManager.RecordMetricsAsync(
+                    activePromptVersion.Id,
+                    success: true,
+                    tokenUsage: estimatedInputTokens + estimatedOutputTokens,
+                    latencyMs: (long)llmStopwatch.Elapsed.TotalMilliseconds);
+
+                // 回填 token 估算到 promptTrace
+                if (promptTrace != null)
+                {
+                    promptTrace.EstimatedInputTokens = estimatedInputTokens;
+                    promptTrace.EstimatedOutputTokens = estimatedOutputTokens;
+                }
+
                 var rawResponse = completionResult.Content;
                 lastRawResponse = rawResponse;
                 _logger.LogDebug("AI 原始响应长度：{Length}", rawResponse?.Length ?? 0);
@@ -387,7 +478,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 {
                     // 校验通过，转换为 DTO 并返回
                     var (flowDto, actualOperatorIdMap) = ConvertToFlowDto(generatedFlow, request.Description);
-                    _layoutService.ApplyLayout(flowDto);
+                    pipeline.Measure(
+                        "layout",
+                        () => { _layoutService.ApplyLayout(flowDto); return true; },
+                        _ => $"applied layout to {flowDto.Operators?.Count ?? 0} operators");
 
                     ReportProgress("正在进行 Dry-Run 沙箱安全校验与分支覆盖率统计...");
 
@@ -432,7 +526,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         Kind = "assistant_result",
                         Status = AiFlowGenerationResult.CompletionStatusCompleted,
                         Reply = assistantReply,
-                        Reasoning = completionResult.Reasoning,
+                        Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? completionResult.Reasoning : null,
                         Progress = progressMessages.ToList(),
                         RequirementBrief = requirementBrief,
                         ClarificationRequired = requirementBrief.ClarificationRequired
@@ -451,7 +545,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
                         Flow = flowDto,
                         AiExplanation = generatedFlow.Explanation,
-                        Reasoning = completionResult.Reasoning,
+                        Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? completionResult.Reasoning : null,
                         ParametersNeedingReview = generatedFlow.ParametersNeedingReview,
                         RetryCount = retryCount,
                         SessionId = conversationContext.SessionId,
@@ -2821,6 +2915,26 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }).ToList();
 
         return flow;
+    }
+
+    private static int EstimateTokens(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+
+        var cjkCount = 0;
+        foreach (var ch in text)
+        {
+            if (ch >= 0x4E00 && ch <= 0x9FFF ||   // CJK Unified Ideographs
+                ch >= 0x3400 && ch <= 0x4DBF ||   // CJK Extension A
+                ch >= 0x3000 && ch <= 0x303F ||   // CJK Symbols and Punctuation
+                ch >= 0xFF00 && ch <= 0xFFEF)     // Fullwidth Forms
+            {
+                cjkCount++;
+            }
+        }
+        var nonCjkCount = text.Length - cjkCount;
+        // CJK chars ~1.5 tokens each; non-CJK ~0.25 tokens each
+        return (int)(cjkCount * 1.5 + nonCjkCount * 0.25);
     }
 }
 

@@ -8,7 +8,6 @@ namespace Acme.Product.Infrastructure.AI.Runtime;
 
 /// <summary>
 /// Unified runtime orchestrator used by generation services.
-/// Stage A keeps policy minimal and forwards calls to the selected connector.
 /// </summary>
 public sealed class AiGenerationOrchestrator
 {
@@ -26,6 +25,33 @@ public sealed class AiGenerationOrchestrator
     public AiModelConfig ResolveGenerationModel()
     {
         return _modelSelector.SelectGenerationModel();
+    }
+
+    /// <summary>
+    /// Returns the selection reason for the generation model.
+    /// </summary>
+    public string ResolveSelectionReason()
+    {
+        return _modelSelector.SelectModelForRoleWithReason("generation").Reason;
+    }
+
+    /// <summary>
+    /// Resolves the model for a specific runtime role (generation, reasoning, fallback, validation).
+    /// </summary>
+    public AiModelConfig ResolveModelForRole(string role)
+    {
+        return _modelSelector.SelectModelForRole(role);
+    }
+
+    /// <summary>
+    /// Resolves a fallback model: tries "fallback" role first, then the active model.
+    /// Returns the fallback model only if it differs from the primary (i.e., a real fallback binding exists).
+    /// </summary>
+    public AiModelConfig ResolveFallbackModel()
+    {
+        var fallback = _modelSelector.SelectModelForRole("fallback");
+        var primary = _modelSelector.SelectModelForRole("generation");
+        return fallback.Id != primary.Id ? fallback : primary;
     }
 
     public AiModelCapabilities ResolveCapabilities(AiModelConfig? modelConfig = null)

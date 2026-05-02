@@ -208,7 +208,7 @@ public class AiModelConfig
         var normalized = roleBindings
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim().ToLowerInvariant())
-            .Where(x => x is "generation" or "reasoning" or "fallback" or "validation")
+            .Where(x => x is "generation" or "reasoning" or "fallback" or "validation" or "vision")
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

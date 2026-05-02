@@ -6,9 +6,19 @@ namespace Acme.Product.Infrastructure.AI.Runtime;
 
 /// <summary>
 /// Selects model profiles for different runtime intents.
-/// Stage A keeps selection strategy simple: active model only.
 /// </summary>
 public interface IAiModelSelector
 {
     AiModelConfig SelectGenerationModel();
+
+    /// <summary>
+    /// Selects a model bound to the specified role.
+    /// Falls back to the active model when no role-specific binding exists.
+    /// </summary>
+    AiModelConfig SelectModelForRole(string role);
+
+    /// <summary>
+    /// Selects a model for the specified role and returns the selection reason.
+    /// </summary>
+    (AiModelConfig Model, string Reason) SelectModelForRoleWithReason(string role);
 }

@@ -78,10 +78,15 @@ public sealed class AiModelRegistry : IAiModelRegistry
 
         return active;
     }
+
+    public IReadOnlyList<AiModelConfig> GetAllModels()
+    {
+        return _configStore.GetAll();
+    }
 }
 
 /// <summary>
-/// Stage A selector: always use active profile.
+/// Stage A selector: always use active profile regardless of role.
 /// </summary>
 public sealed class ActiveAiModelSelector : IAiModelSelector
 {
@@ -95,5 +100,55 @@ public sealed class ActiveAiModelSelector : IAiModelSelector
     public AiModelConfig SelectGenerationModel()
     {
         return _registry.GetActiveModel();
+    }
+
+    public AiModelConfig SelectModelForRole(string role)
+    {
+        return SelectGenerationModel();
+    }
+
+    public (AiModelConfig Model, string Reason) SelectModelForRoleWithReason(string role)
+    {
+        return (SelectGenerationModel(), "active");
+    }
+}
+
+/// <summary>
+/// Stage B+ selector: selects model by RoleBindings and Priority.
+/// Falls back to active model when no role-specific binding exists.
+/// </summary>
+public sealed class RoleAwareAiModelSelector : IAiModelSelector
+{
+    private readonly IAiModelRegistry _registry;
+
+    public RoleAwareAiModelSelector(IAiModelRegistry registry)
+    {
+        _registry = registry;
+    }
+
+    public AiModelConfig SelectGenerationModel()
+    {
+        return SelectModelForRole("generation");
+    }
+
+    public AiModelConfig SelectModelForRole(string role)
+    {
+        return SelectModelForRoleWithReason(role).Model;
+    }
+
+    public (AiModelConfig Model, string Reason) SelectModelForRoleWithReason(string role)
+    {
+        var allModels = _registry.GetAllModels();
+        var candidates = allModels
+            .Where(m => m.RoleBindings != null
+                && m.RoleBindings.Contains(role, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(m => m.Priority ?? 100)
+            .ToList();
+
+        if (candidates.Count > 0)
+            return (candidates[0], $"role_binding:{role}");
+
+        // Fallback: return the active model
+        return (_registry.GetActiveModel(), "active");
     }
 }
