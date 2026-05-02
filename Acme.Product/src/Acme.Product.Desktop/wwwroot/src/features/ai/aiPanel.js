@@ -3010,14 +3010,16 @@ export class AiPanel {
                 const requiredLabel = question.required ? '必填' : '建议';
                 const priority = question.priority ? ` · ${question.priority}` : '';
                 const options = question.options.length > 0
-                    ? `<div class="ai-requirement-question-options">${question.options
-                        .map(option => `
-                            <button class="ai-requirement-question-option" type="button"
-                                data-clarification-field="${this._escapeHtml(question.field)}"
-                                data-clarification-value="${this._escapeHtml(option)}">
-                                ${this._escapeHtml(option)}
-                            </button>`)
-                        .join('')}</div>`
+                    ? `
+                        <div class="ai-requirement-question-options-title">参考选项，点击可填入输入框</div>
+                        <div class="ai-requirement-question-options">${question.options
+                            .map(option => `
+                                <button class="ai-requirement-question-option" type="button"
+                                    data-clarification-field="${this._escapeHtml(question.field)}"
+                                    data-clarification-value="${this._escapeHtml(option)}">
+                                    ${this._escapeHtml(option)}
+                                </button>`)
+                            .join('')}</div>`
                     : '';
                 return `
                     <article class="ai-requirement-question ${question.required ? 'is-required' : 'is-recommended'}">

@@ -45,7 +45,7 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
         brief.KnownFacts = BuildKnownFacts(brief);
         brief.MissingFacts = BuildMissingFacts(brief, scenarioMatch);
         brief.AttachmentFacts = BuildAttachmentFacts(text);
-        brief.ClarificationQuestions = BuildClarificationQuestions(brief).Take(3).ToList();
+        brief.ClarificationQuestions = BuildClarificationQuestions(brief, scenario).Take(3).ToList();
         brief.HasOpenQuestions = brief.MissingFacts.Count > 0 || brief.ClarificationQuestions.Count > 0;
         brief.ClarificationRequired = brief.HasOpenQuestions;
         brief.CanGenerateDraftNow = CanGenerateDraftNow(brief);
@@ -367,30 +367,35 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
         return facts;
     }
 
-    private static IEnumerable<AiClarificationQuestion> BuildClarificationQuestions(AiRequirementBrief brief)
+    private static IEnumerable<AiClarificationQuestion> BuildClarificationQuestions(
+        AiRequirementBrief brief,
+        ScenarioDefinition? scenario)
     {
         foreach (var field in brief.RequiredFields)
         {
-            yield return BuildQuestionForField(field);
+            yield return BuildQuestionForField(field, brief, scenario);
         }
 
         if (string.IsNullOrWhiteSpace(brief.OutputTarget))
-            yield return BuildQuestionForField("output_target");
+            yield return BuildQuestionForField("output_target", brief, scenario);
 
         if (brief.RequiredResources.Any(resource =>
                 resource.Equals("DeepLearning.ModelPath", StringComparison.OrdinalIgnoreCase)))
         {
-            yield return BuildQuestionForField("model_path");
+            yield return BuildQuestionForField("model_path", brief, scenario);
         }
 
         if (brief.RoiRequirement is "region")
-            yield return BuildQuestionForField("roi");
+            yield return BuildQuestionForField("roi", brief, scenario);
 
         if (brief.CalibrationRequirement is "pixel_to_world")
-            yield return BuildQuestionForField("calibration");
+            yield return BuildQuestionForField("calibration", brief, scenario);
     }
 
-    private static AiClarificationQuestion BuildQuestionForField(string field)
+    private static AiClarificationQuestion BuildQuestionForField(
+        string field,
+        AiRequirementBrief brief,
+        ScenarioDefinition? scenario)
     {
         return field switch
         {
@@ -409,7 +414,10 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Question = "请补充检测对象是什么。",
                 Required = true,
                 Reason = "需要明确对象才能选择正确模板与算子。",
-                Priority = "high"
+                Priority = "high",
+                Options = BuildReferenceOptions(
+                    (scenario?.ObjectTypes.AsEnumerable() ?? Enumerable.Empty<string>()).Concat(brief.ObjectTypes),
+                    ["产品", "包装箱/纸箱", "金属件", "连接器/端子", "圆孔/孔位", "标签/二维码"])
             },
             "defect_type" => new AiClarificationQuestion
             {
@@ -417,7 +425,10 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Question = "请补充需要判定的缺陷类别，例如划伤、压痕、破损、标签异常。",
                 Required = true,
                 Reason = "缺陷类别缺失会影响模板与判定逻辑。",
-                Priority = "high"
+                Priority = "high",
+                Options = BuildReferenceOptions(
+                    (scenario?.DefectTypes.AsEnumerable() ?? Enumerable.Empty<string>()).Concat(brief.DefectTypes),
+                    ["划伤/划痕", "压痕/凹坑", "破损/裂纹", "脏污/污渍", "漏装/缺失", "标签异常"])
             },
             "measurement_target" => new AiClarificationQuestion
             {
@@ -425,7 +436,10 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Question = "请补充测量目标、单位和合格范围。",
                 Required = true,
                 Reason = "测量类场景需要明确目标与边界。",
-                Priority = "high"
+                Priority = "high",
+                Options = BuildReferenceOptions(
+                    (scenario?.MeasurementTargets.AsEnumerable() ?? Enumerable.Empty<string>()).Concat(brief.MeasurementTargets),
+                    ["孔距/圆心距离（mm）", "两边缘间距（mm）", "缝隙宽度（mm）", "直径/半径（mm）", "角度（deg）", "面积/长度阈值"])
             },
             "output_target" => new AiClarificationQuestion
             {
@@ -442,7 +456,8 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Question = "是否已有模型文件或标签资源？",
                 Required = false,
                 Reason = "深度学习模板需要模型资源才能落地。",
-                Priority = "medium"
+                Priority = "medium",
+                Options = ["已有模型路径", "需要新训练模型", "先用传统视觉方案", "暂时未知"]
             },
             "roi" => new AiClarificationQuestion
             {
@@ -450,7 +465,8 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Question = "是否需要指定 ROI 范围？",
                 Required = false,
                 Reason = "ROI 能减少误检并提升稳定性。",
-                Priority = "low"
+                Priority = "low",
+                Options = ["整图检测", "固定ROI", "多ROI", "由模板/标定自动定位"]
             },
             "calibration" => new AiClarificationQuestion
             {
@@ -478,6 +494,19 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Priority = "low"
             }
         };
+    }
+
+    private static List<string> BuildReferenceOptions(
+        IEnumerable<string>? primaryOptions,
+        IEnumerable<string> fallbackOptions)
+    {
+        return (primaryOptions ?? Enumerable.Empty<string>())
+            .Concat(fallbackOptions)
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .Select(option => option.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToList();
     }
 
     private static bool CanGenerateDraftNow(AiRequirementBrief brief)

@@ -31,6 +31,8 @@ public class RequirementBriefExtractorTests
         brief.RequiredFields.Should().Contain("defect_type");
         brief.ClarificationQuestions.Should().Contain(question =>
             question.Field == "defect_type" && question.Required);
+        brief.ClarificationQuestions.Single(question => question.Field == "defect_type")
+            .Options.Should().Contain(["scratch", "dent"]);
     }
 
     [Fact]
@@ -155,6 +157,10 @@ public class RequirementBriefExtractorTests
         brief.RequiredFields.Should().Contain("scene");
         brief.ClarificationQuestions.Should().NotBeEmpty();
         brief.ClarificationQuestions[0].Question.Should().NotBeNullOrWhiteSpace();
+        brief.ClarificationQuestions.Single(question => question.Field == "object_type")
+            .Options.Should().NotBeEmpty();
+        brief.ClarificationQuestions.Single(question => question.Field == "measurement_target")
+            .Options.Should().NotBeEmpty();
     }
 
     [Fact]

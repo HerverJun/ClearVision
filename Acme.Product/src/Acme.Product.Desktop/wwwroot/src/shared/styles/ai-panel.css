@@ -758,6 +758,14 @@
     gap: 6px;
 }
 
+.ai-requirement-question-options-title {
+    margin-top: 8px;
+    color: var(--ink-gray);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
 .ai-requirement-question-option {
     display: inline-flex;
     align-items: center;
