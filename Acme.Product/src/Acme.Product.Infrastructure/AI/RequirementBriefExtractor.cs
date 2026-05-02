@@ -188,7 +188,9 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
             return "空调内机";
         if (ContainsAny(text, ["遥控器", "remote"]))
             return "遥控器";
-        if (ContainsAny(text, ["铜孔", "孔距", "间距"]))
+        if (ContainsAny(text, ["圆形孔位", "圆形孔", "圆孔", "孔位"]))
+            return "圆孔/孔位";
+        if (ContainsAny(text, ["铜孔", "孔距", "间距", "圆心距离"]))
             return "铜孔";
 
         return string.Empty;
@@ -264,7 +266,8 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
         if (string.IsNullOrWhiteSpace(brief.ScenarioKey) || (scenarioMatch?.Confidence ?? 0) < 0.45)
             required.Add("scene");
 
-        if (brief.ObjectTypes.Count == 0)
+        var lowScenarioConfidence = (scenarioMatch?.Confidence ?? 0) < 0.45;
+        if (brief.ObjectTypes.Count == 0 && (string.IsNullOrWhiteSpace(brief.ObjectName) || lowScenarioConfidence))
             required.Add("object_type");
 
         if (brief.IntentType.Contains("defect", StringComparison.OrdinalIgnoreCase) && brief.DefectTypes.Count == 0)
@@ -277,9 +280,18 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
         {
             foreach (var signal in scenarioMatch.MissingSignals)
             {
+                if (!lowScenarioConfidence && IsMissingSignalAlreadySatisfied(signal, brief, scenarioMatch?.Confidence ?? 0))
+                    continue;
+
                 if (IsBlockingMissingSignal(signal))
                     required.Add(signal);
             }
+        }
+
+        if (brief.IntentType.Contains("measurement", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(brief.CalibrationRequirement, "pixel_to_world", StringComparison.OrdinalIgnoreCase))
+        {
+            required.Add("calibration");
         }
 
         return required
@@ -296,6 +308,24 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                !signal.Equals("roi", StringComparison.OrdinalIgnoreCase) &&
                !signal.Equals("calibration", StringComparison.OrdinalIgnoreCase) &&
                !signal.Equals("output_target", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMissingSignalAlreadySatisfied(string? signal, AiRequirementBrief brief, double scenarioConfidence)
+    {
+        return signal?.Trim().ToLowerInvariant() switch
+        {
+            "scene" => !string.IsNullOrWhiteSpace(brief.ScenarioKey),
+            "object_type" => brief.ObjectTypes.Count > 0 ||
+                             (scenarioConfidence >= 0.45 && !string.IsNullOrWhiteSpace(brief.ObjectName)),
+            "defect_type" => brief.DefectTypes.Count > 0,
+            "measurement_target" => brief.MeasurementTargets.Count > 0,
+            "output_target" => !string.IsNullOrWhiteSpace(brief.OutputTarget),
+            "roi" => !string.IsNullOrWhiteSpace(brief.RoiRequirement) &&
+                     !brief.RoiRequirement.Equals("none", StringComparison.OrdinalIgnoreCase),
+            "calibration" => !string.IsNullOrWhiteSpace(brief.CalibrationRequirement) &&
+                             !brief.CalibrationRequirement.Equals("none", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
     }
 
     private static List<string> BuildKnownFacts(AiRequirementBrief brief)
@@ -472,9 +502,9 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
             {
                 Field = field,
                 Question = "是否需要像素到物理单位换算或标定？",
-                Required = false,
+                Required = brief.IntentType.Contains("measurement", StringComparison.OrdinalIgnoreCase),
                 Reason = "测量类场景通常需要标定。",
-                Priority = "low",
+                Priority = brief.IntentType.Contains("measurement", StringComparison.OrdinalIgnoreCase) ? "high" : "low",
                 Options = ["像素到物理单位换算", "手眼标定", "不需要"]
             },
             "ambiguous_negative_signal" => new AiClarificationQuestion

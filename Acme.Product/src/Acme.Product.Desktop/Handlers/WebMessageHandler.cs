@@ -889,6 +889,7 @@ public class WebMessageHandler : IDisposable
                 ?? Guid.NewGuid().ToString("N");
             var requirementMode = TryGetMessageString(payload, "requirementMode")
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
+            var templateSelection = TryGetTemplateSelection(payload);
             var existingFlowJson = payload.TryGetProperty("existingFlowJson", out var flowElement)
                 ? flowElement.ValueKind == JsonValueKind.String
                     ? flowElement.GetString()
@@ -919,6 +920,7 @@ public class WebMessageHandler : IDisposable
                 requestId,
                 attachments,
                 requirementMode,
+                templateSelection,
                 onMessage: (type, payload) =>
                 {
                     // payload 已是 JSON 字符串，直接拼接外层 envelope，避免反序列化再序列化的额外开销。
@@ -974,6 +976,38 @@ public class WebMessageHandler : IDisposable
                 UnregisterGenerateFlowRequest(activeRequest);
             }
         }
+    }
+
+    private static AiTemplateSelectionInfo? TryGetTemplateSelection(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("templateSelection", out var selection) &&
+            !payload.TryGetProperty("TemplateSelection", out selection))
+        {
+            return null;
+        }
+
+        if (selection.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return null;
+
+        if (selection.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var mode = TryGetMessageString(selection, "mode");
+        var templateId = TryGetMessageString(selection, "templateId");
+        var scenarioKey = TryGetMessageString(selection, "scenarioKey");
+        if (string.IsNullOrWhiteSpace(mode) &&
+            string.IsNullOrWhiteSpace(templateId) &&
+            string.IsNullOrWhiteSpace(scenarioKey))
+        {
+            return null;
+        }
+
+        return new AiTemplateSelectionInfo
+        {
+            Mode = mode ?? string.Empty,
+            TemplateId = templateId,
+            ScenarioKey = scenarioKey
+        };
     }
 
     /// <summary>

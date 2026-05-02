@@ -152,6 +152,16 @@ public class AiFlowGenerationResult
     public AiRecommendedTemplateInfo? RecommendedTemplate { get; set; }
 
     /// <summary>
+    /// template_fill / template_adapt / free_generate.
+    /// </summary>
+    public string GenerationMode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// strict / relaxed / none.
+    /// </summary>
+    public string TemplateLockLevel { get; set; } = string.Empty;
+
+    /// <summary>
     /// 当前输入是否仍需要在生成前补齐关键需求。
     /// </summary>
     public bool ClarificationRequired { get; set; }

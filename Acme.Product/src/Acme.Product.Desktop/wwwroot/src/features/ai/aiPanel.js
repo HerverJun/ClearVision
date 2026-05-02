@@ -26,6 +26,7 @@ export class AiPanel {
         this.currentResult = null;
         this.lastUserPrompt = '';
         this.nextHintDraft = '';
+        this.nextTemplateSelection = null;
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
@@ -92,6 +93,7 @@ export class AiPanel {
         this.currentResult = null;
         this.lastUserPrompt = '';
         this.nextHintDraft = '';
+        this.nextTemplateSelection = null;
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
@@ -399,6 +401,7 @@ export class AiPanel {
         attachmentPaths = [],
         existingFlowJson = null,
         explicitMode = '',
+        templateSelection = null,
         clearInput = true
     }) {
         const input = this.container.querySelector('#ai-input');
@@ -437,6 +440,7 @@ export class AiPanel {
         const currentFlowPayload = existingFlowJson ?? this._getCurrentFlowJson();
         const resolvedMode = this._resolveGenerateRequestMode(explicitMode);
         const flowPayload = resolvedMode === 'new' ? null : currentFlowPayload;
+        const normalizedTemplateSelection = this._normalizeTemplateSelection(templateSelection);
 
         if (this.currentResult?.flow) {
             this._setResultStatusNote('正在生成新一轮方案，右侧暂时保留上一版可应用结果。', 'info');
@@ -452,6 +456,7 @@ export class AiPanel {
                     hint: normalizedHint || null,
                     mode: resolvedMode,
                     requirementMode: this.requirementMode,
+                    templateSelection: normalizedTemplateSelection,
                     debugPrompt: this._shouldRequestPromptTrace(),
                     requestId,
                     sessionId: this.sessionId,
@@ -460,6 +465,7 @@ export class AiPanel {
                 }
             });
             this.nextHintDraft = '';
+            this.nextTemplateSelection = null;
             this._renderQueuedHintBanner();
             if (clearInput && input) {
                 input.value = '';
@@ -554,6 +560,7 @@ export class AiPanel {
         const description = input.value.trim();
         const attachmentPaths = this.attachments.map(item => item.path);
         const hint = this.nextHintDraft.trim();
+        const templateSelection = this.nextTemplateSelection ? { ...this.nextTemplateSelection } : null;
         const userMessage = attachmentPaths.length > 0
             ? `${description}\n\n[附件] ${this.attachments.map(item => item.name).join('，')}`
             : description;
@@ -562,6 +569,7 @@ export class AiPanel {
             hint,
             userMessage,
             attachmentPaths,
+            templateSelection,
             explicitMode: '',
             clearInput: true
         });
@@ -1115,21 +1123,65 @@ export class AiPanel {
         const pending = this._normalizePendingParameters(data?.pendingParameters ?? data?.PendingParameters);
         const missing = this._normalizeMissingResources(data?.missingResources ?? data?.MissingResources);
         const recommended = this._normalizeRecommendedTemplate(data?.recommendedTemplate ?? data?.RecommendedTemplate);
+        const candidates = this._normalizeTemplateCandidates(data?.templateCandidates ?? data?.TemplateCandidates);
+        const generationMode = this._getGenerationMode(data);
+        const templateLockLevel = this._getTemplateLockLevel(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
+        const hasTemplateStrategy = Boolean(recommended || candidates.length > 0 || generationMode || templateLockLevel);
 
-        if (!recommended && pending.length === 0 && missing.length === 0) {
+        if (!hasTemplateStrategy && pending.length === 0 && missing.length === 0) {
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>';
             return;
         }
 
         const followupText = this._buildFollowupHintText({ recommended, pending, missing, operators });
-        const recommendedHtml = recommended
+        const strategyText = this._formatTemplateStrategy(generationMode, templateLockLevel);
+        const primaryTemplate = recommended || candidates[0] || null;
+        const candidatesHtml = candidates.length > 0
+            ? `
+                <div class="ai-followup-template-candidates">
+                    ${candidates.map((candidate, index) => {
+                        const confidence = Number.isFinite(candidate.confidence) && candidate.confidence > 0
+                            ? ` · ${(candidate.confidence * 100).toFixed(0)}%`
+                            : '';
+                        const meta = [candidate.scenarioKey, candidate.industry, candidate.templateVersion ? `v${candidate.templateVersion}` : '']
+                            .filter(Boolean)
+                            .join(' · ');
+                        return `
+                            <div class="ai-followup-template-candidate">
+                                <div class="ai-followup-template-candidate-main">
+                                    <div class="ai-followup-template-name">${this._escapeHtml(candidate.templateName)}</div>
+                                    <div class="ai-followup-template-reason">${this._escapeHtml(candidate.matchReason || `候选 ${index + 1}`)}${this._escapeHtml(confidence)}</div>
+                                    ${meta ? `<div class="ai-followup-item-meta">${this._escapeHtml(meta)}</div>` : ''}
+                                </div>
+                                <div class="ai-followup-template-actions">
+                                    <button class="ai-followup-template-action" type="button" data-template-action="fill" data-template-id="${this._escapeHtml(candidate.templateId)}" data-scenario-key="${this._escapeHtml(candidate.scenarioKey)}" data-template-name="${this._escapeHtml(candidate.templateName)}">严格沿用</button>
+                                    <button class="ai-followup-template-action" type="button" data-template-action="adapt" data-template-id="${this._escapeHtml(candidate.templateId)}" data-scenario-key="${this._escapeHtml(candidate.scenarioKey)}" data-template-name="${this._escapeHtml(candidate.templateName)}">参考改造</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `
+            : '';
+        const recommendedHtml = hasTemplateStrategy
             ? `
                 <div class="ai-followup-template">
-                    <div class="ai-followup-section-label">模板建议</div>
-                    <div class="ai-followup-template-name">${this._escapeHtml(recommended.templateName)}</div>
-                    <div class="ai-followup-template-reason">${this._escapeHtml(recommended.matchReason || '建议延续当前模板骨架继续补齐缺失项。')}</div>
+                    <div class="ai-followup-section-header">
+                        <div class="ai-followup-section-label">模板策略</div>
+                        <div class="ai-followup-section-tip">${this._escapeHtml(strategyText)}</div>
+                    </div>
+                    ${primaryTemplate ? `
+                        <div class="ai-followup-template-name">${this._escapeHtml(primaryTemplate.templateName)}</div>
+                        <div class="ai-followup-template-reason">${this._escapeHtml(primaryTemplate.matchReason || '建议延续当前模板骨架继续补齐缺失项。')}</div>
+                    ` : `
+                        <div class="ai-followup-template-reason">本轮按自由生成处理，可在候选出现后手动指定模板。</div>
+                    `}
+                    ${candidatesHtml}
+                    <div class="ai-followup-template-free-row">
+                        <button class="ai-followup-template-action" type="button" data-template-action="free">下一轮不用模板</button>
+                    </div>
                 </div>
             `
             : '';
@@ -1196,6 +1248,28 @@ export class AiPanel {
             });
         });
 
+        container.querySelectorAll('[data-template-action]').forEach(button => {
+            button.disabled = this.isGenerating;
+            button.addEventListener('click', () => {
+                const action = button.dataset.templateAction || '';
+                if (action === 'free') {
+                    this._queueTemplateSelection({ mode: 'free_generate' }, '下一轮将不使用模板，改为自由生成。');
+                    return;
+                }
+
+                const templateName = String(button.dataset.templateName || '').trim();
+                const selection = {
+                    mode: action === 'fill' ? 'template_fill' : 'template_adapt',
+                    templateId: String(button.dataset.templateId || '').trim() || null,
+                    scenarioKey: String(button.dataset.scenarioKey || '').trim() || null
+                };
+                const label = action === 'fill'
+                    ? `下一轮将严格沿用模板「${templateName || selection.scenarioKey || '已选模板'}」。`
+                    : `下一轮将参考模板「${templateName || selection.scenarioKey || '已选模板'}」并允许改造。`;
+                this._queueTemplateSelection(selection, label);
+            });
+        });
+
         container.querySelectorAll('[data-followup-action]').forEach(button => {
             button.disabled = this.isGenerating;
             button.addEventListener('click', async () => {
@@ -1219,6 +1293,15 @@ export class AiPanel {
                 }
             });
         });
+    }
+
+    _queueTemplateSelection(selection, message) {
+        const normalized = this._normalizeTemplateSelection(selection);
+        if (!normalized) return;
+
+        this.nextTemplateSelection = normalized;
+        this._renderQueuedHintBanner();
+        this._addMessage('system', message || '已设置下一轮模板策略。');
     }
 
     _renderParameterDraftEditor(data, flow = null) {
@@ -2525,6 +2608,27 @@ export class AiPanel {
             .filter(item => item.resourceType || item.resourceKey || item.description);
     }
 
+    _normalizeTemplateSelection(selection) {
+        if (!selection || typeof selection !== 'object') return null;
+
+        const mode = String(selection?.mode ?? selection?.Mode ?? '').trim().toLowerCase();
+        const templateId = String(selection?.templateId ?? selection?.TemplateId ?? '').trim();
+        const scenarioKey = String(selection?.scenarioKey ?? selection?.ScenarioKey ?? '').trim();
+        const normalizedMode = mode === 'strict'
+            ? 'template_fill'
+            : mode === 'relaxed'
+                ? 'template_adapt'
+                : mode;
+
+        if (!normalizedMode && !templateId && !scenarioKey) return null;
+
+        return {
+            mode: normalizedMode,
+            templateId: templateId || null,
+            scenarioKey: scenarioKey || null
+        };
+    }
+
     _normalizeRecommendedTemplate(item) {
         if (!item || typeof item !== 'object') return null;
 
@@ -2532,9 +2636,60 @@ export class AiPanel {
         if (!templateName) return null;
 
         return {
+            templateId: String(item?.templateId ?? item?.TemplateId ?? '').trim(),
             templateName,
-            matchReason: String(item?.matchReason ?? item?.MatchReason ?? '').trim()
+            templateVersion: String(item?.templateVersion ?? item?.TemplateVersion ?? '').trim(),
+            scenarioKey: String(item?.scenarioKey ?? item?.ScenarioKey ?? '').trim(),
+            industry: String(item?.industry ?? item?.Industry ?? '').trim(),
+            matchReason: String(item?.matchReason ?? item?.MatchReason ?? '').trim(),
+            matchMode: String(item?.matchMode ?? item?.MatchMode ?? '').trim(),
+            confidence: Number(item?.confidence ?? item?.Confidence ?? 0),
+            matchedFields: Array.isArray(item?.matchedFields ?? item?.MatchedFields)
+                ? (item?.matchedFields ?? item?.MatchedFields).map(value => String(value || '').trim()).filter(Boolean)
+                : [],
+            missingSignals: Array.isArray(item?.missingSignals ?? item?.MissingSignals)
+                ? (item?.missingSignals ?? item?.MissingSignals).map(value => String(value || '').trim()).filter(Boolean)
+                : []
         };
+    }
+
+    _normalizeTemplateCandidates(items) {
+        if (!Array.isArray(items)) return [];
+
+        const seen = new Set();
+        return items
+            .map(item => this._normalizeRecommendedTemplate(item))
+            .filter(Boolean)
+            .sort((left, right) => (right.confidence || 0) - (left.confidence || 0))
+            .filter(item => {
+                const key = `${item.templateId}|${item.scenarioKey}|${item.templateName}`.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .slice(0, 3);
+    }
+
+    _getGenerationMode(data) {
+        return String(data?.generationMode ?? data?.GenerationMode ?? '').trim();
+    }
+
+    _getTemplateLockLevel(data) {
+        return String(data?.templateLockLevel ?? data?.TemplateLockLevel ?? '').trim();
+    }
+
+    _formatTemplateStrategy(mode, lockLevel) {
+        const modeText = {
+            template_fill: '严格填充',
+            template_adapt: '参考改造',
+            free_generate: '自由生成'
+        }[String(mode || '').trim()] || '自动判定';
+        const lockText = {
+            strict: '强约束',
+            relaxed: '弱约束',
+            none: '无模板约束'
+        }[String(lockLevel || '').trim()] || '约束未声明';
+        return `${modeText} / ${lockText}`;
     }
 
     _resolvePendingOperatorLabel(operatorId, operators) {
@@ -3538,16 +3693,25 @@ export class AiPanel {
         if (!container) return;
 
         const draft = String(this.nextHintDraft || '').trim();
-        if (!draft) {
+        const templateSelection = this._normalizeTemplateSelection(this.nextTemplateSelection);
+        if (!draft && !templateSelection) {
             container.innerHTML = '';
             return;
         }
 
-        const preview = draft.length > 120 ? `${draft.slice(0, 120)}...` : draft;
+        const previewParts = [];
+        if (templateSelection) {
+            previewParts.push(this._formatQueuedTemplateSelection(templateSelection));
+        }
+        if (draft) {
+            previewParts.push(draft);
+        }
+        const previewText = previewParts.join('\n');
+        const preview = previewText.length > 120 ? `${previewText.slice(0, 120)}...` : previewText;
         container.innerHTML = `
             <div class="ai-followup-hint-card">
                 <div class="ai-followup-hint-copy">
-                    <div class="ai-followup-hint-title">下一轮已附加待补提示</div>
+                    <div class="ai-followup-hint-title">下一轮已附加策略</div>
                     <div class="ai-followup-hint-preview">${this._escapeHtml(preview)}</div>
                 </div>
                 <button class="ai-followup-hint-clear" type="button" id="ai-btn-clear-followup-hint">清除</button>
@@ -3559,10 +3723,24 @@ export class AiPanel {
             clearButton.disabled = this.isGenerating;
             clearButton.addEventListener('click', () => {
                 this.nextHintDraft = '';
+                this.nextTemplateSelection = null;
                 this._renderQueuedHintBanner();
-                this._addMessage('system', '已清除下一轮附加提示。');
+                this._addMessage('system', '已清除下一轮附加策略。');
             });
         }
+    }
+
+    _formatQueuedTemplateSelection(selection) {
+        const normalized = this._normalizeTemplateSelection(selection);
+        if (!normalized) return '';
+
+        if (normalized.mode === 'free_generate') {
+            return '模板策略：自由生成，不使用模板约束。';
+        }
+
+        const modeText = normalized.mode === 'template_fill' ? '严格沿用模板' : '参考模板改造';
+        const target = normalized.scenarioKey || normalized.templateId || '已选模板';
+        return `模板策略：${modeText}（${target}）。`;
     }
 
     async _copyTextToClipboard(text) {
@@ -3906,6 +4084,7 @@ export class AiPanel {
         this.sessionId = sessionId;
         this._saveSessionId(this.sessionId);
         this.nextHintDraft = '';
+        this.nextTemplateSelection = null;
         this._resetPendingDraftState();
         this._resetCurrentResultSyncState();
         this.pendingParameterFilePickContext = null;
@@ -3974,6 +4153,12 @@ export class AiPanel {
             reasoning: parsedAiFlow?.reasoning || parsedAiFlow?.Reasoning ||
                 latestAssistantPayload?.reasoning || latestAssistantPayload?.Reasoning || '',
             recommendedTemplate: followupSource?.recommendedTemplate ?? followupSource?.RecommendedTemplate ?? null,
+            templateCandidates: followupSource?.templateCandidates ?? followupSource?.TemplateCandidates ??
+                latestAssistantPayload?.templateCandidates ?? latestAssistantPayload?.TemplateCandidates ?? [],
+            generationMode: followupSource?.generationMode ?? followupSource?.GenerationMode ??
+                latestAssistantPayload?.generationMode ?? latestAssistantPayload?.GenerationMode ?? '',
+            templateLockLevel: followupSource?.templateLockLevel ?? followupSource?.TemplateLockLevel ??
+                latestAssistantPayload?.templateLockLevel ?? latestAssistantPayload?.TemplateLockLevel ?? '',
             pendingParameters: followupSource?.pendingParameters ?? followupSource?.PendingParameters ?? [],
             missingResources: followupSource?.missingResources ?? followupSource?.MissingResources ?? [],
             requirementBrief: followupSource?.requirementBrief ?? followupSource?.RequirementBrief ?? latestAssistantPayload?.requirementBrief ?? latestAssistantPayload?.RequirementBrief ?? null,

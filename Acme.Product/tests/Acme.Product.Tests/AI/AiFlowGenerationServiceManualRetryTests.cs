@@ -5,6 +5,7 @@ using Acme.Product.Core.Services;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.AI.DryRun;
 using Acme.Product.Infrastructure.AI.Runtime;
+using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
@@ -183,11 +184,459 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         session.History.Last().Payload!.RequirementBrief!.MissingFacts.Should().Contain("需要确认对象");
     }
 
+    [Fact(DisplayName = "GenerateFlowAsync should stop clarification after two rounds")]
+    public async Task GenerateFlowAsync_AfterTwoClarificationRounds_ShouldForceDraftGeneration()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson()
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        _ = conversationService.GetOrCreateSession("clarification-max-rounds");
+        conversationService.RecordAssistantResponse(
+            "clarification-max-rounds",
+            "please clarify object",
+            null,
+            payload: BuildClarificationPayload("object_type"));
+        conversationService.RecordAssistantResponse(
+            "clarification-max-rounds",
+            "please clarify defect",
+            null,
+            payload: BuildClarificationPayload("defect_type"));
+
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            new AiRequirementBrief
+            {
+                Confidence = 0.2,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                MissingFacts = ["need object", "need defect"],
+                ClarificationQuestions =
+                [
+                    BuildQuestion("object_type"),
+                    BuildQuestion("defect_type")
+                ],
+                ClarificationRequired = true
+            },
+            useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "generate a rough inspection flow",
+            SessionId: "clarification-max-rounds"));
+
+        result.Success.Should().BeTrue();
+        result.ClarificationRequired.Should().BeFalse();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        result.RequirementBrief.DraftRiskLevel.Should().Be("high");
+
+        await connector.Received(1).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should reset clarification rounds for a new self-contained request")]
+    public async Task GenerateFlowAsync_NewSelfContainedRequest_ShouldNotInheritOldClarificationRoundLimit()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        _ = conversationService.GetOrCreateSession("clarification-new-request");
+        conversationService.RecordAssistantResponse(
+            "clarification-new-request",
+            "please clarify object",
+            null,
+            payload: BuildClarificationPayload("object_type"));
+        conversationService.RecordAssistantResponse(
+            "clarification-new-request",
+            "please clarify defect",
+            null,
+            payload: BuildClarificationPayload("defect_type"));
+
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            new AiRequirementBrief
+            {
+                ScenarioKey = "copper-hole-spacing-measurement",
+                ScenarioName = "两器铜孔间距检测",
+                IntentType = "measurement",
+                Confidence = 0.9,
+                CanGenerateDraftNow = true,
+                DraftRiskLevel = "high",
+                MissingFacts = ["需要确认标定或像素转物理单位换算"],
+                ClarificationQuestions =
+                [
+                    new AiClarificationQuestion
+                    {
+                        Field = "calibration",
+                        Question = "是否需要像素到物理单位换算或标定？",
+                        Required = true,
+                        Priority = "high",
+                        Options = ["像素到物理单位换算", "手眼标定", "不需要"]
+                    }
+                ],
+                ClarificationRequired = true
+            });
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "测量两个圆形孔位的圆心距离。",
+            SessionId: "clarification-new-request"));
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.ClarificationQuestions.Should().Contain(question => question.Field == "calibration");
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should not repeat answered clarification fields")]
+    public async Task GenerateFlowAsync_WithAnsweredClarificationField_ShouldOnlyAskRemainingFields()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        _ = conversationService.GetOrCreateSession("clarification-no-repeat");
+        conversationService.RecordAssistantResponse(
+            "clarification-no-repeat",
+            "please clarify object and defect",
+            null,
+            payload: new ConversationTurnPayload
+            {
+                Kind = "assistant_clarification",
+                Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                ClarificationRequired = true,
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ClarificationRequired = true,
+                    ClarificationQuestions =
+                    [
+                        BuildQuestion("object_type"),
+                        BuildQuestion("defect_type")
+                    ]
+                }
+            });
+
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            new AiRequirementBrief
+            {
+                Confidence = 0.2,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                RequiredFields = ["object_type", "defect_type"],
+                MissingFacts = ["需要确认检测对象", "需要确认缺陷类别"],
+                ClarificationQuestions =
+                [
+                    BuildQuestion("object_type"),
+                    BuildQuestion("defect_type")
+                ],
+                ClarificationRequired = true
+            });
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "缺陷类别：破损",
+            SessionId: "clarification-no-repeat"));
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.ClarificationQuestions.Should().ContainSingle();
+        result.RequirementBrief.ClarificationQuestions[0].Field.Should().Be("object_type");
+        result.RequirementBrief.MissingFacts.Should().Contain("需要确认检测对象");
+        result.RequirementBrief.MissingFacts.Should().NotContain("需要确认缺陷类别");
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should treat current calibration answer as resolved")]
+    public async Task GenerateFlowAsync_WithCurrentCalibrationNoneAnswer_ShouldNotAskCalibrationAgain()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson()
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        _ = conversationService.GetOrCreateSession("calibration-no-repeat");
+        conversationService.RecordAssistantResponse(
+            "calibration-no-repeat",
+            "please clarify calibration",
+            null,
+            payload: BuildClarificationPayload("calibration"));
+
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            new AiRequirementBrief
+            {
+                ScenarioKey = "copper-hole-spacing-measurement",
+                ScenarioName = "两器铜孔间距检测",
+                IntentType = "measurement",
+                Confidence = 0.9,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                RequiredFields = ["calibration"],
+                MissingFacts = ["需要确认标定或像素转物理单位换算"],
+                ClarificationQuestions = [BuildQuestion("calibration")],
+                ClarificationRequired = true
+            },
+            useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "标定：不需要 输出目标：PLC ROI：固定ROI",
+            SessionId: "calibration-no-repeat"));
+
+        result.Success.Should().BeTrue();
+        result.ClarificationRequired.Should().BeFalse();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.CalibrationRequirement.Should().Be("none");
+        result.RequirementBrief.ClarificationQuestions.Should().NotContain(question => question.Field == "calibration");
+        result.RequirementBrief.MissingFacts.Should().NotContain(fact => fact.Contains("标定", StringComparison.OrdinalIgnoreCase));
+
+        await connector.Received(1).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory(DisplayName = "GenerateFlowAsync should expose template generation mode and lock level")]
+    [InlineData(0.9, "包装箱外观检测", "template_fill", "strict", "检测包装箱破损、压痕、标签异常")]
+    [InlineData(0.5, "包装箱外观检测", "template_adapt", "relaxed", "检测包装箱破损、压痕、标签异常")]
+    [InlineData(0.9, "", "free_generate", "none", "检测包装箱破损、压痕、标签异常，不要用模板")]
+    public async Task GenerateFlowAsync_TemplateMatchConfidence_ShouldExposeGenerationModeAndLockLevel(
+        double confidence,
+        string expectedRecommendedTemplate,
+        string expectedGenerationMode,
+        string expectedTemplateLockLevel,
+        string description)
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson()
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var scenarioMatch = BuildPackagingScenarioMatch(confidence);
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            scenarioMatches: [scenarioMatch],
+            useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            description,
+            SessionId: $"template-mode-{expectedGenerationMode}"));
+
+        result.Success.Should().BeTrue();
+        result.GenerationMode.Should().Be(expectedGenerationMode);
+        result.TemplateLockLevel.Should().Be(expectedTemplateLockLevel);
+        result.TemplateCandidates.Should().ContainSingle();
+        result.TemplateCandidates[0].Confidence.Should().Be(confidence);
+
+        if (string.IsNullOrWhiteSpace(expectedRecommendedTemplate))
+        {
+            result.RecommendedTemplate.Should().BeNull();
+        }
+        else
+        {
+            result.RecommendedTemplate.Should().NotBeNull();
+            result.RecommendedTemplate!.TemplateName.Should().Be(expectedRecommendedTemplate);
+            result.RecommendedTemplate.ScenarioKey.Should().Be("carton-appearance-inspection");
+        }
+
+        await connector.Received(1).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+        validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
+    }
+
+    [Theory(DisplayName = "GenerateFlowAsync should honor explicit template selection")]
+    [InlineData("template_fill", "template_fill", "strict", true)]
+    [InlineData("template_adapt", "template_adapt", "relaxed", true)]
+    [InlineData("free_generate", "free_generate", "none", false)]
+    public async Task GenerateFlowAsync_TemplateSelection_ShouldOverrideAutomaticConfidence(
+        string selectedMode,
+        string expectedGenerationMode,
+        string expectedTemplateLockLevel,
+        bool expectRecommendedTemplate)
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson()
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var scenarioMatch = BuildPackagingScenarioMatch(0.9);
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            scenarioMatches: [scenarioMatch],
+            useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "carton appearance inspection",
+            SessionId: $"template-selection-{selectedMode}",
+            TemplateSelection: new AiTemplateSelectionInfo
+            {
+                Mode = selectedMode,
+                ScenarioKey = "carton-appearance-inspection"
+            }));
+
+        result.Success.Should().BeTrue();
+        result.GenerationMode.Should().Be(expectedGenerationMode);
+        result.TemplateLockLevel.Should().Be(expectedTemplateLockLevel);
+        result.TemplateCandidates.Should().ContainSingle();
+        result.TemplateCandidates[0].ScenarioKey.Should().Be("carton-appearance-inspection");
+
+        if (expectRecommendedTemplate)
+        {
+            result.RecommendedTemplate.Should().NotBeNull();
+            result.RecommendedTemplate!.MatchMode.Should().Be("user-selected-template");
+            result.RecommendedTemplate.ScenarioKey.Should().Be("carton-appearance-inspection");
+        }
+        else
+        {
+            result.RecommendedTemplate.Should().BeNull();
+        }
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should not loop clarification when high-confidence template can draft")]
+    public async Task GenerateFlowAsync_TemplateFillWithMissingFacts_ShouldGenerateDraftInsteadOfClarifying()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson()
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var requirementBrief = new AiRequirementBrief
+        {
+            ScenarioKey = "carton-appearance-inspection",
+            ScenarioName = "包装箱外观检测",
+            IntentType = "defect_detection",
+            Confidence = 0.9,
+            CanGenerateDraftNow = true,
+            DraftRiskLevel = "high",
+            ObjectTypes = ["carton"],
+            RequiredFields = ["defect_type"],
+            MissingFacts = ["需要确认缺陷类别"],
+            ClarificationQuestions =
+            [
+                new AiClarificationQuestion
+                {
+                    Field = "defect_type",
+                    Question = "请补充需要判定的缺陷类别。",
+                    Required = true,
+                    Priority = "high"
+                }
+            ],
+            ClarificationRequired = true
+        };
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            requirementBrief,
+            scenarioMatches: [BuildPackagingScenarioMatch(0.9)],
+            useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "检测包装箱外观缺陷",
+            SessionId: "template-clarification-loop"));
+
+        result.Success.Should().BeTrue();
+        result.ClarificationRequired.Should().BeFalse();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.ClarificationRequired.Should().BeFalse();
+        result.RequirementBrief.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        result.RequirementBrief.MissingFacts.Should().Contain("需要确认缺陷类别");
+
+        await connector.Received(1).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
     private static AiFlowGenerationService CreateService(
         IAiConnector connector,
         IAiFlowValidator validator,
         IConversationalFlowService conversationService,
-        AiRequirementBrief? requirementBrief = null)
+        AiRequirementBrief? requirementBrief = null,
+        IReadOnlyList<ScenarioMatchResult>? scenarioMatches = null,
+        bool useRealOperatorFactory = false)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
         modelSelector.SelectGenerationModel().Returns(new AiModelConfig
@@ -201,8 +650,11 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var connectorFactory = Substitute.For<IAiConnectorFactory>();
         connectorFactory.CreateConnector(Arg.Any<AiModelConfig>()).Returns(connector);
 
-        var operatorFactory = Substitute.For<IOperatorFactory>();
-        operatorFactory.GetAllMetadata().Returns(Array.Empty<OperatorMetadata>());
+        var operatorFactory = useRealOperatorFactory
+            ? new OperatorFactory()
+            : Substitute.For<IOperatorFactory>();
+        if (!useRealOperatorFactory)
+            operatorFactory.GetAllMetadata().Returns(Array.Empty<OperatorMetadata>());
 
         var templateService = Substitute.For<IFlowTemplateService>();
         var scenarioMatcher = Substitute.For<IScenarioMatcher>();
@@ -212,7 +664,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 Arg.Any<IReadOnlyList<string>?>(),
                 Arg.Any<int>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<ScenarioMatchResult>>(Array.Empty<ScenarioMatchResult>()));
+            .Returns(Task.FromResult(scenarioMatches ?? Array.Empty<ScenarioMatchResult>()));
 
         var requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
         requirementBriefExtractor.Extract(
@@ -251,6 +703,101 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             new DryRunService(flowExecutionService),
             hostEnvironment,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>());
+    }
+
+    private static ScenarioMatchResult BuildPackagingScenarioMatch(double confidence)
+    {
+        var template = new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "包装箱外观检测",
+            Industry = "包装终检",
+            TemplateVersion = "1.0.0",
+            ScenarioKey = "carton-appearance-inspection",
+            FlowJson = BuildSuccessfulFlowJson()
+        };
+
+        return new ScenarioMatchResult
+        {
+            Template = template,
+            Confidence = confidence,
+            MatchReason = "Matched 包装箱, 破损",
+            MatchedFields = ["keywords", "defectTypes"],
+            Scenario = new ScenarioDefinition
+            {
+                ScenarioKey = "carton-appearance-inspection",
+                ScenarioName = "包装箱外观检测",
+                TemplateName = "包装箱外观检测",
+                TemplateVersion = "1.0.0",
+                Industry = "包装终检",
+                Keywords = ["包装箱"],
+                DefectTypes = ["破损"]
+            }
+        };
+    }
+
+    private static ConversationTurnPayload BuildClarificationPayload(string field)
+    {
+        return new ConversationTurnPayload
+        {
+            Kind = "assistant_clarification",
+            Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            ClarificationRequired = true,
+            RequirementBrief = new AiRequirementBrief
+            {
+                ClarificationRequired = true,
+                ClarificationQuestions = [BuildQuestion(field)]
+            }
+        };
+    }
+
+    private static AiClarificationQuestion BuildQuestion(string field)
+    {
+        return new AiClarificationQuestion
+        {
+            Field = field,
+            Question = $"Please clarify {field}",
+            Required = true,
+            Priority = "high",
+            Options = field switch
+            {
+                "calibration" => ["像素到物理单位换算", "手眼标定", "不需要"],
+                "defect_type" => ["破损", "压痕"],
+                _ => ["包装箱", "产品"]
+            }
+        };
+    }
+
+    private static string BuildSuccessfulFlowJson()
+    {
+        return """
+               {
+                 "explanation": "模板策略测试流程。",
+                 "operators": [
+                   {
+                     "tempId": "op_1",
+                     "operatorType": "ImageAcquisition",
+                     "displayName": "图像采集",
+                     "parameters": {
+                       "SourceType": "File",
+                       "FilePath": "data/input.png",
+                       "CameraId": "cam_1"
+                     }
+                   },
+                   {
+                     "tempId": "op_2",
+                     "operatorType": "ResultOutput",
+                     "displayName": "结果输出",
+                     "parameters": {
+                       "Format": "JSON",
+                       "SaveToFile": "false"
+                     }
+                   }
+                 ],
+                 "connections": [],
+                 "parametersNeedingReview": {}
+               }
+               """;
     }
 
     public void Dispose()

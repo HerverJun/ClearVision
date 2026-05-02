@@ -64,6 +64,31 @@ public class RequirementBriefExtractorTests
     }
 
     [Fact]
+    public void Extract_WithResolvedObject_ShouldNotKeepObjectMissingSignalAsBlocking()
+    {
+        var extractor = new RequirementBriefExtractor();
+        var match = new ScenarioMatchResult
+        {
+            Scenario = new ScenarioDefinition
+            {
+                ScenarioKey = "carton-appearance-inspection",
+                ScenarioName = "包装箱外观检测",
+                IntentTypes = ["defect_detection"],
+                ObjectTypes = ["carton", "package", "label"],
+                DefectTypes = ["破损", "压痕", "标签异常"]
+            },
+            Confidence = 0.9,
+            MissingSignals = ["object_type"]
+        };
+
+        var brief = extractor.Extract("检测包装箱破损", null, match);
+
+        brief.ObjectName.Should().NotBeNullOrWhiteSpace();
+        brief.RequiredFields.Should().NotContain("object_type");
+        brief.MissingFacts.Should().NotContain("需要确认检测对象");
+    }
+
+    [Fact]
     public void Extract_WithQueuedClarificationQuestions_ShouldIgnoreExamplesAsAnswers()
     {
         var extractor = new RequirementBriefExtractor();
@@ -189,6 +214,37 @@ public class RequirementBriefExtractorTests
             .Options.Should().NotBeEmpty();
         brief.ClarificationQuestions.Single(question => question.Field == "measurement_target")
             .Options.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void ApplyPolicy_StrictMeasurementRequest_ShouldAskCalibrationBeforeGeneration()
+    {
+        var extractor = new RequirementBriefExtractor();
+        var engine = new ClarificationEngine();
+        var match = new ScenarioMatchResult
+        {
+            Scenario = new ScenarioDefinition
+            {
+                ScenarioKey = "copper-hole-spacing-measurement",
+                ScenarioName = "两器铜孔间距检测",
+                IntentTypes = ["measurement"],
+                ObjectTypes = ["copper_hole"],
+                MeasurementTargets = ["hole_spacing"]
+            },
+            Confidence = 0.9
+        };
+
+        var brief = extractor.Extract("测量两个圆形孔位的圆心距离。", null, match);
+        var evaluated = engine.ApplyPolicy(brief, GenerateFlowMode.New, AiRequirementModes.Strict);
+
+        evaluated.IntentType.Should().Be("measurement");
+        evaluated.ObjectName.Should().NotBeNullOrWhiteSpace();
+        evaluated.MeasurementTargets.Should().Contain("孔距/圆心距离");
+        evaluated.RequiredFields.Should().Contain("calibration");
+        evaluated.MissingFacts.Should().Contain("需要确认标定或像素转物理单位换算");
+        evaluated.ClarificationQuestions.Should().Contain(question =>
+            question.Field == "calibration" && question.Required);
+        evaluated.ClarificationRequired.Should().BeTrue();
     }
 
     [Fact]

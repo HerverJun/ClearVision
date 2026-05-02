@@ -55,6 +55,11 @@ public record GenerateFlowRequestPayload
     /// </summary>
     public string? RequirementMode { get; init; }
 
+    /// <summary>
+    /// 可选：用户在工作台中选择的模板策略。
+    /// </summary>
+    public GenerateFlowTemplateSelection? TemplateSelection { get; init; }
+
     public List<string>? Attachments { get; init; }
 }
 
@@ -80,6 +85,9 @@ public record GenerateFlowResponse
     public string? DetectedIntent { get; init; }
     public object? DryRunResult { get; init; }
     public GenerateFlowTemplateRecommendation? RecommendedTemplate { get; init; }
+    public string GenerationMode { get; init; } = string.Empty;
+    public string TemplateLockLevel { get; init; } = string.Empty;
+    public List<GenerateFlowTemplateCandidate> TemplateCandidates { get; init; } = new();
     public List<GenerateFlowPendingParameter> PendingParameters { get; init; } = new();
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
     public GenerateFlowManualRetry? ManualRetry { get; init; }
@@ -119,9 +127,34 @@ public record GenerateFlowTemplateRecommendation
 {
     public string? TemplateId { get; init; }
     public string TemplateName { get; init; } = string.Empty;
+    public string? TemplateVersion { get; init; }
+    public string? ScenarioKey { get; init; }
+    public string? Industry { get; init; }
     public string MatchReason { get; init; } = string.Empty;
     public string MatchMode { get; init; } = string.Empty;
     public double Confidence { get; init; }
+    public List<string> MatchedFields { get; init; } = new();
+    public List<string> MissingSignals { get; init; } = new();
+}
+
+public record GenerateFlowTemplateCandidate
+{
+    public string? TemplateId { get; init; }
+    public string TemplateName { get; init; } = string.Empty;
+    public string? TemplateVersion { get; init; }
+    public string? ScenarioKey { get; init; }
+    public string? Industry { get; init; }
+    public double Confidence { get; init; }
+    public string MatchReason { get; init; } = string.Empty;
+    public List<string> MatchedFields { get; init; } = new();
+    public List<string> MissingSignals { get; init; } = new();
+}
+
+public record GenerateFlowTemplateSelection
+{
+    public string Mode { get; init; } = string.Empty;
+    public string? TemplateId { get; init; }
+    public string? ScenarioKey { get; init; }
 }
 
 public record GenerateFlowPendingParameter

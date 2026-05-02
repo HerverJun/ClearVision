@@ -40,6 +40,7 @@ public class GenerateFlowMessageHandler
         string? requestId = null,
         IReadOnlyList<string>? attachments = null,
         string? requirementMode = null,
+        AiTemplateSelectionInfo? templateSelection = null,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -64,7 +65,8 @@ public class GenerateFlowMessageHandler
                     ExistingFlowJson: existingFlowJson,
                     Attachments: attachments,
                     Mode: mode,
-                    DebugPrompt: debugPrompt)
+                    DebugPrompt: debugPrompt,
+                    TemplateSelection: templateSelection)
                 {
                     RequirementMode = requirementMode ?? AiRequirementModes.Strict
                 },
@@ -106,6 +108,9 @@ public class GenerateFlowMessageHandler
                 DetectedIntent = result.DetectedIntent,
                 DryRunResult = result.DryRunResult,
                 RecommendedTemplate = MapRecommendedTemplate(result.RecommendedTemplate),
+                GenerationMode = result.GenerationMode,
+                TemplateLockLevel = result.TemplateLockLevel,
+                TemplateCandidates = MapTemplateCandidates(result.TemplateCandidates),
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
                 ManualRetry = MapManualRetry(result.ManualRetry),
@@ -177,20 +182,23 @@ public class GenerateFlowMessageHandler
                 response.Type,
                 response.Success,
                 response.Status,
-            response.Flow,
-            response.ErrorMessage,
-            response.FailureSummary,
-            response.LastAttemptDiagnostics,
-            response.AiExplanation,
-            response.Reasoning,
-            response.ParametersNeedingReview,
-            response.ClarificationRequired,
-            response.RequirementBrief,
-            response.SessionId,
-            response.RequestId,
-            response.DetectedIntent,
-            response.DryRunResult,
+                response.Flow,
+                response.ErrorMessage,
+                response.FailureSummary,
+                response.LastAttemptDiagnostics,
+                response.AiExplanation,
+                response.Reasoning,
+                response.ParametersNeedingReview,
+                response.ClarificationRequired,
+                response.RequirementBrief,
+                response.SessionId,
+                response.RequestId,
+                response.DetectedIntent,
+                response.DryRunResult,
                 response.RecommendedTemplate,
+                response.GenerationMode,
+                response.TemplateLockLevel,
+                response.TemplateCandidates,
                 response.PendingParameters,
                 response.MissingResources,
                 response.ManualRetry,
@@ -234,10 +242,40 @@ public class GenerateFlowMessageHandler
         {
             TemplateId = template.TemplateId,
             TemplateName = template.TemplateName,
+            TemplateVersion = template.TemplateVersion,
+            ScenarioKey = template.ScenarioKey,
+            Industry = template.Industry,
             MatchReason = template.MatchReason,
             MatchMode = template.MatchMode,
-            Confidence = template.Confidence
+            Confidence = template.Confidence,
+            MatchedFields = template.MatchedFields?.Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>(),
+            MissingSignals = template.MissingSignals?.Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>()
         };
+    }
+
+    private static List<GenerateFlowTemplateCandidate> MapTemplateCandidates(
+        IReadOnlyCollection<AiTemplateCandidateInfo>? candidates)
+    {
+        if (candidates == null || candidates.Count == 0)
+        {
+            return new List<GenerateFlowTemplateCandidate>();
+        }
+
+        return candidates
+            .OrderByDescending(item => item.Confidence)
+            .Select(item => new GenerateFlowTemplateCandidate
+            {
+                TemplateId = item.TemplateId,
+                TemplateName = item.TemplateName,
+                TemplateVersion = item.TemplateVersion,
+                ScenarioKey = item.ScenarioKey,
+                Industry = item.Industry,
+                Confidence = item.Confidence,
+                MatchReason = item.MatchReason,
+                MatchedFields = item.MatchedFields?.Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>(),
+                MissingSignals = item.MissingSignals?.Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>()
+            })
+            .ToList();
     }
 
     private static List<GenerateFlowPendingParameter> MapPendingParameters(IReadOnlyCollection<AiPendingParameterInfo>? parameters)

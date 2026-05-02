@@ -103,9 +103,20 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             "conversation",
             () => _conversationalFlowService.PrepareContext(request),
             context => $"session={context.SessionId}, mode={context.Mode.ToWireValue()}");
+        var clarificationHistory = BuildClarificationHistoryContext(
+            _conversationalFlowService.GetSession(conversationContext.SessionId),
+            request.Description);
+        var answeredClarificationFields = BuildAnsweredClarificationFields(
+            clarificationHistory.AnsweredFields,
+            request.Description,
+            request.AdditionalContext);
+        var priorUserRequirementContext = BuildPriorUserRequirementContext(
+            conversationContext.SessionSummary,
+            request.Description,
+            clarificationHistory);
         var templatePriority = await pipeline.MeasureAsync(
             "scenario_match",
-            () => BuildTemplatePriorityContextAsync(request, cancellationToken),
+            () => BuildTemplatePriorityContextAsync(request, priorUserRequirementContext, cancellationToken),
             context => context.IsTemplateFirst
                 ? $"matched {context.Template?.Name ?? context.ScenarioName} ({context.Confidence:P0})"
                 : "no confident template match",
@@ -122,6 +133,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             new[]
             {
                 request.AdditionalContext,
+                priorUserRequirementContext,
                 attachmentContext
             }.Where(item => !string.IsNullOrWhiteSpace(item)));
         var requirementBrief = pipeline.Measure(
@@ -132,7 +144,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     request.Description,
                     requirementContext,
                     templatePriority.PrimaryMatch);
-                return _clarificationEngine.ApplyPolicy(extracted, conversationContext.Mode, request.RequirementMode);
+                ApplyExplicitCurrentAnswerOverrides(extracted, request.Description, request.AdditionalContext);
+                ApplyAnsweredClarificationFields(extracted, answeredClarificationFields);
+                var evaluated = _clarificationEngine.ApplyPolicy(extracted, conversationContext.Mode, request.RequirementMode);
+                evaluated = RelaxClarificationForTemplatePriority(evaluated, templatePriority);
+                return EnforceClarificationRoundLimit(evaluated, clarificationHistory.ClarificationRounds);
             },
             brief => string.IsNullOrWhiteSpace(brief.ScenarioName)
                 ? "requirement brief extracted without a scenario"
@@ -323,6 +339,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         promptTrace,
                         progressMessages,
                         requirementBrief,
+                        templatePriority.GenerationMode,
+                        templatePriority.TemplateLockLevel,
                         BuildTemplateCandidates(templatePriority),
                         pipeline.Timeline.ToList());
                 }
@@ -431,6 +449,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         DetectedIntent = conversationContext.Intent.ToString().ToUpperInvariant(),
                         DryRunResult = dryRunReport,
                         RecommendedTemplate = recommendedTemplate,
+                        GenerationMode = templatePriority.GenerationMode,
+                        TemplateLockLevel = templatePriority.TemplateLockLevel,
                         PendingParameters = pendingParameters,
                         MissingResources = missingResources,
                         PromptTrace = promptTrace,
@@ -452,6 +472,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         promptTrace,
                         progressMessages,
                         requirementBrief,
+                        templatePriority.GenerationMode,
+                        templatePriority.TemplateLockLevel,
                         BuildTemplateCandidates(templatePriority),
                         pipeline.Timeline.ToList());
             }
@@ -513,6 +535,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     LastAttemptDiagnostics = lastAttemptDiagnostics,
                     PromptTrace = promptTrace,
                     RequirementBrief = requirementBrief,
+                    GenerationMode = templatePriority.GenerationMode,
+                    TemplateLockLevel = templatePriority.TemplateLockLevel,
                     TemplateCandidates = BuildTemplateCandidates(templatePriority),
                     StageTimeline = pipeline.Timeline.ToList()
                 };
@@ -581,6 +605,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     LastAttemptDiagnostics = lastAttemptDiagnostics,
                     PromptTrace = promptTrace,
                     RequirementBrief = requirementBrief,
+                    GenerationMode = templatePriority.GenerationMode,
+                    TemplateLockLevel = templatePriority.TemplateLockLevel,
                     TemplateCandidates = BuildTemplateCandidates(templatePriority),
                     StageTimeline = pipeline.Timeline.ToList()
                 };
@@ -616,6 +642,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             LastAttemptDiagnostics = lastAttemptDiagnostics,
             PromptTrace = promptTrace,
             RequirementBrief = requirementBrief,
+            GenerationMode = templatePriority.GenerationMode,
+            TemplateLockLevel = templatePriority.TemplateLockLevel,
             TemplateCandidates = BuildTemplateCandidates(templatePriority),
             StageTimeline = pipeline.Timeline.ToList()
         };
@@ -1028,15 +1056,48 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
     private async Task<TemplatePriorityContext> BuildTemplatePriorityContextAsync(
         AiFlowGenerationRequest request,
+        string? priorUserRequirementContext,
         CancellationToken cancellationToken)
     {
+        var matcherContext = string.Join(
+            Environment.NewLine,
+            new[] { request.AdditionalContext, priorUserRequirementContext }
+                .Where(item => !string.IsNullOrWhiteSpace(item)));
         var matches = await _scenarioMatcher.MatchAsync(
             request.Description,
-            request.AdditionalContext,
+            matcherContext,
             request.Attachments,
             topN: 3,
             cancellationToken);
         var top = matches.FirstOrDefault();
+        var selectionMode = NormalizeTemplateSelectionMode(request.TemplateSelection?.Mode);
+
+        if (selectionMode == "free_generate")
+        {
+            return TemplatePriorityContext.None with
+            {
+                MatchMode = "user-selected-free",
+                Confidence = top?.Confidence ?? 0,
+                PrimaryMatch = top,
+                Candidates = matches.ToList()
+            };
+        }
+
+        if (selectionMode is "template_fill" or "template_adapt")
+        {
+            var selectedMatch = await ResolveSelectedTemplateMatchAsync(
+                request.TemplateSelection,
+                matches,
+                cancellationToken);
+            if (selectedMatch != null)
+            {
+                return BuildSelectedTemplatePriorityContext(
+                    selectedMatch,
+                    matches,
+                    selectionMode);
+            }
+        }
+
         if (top == null || top.Confidence < 0.35)
             return TemplatePriorityContext.None with { Candidates = matches.ToList() };
 
@@ -1066,6 +1127,526 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             MissingSignals: top.MissingSignals,
             PrimaryMatch: top,
             Candidates: matches.ToList());
+    }
+
+    private async Task<ScenarioMatchResult?> ResolveSelectedTemplateMatchAsync(
+        AiTemplateSelectionInfo? selection,
+        IReadOnlyList<ScenarioMatchResult> matches,
+        CancellationToken cancellationToken)
+    {
+        if (selection == null)
+            return null;
+
+        var selected = matches.FirstOrDefault(match => MatchesTemplateSelection(match, selection));
+        if (selected != null)
+            return selected;
+
+        FlowTemplate? template = null;
+        if (Guid.TryParse(selection.TemplateId, out var templateId))
+        {
+            var templateTask = _templateService.GetTemplateAsync(templateId, cancellationToken);
+            template = templateTask == null ? null : await templateTask;
+        }
+
+        if (template == null && !string.IsNullOrWhiteSpace(selection.ScenarioKey))
+        {
+            var templatesTask = _templateService.GetTemplatesAsync(cancellationToken: cancellationToken);
+            var templates = templatesTask == null
+                ? Array.Empty<FlowTemplate>()
+                : await templatesTask;
+            template = templates.FirstOrDefault(item =>
+                string.Equals(item.ScenarioKey, selection.ScenarioKey, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (template == null)
+            return null;
+
+        var scenarioKey = !string.IsNullOrWhiteSpace(template.ScenarioKey)
+            ? template.ScenarioKey!
+            : selection.ScenarioKey ?? string.Empty;
+        return new ScenarioMatchResult
+        {
+            Template = template,
+            Confidence = 1,
+            MatchReason = "User selected template",
+            MatchedFields = ["userSelection"],
+            Scenario = new ScenarioDefinition
+            {
+                ScenarioKey = scenarioKey,
+                ScenarioName = template.Name,
+                TemplateName = template.Name,
+                TemplateVersion = template.TemplateVersion,
+                Industry = template.Industry,
+                TemplateId = template.Id == Guid.Empty ? null : template.Id.ToString()
+            }
+        };
+    }
+
+    private static AiRequirementBrief RelaxClarificationForTemplatePriority(
+        AiRequirementBrief brief,
+        TemplatePriorityContext templatePriority)
+    {
+        if (!brief.ClarificationRequired)
+            return brief;
+
+        if (!templatePriority.IsTemplateFirst ||
+            string.IsNullOrWhiteSpace(templatePriority.ScenarioKey) ||
+            templatePriority.Confidence < 0.75)
+        {
+            return brief;
+        }
+
+        if (!string.Equals(templatePriority.GenerationMode, "template_fill", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(templatePriority.GenerationMode, "template_adapt", StringComparison.OrdinalIgnoreCase))
+        {
+            return brief;
+        }
+
+        if (!brief.CanGenerateDraftNow)
+            return brief;
+
+        if (HasBlockingMeasurementClarification(brief))
+            return brief;
+
+        // 高频模板命中已经给出主拓扑，缺陷类别、ROI、模型资源等应作为待确认项进入草稿，
+        // 不能把用户锁死在反复澄清里。
+        brief.ClarificationRequired = false;
+        brief.RequirementMode = AiRequirementModes.Draft;
+        if (string.Equals(brief.DraftRiskLevel, "low", StringComparison.OrdinalIgnoreCase) &&
+            (brief.MissingFacts.Count > 0 || brief.ClarificationQuestions.Count > 0))
+        {
+            brief.DraftRiskLevel = "medium";
+        }
+
+        return brief;
+    }
+
+    private static bool HasBlockingMeasurementClarification(AiRequirementBrief brief)
+    {
+        if (!brief.IntentType.Contains("measurement", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return brief.MissingFacts.Any(fact =>
+            string.Equals(MapMissingFactToField(fact), "measurement_target", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(MapMissingFactToField(fact), "calibration", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static AiRequirementBrief EnforceClarificationRoundLimit(
+        AiRequirementBrief brief,
+        int clarificationRounds)
+    {
+        if (!brief.ClarificationRequired || clarificationRounds < 2)
+            return brief;
+
+        brief.ClarificationRequired = false;
+        brief.RequirementMode = AiRequirementModes.Draft;
+        brief.CanGenerateDraftNow = true;
+        brief.DraftRiskLevel = "high";
+        if (!brief.KnownFacts.Contains("已达到澄清上限，本轮将按高风险草稿继续生成。", StringComparer.OrdinalIgnoreCase))
+        {
+            brief.KnownFacts.Add("已达到澄清上限，本轮将按高风险草稿继续生成。");
+        }
+
+        return brief;
+    }
+
+    private static void ApplyAnsweredClarificationFields(
+        AiRequirementBrief brief,
+        IReadOnlySet<string> answeredFields)
+    {
+        if (answeredFields.Count == 0)
+            return;
+
+        brief.RequiredFields = brief.RequiredFields
+            .Where(field => !answeredFields.Contains(field))
+            .ToList();
+        brief.ClarificationQuestions = brief.ClarificationQuestions
+            .Where(question => !answeredFields.Contains(question.Field))
+            .ToList();
+        brief.MissingFacts = brief.MissingFacts
+            .Where(fact => !answeredFields.Contains(MapMissingFactToField(fact)))
+            .ToList();
+
+        brief.HasOpenQuestions = brief.MissingFacts.Count > 0 || brief.ClarificationQuestions.Count > 0;
+        if (!brief.HasOpenQuestions)
+        {
+            brief.ClarificationRequired = false;
+            brief.CanGenerateDraftNow = true;
+            if (string.Equals(brief.DraftRiskLevel, "high", StringComparison.OrdinalIgnoreCase))
+                brief.DraftRiskLevel = "medium";
+        }
+    }
+
+    private static IReadOnlySet<string> BuildAnsweredClarificationFields(
+        IReadOnlySet<string> historyAnsweredFields,
+        string? description,
+        string? additionalContext)
+    {
+        var fields = new HashSet<string>(historyAnsweredFields, StringComparer.OrdinalIgnoreCase);
+        var text = $"{description} {additionalContext}".Trim();
+        if (string.IsNullOrWhiteSpace(text))
+            return fields;
+
+        if (ContainsFieldScopedAnswer(text, "calibration", ["标定", "换算", "像素到物理", "物理单位"]))
+            fields.Add("calibration");
+        if (ContainsFieldScopedAnswer(text, "output_target", ["输出目标", "输出", "结果去向"]))
+            fields.Add("output_target");
+        if (ContainsFieldScopedAnswer(text, "roi", ["ROI", "区域", "范围"]))
+            fields.Add("roi");
+        if (ContainsFieldScopedAnswer(text, "measurement_target", ["测量目标", "测量项", "尺寸", "距离", "孔距", "圆心距"]))
+            fields.Add("measurement_target");
+        if (ContainsFieldScopedAnswer(text, "object_type", ["检测对象", "对象", "产品"]))
+            fields.Add("object_type");
+        if (ContainsFieldScopedAnswer(text, "defect_type", ["缺陷类别", "缺陷类型", "缺陷", "瑕疵"]))
+            fields.Add("defect_type");
+
+        return fields;
+    }
+
+    private static void ApplyExplicitCurrentAnswerOverrides(
+        AiRequirementBrief brief,
+        string? description,
+        string? additionalContext)
+    {
+        var text = $"{description} {additionalContext}".Trim();
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        if (HasCalibrationNotRequiredAnswer(text))
+        {
+            brief.CalibrationRequirement = "none";
+            AddKnownFact(brief, "标定：不需要");
+        }
+
+        if (ContainsAny(text, ["ROI", "区域", "范围"]) &&
+            ContainsAny(text, ["固定ROI", "固定 ROI", "固定区域", "固定范围"]))
+        {
+            brief.RoiRequirement = "region";
+        }
+    }
+
+    private static bool ContainsFieldScopedAnswer(
+        string text,
+        string field,
+        IEnumerable<string> labels)
+    {
+        if (!ContainsAny(text, labels))
+            return false;
+
+        return field switch
+        {
+            "calibration" => HasCalibrationNotRequiredAnswer(text) ||
+                             ContainsAny(text, ["像素到物理单位换算", "手眼标定", "相机标定", "标定文件", "mm", "毫米"]),
+            "output_target" => ContainsAny(text, ["PLC", "数据库", "界面", "UI", "屏幕", "文件", "CSV", "Excel"]),
+            "roi" => ContainsAny(text, ["固定", "整图", "多ROI", "自动定位", "区域", "范围"]),
+            "measurement_target" => ContainsAny(text, ["孔距", "圆心距", "间距", "距离", "直径", "半径", "角度", "mm", "毫米"]),
+            "object_type" => ContainsAny(text, ["包装箱", "纸箱", "箱体", "产品", "金属件", "连接器", "端子", "空调", "内机", "外机", "遥控器", "铜孔", "圆孔", "孔位", "标签"]),
+            "defect_type" => ContainsAny(text, ["破损", "裂纹", "划伤", "划痕", "压痕", "凹坑", "脏污", "污渍", "标签异常", "封箱异常", "scratch", "dent", "damage", "broken", "stain"]),
+            _ => false
+        };
+    }
+
+    private static bool HasCalibrationNotRequiredAnswer(string text)
+    {
+        if (!ContainsAny(text, ["标定", "换算", "像素到物理", "物理单位"]))
+            return false;
+
+        return ContainsAny(text, ["不需要", "无需", "不用", "不做", "不要", "none", "no calibration"]);
+    }
+
+    private static void AddKnownFact(AiRequirementBrief brief, string fact)
+    {
+        if (!brief.KnownFacts.Contains(fact, StringComparer.OrdinalIgnoreCase))
+            brief.KnownFacts.Add(fact);
+    }
+
+    private static ClarificationHistoryContext BuildClarificationHistoryContext(
+        ConversationSession? session,
+        string? currentDescription)
+    {
+        if (session == null || session.History.Count == 0)
+            return ClarificationHistoryContext.Empty;
+
+        var answeredFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pendingQuestions = new List<AiClarificationQuestion>();
+        var latestPendingQuestions = new List<AiClarificationQuestion>();
+        var clarificationRounds = 0;
+        var normalizedCurrent = NormalizeRequirementContextText(currentDescription);
+
+        foreach (var turn in session.History.OrderBy(item => item.TimestampUtc))
+        {
+            if (turn.Payload?.ClarificationRequired == true)
+            {
+                clarificationRounds++;
+                pendingQuestions = turn.Payload.RequirementBrief?.ClarificationQuestions
+                    ?.Where(question => !string.IsNullOrWhiteSpace(question.Field))
+                    .ToList() ?? new List<AiClarificationQuestion>();
+                latestPendingQuestions = pendingQuestions.ToList();
+                continue;
+            }
+
+            if (turn.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
+            {
+                // 一旦出现非澄清助手回复，上一段澄清回合已经结束。
+                clarificationRounds = 0;
+                answeredFields.Clear();
+                pendingQuestions.Clear();
+                latestPendingQuestions.Clear();
+                continue;
+            }
+
+            if (!turn.Role.Equals("user", StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(turn.Message))
+            {
+                continue;
+            }
+
+            var isCurrentUserTurn = string.Equals(
+                NormalizeRequirementContextText(turn.Message),
+                normalizedCurrent,
+                StringComparison.OrdinalIgnoreCase);
+            if (isCurrentUserTurn &&
+                IsSelfContainedNewRequirement(turn.Message) &&
+                !pendingQuestions.Any(question => LooksLikeAnswerForField(turn.Message, question)))
+            {
+                clarificationRounds = 0;
+                answeredFields.Clear();
+                pendingQuestions.Clear();
+                latestPendingQuestions.Clear();
+                continue;
+            }
+
+            if (pendingQuestions.Count == 0)
+                continue;
+
+            foreach (var question in pendingQuestions)
+            {
+                if (LooksLikeAnswerForField(turn.Message, question))
+                    answeredFields.Add(question.Field);
+            }
+        }
+
+        return new ClarificationHistoryContext(clarificationRounds, answeredFields, latestPendingQuestions);
+    }
+
+    private static bool LooksLikeAnswerForField(string message, AiClarificationQuestion question)
+    {
+        var text = message.Trim();
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(question.Field))
+            return false;
+
+        if (ContainsAny(text, FieldLabels(question.Field)))
+            return true;
+
+        if (question.Options.Any(option =>
+                !string.IsNullOrWhiteSpace(option) &&
+                text.Contains(option, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return question.Field switch
+        {
+            "scene" => ContainsAny(text, ["外观", "缺陷", "漏装", "有无", "线序", "尺寸", "测量", "分类"]),
+            "object_type" => ContainsAny(text, ["包装箱", "纸箱", "箱体", "产品", "金属件", "连接器", "端子", "空调", "内机", "外机", "遥控器", "铜孔", "孔位", "标签"]),
+            "defect_type" => ContainsAny(text, ["破损", "裂纹", "划伤", "划痕", "压痕", "凹坑", "脏污", "污渍", "标签异常", "封箱异常", "scratch", "dent", "damage", "broken", "stain"]),
+            "measurement_target" => ContainsAny(text, ["孔距", "圆心距", "间距", "距离", "缝隙", "直径", "半径", "角度", "mm", "毫米"]),
+            "output_target" => ContainsAny(text, ["PLC", "数据库", "界面", "UI", "屏幕", "文件", "CSV", "Excel"]),
+            "model_path" => ContainsAny(text, ["模型", "训练", "YOLO", "onnx", "pt", "路径", "已有模型", "传统视觉"]),
+            "roi" => ContainsAny(text, ["ROI", "整图", "固定", "区域", "多ROI", "范围"]),
+            "calibration" => ContainsAny(text, ["标定", "像素", "物理", "毫米", "mm", "手眼"]),
+            "ambiguous_negative_signal" => text.Length >= 4,
+            _ => text.Length >= 2
+        };
+    }
+
+    private static IReadOnlyList<string> FieldLabels(string field)
+    {
+        return field switch
+        {
+            "scene" => ["场景", "场景类型"],
+            "object_type" => ["检测对象", "对象", "产品"],
+            "defect_type" => ["缺陷类别", "缺陷类型", "缺陷", "瑕疵"],
+            "measurement_target" => ["测量目标", "测量项", "尺寸"],
+            "output_target" => ["输出目标", "输出", "结果"],
+            "model_path" => ["模型资源", "模型", "标签资源"],
+            "roi" => ["ROI", "区域", "范围"],
+            "calibration" => ["标定", "换算"],
+            "ambiguous_negative_signal" => ["歧义", "补充信息"],
+            _ => [field]
+        };
+    }
+
+    private static string MapMissingFactToField(string missingFact)
+    {
+        if (missingFact.Contains("场景", StringComparison.OrdinalIgnoreCase))
+            return "scene";
+        if (missingFact.Contains("检测对象", StringComparison.OrdinalIgnoreCase) ||
+            missingFact.Contains("对象", StringComparison.OrdinalIgnoreCase))
+            return "object_type";
+        if (missingFact.Contains("缺陷", StringComparison.OrdinalIgnoreCase))
+            return "defect_type";
+        if (missingFact.Contains("输出", StringComparison.OrdinalIgnoreCase))
+            return "output_target";
+        if (missingFact.Contains("模型", StringComparison.OrdinalIgnoreCase) ||
+            missingFact.Contains("标签资源", StringComparison.OrdinalIgnoreCase))
+            return "model_path";
+        if (missingFact.Contains("ROI", StringComparison.OrdinalIgnoreCase))
+            return "roi";
+        if (missingFact.Contains("标定", StringComparison.OrdinalIgnoreCase) ||
+            missingFact.Contains("像素", StringComparison.OrdinalIgnoreCase))
+            return "calibration";
+        if (missingFact.Contains("测量", StringComparison.OrdinalIgnoreCase) ||
+            missingFact.Contains("单位", StringComparison.OrdinalIgnoreCase))
+            return "measurement_target";
+        if (missingFact.Contains("歧义", StringComparison.OrdinalIgnoreCase))
+            return "ambiguous_negative_signal";
+
+        return string.Empty;
+    }
+
+    private static bool ContainsAny(string text, IEnumerable<string> terms)
+    {
+        return !string.IsNullOrWhiteSpace(text) &&
+               terms.Any(term => !string.IsNullOrWhiteSpace(term) &&
+                                 text.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildPriorUserRequirementContext(
+        string? sessionSummary,
+        string? currentDescription,
+        ClarificationHistoryContext clarificationHistory)
+    {
+        if (string.IsNullOrWhiteSpace(sessionSummary))
+            return string.Empty;
+
+        if (!ShouldUsePriorRequirementContext(currentDescription, clarificationHistory))
+            return string.Empty;
+
+        var current = NormalizeRequirementContextText(currentDescription);
+        var userLines = sessionSummary
+            .Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => line.StartsWith("- user:", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line["- user:".Length..].Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Where(line => !string.Equals(NormalizeRequirementContextText(line), current, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .TakeLast(3)
+            .ToList();
+
+        return userLines.Count == 0
+            ? string.Empty
+            : "历史用户需求： " + string.Join("；", userLines);
+    }
+
+    private static bool ShouldUsePriorRequirementContext(
+        string? currentDescription,
+        ClarificationHistoryContext clarificationHistory)
+    {
+        if (clarificationHistory.PendingQuestions.Count == 0)
+            return false;
+
+        var current = currentDescription ?? string.Empty;
+        if (IsSelfContainedNewRequirement(current))
+            return false;
+
+        return clarificationHistory.PendingQuestions.Any(question => LooksLikeAnswerForField(current, question));
+    }
+
+    private static bool IsSelfContainedNewRequirement(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        return text.Trim().Length >= 8 &&
+               ContainsAny(text, ["检测", "测量", "识别", "判断", "读取", "定位", "生成", "创建", "做一个", "做套", "measure", "detect", "inspect"]) &&
+               ContainsAny(text, ["包装箱", "纸箱", "箱体", "产品", "金属件", "连接器", "端子", "空调", "内机", "外机", "遥控器", "铜孔", "圆孔", "孔位", "圆形孔", "圆心", "标签", "缺陷", "距离", "间距", "孔距"]);
+    }
+
+    private static string NormalizeRequirementContextText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        var normalized = text.Trim()
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal);
+        while (normalized.Contains("  ", StringComparison.Ordinal))
+            normalized = normalized.Replace("  ", " ", StringComparison.Ordinal);
+        return normalized;
+    }
+
+    private static TemplatePriorityContext BuildSelectedTemplatePriorityContext(
+        ScenarioMatchResult selectedMatch,
+        IReadOnlyList<ScenarioMatchResult> candidates,
+        string generationMode)
+    {
+        var lockLevel = generationMode == "template_fill" ? "strict" : "relaxed";
+        var template = selectedMatch.Template;
+        var scenarioKey = !string.IsNullOrWhiteSpace(template?.ScenarioKey)
+            ? template!.ScenarioKey!
+            : selectedMatch.Scenario.ScenarioKey;
+        var scenarioName = !string.IsNullOrWhiteSpace(selectedMatch.Scenario.ScenarioName)
+            ? selectedMatch.Scenario.ScenarioName
+            : template?.Name ?? string.Empty;
+
+        return new TemplatePriorityContext(
+            IsTemplateFirst: true,
+            Template: template,
+            MatchReason: string.IsNullOrWhiteSpace(selectedMatch.MatchReason)
+                ? "User selected template"
+                : selectedMatch.MatchReason,
+            MatchMode: "user-selected-template",
+            Confidence: selectedMatch.Confidence > 0 ? selectedMatch.Confidence : 1,
+            MatchedKeywords: selectedMatch.MatchedFields,
+            ScenarioKey: scenarioKey,
+            ScenarioName: scenarioName,
+            GenerationMode: generationMode,
+            TemplateLockLevel: lockLevel,
+            MatchedFields: selectedMatch.MatchedFields,
+            MissingSignals: selectedMatch.MissingSignals,
+            PrimaryMatch: selectedMatch,
+            Candidates: candidates.Count > 0 ? candidates : new[] { selectedMatch });
+    }
+
+    private static bool MatchesTemplateSelection(
+        ScenarioMatchResult match,
+        AiTemplateSelectionInfo selection)
+    {
+        if (!string.IsNullOrWhiteSpace(selection.TemplateId))
+        {
+            var templateId = match.Template?.Id == Guid.Empty ? null : match.Template?.Id.ToString();
+            if (!string.IsNullOrWhiteSpace(templateId) &&
+                string.Equals(templateId, selection.TemplateId, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(match.Scenario.TemplateId) &&
+                string.Equals(match.Scenario.TemplateId, selection.TemplateId, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(selection.ScenarioKey))
+            return false;
+
+        return string.Equals(match.Template?.ScenarioKey, selection.ScenarioKey, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(match.Scenario.ScenarioKey, selection.ScenarioKey, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeTemplateSelectionMode(string? mode)
+    {
+        var normalized = (mode ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "template_fill" or "strict" or "fill" or "force" or "recommended" or "use_template" => "template_fill",
+            "template_adapt" or "relaxed" or "adapt" or "reference" => "template_adapt",
+            "free_generate" or "free" or "none" or "no_template" or "without_template" => "free_generate",
+            _ => string.Empty
+        };
     }
 
     private static bool IsExplicitFreeGenerateRequest(AiFlowGenerationRequest request)
@@ -1107,9 +1688,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ? null
                 : templatePriority.Template?.Id.ToString(),
             TemplateName = templatePriority.Template?.Name ?? "端子线序检测",
+            TemplateVersion = templatePriority.Template?.TemplateVersion,
+            ScenarioKey = templatePriority.ScenarioKey,
+            Industry = templatePriority.Template?.Industry,
             MatchReason = templatePriority.MatchReason,
             MatchMode = templatePriority.MatchMode,
-            Confidence = templatePriority.Confidence
+            Confidence = templatePriority.Confidence,
+            MatchedFields = templatePriority.MatchedFields.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            MissingSignals = templatePriority.MissingSignals.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
         };
     }
 
@@ -1485,6 +2071,15 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 Array.Empty<ScenarioMatchResult>());
     }
 
+    private sealed record ClarificationHistoryContext(
+        int ClarificationRounds,
+        IReadOnlySet<string> AnsweredFields,
+        IReadOnlyList<AiClarificationQuestion> PendingQuestions)
+    {
+        public static ClarificationHistoryContext Empty { get; } =
+            new(0, new HashSet<string>(StringComparer.OrdinalIgnoreCase), Array.Empty<AiClarificationQuestion>());
+    }
+
     private string BuildRetryMessage(string originalMessage, AiValidationResult failedValidation, string? lastRawResponse)
     {
         var sb = new StringBuilder();
@@ -1604,6 +2199,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             SessionId = sessionId,
             DetectedIntent = detectedIntent,
             RecommendedTemplate = recommendedTemplate,
+            GenerationMode = templatePriority.GenerationMode,
+            TemplateLockLevel = templatePriority.TemplateLockLevel,
             PendingParameters = [],
             MissingResources = missingResources,
             PromptTrace = promptTrace,
@@ -1652,6 +2249,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         object? promptTrace,
         IReadOnlyList<string> progressMessages,
         AiRequirementBrief? requirementBrief,
+        string generationMode,
+        string templateLockLevel,
         List<AiTemplateCandidateInfo> templateCandidates,
         IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline)
     {
@@ -1697,6 +2296,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             SessionId = sessionId,
             PromptTrace = promptTrace,
             RequirementBrief = requirementBrief,
+            GenerationMode = generationMode,
+            TemplateLockLevel = templateLockLevel,
             TemplateCandidates = templateCandidates,
             StageTimeline = stageTimeline.ToList()
         };

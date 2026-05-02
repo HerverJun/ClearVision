@@ -65,6 +65,11 @@ public class GenerateFlowMessageHandlerTests
         var generationService = Substitute.For<IAiFlowGenerationService>();
         var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
         var handler = new GenerateFlowMessageHandler(generationService, logger);
+        var templateSelection = new AiTemplateSelectionInfo
+        {
+            Mode = "template_adapt",
+            ScenarioKey = "carton-appearance-inspection"
+        };
 
         generationService.GenerateFlowAsync(
                 Arg.Any<AiFlowGenerationRequest>(),
@@ -82,13 +87,17 @@ public class GenerateFlowMessageHandlerTests
             description: "review pending parameters",
             mode: GenerateFlowMode.ReviewPendingParameters,
             debugPrompt: true,
-            requirementMode: "draft");
+            requirementMode: "draft",
+            templateSelection: templateSelection);
 
         await generationService.Received(1).GenerateFlowAsync(
             Arg.Is<AiFlowGenerationRequest>(request =>
                 request.Mode == GenerateFlowMode.ReviewPendingParameters &&
                 request.DebugPrompt &&
-                request.RequirementMode == "draft"),
+                request.RequirementMode == "draft" &&
+                request.TemplateSelection != null &&
+                request.TemplateSelection.Mode == "template_adapt" &&
+                request.TemplateSelection.ScenarioKey == "carton-appearance-inspection"),
             Arg.Any<Action<string>>(),
             Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
             Arg.Any<CancellationToken>(),
@@ -271,14 +280,42 @@ public class GenerateFlowMessageHandlerTests
             {
                 Success = true,
                 Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
+                GenerationMode = "template_fill",
+                TemplateLockLevel = "strict",
                 RecommendedTemplate = new AiRecommendedTemplateInfo
                 {
                     TemplateId = Guid.NewGuid().ToString(),
                     TemplateName = "端子线序检测",
+                    TemplateVersion = "1.0.0",
+                    ScenarioKey = "wire-sequence-terminal",
+                    Industry = "线束装配",
                     MatchReason = "命中关键词：线序、端子",
                     MatchMode = "template-first",
-                    Confidence = 0.91
+                    Confidence = 0.91,
+                    MatchedFields = ["keywords", "objectTypes"]
                 },
+                TemplateCandidates =
+                [
+                    new AiTemplateCandidateInfo
+                    {
+                        TemplateName = "端子线序检测",
+                        TemplateVersion = "1.0.0",
+                        ScenarioKey = "wire-sequence-terminal",
+                        Industry = "线束装配",
+                        Confidence = 0.91,
+                        MatchReason = "命中关键词：线序、端子",
+                        MatchedFields = ["keywords", "objectTypes"]
+                    },
+                    new AiTemplateCandidateInfo
+                    {
+                        TemplateName = "包装箱外观检测",
+                        TemplateVersion = "1.0.0",
+                        ScenarioKey = "carton-appearance-inspection",
+                        Industry = "包装终检",
+                        Confidence = 0.18,
+                        MatchReason = "弱匹配"
+                    }
+                ],
                 PendingParameters =
                 [
                     new AiPendingParameterInfo
@@ -306,8 +343,17 @@ public class GenerateFlowMessageHandlerTests
         var root = doc.RootElement;
         root.GetProperty("recommendedTemplate").GetProperty("templateName").GetString()
             .Should().Be("端子线序检测");
+        root.GetProperty("recommendedTemplate").GetProperty("templateVersion").GetString()
+            .Should().Be("1.0.0");
+        root.GetProperty("recommendedTemplate").GetProperty("scenarioKey").GetString()
+            .Should().Be("wire-sequence-terminal");
         root.GetProperty("recommendedTemplate").GetProperty("matchMode").GetString()
             .Should().Be("template-first");
+        root.GetProperty("generationMode").GetString().Should().Be("template_fill");
+        root.GetProperty("templateLockLevel").GetString().Should().Be("strict");
+        root.GetProperty("templateCandidates").GetArrayLength().Should().Be(2);
+        root.GetProperty("templateCandidates")[0].GetProperty("scenarioKey").GetString()
+            .Should().Be("wire-sequence-terminal");
         root.GetProperty("pendingParameters").GetArrayLength().Should().Be(1);
         root.GetProperty("pendingParameters")[0].GetProperty("operatorId").GetString().Should().Be("op_3");
         root.GetProperty("missingResources").GetArrayLength().Should().Be(1);

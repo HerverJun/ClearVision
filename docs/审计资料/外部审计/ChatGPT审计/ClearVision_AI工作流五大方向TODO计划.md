@@ -1,11 +1,11 @@
 # ClearVision AI 工作流五大方向 TODO 计划
 
-> 日期：2026-04-30  
-> 范围：仅覆盖以下五个方向，不扩展到其他产品方向。  
-> - 产品优化方向一：做强“模板优先”，不要让 LLM 自由发挥  
-> - 产品优化方向二：把算子库变成“AI 可理解的工业知识图谱”  
-> - 产品优化方向三：把“用户输入”从一句话升级为需求澄清闭环  
-> - 产品优化方向四：把 UX 从“聊天框”升级为“AI 工程师工作台”（重点）  
+> 日期：2026-04-30范围：仅覆盖以下五个方向，不扩展到其他产品方向。
+>
+> - 产品优化方向一：做强“模板优先”，不要让 LLM 自由发挥
+> - 产品优化方向二：把算子库变成“AI 可理解的工业知识图谱”
+> - 产品优化方向三：把“用户输入”从一句话升级为需求澄清闭环
+> - 产品优化方向四：把 UX 从“聊天框”升级为“AI 工程师工作台”（重点）
 > - 产品优化方向五：工程架构与 LLM 策略优化
 
 ---
@@ -62,15 +62,15 @@ ClearVision 当前已经不是简单的“LLM 生成 JSON”项目，而是具�
 
 ### 0.4 总体验收指标
 
-| 指标 | 当前问题 | 目标口径 |
-|---|---|---|
-| 模板命中率 | 当前模板优先主要依赖线序关键词，其他内置模板尚未形成强匹配闭环 | 5 个核心场景的标准提示词 100% 命中正确模板候选 Top1 |
-| LLM 自由发挥比例 | 非线序场景容易走自由生成 | 高频场景默认模板优先，自由生成仅作为 fallback |
-| 首轮结构合法率 | 依赖 Prompt + Validator | 模板优先场景首轮 `AiFlowValidator.IsValid` ≥ 90% |
-| 待确认参数闭环率 | 已有 PendingParameters，但产品动作仍需强化 | 生成后必须能在工作台中补录、确认、复审、应用 |
-| 工作台可解释性 | 结果字段丰富，但部分信息隐藏或分散 | 用户能看到：为什么匹配该模板、缺什么、哪里有风险、DryRun 如何 |
-| Prompt 成本与稳定性 | 当前可能向模型塞入较重上下文 | 按场景检索算子知识切片，减少无关算子干扰 |
-| 现场可信边界 | 质量矩阵显示真实现场验证仍是缺口 | 工作台明确标记“功能可用但未完成现场工业验证”，不误导用户 |
+| 指标                | 当前问题                                                       | 目标口径                                                      |
+| ------------------- | -------------------------------------------------------------- | ------------------------------------------------------------- |
+| 模板命中率          | 当前模板优先主要依赖线序关键词，其他内置模板尚未形成强匹配闭环 | 5 个核心场景的标准提示词 100% 命中正确模板候选 Top1           |
+| LLM 自由发挥比例    | 非线序场景容易走自由生成                                       | 高频场景默认模板优先，自由生成仅作为 fallback                 |
+| 首轮结构合法率      | 依赖 Prompt + Validator                                        | 模板优先场景首轮 `AiFlowValidator.IsValid` ≥ 90%           |
+| 待确认参数闭环率    | 已有 PendingParameters，但产品动作仍需强化                     | 生成后必须能在工作台中补录、确认、复审、应用                  |
+| 工作台可解释性      | 结果字段丰富，但部分信息隐藏或分散                             | 用户能看到：为什么匹配该模板、缺什么、哪里有风险、DryRun 如何 |
+| Prompt 成本与稳定性 | 当前可能向模型塞入较重上下文                                   | 按场景检索算子知识切片，减少无关算子干扰                      |
+| 现场可信边界        | 质量矩阵显示真实现场验证仍是缺口                               | 工作台明确标记“功能可用但未完成现场工业验证”，不误导用户    |
 
 ---
 
@@ -323,17 +323,17 @@ ClearVision 的算子体系已经很强：155 个正式算子、端口、参数�
 
 TODO：
 
-- [x] 从 `OperatorMetadata` 生成基础字段：类型、显示名、分类、输入端口、输出端口、参数、默认值、范围、是否必填。
-- [x] 从算子名片补充：算法摘要、已知限制、适用场景、误用场景。
-- [x] 从 `operator_quality_matrix.md` 补充证据状态、QScore、工业验证状态。
-- [x] 每个算子至少具备：`intentTags`、`requiredResources`、`typicalUpstream`、`typicalDownstream`。
-- [x] 对 AI 相关算子优先补齐：`DeepLearning`、`SemanticSegmentation`、`AnomalyDetection`、`SurfaceDefectDetection`、`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
+- [X] 从 `OperatorMetadata` 生成基础字段：类型、显示名、分类、输入端口、输出端口、参数、默认值、范围、是否必填。
+- [X] 从算子名片补充：算法摘要、已知限制、适用场景、误用场景。
+- [X] 从 `operator_quality_matrix.md` 补充证据状态、QScore、工业验证状态。
+- [X] 每个算子至少具备：`intentTags`、`requiredResources`、`typicalUpstream`、`typicalDownstream`。
+- [X] 对 AI 相关算子优先补齐：`DeepLearning`、`SemanticSegmentation`、`AnomalyDetection`、`SurfaceDefectDetection`、`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
 
 验收标准：
 
-- [x] 155 个正式算子都有 Knowledge Card。
-- [x] 生成工具能检查卡片与运行时元数据是否一致。（已落地：`OperatorKnowledgeGraphTests` 覆盖 operatorType 可解析、端口/参数一致性、缺卡失败）
-- [x] 缺端口、缺参数、未知算子会导致生成工具失败。（由一致性门禁测试覆盖：枚举不可解析、集合不等价即失败）
+- [X] 155 个正式算子都有 Knowledge Card。
+- [X] 生成工具能检查卡片与运行时元数据是否一致。（已落地：`OperatorKnowledgeGraphTests` 覆盖 operatorType 可解析、端口/参数一致性、缺卡失败）
+- [X] 缺端口、缺参数、未知算子会导致生成工具失败。（由一致性门禁测试覆盖：枚举不可解析、集合不等价即失败）
 
 ---
 
@@ -355,17 +355,17 @@ TODO：
 
 TODO：
 
-- [x] 由端口类型自动生成基础 `PRODUCES/CONSUMES`。
-- [x] 由模板 JSON 自动生成 `COMMONLY_PRECEDES/COMMONLY_FOLLOWS`。
-- [x] 由 `ScenarioPackageBinding.RequiredResources` 生成 `REQUIRES_RESOURCE`。
-- [x] 由质量矩阵生成 `HAS_EVIDENCE`。
-- [x] 输出 `operator_knowledge_graph.json`。
+- [X] 由端口类型自动生成基础 `PRODUCES/CONSUMES`。
+- [X] 由模板 JSON 自动生成 `COMMONLY_PRECEDES/COMMONLY_FOLLOWS`。
+- [X] 由 `ScenarioPackageBinding.RequiredResources` 生成 `REQUIRES_RESOURCE`。
+- [X] 由质量矩阵生成 `HAS_EVIDENCE`。
+- [X] 输出 `operator_knowledge_graph.json`。
 
 验收标准：
 
-- [x] 查询 `DeepLearning` 能返回常见下游：`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
-- [x] 查询 `GapMeasurement` 能返回上游：`EdgeDetection`，下游：`ResultJudgment`、`ResultOutput`。
-- [x] 查询某模板能返回其核心算子链。
+- [X] 查询 `DeepLearning` 能返回常见下游：`BoxFilter`、`BoxNms`、`ResultJudgment`、`DetectionSequenceJudge`。
+- [X] 查询 `GapMeasurement` 能返回上游：`EdgeDetection`，下游：`ResultJudgment`、`ResultOutput`。
+- [X] 查询某模板能返回其核心算子链。
 
 ---
 
@@ -375,16 +375,16 @@ TODO：
 
 TODO：
 
-- [x] `PromptBuilder.BuildSystemPrompt(userDescription)` 内部调用 `OperatorKnowledgeRetriever`。
+- [X] `PromptBuilder.BuildSystemPrompt(userDescription)` 内部调用 `OperatorKnowledgeRetriever`。
 - [ ] 检索输入包括：场景候选、意图、模板、当前流程、用户附件元信息。
-- [x] 返回相关算子子集，而不是默认塞入全部 155 个算子。
-- [x] 高置信度模板场景只发送模板涉及算子 + 少量备选算子。
-- [x] 低置信度自由生成场景才发送更大的候选集。
+- [X] 返回相关算子子集，而不是默认塞入全部 155 个算子。
+- [X] 高置信度模板场景只发送模板涉及算子 + 少量备选算子。
+- [X] 低置信度自由生成场景才发送更大的候选集。
 
 验收标准：
 
-- [x] 线序场景 Prompt 中优先出现 `DeepLearning`、`BoxFilter`、`BoxNms`、`DetectionSequenceJudge`、`ResultOutput`。
-- [x] 铜孔间距场景 Prompt 中优先出现 `Filtering`、`EdgeDetection`、`GapMeasurement`、`ResultJudgment`、`ResultOutput`。
+- [X] 线序场景 Prompt 中优先出现 `DeepLearning`、`BoxFilter`、`BoxNms`、`DetectionSequenceJudge`、`ResultOutput`。
+- [X] 铜孔间距场景 Prompt 中优先出现 `Filtering`、`EdgeDetection`、`GapMeasurement`、`ResultJudgment`、`ResultOutput`。
 - [ ] 与当前全量目录相比，模板场景 Prompt 中算子目录 token 体量明显下降。
 
 ---
@@ -395,14 +395,14 @@ TODO：
 
 TODO：
 
-- [x] `AiFlowValidator` 在端口/参数校验之外，读取知识图谱中的 `antiPatterns` 与 `requiredResources`。
+- [X] `AiFlowValidator` 在端口/参数校验之外，读取知识图谱中的 `antiPatterns` 与 `requiredResources`。
 - [ ] `AiPanel` 的算子清单卡片展示：算子角色、证据等级、已知限制、缺资源。
 - [ ] 工作台中点击某算子，显示“为什么选择它”和“它通常接在哪些算子后面”。
 - [ ] 对质量矩阵中“未完成现场工业验证”的算子显示风险提示。
 
 验收标准：
 
-- [x] 用户能在工作台中看到 DeepLearning 缺 `ModelPath` 的资源提示。（后端诊断已产出；UI 面板展示待完成）
+- [X] 用户能在工作台中看到 DeepLearning 缺 `ModelPath` 的资源提示。（后端诊断已产出；UI 面板展示待完成）
 - [ ] 用户能看到 TemplateMatching/CaliperTool 等算子的证据状态与现场验证边界。
 - [ ] UI 展示的参数范围与 Validator 使用的参数范围一致。
 
@@ -414,17 +414,17 @@ TODO：
 
 TODO：
 
-- [x] 新增 `OperatorKnowledgeGraphGenerator`。
-- [x] 新增 `OperatorKnowledgeGraphTests`。
-- [x] CI 检查：155 个正式算子必须都有卡片。（已落地：`Artifact_ShouldCoverAllOperators_AndOperatorTypeShouldBeParseable`）
-- [x] CI 检查：卡片中的端口/参数必须与 `OperatorMetadata` 一致。（已落地：`Artifact_ShouldAlignPortsAndParametersWithOperatorMetadata`）
-- [x] CI 检查：卡片中的 `operatorType` 必须可被 `Enum.TryParse<OperatorType>` 解析。（已落地：`Artifact_ShouldCoverAllOperators_AndOperatorTypeShouldBeParseable`）
+- [X] 新增 `OperatorKnowledgeGraphGenerator`。
+- [X] 新增 `OperatorKnowledgeGraphTests`。
+- [X] CI 检查：155 个正式算子必须都有卡片。（已落地：`Artifact_ShouldCoverAllOperators_AndOperatorTypeShouldBeParseable`）
+- [X] CI 检查：卡片中的端口/参数必须与 `OperatorMetadata` 一致。（已落地：`Artifact_ShouldAlignPortsAndParametersWithOperatorMetadata`）
+- [X] CI 检查：卡片中的 `operatorType` 必须可被 `Enum.TryParse<OperatorType>` 解析。（已落地：`Artifact_ShouldCoverAllOperators_AndOperatorTypeShouldBeParseable`）
 
 验收标准：
 
-- [x] 新增算子但未生成知识卡片时，测试失败。（由 cards/operator types 集合等价断言保障）
-- [x] 修改参数名但未更新知识卡片时，测试失败。（由端口/参数名称集合一致性断言保障）
-- [x] PromptBuilder 只能使用通过校验的知识卡片。（已落地：`PromptBuilder` 对知识卡片执行 operatorType 可解析 + 端口/参数与 `OperatorMetadata` 集合一致性校验；`PromptBuilderKnowledgeSliceTests.BuildSystemPrompt_WithInvalidKnowledgeCards_ShouldDropThem` 覆盖未通过卡片剔除）
+- [X] 新增算子但未生成知识卡片时，测试失败。（由 cards/operator types 集合等价断言保障）
+- [X] 修改参数名但未更新知识卡片时，测试失败。（由端口/参数名称集合一致性断言保障）
+- [X] PromptBuilder 只能使用通过校验的知识卡片。（已落地：`PromptBuilder` 对知识卡片执行 operatorType 可解析 + 端口/参数与 `OperatorMetadata` 集合一致性校验；`PromptBuilderKnowledgeSliceTests.BuildSystemPrompt_WithInvalidKnowledgeCards_ShouldDropThem` 覆盖未通过卡片剔除）
 
 ---
 
@@ -453,8 +453,6 @@ TODO：
 当前 `GenerateFlowRequestPayload` 已有 `Description`、`Hint`、`SessionId`、`ExistingFlowJson`、`Mode`、`Attachments` 等字段，但用户入口仍以自然语言为主。工业视觉检测的真实需求通常必须明确：检测对象、缺陷类别、相机来源、模型文件、ROI、阈值、PLC/输出方式、标定状态、OK/NG 判定逻辑。直接把一句话交给 LLM，容易让模型补出看似合理但现场不可用的参数。
 
 因此，生成前应增加“需求澄清”，生成后通过 `PendingParameters` 与 `MissingResources` 做参数闭环。
-建议把输入模式拆成 `draft` 和 `strict` 两档：`draft` 允许先出草案但必须显式标出风险与缺口，`strict` 在最小信息集未满足前不进入生成。
-澄清也不是长表单，而是先抽取 `RequirementBrief`，再只问最关键的缺口。
 
 ## 3.2 TODO 清单
 
@@ -494,19 +492,12 @@ TODO：
 - [ ] 只有复杂/歧义需求才调用轻量 LLM 做补充解析。
 - [ ] `RequirementBrief` 写入会话上下文，后续 Modify/Review 模式复用。
 - [ ] 附件元信息进入 `RequirementBrief`，例如图片数量、分辨率、是否可发送给模型。
-- [ ] 定义 `draft` / `strict` 两种澄清模式，前者允许带风险草案，后者缺 `required` 字段时直接拦截。
-- [ ] `ClarificationEngine` 输出必须结构化：`knownFacts`、`missingFacts`、`recommendedQuestions`、`canGenerateDraftNow`、`draftRiskLevel`。
-- [ ] 澄清问题生成遵循优先级：场景最小必需字段 > 资源缺口 > 语义歧义 > 低价值补充信息。
-- [ ] 严禁模型编造模型路径、PLC 地址、标定文件和样本结果，缺失项只能进入澄清或补录。
 
 验收标准：
 
 - [ ] “检测空调内机面板划伤”解析出：`sceneType=appearance_defect`、`industry=空调制造`、`defectTypes=[划伤]`。
 - [ ] “测量两个孔的圆心距离”解析出：`sceneType=measurement`、`measurementTargets=[孔距/圆心距离]`。
 - [ ] “端子线序黑蓝顺序检测”解析出：`sceneType=wire_sequence`、`expectedSequence=[黑, 蓝]`。
-- [ ] `draft` 模式下可先生成草案，但风险与缺口必须显式展示。
-- [ ] `strict` 模式下只要缺关键字段，就必须返回 `ClarificationRequired`。
-- [ ] 每轮澄清最多 3 个问题，且可跳过非关键字段。
 
 ---
 
@@ -566,7 +557,6 @@ TODO：
 - [ ] 缺失字段用黄色/红色标记。
 - [ ] 支持用户用表单补充，不必须继续打字。
 - [ ] 补充后自动更新 `hint` 或新增 `requirementBrief` payload。
-- [ ] 需求卡片本身要记录“问题 -> 回答 -> 状态”的链路，回写到 `RequirementBrief`，而不是只做静态摘要。
 
 验收标准：
 
@@ -586,7 +576,6 @@ TODO：
 - [ ] `MissingResources` 每项绑定处理动作：选择模型文件、选择标签文件、配置相机、配置 PLC、选择 ROI。
 - [ ] 用户补齐后调用现有 `review_pending_parameters` 模式复核。
 - [ ] 参数确认后在工作台中显示“已确认”，并允许再次编辑。
-- [ ] 参数补录完成后，工作台状态自动从 `reviewing_parameters` 回到 `ready_to_generate` 或 `ready_to_apply`。
 
 验收标准：
 
@@ -606,7 +595,6 @@ TODO：
 - [ ] 模板级默认值：某模板常用参数默认值。
 - [ ] 产线级默认值：某工位相机/PLC/输出路径。
 - [ ] 用户可选择“仅本次使用 / 保存为模板默认 / 保存为产线默认”。
-- [ ] 默认值只能覆盖已确认字段，不能覆盖 `required` 缺口的人工确认项。
 
 验收标准：
 
@@ -630,63 +618,6 @@ TODO：
 
 - [ ] 上传图片后，工作台显示附件状态与模型视觉能力。
 - [ ] 不支持视觉模型时，系统不会假装看过图片。
-
----
-
-### P1-3.7：把需求澄清做成可回放的状态机
-
-目标：让“问了什么、用户答了什么、为什么继续生成”都有明确状态，而不是散落在聊天记录里。
-
-TODO：
-
-- [ ] 定义 `RequirementBriefStatus` / `ClarificationSessionState`，至少包括 `parsed`、`clarifying`、`ready_to_generate`、`generating`、`reviewing_parameters`、`ready_to_apply`、`failed`。
-- [ ] `GenerateFlowMessageHandler` 先走 `RequirementBriefExtractor`，再决定直接生成还是进入澄清。
-- [ ] 把每个问题、回答、补录动作写入会话事件流，支持回放与审计。
-- [ ] 同一会话内已确认字段不重复追问，除非用户主动重置需求。
-
-验收标准：
-
-- [ ] 能从会话记录还原一次完整的澄清过程。
-- [ ] 缺字段补齐后自动回到生成，而不是重新开会话。
-- [ ] `draft` 与 `strict` 模式在工作台中可被明确区分。
-
----
-
-### P1-3.8：建立需求澄清评测集与指标
-
-目标：用数据约束“少问关键问题”，避免澄清退化成冗长表单。
-
-TODO：
-
-- [ ] 为 5 个高频场景准备至少 20 条一句话输入样本，并标注标准场景、必需字段、推荐问题。
-- [ ] 评测指标包括：场景识别正确率、澄清问题命中率、平均问题数、补齐后一次生成成功率、重复追问率。
-- [ ] 输出 Markdown 报告 `clarification_eval_report.md`，并复用模板命中评测脚手架。
-- [ ] 将轻量评测接入本地回归脚本或 CI 钩子。
-
-验收标准：
-
-- [ ] 高频场景的首次场景识别率达到 `>= 95%`。
-- [ ] 平均每次澄清问题数 `<= 3`。
-- [ ] 澄清后进入生成的一次成功率 `>= 90%`。
-
----
-
-### P1-3.9：第一轮落地切片只做一个端到端闭环
-
-目标：先打通一条完整链路，再横向扩展到更多场景。
-
-TODO：
-
-- [ ] 优先落地 `端子线序检测` 或 `包装箱外观检测` 其中一个。
-- [ ] 串通 `RequirementBriefExtractor`、`ClarificationEngine`、需求卡片、`PendingParameters`、`MissingResources`。
-- [ ] 在工作台中显示“已识别 / 待确认 / 缺资源 / 已确认”四态。
-- [ ] 先支持文本输入 + 附件元信息，不强求一次把复杂视觉理解做满。
-
-验收标准：
-
-- [ ] 一句话输入后能看到结构化需求卡片与缺口清单。
-- [ ] 缺关键字段时不会直接生成。
-- [ ] 补齐后可以连续生成并回写上下文。
 
 ---
 
@@ -1030,14 +961,14 @@ TODO：
 
 建议策略：
 
-| 任务 | 模型要求 | 可用能力字段 |
-|---|---|---|
+| 任务              | 模型要求                   | 可用能力字段                                                     |
+| ----------------- | -------------------------- | ---------------------------------------------------------------- |
 | 意图识别/场景匹配 | 快、低成本、可本地规则优先 | `RoleBindings=generation/validation` 或新增 `classification` |
-| 需求澄清问题生成 | 便宜、中文表达好 | `SupportsSystemPrompt` |
-| 工作流 JSON 生成 | JSON 稳定、遵守 Schema | `SupportsJsonMode=true` |
-| 图片理解 | 支持视觉输入 | `SupportsVisionInput=true` |
-| 修复/解释 | 推理能力强 | `Reasoning.Mode` / `SupportsReasoningStream` |
-| 离线降级 | 不依赖外部 LLM | 模板向导 |
+| 需求澄清问题生成  | 便宜、中文表达好           | `SupportsSystemPrompt`                                         |
+| 工作流 JSON 生成  | JSON 稳定、遵守 Schema     | `SupportsJsonMode=true`                                        |
+| 图片理解          | 支持视觉输入               | `SupportsVisionInput=true`                                     |
+| 修复/解释         | 推理能力强                 | `Reasoning.Mode` / `SupportsReasoningStream`                 |
+| 离线降级          | 不依赖外部 LLM             | 模板向导                                                         |
 
 TODO：
 
@@ -1227,20 +1158,20 @@ scenario-packages/
 
 ## 9. 建议的任务优先级总表
 
-| 优先级 | 任务 | 方向 | 主要收益 | 建议负责人 |
-|---|---|---|---|---|
-| P0 | ScenarioMatcher | 方向一 | 让模板优先从线序扩到全部内置高频模板 | AI 后端 |
-| P0 | Template Lock + Template Gate | 方向一 | 限制 LLM 自由发挥，保证拓扑稳定 | AI 后端 / 质量 |
-| P0 | RequirementBrief + ClarificationEngine | 方向三 | 生成前先补关键需求，减少无效生成 | AI 后端 / 产品 |
-| P0 | AiWorkbench 状态机 | 方向四 | 让用户看懂生成阶段和结果状态 | 前端 |
-| P0 | 模板匹配卡片 + 需求卡片 + 验证卡片 | 方向四 | 把现有字段变成可操作 UX | 前端 |
-| P0 | Generation Pipeline 拆分 | 方向五 | 降低 `AiFlowGenerationService` 复杂度 | AI 后端 |
-| P1 | Operator Knowledge Graph | 方向二 | 让 LLM 从算子清单升级为场景知识检索 | AI 后端 / 文档生成 |
-| P1 | 模板评测集 | 方向一/五 | 用数据证明 Prompt 和模板策略稳定 | 质量 |
-| P1 | 参数补录控件工程化 | 方向四 | 降低用户配置难度 | 前端 / 运行时 |
-| P1 | 模型角色路由 | 方向五 | 降本增稳，视觉/生成/修复分工 | AI 后端 |
-| P2 | 离线模板向导 | 方向五 | LLM 不可用时仍可落地高频场景 | 产品 / 前端 |
-| P2 | 场景包版本化 | 方向一/五 | 模板从流程升级为工业资产包 | 架构 / 质量 |
+| 优先级 | 任务                                   | 方向      | 主要收益                                | 建议负责人         |
+| ------ | -------------------------------------- | --------- | --------------------------------------- | ------------------ |
+| P0     | ScenarioMatcher                        | 方向一    | 让模板优先从线序扩到全部内置高频模板    | AI 后端            |
+| P0     | Template Lock + Template Gate          | 方向一    | 限制 LLM 自由发挥，保证拓扑稳定         | AI 后端 / 质量     |
+| P0     | RequirementBrief + ClarificationEngine | 方向三    | 生成前先补关键需求，减少无效生成        | AI 后端 / 产品     |
+| P0     | AiWorkbench 状态机                     | 方向四    | 让用户看懂生成阶段和结果状态            | 前端               |
+| P0     | 模板匹配卡片 + 需求卡片 + 验证卡片     | 方向四    | 把现有字段变成可操作 UX                 | 前端               |
+| P0     | Generation Pipeline 拆分               | 方向五    | 降低 `AiFlowGenerationService` 复杂度 | AI 后端            |
+| P1     | Operator Knowledge Graph               | 方向二    | 让 LLM 从算子清单升级为场景知识检索     | AI 后端 / 文档生成 |
+| P1     | 模板评测集                             | 方向一/五 | 用数据证明 Prompt 和模板策略稳定        | 质量               |
+| P1     | 参数补录控件工程化                     | 方向四    | 降低用户配置难度                        | 前端 / 运行时      |
+| P1     | 模型角色路由                           | 方向五    | 降本增稳，视觉/生成/修复分工            | AI 后端            |
+| P2     | 离线模板向导                           | 方向五    | LLM 不可用时仍可落地高频场景            | 产品 / 前端        |
+| P2     | 场景包版本化                           | 方向一/五 | 模板从流程升级为工业资产包              | 架构 / 质量        |
 
 ---
 
