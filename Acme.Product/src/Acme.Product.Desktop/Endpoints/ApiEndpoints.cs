@@ -12,6 +12,7 @@ using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Services;
+using Acme.Product.Runtime;
 using Acme.Product.Desktop.Handlers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -70,6 +71,13 @@ public static class ApiEndpoints
         public List<string> Tags { get; set; } = new();
         public string? FlowJson { get; set; }
         public object? FlowData { get; set; }
+    }
+
+    public class ExportRuntimePackageRequest
+    {
+        public string? TargetRootDirectory { get; set; }
+
+        public OperatorFlowDto? Flow { get; set; }
     }
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
@@ -158,6 +166,58 @@ public static class ApiEndpoints
             catch (Exception ex)
             {
                 // 日志已由全局异常中间件记录
+                return Results.BadRequest(new { Error = ex.Message });
+            }
+        });
+
+        app.MapPost("/api/projects/{id:guid}/runtime-package/export", async (
+            Guid id,
+            ExportRuntimePackageRequest? request,
+            ProjectService service,
+            RuntimePackageExporter exporter,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var project = await service.GetByIdAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound(new { Error = "Project not found." });
+                }
+
+                if (request?.Flow != null)
+                {
+                    project.Flow = request.Flow;
+                }
+
+                var exportResult = await exporter.ExportAsync(
+                    new RuntimePackageExportRequest
+                    {
+                        Project = project,
+                        TargetRootDirectory = request?.TargetRootDirectory
+                    },
+                    cancellationToken);
+
+                return Results.Ok(new
+                {
+                    exportResult.PackageRootPath,
+                    PackageId = exportResult.Manifest.PackageId,
+                    PackageName = exportResult.Manifest.PackageName,
+                    FlowHash = exportResult.Manifest.FlowHash,
+                    exportResult.ValidationReport,
+                    exportResult.ReadmePath
+                });
+            }
+            catch (RuntimePackageException ex)
+            {
+                return Results.BadRequest(new
+                {
+                    Error = ex.Message,
+                    Validation = ex.ValidationResult
+                });
+            }
+            catch (Exception ex)
+            {
                 return Results.BadRequest(new { Error = ex.Message });
             }
         });

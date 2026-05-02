@@ -5,6 +5,7 @@ using Acme.Product.Desktop.Middleware;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Logging;
 using Acme.Product.Infrastructure.Services;
+using Acme.Product.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -112,10 +113,11 @@ static class Program
 
             builder.Services.AddVisionServices(builder.Configuration);
             builder.Services.AddAiFlowGeneration(builder.Configuration);
+            builder.Services.AddScoped<RuntimePackageExporter>();
+            builder.Services.AddScoped<RuntimePackageValidator>();
+            builder.Services.AddScoped<RuntimePackageLoader>();
+            builder.Services.AddSingleton<RuntimeResultNormalizer>();
             builder.Services.AddSingleton<WebMessageHandler>();
-            builder.Services.AddSingleton<Acme.Product.Core.Interfaces.IProjectFlowStorage, JsonFileProjectFlowStorage>();
-            builder.Services.AddTransient<IPlanarScaleOffsetCalibrationService, PlanarScaleOffsetCalibrationService>();
-
             builder.Services.ConfigureHttpJsonOptions(options =>
             {
                 options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;

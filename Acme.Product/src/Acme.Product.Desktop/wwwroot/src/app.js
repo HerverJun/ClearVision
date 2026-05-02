@@ -1585,6 +1585,81 @@ function exportProjectToJson() {
     }
 }
 
+async function exportRuntimePackage() {
+    const project = getCurrentProject();
+    if (!project) {
+        showToast('娌℃湁鍙鍑虹殑宸ョ▼', 'warning');
+        return;
+    }
+
+    try {
+        const flow = flowCanvas ? flowCanvas.serialize() : project.flow;
+        await projectManager.saveProject({
+            ...project,
+            flow
+        });
+
+        const response = await httpClient.post(`/projects/${project.id}/runtime-package/export`, {
+            flow
+        });
+
+        showToast('Runtime Package 瀵煎嚭鎴愬姛', 'success');
+        Dialog.alert(
+            'Runtime Package 宸插鍑?',
+            `鐩綍: ${response.packageRootPath || '-'}<br>FlowHash: ${response.flowHash || '-'}`,
+            null
+        );
+    } catch (err) {
+        console.error('[Export] Runtime Package export failed:', err);
+        showToast(`Runtime Package 瀵煎嚭澶辫触: ${err.message}`, 'error');
+    }
+}
+
+function showProjectExportDialog() {
+    const content = document.createElement('div');
+    content.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
+                <div style="font-weight:600; margin-bottom:4px;">Project JSON</div>
+                <div style="color:var(--text-muted); font-size:12px;">Export the editable Studio project snapshot.</div>
+            </div>
+            <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
+                <div style="font-weight:600; margin-bottom:4px;">Runtime Package</div>
+                <div style="color:var(--text-muted); font-size:12px;">Export the current flow as a Station-ready runtime package.</div>
+            </div>
+        </div>
+    `;
+
+    let modalOverlay = null;
+    const btnCancel = createButton({
+        text: '鍙栨秷',
+        type: 'secondary',
+        onClick: () => closeModal(modalOverlay)
+    });
+    const btnJson = createButton({
+        text: 'Project JSON',
+        type: 'secondary',
+        onClick: () => {
+            closeModal(modalOverlay);
+            exportProjectToJson();
+        }
+    });
+    const btnRuntime = createButton({
+        text: 'Runtime Package',
+        onClick: async () => {
+            closeModal(modalOverlay);
+            await exportRuntimePackage();
+        }
+    });
+
+    modalOverlay = createModal({
+        title: '瀵煎嚭',
+        content,
+        footer: [btnCancel, btnJson, btnRuntime],
+        width: '420px'
+    });
+}
+
 /**
  * 【修复】根据算子类型查找算子库中的定义数据
  * @param {string} type - 算子类型
@@ -1697,6 +1772,8 @@ function showImportDialog() {
 // Expose import/export functions globally for projectView.js
 window.showImportDialog = showImportDialog;
 window.exportProjectToJson = exportProjectToJson;
+window.exportRuntimePackage = exportRuntimePackage;
+window.showProjectExportDialog = showProjectExportDialog;
 
 // ==========================================================================
 // 阶段五：状态栏更新功能
@@ -1907,8 +1984,10 @@ export {
     flowCanvas,
     flowEditorInteraction,
     exportProjectToJson,
+    exportRuntimePackage,
     importProjectFromJson,
     showImportDialog,
+    showProjectExportDialog,
     triggerAutoSave
 };
 

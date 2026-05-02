@@ -71,7 +71,9 @@ export class ProjectView {
         if (exportBtn) {
             exportBtn.addEventListener('click', () => {
                 console.log('[ProjectView] 导出工程');
-                if (typeof window.exportProjectToJson === 'function') {
+                if (typeof window.showProjectExportDialog === 'function') {
+                    window.showProjectExportDialog();
+                } else if (typeof window.exportProjectToJson === 'function') {
                     window.exportProjectToJson();
                 } else {
                     showToast('导出功能未就绪', 'warning');

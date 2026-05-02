@@ -63,6 +63,7 @@
     <ProjectReference Include="..\Acme.Product.Application\Acme.Product.Application.csproj" />
     <ProjectReference Include="..\Acme.Product.Contracts\Acme.Product.Contracts.csproj" />
     <ProjectReference Include="..\Acme.Product.Infrastructure\Acme.Product.Infrastructure.csproj" />
+    <ProjectReference Include="..\Acme.Product.Runtime\Acme.Product.Runtime.csproj" />
   </ItemGroup>
 
   <!-- 配置文件 -->

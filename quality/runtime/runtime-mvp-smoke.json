@@ -1,0 +1,27 @@
+{
+  "name": "runtime-mvp-smoke",
+  "date": "2026-05-02",
+  "status": "passed",
+  "checks": [
+    {
+      "id": "build-solution",
+      "status": "passed",
+      "command": "dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore"
+    },
+    {
+      "id": "runtime-tests",
+      "status": "passed",
+      "command": "./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -FullyQualifiedName RuntimeMvpTests -NoRestore -Verbosity minimal"
+    },
+    {
+      "id": "build-station",
+      "status": "passed",
+      "command": "dotnet build Acme.Product/src/Acme.Product.Station/Acme.Product.Station.csproj --configuration Debug --no-restore"
+    },
+    {
+      "id": "dependency-scan",
+      "status": "passed",
+      "command": "Select-String banned Desktop/Web patterns across Runtime and Station sources"
+    }
+  ]
+}

@@ -33,6 +33,8 @@
     <ProjectReference Include="..\..\src\Acme.Product.Core\Acme.Product.Core.csproj" />
     <ProjectReference Include="..\..\src\Acme.Product.Application\Acme.Product.Application.csproj" />
     <ProjectReference Include="..\..\src\Acme.Product.Infrastructure\Acme.Product.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Acme.Product.Runtime.Abstractions\Acme.Product.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Acme.Product.Runtime\Acme.Product.Runtime.csproj" />
   </ItemGroup>
 
   <ItemGroup>
