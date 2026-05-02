@@ -72,6 +72,16 @@ ClearVision 当前已经不是简单的“LLM 生成 JSON”项目，而是具�
 | Prompt 成本与稳定性 | 当前可能向模型塞入较重上下文                                   | 按场景检索算子知识切片，减少无关算子干扰                      |
 | 现场可信边界        | 质量矩阵显示真实现场验证仍是缺口                               | 工作台明确标记“功能可用但未完成现场工业验证”，不误导用户    |
 
+### 0.5 2026-05-02 复核结论
+
+按当前代码与测试复核，前三个方向不是“待开始”，而是已经形成了可继续接 UX 的基础闭环：
+
+- 方向一“模板优先”：P0 主链路已基本完成。`ScenarioDefinition`、`ScenarioMatcher`、`TemplateConstraintValidator`、`GenerationMode/TemplateLockLevel`、模板候选返回与 `TemplateSelection` 已落地，并有 `ScenarioMatcherTests`、`TemplateConstraintValidatorTests` 覆盖核心场景。剩余不应阻塞方向四的是：真正把模板 `FlowJson` 预转为初稿再让 LLM 补全、批量 golden prompt 评测、模板生命周期。
+- 方向二“算子知识图谱”：P0 与 P1 主链路已完成到可用状态。`operator_knowledge_graph.json`、`operator_knowledge_cards.json`、`operator_knowledge_schema.json`、`OperatorKnowledgeGraphRunner`、`OperatorKnowledgeRetriever`、`PromptBuilder` 知识切片、`AiFlowValidator` 知识图谱资源/反模式诊断均已落地。剩余是 UI 风险解释、替代方案解释与 Prompt token 量化报表。
+- 方向三“需求澄清闭环”：P0 已完成，P1 有可用雏形。`RequirementBriefExtractor`、`ClarificationEngine`、严格/草稿模式、会话澄清记忆、右侧需求卡片、待确认参数复核入口已落地。剩余是更深的附件观察、产线/模板默认值沉淀，以及 ROI/PLC 等工业控件完善。
+
+因此，方向四本轮不要再扩成“全新工作台工程”。它应只把前三个方向已经产出的字段产品化：`requirementBrief`、`templateCandidates/recommendedTemplate`、`pendingParameters`、`missingResources`、`validation/manualRetry`、`dryRunResult`、`promptTrace/stageTimeline`。
+
 ---
 
 ## 1. 执行路线图
@@ -80,8 +90,8 @@ ClearVision 当前已经不是简单的“LLM 生成 JSON”项目，而是具�
 
 目标：让现有 AI 生成链路从“能生成”变成“可控生成”。
 
-- [ ] 方向一：把现有模板匹配从线序关键词扩展为数据驱动的 `ScenarioMatcher`。
-- [ ] 方向三：生成前新增 `RequirementBrief`，缺关键信息时先澄清，不急着调用 LLM。
+- [X] 方向一：把现有模板匹配从线序关键词扩展为数据驱动的 `ScenarioMatcher`。
+- [X] 方向三：生成前新增 `RequirementBrief`，缺关键信息时先澄清，不急着调用 LLM。
 - [ ] 方向四：把现有 `AiPanel` 的右侧结果区升级为工作台状态机，展示模板命中、缺资源、待确认参数、Validator、DryRun。
 - [ ] 方向五：把 `AiFlowGenerationService` 中的生成链路拆成可测试 stage，但先不大规模重构外部 API。
 
@@ -89,9 +99,9 @@ ClearVision 当前已经不是简单的“LLM 生成 JSON”项目，而是具�
 
 目标：让 LLM 看到的不是“155 个算子大清单”，而是按场景检索出的工业知识切片。
 
-- [ ] 方向二：生成 Operator Knowledge Graph，并让 PromptBuilder 使用相关算子子图。
+- [X] 方向二：生成 Operator Knowledge Graph，并让 PromptBuilder 使用相关算子子图。
 - [ ] 方向一：建立模板 golden prompts 测试集与模板命中率评测。
-- [ ] 方向三：把澄清问题、用户回答、参数补录写入会话上下文。
+- [X] 方向三：把澄清问题、用户回答、参数补录写入会话上下文。
 - [ ] 方向五：模型路由按任务角色拆分：意图识别、澄清、生成、修复、视觉附件理解。
 
 ### Phase 2：工程师工作台闭环
@@ -126,26 +136,26 @@ ClearVision 已经有内置模板，但当前模板优先逻辑还偏窄：`AiFl
 
 TODO：
 
-- [ ] 定义 `ScenarioDefinition`：`scenarioKey`、`scenarioName`、`industry`、`keywords`、`synonyms`、`negativeKeywords`、`intentTypes`、`objectTypes`、`defectTypes`、`measurementTargets`、`requiredResources`、`templateId/templateName`。
-- [ ] 从 `FlowTemplateService.CreateBuiltInTemplates()` 生成内置场景定义，不再只靠线序关键词。
-- [ ] 为以下模板补齐场景匹配特征：
-  - [ ] `wire-sequence-terminal`：端子线序检测。
-  - [ ] 包装箱外观检测。
-  - [ ] 空调内机外观检测。
-  - [ ] 空调外机外观检测。
-  - [ ] 遥控器漏装检测。
-  - [ ] 两器铜孔间距检测。
-- [ ] `ScenarioMatcher.Match(description, additionalContext, attachments)` 返回 TopN 候选，包含 `confidence`、`matchReason`、`matchedFields`、`missingSignals`。
-- [ ] `AiFlowGenerationService.BuildTemplatePriorityContextAsync()` 改为调用 `ScenarioMatcher`，不再只判断线序关键词。
+- [X] 定义 `ScenarioDefinition`：`scenarioKey`、`scenarioName`、`industry`、`keywords`、`synonyms`、`negativeKeywords`、`intentTypes`、`objectTypes`、`defectTypes`、`measurementTargets`、`requiredResources`、`templateId/templateName`。
+- [X] 从 `FlowTemplateService.CreateBuiltInTemplates()` 生成内置场景定义，不再只靠线序关键词。
+- [X] 为以下模板补齐场景匹配特征：
+  - [X] `wire-sequence-terminal`：端子线序检测。
+  - [X] 包装箱外观检测。
+  - [X] 空调内机外观检测。
+  - [X] 空调外机外观检测。
+  - [X] 遥控器漏装检测。
+  - [X] 两器铜孔间距检测。
+- [X] `ScenarioMatcher.Match(description, additionalContext, attachments)` 返回 TopN 候选，包含 `confidence`、`matchReason`、`matchedFields`、`missingSignals`。
+- [X] `AiFlowGenerationService.BuildTemplatePriorityContextAsync()` 改为调用 `ScenarioMatcher`，不再只判断线序关键词。
 
 验收标准：
 
-- [ ] 输入“检测包装箱破损、压痕、标签异常”，Top1 命中包装箱外观检测模板。
-- [ ] 输入“空调内机面板划伤和缝隙检测”，Top1 命中空调内机外观检测模板。
-- [ ] 输入“附件区域判断遥控器有没有漏装”，Top1 命中遥控器漏装检测模板。
-- [ ] 输入“测量两器铜孔之间的距离是否合格”，Top1 命中两器铜孔间距检测模板。
-- [ ] 输入“端子线序黑蓝顺序检测”，Top1 命中端子线序检测模板。
-- [ ] 单测覆盖：中文同义词、英文关键词、行业词缺失、歧义场景、低置信度 fallback。
+- [X] 输入“检测包装箱破损、压痕、标签异常”，Top1 命中包装箱外观检测模板。
+- [X] 输入“空调内机面板划伤和缝隙检测”，Top1 命中空调内机外观检测模板。
+- [X] 输入“附件区域判断遥控器有没有漏装”，Top1 命中遥控器漏装检测模板。
+- [X] 输入“测量两器铜孔之间的距离是否合格”，Top1 命中两器铜孔间距检测模板。
+- [X] 输入“端子线序黑蓝顺序检测”，Top1 命中端子线序检测模板。
+- [X] 单测覆盖：中文同义词、英文关键词、行业词缺失、歧义场景、低置信度 fallback。
 
 ---
 
@@ -162,18 +172,20 @@ TODO：
 
 TODO：
 
-- [ ] 当 `ScenarioMatcher.confidence >= 0.75` 时进入 `template_fill`。
-- [ ] `template_fill` 模式下，传给 LLM 的指令明确：不得删除模板必需算子，不得替换核心拓扑，不得创造模板外算子。
+- [X] 当 `ScenarioMatcher.confidence >= 0.75` 时进入 `template_fill`。
+- [X] `template_fill` 模式下，传给 LLM 的指令明确：不得删除模板必需算子，不得替换核心拓扑，不得创造模板外算子。
 - [ ] `template_fill` 模式下，优先把模板 `FlowJson` 转为 `AiGeneratedFlowJson` 初稿，再让 LLM 对参数、说明、待确认项做补全。
-- [ ] 如果用户明确要求“换一种方案/不要用模板”，才进入 `template_adapt` 或 `free_generate`。
-- [ ] 返回结果里展示模板命中原因、模板版本、场景 Key、锁定等级。
+- [X] 如果用户明确要求“换一种方案/不要用模板”，才进入 `template_adapt` 或 `free_generate`。
+- [X] 返回结果里展示模板命中原因、模板版本、场景 Key、锁定等级。
+
+当前备注：现在已把模板骨架放入 prompt，并用 `TemplateConstraintValidator` 做后置约束；尚未把模板 `FlowJson` 作为服务端初稿对象直接注入 LLM 前流程。因此该方向不再阻塞方向四，但后续可作为稳定性增强项。
 
 验收标准：
 
-- [ ] 端子线序模板生成结果必须保留 `ImageAcquisition -> DeepLearning -> BoxFilter -> BoxNms -> DetectionSequenceJudge -> ResultOutput` 主干。
-- [ ] 包装箱/空调外观检测必须保留 `ImageResize -> DeepLearning -> BoxFilter -> BoxNms -> ResultJudgment -> ResultOutput` 主干。
-- [ ] 铜孔间距检测必须保留 `Filtering -> EdgeDetection -> GapMeasurement -> ResultJudgment -> ResultOutput` 主干。
-- [ ] LLM 不能把模板主干替换成无关算子组合。
+- [X] 端子线序模板生成结果必须保留 `ImageAcquisition -> DeepLearning -> BoxFilter -> BoxNms -> DetectionSequenceJudge -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
+- [X] 包装箱/空调外观检测必须保留 `ImageResize -> DeepLearning -> BoxFilter -> BoxNms -> ResultJudgment -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
+- [X] 铜孔间距检测必须保留 `Filtering -> EdgeDetection -> GapMeasurement -> ResultJudgment -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
+- [X] LLM 不能把模板主干替换成无关算子组合。（偏离会进入模板约束诊断/ManualRetry）
 
 ---
 
@@ -188,16 +200,16 @@ TODO：
 
 TODO：
 
-- [ ] 从 `FlowTemplate.ScenarioPackage.Constraints` 或模板 JSON 中抽取约束：必需算子、必需连线、必需资源、可调参数、禁止替换的节点。
-- [ ] 在 `AiFlowValidator.Validate()` 后增加模板约束校验。
-- [ ] 模板约束失败时返回结构化错误：`template_required_operator_missing`、`template_required_connection_missing`、`template_required_resource_missing`。
-- [ ] 模板约束错误进入 `ManualRetry` 或自动修复队列。
+- [X] 从 `FlowTemplate.ScenarioPackage.Constraints` 或模板 JSON 中抽取约束：必需算子、必需连线、必需资源、可调参数、禁止替换的节点。
+- [X] 在 `AiFlowValidator.Validate()` 后增加模板约束校验。
+- [X] 模板约束失败时返回结构化错误：`template_required_operator_missing`、`template_required_connection_missing`、`template_required_resource_missing`。
+- [X] 模板约束错误进入 `ManualRetry` 或自动修复队列。
 
 验收标准：
 
-- [ ] 手动删除模板中的 `ResultOutput`，Template Gate 报错。
-- [ ] 手动删除线序模板中的 `DetectionSequenceJudge`，Template Gate 报错。
-- [ ] `DeepLearning.ModelPath` 缺失时，不视为结构失败，但进入 `MissingResources` 与参数补录。
+- [X] 手动删除模板中的 `ResultOutput`，Template Gate 报错。
+- [X] 手动删除线序模板中的 `DetectionSequenceJudge`，Template Gate 报错。
+- [X] `DeepLearning.ModelPath` 缺失时，不视为结构失败，但进入 `MissingResources` 与参数补录。
 
 ---
 
@@ -231,16 +243,16 @@ TODO：
 
 TODO：
 
-- [ ] 在 `aiPanel.js` 右侧新增“模板候选”卡片。
-- [ ] 展示 Top3：模板名、行业、匹配置信度、命中词、缺失信息、模板版本。
-- [ ] 用户可选择：`使用推荐模板`、`换一个模板`、`不用模板自由生成`。
-- [ ] 选择结果写入 GenerateFlow 的 `hint` 或新增 `templateSelection` 字段。
+- [X] 在 `aiPanel.js` 右侧新增“模板候选”卡片。（当前集成在“待补信息/模板策略”区域，方向四再收敛成独立卡片或 Tab）
+- [X] 展示 Top3：模板名、行业、匹配置信度、命中词、缺失信息、模板版本。
+- [X] 用户可选择：`使用推荐模板`、`换一个模板`、`不用模板自由生成`。
+- [X] 选择结果写入 GenerateFlow 的 `hint` 或新增 `templateSelection` 字段。
 
 验收标准：
 
-- [ ] 用户输入歧义需求时，可看到多个模板候选。
-- [ ] 用户强制选择模板后，后端按该模板生成。
-- [ ] 生成结果中保留用户选择过的模板版本。
+- [X] 用户输入歧义需求时，可看到多个模板候选。
+- [X] 用户强制选择模板后，后端按该模板生成。
+- [X] 生成结果中保留用户选择过的模板版本。
 
 ---
 
@@ -381,6 +393,8 @@ TODO：
 - [X] 高置信度模板场景只发送模板涉及算子 + 少量备选算子。
 - [X] 低置信度自由生成场景才发送更大的候选集。
 
+当前备注：`OperatorKnowledgeRetriever` 已支持场景提示与附件名输入，但 `PromptBuilder.BuildSystemPrompt(userDescription)` 目前主要传入描述文本。更丰富的“场景候选/模板/当前流程/附件元信息”统一接线留给方向五或方向四调试视图，不阻塞当前工作台卡片化。
+
 验收标准：
 
 - [X] 线序场景 Prompt 中优先出现 `DeepLearning`、`BoxFilter`、`BoxNms`、`DetectionSequenceJudge`、`ResultOutput`。
@@ -402,7 +416,7 @@ TODO：
 
 验收标准：
 
-- [X] 用户能在工作台中看到 DeepLearning 缺 `ModelPath` 的资源提示。（后端诊断已产出；UI 面板展示待完成）
+- [ ] 用户能在工作台中看到 DeepLearning 缺 `ModelPath` 的资源提示。（后端诊断与 `MissingResources` 已产出；方向四负责把它固定为清晰工作台卡片）
 - [ ] 用户能看到 TemplateMatching/CaliperTool 等算子的证据状态与现场验证边界。
 - [ ] UI 展示的参数范围与 Validator 使用的参数范围一致。
 
@@ -488,15 +502,15 @@ RequirementBrief
 
 TODO：
 
-- [ ] 先用规则 + ScenarioMatcher 生成基础 `RequirementBrief`。
+- [X] 先用规则 + ScenarioMatcher 生成基础 `RequirementBrief`。
 - [ ] 只有复杂/歧义需求才调用轻量 LLM 做补充解析。
-- [ ] `RequirementBrief` 写入会话上下文，后续 Modify/Review 模式复用。
+- [X] `RequirementBrief` 写入会话上下文，后续 Modify/Review 模式复用。
 - [ ] 附件元信息进入 `RequirementBrief`，例如图片数量、分辨率、是否可发送给模型。
 
 验收标准：
 
-- [ ] “检测空调内机面板划伤”解析出：`sceneType=appearance_defect`、`industry=空调制造`、`defectTypes=[划伤]`。
-- [ ] “测量两个孔的圆心距离”解析出：`sceneType=measurement`、`measurementTargets=[孔距/圆心距离]`。
+- [X] “检测空调内机面板划伤”解析出：`sceneType=appearance_defect`、`industry=空调制造`、`defectTypes=[划伤]`。
+- [X] “测量两个孔的圆心距离”解析出：`sceneType=measurement`、`measurementTargets=[孔距/圆心距离]`。
 - [ ] “端子线序黑蓝顺序检测”解析出：`sceneType=wire_sequence`、`expectedSequence=[黑, 蓝]`。
 
 ---
@@ -512,15 +526,15 @@ TODO：
 
 TODO：
 
-- [ ] 定义澄清级别：`required` / `recommended` / `optional`。
+- [X] 定义澄清级别：`required` / `recommended` / `optional`。
 - [ ] 每个模板定义最小必需字段，例如：
   - 线序：期望顺序、模型路径、ROI、排序方向。
   - 外观检测：缺陷类型、模型路径、ROI、OK/NG 判定。
   - 漏装检测：目标类别、期望数量、ROI、模型路径。
   - 铜孔间距：测量方向、合格范围、是否需要像素到物理单位换算。
-- [ ] 生成前若缺 `required` 字段，返回 `ClarificationRequired`，而不是返回 Flow。
-- [ ] 每次最多问 3 个最关键问题，避免用户被长表单吓退。
-- [ ] 用户回答后合并到 `RequirementBrief`，再继续模板匹配/生成。
+- [X] 生成前若缺 `required` 字段，返回 `ClarificationRequired`，而不是返回 Flow。
+- [X] 每次最多问 3 个最关键问题，避免用户被长表单吓退。
+- [X] 用户回答后合并到 `RequirementBrief`，再继续模板匹配/生成。
 
 建议新增响应字段：
 
@@ -535,9 +549,9 @@ GenerateFlowResponse
 
 验收标准：
 
-- [ ] 用户只说“检测缺陷”，系统先问产品/缺陷类型/是否有模型，而不是直接生成。
-- [ ] 用户说“用 YOLO 检测包装箱破损”，系统可以继续生成，但把 `ModelPath` 放入缺资源。
-- [ ] 用户说“测铜孔间距”，系统询问合格范围或单位换算需求。
+- [X] 用户只说“检测缺陷”，系统先问产品/缺陷类型/是否有模型，而不是直接生成。
+- [X] 用户说“用 YOLO 检测包装箱破损”，系统可以继续生成，但把 `ModelPath` 放入缺资源。
+- [X] 用户说“测铜孔间距”，系统询问合格范围或单位换算需求。
 
 ---
 
@@ -552,17 +566,17 @@ GenerateFlowResponse
 
 TODO：
 
-- [ ] 在 AI 工作台右侧或顶部新增“需求卡片”。
-- [ ] 展示系统已识别字段：场景、行业、检测对象、缺陷类型、输出目标、资源状态。
-- [ ] 缺失字段用黄色/红色标记。
+- [X] 在 AI 工作台右侧或顶部新增“需求卡片”。
+- [X] 展示系统已识别字段：场景、行业、检测对象、缺陷类型、输出目标、资源状态。
+- [X] 缺失字段用黄色/红色标记。
 - [ ] 支持用户用表单补充，不必须继续打字。
-- [ ] 补充后自动更新 `hint` 或新增 `requirementBrief` payload。
+- [X] 补充后自动更新 `hint` 或新增 `requirementBrief` payload。
 
 验收标准：
 
-- [ ] 用户输入一句话后，需求卡片自动生成。
-- [ ] 用户能直接在卡片中选择“包装箱外观检测 / 遥控器漏装 / 铜孔间距”。
-- [ ] 用户补充字段后再次生成，不丢失会话上下文。
+- [X] 用户输入一句话后，需求卡片自动生成。
+- [ ] 用户能直接在需求卡片中选择“包装箱外观检测 / 遥控器漏装 / 铜孔间距”。（模板候选卡已支持选择；需求卡内选择仍留给方向四收敛）
+- [X] 用户补充字段后再次生成，不丢失会话上下文。
 
 ---
 
@@ -572,16 +586,16 @@ TODO：
 
 TODO：
 
-- [ ] `PendingParameters` 每项绑定算子、参数定义、默认值、范围、输入控件类型。
+- [X] `PendingParameters` 每项绑定算子、参数定义、默认值、范围、输入控件类型。
 - [ ] `MissingResources` 每项绑定处理动作：选择模型文件、选择标签文件、配置相机、配置 PLC、选择 ROI。
-- [ ] 用户补齐后调用现有 `review_pending_parameters` 模式复核。
-- [ ] 参数确认后在工作台中显示“已确认”，并允许再次编辑。
+- [X] 用户补齐后调用现有 `review_pending_parameters` 模式复核。
+- [X] 参数确认后在工作台中显示“已确认”，并允许再次编辑。
 
 验收标准：
 
-- [ ] `DeepLearning.ModelPath` 缺失时，用户能通过文件选择器补齐。
+- [X] `DeepLearning.ModelPath` 缺失时，用户能通过文件选择器补齐。
 - [ ] `BoxFilter.RegionX/Y/W/H` 缺失时，用户能通过 ROI 选择或数字输入补齐。
-- [ ] 补齐参数后，`review_pending_parameters` 能保持流程结构稳定，仅更新参数。
+- [X] 补齐参数后，`review_pending_parameters` 能保持流程结构稳定，仅更新参数。
 
 ---
 
@@ -656,6 +670,17 @@ TODO：
 [需求] [模板] [流程] [参数] [验证] [应用] [调试]
 ```
 
+### 4.2.1 本轮方向四约束
+
+由于方向一、二、三的后端字段和基础 UI 已经可用，方向四本轮只做“收敛呈现与闭环动作”，不要发散成新产品线：
+
+- 不重写 `AiPanel`，只在现有 `ai-workspace`、右侧结果区、应用按钮、会话历史基础上整理。
+- 不新增复杂后端概念；优先消费现有返回字段：`requirementBrief`、`templateCandidates`、`recommendedTemplate`、`pendingParameters`、`missingResources`、`manualRetry`、`dryRunResult`、`promptTrace`、`stageTimeline`。
+- 不做大而全方案市场、自动报告中心、复杂指标平台；P2 的导出报告、替代方案比较、工作台埋点全部后置。
+- 不把 PromptTrace 和原始推理作为普通用户主界面；普通模式只显示工程摘要，Debug 模式才展开原始上下文。
+- 不把“保存为模板 / 场景包版本化 / 离线向导”混入本轮方向四 P0；这些归方向一 P2 或方向五 P2。
+- 第一轮只验收一个端到端高频场景，优先 `包装箱外观检测` 或 `端子线序检测`，保证需求卡片、模板卡片、待补参数、验证摘要、应用前确认可以串起来。
+
 ## 4.3 TODO 清单
 
 ### P0-4.1：把 AiPanel 升级为显式状态机
@@ -682,17 +707,19 @@ cancelled
 
 TODO：
 
-- [ ] 新增 `AiWorkbenchState` 常量或状态管理模块。
-- [ ] 把当前 `isGenerating`、`isCancellingGenerate`、`currentResultVersion`、`appliedResultVersion` 等状态映射到统一状态机。
-- [ ] 顶部显示工作台阶段条，当前阶段高亮，失败阶段显示原因。
-- [ ] 所有 GenerateFlowProgress 进入阶段时间线，而不是只追加聊天文本。
-- [ ] `ManualRetry`、`ClarificationRequired`、`ValidationFailed`、`DryRunSkipped` 都映射为明确状态。
+- [X] 新增 `AiWorkbenchState` 常量或状态管理模块。
+- [X] 把当前 `isGenerating`、`isCancellingGenerate`、`currentResultVersion`、`appliedResultVersion` 等状态映射到统一状态机。
+- [X] 顶部显示工作台阶段条，当前阶段高亮，失败阶段显示原因。
+- [X] 优先消费后端已返回的 `stageTimeline`；`GenerateFlowProgress` 只作为补充，不另造一套进度协议。
+- [X] `ManualRetry`、`ClarificationRequired`、`ValidationFailed`、`DryRunSkipped` 都映射为明确状态。
+
+本轮约束：状态机只覆盖“澄清、模板、生成、校验、待补、可应用、失败、取消、已应用”这些用户能感知的阶段，不暴露所有内部 stage 细节。
 
 验收标准：
 
-- [ ] 用户能一眼看到当前处于“模板匹配 / 生成 / 校验 / 待补参数 / 可应用”的哪个阶段。
-- [ ] 取消生成后状态回到 `cancelled`，不会误显示可应用。
-- [ ] 生成失败但上一版结果仍可应用时，状态条明确区分“本轮失败 / 右侧保留上一版”。
+- [X] 用户能一眼看到当前处于”模板匹配 / 生成 / 校验 / 待补参数 / 可应用”的哪个阶段。
+- [X] 取消生成后状态回到 `cancelled`，不会误显示可应用。
+- [ ] 生成失败但上一版结果仍可应用时，状态条明确区分”本轮失败 / 右侧保留上一版”。
 
 ---
 
@@ -702,16 +729,18 @@ TODO：
 
 TODO：
 
-- [ ] 在右侧结果区新增“模板匹配”卡片。
-- [ ] 展示：推荐模板名、行业、版本、场景 Key、置信度、命中关键词、缺失信号。
-- [ ] 支持 Top3 模板候选切换。
-- [ ] 支持“强制使用此模板 / 允许轻微改造 / 不使用模板”三种模式。
-- [ ] 模板卡片展示核心拓扑摘要，例如：`ImageAcquisition -> DeepLearning -> BoxNms -> ResultJudgment -> ResultOutput`。
+- [X] 在右侧结果区新增“模板匹配”卡片。（当前在“待补信息/模板策略”中，后续只做命名与布局收敛）
+- [X] 展示：推荐模板名、行业、版本、场景 Key、置信度、命中关键词、缺失信号。
+- [X] 支持 Top3 模板候选切换。
+- [X] 支持“强制使用此模板 / 允许轻微改造 / 不使用模板”三种模式。
+- [X] 模板卡片展示核心拓扑摘要，例如：`ImageAcquisition -> DeepLearning -> BoxNms -> ResultJudgment -> ResultOutput`。
+
+本轮约束：模板卡片只展示 Top3 和三种选择动作，不做模板库管理、模板编辑器或多方案横向评审。
 
 验收标准：
 
-- [ ] 线序场景显示端子线序模板及其版本。
-- [ ] 包装箱外观检测显示包装箱模板，并展示需要 `DeepLearning.ModelPath`。
+- [X] 线序场景显示端子线序模板及其版本。
+- [X] 包装箱外观检测显示包装箱模板，并展示需要 `DeepLearning.ModelPath`。
 - [ ] 用户切换模板后，重新生成使用新模板。
 
 ---
@@ -722,15 +751,17 @@ TODO：
 
 TODO：
 
-- [ ] 右侧增加“需求卡片”。
-- [ ] 字段包括：检测对象、缺陷/测量目标、输入源、触发方式、输出方式、模型资源、ROI、判定逻辑。
-- [ ] 字段状态：已识别、待确认、缺失、用户已确认。
-- [ ] 缺失字段直接生成可点击动作：`选择模型文件`、`绘制 ROI`、`配置 PLC`、`填写阈值`。
+- [X] 右侧增加“需求卡片”。
+- [X] 字段包括：检测对象、缺陷/测量目标、输入源、触发方式、输出方式、模型资源、ROI、判定逻辑。
+- [X] 字段状态：已识别、待确认、缺失、用户已确认。
+- [X] 缺失字段直接生成可点击动作：`选择模型文件`、`绘制 ROI`、`配置 PLC`、`填写阈值`。
 - [ ] 需求卡片可折叠，避免占据过多空间。
+
+本轮约束：缺口动作先覆盖“插入输入框 / 挂到下一轮 / 文件参数选择 / 参数复核”，ROI 绘制与 PLC 配置只保留入口文案，不在本轮实现完整编辑器。
 
 验收标准：
 
-- [ ] “检测包装箱破损”至少显示检测对象=包装箱、缺陷=破损、模型资源=缺失。
+- [X] “检测包装箱破损”至少显示检测对象=包装箱、缺陷=破损、模型资源=缺失。
 - [ ] 用户在需求卡片中补充字段后，Prompt/Hint 能拿到更新后的结构化上下文。
 
 ---
@@ -741,16 +772,18 @@ TODO：
 
 TODO：
 
-- [ ] 每个算子显示：角色、输入输出摘要、关键参数、资源状态、证据状态、风险标签。
-- [ ] 对模板核心算子打上“模板锁定”标记。
-- [ ] 对待确认参数打上黄色标记。
-- [ ] 对缺资源打上红色标记。
+- [X] 每个算子显示：角色、输入输出摘要、关键参数、资源状态、证据状态、风险标签。
+- [ ] 对模板核心算子打上”模板锁定”标记。
+- [X] 对待确认参数打上黄色标记。
+- [X] 对缺资源打上红色标记。
 - [ ] 点击算子时，在画布中高亮对应节点和上下游连线。
-- [ ] 支持“为什么选它”解释：来自模板、来自知识图谱、来自用户需求、来自 LLM 补全。
+- [ ] 支持”为什么选它”解释：来自模板、来自知识图谱、来自用户需求、来自 LLM 补全。
+
+本轮约束：算子审核视图先补“角色、关键参数、待确认、缺资源、模板锁定”五类信息；证据状态与“为什么选它”只展示已有知识图谱摘要，不做替代方案推理。
 
 验收标准：
 
-- [ ] `DeepLearning` 节点显示 `ModelPath` 缺失和 `TargetClasses`。
+- [X] `DeepLearning` 节点显示 `ModelPath` 缺失和 `TargetClasses`。
 - [ ] `BoxNms` 节点显示 `IouThreshold/ScoreThreshold` 可调。
 - [ ] `ResultJudgment` 节点显示 OK/NG 判定逻辑。
 
@@ -762,17 +795,19 @@ TODO：
 
 TODO：
 
-- [ ] 新增“验证”Tab 或卡片。
-- [ ] 展示 `AiFlowValidator` 的结构化错误/警告：算子不存在、端口错误、类型不兼容、环路、参数越界、缺源算子、缺输出算子。
-- [ ] 展示 DryRun 结果：是否成功、覆盖率、分支数、跳过原因。
+- [X] 新增”验证”Tab 或卡片。
+- [X] 展示 `AiFlowValidator` 的结构化错误/警告：算子不存在、端口错误、类型不兼容、环路、参数越界、缺源算子、缺输出算子。
+- [X] 展示 DryRun 结果：是否成功、覆盖率、分支数、跳过原因。
 - [ ] 对每个问题提供动作：自动修复、回到参数编辑、重新生成、忽略警告。
-- [ ] ManualRetry 展示原始问题摘要、修复目标、草稿，而不是只追加到输入框。
+- [X] ManualRetry 展示原始问题摘要、修复目标、草稿，而不是只追加到输入框。
+
+本轮约束：验证控制台只消费现有 `ManualRetry`、`LastAttemptDiagnostics` 与 `DryRunResult`；“自动修复”按钮本轮只允许进入重新生成/参数编辑，不新增 patch 引擎。
 
 验收标准：
 
 - [ ] 端口错误能在工作台中定位到具体连线。
 - [ ] 参数越界能显示旧值、新值和原因。
-- [ ] DryRun 异常时，用户能看到“已跳过/失败”的结构化原因。
+- [X] DryRun 异常时，用户能看到”已跳过/失败”的结构化原因。
 
 ---
 
@@ -782,16 +817,18 @@ TODO：
 
 TODO：
 
-- [ ] `应用到环境` 前增加预览确认：将新增/修改/删除哪些节点和连线。
-- [ ] 对当前画布与 AI 方案做 diff：新增节点、删除节点、参数变更、连线变更。
-- [ ] 应用后保存上一版快照，支持撤销。
-- [ ] 应用后显示“已应用版本号/会话号/模板号”。
-- [ ] 应用后可一键“保存为模板”。
+- [X] `应用到环境` 前增加预览确认：将新增/修改/删除哪些节点和连线。
+- [X] 对当前画布与 AI 方案做 diff：新增节点、删除节点、参数变更、连线变更。
+- [X] 应用后保存上一版快照，支持撤销。
+- [ ] 应用后显示”已应用版本号/会话号/模板号”。
+- [ ] 应用后可一键”保存为模板”。（本轮后置，不进入方向四 P0）
+
+本轮约束：应用闭环优先做“预览确认、一次应用幂等、防重复应用、撤销上一版”。保存模板归方向一 P2，不与应用安全混在一起。
 
 验收标准：
 
-- [ ] 用户应用前能看到流程变更摘要。
-- [ ] 应用后能撤回到应用前画布。
+- [X] 用户应用前能看到流程变更摘要。
+- [X] 应用后能撤回到应用前画布。
 - [ ] 同一生成结果不可重复误应用，或重复应用时给出明确提示。
 
 ---
@@ -802,15 +839,17 @@ TODO：
 
 TODO：
 
-- [ ] 根据参数类型渲染控件：数字、枚举、布尔、文件、路径、ROI、相机绑定、PLC 地址。
-- [ ] 文件参数支持文件选择器，例如 `ModelPath`、`LabelsPath`。
+- [X] 根据参数类型渲染控件：数字、枚举、布尔、文件、路径、ROI、相机绑定、PLC 地址。（基础参数编辑器已具备类型化雏形，ROI/PLC 仍需专用交互）
+- [X] 文件参数支持文件选择器，例如 `ModelPath`、`LabelsPath`。
 - [ ] ROI 参数支持从图像或画布中选择。
 - [ ] PLC/Modbus 参数支持地址、寄存器、功能码校验。
-- [ ] 参数修改后实时更新当前 Flow DTO，并可提交 `review_pending_parameters`。
+- [X] 参数修改后实时更新当前 Flow DTO，并可提交 `review_pending_parameters`。
+
+本轮约束：参数补录只把已有 `PendingParameters` 做稳，不新增通用工业表单引擎；ROI/PLC 专用控件后置。
 
 验收标准：
 
-- [ ] 用户不需要手写模型路径字符串。
+- [X] 用户不需要手写模型路径字符串。
 - [ ] 用户不需要手工输入 ROI 四个数字也能完成区域选择。
 - [ ] 参数补录完成后，待确认状态自动消失或转为已确认。
 
@@ -822,15 +861,17 @@ TODO：
 
 TODO：
 
-- [ ] 附件区展示缩略图、名称、大小、分辨率、发送状态。
-- [ ] 如果模型不支持视觉输入，显示“已降级文本模式”。
-- [ ] 如果图片过大/格式不支持，显示跳过原因。
+- [X] 附件区展示缩略图、名称、大小、分辨率、发送状态。
+- [X] 如果模型不支持视觉输入，显示”已降级文本模式”。
+- [X] 如果图片过大/格式不支持，显示跳过原因。
 - [ ] 在 PromptTrace 中保留附件摘要，但普通模式不展示敏感路径。
+
+本轮约束：附件面板只解释“有没有发送给模型、为什么降级”，不做图片理解结果判定或视觉质检结论。
 
 验收标准：
 
-- [ ] 模型不支持图片时，用户明确知道图片没有进入模型。
-- [ ] 附件被跳过时，用户能看到原因。
+- [X] 模型不支持图片时，用户明确知道图片没有进入模型。
+- [X] 附件被跳过时，用户能看到原因。
 
 ---
 
@@ -840,16 +881,16 @@ TODO：
 
 TODO：
 
-- [ ] 普通模式只显示工程摘要：模板、模型、阶段耗时、校验结果。
-- [ ] Debug 模式才显示 SystemPrompt、UserPrompt、Capabilities、附件报告。
-- [ ] PromptTrace 中敏感信息脱敏：本地路径、API Key、客户文件名、内部网络地址。
-- [ ] Reasoning/Thinking 不作为普通用户可见主内容，改为“工程摘要”。
+- [X] 普通模式只显示工程摘要：模板、模型、阶段耗时、校验结果。
+- [X] Debug 模式才显示 SystemPrompt、UserPrompt、Capabilities、附件报告。
+- [X] PromptTrace 中敏感信息脱敏：本地路径、API Key、客户文件名、内部网络地址。
+- [X] Reasoning/Thinking 不作为普通用户可见主内容，改为”工程摘要”。
 
 验收标准：
 
-- [ ] `?debugPrompt=1` 或本地开关打开时可见 PromptTrace。
-- [ ] 普通用户界面不展示长 Prompt 和原始推理内容。
-- [ ] 不在 UI 中泄露 API Key 或敏感路径。
+- [X] `?debugPrompt=1` 或本地开关打开时可见 PromptTrace。
+- [X] 普通用户界面不展示长 Prompt 和原始推理内容。
+- [X] 不在 UI 中泄露 API Key 或敏感路径。
 
 ---
 
@@ -859,15 +900,15 @@ TODO：
 
 TODO：
 
-- [ ] 历史列表显示：场景、模板、生成状态、是否应用、是否保存模板。
+- [X] 历史列表显示：场景、模板、生成状态、是否应用、是否保存模板。
 - [ ] 会话详情显示：需求卡片、模板、参数补录、校验、DryRun、应用版本。
 - [ ] 支持按模板/行业/状态筛选历史。
 - [ ] 支持从历史方案重新生成、复制为模板、导出报告。
 
 验收标准：
 
-- [ ] 用户能找到“上次包装箱外观检测方案”。
-- [ ] 用户能看到该方案有没有应用到画布。
+- [X] 用户能找到”上次包装箱外观检测方案”。
+- [X] 用户能看到该方案有没有应用到画布。
 - [ ] 历史方案能恢复到工作台进行修改。
 
 ---
@@ -875,6 +916,8 @@ TODO：
 ### P2-4.11：工作台指标埋点
 
 目标：用数据判断工作台是否真的提高效率。
+
+本轮约束：P0 工作台稳定前不做指标平台；最多保留本地 `stageTimeline` 展示与调试用摘要。
 
 TODO：
 
@@ -893,6 +936,8 @@ TODO：
 ### P2-4.12：方案对比与替代路线
 
 目标：让用户能比较“模板方案 / 自由生成方案 / 传统视觉方案 / AI 检测方案”。
+
+本轮约束：方向四 P0 不做多方案生成与横向比较，只允许展示模板候选 Top3；替代路线解释归方向二 P2。
 
 TODO：
 
