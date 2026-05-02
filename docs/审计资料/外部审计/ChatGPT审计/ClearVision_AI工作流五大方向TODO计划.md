@@ -952,252 +952,196 @@ TODO：
 
 ---
 
-# 方向五：工程架构与 LLM 策略优化
+# 方向五：工程架构与 LLM 策略优化（收束版）
 
 ## 5.1 产品判断
 
-当前 `AiFlowGenerationService` 承担了较多职责：准备上下文、模板匹配、Prompt 构建、模型调用、解析、校验、DryRun、结果组装、会话记录等。短期可运行，但未来要做模板优先、知识图谱、澄清闭环、工作台，就需要把生成链路拆成可测试、可观察、可替换的阶段。
+方向一到四已经形成清晰主线：
 
-此外，模型配置已经有 `RoleBindings`、`Priority`、`Capabilities`、`SupportsVisionInput`、`SupportsJsonMode` 等字段，但还需要真正落地“按任务选择模型”的策略。
+```text
+方向一：先识别场景，命中模板，锁住核心拓扑。
+方向二：只给 LLM 当前场景需要的算子知识。
+方向三：生成前先澄清关键需求，不盲目调用模型。
+方向四：把模板、知识、澄清、校验和 DryRun 做成可审核的工作台。
+```
+
+因此，方向五不再展开成一套独立的“AI 平台架构工程”，而是作为前四个方向的工程底座：让现有生成链路更可测试、可追踪、可降级。它只解决三类问题：
+
+- 让 `AiFlowGenerationService` 的现有步骤形成轻量 stage timeline，服务方向四工作台展示。
+- 让模型能力、结构化输出、Prompt 版本、Trace 安全成为稳定契约，服务方向一到三的结果可追溯。
+- 让模板降级和场景包版本有最小闭环，服务“模板优先”而不是扩展成通用资产平台。
+
+本轮明确不做：复杂编排框架、全量多模型任务平台、自动 patch 引擎、跨场景 Prompt 缓存系统、独立场景资产管理后台。这些可以作为后续演进，但不进入当前五大方向的主线。
 
 ## 5.2 TODO 清单
 
-### P0-5.1：把 AiFlowGenerationService 拆成阶段化 Pipeline
+### P0-5.1：把生成链路整理成轻量 Pipeline Timeline
 
-目标：不改变外部 GenerateFlow API 的前提下，把内部拆成可测试 stage。
+目标：不改变外部 GenerateFlow API、不重写主流程，只把现有链路分段、可测试、可展示。
 
-建议阶段：
+收束后的 stage：
 
 ```text
-1. RequirementBriefExtractor
-2. ClarificationEngine
-3. ScenarioMatcher
-4. TemplateContextBuilder
-5. OperatorKnowledgeRetriever
-6. PromptContextBuilder
-7. LlmGenerationClient
-8. ResponseParser
-9. AiFlowValidator
-10. TemplateConstraintValidator
-11. AutoRepairEngine
-12. DryRunExecutor
-13. ResultAssembler
-14. ConversationRecorder
+1. 需求提取与澄清：RequirementBriefExtractor / ClarificationEngine
+2. 场景与模板：ScenarioMatcher / TemplateContextBuilder
+3. 算子知识与 Prompt：OperatorKnowledgeRetriever / PromptBuilder
+4. LLM 调用与解析：ModelSelector / LLM Provider / ResponseParser
+5. 校验与预演：AiFlowValidator / TemplateConstraintValidator / DryRunService
+6. 结果组装与记录：ResultAssembler / ConversationRecorder
 ```
 
 TODO：
 
-- [ ] 新增 `AiGenerationPipelineContext`，贯穿 request、brief、scenario、template、prompt、raw response、validation、dryrun、result。
-- [ ] 先抽出纯函数/服务，不急着改对外接口。
-- [ ] 每个 stage 输出结构化诊断，供工作台时间线展示。
-- [ ] `GenerateFlowMessageHandler` 保持现有消息契约，但逐步增加澄清字段。
+- [X] 新增或整理 `AiGenerationPipelineContext`，承接 request、brief、scenario、template、prompt、raw response、validation、dryrun、result。
+- [X] 每个 stage 只输出 `status`、`elapsedMs`、`summary`、`warnings/errors`、关键产物 ID，不引入重型编排框架。
+- [X] 把已有 `requirementBrief`、`templateCandidates/recommendedTemplate`、`pendingParameters`、`missingResources`、`validation/manualRetry`、`dryRunResult` 串到 `stageTimeline`。
+- [X] `GenerateFlowMessageHandler` 保持现有消息契约，新增字段采用向后兼容方式。
+- [X] 补齐 `layout` 阶段到 pipeline timeline（`pipeline.Measure(“layout”, ...)`）。
 
 验收标准：
 
-- [ ] 每个 stage 能单独单测。
-- [ ] 一次生成可输出完整 stage timeline。
-- [ ] 失败时能定位是澄清、模板、LLM、解析、校验还是 DryRun 阶段。
+- [X] 工作台能显示”当前卡在澄清、模板、LLM、解析、校验还是 DryRun”。
+- [X] 至少覆盖模板优先成功、需要澄清、Validator 失败三个链路的 stage context 单测。
+- [X] 现有 GenerateFlow 前端调用不需要一次性迁移。
 
 ---
 
-### P0-5.2：模型路由策略按任务角色拆分
+### P0-5.2：统一结构化结果契约，服务工作台展示
 
-目标：不要所有任务都用同一个模型。
-
-建议策略：
-
-| 任务              | 模型要求                   | 可用能力字段                                                     |
-| ----------------- | -------------------------- | ---------------------------------------------------------------- |
-| 意图识别/场景匹配 | 快、低成本、可本地规则优先 | `RoleBindings=generation/validation` 或新增 `classification` |
-| 需求澄清问题生成  | 便宜、中文表达好           | `SupportsSystemPrompt`                                         |
-| 工作流 JSON 生成  | JSON 稳定、遵守 Schema     | `SupportsJsonMode=true`                                        |
-| 图片理解          | 支持视觉输入               | `SupportsVisionInput=true`                                     |
-| 修复/解释         | 推理能力强                 | `Reasoning.Mode` / `SupportsReasoningStream`                 |
-| 离线降级          | 不依赖外部 LLM             | 模板向导                                                         |
+目标：方向四不再猜字段，而是消费一套稳定的 AI 生成结果契约。
 
 TODO：
 
-- [ ] 扩展 `RoleBindings`：`classification`、`clarification`、`generation`、`repair`、`vision`、`validation`、`fallback`。
-- [ ] `ActiveAiModelSelector` 支持按任务角色选择模型。
-- [ ] 当当前模型 `SupportsVisionInput=false` 时，附件自动降级但工作台明确提示。
-- [ ] 当模型不支持 JSON Mode 时，PromptBuilder 使用更强格式约束，Parser 开启修复流程。
-- [ ] 加入 fallback 顺序：主模型失败 -> 备用模型 -> 模板向导。
+- [X] 为 `AiGeneratedFlowJson` 增加或确认 `schemaVersion`。（已有 `SchemaVersion = “1.0”`）
+- [X] 统一以下字段的命名与空值语义：`requirementBrief`、`templateCandidates`、`recommendedTemplate`、`pendingParameters`、`missingResources`、`validationResult`、`manualRetry`、`dryRunResult`、`promptTrace`、`stageTimeline`。
+- [X] 若模型 `SupportsJsonMode=true`，优先使用 JSON Mode；否则由 PromptBuilder 加强格式约束。
+- [X] Parser 只做最小 JSON 修复，修复记录必须进入 `stageTimeline` 或诊断摘要。
+- [X] 普通响应只返回工程摘要，完整 PromptTrace 继续放在 Debug/开发态。
+- [X] PromptTrace 脱敏：API Key、本地路径、内网 IP、客户文件名在后端序列化前统一脱敏（`AiPromptTrace.Desensitize()`）。
 
 验收标准：
 
-- [ ] `reasoner` 类模型不会被用于图片输入。
-- [ ] 视觉场景自动选择支持图片的模型。
-- [ ] 主模型超时后能进入备用模型或模板降级。
+- [X] 工作台能稳定渲染需求卡片、模板卡片、待补参数、缺资源、验证与 DryRun。
+- [X] 模型返回 Markdown 包裹 JSON 时能修复或进入 ManualRetry，并说明失败阶段。
+- [X] 普通用户响应中不暴露完整 Prompt、API Key、本地绝对路径或客户文件名。
 
 ---
 
-### P0-5.3：结构化输出强约束
+### P1-5.3：模型能力路由做最小闭环
 
-目标：降低非法 JSON、乱字段、乱算子类型的概率。
+目标：只围绕前四个方向需要的场景选择模型，不把每个小任务都拆成独立模型角色。
+
+收束后的角色：
+
+| 角色         | 使用场景                         | 关键能力                                      |
+| ------------ | -------------------------------- | --------------------------------------------- |
+| `generation` | 工作流 JSON 生成与常规解释       | `SupportsJsonMode`、`SupportsSystemPrompt` |
+| `vision`     | 附件图片确实需要进入模型时       | `SupportsVisionInput=true`                 |
+| `repair`     | 解析/校验失败后的重试说明或修正  | JSON 稳定、遵守约束                           |
+| `fallback`   | 主模型失败或离线模板模式衔接     | 可配置备用模型或模板向导                      |
+
+说明：场景识别优先由方向一的 `ScenarioMatcher` 完成，需求澄清优先复用当前生成模型或轻量模型，不在本轮先扩成复杂角色体系。
 
 TODO：
 
-- [ ] 为 `AiGeneratedFlowJson` 增加 `schemaVersion`。
-- [ ] 生成 JSON Schema：包括 `operators`、`connections`、`parametersNeedingReview`、`recommendedTemplate`、`pendingParameters`、`missingResources`。
-- [ ] 若模型 `SupportsJsonMode=true`，优先使用 JSON Mode。
-- [ ] 若模型支持 Tool Call，探索以“生成工作流草案工具”形式返回结构化对象。
-- [ ] Parser 对非法 JSON 做最小修复，但修复记录必须进入诊断。
+- [X] `IAiModelSelector` 新增 `SelectModelForRole(string role)` 方法。
+- [X] `RoleAwareAiModelSelector` 按 `RoleBindings` + `Priority` 选择模型，无绑定时 fallback 到活跃模型。
+- [X] `IAiModelRegistry` 新增 `GetAllModels()` 方法，`AiModelRegistry` 实现。
+- [X] `AiGenerationOrchestrator` 新增 `ResolveModelForRole(role)` 和 `ResolveFallbackModel()`。
+- [X] DI 注册从 `ActiveAiModelSelector` 切换到 `RoleAwareAiModelSelector`。
+- [X] 当当前模型 `SupportsVisionInput=false` 时，附件降级为文本摘要，并把原因交给方向四附件面板展示。（后端降级逻辑已实现：`AiFlowGenerationService:255-263` 清空可发送路径 + 构建降级报告；**【委托方向四】** 前端附件面板展示降级原因）
+- [X] 当模型不支持 JSON Mode 时，走 P0-5.2 的强格式 Prompt + Parser 修复。（`PromptBuilder.BuildSystemPrompt` 已支持 `supportsJsonMode` 参数，为 false 时追加严格 JSON-only 约束；`AiApiClient` 对 reasoner 类模型已跳过 `response_format`）
+- [X] fallback 顺序收束为：主模型 -> 配置的备用模型 -> 可用模板降级。（`ResolveFallbackModel` 已实现主模型->备用模型切换，LLM 调用失败时自动尝试备用模型；**【P2-5.6】** 模板降级归离线模式）
+- [X] 记录本次选择的 `modelId`、能力命中原因与 fallback 原因。（`AiPromptTrace.SelectionReason`）
 
 验收标准：
 
-- [ ] 模型返回 Markdown 包裹 JSON 时能修复或进入 ManualRetry。
-- [ ] 生成结果缺 `operators` 时明确失败。
-- [ ] `schemaVersion` 不兼容时明确提示。
+- [X] 图片输入不会无提示地发送给不支持视觉的模型。（已有 `SupportsVisionInput` 检查 + 降级；**【委托方向四】** 前端展示降级原因）
+- [X] 主模型失败后能明确进入备用模型或模板降级，而不是静默失败。（LLM 失败时自动尝试 `ResolveFallbackModel()`，备用模型也失败才抛异常；**【P2-5.6】** 模板降级归离线模式）
+- [X] 工作台调试摘要能看到本次模型选择原因。（`SelectionReason` 在 PromptTrace 中，已动态反映 role_binding/active/fallback）
 
 ---
 
-### P0-5.4：Prompt 版本与评测闭环
+### P1-5.4：Prompt 版本与评测追溯跟随模板策略
 
-目标：每次 Prompt 修改都能被评测，而不是凭感觉优化。
+目标：Prompt 追溯服务方向一的模板命中和方向二的知识切片，不单独建设一套大评测平台。
 
 当前可利用能力：`IPromptVersionManager` 已在 DI 中注册。
 
 TODO：
 
-- [ ] 每个场景模板绑定 `promptVersion`。
-- [ ] 每次生成记录：`promptVersion`、`templateVersion`、`operatorKGVersion`、`modelId`、`modelCapabilities`。
-- [ ] 建立 `ai_generation_eval`：输入 prompt、预期模板、预期核心算子、预期待确认参数。
-- [ ] Prompt 更新后自动跑轻量评测。
+- [X] 每次生成记录：`promptVersion`、`modelId`、`modelCapabilities`。（`AiPromptTrace.PromptVersionId/PromptVersionName` + `StageTimeline llm metadata`）
+- [X] `IPromptVersionManager` 注入 `AiFlowGenerationService`，LLM 调用后 `RecordMetricsAsync` 记录成功/token/延迟。
+- [ ] 模板评测复用方向一的 golden prompts，报告继续落在 `template_match_eval_report.md`。（**【委托方向一 P1-1.4】** 方向五只提供 PromptVersion 记录，评测集由方向一建设）
+- [ ] 评测项聚焦三件事：模板 Top1 命中、核心拓扑保持、Validator 首轮通过。（**【委托方向一 P1-1.4】**）
+- [ ] PromptBuilder 改动后优先跑轻量固定回归，不要求一次性接入完整 CI。（**【委托方向一 P1-1.4】**）
 
 验收标准：
 
-- [ ] 修改 PromptBuilder 后能看到模板命中率是否下降。
-- [ ] 生成失败能追溯到具体 promptVersion。
-- [ ] 工作台调试页能显示本次使用的版本信息。
+- [ ] 修改 PromptBuilder 后能看到模板命中率或 Validator 通过率是否下降。（**【委托方向一 P1-1.4】** 依赖 golden prompts 评测集）
+- [ ] 生成失败能追溯到具体 prompt/template/operatorKG/model 版本。（promptVersion 已追溯，**【P2-5.7】** templateVersion/operatorKGVersion 待场景包版本化）
+- [X] 工作台 Debug 摘要能显示本次使用的版本信息。（`GenerateFlowResponse.PromptVersionId/PromptVersionName`）
 
 ---
 
-### P1-5.5：自动修复策略从“重试”升级为“定向修复”
+### P1-5.5：生成链路可观测性与安全边界
 
-目标：Validator 发现问题后，不再只让 LLM 重生成整个流程，而是生成 patch。
+目标：保留工程诊断能力，但把可观测性收束到本地、分层、可脱敏。
 
 TODO：
 
-- [ ] 新增 `AiFlowPatch`：添加算子、删除连线、修正端口、修正参数。
-- [ ] Validator 错误转成 patch 提示。
-- [ ] 对常见错误做确定性修复：参数越界、缺默认值、缺输出算子、重复输入端口。
-- [ ] 对复杂错误调用 repair 模型，只允许返回 patch。
-- [ ] Patch 应用后再次 Validator。
+- [X] 每次生成记录 stage 耗时：澄清、匹配、Prompt、LLM、解析、Validator、DryRun。`layout` 阶段已补入 `pipeline.Measure()`。
+- [X] 记录模型、模板、场景、token 估算、失败原因，但默认只在本地调试摘要中展示。`AiPromptTrace` 新增 `EstimatedInputTokens`/`EstimatedOutputTokens`/`SelectionReason`。
+- [X] PromptTrace 对 API Key、本地绝对路径、客户文件名、内网地址做脱敏。`AiPromptTrace.Desensitize()` 在 `GenerateFlowMessageHandler` 返回前调用。
+- [X] Reasoning/Thinking 不作为普通 UI 内容返回，只保留工程摘要。（`AiFlowGenerationService` 在非 Debug 模式下将 `Reasoning` 置空，复用 `ShouldIncludePromptTrace` 守卫逻辑）
+- [ ] 日志默认不记录完整 Prompt 与图片路径；仅开发态显式打开。（`PromptTrace` 创建已受 `ShouldIncludePromptTrace` 守卫；`LogDebug` 级别 reasoning 摘要依赖日志级别配置，非硬守卫）
 
 验收标准：
 
-- [ ] 参数越界无需重新调用 LLM，可自动 clamp 并记录。
-- [ ] 缺 ResultOutput 可自动建议补齐。
-- [ ] 端口错误进入定向修复，而不是全流程重生成。
+- [X] 能定位”慢在模型调用还是 DryRun”。`StageTimeline` 包含 `layout`、`llm` 等阶段耗时。
+- [ ] 能统计某模板的首轮 Validator 通过率。（**【委托方向一 P1-1.4】** 依赖评测集按模板聚合统计）
+- [X] 普通用户看不到完整 PromptTrace，Debug 用户能看到脱敏后的诊断。`Desensitize()` 覆盖路径、API Key、内网 IP、`.local` 域名。
 
 ---
 
-### P1-5.6：Prompt 压缩与上下文缓存
+### P2-5.6：离线/断网只做模板优先降级
 
-目标：减少每次都发送大量重复知识。
-
-TODO：
-
-- [ ] Operator Knowledge Card 按场景切片。
-- [ ] 模板骨架用 hash 标识，工作台可展示完整模板，LLM 只拿必要内容。
-- [ ] 常用场景 PromptContext 缓存到本地。
-- [ ] 会话内复用 `RequirementBrief`、模板候选、知识切片。
-
-验收标准：
-
-- [ ] 高频模板场景的 Prompt 明显短于全量算子目录 Prompt。
-- [ ] 同一会话二次修改不重复发送全部无关上下文。
-
----
-
-### P1-5.7：PromptTrace 与安全边界
-
-目标：调试可用，但不泄露敏感信息。
+目标：LLM 不可用时，仍能完成少数高频模板场景配置；不做通用离线 AI 助手。
 
 TODO：
 
-- [ ] PromptTrace 仅 Debug/开发态可见。
-- [ ] 对 API Key、本地绝对路径、客户文件名、内网地址做脱敏。
-- [ ] Reasoning 内容不默认返回给普通 UI；只展示工程摘要。
-- [ ] 日志中不要记录完整 Prompt 与图片路径，或仅在开发态记录。
-
-验收标准：
-
-- [ ] 普通用户无法看到完整 PromptTrace。
-- [ ] PromptTrace 中不存在 API Key。
-- [ ] 附件路径在 UI 中可脱敏显示。
-
----
-
-### P1-5.8：生成链路可观测性
-
-目标：为产品优化提供数据。
-
-TODO：
-
-- [ ] 每次生成记录 stage 耗时：澄清、匹配、Prompt、LLM、解析、Validator、DryRun。
-- [ ] 记录模型、模板、场景、token 估算、失败原因。
-- [ ] 工作台展示本次生成诊断摘要。
-- [ ] 本地生成 Markdown/JSON 报告。
-
-验收标准：
-
-- [ ] 能定位“慢在模型调用还是 DryRun”。
-- [ ] 能统计某模型的 JSON 失败率。
-- [ ] 能统计某模板的首轮 Validator 通过率。
-
----
-
-### P2-5.9：离线/断网模板向导降级
-
-目标：LLM 不可用时，用户仍能完成高频场景配置。
-
-TODO：
-
-- [ ] 当 AI 服务不可用，工作台进入“模板向导模式”。
-- [ ] 用户选择模板 -> 填参数 -> Validator -> DryRun -> 应用。
-- [ ] 不调用 LLM 也能生成模板 Flow。
-- [ ] 离线模式明确标记“未使用 LLM”。
+- [ ] 当 AI 服务不可用，工作台进入“模板优先降级模式”。
+- [ ] 仅对内置高频模板开放：端子线序检测、两器铜孔间距检测、包装箱外观检测等资源需求明确的场景。
+- [ ] 用户选择模板 -> 补必填参数/资源 -> Validator -> DryRun -> 应用。
+- [ ] 不调用 LLM 时明确标记“未使用 LLM”，只展示模板说明、缺资源和校验结果。
+- [ ] 复用方向四的参数补录、验证卡片、应用前 diff 与撤销能力。
 
 验收标准：
 
 - [ ] 断网时仍能配置端子线序模板。
 - [ ] 断网时仍能配置铜孔间距模板。
-- [ ] 断网模式不会显示 AI 生成解释，而是显示模板说明。
+- [ ] 离线模式不会显示 AI 生成解释，而是显示模板说明和工程校验。
 
 ---
 
-### P2-5.10：Scenario Package 版本化与资产校验
+### P2-5.7：Scenario Package 版本化只服务模板与缺资源
 
-目标：让模板不只是流程 JSON，而是包含模型、规则、标签、样本、FAQ 的场景资产包。
+目标：为方向一的模板生命周期和方向四的缺资源提示提供版本依据，不扩展成完整资产管理后台。
 
-当前 `FlowTemplate` 已有 `ScenarioPackageBinding` 和 `ScenarioPackageManifest` 基础，可以继续扩展。
+当前 `FlowTemplate` 已有 `ScenarioPackageBinding` 和 `ScenarioPackageManifest` 基础，可以先做最小增强。
 
 TODO：
 
-- [ ] 建立场景包目录结构：
-
-```text
-scenario-packages/
-  wire-sequence-terminal/
-    manifest.json
-    templates/
-    rules/
-    labels/
-    samples/
-    faq.md
-```
-
-- [ ] Manifest 记录资产版本、checksum、必需资源、约束条件。
-- [ ] 模板加载时校验 manifest。
-- [ ] 工作台显示场景包版本与缺失资产。
-- [ ] 保存为模板时可选择是否归入场景包。
+- [ ] 在现有模板/场景包上记录 `packageVersion`、`templateVersion`、必需资源、约束 hash。
+- [ ] 模板加载或生成时校验 manifest，并把缺失资产写入 `MissingResources`。
+- [ ] 工作台显示场景包版本、模板版本与缺失资源状态。
+- [ ] “保存为模板”仍归方向一 P2 生命周期管理，本方向只提供版本与资产校验字段。
 
 验收标准：
 
 - [ ] 线序模板能显示 package version、template version、model/rule/label 资产状态。
-- [ ] 缺少必需标签文件时进入 MissingResources。
-- [ ] 场景包升级可追溯。
+- [ ] 缺少必需标签或模型文件时进入 MissingResources。
+- [ ] 场景包升级可追溯到生成记录。
 
 ---
 
@@ -1210,13 +1154,13 @@ scenario-packages/
 | P0     | RequirementBrief + ClarificationEngine | 方向三    | 生成前先补关键需求，减少无效生成        | AI 后端 / 产品     |
 | P0     | AiWorkbench 状态机                     | 方向四    | 让用户看懂生成阶段和结果状态            | 前端               |
 | P0     | 模板匹配卡片 + 需求卡片 + 验证卡片     | 方向四    | 把现有字段变成可操作 UX                 | 前端               |
-| P0     | Generation Pipeline 拆分               | 方向五    | 降低 `AiFlowGenerationService` 复杂度 | AI 后端            |
+| P0     | 轻量 Pipeline Timeline                 | 方向五    | 让生成链路可测试、可追踪、可展示       | AI 后端            |
 | P1     | Operator Knowledge Graph               | 方向二    | 让 LLM 从算子清单升级为场景知识检索     | AI 后端 / 文档生成 |
 | P1     | 模板评测集                             | 方向一/五 | 用数据证明 Prompt 和模板策略稳定        | 质量               |
 | P1     | 参数补录控件工程化                     | 方向四    | 降低用户配置难度                        | 前端 / 运行时      |
-| P1     | 模型角色路由                           | 方向五    | 降本增稳，视觉/生成/修复分工            | AI 后端            |
-| P2     | 离线模板向导                           | 方向五    | LLM 不可用时仍可落地高频场景            | 产品 / 前端        |
-| P2     | 场景包版本化                           | 方向一/五 | 模板从流程升级为工业资产包              | 架构 / 质量        |
+| P1     | 模型能力路由最小闭环                   | 方向五    | 按视觉、生成、修复、降级做必要分工      | AI 后端            |
+| P2     | 离线模板优先降级                       | 方向五    | LLM 不可用时仍可落地高频模板            | 产品 / 前端        |
+| P2     | 场景包版本与缺资源校验                 | 方向一/五 | 让模板版本、资源缺失和生成记录可追溯    | 架构 / 质量        |
 
 ---
 
