@@ -32,7 +32,35 @@ public class RequirementBriefExtractorTests
         brief.ClarificationQuestions.Should().Contain(question =>
             question.Field == "defect_type" && question.Required);
         brief.ClarificationQuestions.Single(question => question.Field == "defect_type")
-            .Options.Should().Contain(["scratch", "dent"]);
+            .Options.Should().Contain(["划伤/划痕", "压痕/凹坑"]);
+    }
+
+    [Fact]
+    public void Extract_WithTemplateSnakeCaseOptions_ShouldExposeChineseReferenceOptions()
+    {
+        var extractor = new RequirementBriefExtractor();
+        var match = new ScenarioMatchResult
+        {
+            Scenario = new ScenarioDefinition
+            {
+                ScenarioKey = "copper-hole-measurement",
+                ScenarioName = "Copper hole spacing measurement",
+                IntentTypes = ["measurement"],
+                ObjectTypes = ["copper_hole", "heat_exchanger"],
+                MeasurementTargets = ["hole_spacing", "copper_hole_spacing"]
+            },
+            Confidence = 0.2,
+            MissingSignals = ["object_type", "measurement_target"]
+        };
+
+        var brief = extractor.Extract("测量孔距", null, match);
+
+        var objectOptions = brief.ClarificationQuestions.Single(question => question.Field == "object_type").Options;
+        var measurementOptions = brief.ClarificationQuestions.Single(question => question.Field == "measurement_target").Options;
+        objectOptions.Should().Contain(["铜孔/孔位", "换热器"]);
+        measurementOptions.Should().Contain(["孔距/圆心距离", "铜孔孔距"]);
+        objectOptions.Should().NotContain(option => option.Contains('_', StringComparison.Ordinal));
+        measurementOptions.Should().NotContain(option => option.Contains('_', StringComparison.Ordinal));
     }
 
     [Fact]

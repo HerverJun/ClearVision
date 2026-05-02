@@ -448,7 +448,7 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Required = false,
                 Reason = "输出目标会影响后续算子编排。",
                 Priority = "medium",
-                Options = ["PLC", "Database", "UI"]
+                Options = ["PLC", "数据库", "界面显示"]
             },
             "model_path" => new AiClarificationQuestion
             {
@@ -475,7 +475,7 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Required = false,
                 Reason = "测量类场景通常需要标定。",
                 Priority = "low",
-                Options = ["pixel_to_world", "hand_eye", "不需要"]
+                Options = ["像素到物理单位换算", "手眼标定", "不需要"]
             },
             "ambiguous_negative_signal" => new AiClarificationQuestion
             {
@@ -503,10 +503,35 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
         return (primaryOptions ?? Enumerable.Empty<string>())
             .Concat(fallbackOptions)
             .Where(option => !string.IsNullOrWhiteSpace(option))
-            .Select(option => option.Trim())
+            .Select(option => ToDisplayOption(option.Trim()))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(8)
             .ToList();
+    }
+
+    private static string ToDisplayOption(string option)
+    {
+        return option.Trim().ToLowerInvariant() switch
+        {
+            "copper_hole" => "铜孔/孔位",
+            "heat_exchanger" => "换热器",
+            "hole_spacing" => "孔距/圆心距离",
+            "copper_hole_spacing" => "铜孔孔距",
+            "metal_part" => "金属件",
+            "carton" => "包装箱/纸箱",
+            "connector" => "连接器",
+            "terminal" => "端子",
+            "label" => "标签",
+            "scratch" => "划伤/划痕",
+            "dent" => "压痕/凹坑",
+            "broken" => "破损/裂纹",
+            "damage" => "破损/裂纹",
+            "stain" => "脏污/污渍",
+            "gap_width" => "缝隙宽度",
+            "diameter" => "直径",
+            "angle" => "角度",
+            _ => option
+        };
     }
 
     private static bool CanGenerateDraftNow(AiRequirementBrief brief)

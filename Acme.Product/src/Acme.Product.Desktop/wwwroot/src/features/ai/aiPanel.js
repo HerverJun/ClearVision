@@ -3009,6 +3009,18 @@ export class AiPanel {
             return `<div class="ai-requirement-question-list">${questions.map((question, index) => {
                 const requiredLabel = question.required ? '必填' : '建议';
                 const priority = question.priority ? ` · ${question.priority}` : '';
+                const fieldLabelMap = {
+                    scene: '场景类型',
+                    object_type: '检测对象',
+                    defect_type: '缺陷类别',
+                    measurement_target: '测量目标',
+                    output_target: '输出目标',
+                    model_path: '模型资源',
+                    roi: 'ROI范围',
+                    calibration: '标定方式',
+                    ambiguous_negative_signal: '歧义信息'
+                };
+                const fieldLabel = fieldLabelMap[question.field] || question.field;
                 const options = question.options.length > 0
                     ? `
                         <div class="ai-requirement-question-options-title">参考选项，点击可填入输入框</div>
@@ -3025,7 +3037,7 @@ export class AiPanel {
                     <article class="ai-requirement-question ${question.required ? 'is-required' : 'is-recommended'}">
                         <div class="ai-requirement-question-header">
                             <span class="ai-requirement-question-level">${requiredLabel}${this._escapeHtml(priority)}</span>
-                            ${question.field ? `<span class="ai-requirement-question-field">${this._escapeHtml(question.field)}</span>` : ''}
+                            ${fieldLabel ? `<span class="ai-requirement-question-field">${this._escapeHtml(fieldLabel)}</span>` : ''}
                         </div>
                         <div class="ai-requirement-question-title">${index + 1}. ${this._escapeHtml(question.question)}</div>
                         ${question.reason ? `<div class="ai-requirement-question-reason">${this._escapeHtml(question.reason)}</div>` : ''}
