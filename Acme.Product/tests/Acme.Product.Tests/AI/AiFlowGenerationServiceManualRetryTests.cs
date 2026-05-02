@@ -126,10 +126,68 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         session.History.Last().Payload!.ManualRetry!.Stage.Should().Be("validation");
     }
 
+    [Fact]
+    public async Task GenerateFlowAsync_ClarificationRequired_ShouldReturnClarificationWithoutCallingModel()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            new AiRequirementBrief
+            {
+                Confidence = 0.2,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                MissingFacts = ["需要确认对象", "需要确认输出目标"],
+                ClarificationQuestions =
+                [
+                    new AiClarificationQuestion
+                    {
+                        Field = "object_type",
+                        Question = "请确认检测对象是什么？",
+                        Required = true,
+                        Priority = "high",
+                        Reason = "对象未明确时无法安全生成流程。"
+                    }
+                ]
+            });
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "请帮我生成一个视觉检测流程",
+            SessionId: "clarification-short-circuit"));
+
+        result.Success.Should().BeFalse();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeClarificationRequired);
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.MissingFacts.Should().Contain("需要确认对象");
+        result.RequirementBrief!.ClarificationQuestions.Should().ContainSingle();
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+
+        validator.DidNotReceive().Validate(Arg.Any<AiGeneratedFlowJson>());
+
+        var session = conversationService.GetSession("clarification-short-circuit");
+        session.Should().NotBeNull();
+        session!.History.Last().Payload.Should().NotBeNull();
+        session.History.Last().Payload!.ClarificationRequired.Should().BeTrue();
+        session.History.Last().Payload!.RequirementBrief.Should().NotBeNull();
+        session.History.Last().Payload!.RequirementBrief!.MissingFacts.Should().Contain("需要确认对象");
+    }
+
     private static AiFlowGenerationService CreateService(
         IAiConnector connector,
         IAiFlowValidator validator,
-        IConversationalFlowService conversationService)
+        IConversationalFlowService conversationService,
+        AiRequirementBrief? requirementBrief = null)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
         modelSelector.SelectGenerationModel().Returns(new AiModelConfig
@@ -161,7 +219,12 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<ScenarioMatchResult?>())
-            .Returns(new AiRequirementBrief());
+            .Returns(requirementBrief ?? new AiRequirementBrief
+            {
+                Confidence = 0.9,
+                CanGenerateDraftNow = true,
+                DraftRiskLevel = "low"
+            });
 
         var templateConstraintValidator = Substitute.For<ITemplateConstraintValidator>();
         templateConstraintValidator.Validate(

@@ -453,6 +453,8 @@ TODO：
 当前 `GenerateFlowRequestPayload` 已有 `Description`、`Hint`、`SessionId`、`ExistingFlowJson`、`Mode`、`Attachments` 等字段，但用户入口仍以自然语言为主。工业视觉检测的真实需求通常必须明确：检测对象、缺陷类别、相机来源、模型文件、ROI、阈值、PLC/输出方式、标定状态、OK/NG 判定逻辑。直接把一句话交给 LLM，容易让模型补出看似合理但现场不可用的参数。
 
 因此，生成前应增加“需求澄清”，生成后通过 `PendingParameters` 与 `MissingResources` 做参数闭环。
+建议把输入模式拆成 `draft` 和 `strict` 两档：`draft` 允许先出草案但必须显式标出风险与缺口，`strict` 在最小信息集未满足前不进入生成。
+澄清也不是长表单，而是先抽取 `RequirementBrief`，再只问最关键的缺口。
 
 ## 3.2 TODO 清单
 
@@ -492,12 +494,19 @@ TODO：
 - [ ] 只有复杂/歧义需求才调用轻量 LLM 做补充解析。
 - [ ] `RequirementBrief` 写入会话上下文，后续 Modify/Review 模式复用。
 - [ ] 附件元信息进入 `RequirementBrief`，例如图片数量、分辨率、是否可发送给模型。
+- [ ] 定义 `draft` / `strict` 两种澄清模式，前者允许带风险草案，后者缺 `required` 字段时直接拦截。
+- [ ] `ClarificationEngine` 输出必须结构化：`knownFacts`、`missingFacts`、`recommendedQuestions`、`canGenerateDraftNow`、`draftRiskLevel`。
+- [ ] 澄清问题生成遵循优先级：场景最小必需字段 > 资源缺口 > 语义歧义 > 低价值补充信息。
+- [ ] 严禁模型编造模型路径、PLC 地址、标定文件和样本结果，缺失项只能进入澄清或补录。
 
 验收标准：
 
 - [ ] “检测空调内机面板划伤”解析出：`sceneType=appearance_defect`、`industry=空调制造`、`defectTypes=[划伤]`。
 - [ ] “测量两个孔的圆心距离”解析出：`sceneType=measurement`、`measurementTargets=[孔距/圆心距离]`。
 - [ ] “端子线序黑蓝顺序检测”解析出：`sceneType=wire_sequence`、`expectedSequence=[黑, 蓝]`。
+- [ ] `draft` 模式下可先生成草案，但风险与缺口必须显式展示。
+- [ ] `strict` 模式下只要缺关键字段，就必须返回 `ClarificationRequired`。
+- [ ] 每轮澄清最多 3 个问题，且可跳过非关键字段。
 
 ---
 
@@ -557,6 +566,7 @@ TODO：
 - [ ] 缺失字段用黄色/红色标记。
 - [ ] 支持用户用表单补充，不必须继续打字。
 - [ ] 补充后自动更新 `hint` 或新增 `requirementBrief` payload。
+- [ ] 需求卡片本身要记录“问题 -> 回答 -> 状态”的链路，回写到 `RequirementBrief`，而不是只做静态摘要。
 
 验收标准：
 
@@ -576,6 +586,7 @@ TODO：
 - [ ] `MissingResources` 每项绑定处理动作：选择模型文件、选择标签文件、配置相机、配置 PLC、选择 ROI。
 - [ ] 用户补齐后调用现有 `review_pending_parameters` 模式复核。
 - [ ] 参数确认后在工作台中显示“已确认”，并允许再次编辑。
+- [ ] 参数补录完成后，工作台状态自动从 `reviewing_parameters` 回到 `ready_to_generate` 或 `ready_to_apply`。
 
 验收标准：
 
@@ -595,6 +606,7 @@ TODO：
 - [ ] 模板级默认值：某模板常用参数默认值。
 - [ ] 产线级默认值：某工位相机/PLC/输出路径。
 - [ ] 用户可选择“仅本次使用 / 保存为模板默认 / 保存为产线默认”。
+- [ ] 默认值只能覆盖已确认字段，不能覆盖 `required` 缺口的人工确认项。
 
 验收标准：
 
@@ -618,6 +630,63 @@ TODO：
 
 - [ ] 上传图片后，工作台显示附件状态与模型视觉能力。
 - [ ] 不支持视觉模型时，系统不会假装看过图片。
+
+---
+
+### P1-3.7：把需求澄清做成可回放的状态机
+
+目标：让“问了什么、用户答了什么、为什么继续生成”都有明确状态，而不是散落在聊天记录里。
+
+TODO：
+
+- [ ] 定义 `RequirementBriefStatus` / `ClarificationSessionState`，至少包括 `parsed`、`clarifying`、`ready_to_generate`、`generating`、`reviewing_parameters`、`ready_to_apply`、`failed`。
+- [ ] `GenerateFlowMessageHandler` 先走 `RequirementBriefExtractor`，再决定直接生成还是进入澄清。
+- [ ] 把每个问题、回答、补录动作写入会话事件流，支持回放与审计。
+- [ ] 同一会话内已确认字段不重复追问，除非用户主动重置需求。
+
+验收标准：
+
+- [ ] 能从会话记录还原一次完整的澄清过程。
+- [ ] 缺字段补齐后自动回到生成，而不是重新开会话。
+- [ ] `draft` 与 `strict` 模式在工作台中可被明确区分。
+
+---
+
+### P1-3.8：建立需求澄清评测集与指标
+
+目标：用数据约束“少问关键问题”，避免澄清退化成冗长表单。
+
+TODO：
+
+- [ ] 为 5 个高频场景准备至少 20 条一句话输入样本，并标注标准场景、必需字段、推荐问题。
+- [ ] 评测指标包括：场景识别正确率、澄清问题命中率、平均问题数、补齐后一次生成成功率、重复追问率。
+- [ ] 输出 Markdown 报告 `clarification_eval_report.md`，并复用模板命中评测脚手架。
+- [ ] 将轻量评测接入本地回归脚本或 CI 钩子。
+
+验收标准：
+
+- [ ] 高频场景的首次场景识别率达到 `>= 95%`。
+- [ ] 平均每次澄清问题数 `<= 3`。
+- [ ] 澄清后进入生成的一次成功率 `>= 90%`。
+
+---
+
+### P1-3.9：第一轮落地切片只做一个端到端闭环
+
+目标：先打通一条完整链路，再横向扩展到更多场景。
+
+TODO：
+
+- [ ] 优先落地 `端子线序检测` 或 `包装箱外观检测` 其中一个。
+- [ ] 串通 `RequirementBriefExtractor`、`ClarificationEngine`、需求卡片、`PendingParameters`、`MissingResources`。
+- [ ] 在工作台中显示“已识别 / 待确认 / 缺资源 / 已确认”四态。
+- [ ] 先支持文本输入 + 附件元信息，不强求一次把复杂视觉理解做满。
+
+验收标准：
+
+- [ ] 一句话输入后能看到结构化需求卡片与缺口清单。
+- [ ] 缺关键字段时不会直接生成。
+- [ ] 补齐后可以连续生成并回写上下文。
 
 ---
 

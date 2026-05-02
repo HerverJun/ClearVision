@@ -11,6 +11,7 @@ public sealed record AiPromptRequest(
     string? TemplatePriority = null,
     string? AttachmentContext = null,
     string? SessionSummary = null,
+    string? RequirementBriefSection = null,
     string? ReferenceFlowSummary = null,
     string? OutputRequirements = null);
 
@@ -28,6 +29,7 @@ public static class AiPromptComposer
         AppendSection(sb, "TemplatePriority", request.TemplatePriority);
         AppendSection(sb, "AttachmentContext", request.AttachmentContext);
         AppendSection(sb, "SessionSummary", request.SessionSummary);
+        AppendSection(sb, "RequirementBrief", request.RequirementBriefSection);
         AppendSection(sb, "ReferenceFlowSummary", request.ReferenceFlowSummary);
         AppendSection(sb, "OutputRequirements", request.OutputRequirements ?? BuildDefaultOutputRequirements(request.Mode));
 

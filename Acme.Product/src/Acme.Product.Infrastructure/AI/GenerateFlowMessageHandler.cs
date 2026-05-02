@@ -39,6 +39,7 @@ public class GenerateFlowMessageHandler
         bool debugPrompt = false,
         string? requestId = null,
         IReadOnlyList<string>? attachments = null,
+        string? requirementMode = null,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -63,7 +64,10 @@ public class GenerateFlowMessageHandler
                     ExistingFlowJson: existingFlowJson,
                     Attachments: attachments,
                     Mode: mode,
-                    DebugPrompt: debugPrompt),
+                    DebugPrompt: debugPrompt)
+                {
+                    RequirementMode = requirementMode ?? AiRequirementModes.Strict
+                },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",
                     JsonSerializer.Serialize(new
@@ -95,6 +99,8 @@ public class GenerateFlowMessageHandler
                 AiExplanation = result.AiExplanation,
                 Reasoning = result.Reasoning,
                 ParametersNeedingReview = result.ParametersNeedingReview,
+                ClarificationRequired = result.ClarificationRequired,
+                RequirementBrief = MapRequirementBrief(result.RequirementBrief),
                 SessionId = result.SessionId ?? sessionId,
                 RequestId = requestId,
                 DetectedIntent = result.DetectedIntent,
@@ -178,6 +184,8 @@ public class GenerateFlowMessageHandler
             response.AiExplanation,
             response.Reasoning,
             response.ParametersNeedingReview,
+            response.ClarificationRequired,
+            response.RequirementBrief,
             response.SessionId,
             response.RequestId,
             response.DetectedIntent,
@@ -278,6 +286,52 @@ public class GenerateFlowMessageHandler
             RepairTarget = manualRetry.RepairTarget,
             LastOutputSummary = manualRetry.LastOutputSummary,
             Diagnostics = manualRetry.Diagnostics.Cast<object>().ToList()
+        };
+    }
+
+    private static GenerateFlowRequirementBrief? MapRequirementBrief(AiRequirementBrief? brief)
+    {
+        if (brief == null)
+        {
+            return null;
+        }
+
+        return new GenerateFlowRequirementBrief
+        {
+            ScenarioKey = brief.ScenarioKey,
+            ScenarioName = brief.ScenarioName,
+            IntentType = brief.IntentType,
+            RequirementMode = brief.RequirementMode,
+            Confidence = brief.Confidence,
+            HasOpenQuestions = brief.HasOpenQuestions,
+            ClarificationRequired = brief.ClarificationRequired,
+            CanGenerateDraftNow = brief.CanGenerateDraftNow,
+            DraftRiskLevel = brief.DraftRiskLevel,
+            ObjectTypes = brief.ObjectTypes?.ToList() ?? new List<string>(),
+            DefectTypes = brief.DefectTypes?.ToList() ?? new List<string>(),
+            MeasurementTargets = brief.MeasurementTargets?.ToList() ?? new List<string>(),
+            RequiredResources = brief.RequiredResources?.ToList() ?? new List<string>(),
+            RequiredFields = brief.RequiredFields?.ToList() ?? new List<string>(),
+            KnownFacts = brief.KnownFacts?.ToList() ?? new List<string>(),
+            MissingFacts = brief.MissingFacts?.ToList() ?? new List<string>(),
+            AttachmentFacts = brief.AttachmentFacts?.ToList() ?? new List<string>(),
+            ObjectName = brief.ObjectName,
+            ImageSource = brief.ImageSource,
+            OutputTarget = brief.OutputTarget,
+            DecisionRule = brief.DecisionRule,
+            RoiRequirement = brief.RoiRequirement,
+            CalibrationRequirement = brief.CalibrationRequirement,
+            ClarificationQuestions = brief.ClarificationQuestions?
+                .Select(question => new GenerateFlowClarificationQuestion
+                {
+                    Field = question.Field,
+                    Question = question.Question,
+                    Required = question.Required,
+                    Reason = question.Reason,
+                    Priority = question.Priority,
+                    Options = question.Options?.ToList() ?? new List<string>()
+                })
+                .ToList() ?? new List<GenerateFlowClarificationQuestion>()
         };
     }
 }

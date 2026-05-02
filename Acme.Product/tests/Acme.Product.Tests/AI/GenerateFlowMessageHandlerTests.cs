@@ -81,12 +81,14 @@ public class GenerateFlowMessageHandlerTests
         await handler.HandleAsync(
             description: "review pending parameters",
             mode: GenerateFlowMode.ReviewPendingParameters,
-            debugPrompt: true);
+            debugPrompt: true,
+            requirementMode: "draft");
 
         await generationService.Received(1).GenerateFlowAsync(
             Arg.Is<AiFlowGenerationRequest>(request =>
                 request.Mode == GenerateFlowMode.ReviewPendingParameters &&
-                request.DebugPrompt),
+                request.DebugPrompt &&
+                request.RequirementMode == "draft"),
             Arg.Any<Action<string>>(),
             Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
             Arg.Any<CancellationToken>(),
@@ -345,6 +347,54 @@ public class GenerateFlowMessageHandlerTests
         using var doc = JsonDocument.Parse(resultJson);
         doc.RootElement.GetProperty("promptTrace").GetProperty("mode").GetString().Should().Be("modify");
         doc.RootElement.GetProperty("promptTrace").GetProperty("model").GetString().Should().Be("gpt-5.4");
+    }
+
+    [Fact(DisplayName = "GenerateFlowMessageHandler should serialize clarification payload")]
+    public async Task HandleAsync_ShouldSerializeClarificationPayload()
+    {
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = false,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+                ClarificationRequired = true,
+                ErrorMessage = "当前需求还需要澄清 1 项关键信息。",
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ScenarioName = "缺陷检测",
+                    ClarificationRequired = true,
+                    ClarificationQuestions =
+                    [
+                        new AiClarificationQuestion
+                        {
+                            Field = "object_type",
+                            Question = "请确认检测对象是什么？",
+                            Required = true,
+                            Priority = "high"
+                        }
+                    ]
+                }
+            }));
+
+        var resultJson = await handler.HandleAsync("clarification");
+
+        using var doc = JsonDocument.Parse(resultJson);
+        var root = doc.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        root.GetProperty("clarificationRequired").GetBoolean().Should().BeTrue();
+        root.GetProperty("requirementBrief").GetProperty("scenarioName").GetString().Should().Be("缺陷检测");
+        root.GetProperty("requirementBrief").GetProperty("clarificationQuestions").GetArrayLength().Should().Be(1);
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should serialize cancelled completion status")]

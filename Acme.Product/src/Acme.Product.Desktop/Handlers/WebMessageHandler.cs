@@ -887,6 +887,8 @@ public class WebMessageHandler : IDisposable
             var requestId = TryGetMessageString(payload, "requestId")
                 ?? TryGetMessageString(doc.RootElement, "requestId")
                 ?? Guid.NewGuid().ToString("N");
+            var requirementMode = TryGetMessageString(payload, "requirementMode")
+                ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var existingFlowJson = payload.TryGetProperty("existingFlowJson", out var flowElement)
                 ? flowElement.ValueKind == JsonValueKind.String
                     ? flowElement.GetString()
@@ -916,6 +918,7 @@ public class WebMessageHandler : IDisposable
                 debugPrompt,
                 requestId,
                 attachments,
+                requirementMode,
                 onMessage: (type, payload) =>
                 {
                     // payload 已是 JSON 字符串，直接拼接外层 envelope，避免反序列化再序列化的额外开销。

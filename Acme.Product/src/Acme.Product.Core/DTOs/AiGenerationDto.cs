@@ -18,7 +18,16 @@ public record AiFlowGenerationRequest(
     GenerateFlowMode Mode = GenerateFlowMode.Auto,
     bool DebugPrompt = false,
     AiTemplateSelectionInfo? TemplateSelection = null
-);
+)
+{
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+}
+
+public static class AiRequirementModes
+{
+    public const string Draft = "draft";
+    public const string Strict = "strict";
+}
 
 public enum GenerateFlowMode
 {
@@ -67,10 +76,12 @@ public class AiFlowGenerationResult
     public const string CompletionStatusCompleted = "completed";
     public const string CompletionStatusCancelled = "cancelled";
     public const string CompletionStatusTimedOut = "timed_out";
+    public const string CompletionStatusClarificationRequired = "clarification_required";
     public const string CompletionStatusFailed = "failed";
 
     public const string FailureTypeUserCancelled = "user_cancelled";
     public const string FailureTypeTimeout = "timeout";
+    public const string FailureTypeClarificationRequired = "clarification_required";
     public const string FailureTypeSystemError = "system_error";
     public const string FailureTypeManualRetryRequired = "manual_retry_required";
 
@@ -141,6 +152,16 @@ public class AiFlowGenerationResult
     public AiRecommendedTemplateInfo? RecommendedTemplate { get; set; }
 
     /// <summary>
+    /// 当前输入是否仍需要在生成前补齐关键需求。
+    /// </summary>
+    public bool ClarificationRequired { get; set; }
+
+    /// <summary>
+    /// 需求抽取与澄清结果的结构化摘要。
+    /// </summary>
+    public AiRequirementBrief? RequirementBrief { get; set; }
+
+    /// <summary>
     /// 结构化待确认参数（用于前端更精准展示）
     /// </summary>
     public List<AiPendingParameterInfo> PendingParameters { get; set; } = new();
@@ -165,11 +186,6 @@ public class AiFlowGenerationResult
     /// </summary>
     public AiManualRetryInfo? ManualRetry { get; set; }
     public object? PromptTrace { get; set; }
-
-    /// <summary>
-    /// Parsed requirement summary used by the AI workbench before and after generation.
-    /// </summary>
-    public AiRequirementBrief? RequirementBrief { get; set; }
 
     /// <summary>
     /// Template candidates produced by the deterministic scenario matcher.
@@ -301,10 +317,26 @@ public class AiRequirementBrief
     public string ScenarioKey { get; set; } = string.Empty;
     public string ScenarioName { get; set; } = string.Empty;
     public string IntentType { get; set; } = string.Empty;
+    public string RequirementMode { get; set; } = AiRequirementModes.Strict;
+    public double Confidence { get; set; }
+    public bool HasOpenQuestions { get; set; }
+    public bool ClarificationRequired { get; set; }
+    public bool CanGenerateDraftNow { get; set; }
+    public string DraftRiskLevel { get; set; } = "medium";
     public List<string> ObjectTypes { get; set; } = new();
     public List<string> DefectTypes { get; set; } = new();
     public List<string> MeasurementTargets { get; set; } = new();
     public List<string> RequiredResources { get; set; } = new();
+    public List<string> RequiredFields { get; set; } = new();
+    public List<string> KnownFacts { get; set; } = new();
+    public List<string> MissingFacts { get; set; } = new();
+    public List<string> AttachmentFacts { get; set; } = new();
+    public string? ObjectName { get; set; }
+    public string? ImageSource { get; set; }
+    public string? OutputTarget { get; set; }
+    public string? DecisionRule { get; set; }
+    public string? RoiRequirement { get; set; }
+    public string? CalibrationRequirement { get; set; }
     public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
 }
 
@@ -313,6 +345,9 @@ public class AiClarificationQuestion
     public string Field { get; set; } = string.Empty;
     public string Question { get; set; } = string.Empty;
     public bool Required { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string Priority { get; set; } = string.Empty;
+    public List<string> Options { get; set; } = new();
 }
 
 public class AiTemplateCandidateInfo

@@ -212,6 +212,13 @@ public class ConversationalFlowServiceTests : IDisposable
                 Reply = "请确认后手动发送纠错草稿。",
                 Reasoning = "模型输出缺少 ResultOutput 参数。",
                 Progress = ["正在分析需求", "正在校验生成结果"],
+                ClarificationRequired = true,
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ScenarioName = "缺陷检测",
+                    ClarificationRequired = true,
+                    MissingFacts = ["需要确认对象"]
+                },
                 Failure = new ConversationTurnFailurePayload
                 {
                     Summary = "缺少关键参数",
@@ -259,6 +266,9 @@ public class ConversationalFlowServiceTests : IDisposable
         assistantTurn.Payload.ManualRetry!.Required.Should().BeTrue();
         assistantTurn.Payload.ManualRetry.Stage.Should().Be("validation");
         assistantTurn.Payload.ManualRetry.Draft.Should().Be("请仅补齐缺失参数后返回 JSON。");
+        assistantTurn.Payload.ClarificationRequired.Should().BeTrue();
+        assistantTurn.Payload.RequirementBrief.Should().NotBeNull();
+        assistantTurn.Payload.RequirementBrief!.ScenarioName.Should().Be("缺陷检测");
     }
 
     public void Dispose()
