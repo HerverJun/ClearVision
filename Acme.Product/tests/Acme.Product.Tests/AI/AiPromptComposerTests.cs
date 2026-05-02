@@ -58,6 +58,7 @@ public class AiPromptComposerTests
             TemplatePriority: "templateFirst=true",
             AttachmentContext: "1. sample.png | type=png | resolution=1024x768",
             SessionSummary: "- user: detect scratches\n- assistant: previous draft created",
+            RequirementBriefSection: "requirementMode=strict\nclarificationRequired=true",
             ReferenceFlowSummary: "operatorCount=1",
             OutputRequirements: "- Return JSON only."));
 
@@ -66,6 +67,8 @@ public class AiPromptComposerTests
         prompt.Should().Contain("mode=modify");
         prompt.Should().Contain("AttachmentContext:");
         prompt.Should().Contain("SessionSummary:");
+        prompt.Should().Contain("RequirementBrief:");
+        prompt.Should().Contain("clarificationRequired=true");
         prompt.Should().Contain("ReferenceFlowSummary:");
         prompt.Should().Contain("OutputRequirements:");
     }

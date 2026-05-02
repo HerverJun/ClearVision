@@ -34,6 +34,8 @@ public sealed class ConversationTurnPayload
     public List<string> Progress { get; set; } = new();
     public ConversationTurnFailurePayload? Failure { get; set; }
     public AiManualRetryInfo? ManualRetry { get; set; }
+    public bool ClarificationRequired { get; set; }
+    public AiRequirementBrief? RequirementBrief { get; set; }
 }
 
 public sealed class ConversationTurnFailurePayload
@@ -617,7 +619,9 @@ public class ConversationalFlowService : IConversationalFlowService
             Reasoning = payload.Reasoning,
             Progress = payload.Progress?.Where(item => !string.IsNullOrWhiteSpace(item)).ToList() ?? new List<string>(),
             Failure = CloneTurnFailurePayload(payload.Failure),
-            ManualRetry = CloneManualRetry(payload.ManualRetry)
+            ManualRetry = CloneManualRetry(payload.ManualRetry),
+            ClarificationRequired = payload.ClarificationRequired,
+            RequirementBrief = CloneRequirementBrief(payload.RequirementBrief)
         };
     }
 
@@ -665,6 +669,15 @@ public class ConversationalFlowService : IConversationalFlowService
             RetryCount = summary.RetryCount,
             LastOutputSummary = summary.LastOutputSummary
         };
+    }
+
+    private static AiRequirementBrief? CloneRequirementBrief(AiRequirementBrief? brief)
+    {
+        if (brief == null)
+            return null;
+
+        var json = JsonSerializer.Serialize(brief, _jsonOptions);
+        return JsonSerializer.Deserialize<AiRequirementBrief>(json, _jsonOptions);
     }
 
     private static AiAttemptDiagnostic CloneAttemptDiagnostic(AiAttemptDiagnostic diagnostic)

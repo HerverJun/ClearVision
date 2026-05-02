@@ -50,6 +50,11 @@ public record GenerateFlowRequestPayload
     /// </summary>
     public bool? DebugPrompt { get; init; }
 
+    /// <summary>
+    /// 可选：需求澄清模式，支持 strict / draft。
+    /// </summary>
+    public string? RequirementMode { get; init; }
+
     public List<string>? Attachments { get; init; }
 }
 
@@ -68,6 +73,8 @@ public record GenerateFlowResponse
     public string? AiExplanation { get; init; }
     public string? Reasoning { get; init; }
     public Dictionary<string, List<string>>? ParametersNeedingReview { get; init; }
+    public bool ClarificationRequired { get; init; }
+    public GenerateFlowRequirementBrief? RequirementBrief { get; init; }
     public string? SessionId { get; init; }
     public string? RequestId { get; init; }
     public string? DetectedIntent { get; init; }
@@ -77,8 +84,6 @@ public record GenerateFlowResponse
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
-    public List<GenerateFlowClarificationQuestion> ClarificationQuestions { get; init; } = new();
-    public object? RequirementBrief { get; init; }
 }
 
 /// <summary>
@@ -144,15 +149,42 @@ public record GenerateFlowManualRetry
     public List<object> Diagnostics { get; init; } = new();
 }
 
+public record GenerateFlowRequirementBrief
+{
+    public string ScenarioKey { get; init; } = string.Empty;
+    public string ScenarioName { get; init; } = string.Empty;
+    public string IntentType { get; init; } = string.Empty;
+    public string RequirementMode { get; init; } = "strict";
+    public double Confidence { get; init; }
+    public bool HasOpenQuestions { get; init; }
+    public bool ClarificationRequired { get; init; }
+    public bool CanGenerateDraftNow { get; init; }
+    public string DraftRiskLevel { get; init; } = "medium";
+    public List<string> ObjectTypes { get; init; } = new();
+    public List<string> DefectTypes { get; init; } = new();
+    public List<string> MeasurementTargets { get; init; } = new();
+    public List<string> RequiredResources { get; init; } = new();
+    public List<string> RequiredFields { get; init; } = new();
+    public List<string> KnownFacts { get; init; } = new();
+    public List<string> MissingFacts { get; init; } = new();
+    public List<string> AttachmentFacts { get; init; } = new();
+    public string? ObjectName { get; init; }
+    public string? ImageSource { get; init; }
+    public string? OutputTarget { get; init; }
+    public string? DecisionRule { get; init; }
+    public string? RoiRequirement { get; init; }
+    public string? CalibrationRequirement { get; init; }
+    public List<GenerateFlowClarificationQuestion> ClarificationQuestions { get; init; } = new();
+}
+
 public record GenerateFlowClarificationQuestion
 {
     public string Field { get; init; } = string.Empty;
     public string Question { get; init; } = string.Empty;
     public bool Required { get; init; }
-    public List<string> Options { get; init; } = new();
-    public string DefaultValue { get; init; } = string.Empty;
     public string Reason { get; init; } = string.Empty;
-    public string Level { get; init; } = "required";
+    public string Priority { get; init; } = string.Empty;
+    public List<string> Options { get; init; } = new();
 }
 
 

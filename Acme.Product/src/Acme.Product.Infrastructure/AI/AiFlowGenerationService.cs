@@ -33,7 +33,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IFlowTemplateService _templateService;
     private readonly IScenarioMatcher _scenarioMatcher;
     private readonly IRequirementBriefExtractor _requirementBriefExtractor;
-    private readonly IClarificationEngine _clarificationEngine;
+    private readonly ClarificationEngine _clarificationEngine = new();
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
@@ -58,7 +58,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IFlowTemplateService templateService,
         IScenarioMatcher scenarioMatcher,
         IRequirementBriefExtractor requirementBriefExtractor,
-        IClarificationEngine clarificationEngine,
         ITemplateConstraintValidator templateConstraintValidator,
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
@@ -73,7 +72,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateService = templateService;
         _scenarioMatcher = scenarioMatcher;
         _requirementBriefExtractor = requirementBriefExtractor;
-        _clarificationEngine = clarificationEngine;
         _templateConstraintValidator = templateConstraintValidator;
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
@@ -118,59 +116,63 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ["templateName"] = context.Template?.Name ?? string.Empty,
                 ["confidence"] = context.Confidence.ToString("F4", CultureInfo.InvariantCulture)
             });
+        var attachmentContext = BuildAttachmentContext(request.Attachments);
+        var requirementContext = string.Join(
+            Environment.NewLine,
+            new[]
+            {
+                request.AdditionalContext,
+                attachmentContext
+            }.Where(item => !string.IsNullOrWhiteSpace(item)));
         var requirementBrief = pipeline.Measure(
             "requirement_brief",
-            () => _requirementBriefExtractor.Extract(request.Description, request.AdditionalContext, templatePriority.PrimaryMatch),
+            () =>
+            {
+                var extracted = _requirementBriefExtractor.Extract(
+                    request.Description,
+                    requirementContext,
+                    templatePriority.PrimaryMatch);
+                return _clarificationEngine.ApplyPolicy(extracted, conversationContext.Mode, request.RequirementMode);
+            },
             brief => string.IsNullOrWhiteSpace(brief.ScenarioName)
                 ? "requirement brief extracted without a scenario"
-                : $"scenario={brief.ScenarioName}, clarifications={brief.ClarificationQuestions.Count}",
+                : $"scenario={brief.ScenarioName}, clarifications={brief.ClarificationQuestions.Count}, blocking={brief.ClarificationRequired}",
             brief => new Dictionary<string, string>
             {
                 ["scenarioKey"] = brief.ScenarioKey,
                 ["intentType"] = brief.IntentType,
-                ["clarificationCount"] = brief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture)
+                ["clarificationCount"] = brief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture),
+                ["clarificationRequired"] = brief.ClarificationRequired.ToString(CultureInfo.InvariantCulture),
+                ["requirementMode"] = brief.RequirementMode
             });
-
-        // --- Clarification gate: return early if critical fields are missing ---
-        var clarificationResult = pipeline.Measure(
-            "clarification",
-            () => _clarificationEngine.Evaluate(requirementBrief, templatePriority.PrimaryMatch),
-            eval => eval.ClarificationRequired
-                ? $"clarification required: {eval.Questions.Count} questions, level={eval.Level}"
-                : "no clarification needed",
-            eval => new Dictionary<string, string>
-            {
-                ["clarificationRequired"] = eval.ClarificationRequired.ToString(),
-                ["level"] = eval.Level,
-                ["questionCount"] = eval.Questions.Count.ToString(CultureInfo.InvariantCulture)
-            });
-
-        if (clarificationResult.ClarificationRequired)
-        {
-            ReportProgress("需要补充关键信息才能生成准确方案...");
-            requirementBrief.ClarificationQuestions = clarificationResult.Questions;
-            requirementBrief.MissingFields = clarificationResult.StillMissingFields;
-
-            return new AiFlowGenerationResult
-            {
-                Success = false,
-                CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
-                RequirementBrief = requirementBrief,
-                ClarificationQuestions = clarificationResult.Questions,
-                TemplateCandidates = BuildTemplateCandidates(templatePriority),
-                StageTimeline = pipeline.Timeline.ToList(),
-                SessionId = conversationContext.SessionId
-            };
-        }
-
-        if (clarificationResult.Level == "recommended")
-        {
-            requirementBrief.ClarificationQuestions = clarificationResult.Questions;
-        }
-
         if (templatePriority.IsTemplateFirst)
         {
             ReportProgress($"已命中模板优先场景：{templatePriority.Template?.Name ?? templatePriority.ScenarioName}，进入 {templatePriority.GenerationMode} 模式...");
+        }
+
+        if (requirementBrief.ClarificationRequired)
+        {
+            ReportProgress("当前需求缺少关键字段，已进入澄清阶段。");
+            pipeline.AddStage(
+                "clarification",
+                "blocked",
+                $"missing={requirementBrief.MissingFacts.Count}, questions={requirementBrief.ClarificationQuestions.Count}",
+                TimeSpan.Zero,
+                new Dictionary<string, string>
+                {
+                    ["requirementMode"] = requirementBrief.RequirementMode,
+                    ["missingCount"] = requirementBrief.MissingFacts.Count.ToString(CultureInfo.InvariantCulture),
+                    ["questionCount"] = requirementBrief.ClarificationQuestions.Count.ToString(CultureInfo.InvariantCulture)
+                });
+
+            return CreateClarificationResult(
+                conversationContext.SessionId,
+                requirementBrief,
+                templatePriority,
+                conversationContext.Intent.ToString().ToUpperInvariant(),
+                progressMessages,
+                promptTrace: null,
+                pipeline.Timeline.ToList());
         }
 
         var systemPrompt = pipeline.Measure(
@@ -180,7 +182,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(conversationContext.Mode)
             ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
             : string.Empty;
-        var attachmentContext = BuildAttachmentContext(request.Attachments);
         var userMessage = AiPromptComposer.BuildUserPrompt(new AiPromptRequest(
             Task: request.Description,
             Mode: conversationContext.Mode,
@@ -188,7 +189,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TemplatePriority: BuildTemplatePriorityPromptSection(templatePriority),
             AttachmentContext: attachmentContext,
             SessionSummary: conversationContext.SessionSummary,
-            ReferenceFlowSummary: referenceFlowSummary));
+            ReferenceFlowSummary: referenceFlowSummary,
+            RequirementBriefSection: BuildRequirementBriefPromptSection(requirementBrief)));
 
         // 读取当前激活模型快照
         var activeModel = _aiOrchestrator.ResolveGenerationModel();
@@ -279,7 +281,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     });
                 var rawResponse = completionResult.Content;
                 lastRawResponse = rawResponse;
-                _logger.LogDebug("AI 原始响应长度：{Length}", rawResponse.Length);
+                _logger.LogDebug("AI 原始响应长度：{Length}", rawResponse?.Length ?? 0);
                 if (!string.IsNullOrEmpty(completionResult.Reasoning))
                 {
                     _logger.LogDebug("AI 思维链：{Reasoning}", completionResult.Reasoning[..Math.Min(200, completionResult.Reasoning.Length)] + "...");
@@ -295,7 +297,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 // 解析 AI 输出的 JSON
                 generatedFlow = pipeline.Measure(
                     "parse",
-                    () => ParseAiResponse(rawResponse),
+                    () => ParseAiResponse(rawResponse ?? string.Empty),
                     flow => flow == null ? "parse failed" : $"operators={flow.Operators?.Count ?? 0}, connections={flow.Connections?.Count ?? 0}");
                 if (generatedFlow == null)
                 {
@@ -404,7 +406,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         Status = AiFlowGenerationResult.CompletionStatusCompleted,
                         Reply = assistantReply,
                         Reasoning = completionResult.Reasoning,
-                        Progress = progressMessages.ToList()
+                        Progress = progressMessages.ToList(),
+                        RequirementBrief = requirementBrief,
+                        ClarificationRequired = requirementBrief.ClarificationRequired
                     };
 
                     _conversationalFlowService.RecordAssistantResponse(
@@ -676,6 +680,91 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         sb.AppendLine("Include recommendedTemplate, pendingParameters, and missingResources in the JSON output.");
+        return sb.ToString().Trim();
+    }
+
+    private static string BuildRequirementBriefPromptSection(AiRequirementBrief requirementBrief)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"requirementMode={requirementBrief.RequirementMode}");
+        sb.AppendLine($"scenarioKey={requirementBrief.ScenarioKey}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ScenarioName))
+            sb.AppendLine($"scenarioName={requirementBrief.ScenarioName}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.IntentType))
+            sb.AppendLine($"intentType={requirementBrief.IntentType}");
+        sb.AppendLine($"confidence={requirementBrief.Confidence.ToString("F4", CultureInfo.InvariantCulture)}");
+        sb.AppendLine($"clarificationRequired={requirementBrief.ClarificationRequired.ToString(CultureInfo.InvariantCulture)}");
+        sb.AppendLine($"hasOpenQuestions={requirementBrief.HasOpenQuestions.ToString(CultureInfo.InvariantCulture)}");
+        sb.AppendLine($"canGenerateDraftNow={requirementBrief.CanGenerateDraftNow.ToString(CultureInfo.InvariantCulture)}");
+        sb.AppendLine($"draftRiskLevel={requirementBrief.DraftRiskLevel}");
+
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ObjectName))
+            sb.AppendLine($"objectName={requirementBrief.ObjectName}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ImageSource))
+            sb.AppendLine($"imageSource={requirementBrief.ImageSource}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.OutputTarget))
+            sb.AppendLine($"outputTarget={requirementBrief.OutputTarget}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.DecisionRule))
+            sb.AppendLine($"decisionRule={requirementBrief.DecisionRule}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.RoiRequirement))
+            sb.AppendLine($"roiRequirement={requirementBrief.RoiRequirement}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.CalibrationRequirement))
+            sb.AppendLine($"calibrationRequirement={requirementBrief.CalibrationRequirement}");
+
+        if (requirementBrief.ObjectTypes.Count > 0)
+            sb.AppendLine($"objectTypes={string.Join(",", requirementBrief.ObjectTypes.Take(6))}");
+        if (requirementBrief.DefectTypes.Count > 0)
+            sb.AppendLine($"defectTypes={string.Join(",", requirementBrief.DefectTypes.Take(6))}");
+        if (requirementBrief.MeasurementTargets.Count > 0)
+            sb.AppendLine($"measurementTargets={string.Join(",", requirementBrief.MeasurementTargets.Take(6))}");
+        if (requirementBrief.RequiredResources.Count > 0)
+            sb.AppendLine($"requiredResources={string.Join(",", requirementBrief.RequiredResources.Take(6))}");
+        if (requirementBrief.RequiredFields.Count > 0)
+            sb.AppendLine($"requiredFields={string.Join(",", requirementBrief.RequiredFields.Take(8))}");
+
+        if (requirementBrief.KnownFacts.Count > 0)
+        {
+            sb.AppendLine("knownFacts:");
+            foreach (var fact in requirementBrief.KnownFacts.Take(8))
+            {
+                sb.AppendLine($"- {fact}");
+            }
+        }
+
+        if (requirementBrief.MissingFacts.Count > 0)
+        {
+            sb.AppendLine("missingFacts:");
+            foreach (var fact in requirementBrief.MissingFacts.Take(8))
+            {
+                sb.AppendLine($"- {fact}");
+            }
+        }
+
+        if (requirementBrief.AttachmentFacts.Count > 0)
+        {
+            sb.AppendLine("attachmentFacts:");
+            foreach (var fact in requirementBrief.AttachmentFacts.Take(4))
+            {
+                sb.AppendLine($"- {fact}");
+            }
+        }
+
+        if (requirementBrief.ClarificationQuestions.Count > 0)
+        {
+            sb.AppendLine("clarificationQuestions:");
+            foreach (var question in requirementBrief.ClarificationQuestions.Take(3))
+            {
+                var options = question.Options.Count > 0
+                    ? $" | options={string.Join(" / ", question.Options.Take(4))}"
+                    : string.Empty;
+                sb.AppendLine($"- [{question.Priority}] {question.Question}{options}");
+                if (!string.IsNullOrWhiteSpace(question.Reason))
+                {
+                    sb.AppendLine($"  reason={question.Reason}");
+                }
+            }
+        }
+
         return sb.ToString().Trim();
     }
 
@@ -993,10 +1082,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     }
 
     private static AiRecommendedTemplateInfo? ResolveRecommendedTemplate(
-        AiGeneratedFlowJson generatedFlow,
+        AiGeneratedFlowJson? generatedFlow,
         TemplatePriorityContext templatePriority)
     {
-        var modelTemplate = generatedFlow.RecommendedTemplate;
+        var modelTemplate = generatedFlow?.RecommendedTemplate;
         if (modelTemplate != null && !string.IsNullOrWhiteSpace(modelTemplate.TemplateName))
         {
             modelTemplate.MatchMode = string.IsNullOrWhiteSpace(modelTemplate.MatchMode)
@@ -1275,7 +1364,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     }
 
     private static List<AiMissingResourceInfo> BuildMissingResources(
-        AiGeneratedFlowJson generatedFlow,
+        AiGeneratedFlowJson? generatedFlow,
         TemplatePriorityContext templatePriority)
     {
         var resources = new Dictionary<string, AiMissingResourceInfo>(StringComparer.OrdinalIgnoreCase);
@@ -1293,7 +1382,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             };
         }
 
-        foreach (var item in generatedFlow.MissingResources ?? new List<AiMissingResourceInfo>())
+        foreach (var item in generatedFlow?.MissingResources ?? new List<AiMissingResourceInfo>())
         {
             if (string.IsNullOrWhiteSpace(item.ResourceType) || string.IsNullOrWhiteSpace(item.ResourceKey))
                 continue;
@@ -1304,7 +1393,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 string.IsNullOrWhiteSpace(item.Description) ? "缺少必要资源" : item.Description.Trim());
         }
 
-        foreach (var op in generatedFlow.Operators ?? new List<AiGeneratedOperator>())
+        foreach (var op in generatedFlow?.Operators ?? new List<AiGeneratedOperator>())
         {
             var parameters = op.Parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1473,6 +1562,84 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         return $"工程方案已生成，包含 {operatorCount} 个算子、{connectionCount} 条连线。";
+    }
+
+    private AiFlowGenerationResult CreateClarificationResult(
+        string sessionId,
+        AiRequirementBrief requirementBrief,
+        TemplatePriorityContext templatePriority,
+        string detectedIntent,
+        IReadOnlyList<string> progressMessages,
+        object? promptTrace,
+        IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline)
+    {
+        var summary = BuildClarificationSummary(requirementBrief);
+        var recommendedTemplate = ResolveRecommendedTemplate(null, templatePriority);
+        var missingResources = BuildMissingResources(null, templatePriority);
+        var assistantPayload = new ConversationTurnPayload
+        {
+            Kind = "assistant_clarification",
+            Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            Reply = summary,
+            Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
+            ClarificationRequired = true,
+            RequirementBrief = requirementBrief
+        };
+
+        _conversationalFlowService.RecordAssistantResponse(
+            sessionId,
+            summary,
+            null,
+            payload: assistantPayload);
+
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            ErrorMessage = summary,
+            AiExplanation = summary,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+            ClarificationRequired = true,
+            RequirementBrief = requirementBrief,
+            SessionId = sessionId,
+            DetectedIntent = detectedIntent,
+            RecommendedTemplate = recommendedTemplate,
+            PendingParameters = [],
+            MissingResources = missingResources,
+            PromptTrace = promptTrace,
+            TemplateCandidates = BuildTemplateCandidates(templatePriority),
+            StageTimeline = stageTimeline.ToList()
+        };
+    }
+
+    private static string BuildClarificationSummary(AiRequirementBrief requirementBrief)
+    {
+        var questionCount = requirementBrief.ClarificationQuestions.Count > 0
+            ? requirementBrief.ClarificationQuestions.Count
+            : Math.Max(requirementBrief.MissingFacts.Count, 1);
+        var sb = new StringBuilder();
+        sb.Append($"当前需求还需要澄清 {questionCount} 项关键信息。");
+
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ScenarioName))
+        {
+            sb.Append($" 已识别场景：{requirementBrief.ScenarioName}。");
+        }
+
+        if (requirementBrief.MissingFacts.Count > 0)
+        {
+            sb.Append($" 主要缺口：{string.Join("；", requirementBrief.MissingFacts.Take(3))}。");
+        }
+
+        if (requirementBrief.CanGenerateDraftNow)
+        {
+            sb.Append(" 若希望先看草稿，可切换到草稿模式。");
+        }
+        else
+        {
+            sb.Append(" 请先补齐关键字段后再继续。");
+        }
+
+        return sb.ToString();
     }
 
     private AiFlowGenerationResult CreateManualRetryResult(
