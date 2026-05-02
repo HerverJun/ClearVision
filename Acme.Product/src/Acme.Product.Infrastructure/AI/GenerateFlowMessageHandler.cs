@@ -114,7 +114,11 @@ public class GenerateFlowMessageHandler
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace
+                PromptTrace = result.PromptTrace,
+                StageTimeline = MapStageTimeline(result.StageTimeline),
+                CompletionStatus = result.CompletionStatus,
+                RetryCount = result.RetryCount,
+                KnowledgeDiagnostics = MapKnowledgeDiagnostics(result.KnowledgeDiagnostics)
             };
 
             return SerializeResponse(response, result.FailureType);
@@ -203,6 +207,10 @@ public class GenerateFlowMessageHandler
                 response.MissingResources,
                 response.ManualRetry,
                 response.PromptTrace,
+                response.StageTimeline,
+                response.CompletionStatus,
+                response.RetryCount,
+                response.KnowledgeDiagnostics,
                 FailureType = failureType
             }, _jsonOptions);
     }
@@ -325,6 +333,42 @@ public class GenerateFlowMessageHandler
             LastOutputSummary = manualRetry.LastOutputSummary,
             Diagnostics = manualRetry.Diagnostics.Cast<object>().ToList()
         };
+    }
+
+    private static List<GenerateFlowStageDiagnostic>? MapStageTimeline(IReadOnlyList<AiGenerationStageDiagnostic>? timeline)
+    {
+        if (timeline == null || timeline.Count == 0)
+        {
+            return null;
+        }
+
+        return timeline.Select(stage => new GenerateFlowStageDiagnostic
+        {
+            Stage = stage.Stage ?? string.Empty,
+            Status = stage.Status ?? "completed",
+            Summary = stage.Summary ?? string.Empty,
+            DurationMs = stage.DurationMs,
+            Metadata = stage.Metadata ?? new Dictionary<string, string>()
+        }).ToList();
+    }
+
+    private static List<GenerateFlowKnowledgeDiagnostic>? MapKnowledgeDiagnostics(IReadOnlyList<AiValidationDiagnostic>? diagnostics)
+    {
+        if (diagnostics == null || diagnostics.Count == 0)
+        {
+            return null;
+        }
+
+        return diagnostics.Select(d => new GenerateFlowKnowledgeDiagnostic
+        {
+            Severity = d.Severity ?? string.Empty,
+            Code = d.Code ?? string.Empty,
+            Category = d.Category ?? string.Empty,
+            Message = d.Message ?? string.Empty,
+            RelatedFields = d.RelatedFields?.ToList() ?? new List<string>(),
+            OperatorId = d.OperatorId,
+            RepairHint = d.RepairHint
+        }).ToList();
     }
 
     private static GenerateFlowRequirementBrief? MapRequirementBrief(AiRequirementBrief? brief)

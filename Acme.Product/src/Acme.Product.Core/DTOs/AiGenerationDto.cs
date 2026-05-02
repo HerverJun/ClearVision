@@ -206,6 +206,12 @@ public class AiFlowGenerationResult
     /// Structured generation timeline for workbench diagnostics.
     /// </summary>
     public List<AiGenerationStageDiagnostic> StageTimeline { get; set; } = new();
+
+    /// <summary>
+    /// Knowledge graph diagnostics (warnings about missing resources, anti-patterns, etc.)
+    /// Filtered from validation diagnostics with category == "knowledge".
+    /// </summary>
+    public List<AiValidationDiagnostic>? KnowledgeDiagnostics { get; set; }
 }
 
 public class AiFailureSummary

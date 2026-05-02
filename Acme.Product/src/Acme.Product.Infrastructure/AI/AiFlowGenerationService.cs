@@ -277,12 +277,21 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
                 // 调用 API（使用流式接口）
                 var llmStopwatch = Stopwatch.StartNew();
-                var completionResult = await _aiOrchestrator.StreamCompleteAsync(
-                    systemPrompt,
-                    messages,
-                    chunk => onStreamChunk?.Invoke(chunk),
-                    activeModel,
-                    cancellationToken);
+                AiCompletionResult completionResult;
+                try
+                {
+                    completionResult = await _aiOrchestrator.StreamCompleteAsync(
+                        systemPrompt,
+                        messages,
+                        chunk => onStreamChunk?.Invoke(chunk),
+                        activeModel,
+                        cancellationToken);
+                }
+                catch (Exception llmEx)
+                {
+                    pipeline.AddStage("llm", "failed", llmEx.Message, llmStopwatch.Elapsed);
+                    throw;
+                }
                 pipeline.AddStage(
                     "llm",
                     "completed",
@@ -456,7 +465,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         PromptTrace = promptTrace,
                         RequirementBrief = requirementBrief,
                         TemplateCandidates = BuildTemplateCandidates(templatePriority),
-                        StageTimeline = pipeline.Timeline.ToList()
+                        StageTimeline = pipeline.Timeline.ToList(),
+                        KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation)
                     };
                 }
 
@@ -645,7 +655,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             GenerationMode = templatePriority.GenerationMode,
             TemplateLockLevel = templatePriority.TemplateLockLevel,
             TemplateCandidates = BuildTemplateCandidates(templatePriority),
-            StageTimeline = pipeline.Timeline.ToList()
+            StageTimeline = pipeline.Timeline.ToList(),
+            KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation)
         };
     }
 
@@ -2391,6 +2402,16 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 Issues = validation.Diagnostics.Select(CloneDiagnostic).ToList()
             }
         ];
+    }
+
+    private static List<AiValidationDiagnostic>? ExtractKnowledgeDiagnostics(AiValidationResult? validation)
+    {
+        if (validation == null) return null;
+        var knowledge = validation.Diagnostics
+            .Where(d => string.Equals(d.Category, "knowledge", StringComparison.OrdinalIgnoreCase))
+            .Select(CloneDiagnostic)
+            .ToList();
+        return knowledge.Count > 0 ? knowledge : null;
     }
 
     private static string BuildAttemptSummary(AiValidationResult validation)

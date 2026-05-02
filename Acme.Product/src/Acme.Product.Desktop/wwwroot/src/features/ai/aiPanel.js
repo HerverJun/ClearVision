@@ -3,6 +3,45 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
 
+const AiWorkbenchStates = Object.freeze({
+    IDLE: 'idle',
+    CLARIFYING: 'clarifying',
+    MATCHING_TEMPLATE: 'matching_template',
+    GENERATING: 'generating',
+    PARSING: 'parsing',
+    VALIDATING: 'validating',
+    DRY_RUNNING: 'dry_running',
+    REVIEWING_PARAMETERS: 'reviewing_parameters',
+    READY_TO_APPLY: 'ready_to_apply',
+    APPLYING: 'applying',
+    APPLIED: 'applied',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled'
+});
+
+const WORKBENCH_STAGE_ORDER = [
+    { key: 'scenario_match', label: '场景识别', states: [AiWorkbenchStates.MATCHING_TEMPLATE] },
+    { key: 'template_match', label: '模板匹配', states: [AiWorkbenchStates.MATCHING_TEMPLATE] },
+    { key: 'generating', label: '生成', states: [AiWorkbenchStates.GENERATING, AiWorkbenchStates.PARSING] },
+    { key: 'validating', label: '校验', states: [AiWorkbenchStates.VALIDATING] },
+    { key: 'dryrun', label: 'DryRun', states: [AiWorkbenchStates.DRY_RUNNING] },
+    { key: 'parameters', label: '待补参数', states: [AiWorkbenchStates.REVIEWING_PARAMETERS] },
+    { key: 'apply', label: '可应用', states: [AiWorkbenchStates.READY_TO_APPLY, AiWorkbenchStates.APPLYING, AiWorkbenchStates.APPLIED] }
+];
+
+const STAGE_DIAGNOSTIC_LABELS = {
+    conversation: '会话准备',
+    scenario_match: '场景匹配',
+    requirement_brief: '需求提炼',
+    clarification: '需求澄清',
+    prompt_context: 'Prompt 构建',
+    llm: '模型调用',
+    parse: '结果解析',
+    validator: '流程校验',
+    template_gate: '模板约束',
+    dryrun: 'DryRun 预演'
+};
+
 /**
  * AI 智能助手面板
  * 负责管理 AI 交互界面、发送生成请求、显示思考链和结果
@@ -52,7 +91,21 @@ export class AiPanel {
         this.activeAssistantTurn = null;
         this.pendingManualRetry = null;
         this.requirementMode = this._loadRequirementMode();
-        
+
+        // 工作台状态机
+        this.workbenchState = AiWorkbenchStates.IDLE;
+        this._lastActiveWorkbenchState = AiWorkbenchStates.IDLE;
+        this._workbenchStageTimeline = [];
+
+        // 应用预览与撤销
+        this._preApplySnapshot = null;
+        this._preApplySnapshotVersion = 0;
+        this._preApplyCanvasRevision = 0;
+
+        // 附件报告缓存
+        this._lastAttachmentReport = null;
+        this._lastModelSupportsVision = null;
+
         // 绑定方法
         this._handleGenerate = this._handleGenerate.bind(this);
         this._handleApplyFlow = this._handleApplyFlow.bind(this);
@@ -103,6 +156,10 @@ export class AiPanel {
         this.pendingParameterFilePickContext = null;
         this.pendingManualRetry = null;
         this.activeAssistantTurn = null;
+        this._preApplySnapshot = null;
+        this._lastAttachmentReport = null;
+        this._lastModelSupportsVision = null;
+        this._setWorkbenchState(AiWorkbenchStates.IDLE);
         this._clearResultPane();
         this._renderAttachments();
         this._renderManualRetryBanner();
@@ -245,6 +302,7 @@ export class AiPanel {
                 </aside>
 
                 <aside class="ai-pane-right" id="ai-result-pane">
+                    <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
                     <div class="ai-result-status-note" id="ai-result-status-note"></div>
                     <div class="ai-results-scroll" id="ai-results-scroll">
                         <div class="result-card requirement-brief-card" id="ai-result-requirement-brief-card" hidden>
@@ -262,9 +320,24 @@ export class AiPanel {
                             <div class="ai-explanation" id="ai-result-summary">--</div>
                         </div>
 
+                        <div class="result-card stage-timeline-card" id="ai-result-stage-timeline-card" hidden>
+                            <div class="card-title stage-timeline-titlebar">
+                                <span>生成流水线</span>
+                                <span class="card-badge" id="ai-stage-timeline-summary"></span>
+                            </div>
+                            <div class="ai-stage-timeline" id="ai-result-stage-timeline"></div>
+                        </div>
+
                         <div class="result-card ops-list">
                             <div class="card-title">生成的算子清单</div>
                             <div class="generated-ops-list" id="ai-result-ops"></div>
+                        </div>
+
+                        <div class="result-card validation-card" id="ai-result-validation-card" hidden>
+                            <div class="card-title">
+                                <span>校验与预演</span>
+                            </div>
+                            <div class="ai-validation-panel" id="ai-result-validation"></div>
                         </div>
 
                         <div class="result-card followup-card">
@@ -281,8 +354,16 @@ export class AiPanel {
                             </div>
                         </div>
 
+                        <div class="result-card attachment-card" id="ai-result-attachment-card" hidden>
+                            <div class="card-title">附件与模型能力</div>
+                            <div class="ai-attachment-panel" id="ai-result-attachments"></div>
+                        </div>
+
                         <div class="result-card prompt-trace-card" id="ai-result-prompt-trace-card" hidden>
-                            <div class="card-title">本次发送上下文</div>
+                            <div class="card-title prompt-trace-titlebar">
+                                <span>调试信息</span>
+                                <button class="ai-trace-toggle-btn" id="ai-trace-toggle" type="button">切换视图</button>
+                            </div>
                             <div class="ai-prompt-trace" id="ai-result-prompt-trace"></div>
                         </div>
                     </div>
@@ -418,6 +499,7 @@ export class AiPanel {
 
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this._setGeneratingState(true);
+        this._setWorkbenchState(AiWorkbenchStates.GENERATING);
         this.activeGenerateRequestId = requestId;
         this.activeGenerateSessionId = this.sessionId;
         this.isCancellingGenerate = false;
@@ -678,6 +760,16 @@ export class AiPanel {
 
         const msg = typeof data === 'string' ? data : (data.payload?.message || data.message);
         const phase = typeof data === 'string' ? '' : (data.payload?.phase || data.phase || '');
+
+        // Map progress phases to workbench states
+        if (phase === 'validating' || phase === 'validator') {
+            this._setWorkbenchState(AiWorkbenchStates.VALIDATING);
+        } else if (phase === 'layouting' || phase === 'dryrun') {
+            this._setWorkbenchState(AiWorkbenchStates.DRY_RUNNING);
+        } else if (phase === 'calling_ai' || phase === 'connecting') {
+            this._setWorkbenchState(AiWorkbenchStates.GENERATING);
+        }
+
         if (msg) {
             this._appendAssistantProgressStep(msg, phase);
         }
@@ -774,6 +866,7 @@ export class AiPanel {
 
         if (isCancelled) {
             this._clearActiveRequestState();
+            this._setWorkbenchState(AiWorkbenchStates.CANCELLED);
             this._setAssistantTurnStatus(activeTurn, '已取消', 'cancelled');
             this._setResultStatusNote('', '');
             this.activeAssistantTurn = null;
@@ -784,6 +877,7 @@ export class AiPanel {
             this._clearActiveRequestState();
             if (isClarification) {
                 this.pendingManualRetry = null;
+                this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
                 this._renderManualRetryBanner();
                 this._setAssistantTurnStatus(activeTurn, '待澄清', 'warning');
                 this._setAssistantSectionText(
@@ -818,6 +912,7 @@ export class AiPanel {
             }
 
             const manualRetry = payload.manualRetry || payload.ManualRetry || null;
+            this._setWorkbenchState(AiWorkbenchStates.FAILED);
             if (manualRetry?.required) {
                 this.pendingManualRetry = {
                     ...manualRetry,
@@ -854,12 +949,28 @@ export class AiPanel {
             flow: payload?.flow ?? payload?.Flow ?? null,
             preferIndexFallback: true
         });
+
+        // Cache stage timeline and model capabilities for new cards
+        this._workbenchStageTimeline = payload.stageTimeline || payload.StageTimeline || [];
+        const promptTrace = payload.promptTrace || payload.PromptTrace || null;
+        if (promptTrace?.capabilities) {
+            this._lastModelSupportsVision = promptTrace.capabilities.supportsVisionInput ?? null;
+        }
+
+        // Set workbench state based on pending parameters
+        const hasPending = (payload.pendingParameters || payload.PendingParameters || []).length > 0;
+        this._setWorkbenchState(hasPending ? AiWorkbenchStates.REVIEWING_PARAMETERS : AiWorkbenchStates.READY_TO_APPLY);
+
         if (this.sessionId) {
             this._addToHistory({
                 sessionId: this.sessionId,
                 lastMessage: this.lastUserPrompt || payload.aiExplanation || '已生成流程',
                 updatedAtUtc: new Date().toISOString(),
-                turnCount: 0
+                turnCount: 0,
+                scenarioKey: payload.requirementBrief?.scenarioKey || payload.RequirementBrief?.ScenarioKey || '',
+                templateName: payload.recommendedTemplate?.templateName || payload.RecommendedTemplate?.TemplateName || '',
+                generationMode: payload.generationMode || payload.GenerationMode || '',
+                applied: false
             });
         }
         this._setAssistantTurnStatus(activeTurn, '生成成功', 'success');
@@ -973,21 +1084,42 @@ export class AiPanel {
         }
         this.container.querySelector('#ai-result-summary').innerHTML = summaryLines.join('<br/>');
 
-        // 算子列表逐个淡入
+        // 算子列表逐个淡入（增强：显示工程角色、资源状态、待确认参数）
         const opsContainer = this.container.querySelector('#ai-result-ops');
         opsContainer.innerHTML = '';
+        const pendingSet = new Set(
+            (data?.pendingParameters || data?.PendingParameters || [])
+                .map(p => p.operatorId || p.OperatorId || p.actualOperatorId || p.ActualOperatorId || '')
+                .filter(Boolean)
+        );
+        const missingResourceOps = new Set(
+            (data?.missingResources || data?.MissingResources || [])
+                .map(r => (r.description || r.Description || '').toLowerCase())
+        );
         if (clarificationRequired && !flow) {
             opsContainer.innerHTML = '<div class="ai-followup-empty">当前尚未进入生成阶段，请先完成需求澄清。</div>';
         } else {
             ops.forEach((op, i) => {
                 const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';
+                const opType = op?.operatorType || op?.OperatorType || '';
+                const opId = op?.tempId || op?.TempId || op?.id || op?.Id || '';
+                const hasPending = pendingSet.has(opId);
+                const hasMissing = (op.parameters || op.Parameters || {})['ModelPath'] === '' || missingResourceOps.has(opName.toLowerCase());
+                const statusBadges = [];
+                if (hasPending) statusBadges.push('<span class="op-badge op-badge-pending">待确认</span>');
+                if (hasMissing) statusBadges.push('<span class="op-badge op-badge-missing">缺资源</span>');
+
                 const item = document.createElement('div');
                 item.className = 'generated-op-item';
                 item.style.opacity = '0';
                 item.style.transform = 'translateX(12px)';
                 item.innerHTML = `
                     <div class="op-dot"></div>
-                    <div class="op-name">${this._escapeHtml(String(opName))}</div>
+                    <div class="op-main">
+                        <div class="op-name">${this._escapeHtml(String(opName))}</div>
+                        ${opType ? `<div class="op-type-badge">${this._escapeHtml(opType)}</div>` : ''}
+                    </div>
+                    ${statusBadges.length > 0 ? `<div class="op-badges">${statusBadges.join('')}</div>` : ''}
                 `;
                 opsContainer.appendChild(item);
                 setTimeout(() => {
@@ -1002,6 +1134,9 @@ export class AiPanel {
         const templateNotice = matchedTemplateName ? ` 已按模板优先命中「${matchedTemplateName}」。` : '';
         this._renderFollowupChecklist(data, flow);
         this._renderParameterDraftEditor(data, flow);
+        this._renderStageTimeline(data?.stageTimeline || data?.StageTimeline || this._workbenchStageTimeline || []);
+        this._renderValidationConsole(data);
+        this._renderAttachmentPanel();
         this._renderPromptTrace(data?.promptTrace ?? data?.PromptTrace ?? null);
         if (appendChatMessage) {
             this._addMessage('ai', `工程方案已生成！包含 ${ops.length} 个算子、${connections.length} 条连线。${templateNotice}可继续输入修改指令。`);
@@ -1011,6 +1146,7 @@ export class AiPanel {
     _renderPromptTrace(trace) {
         const card = this.container?.querySelector('#ai-result-prompt-trace-card');
         const container = this.container?.querySelector('#ai-result-prompt-trace');
+        const toggleBtn = this.container?.querySelector('#ai-trace-toggle');
         if (!card || !container) return;
 
         if (!trace || typeof trace !== 'object') {
@@ -1019,20 +1155,63 @@ export class AiPanel {
             return;
         }
 
+        const isDebugMode = new URLSearchParams(window.location.search).has('debugPrompt')
+            || localStorage.getItem('cv_ai_debug_prompt') === '1';
+
+        // Store trace for toggle
+        this._currentPromptTrace = trace;
+        this._promptTraceViewMode = this._promptTraceViewMode || (isDebugMode ? 'debug' : 'engineering');
+
+        if (toggleBtn) {
+            toggleBtn.textContent = this._promptTraceViewMode === 'debug' ? '工程视图' : '调试视图';
+            toggleBtn.onclick = () => {
+                this._promptTraceViewMode = this._promptTraceViewMode === 'debug' ? 'engineering' : 'debug';
+                this._renderPromptTrace(this._currentPromptTrace);
+            };
+        }
+
         const mode = String(trace.mode || '').trim();
         const provider = String(trace.provider || '').trim();
         const model = String(trace.model || '').trim();
         const baseUrl = String(trace.baseUrl || '').trim();
+
+        card.hidden = false;
+
+        if (this._promptTraceViewMode === 'engineering') {
+            // Engineering view: show summary only
+            const stageTimeline = this._workbenchStageTimeline || [];
+            const totalMs = stageTimeline.reduce((sum, s) => sum + (s.durationMs || 0), 0);
+            container.innerHTML = `
+                <div class="ai-trace-engineering">
+                    <div class="ai-trace-eng-row"><span class="ai-trace-eng-label">模型</span><span>${this._escapeHtml(model || '--')}</span></div>
+                    <div class="ai-trace-eng-row"><span class="ai-trace-eng-label">提供商</span><span>${this._escapeHtml(provider || '--')}</span></div>
+                    <div class="ai-trace-eng-row"><span class="ai-trace-eng-label">模式</span><span>${this._escapeHtml(mode || '--')}</span></div>
+                    ${totalMs > 0 ? `<div class="ai-trace-eng-row"><span class="ai-trace-eng-label">总耗时</span><span>${(totalMs / 1000).toFixed(1)}s</span></div>` : ''}
+                    ${stageTimeline.length > 0 ? `
+                        <div class="ai-trace-eng-stages">
+                            ${stageTimeline.map(s => {
+                                const label = STAGE_DIAGNOSTIC_LABELS[s.stage] || s.stage;
+                                const status = s.status === 'failed' ? '&#10007;' : '&#10003;';
+                                const cls = s.status === 'failed' ? 'is-failed' : 'is-ok';
+                                return `<span class="ai-trace-eng-stage ${cls}">${status} ${this._escapeHtml(label)} ${s.durationMs != null ? s.durationMs + 'ms' : '--'}</span>`;
+                            }).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            return;
+        }
+
+        // Debug view: full prompt trace
         const capabilities = this._formatPromptTraceJson(trace.capabilities || null);
         const attachmentReport = this._formatPromptTraceJson(trace.attachmentReport || null);
         const referenceFlow = String(trace.usedReferenceFlowSummary || '').trim();
         const systemPrompt = String(trace.systemPrompt || '').trim();
         const userPrompt = String(trace.userPrompt || '').trim();
 
-        card.hidden = false;
         container.innerHTML = `
-            <details class="ai-prompt-trace-details">
-                <summary>展开查看本次实际发送给模型的上下文</summary>
+            <details class="ai-prompt-trace-details" open>
+                <summary>本次实际发送给模型的上下文</summary>
                 <div class="ai-prompt-trace-grid">
                     <div class="ai-prompt-trace-block">
                         <div class="ai-prompt-trace-label">Meta</div>
@@ -1165,6 +1344,7 @@ export class AiPanel {
                 </div>
             `
             : '';
+        const topologySummary = this._extractTopologySummary(flow || data?.flow || data?.Flow || null);
         const recommendedHtml = hasTemplateStrategy
             ? `
                 <div class="ai-followup-template">
@@ -1175,9 +1355,13 @@ export class AiPanel {
                     ${primaryTemplate ? `
                         <div class="ai-followup-template-name">${this._escapeHtml(primaryTemplate.templateName)}</div>
                         <div class="ai-followup-template-reason">${this._escapeHtml(primaryTemplate.matchReason || '建议延续当前模板骨架继续补齐缺失项。')}</div>
+                        ${primaryTemplate.matchMode ? `<div class="ai-followup-item-meta">匹配模式：${this._escapeHtml(primaryTemplate.matchMode)}</div>` : ''}
+                        ${primaryTemplate.matchedFields && primaryTemplate.matchedFields.length > 0 ? `<div class="ai-followup-item-meta">匹配字段：${this._escapeHtml(primaryTemplate.matchedFields.join('、'))}</div>` : ''}
+                        ${primaryTemplate.missingSignals && primaryTemplate.missingSignals.length > 0 ? `<div class="ai-followup-item-meta">缺失信号：${this._escapeHtml(primaryTemplate.missingSignals.join('、'))}</div>` : ''}
                     ` : `
                         <div class="ai-followup-template-reason">本轮按自由生成处理，可在候选出现后手动指定模板。</div>
                     `}
+                    ${topologySummary ? `<div class="ai-followup-template-topology">${this._escapeHtml(topologySummary)}</div>` : ''}
                     ${candidatesHtml}
                     <div class="ai-followup-template-free-row">
                         <button class="ai-followup-template-action" type="button" data-template-action="free">下一轮不用模板</button>
@@ -2786,33 +2970,35 @@ export class AiPanel {
             return;
         }
 
+        this._setWorkbenchState(AiWorkbenchStates.APPLYING);
+
+        // Compute diff and show preview
+        let currentFlow = null;
         try {
-            const flowBtn = document.querySelector('.nav-btn[data-view="flow"]');
-            if (flowBtn) flowBtn.click();
-            this.flowCanvas.deserialize(flow);
-            this._markCurrentResultAppliedToCanvas();
-            this._syncPendingParameterDrafts(this.currentResult, this.currentResult?.flow, { force: true });
-            this._renderFollowupChecklist(this.currentResult, this.currentResult?.flow);
-            this._renderParameterDraftEditor(this.currentResult, this.currentResult?.flow);
-        this.options.onApplied?.(flow);
-        this.options.showToast?.('方案已应用到画布', 'success');
-        } catch (err) {
-            console.error('应用流程失败:', err);
-            alert('应用流程失败: ' + err.message);
+            currentFlow = this.flowCanvas.serialize();
+        } catch {
+            // Canvas may be empty
         }
+
+        if (currentFlow) {
+            const diff = this._computeFlowDiff(currentFlow, flow);
+            const totalChanges = diff.added.length + diff.removed.length + diff.modified.length;
+            if (totalChanges > 0) {
+                this._showApplyPreview(diff, flow);
+                return;
+            }
+        }
+
+        // No diff or no current flow - apply directly
+        this._executeApplyFlow(flow);
     }
     
     _addMessage(role, text, options = {}) {
         const container = this.container.querySelector('#ai-chat-container');
         const msg = document.createElement('div');
         msg.className = `ai-message ${role}`;
-        
-        const escapeHtml = (str) => {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        };
-        const safeText = escapeHtml(text);
+
+        const safeText = this._escapeHtml(text);
         
         if (role === 'ai') {
             msg.innerHTML = `<div class="ai-bubble">${safeText}</div>`;
@@ -3218,7 +3404,7 @@ export class AiPanel {
                 </section>
                 <section class="ai-requirement-brief-section">
                     <div class="ai-requirement-brief-section-label">待确认项</div>
-                    ${renderTagList(brief.missingFacts, '当前没有待确认项。', 'missing')}
+                    ${this._renderMissingFactsWithActions(brief.missingFacts)}
                 </section>
                 <section class="ai-requirement-brief-section">
                     <div class="ai-requirement-brief-section-label">澄清问题</div>
@@ -3518,6 +3704,9 @@ export class AiPanel {
         const payload = data?.payload || data || {};
         if (!this._shouldHandleGenerateRealtimePayload(payload)) return;
 
+        // Cache for attachment panel
+        this._lastAttachmentReport = payload;
+
         const sent = Array.isArray(payload.sent) ? payload.sent : [];
         const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
 
@@ -3637,7 +3826,7 @@ export class AiPanel {
         return div.innerHTML;
     }
 
-    _setResultStatusNote(text = '', tone = '') {
+    _setResultStatusNote(text = '', tone = '', allowHtml = false) {
         const note = this.container?.querySelector('#ai-result-status-note');
         if (!note) return;
 
@@ -3653,7 +3842,11 @@ export class AiPanel {
         if (tone) {
             note.classList.add(`is-${tone}`);
         }
-        note.textContent = normalizedText;
+        if (allowHtml) {
+            note.innerHTML = normalizedText;
+        } else {
+            note.textContent = normalizedText;
+        }
     }
 
     _renderManualRetryBanner() {
@@ -3996,16 +4189,25 @@ export class AiPanel {
             return;
         }
         
-        list.innerHTML = rows.map(item => `
+        list.innerHTML = rows.map(item => {
+            const templateBadge = item.templateName
+                ? `<span class="history-template-badge">${this._escapeHtml(item.templateName)}</span>`
+                : '';
+            const modeChip = item.generationMode
+                ? `<span class="history-mode-chip">${this._escapeHtml(item.generationMode)}</span>`
+                : '';
+            const appliedIcon = item.applied ? '<span class="history-applied-icon" title="已应用">&#10003;</span>' : '';
+            return `
             <div class="ai-history-item ${item.sessionId === this.sessionId ? 'active' : ''}" data-session-id="${this._escapeHtml(item.sessionId)}">
                 <div class="history-desc">${this._escapeHtml(item.lastMessage)}</div>
+                <div class="history-badges">${templateBadge}${modeChip}${appliedIcon}</div>
                 <div class="history-meta">
                     <span>${this._escapeHtml(this._formatHistoryTime(item.updatedAtUtc))}</span>
                     <span>${this._escapeHtml(String(item.turnCount))} 轮</span>
                 </div>
                 <button class="ai-history-delete" type="button" data-session-id="${this._escapeHtml(item.sessionId)}" title="删除会话">删除</button>
             </div>
-        `).join('');
+        `}).join('');
 
         list.querySelectorAll('.ai-history-item').forEach(itemEl => {
             itemEl.addEventListener('click', (event) => {
@@ -4312,5 +4514,674 @@ export class AiPanel {
         } catch {
             // ignore localStorage failures
         }
+    }
+
+    // ── 工作台状态机 ──────────────────────────────────────────
+
+    _setWorkbenchState(state) {
+        if (this.workbenchState === state) return;
+        // Track last non-terminal state for failure recovery
+        if (state !== AiWorkbenchStates.FAILED && state !== AiWorkbenchStates.CANCELLED && state !== AiWorkbenchStates.IDLE) {
+            this._lastActiveWorkbenchState = state;
+        }
+        this.workbenchState = state;
+        this._renderWorkbenchStateBar();
+    }
+
+    _renderWorkbenchStateBar() {
+        const bar = this.container?.querySelector('#ai-workbench-state-bar');
+        if (!bar) return;
+
+        const state = this.workbenchState;
+        if (state === AiWorkbenchStates.IDLE) {
+            bar.innerHTML = '';
+            bar.classList.remove('is-active');
+            return;
+        }
+
+        bar.classList.add('is-active');
+        const stateToStageIndex = {
+            [AiWorkbenchStates.MATCHING_TEMPLATE]: 1,
+            [AiWorkbenchStates.GENERATING]: 2,
+            [AiWorkbenchStates.PARSING]: 2,
+            [AiWorkbenchStates.VALIDATING]: 3,
+            [AiWorkbenchStates.DRY_RUNNING]: 4,
+            [AiWorkbenchStates.REVIEWING_PARAMETERS]: 5,
+            [AiWorkbenchStates.READY_TO_APPLY]: 6,
+            [AiWorkbenchStates.APPLYING]: 6,
+            [AiWorkbenchStates.APPLIED]: 6,
+            [AiWorkbenchStates.CLARIFYING]: 0,
+            [AiWorkbenchStates.FAILED]: -1,
+            [AiWorkbenchStates.CANCELLED]: -1
+        };
+        const activeIndex = stateToStageIndex[state] ?? -1;
+
+        // For FAILED/CANCELLED: determine which stage actually failed
+        let failedStageIndex = activeIndex;
+        if ((state === AiWorkbenchStates.FAILED || state === AiWorkbenchStates.CANCELLED) && activeIndex === -1) {
+            // Infer from stage timeline: find the last failed stage
+            const timeline = this._workbenchStageTimeline || [];
+            const failedStageKey = timeline.filter(s => s.status === 'failed').pop()?.stage;
+            if (failedStageKey) {
+                const stageKeyToOrderIndex = {
+                    conversation: 0, scenario_match: 0, requirement_brief: 0, clarification: 0,
+                    prompt_context: 1, template_gate: 1,
+                    llm: 2, parse: 2,
+                    validator: 3,
+                    dryrun: 4,
+                    parameters: 5,
+                    apply: 6
+                };
+                failedStageIndex = stageKeyToOrderIndex[failedStageKey] ?? 0;
+            } else {
+                // Fallback: use last active state to determine stage index
+                failedStageIndex = stateToStageIndex[this._lastActiveWorkbenchState] ?? 0;
+            }
+        }
+
+        bar.innerHTML = WORKBENCH_STAGE_ORDER.map((stage, i) => {
+            let cls = 'wb-stage';
+            if (state === AiWorkbenchStates.FAILED || state === AiWorkbenchStates.CANCELLED) {
+                if (i < failedStageIndex) {
+                    cls += ' completed';
+                } else if (i === failedStageIndex) {
+                    cls += ' failed';
+                }
+            } else if (state === AiWorkbenchStates.APPLIED) {
+                cls += ' completed';
+            } else if (i < activeIndex) {
+                cls += ' completed';
+            } else if (i === activeIndex) {
+                cls += ' active';
+            }
+            return `<span class="${cls}">${stage.label}</span>`;
+        }).join('');
+    }
+
+    // ── 生成流水线时间线 ──────────────────────────────────────
+
+    _renderStageTimeline(timeline) {
+        const card = this.container?.querySelector('#ai-result-stage-timeline-card');
+        const container = this.container?.querySelector('#ai-result-stage-timeline');
+        const summaryBadge = this.container?.querySelector('#ai-stage-timeline-summary');
+        if (!card || !container) return;
+
+        if (!Array.isArray(timeline) || timeline.length === 0) {
+            card.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        card.hidden = false;
+        const totalMs = timeline.reduce((sum, s) => sum + (s.durationMs || 0), 0);
+        const totalSec = (totalMs / 1000).toFixed(1);
+        if (summaryBadge) {
+            summaryBadge.textContent = `${timeline.length} 阶段 · ${totalSec}s`;
+        }
+
+        container.innerHTML = `
+            <details class="ai-stage-timeline-details">
+                <summary>${timeline.length} 个阶段，总耗时 ${totalSec}s</summary>
+                <div class="ai-stage-timeline-list">
+                    ${timeline.map(stage => {
+                        const label = STAGE_DIAGNOSTIC_LABELS[stage.stage] || stage.stage;
+                        const status = stage.status || 'completed';
+                        const duration = stage.durationMs != null ? `${stage.durationMs}ms` : '--';
+                        const statusIcon = status === 'completed' ? '&#10003;'
+                            : status === 'failed' ? '&#10007;'
+                            : status === 'warning' ? '&#9888;'
+                            : '&#9675;';
+                        const statusClass = status === 'failed' ? 'is-failed'
+                            : status === 'warning' ? 'is-warning'
+                            : 'is-ok';
+                        return `
+                            <div class="ai-stage-timeline-item ${statusClass}">
+                                <span class="ai-stage-icon">${statusIcon}</span>
+                                <span class="ai-stage-label">${this._escapeHtml(label)}</span>
+                                <span class="ai-stage-summary">${this._escapeHtml(stage.summary || '')}</span>
+                                <span class="ai-stage-duration">${duration}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </details>
+        `;
+    }
+
+    // ── 校验与 DryRun 控制台 ──────────────────────────────────
+
+    _renderValidationConsole(data) {
+        const card = this.container?.querySelector('#ai-result-validation-card');
+        const container = this.container?.querySelector('#ai-result-validation');
+        if (!card || !container) return;
+
+        const diagnostics = data?.lastAttemptDiagnostics || data?.LastAttemptDiagnostics || [];
+        const manualRetry = data?.manualRetry || data?.ManualRetry || null;
+        const dryRun = data?.dryRunResult || data?.DryRunResult || null;
+        const knowledgeDiags = data?.knowledgeDiagnostics || data?.KnowledgeDiagnostics || [];
+        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || knowledgeDiags.length > 0;
+
+        if (!hasContent) {
+            card.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        card.hidden = false;
+        const sections = [];
+
+        // ManualRetry banner
+        if (manualRetry?.required) {
+            sections.push(`
+                <div class="ai-validation-retry-banner">
+                    <div class="ai-validation-retry-title">需要手动确认</div>
+                    <div class="ai-validation-retry-summary">${this._escapeHtml(manualRetry.summary || manualRetry.repairTarget || '')}</div>
+                    <div class="ai-validation-retry-stage">失败阶段：${this._escapeHtml(manualRetry.stage || '未知')}</div>
+                </div>
+            `);
+        }
+
+        // Diagnostics list
+        if (diagnostics.length > 0) {
+            const issueItems = diagnostics.flatMap(d => {
+                const issues = d.issues || d.Issues || [];
+                return issues.map(issue => ({
+                    severity: issue.severity || issue.Severity || 'error',
+                    category: issue.category || issue.Category || '',
+                    code: issue.code || issue.Code || '',
+                    message: issue.message || issue.Message || '',
+                    repairHint: issue.repairHint || issue.RepairHint || '',
+                    operatorId: issue.operatorId || issue.OperatorId || ''
+                }));
+            });
+
+            if (issueItems.length > 0) {
+                sections.push(`
+                    <div class="ai-validation-issues">
+                        <div class="ai-validation-issues-header">校验问题 (${issueItems.length})</div>
+                        ${issueItems.map(item => {
+                            const isWarning = item.severity === 'warning';
+                            const icon = isWarning ? '&#9888;' : '&#10007;';
+                            const cls = isWarning ? 'is-warning' : 'is-error';
+                            return `
+                                <div class="ai-validation-issue ${cls}">
+                                    <span class="ai-validation-issue-icon">${icon}</span>
+                                    <div class="ai-validation-issue-body">
+                                        <div class="ai-validation-issue-msg">${this._escapeHtml(item.message)}</div>
+                                        ${item.category ? `<div class="ai-validation-issue-meta">${this._escapeHtml(item.category)}${item.operatorId ? ` · ${this._escapeHtml(item.operatorId)}` : ''}</div>` : ''}
+                                        ${item.repairHint ? `<div class="ai-validation-issue-hint">${this._escapeHtml(item.repairHint)}</div>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `);
+            }
+        }
+
+        // DryRun result
+        if (dryRun) {
+            const isSuccess = dryRun.isSuccess ?? dryRun.IsSuccess ?? false;
+            const coverage = dryRun.coveragePercentage ?? dryRun.CoveragePercentage ?? 0;
+            const covered = dryRun.coveredBranches ?? dryRun.CoveredBranches ?? 0;
+            const total = dryRun.totalBranches ?? dryRun.TotalBranches ?? 0;
+            const duration = dryRun.durationMs ?? dryRun.DurationMs ?? null;
+            const icon = isSuccess ? '&#10003;' : '&#10007;';
+            const cls = isSuccess ? 'is-ok' : 'is-failed';
+            sections.push(`
+                <div class="ai-validation-dryrun ${cls}">
+                    <div class="ai-validation-dryrun-header">
+                        <span class="ai-validation-issue-icon">${icon}</span>
+                        <span>DryRun ${isSuccess ? '通过' : '失败'}</span>
+                        ${duration != null ? `<span class="ai-validation-dryrun-duration">${Math.round(duration)}ms</span>` : ''}
+                    </div>
+                    <div class="ai-validation-dryrun-coverage">
+                        <div class="ai-coverage-bar">
+                            <div class="ai-coverage-bar-fill" style="width:${Math.min(100, coverage)}%"></div>
+                        </div>
+                        <div class="ai-coverage-text">分支覆盖 ${covered}/${total} (${coverage.toFixed(1)}%)</div>
+                    </div>
+                </div>
+            `);
+        }
+
+        // Knowledge graph diagnostics
+        if (knowledgeDiags.length > 0) {
+            sections.push(`
+                <div class="ai-validation-issues">
+                    <div class="ai-validation-issues-header">知识图谱诊断 (${knowledgeDiags.length})</div>
+                    ${knowledgeDiags.map(d => {
+                        const severity = d.severity || d.Severity || 'warning';
+                        const isWarning = severity === 'warning';
+                        const icon = isWarning ? '&#9888;' : '&#10007;';
+                        const cls = isWarning ? 'is-warning' : 'is-error';
+                        const message = d.message || d.Message || '';
+                        const code = d.code || d.Code || '';
+                        const operatorId = d.operatorId || d.OperatorId || '';
+                        const repairHint = d.repairHint || d.RepairHint || '';
+                        return `
+                            <div class="ai-validation-issue ${cls}">
+                                <span class="ai-validation-issue-icon">${icon}</span>
+                                <div class="ai-validation-issue-body">
+                                    <div class="ai-validation-issue-msg">${this._escapeHtml(message)}</div>
+                                    ${code ? `<div class="ai-validation-issue-meta">${this._escapeHtml(code)}${operatorId ? ` · ${this._escapeHtml(operatorId)}` : ''}</div>` : ''}
+                                    ${repairHint ? `<div class="ai-validation-issue-hint">${this._escapeHtml(repairHint)}</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `);
+        }
+
+        container.innerHTML = sections.join('');
+    }
+
+    // ── 附件与模型能力面板 ────────────────────────────────────
+
+    _renderAttachmentPanel() {
+        const card = this.container?.querySelector('#ai-result-attachment-card');
+        const container = this.container?.querySelector('#ai-result-attachments');
+        if (!card || !container) return;
+
+        const report = this._lastAttachmentReport;
+        const attachments = this.attachments || [];
+        const supportsVision = this._lastModelSupportsVision;
+
+        if (!report && attachments.length === 0) {
+            card.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        card.hidden = false;
+        const sections = [];
+
+        // Model vision capability
+        if (supportsVision === false) {
+            sections.push(`
+                <div class="ai-attachment-vision-warning">
+                    当前模型不支持视觉输入，附件仅用于元信息分析，不会发送图片给模型。
+                </div>
+            `);
+        } else if (supportsVision === true) {
+            sections.push(`
+                <div class="ai-attachment-vision-ok">
+                    当前模型支持视觉输入，图片已发送给模型分析。
+                </div>
+            `);
+        }
+
+        // Sent attachments
+        const sent = report?.sent || report?.Sent || [];
+        if (sent.length > 0) {
+            sections.push(`
+                <div class="ai-attachment-section">
+                    <div class="ai-attachment-section-header">已发送 (${sent.length})</div>
+                    ${sent.map(item => `
+                        <div class="ai-attachment-item is-sent">
+                            <span class="ai-attachment-icon">&#128206;</span>
+                            <span class="ai-attachment-name">${this._escapeHtml(item.name || item.Name || '未知文件')}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        // Skipped attachments
+        const skipped = report?.skipped || report?.Skipped || [];
+        if (skipped.length > 0) {
+            sections.push(`
+                <div class="ai-attachment-section">
+                    <div class="ai-attachment-section-header">已跳过 (${skipped.length})</div>
+                    ${skipped.map(item => `
+                        <div class="ai-attachment-item is-skipped">
+                            <span class="ai-attachment-icon">&#9888;</span>
+                            <span class="ai-attachment-name">${this._escapeHtml(item.name || item.Name || '未知文件')}</span>
+                            <span class="ai-attachment-reason">${this._escapeHtml(item.reason || item.Reason || '未知原因')}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        // Pending attachments (no report yet)
+        if (!report && attachments.length > 0) {
+            sections.push(`
+                <div class="ai-attachment-section">
+                    <div class="ai-attachment-section-header">附件 (${attachments.length})</div>
+                    ${attachments.map(item => `
+                        <div class="ai-attachment-item is-${this._escapeHtml(item.status || 'pending')}">
+                            <span class="ai-attachment-icon">&#128206;</span>
+                            <span class="ai-attachment-name">${this._escapeHtml(item.name || '未知文件')}</span>
+                            ${item.reason ? `<span class="ai-attachment-reason">${this._escapeHtml(item.reason)}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        container.innerHTML = sections.join('');
+    }
+
+    // ── 应用预览与撤销 ────────────────────────────────────────
+
+    _computeFlowDiff(currentFlow, newFlow) {
+        const currentOps = this._extractOperators(currentFlow);
+        const newOps = this._extractOperators(newFlow);
+        const currentConns = this._extractConnections(currentFlow);
+        const newConns = this._extractConnections(newFlow);
+
+        const opDiffKey = op => {
+            const tid = op.tempId || op.TempId || '';
+            if (tid) return `tid:${tid}`;
+            return `type:${op.operatorType || op.OperatorType || ''}::${op.displayName || op.DisplayName || op.name || op.Name || ''}`;
+        };
+
+        const currentOpMap = new Map();
+        currentOps.forEach(op => { currentOpMap.set(opDiffKey(op), op); });
+
+        const newOpMap = new Map();
+        newOps.forEach(op => { newOpMap.set(opDiffKey(op), op); });
+
+        const added = [];
+        const removed = [];
+        const modified = [];
+
+        for (const [key, newOp] of newOpMap) {
+            if (!currentOpMap.has(key)) {
+                added.push(newOp);
+            } else {
+                const currentOp = currentOpMap.get(key);
+                const currentParams = currentOp.parameters || currentOp.Parameters || {};
+                const newParams = newOp.parameters || newOp.Parameters || {};
+                const paramChanges = [];
+                for (const [pName, pVal] of Object.entries(newParams)) {
+                    if (String(currentParams[pName] ?? '') !== String(pVal ?? '')) {
+                        paramChanges.push({ name: pName, old: currentParams[pName], new: pVal });
+                    }
+                }
+                if (paramChanges.length > 0) {
+                    modified.push({ op: newOp, changes: paramChanges });
+                }
+            }
+        }
+
+        for (const [key, currentOp] of currentOpMap) {
+            if (!newOpMap.has(key)) {
+                removed.push(currentOp);
+            }
+        }
+
+        const connKey = c => `${c.sourceTempId || c.SourceTempId || ''}::${c.sourcePortName || c.SourcePortName || ''}::${c.targetTempId || c.TargetTempId || ''}::${c.targetPortName || c.TargetPortName || ''}`;
+        const currentConnSet = new Set(currentConns.map(connKey));
+        const newConnSet = new Set(newConns.map(connKey));
+        const addedConnections = newConns.filter(c => !currentConnSet.has(connKey(c)));
+        const removedConnections = currentConns.filter(c => !newConnSet.has(connKey(c)));
+
+        return { added, removed, modified, addedConnections, removedConnections };
+    }
+
+    _showApplyPreview(diff, newFlow) {
+        const totalChanges = diff.added.length + diff.removed.length + diff.modified.length;
+        if (totalChanges === 0) {
+            this._executeApplyFlow(newFlow);
+            return;
+        }
+
+        // Remove existing preview if any
+        const existing = this.container.querySelector('.ai-apply-preview-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'ai-apply-preview-overlay';
+        overlay.innerHTML = `
+            <div class="ai-apply-preview-dialog">
+                <div class="ai-apply-preview-header">
+                    <span>应用预览</span>
+                    <button class="ai-apply-preview-close" type="button">&times;</button>
+                </div>
+                <div class="ai-apply-preview-body">
+                    ${diff.added.length > 0 ? `
+                        <div class="ai-apply-preview-section">
+                            <div class="ai-apply-preview-section-title is-add">新增算子 (${diff.added.length})</div>
+                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add">+ ${this._escapeHtml(op.displayName || op.DisplayName || op.name || '未命名')}</div>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${diff.removed.length > 0 ? `
+                        <div class="ai-apply-preview-section">
+                            <div class="ai-apply-preview-section-title is-remove">删除算子 (${diff.removed.length})</div>
+                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove">- ${this._escapeHtml(op.displayName || op.DisplayName || op.name || '未命名')}</div>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${diff.modified.length > 0 ? `
+                        <div class="ai-apply-preview-section">
+                            <div class="ai-apply-preview-section-title is-modify">参数变更 (${diff.modified.length})</div>
+                            ${diff.modified.map(m => `
+                                <div class="ai-apply-preview-item is-modify">
+                                    ${this._escapeHtml(m.op.displayName || m.op.DisplayName || m.op.name || '未命名')}
+                                    ${m.changes.map(c => `<div class="ai-apply-preview-param">${this._escapeHtml(c.name)}: ${this._escapeHtml(String(c.old ?? '--'))} &rarr; ${this._escapeHtml(String(c.new ?? '--'))}</div>`).join('')}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    ${diff.addedConnections.length > 0 ? `
+                        <div class="ai-apply-preview-section">
+                            <div class="ai-apply-preview-section-title is-add">新增连线 (${diff.addedConnections.length})</div>
+                        </div>
+                    ` : ''}
+                    ${diff.removedConnections.length > 0 ? `
+                        <div class="ai-apply-preview-section">
+                            <div class="ai-apply-preview-section-title is-remove">删除连线 (${diff.removedConnections.length})</div>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="ai-apply-preview-actions">
+                    <button class="ai-apply-preview-cancel" type="button">取消</button>
+                    <button class="ai-apply-preview-confirm" type="button">确认应用</button>
+                </div>
+            </div>
+        `;
+
+        this.container.appendChild(overlay);
+
+        overlay.querySelector('.ai-apply-preview-close').addEventListener('click', () => overlay.remove());
+        overlay.querySelector('.ai-apply-preview-cancel').addEventListener('click', () => overlay.remove());
+        overlay.querySelector('.ai-apply-preview-confirm').addEventListener('click', () => {
+            overlay.remove();
+            this._executeApplyFlow(newFlow);
+        });
+    }
+
+    _executeApplyFlow(flow) {
+        if (!this.flowCanvas) return;
+        try {
+            // Snapshot before apply for undo
+            this._preApplySnapshot = this.flowCanvas.serialize();
+            this._preApplySnapshotVersion += 1;
+            this._preApplyCanvasRevision = this.flowCanvas?.getFlowRevision?.() || 0;
+
+            const flowBtn = document.querySelector('.nav-btn[data-view="flow"]');
+            if (flowBtn) flowBtn.click();
+            this.flowCanvas.deserialize(flow);
+            this._markCurrentResultAppliedToCanvas();
+            this._syncPendingParameterDrafts(this.currentResult, this.currentResult?.flow, { force: true });
+            this._renderFollowupChecklist(this.currentResult, this.currentResult?.flow);
+            this._renderParameterDraftEditor(this.currentResult, this.currentResult?.flow);
+            this.options.onApplied?.(flow);
+            this.options.showToast?.('方案已应用到画布', 'success');
+            this._setWorkbenchState(AiWorkbenchStates.APPLIED);
+
+            // Show undo option in status note
+            this._setResultStatusNote(
+                '方案已应用到画布。<button class="ai-undo-btn" id="ai-btn-undo">撤销应用</button>',
+                'success',
+                true
+            );
+            const undoBtn = this.container.querySelector('#ai-btn-undo');
+            if (undoBtn) {
+                undoBtn.addEventListener('click', () => this._undoApply());
+            }
+        } catch (err) {
+            console.error('应用流程失败:', err);
+            alert('应用流程失败: ' + err.message);
+        }
+    }
+
+    _undoApply() {
+        if (!this._preApplySnapshot || !this.flowCanvas) {
+            this._addMessage('system', '没有可撤销的应用记录。');
+            return;
+        }
+
+        // Check if canvas was manually modified after apply
+        const currentRevision = this.flowCanvas?.getFlowRevision?.() || 0;
+        const revisionAtApply = this._preApplyCanvasRevision || 0;
+        if (currentRevision > revisionAtApply + 1) {
+            const confirmed = window.confirm('画布在应用后已被手动修改，撤销将覆盖这些修改。确定要继续吗？');
+            if (!confirmed) return;
+        }
+
+        try {
+            this.flowCanvas.deserialize(this._preApplySnapshot);
+            this.appliedResultVersion = 0;
+            this.appliedCanvasRevision = this.flowCanvas?.getFlowRevision?.() || 0;
+            this._preApplySnapshot = null;
+            this._preApplySnapshotVersion = 0;
+            this._preApplyCanvasRevision = 0;
+            this._setResultStatusNote('已撤销上一次应用。', 'info');
+            this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
+            this._addMessage('system', '已撤销应用，画布已恢复到应用前状态。');
+        } catch (err) {
+            console.error('撤销应用失败:', err);
+            this._addMessage('system', '撤销失败: ' + err.message);
+        }
+    }
+
+    // ── 拓扑摘要提取 ─────────────────────────────────────────
+
+    _extractTopologySummary(flow) {
+        if (!flow) return '';
+        const ops = this._extractOperators(flow);
+        const connections = this._extractConnections(flow);
+        if (ops.length === 0) return '';
+
+        // Build adjacency from connections
+        const adj = new Map();
+        const inDegree = new Map();
+        ops.forEach(op => {
+            const tid = op.tempId || op.TempId || '';
+            if (!adj.has(tid)) adj.set(tid, []);
+            if (!inDegree.has(tid)) inDegree.set(tid, 0);
+        });
+        connections.forEach(conn => {
+            const src = conn.sourceTempId || conn.SourceTempId || '';
+            const tgt = conn.targetTempId || conn.TargetTempId || '';
+            if (adj.has(src)) adj.get(src).push(tgt);
+            inDegree.set(tgt, (inDegree.get(tgt) || 0) + 1);
+        });
+
+        // Topological sort with cycle detection
+        const queue = [];
+        for (const [tid, deg] of inDegree) {
+            if (deg === 0) queue.push(tid);
+        }
+        const sorted = [];
+        while (queue.length > 0) {
+            const tid = queue.shift();
+            sorted.push(tid);
+            for (const next of (adj.get(tid) || [])) {
+                inDegree.set(next, inDegree.get(next) - 1);
+                if (inDegree.get(next) === 0) queue.push(next);
+            }
+        }
+
+        // Cycle detection: append remaining nodes (in cycles) to avoid silent loss
+        if (sorted.length < ops.length) {
+            for (const [tid, deg] of inDegree) {
+                if (deg > 0 && !sorted.includes(tid)) {
+                    sorted.push(tid);
+                }
+            }
+        }
+
+        const opMap = new Map();
+        ops.forEach(op => {
+            const tid = op.tempId || op.TempId || '';
+            opMap.set(tid, op);
+        });
+
+        return sorted
+            .map(tid => opMap.get(tid))
+            .filter(Boolean)
+            .map(op => op.operatorType || op.OperatorType || op.displayName || op.DisplayName || '?')
+            .join(' -> ');
+    }
+
+    // ── 路径脱敏 ─────────────────────────────────────────────
+
+    _sanitizePath(path) {
+        if (!path || typeof path !== 'string') return path;
+        // Replace Windows absolute paths (including spaces, Unicode, parentheses)
+        return path.replace(/[A-Z]:\\[^\s"'\]]+/gi, '<local-path>')
+            .replace(/\/home\/[^\s"'\]]+/gi, '<local-path>')
+            .replace(/\/Users\/[^\s"'\]]+/gi, '<local-path>');
+    }
+
+    _sanitizePromptTraceForNormalMode(trace) {
+        if (!trace || typeof trace !== 'object') return trace;
+        return {
+            ...trace,
+            systemPrompt: this._sanitizePath(trace.systemPrompt || ''),
+            userPrompt: this._sanitizePath(trace.userPrompt || ''),
+            baseUrl: this._sanitizePath(trace.baseUrl || '')
+        };
+    }
+
+    // ── 缺失字段动作映射 ─────────────────────────────────────
+
+    _getMissingFactAction(fact) {
+        const lower = (fact || '').toLowerCase();
+        if (lower.includes('modelpath') || lower.includes('模型路径') || lower.includes('模型文件')) {
+            return { label: '选择模型文件', action: 'pick_model' };
+        }
+        if (lower.includes('labelspath') || lower.includes('标签')) {
+            return { label: '选择标签文件', action: 'pick_labels' };
+        }
+        if (lower.includes('roi') || lower.includes('区域')) {
+            return { label: '绘制 ROI', action: 'draw_roi', disabled: true, tip: 'ROI 编辑器即将推出' };
+        }
+        if (lower.includes('plc') || lower.includes('modbus')) {
+            return { label: '配置 PLC', action: 'configure_plc', disabled: true, tip: 'PLC 配置即将推出' };
+        }
+        if (lower.includes('阈值') || lower.includes('threshold')) {
+            return { label: '填写阈值', action: 'fill_threshold' };
+        }
+        return null;
+    }
+
+    // ── 缺失字段带动作按钮 ───────────────────────────────────
+
+    _renderMissingFactsWithActions(missingFacts) {
+        if (!Array.isArray(missingFacts) || missingFacts.length === 0) {
+            return '<div class="ai-requirement-brief-empty">当前没有待确认项。</div>';
+        }
+
+        return `<div class="ai-requirement-brief-tags">${missingFacts.map(fact => {
+            const action = this._getMissingFactAction(fact);
+            if (action && !action.disabled) {
+                return `<span class="ai-requirement-brief-tag is-missing ai-requirement-tag-with-action">
+                    ${this._escapeHtml(String(fact))}
+                    <button class="ai-requirement-tag-action" type="button" data-gap-action="${this._escapeHtml(action.action)}" data-gap-fact="${this._escapeHtml(String(fact))}">${this._escapeHtml(action.label)}</button>
+                </span>`;
+            }
+            if (action && action.disabled) {
+                return `<span class="ai-requirement-brief-tag is-missing ai-requirement-tag-with-action" title="${this._escapeHtml(action.tip || '')}">
+                    ${this._escapeHtml(String(fact))}
+                    <span class="ai-requirement-tag-action is-disabled">${this._escapeHtml(action.label)}</span>
+                </span>`;
+            }
+            return `<span class="ai-requirement-brief-tag is-missing">${this._escapeHtml(String(fact))}</span>`;
+        }).join('')}</div>`;
     }
 }

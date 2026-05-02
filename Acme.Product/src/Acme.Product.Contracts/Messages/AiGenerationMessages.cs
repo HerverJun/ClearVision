@@ -92,6 +92,10 @@ public record GenerateFlowResponse
     public List<GenerateFlowMissingResource> MissingResources { get; init; } = new();
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
+    public List<GenerateFlowStageDiagnostic>? StageTimeline { get; init; }
+    public string? CompletionStatus { get; init; }
+    public int RetryCount { get; init; }
+    public List<GenerateFlowKnowledgeDiagnostic>? KnowledgeDiagnostics { get; init; }
 }
 
 /// <summary>
@@ -218,6 +222,26 @@ public record GenerateFlowClarificationQuestion
     public string Reason { get; init; } = string.Empty;
     public string Priority { get; init; } = string.Empty;
     public List<string> Options { get; init; } = new();
+}
+
+public record GenerateFlowStageDiagnostic
+{
+    public string Stage { get; init; } = string.Empty;
+    public string Status { get; init; } = "completed";
+    public string Summary { get; init; } = string.Empty;
+    public long DurationMs { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
+}
+
+public record GenerateFlowKnowledgeDiagnostic
+{
+    public string Severity { get; init; } = string.Empty;
+    public string Code { get; init; } = string.Empty;
+    public string Category { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public List<string> RelatedFields { get; init; } = new();
+    public string? OperatorId { get; init; }
+    public string? RepairHint { get; init; }
 }
 
 
