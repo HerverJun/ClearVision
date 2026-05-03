@@ -1,8 +1,11 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -34,13 +37,18 @@ public sealed class RuntimePackageExporter
     };
 
     private readonly IOperatorFactory _operatorFactory;
+    private readonly IReadOnlyDictionary<OperatorType, IOperatorExecutor> _executorsByType;
     private readonly ILogger<RuntimePackageExporter> _logger;
 
     public RuntimePackageExporter(
         IOperatorFactory operatorFactory,
-        ILogger<RuntimePackageExporter> logger)
+        ILogger<RuntimePackageExporter> logger,
+        IEnumerable<IOperatorExecutor>? executors = null)
     {
         _operatorFactory = operatorFactory;
+        _executorsByType = (executors ?? Array.Empty<IOperatorExecutor>())
+            .GroupBy(executor => executor.OperatorType)
+            .ToDictionary(group => group.Key, group => group.Last());
         _logger = logger;
     }
 
@@ -58,28 +66,32 @@ public sealed class RuntimePackageExporter
             throw new RuntimePackageException("The selected project does not contain any operators.");
         }
 
-        var pendingParameters = FindPendingParameters(flow).ToList();
+        var parameterValidationErrors = FindParameterValidationErrors(flow).ToList();
         var missingResources = FindMissingResources(flow).ToList();
         var secretFindings = FindSecretLikeFields(flow).ToList();
         if (secretFindings.Count > 0)
         {
             throw new RuntimePackageException(
-                "Runtime package export was blocked because secret-like parameters were detected: " +
-                string.Join(", ", secretFindings));
+                "导出被阻止：以下算子的参数包含疑似密钥、令牌或认证信息，" +
+                "出于安全考虑不允许打包到 Runtime Package 中。" +
+                "请将敏感信息移到环境变量或运行时配置，清空对应参数值后重试。\n" +
+                "涉及参数：\n• " + string.Join("\n• ", secretFindings));
         }
 
-        if (pendingParameters.Count > 0)
+        if (parameterValidationErrors.Count > 0)
         {
             throw new RuntimePackageException(
-                "Runtime package export was blocked because required parameters are still pending: " +
-                string.Join(", ", pendingParameters));
+                "导出被阻止：以下算子的参数配置未通过校验，" +
+                "请在 Studio 中检查对应算子配置后重新导出。\n" +
+                "参数问题：\n• " + string.Join("\n• ", parameterValidationErrors));
         }
 
         if (missingResources.Count > 0)
         {
             throw new RuntimePackageException(
-                "Runtime package export was blocked because referenced resources are missing: " +
-                string.Join(", ", missingResources));
+                "导出被阻止：以下算子引用的文件或目录在本机不存在，" +
+                "请先确认路径是否正确、文件是否已就位，然后重新导出。\n" +
+                "缺失资源：\n• " + string.Join("\n• ", missingResources));
         }
 
         var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
@@ -94,7 +106,9 @@ public sealed class RuntimePackageExporter
         Directory.CreateDirectory(Path.Combine(packageRoot, "quality"));
         Directory.CreateDirectory(Path.Combine(packageRoot, "field"));
 
-        var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, RuntimeJson.StableSerializerOptions);
+        var packagedFlow = CloneFlow(flow);
+        var bundledAssets = await BundleFlowResourcesAsync(packagedFlow, packageRoot, cancellationToken);
+        var flowBytes = JsonSerializer.SerializeToUtf8Bytes(packagedFlow, RuntimeJson.StableSerializerOptions);
         var flowHash = RuntimePathGuard.ComputeSha256(flowBytes);
         var profile = new RuntimeProfile();
         var manifest = new RuntimePackageManifest
@@ -110,15 +124,28 @@ public sealed class RuntimePackageExporter
             FlowHash = flowHash,
             OperatorCatalogVersion = BuildOperatorCatalogVersion(),
             ExportAllowed = true,
-            PendingParameters = pendingParameters,
+            PendingParameters = parameterValidationErrors,
             MissingResources = missingResources,
             FieldExtensions = new RuntimeFieldExtensions
             {
                 StationProfile = "field/station-profile.json",
                 TriggerProfile = "field/trigger-profile.json",
                 ResultMappingProfile = "field/result-mapping-profile.json",
-                ModelAssets = "field/model-assets.json"
+                ModelAssets = "field/model-assets.json",
+                RuntimeParameters = "field/runtime-parameters.json",
+                DefaultSiteProfile = "field/station-profile.default.json"
             }
+        };
+        var parameterSchema = BuildRuntimeParameterSchema(packageId, flowHash, packagedFlow);
+        var defaultSiteProfile = new RuntimeSiteProfile
+        {
+            ProfileId = "package-default",
+            PackageId = packageId,
+            FlowHash = flowHash,
+            Revision = 0,
+            UpdatedAtUtc = manifest.CreatedAt,
+            UpdatedBy = string.IsNullOrWhiteSpace(manifest.CreatedBy) ? "ClearVision Studio" : manifest.CreatedBy,
+            Overrides = []
         };
 
         var validationReport = new RuntimeValidationReport
@@ -146,7 +173,12 @@ public sealed class RuntimePackageExporter
             validationBytes,
             cancellationToken);
 
-        await WriteFieldSchemaDraftsAsync(packageRoot, cancellationToken);
+        await WriteFieldSchemaDraftsAsync(
+            packageRoot,
+            bundledAssets,
+            parameterSchema,
+            defaultSiteProfile,
+            cancellationToken);
 
         var readmePath = Path.Combine(packageRoot, "README.runtime.md");
         await File.WriteAllTextAsync(readmePath, BuildReadme(manifest, validationReport), cancellationToken);
@@ -177,26 +209,374 @@ public sealed class RuntimePackageExporter
         return $"{payload.Count(ch => ch == '|') + 1}+{hash[7..19]}";
     }
 
-    private static IEnumerable<string> FindPendingParameters(OperatorFlowDto flow)
+    private static RuntimeParameterSchema BuildRuntimeParameterSchema(
+        string packageId,
+        string flowHash,
+        OperatorFlowDto flow)
     {
+        var schema = new RuntimeParameterSchema
+        {
+            PackageId = packageId,
+            FlowHash = flowHash,
+            Parameters = []
+        };
+
+        var order = 10;
         foreach (var op in flow.Operators)
         {
+            if (op.Type != OperatorType.DeepLearning)
+            {
+                continue;
+            }
+
+            var confidence = FindParameter(op, "Confidence");
+            if (confidence == null)
+            {
+                continue;
+            }
+
+            var defaultValue = TryReadDouble(confidence.Value, out var value)
+                ? value
+                : (TryReadDouble(confidence.DefaultValue, out var fallback) ? fallback : 0.5d);
+            var min = TryReadDouble(confidence.MinValue, out var minValue) ? minValue : 0.0d;
+            var max = TryReadDouble(confidence.MaxValue, out var maxValue) ? maxValue : 1.0d;
+            var displayName = !string.IsNullOrWhiteSpace(confidence.DisplayName)
+                ? confidence.DisplayName.Trim()
+                : (!string.IsNullOrWhiteSpace(op.Name) ? $"{op.Name.Trim()}置信度" : "检测置信度");
+
+            schema.Parameters.Add(new RuntimeParameterDefinition
+            {
+                Id = BuildParameterId(op.Id, confidence.Name),
+                OperatorId = op.Id,
+                OperatorName = op.Name,
+                OperatorType = op.Type.ToString(),
+                ParameterName = confidence.Name,
+                DisplayName = displayName,
+                Description = string.IsNullOrWhiteSpace(confidence.Description)
+                    ? "低于该置信度的检测结果不参与判定。"
+                    : confidence.Description,
+                GroupName = "现场参数",
+                ValueType = RuntimeParameterValueType.Number,
+                UiKind = RuntimeParameterUiKind.NumericInput,
+                DefaultValue = JsonSerializer.SerializeToElement(defaultValue, RuntimeJson.SerializerOptions),
+                Min = min,
+                Max = max,
+                Step = 0.01d,
+                SiteTunable = true,
+                RequiresEngineerMode = true,
+                ApplyMode = RuntimeParameterApplyMode.NextRun,
+                Order = order
+            });
+            order += 10;
+        }
+
+        return schema;
+    }
+
+    private static OperatorFlowDto CloneFlow(OperatorFlowDto flow)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(flow, RuntimeJson.SerializerOptions);
+        return JsonSerializer.Deserialize<OperatorFlowDto>(bytes, RuntimeJson.SerializerOptions)
+            ?? throw new RuntimePackageException("Unable to clone flow for runtime packaging.");
+    }
+
+    private static async Task<IReadOnlyList<RuntimeBundledAsset>> BundleFlowResourcesAsync(
+        OperatorFlowDto flow,
+        string packageRoot,
+        CancellationToken cancellationToken)
+    {
+        var assets = new List<RuntimeBundledAsset>();
+        var bundledBySource = new Dictionary<string, RuntimeBundledAsset>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var op in flow.Operators)
+        {
+            var originalDeepLearningModelPath = op.Type == OperatorType.DeepLearning
+                ? NormalizeScalar(FindParameter(op, "ModelPath")?.Value)
+                : null;
+
             foreach (var parameter in op.Parameters)
+            {
+                if (!LooksLikeFileParameter(parameter))
+                {
+                    continue;
+                }
+
+                var sourcePath = NormalizeScalar(parameter.Value);
+                if (string.IsNullOrWhiteSpace(sourcePath))
+                {
+                    continue;
+                }
+
+                var asset = await BundleResourceAsync(
+                    packageRoot,
+                    op,
+                    parameter.Name,
+                    sourcePath,
+                    bundledBySource,
+                    assets,
+                    cancellationToken);
+
+                parameter.Value = asset.RelativePath;
+            }
+
+            await BundleDeepLearningAutoLabelsAsync(
+                packageRoot,
+                op,
+                originalDeepLearningModelPath,
+                bundledBySource,
+                assets,
+                cancellationToken);
+        }
+
+        return assets;
+    }
+
+    private static async Task BundleDeepLearningAutoLabelsAsync(
+        string packageRoot,
+        OperatorDto op,
+        string? originalModelPath,
+        Dictionary<string, RuntimeBundledAsset> bundledBySource,
+        List<RuntimeBundledAsset> assets,
+        CancellationToken cancellationToken)
+    {
+        if (op.Type != OperatorType.DeepLearning)
+        {
+            return;
+        }
+
+        var labelsParameter = FindParameter(op, "LabelsPath");
+        if (!string.IsNullOrWhiteSpace(NormalizeScalar(labelsParameter?.Value)))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(originalModelPath))
+        {
+            return;
+        }
+
+        var resolvedModelPath = Path.GetFullPath(originalModelPath);
+        var originalModelDirectory = Path.GetDirectoryName(resolvedModelPath);
+        if (string.IsNullOrWhiteSpace(originalModelDirectory))
+        {
+            return;
+        }
+
+        var siblingLabelsPath = Path.Combine(originalModelDirectory, "labels.txt");
+        if (!File.Exists(siblingLabelsPath))
+        {
+            return;
+        }
+
+        var modelAsset = bundledBySource.TryGetValue(resolvedModelPath, out var bundledModel)
+            ? bundledModel
+            : null;
+        if (modelAsset == null)
+        {
+            return;
+        }
+
+        var modelRelativeDirectory = Path.GetDirectoryName(modelAsset.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (string.IsNullOrWhiteSpace(modelRelativeDirectory))
+        {
+            return;
+        }
+
+        var labelsRelativePath = ToPackageRelativePath(Path.Combine(modelRelativeDirectory, "labels.txt"));
+        var labelsAsset = await BundleResourceAsync(
+            packageRoot,
+            op,
+            "LabelsPath",
+            siblingLabelsPath,
+            bundledBySource,
+            assets,
+            cancellationToken,
+            labelsRelativePath);
+
+        if (labelsParameter != null)
+        {
+            labelsParameter.Value = labelsAsset.RelativePath;
+        }
+    }
+
+    private static async Task<RuntimeBundledAsset> BundleResourceAsync(
+        string packageRoot,
+        OperatorDto op,
+        string parameterName,
+        string sourcePath,
+        Dictionary<string, RuntimeBundledAsset> bundledBySource,
+        List<RuntimeBundledAsset> assets,
+        CancellationToken cancellationToken,
+        string? preferredRelativePath = null)
+    {
+        var resolvedSourcePath = Path.GetFullPath(sourcePath);
+        if (bundledBySource.TryGetValue(resolvedSourcePath, out var existing))
+        {
+            return existing;
+        }
+
+        var isDirectory = Directory.Exists(resolvedSourcePath);
+        var relativePath = preferredRelativePath ?? BuildAssetRelativePath(op, parameterName, resolvedSourcePath, isDirectory);
+        var targetPath = RuntimePathGuard.ResolveChildPath(packageRoot, relativePath);
+
+        if (isDirectory)
+        {
+            await CopyDirectoryAsync(resolvedSourcePath, targetPath, cancellationToken);
+        }
+        else
+        {
+            var targetDirectory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            await using var source = File.OpenRead(resolvedSourcePath);
+            await using var target = File.Create(targetPath);
+            await source.CopyToAsync(target, cancellationToken);
+        }
+
+        var asset = new RuntimeBundledAsset
+        {
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            OperatorType = op.Type.ToString(),
+            ParameterName = parameterName,
+            FileName = Path.GetFileName(resolvedSourcePath),
+            RelativePath = ToPackageRelativePath(relativePath),
+            Kind = isDirectory ? "directory" : "file",
+            LengthBytes = isDirectory ? null : new FileInfo(resolvedSourcePath).Length,
+            Sha256 = isDirectory ? null : await ComputeFileSha256Async(resolvedSourcePath, cancellationToken)
+        };
+
+        bundledBySource[resolvedSourcePath] = asset;
+        assets.Add(asset);
+        return asset;
+    }
+
+    private static async Task<string> ComputeFileSha256Async(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(path);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return $"sha256:{Convert.ToHexString(hash).ToLowerInvariant()}";
+    }
+
+    private static async Task CopyDirectoryAsync(
+        string sourceDirectory,
+        string targetDirectory,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(targetDirectory);
+        foreach (var sourceFile in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var relative = Path.GetRelativePath(sourceDirectory, sourceFile);
+            var targetFile = Path.GetFullPath(Path.Combine(targetDirectory, relative));
+            var normalizedTargetRoot = Path.GetFullPath(targetDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+
+            if (!targetFile.StartsWith(normalizedTargetRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new RuntimePackageException($"Resource path escapes bundled asset directory: {relative}");
+            }
+
+            var parent = Path.GetDirectoryName(targetFile);
+            if (!string.IsNullOrWhiteSpace(parent))
+            {
+                Directory.CreateDirectory(parent);
+            }
+
+            await using var source = File.OpenRead(sourceFile);
+            await using var target = File.Create(targetFile);
+            await source.CopyToAsync(target, cancellationToken);
+        }
+    }
+
+    private static string BuildAssetRelativePath(
+        OperatorDto op,
+        string parameterName,
+        string sourcePath,
+        bool isDirectory)
+    {
+        var operatorFolder = $"{RuntimePathGuard.SanitizeFileName(op.Name, op.Type.ToString())}-{op.Id:N}";
+        var parameterFolder = RuntimePathGuard.SanitizeFileName(parameterName, "resource");
+        var assetName = RuntimePathGuard.SanitizeFileName(
+            Path.GetFileName(sourcePath),
+            isDirectory ? "directory" : "file");
+
+        return ToPackageRelativePath(Path.Combine("assets", "resources", operatorFolder, parameterFolder, assetName));
+    }
+
+    private static ParameterDto? FindParameter(OperatorDto op, string parameterName)
+    {
+        return op.Parameters.FirstOrDefault(parameter =>
+            parameter.Name.Equals(parameterName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildParameterId(Guid operatorId, string parameterName)
+    {
+        return $"node.{operatorId:D}.{parameterName}";
+    }
+
+    private IEnumerable<string> FindParameterValidationErrors(OperatorFlowDto flow)
+    {
+        OperatorFlow entityFlow;
+        try
+        {
+            entityFlow = flow.ToEntity();
+        }
+        catch (Exception ex)
+        {
+            return [$"Flow: {ex.Message}"];
+        }
+
+        var errors = new List<string>();
+        var dtoOperatorsById = flow.Operators.ToDictionary(op => op.Id);
+        foreach (var op in entityFlow.Operators)
+        {
+            if (_executorsByType.TryGetValue(op.Type, out var executor))
+            {
+                var validation = executor.ValidateParameters(op);
+                if (validation.IsValid)
+                {
+                    continue;
+                }
+
+                foreach (var error in validation.Errors.Where(error => !string.IsNullOrWhiteSpace(error)))
+                {
+                    errors.Add($"{op.Name}: {error}");
+                }
+                continue;
+            }
+
+            if (!dtoOperatorsById.TryGetValue(op.Id, out var opDto))
+            {
+                continue;
+            }
+
+            foreach (var parameter in opDto.Parameters)
             {
                 if (!parameter.IsRequired)
                 {
                     continue;
                 }
 
-                var text = NormalizeScalar(parameter.Value);
-                if (text != null)
+                if (NormalizeScalar(parameter.Value) != null)
                 {
                     continue;
                 }
 
-                yield return $"{op.Name}.{parameter.Name}";
+                if (NormalizeScalar(parameter.DefaultValue) != null)
+                {
+                    continue;
+                }
+
+                errors.Add($"{op.Name}.{parameter.Name}");
             }
         }
+
+        return errors;
     }
 
     private static IEnumerable<string> FindMissingResources(OperatorFlowDto flow)
@@ -263,10 +643,9 @@ public sealed class RuntimePackageExporter
             return true;
         }
 
-        return parameter.Name.Contains("path", StringComparison.OrdinalIgnoreCase) ||
-               parameter.Name.Contains("file", StringComparison.OrdinalIgnoreCase) ||
-               parameter.Name.Contains("model", StringComparison.OrdinalIgnoreCase) ||
-               parameter.Name.Contains("calibration", StringComparison.OrdinalIgnoreCase);
+        return parameter.Name.EndsWith("Path", StringComparison.OrdinalIgnoreCase) ||
+               parameter.Name.EndsWith("Directory", StringComparison.OrdinalIgnoreCase) ||
+               parameter.Name.EndsWith("Folder", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeScalar(object? value)
@@ -283,7 +662,53 @@ public sealed class RuntimePackageExporter
         };
     }
 
-    private static async Task WriteFieldSchemaDraftsAsync(string packageRoot, CancellationToken cancellationToken)
+    private static bool TryReadDouble(object? value, out double number)
+    {
+        number = 0;
+        switch (value)
+        {
+            case null:
+                return false;
+            case double doubleValue:
+                number = doubleValue;
+                return true;
+            case float floatValue:
+                number = floatValue;
+                return true;
+            case decimal decimalValue:
+                number = (double)decimalValue;
+                return true;
+            case int intValue:
+                number = intValue;
+                return true;
+            case long longValue:
+                number = longValue;
+                return true;
+            case JsonElement { ValueKind: JsonValueKind.Number } element:
+                return element.TryGetDouble(out number);
+            case JsonElement { ValueKind: JsonValueKind.String } element:
+                return double.TryParse(element.GetString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out number);
+            case string text:
+                return double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out number) ||
+                       double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out number);
+            default:
+                var scalar = NormalizeScalar(value);
+                return double.TryParse(scalar, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out number) ||
+                       double.TryParse(scalar, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out number);
+        }
+    }
+
+    private static string ToPackageRelativePath(string path)
+    {
+        return path.Replace('\\', '/');
+    }
+
+    private static async Task WriteFieldSchemaDraftsAsync(
+        string packageRoot,
+        IReadOnlyList<RuntimeBundledAsset> bundledAssets,
+        RuntimeParameterSchema parameterSchema,
+        RuntimeSiteProfile defaultSiteProfile,
+        CancellationToken cancellationToken)
     {
         var fieldRoot = Path.Combine(packageRoot, "field");
         var drafts = new Dictionary<string, object>
@@ -307,11 +732,12 @@ public sealed class RuntimePackageExporter
                 errorCode = "ERROR",
                 notes = "Reserved for V1.1 result writeback mapping."
             },
-            ["model-assets.json"] = new
+            ["model-assets.json"] = new RuntimeModelAssetsDraft
             {
-                assets = Array.Empty<object>(),
-                notes = "Reserved for V1.1 external model assets."
-            }
+                Assets = bundledAssets.ToList()
+            },
+            ["runtime-parameters.json"] = parameterSchema,
+            ["station-profile.default.json"] = defaultSiteProfile
         };
 
         foreach (var (fileName, payload) in drafts)
@@ -342,8 +768,36 @@ public sealed class RuntimePackageExporter
 
         builder.AppendLine();
         builder.AppendLine("## Field Extensions");
-        builder.AppendLine("- `field/` is reserved for Station/trigger/result-mapping/model-assets drafts.");
-        builder.AppendLine("- Station MVP may safely ignore those files.");
+        builder.AppendLine("- `field/` contains Station deployment drafts, runtime parameter schema, and bundled asset metadata.");
+        builder.AppendLine("- File-based resources are bundled under `assets/resources/` and referenced by package-relative paths.");
         return builder.ToString();
+    }
+
+    private sealed class RuntimeBundledAsset
+    {
+        public Guid OperatorId { get; init; }
+
+        public string OperatorName { get; init; } = string.Empty;
+
+        public string OperatorType { get; init; } = string.Empty;
+
+        public string ParameterName { get; init; } = string.Empty;
+
+        public string FileName { get; init; } = string.Empty;
+
+        public string RelativePath { get; init; } = string.Empty;
+
+        public string Kind { get; init; } = string.Empty;
+
+        public long? LengthBytes { get; init; }
+
+        public string? Sha256 { get; init; }
+    }
+
+    private sealed class RuntimeModelAssetsDraft
+    {
+        public List<RuntimeBundledAsset> Assets { get; init; } = [];
+
+        public string Notes { get; init; } = "Bundled resources required by this runtime package.";
     }
 }

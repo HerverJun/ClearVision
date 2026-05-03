@@ -1,5 +1,8 @@
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
+using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Enums;
+using Acme.Product.Infrastructure.Operators;
 
 namespace Acme.Product.Station;
 
@@ -7,13 +10,31 @@ public sealed class MainForm : Form
 {
     private readonly RuntimeHost _runtimeHost;
     private readonly StationLocalSettingsStore _settingsStore;
-    private readonly Label _packageLabel = new();
-    private readonly Label _stateLabel = new();
-    private readonly Label _hashLabel = new();
+    private readonly StationSiteProfileStore _siteProfileStore;
+    private readonly ICameraManager _cameraManager;
+    private readonly System.Windows.Forms.Timer _statusRefreshTimer = new();
     private readonly Label _selectedPathLabel = new();
+    private readonly Label _stationStatusValueLabel = new();
+    private readonly Label _stationStatusDetailLabel = new();
+    private readonly Label _cameraStatusValueLabel = new();
+    private readonly Label _cameraStatusDetailLabel = new();
+    private readonly Label _plcStatusValueLabel = new();
+    private readonly Label _plcStatusDetailLabel = new();
+    private readonly Label _packageSummaryValueLabel = new();
+    private readonly Label _packageSummaryDetailLabel = new();
+    private readonly Label _productionValueLabel = new();
+    private readonly Label _productionDetailLabel = new();
+    private readonly Label _yieldValueLabel = new();
+    private readonly Label _yieldDetailLabel = new();
     private readonly Label _statusValueLabel = new();
+    private readonly Label _statusDetailLabel = new();
     private readonly Label _timingValueLabel = new();
+    private readonly Label _timingDetailLabel = new();
     private readonly Label _statsValueLabel = new();
+    private readonly Label _statsDetailLabel = new();
+    private readonly Label _taskValueLabel = new();
+    private readonly Label _taskDetailLabel = new();
+    private readonly RuntimeParameterPanel _runtimeParameterPanel = new();
     private readonly TextBox _stationIdTextBox = new();
     private readonly TextBox _lineNameTextBox = new();
     private readonly Button _loadPackageButton = new();
@@ -31,27 +52,55 @@ public sealed class MainForm : Form
     private string? _selectedImagePath;
     private string? _selectedFolderPath;
     private RuntimePackage? _loadedPackage;
+    private RuntimeSiteProfile? _activeSiteProfile;
+    private const int LeftSidebarWidth = 240;
+    private const int RightSidebarWidth = 320;
 
-    public MainForm(RuntimeHost runtimeHost, StationLocalSettingsStore settingsStore)
+    private static readonly HashSet<OperatorType> PlcOperatorTypes =
+    [
+        OperatorType.ModbusCommunication,
+        OperatorType.SiemensS7Communication,
+        OperatorType.MitsubishiMcCommunication,
+        OperatorType.OmronFinsCommunication
+    ];
+
+    public MainForm(
+        RuntimeHost runtimeHost,
+        StationLocalSettingsStore settingsStore,
+        StationSiteProfileStore siteProfileStore,
+        ICameraManager cameraManager)
     {
         _runtimeHost = runtimeHost;
         _settingsStore = settingsStore;
+        _siteProfileStore = siteProfileStore;
+        _cameraManager = cameraManager;
 
-        Text = "ClearVision Station";
+        Text = "ClearVision 工作站";
         Width = 1280;
         Height = 860;
         MinimumSize = new Size(1024, 720);
         StartPosition = FormStartPosition.CenterScreen;
+        AutoScaleMode = AutoScaleMode.Dpi;
+        BackColor = Color.FromArgb(244, 247, 250);
 
         BuildUi();
+        _runtimeParameterPanel.ApplyRequested = ApplyRuntimeParameterProfile;
+        _runtimeParameterPanel.ResetRequested = ResetRuntimeParameterProfileToDefault;
         BindRuntimeEvents();
         LoadSettings();
         ApplySnapshot(_runtimeHost.GetSnapshot());
+        RefreshHeaderCards();
         UpdateButtonStates();
+
+        _statusRefreshTimer.Interval = 1000;
+        _statusRefreshTimer.Tick += (_, _) => RefreshHeaderCards();
+        _statusRefreshTimer.Start();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        _statusRefreshTimer.Stop();
+        _statusRefreshTimer.Dispose();
         PersistStationIdentity();
         base.OnFormClosing(e);
     }
@@ -62,19 +111,16 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
-            Padding = new Padding(12)
+            RowCount = 2,
+            Padding = new Padding(12),
+            BackColor = BackColor
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 180));
         Controls.Add(root);
 
-        root.Controls.Add(BuildHeaderPanel(), 0, 0);
-        root.Controls.Add(BuildToolbarPanel(), 0, 1);
-        root.Controls.Add(BuildMainPanel(), 0, 2);
-        root.Controls.Add(BuildLogPanel(), 0, 3);
+        root.Controls.Add(BuildNavigationBar(), 0, 0);
+        root.Controls.Add(BuildDashboardPanel(), 0, 1);
     }
 
     private Control BuildHeaderPanel()
@@ -82,66 +128,189 @@ public sealed class MainForm : Form
         var panel = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            ColumnCount = 4,
+            ColumnCount = 2,
+            RowCount = 3,
             AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Padding = new Padding(0, 0, 0, 8)
         };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        for (var row = 0; row < panel.RowCount; row += 1)
+        {
+            panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
 
-        _packageLabel.AutoEllipsis = true;
-        _packageLabel.Text = "Package: -";
-        _stateLabel.Text = "State: Idle";
-        _hashLabel.AutoEllipsis = true;
-        _hashLabel.Text = "FlowHash: -";
+        panel.Controls.Add(
+            CreateSummaryCard("运行状态", _stationStatusValueLabel, _stationStatusDetailLabel, Color.DodgerBlue),
+            0,
+            0);
+        panel.Controls.Add(
+            CreateSummaryCard("工站编号", BuildIdentityContent(), accentColor: Color.SteelBlue),
+            1,
+            0);
+        panel.Controls.Add(
+            CreateSummaryCard("相机连接状态", _cameraStatusValueLabel, _cameraStatusDetailLabel, Color.SeaGreen),
+            0,
+            1);
+        panel.Controls.Add(
+            CreateSummaryCard("PLC 连接状态", _plcStatusValueLabel, _plcStatusDetailLabel, Color.DarkOrange),
+            1,
+            1);
+        panel.Controls.Add(
+            CreateSummaryCard("产量统计", _productionValueLabel, _productionDetailLabel, Color.MediumSlateBlue),
+            0,
+            2);
+        panel.Controls.Add(
+            CreateSummaryCard("合格率统计", _yieldValueLabel, _yieldDetailLabel, Color.MediumSeaGreen),
+            1,
+            2);
 
-        var identityPanel = new FlowLayoutPanel
+        return panel;
+    }
+
+    private Control BuildIdentityContent()
+    {
+        var identityPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.LeftToRight,
+            ColumnCount = 2,
+            RowCount = 2,
             AutoSize = true,
-            WrapContents = false
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0)
         };
-        _stationIdTextBox.Width = 110;
-        _lineNameTextBox.Width = 110;
-        identityPanel.Controls.Add(new Label { Text = "StationId", AutoSize = true, Margin = new Padding(0, 6, 6, 0) });
-        identityPanel.Controls.Add(_stationIdTextBox);
-        identityPanel.Controls.Add(new Label { Text = "Line", AutoSize = true, Margin = new Padding(12, 6, 6, 0) });
-        identityPanel.Controls.Add(_lineNameTextBox);
+        identityPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        identityPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        identityPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        identityPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        panel.Controls.Add(_packageLabel, 0, 0);
-        panel.Controls.Add(_stateLabel, 1, 0);
-        panel.Controls.Add(_hashLabel, 2, 0);
-        panel.Controls.Add(identityPanel, 3, 0);
-        return panel;
+        _stationIdTextBox.Width = 140;
+        _lineNameTextBox.Width = 140;
+
+        identityPanel.Controls.Add(new Label { Text = "编号", AutoSize = true, Margin = new Padding(0, 6, 6, 0) }, 0, 0);
+        identityPanel.Controls.Add(_stationIdTextBox, 1, 0);
+        identityPanel.Controls.Add(new Label { Text = "产线", AutoSize = true, Margin = new Padding(0, 10, 6, 0) }, 0, 1);
+        identityPanel.Controls.Add(_lineNameTextBox, 1, 1);
+
+        return identityPanel;
+    }
+
+    private static Panel CreateSummaryCard(string title, Label valueLabel, Label detailLabel, Color accentColor)
+    {
+        ConfigureCardLabel(valueLabel, 18, FontStyle.Bold, accentColor);
+        ConfigureCardLabel(detailLabel, 9, FontStyle.Regular, SystemColors.GrayText);
+        detailLabel.MaximumSize = new Size(0, 42);
+
+        var content = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0)
+        };
+        content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        content.Controls.Add(new Label
+        {
+            Text = title,
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+            ForeColor = SystemColors.ControlText,
+            Margin = new Padding(0, 0, 0, 4)
+        }, 0, 0);
+        content.Controls.Add(valueLabel, 0, 1);
+        content.Controls.Add(detailLabel, 0, 2);
+
+        return CreateSummaryCard(title, content, accentColor);
+    }
+
+    private static Panel CreateSummaryCard(string title, Control content, Color accentColor)
+    {
+        var accent = new Panel
+        {
+            Dock = DockStyle.Left,
+            Width = 4,
+            BackColor = accentColor
+        };
+
+        var body = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(12, 8, 12, 8)
+        };
+        content.Dock = DockStyle.Fill;
+        body.Controls.Add(content);
+
+        var card = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 12, 12),
+            Padding = new Padding(0),
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.White,
+            MinimumSize = new Size(0, 76)
+        };
+
+        card.Controls.Add(body);
+        card.Controls.Add(accent);
+        return card;
+    }
+
+    private static void ConfigureCardLabel(Label label, float fontSize, FontStyle fontStyle, Color foreColor)
+    {
+        label.AutoSize = true;
+        label.Dock = DockStyle.Top;
+        label.Font = new Font(SystemFonts.DefaultFont.FontFamily, fontSize, fontStyle);
+        label.ForeColor = foreColor;
+        label.Margin = new Padding(0);
     }
 
     private Control BuildToolbarPanel()
     {
-        var panel = new FlowLayoutPanel
+        var buttonPanel = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top,
+            Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             AutoSize = true,
-            WrapContents = true,
-            Padding = new Padding(0, 0, 0, 12)
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false,
+            Margin = new Padding(0)
         };
 
-        ConfigureButton(_loadPackageButton, "Load Package", async (_, _) => await LoadPackageFromPickerAsync());
-        ConfigureButton(_loadLastGoodButton, "Load Last Good", async (_, _) => await LoadLastGoodPackageAsync());
-        ConfigureButton(_chooseImageButton, "Choose Image", (_, _) => ChooseImage());
-        ConfigureButton(_runSingleButton, "Run Single", async (_, _) => await RunSingleAsync());
-        ConfigureButton(_chooseFolderButton, "Choose Folder", (_, _) => ChooseFolder());
-        ConfigureButton(_runFolderButton, "Run Folder", async (_, _) => await RunFolderAsync());
-        ConfigureButton(_stopButton, "Stop", async (_, _) => await StopAsync());
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        _selectedPathLabel.AutoSize = true;
-        _selectedPathLabel.Margin = new Padding(12, 10, 0, 0);
-        _selectedPathLabel.Text = "Selected: -";
+        ConfigureButton(_loadPackageButton, "加载运行包", async (_, _) => await LoadPackageFromPickerAsync());
+        ConfigureButton(_loadLastGoodButton, "加载上次可用包", async (_, _) => await LoadLastGoodPackageAsync());
+        ConfigureButton(_chooseImageButton, "选择图片", (_, _) => ChooseImage());
+        ConfigureButton(_runSingleButton, "单张运行", async (_, _) => await RunSingleAsync());
+        ConfigureButton(_chooseFolderButton, "选择文件夹", (_, _) => ChooseFolder());
+        ConfigureButton(_runFolderButton, "批量运行", async (_, _) => await RunFolderAsync());
+        ConfigureButton(_stopButton, "停止", async (_, _) => await StopAsync());
 
-        panel.Controls.AddRange(
+        _selectedPathLabel.AutoSize = false;
+        _selectedPathLabel.Dock = DockStyle.Fill;
+        _selectedPathLabel.Height = 24;
+        _selectedPathLabel.AutoEllipsis = true;
+        _selectedPathLabel.Margin = new Padding(0, 6, 0, 0);
+        _selectedPathLabel.TextAlign = ContentAlignment.MiddleLeft;
+        _selectedPathLabel.Text = "当前选择：-";
+
+        buttonPanel.Controls.AddRange(
         [
             _loadPackageButton,
             _loadLastGoodButton,
@@ -149,11 +318,13 @@ public sealed class MainForm : Form
             _runSingleButton,
             _chooseFolderButton,
             _runFolderButton,
-            _stopButton,
-            _selectedPathLabel
+            _stopButton
         ]);
 
-        return panel;
+        layout.Controls.Add(buttonPanel, 0, 0);
+        layout.Controls.Add(_selectedPathLabel, 1, 0);
+
+        return layout;
     }
 
     private Control BuildMainPanel()
@@ -161,59 +332,79 @@ public sealed class MainForm : Form
         var split = new SplitContainer
         {
             Dock = DockStyle.Fill,
-            SplitterDistance = 520
+            BackColor = BackColor,
+            FixedPanel = FixedPanel.Panel2
         };
+        split.SizeChanged += (_, _) => ApplyMainSplitterLayout(split);
 
         _previewBox.Dock = DockStyle.Fill;
         _previewBox.BackColor = Color.Black;
         _previewBox.SizeMode = PictureBoxSizeMode.Zoom;
-        split.Panel1.Controls.Add(_previewBox);
+        split.Panel1.Padding = new Padding(0, 0, 12, 0);
+        split.Panel1.Controls.Add(CreatePaneShell("实时预览", _previewBox));
 
         var right = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5
+            RowCount = 3,
+            BackColor = BackColor
         };
-        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
 
-        _statusValueLabel.Font = new Font(Font.FontFamily, 24, FontStyle.Bold);
-        _statusValueLabel.Text = "IDLE";
-        _statusValueLabel.AutoSize = true;
-        _timingValueLabel.Text = "Last run: -";
-        _timingValueLabel.AutoSize = true;
-        _statsValueLabel.Text = "Stats: -";
-        _statsValueLabel.AutoSize = true;
-
-        var title = new Label
+        var overviewGrid = new TableLayoutPanel
         {
-            Text = "Recent Results",
-            Font = new Font(Font, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            ColumnCount = 2,
+            RowCount = 2,
             AutoSize = true,
-            Padding = new Padding(0, 12, 0, 6)
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 0, 0, 12)
         };
+        overviewGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        overviewGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        overviewGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        overviewGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        overviewGrid.Controls.Add(
+            CreateSummaryCard("当前判定", _statusValueLabel, _statusDetailLabel, Color.SeaGreen),
+            0,
+            0);
+        overviewGrid.Controls.Add(
+            CreateSummaryCard("推理耗时", _timingValueLabel, _timingDetailLabel, Color.DodgerBlue),
+            1,
+            0);
+        overviewGrid.Controls.Add(
+            CreateSummaryCard("运行统计", _statsValueLabel, _statsDetailLabel, Color.MediumSlateBlue),
+            0,
+            1);
+        overviewGrid.Controls.Add(
+            CreateSummaryCard("当前任务", _taskValueLabel, _taskDetailLabel, Color.SlateGray),
+            1,
+            1);
 
         _recentResultsView.Dock = DockStyle.Fill;
         _recentResultsView.View = View.Details;
         _recentResultsView.FullRowSelect = true;
-        _recentResultsView.Columns.Add("Time", 120);
-        _recentResultsView.Columns.Add("Image", 180);
-        _recentResultsView.Columns.Add("Outcome", 80);
-        _recentResultsView.Columns.Add("Ms", 70);
-        _recentResultsView.Columns.Add("Code", 180);
+        _recentResultsView.GridLines = true;
+        _recentResultsView.Columns.Add("时间", 120);
+        _recentResultsView.Columns.Add("图片", 150);
+        _recentResultsView.Columns.Add("结果", 80);
+        _recentResultsView.Columns.Add("耗时(ms)", 80);
+        _recentResultsView.Columns.Add("诊断码", 150);
 
-        right.Controls.Add(_statusValueLabel, 0, 0);
-        right.Controls.Add(_timingValueLabel, 0, 1);
-        right.Controls.Add(_statsValueLabel, 0, 2);
-        right.Controls.Add(title, 0, 3);
-        right.Controls.Add(_recentResultsView, 0, 4);
+        right.Controls.Add(overviewGrid, 0, 0);
+        right.Controls.Add(CreatePaneShell("最近结果", _recentResultsView), 0, 1);
         split.Panel2.Controls.Add(right);
+        ApplyMainSplitterLayout(split);
 
         return split;
+    }
+
+    private static void ApplyMainSplitterLayout(SplitContainer split)
+    {
     }
 
     private Control BuildLogPanel()
@@ -229,7 +420,7 @@ public sealed class MainForm : Form
 
         panel.Controls.Add(new Label
         {
-            Text = "Log",
+            Text = "运行日志",
             Font = new Font(Font, FontStyle.Bold),
             AutoSize = true,
             Padding = new Padding(0, 0, 0, 6)
@@ -243,11 +434,285 @@ public sealed class MainForm : Form
         return panel;
     }
 
+    private Control BuildNavigationBar()
+    {
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false,
+            Margin = new Padding(0)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        ConfigureButton(_loadPackageButton, "加载运行包", async (_, _) => await LoadPackageFromPickerAsync());
+        ConfigureButton(_loadLastGoodButton, "加载上次可用包", async (_, _) => await LoadLastGoodPackageAsync());
+        ConfigureButton(_chooseImageButton, "选择图片", (_, _) => ChooseImage());
+        ConfigureButton(_runSingleButton, "单张测试", async (_, _) => await RunSingleAsync());
+        ConfigureButton(_runFolderButton, "启动系统", async (_, _) => await RunFolderAsync());
+        ConfigureButton(_stopButton, "停止", async (_, _) => await StopAsync());
+
+        _selectedPathLabel.AutoSize = false;
+        _selectedPathLabel.Dock = DockStyle.Fill;
+        _selectedPathLabel.AutoEllipsis = true;
+        _selectedPathLabel.Margin = new Padding(16, 0, 0, 0);
+        _selectedPathLabel.TextAlign = ContentAlignment.MiddleRight;
+        _selectedPathLabel.ForeColor = Color.DimGray;
+        _selectedPathLabel.Text = "当前选择：-";
+
+        buttonPanel.Controls.AddRange(
+        [
+            _loadPackageButton,
+            _loadLastGoodButton,
+            _chooseImageButton,
+            _runSingleButton,
+            _runFolderButton,
+            _stopButton
+        ]);
+
+        layout.Controls.Add(buttonPanel, 0, 0);
+        layout.Controls.Add(_selectedPathLabel, 1, 0);
+
+        var shell = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 52,
+            Padding = new Padding(12, 8, 12, 8),
+            Margin = new Padding(0, 0, 0, 12),
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        shell.Controls.Add(layout);
+        return shell;
+    }
+
+    private Control BuildDashboardPanel()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            BackColor = BackColor
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LeftSidebarWidth));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, RightSidebarWidth));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        _previewBox.Dock = DockStyle.Fill;
+        _previewBox.BackColor = Color.Black;
+        _previewBox.SizeMode = PictureBoxSizeMode.Zoom;
+
+        var left = BuildStatusSidebar();
+        left.Margin = new Padding(0, 0, 12, 0);
+
+        var center = CreatePaneShell("图像预览", _previewBox);
+        center.Margin = new Padding(0, 0, 12, 0);
+
+        var right = BuildMetricsSidebar();
+
+        layout.Controls.Add(left, 0, 0);
+        layout.Controls.Add(center, 1, 0);
+        layout.Controls.Add(right, 2, 0);
+
+        return layout;
+    }
+
+    private Control BuildStatusSidebar()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 6,
+            BackColor = BackColor,
+            AutoScroll = true
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        layout.Controls.Add(CreateSidebarCard("运行状态", _stationStatusValueLabel, _stationStatusDetailLabel, Color.DodgerBlue), 0, 0);
+        layout.Controls.Add(CreateSidebarCard("相机连接状态", _cameraStatusValueLabel, _cameraStatusDetailLabel, Color.SeaGreen), 0, 1);
+        layout.Controls.Add(CreateSidebarCard("PLC 连接状态", _plcStatusValueLabel, _plcStatusDetailLabel, Color.DarkOrange), 0, 2);
+        layout.Controls.Add(CreateSidebarCard("运行包流程", BuildPackageSummaryContent(), Color.SteelBlue), 0, 3);
+        layout.Controls.Add(CreateSidebarCard("现场参数", _runtimeParameterPanel, Color.DarkCyan), 0, 4);
+
+        return layout;
+    }
+
+    private Control BuildMetricsSidebar()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            BackColor = BackColor
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 160));
+
+        var metricsGrid = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 2,
+            RowCount = 2,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        metricsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        metricsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        metricsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        metricsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        metricsGrid.Controls.Add(CreateSidebarCard("产量统计", _productionValueLabel, _productionDetailLabel, Color.MediumSlateBlue), 0, 0);
+        metricsGrid.Controls.Add(CreateSidebarCard("合格率统计", _yieldValueLabel, _yieldDetailLabel, Color.MediumSeaGreen), 1, 0);
+        metricsGrid.Controls.Add(CreateSidebarCard("当前判定", _statusValueLabel, _statusDetailLabel, Color.SeaGreen), 0, 1);
+        metricsGrid.Controls.Add(CreateSidebarCard("推理耗时", _timingValueLabel, _timingDetailLabel, Color.DodgerBlue), 1, 1);
+
+        var infoStack = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 1,
+            RowCount = 3,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        infoStack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        infoStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        infoStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        infoStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        infoStack.Controls.Add(CreateSidebarCard("统计摘要", _statsValueLabel, _statsDetailLabel, Color.MediumPurple), 0, 0);
+        infoStack.Controls.Add(CreateSidebarCard("当前任务", _taskValueLabel, _taskDetailLabel, Color.SlateGray), 0, 1);
+        infoStack.Controls.Add(CreateSidebarCard("工位信息", BuildIdentityContent(), Color.SteelBlue), 0, 2);
+
+        _recentResultsView.Dock = DockStyle.Fill;
+        _recentResultsView.View = View.Details;
+        _recentResultsView.FullRowSelect = true;
+        _recentResultsView.GridLines = true;
+        _recentResultsView.Columns.Clear();
+        _recentResultsView.Columns.Add("时间", 56);
+        _recentResultsView.Columns.Add("图片", 72);
+        _recentResultsView.Columns.Add("结果", 48);
+        _recentResultsView.Columns.Add("耗时", 52);
+        _recentResultsView.Columns.Add("诊断码", 70);
+
+        _logTextBox.Dock = DockStyle.Fill;
+        _logTextBox.Multiline = true;
+        _logTextBox.ReadOnly = true;
+        _logTextBox.ScrollBars = ScrollBars.Vertical;
+
+        layout.Controls.Add(metricsGrid, 0, 0);
+        layout.Controls.Add(infoStack, 0, 1);
+        layout.Controls.Add(CreatePaneShell("最近结果", _recentResultsView), 0, 2);
+        layout.Controls.Add(CreatePaneShell("运行日志", _logTextBox), 0, 3);
+
+        return layout;
+    }
+
+    private Control BuildPackageSummaryContent()
+    {
+        ConfigureCardLabel(_packageSummaryValueLabel, 12, FontStyle.Bold, Color.SteelBlue);
+        ConfigureCardLabel(_packageSummaryDetailLabel, 9, FontStyle.Regular, SystemColors.GrayText);
+        _packageSummaryValueLabel.MaximumSize = new Size(210, 0);
+        _packageSummaryDetailLabel.MaximumSize = new Size(210, 0);
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.Controls.Add(_packageSummaryValueLabel, 0, 0);
+        layout.Controls.Add(_packageSummaryDetailLabel, 0, 1);
+        return layout;
+    }
+
+    private static Panel CreateSidebarCard(string title, Label valueLabel, Label detailLabel, Color accentColor)
+    {
+        var card = CreateSummaryCard(title, valueLabel, detailLabel, accentColor);
+        card.Margin = new Padding(0, 0, 0, 10);
+        return card;
+    }
+
+    private static Panel CreateSidebarCard(string title, Control content, Color accentColor)
+    {
+        var card = CreateSummaryCard(title, content, accentColor);
+        card.Margin = new Padding(0, 0, 0, 10);
+        return card;
+    }
+
+    private static Control CreatePaneShell(string title, Control content)
+    {
+        var shell = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = Color.White,
+            Margin = new Padding(0),
+            Padding = new Padding(10)
+        };
+        shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        shell.Controls.Add(new Label
+        {
+            Text = title,
+            Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+            AutoSize = true,
+            Padding = new Padding(0, 0, 0, 8)
+        }, 0, 0);
+
+        content.Dock = DockStyle.Fill;
+        shell.Controls.Add(content, 0, 1);
+
+        var border = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Margin = new Padding(0)
+        };
+        border.Controls.Add(shell);
+        return border;
+    }
+
     private void BindRuntimeEvents()
     {
         _runtimeHost.SnapshotChanged += snapshot => Ui(() =>
         {
             ApplySnapshot(snapshot);
+            RefreshHeaderCards();
             UpdateButtonStates();
         });
 
@@ -255,6 +720,7 @@ public sealed class MainForm : Form
         {
             _settingsStore.UpdateLastRun(result.RunId);
             ApplyResult(result);
+            RefreshHeaderCards();
             UpdateButtonStates();
         });
 
@@ -269,12 +735,12 @@ public sealed class MainForm : Form
 
         if (settings.LastUnexpectedExitAtUtc.HasValue)
         {
-            AppendLog($"Previous session did not exit cleanly ({settings.LastUnexpectedExitAtUtc:O}).");
+            AppendLog($"检测到上次未正常退出：{settings.LastUnexpectedExitAtUtc:O}");
         }
 
         if (!string.IsNullOrWhiteSpace(settings.LastGoodPackagePath))
         {
-            AppendLog($"Last good package: {settings.LastGoodPackagePath}");
+            AppendLog($"上次可用运行包：{settings.LastGoodPackagePath}");
         }
     }
 
@@ -282,7 +748,7 @@ public sealed class MainForm : Form
     {
         using var dialog = new FolderBrowserDialog
         {
-            Description = "Select a runtime package folder"
+            Description = "请选择运行包目录。可直接选择包含 package.json 的导出包文件夹；如果选择的是上一级目录且其中只有一个运行包，也会自动识别。"
         };
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -298,7 +764,7 @@ public sealed class MainForm : Form
         var lastGood = _settingsStore.Current.LastGoodPackagePath;
         if (string.IsNullOrWhiteSpace(lastGood))
         {
-            AppendLog("No last-good package is recorded yet.");
+            AppendLog("当前还没有记录上次可用的运行包。");
             return;
         }
 
@@ -309,14 +775,20 @@ public sealed class MainForm : Form
     {
         try
         {
-            _loadedPackage = await _runtimeHost.LoadPackageAsync(packagePath);
-            _settingsStore.UpdateLastGoodPackage(packagePath);
-            AppendLog($"Package loaded: {_loadedPackage.Manifest.PackageName}");
+            var resolvedPackagePath = ResolvePackageDirectory(packagePath);
+            _loadedPackage = await _runtimeHost.LoadPackageAsync(resolvedPackagePath);
+            _activeSiteProfile = _siteProfileStore.LoadOrCreate(_loadedPackage);
+            _runtimeHost.SetActiveSiteProfile(_activeSiteProfile);
+            _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
+            _settingsStore.UpdateLastGoodPackage(resolvedPackagePath);
+            _selectedPathLabel.Text = $"当前选择：{resolvedPackagePath}";
+            AppendLog($"运行包加载成功：{_loadedPackage.Manifest.PackageName}");
+            AppendLog($"现场参数 Profile：Revision {_activeSiteProfile.Revision}，{_activeSiteProfile.Overrides.Count} 项覆盖。");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Load Package Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            AppendLog($"Load package failed: {ex.Message}");
+            MessageBox.Show(this, ex.Message, "加载运行包失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"运行包加载失败：{ex.Message}");
         }
         finally
         {
@@ -325,11 +797,55 @@ public sealed class MainForm : Form
         }
     }
 
+    private void ApplyRuntimeParameterProfile(RuntimeSiteProfile profile)
+    {
+        if (_loadedPackage == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _activeSiteProfile = _siteProfileStore.Save(_loadedPackage, profile);
+            _runtimeHost.SetActiveSiteProfile(_activeSiteProfile);
+            _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
+            AppendLog($"现场参数已保存：Revision {_activeSiteProfile.Revision}，下次运行生效。");
+            UpdateButtonStates();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "保存现场参数失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"现场参数保存失败：{ex.Message}");
+        }
+    }
+
+    private void ResetRuntimeParameterProfileToDefault()
+    {
+        if (_loadedPackage == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _activeSiteProfile = _siteProfileStore.ResetToPackageDefault(_loadedPackage, _activeSiteProfile);
+            _runtimeHost.SetActiveSiteProfile(_activeSiteProfile);
+            _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
+            AppendLog($"现场参数已恢复包默认值：Revision {_activeSiteProfile.Revision}，下次运行生效。");
+            UpdateButtonStates();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "恢复现场参数失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"现场参数恢复默认失败：{ex.Message}");
+        }
+    }
+
     private void ChooseImage()
     {
         using var dialog = new OpenFileDialog
         {
-            Filter = "Image Files|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff",
+            Filter = "图片文件|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff",
             Multiselect = false
         };
 
@@ -340,7 +856,7 @@ public sealed class MainForm : Form
 
         _selectedImagePath = dialog.FileName;
         _selectedFolderPath = null;
-        _selectedPathLabel.Text = $"Selected: {_selectedImagePath}";
+        _selectedPathLabel.Text = $"当前选择：{_selectedImagePath}";
         LoadPreviewFromFile(_selectedImagePath);
         UpdateButtonStates();
     }
@@ -349,7 +865,7 @@ public sealed class MainForm : Form
     {
         using var dialog = new FolderBrowserDialog
         {
-            Description = "Select an image replay folder"
+            Description = "请选择用于批量运行的图片文件夹"
         };
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -359,7 +875,7 @@ public sealed class MainForm : Form
 
         _selectedFolderPath = dialog.SelectedPath;
         _selectedImagePath = null;
-        _selectedPathLabel.Text = $"Selected: {_selectedFolderPath}";
+        _selectedPathLabel.Text = $"当前选择：{_selectedFolderPath}";
         UpdateButtonStates();
     }
 
@@ -381,8 +897,8 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Run Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            AppendLog($"Run failed: {ex.Message}");
+            MessageBox.Show(this, ex.Message, "单张运行失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"单张运行失败：{ex.Message}");
         }
         finally
         {
@@ -408,8 +924,8 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Replay Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            AppendLog($"Replay failed: {ex.Message}");
+            MessageBox.Show(this, ex.Message, "批量运行失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"批量运行失败：{ex.Message}");
         }
         finally
         {
@@ -422,24 +938,20 @@ public sealed class MainForm : Form
         var summary = await _runtimeHost.StopAsync();
         AppendLog(
             summary.WasRunning
-                ? $"Stop completed. Pending={summary.PendingCount}, Dropped={summary.DroppedCount}, TimedOut={summary.TimedOut}"
-                : "Nothing was running.");
+                ? $"停止完成。待处理={summary.PendingCount}，丢弃={summary.DroppedCount}，超时={summary.TimedOut}"
+                : "当前没有正在运行的任务。");
         UpdateButtonStates();
     }
 
     private void ApplySnapshot(RuntimeHostSnapshot snapshot)
     {
-        _packageLabel.Text = $"Package: {snapshot.PackageName ?? "-"}";
-        _stateLabel.Text = $"State: {snapshot.State}";
-        _hashLabel.Text = $"FlowHash: {snapshot.FlowHash ?? "-"}";
-
         _statusValueLabel.Text = snapshot.State switch
         {
-            RuntimeHostState.Running => "RUNNING",
-            RuntimeHostState.Stopping => "STOPPING",
-            RuntimeHostState.Faulted => "FAULTED",
-            RuntimeHostState.Loaded => "READY",
-            _ => "IDLE"
+            RuntimeHostState.Running => "运行中",
+            RuntimeHostState.Stopping => "停止中",
+            RuntimeHostState.Faulted => "故障",
+            RuntimeHostState.Loaded => "就绪",
+            _ => "空闲"
         };
 
         _statusValueLabel.ForeColor = snapshot.State switch
@@ -451,7 +963,7 @@ public sealed class MainForm : Form
             _ => SystemColors.ControlText
         };
 
-        _statsValueLabel.Text = $"Stats: OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / ERR {snapshot.SessionErrorCount}";
+        _statsValueLabel.Text = $"统计：OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / 异常 {snapshot.SessionErrorCount}";
     }
 
     private void ApplyResult(RuntimeNormalizedResult result)
@@ -479,7 +991,16 @@ public sealed class MainForm : Form
             _recentResultsView.Items.RemoveAt(_recentResultsView.Items.Count - 1);
         }
 
-        _timingValueLabel.Text = $"Last run: {result.ExecutionTimeMs} ms | Avg {ComputeAverageMs():F1} ms | P95 {ComputeP95Ms():F1} ms";
+        item.SubItems[2].Text = result.Outcome switch
+        {
+            RuntimeRunOutcome.Ok => "OK",
+            RuntimeRunOutcome.Ng => "NG",
+            RuntimeRunOutcome.Error => "异常",
+            RuntimeRunOutcome.Canceled => "已取消",
+            _ => result.Outcome.ToString()
+        };
+
+        _timingValueLabel.Text = $"最近推理：{result.ExecutionTimeMs} ms | 平均 {ComputeAverageMs():F1} ms | P95 {ComputeP95Ms():F1} ms";
 
         var previewBytes = result.OutputImageBytes ?? result.SourceImageBytes;
         if (previewBytes is { Length: > 0 })
@@ -501,6 +1022,7 @@ public sealed class MainForm : Form
         _runSingleButton.Enabled = hasPackage && !running;
         _runFolderButton.Enabled = hasPackage && !running;
         _stopButton.Enabled = running;
+        _runtimeParameterPanel.SetEditingEnabled(hasPackage && !running);
     }
 
     private void AppendLog(string message)
@@ -518,6 +1040,311 @@ public sealed class MainForm : Form
         _logTextBox.ScrollToCaret();
     }
 
+    private void RefreshHeaderCards()
+    {
+        var snapshot = _runtimeHost.GetSnapshot();
+        RefreshStationStatusCard(snapshot);
+        RefreshCameraStatusCard();
+        RefreshPlcStatusCard();
+        RefreshPackageSummaryCard();
+        RefreshProductionCards(snapshot);
+        RefreshOverviewCards(snapshot);
+    }
+
+    private void RefreshStationStatusCard(RuntimeHostSnapshot snapshot)
+    {
+        _stationStatusValueLabel.Text = snapshot.State switch
+        {
+            RuntimeHostState.Running => "运行中",
+            RuntimeHostState.Stopping => "停止中",
+            RuntimeHostState.Faulted => "故障",
+            RuntimeHostState.Loaded => "就绪",
+            _ => "空闲"
+        };
+        _stationStatusValueLabel.ForeColor = snapshot.State switch
+        {
+            RuntimeHostState.Running => Color.SeaGreen,
+            RuntimeHostState.Stopping => Color.DarkOrange,
+            RuntimeHostState.Faulted => Color.Firebrick,
+            RuntimeHostState.Loaded => Color.DodgerBlue,
+            _ => Color.DimGray
+        };
+
+        var packageName = _loadedPackage?.Manifest.PackageName ?? "未加载";
+        _stationStatusDetailLabel.Text = string.IsNullOrWhiteSpace(_selectedImagePath)
+            ? $"当前任务：{packageName}"
+            : $"当前图片：{Path.GetFileName(_selectedImagePath)}";
+    }
+
+    private void RefreshCameraStatusCard()
+    {
+        if (_loadedPackage?.Flow == null)
+        {
+            _cameraStatusValueLabel.Text = "未评估";
+            _cameraStatusValueLabel.ForeColor = Color.DimGray;
+            _cameraStatusDetailLabel.Text = "加载运行包后显示相机模式与连接情况";
+            return;
+        }
+
+        var imageOp = _loadedPackage.Flow.Operators.FirstOrDefault(op => op.Type == OperatorType.ImageAcquisition);
+        if (imageOp == null)
+        {
+            _cameraStatusValueLabel.Text = "未使用";
+            _cameraStatusValueLabel.ForeColor = Color.DimGray;
+            _cameraStatusDetailLabel.Text = "当前流程未包含图像采集算子";
+            return;
+        }
+
+        var sourceType = GetParameterString(imageOp, "SourceType", "File");
+        if (sourceType.Equals("File", StringComparison.OrdinalIgnoreCase))
+        {
+            _cameraStatusValueLabel.Text = "文件模式";
+            _cameraStatusValueLabel.ForeColor = Color.SteelBlue;
+            _cameraStatusDetailLabel.Text = "当前流程使用图片文件输入，不依赖现场相机";
+            return;
+        }
+
+        var bindings = _cameraManager.GetBindings() ?? [];
+        var bindingId = GetParameterString(imageOp, "CameraId", string.Empty);
+        var boundCamera = bindings.FirstOrDefault(binding => string.Equals(binding.Id, bindingId, StringComparison.OrdinalIgnoreCase));
+        var camera = !string.IsNullOrWhiteSpace(boundCamera?.SerialNumber)
+            ? _cameraManager.GetCamera(boundCamera.SerialNumber)
+            : null;
+
+        if (camera?.IsConnected == true)
+        {
+            _cameraStatusValueLabel.Text = "已连接";
+            _cameraStatusValueLabel.ForeColor = Color.SeaGreen;
+            _cameraStatusDetailLabel.Text = $"绑定：{boundCamera?.DisplayName ?? bindingId}";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(bindingId))
+        {
+            _cameraStatusValueLabel.Text = "未配置";
+            _cameraStatusValueLabel.ForeColor = Color.DarkOrange;
+            _cameraStatusDetailLabel.Text = "流程当前是相机模式，但尚未指定相机绑定";
+            return;
+        }
+
+        _cameraStatusValueLabel.Text = "未连接";
+        _cameraStatusValueLabel.ForeColor = Color.Firebrick;
+        _cameraStatusDetailLabel.Text = $"绑定：{boundCamera?.DisplayName ?? bindingId}";
+    }
+
+    private void RefreshPlcStatusCard()
+    {
+        if (_loadedPackage?.Flow == null)
+        {
+            _plcStatusValueLabel.Text = "未评估";
+            _plcStatusValueLabel.ForeColor = Color.DimGray;
+            _plcStatusDetailLabel.Text = "加载运行包后显示 PLC 使用情况";
+            return;
+        }
+
+        var plcOperators = _loadedPackage.Flow.Operators
+            .Where(op => PlcOperatorTypes.Contains(op.Type))
+            .ToList();
+
+        if (plcOperators.Count == 0)
+        {
+            _plcStatusValueLabel.Text = "未使用";
+            _plcStatusValueLabel.ForeColor = Color.DimGray;
+            _plcStatusDetailLabel.Text = "当前流程未包含 PLC 通信算子";
+            return;
+        }
+
+        var connectionStates = PlcCommunicationOperatorBase.GetConnectionStateSnapshot();
+        if (connectionStates.Count == 0)
+        {
+            _plcStatusValueLabel.Text = "待连接";
+            _plcStatusValueLabel.ForeColor = Color.DarkOrange;
+            _plcStatusDetailLabel.Text = $"当前流程包含 {plcOperators.Count} 个 PLC 算子，尚未建立运行时连接";
+            return;
+        }
+
+        var onlineCount = connectionStates.Count(item => item.Value);
+        var offlineCount = connectionStates.Count - onlineCount;
+        if (offlineCount == 0)
+        {
+            _plcStatusValueLabel.Text = "已连接";
+            _plcStatusValueLabel.ForeColor = Color.SeaGreen;
+            _plcStatusDetailLabel.Text = $"在线 {onlineCount} / 总计 {connectionStates.Count}";
+            return;
+        }
+
+        _plcStatusValueLabel.Text = "异常";
+        _plcStatusValueLabel.ForeColor = Color.Firebrick;
+        _plcStatusDetailLabel.Text = $"在线 {onlineCount} / 异常 {offlineCount}";
+    }
+
+    private void RefreshPackageSummaryCard()
+    {
+        if (_loadedPackage?.Flow == null)
+        {
+            _packageSummaryValueLabel.Text = "未加载运行包";
+            _packageSummaryValueLabel.ForeColor = Color.DimGray;
+            _packageSummaryDetailLabel.Text = "加载运行包后显示流程名、算子数、连接数、输入模式与 PLC 使用情况。";
+            return;
+        }
+
+        var flow = _loadedPackage.Flow;
+        var imageOp = flow.Operators.FirstOrDefault(op => op.Type == OperatorType.ImageAcquisition);
+        var inputMode = imageOp == null
+            ? "无图像采集"
+            : (GetParameterString(imageOp, "SourceType", "File").Equals("File", StringComparison.OrdinalIgnoreCase)
+                ? "图片文件"
+                : "现场相机");
+        var plcCount = flow.Operators.Count(op => PlcOperatorTypes.Contains(op.Type));
+        var flowName = string.IsNullOrWhiteSpace(flow.Name) ? "未命名流程" : flow.Name.Trim();
+        var flowHash = _loadedPackage.Manifest.FlowHash;
+        var shortFlowHash = flowHash[..Math.Min(10, flowHash.Length)];
+
+        _packageSummaryValueLabel.Text = _loadedPackage.Manifest.PackageName;
+        _packageSummaryValueLabel.ForeColor = Color.SteelBlue;
+        _packageSummaryDetailLabel.Text =
+            $"流程：{flowName}{Environment.NewLine}" +
+            $"算子 {flow.Operators.Count} | 连线 {flow.Connections.Count}{Environment.NewLine}" +
+            $"输入：{inputMode} | PLC：{plcCount}{Environment.NewLine}" +
+            $"FlowHash：{shortFlowHash}";
+    }
+
+    private void RefreshProductionCards(RuntimeHostSnapshot snapshot)
+    {
+        var totalCount = snapshot.SessionOkCount + snapshot.SessionNgCount + snapshot.SessionErrorCount;
+        _productionValueLabel.Text = totalCount.ToString();
+        _productionValueLabel.ForeColor = totalCount > 0 ? Color.MediumSlateBlue : Color.DimGray;
+        _productionDetailLabel.Text = $"OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / 异常 {snapshot.SessionErrorCount}";
+
+        var inspectedCount = snapshot.SessionOkCount + snapshot.SessionNgCount;
+        if (inspectedCount <= 0)
+        {
+            _yieldValueLabel.Text = "--";
+            _yieldValueLabel.ForeColor = Color.DimGray;
+            _yieldDetailLabel.Text = "当前还没有形成 OK/NG 统计样本";
+            return;
+        }
+
+        var yieldRate = snapshot.SessionOkCount * 100.0 / inspectedCount;
+        _yieldValueLabel.Text = $"{yieldRate:F1}%";
+        _yieldValueLabel.ForeColor = yieldRate >= 95 ? Color.SeaGreen : (yieldRate >= 80 ? Color.DarkOrange : Color.Firebrick);
+        _yieldDetailLabel.Text = $"按 OK / (OK + NG) 计算，当前有效样本 {inspectedCount}";
+    }
+
+    private void RefreshOverviewCards(RuntimeHostSnapshot snapshot)
+    {
+        _statusValueLabel.Text = _recentResults.FirstOrDefault()?.Outcome switch
+        {
+            RuntimeRunOutcome.Ok => "OK",
+            RuntimeRunOutcome.Ng => "NG",
+            RuntimeRunOutcome.Error => "异常",
+            RuntimeRunOutcome.Canceled => "已取消",
+            _ => snapshot.State switch
+            {
+                RuntimeHostState.Running => "运行中",
+                RuntimeHostState.Stopping => "停止中",
+                RuntimeHostState.Faulted => "故障",
+                RuntimeHostState.Loaded => "就绪",
+                _ => "空闲"
+            }
+        };
+        _statusValueLabel.ForeColor = _statusValueLabel.Text switch
+        {
+            "OK" => Color.SeaGreen,
+            "NG" => Color.DarkOrange,
+            "异常" => Color.Firebrick,
+            "已取消" => Color.SlateGray,
+            "运行中" => Color.DodgerBlue,
+            "停止中" => Color.DarkOrange,
+            "故障" => Color.Firebrick,
+            "就绪" => Color.DodgerBlue,
+            _ => Color.DimGray
+        };
+        _statusDetailLabel.Text = _recentResults.FirstOrDefault() is { } latest
+            ? $"诊断码：{latest.DiagnosticCode}"
+            : "等待运行结果";
+
+        _timingValueLabel.Text = _recentResults.FirstOrDefault() is { } result
+            ? $"{result.ExecutionTimeMs} ms"
+            : "--";
+        _timingValueLabel.ForeColor = _recentResults.Count > 0 ? Color.DodgerBlue : Color.DimGray;
+        _timingDetailLabel.Text = _durations.Count > 0
+            ? $"平均 {ComputeAverageMs():F1} ms | P95 {ComputeP95Ms():F1} ms"
+            : "等待形成耗时统计";
+
+        var totalCount = snapshot.SessionOkCount + snapshot.SessionNgCount + snapshot.SessionErrorCount;
+        _statsValueLabel.Text = totalCount.ToString();
+        _statsValueLabel.ForeColor = totalCount > 0 ? Color.MediumSlateBlue : Color.DimGray;
+        _statsDetailLabel.Text = $"OK {snapshot.SessionOkCount} / NG {snapshot.SessionNgCount} / 异常 {snapshot.SessionErrorCount}";
+
+        var currentTaskName = _selectedImagePath != null
+            ? Path.GetFileName(_selectedImagePath)
+            : (_selectedFolderPath != null ? Path.GetFileName(_selectedFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) : "未选择");
+        _taskValueLabel.Text = currentTaskName;
+        _taskValueLabel.ForeColor = (_selectedImagePath != null || _selectedFolderPath != null) ? Color.SlateGray : Color.DimGray;
+        var taskSource = _selectedImagePath != null
+            ? "单张图片运行"
+            : (_selectedFolderPath != null ? "批量文件夹运行" : "请选择图片或文件夹");
+        _taskDetailLabel.Text = taskSource;
+    }
+
+    private static string GetParameterString(Acme.Product.Application.DTOs.OperatorDto op, string parameterName, string fallback)
+    {
+        var parameter = op.Parameters.FirstOrDefault(item => string.Equals(item.Name, parameterName, StringComparison.OrdinalIgnoreCase));
+        var value = parameter?.Value ?? parameter?.DefaultValue;
+        var text = value?.ToString()?.Trim();
+        return string.IsNullOrWhiteSpace(text) ? fallback : text;
+    }
+
+    private static string ToStateText(RuntimeHostState state)
+    {
+        return state switch
+        {
+            RuntimeHostState.Idle => "空闲",
+            RuntimeHostState.Loaded => "已加载",
+            RuntimeHostState.Running => "运行中",
+            RuntimeHostState.Stopping => "停止中",
+            RuntimeHostState.Faulted => "故障",
+            _ => state.ToString()
+        };
+    }
+
+    private static string ResolvePackageDirectory(string selectedPath)
+    {
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            throw new InvalidOperationException("未选择运行包目录。");
+        }
+
+        var normalized = Path.GetFullPath(selectedPath);
+        if (!Directory.Exists(normalized))
+        {
+            throw new DirectoryNotFoundException($"目录不存在：{normalized}");
+        }
+
+        if (File.Exists(Path.Combine(normalized, "package.json")))
+        {
+            return normalized;
+        }
+
+        var candidateDirectories = Directory
+            .EnumerateDirectories(normalized)
+            .Where(path => File.Exists(Path.Combine(path, "package.json")))
+            .ToList();
+
+        if (candidateDirectories.Count == 1)
+        {
+            return candidateDirectories[0];
+        }
+
+        if (candidateDirectories.Count > 1)
+        {
+            throw new InvalidOperationException("你当前选择的是运行包上一级目录，且里面包含多个运行包。请进入具体的导出包子文件夹后再加载。");
+        }
+
+        throw new InvalidOperationException("所选目录不是有效的运行包目录。请确认该目录下包含 package.json。");
+    }
+
     private void PersistStationIdentity()
     {
         _settingsStore.UpdateStationIdentity(_stationIdTextBox.Text, _lineNameTextBox.Text);
@@ -527,6 +1354,10 @@ public sealed class MainForm : Form
     {
         button.Text = text;
         button.AutoSize = true;
+        button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        button.Padding = new Padding(10, 5, 10, 5);
+        button.Margin = new Padding(0, 0, 8, 0);
+        button.FlatStyle = FlatStyle.System;
         button.Click += onClick;
     }
 
@@ -554,7 +1385,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            AppendLog($"Preview load failed: {ex.Message}");
+            AppendLog($"预览加载失败：{ex.Message}");
         }
     }
 

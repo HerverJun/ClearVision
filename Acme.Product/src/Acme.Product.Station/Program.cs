@@ -23,6 +23,7 @@ internal static class Program
                 services.AddSingleton<RuntimeResultNormalizer>();
                 services.AddSingleton<RuntimeHost>();
                 services.AddSingleton<StationLocalSettingsStore>();
+                services.AddSingleton<StationSiteProfileStore>();
                 services.AddSingleton<MainForm>();
             })
             .Build();

@@ -17,6 +17,10 @@ public sealed class RuntimePackage
 
     public required RuntimeValidationReport ValidationReport { get; init; }
 
+    public required RuntimeParameterSchema ParameterSchema { get; init; }
+
+    public required RuntimeSiteProfile DefaultSiteProfile { get; init; }
+
     public string PackageFilePath => Path.Combine(RootPath, "package.json");
 
     public string FlowFilePath => RuntimePathGuard.ResolveChildPath(RootPath, Manifest.EntryFlow);

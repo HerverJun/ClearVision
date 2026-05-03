@@ -73,14 +73,14 @@ Runtime Package
 
 架构红线：
 
-- [ ] Station 不引用 `Acme.Product.Desktop`。
-- [ ] Station 不引用 `Microsoft.Web.WebView2`。
-- [ ] Station 不复制 `wwwroot`。
-- [ ] Station 不启动 Kestrel / `WebApplication`。
-- [ ] Runtime 不复制任何算子实现。
-- [ ] Runtime 必须复用 `IFlowExecutionService` / `FlowExecutionService`。
-- [ ] Runtime Package 不包含 API key、个人本机路径密钥、历史结果大包、Studio 临时噪声。
-- [ ] 任意连续运行、图片保存、记录落盘、日志输出都必须有上限、取消、超时和失败统计。
+- [x] Station 不引用 `Acme.Product.Desktop`。
+- [x] Station 不引用 `Microsoft.Web.WebView2`。
+- [x] Station 不复制 `wwwroot`。
+- [x] Station 不启动 Kestrel / `WebApplication`。
+- [x] Runtime 不复制任何算子实现。
+- [x] Runtime 必须复用 `IFlowExecutionService` / `FlowExecutionService`。
+- [x] Runtime Package 不包含 API key、个人本机路径密钥、历史结果大包、Studio 临时噪声。
+- [x] 任意连续运行、图片保存、记录落盘、日志输出都必须有上限、取消、超时和失败统计。
 
 ---
 
@@ -135,10 +135,10 @@ Desktop 专属注册：
 
 验收标准：
 
-- [ ] Desktop 仍能通过原有 build/test。
-- [ ] Station 可通过共享注册获得同一套 `FlowExecutionService` 和算子执行器。
-- [ ] 没有第二套算子注册表。
-- [ ] 新增架构测试扫描 Station/Runtime 不含 `WebView2|Kestrel|wwwroot|MapVisionApiEndpoints|WebApplication`。
+- [x] Desktop 仍能通过原有 build/test。
+- [x] Station 可通过共享注册获得同一套 `FlowExecutionService` 和算子执行器。
+- [x] 没有第二套算子注册表。
+- [x] 新增架构测试扫描 Station/Runtime 不含 `WebView2|Kestrel|wwwroot|MapVisionApiEndpoints|WebApplication`。
 
 ---
 
@@ -195,16 +195,16 @@ runtime-package/
 
 导出/加载硬规则：
 
-- [ ] `package.json`、`flow.json`、`runtime-profile.json`、`quality/validation-report.json` 必须存在。
-- [ ] `runtimeApiVersion` 必须兼容。
-- [ ] `entryFlow` 必须在 package 根目录下，禁止 `..` 跳出包。
-- [ ] `flowHash` 必须可复算。
-- [ ] `exportAllowed` 必须为 `true`。
-- [ ] `pendingParameters` 必须为空。
-- [ ] `missingResources` 必须为空；simulation/replay 模式可降级为 warning，但必须写入报告。
-- [ ] 发现疑似 secret 的字段值必须阻断导出。
-- [ ] 可忽略 `field/`，但不能因为存在未知扩展目录而失败。
-- [ ] 加载失败必须给操作员可读错误，不只给 stack trace。
+- [x] `package.json`、`flow.json`、`runtime-profile.json`、`quality/validation-report.json` 必须存在。
+- [x] `runtimeApiVersion` 必须兼容。
+- [x] `entryFlow` 必须在 package 根目录下，禁止 `..` 跳出包。
+- [x] `flowHash` 必须可复算。
+- [x] `exportAllowed` 必须为 `true`。
+- [x] `pendingParameters` 必须为空。
+- [x] `missingResources` 必须为空；simulation/replay 模式可降级为 warning，但必须写入报告。
+- [x] 发现疑似 secret 的字段值必须阻断导出。
+- [x] 可忽略 `field/`，但不能因为存在未知扩展目录而失败。
+- [x] 加载失败必须给操作员可读错误，不只给 stack trace。
 
 ---
 
@@ -225,10 +225,10 @@ runtime-package/
 
 不做：
 
-- [ ] 不迁移 Web 前端。
-- [ ] 不改造 FlowCanvas。
-- [ ] 不拆算子源码。
-- [ ] 不改当前 Desktop 发布流程。
+- [x] 不迁移 Web 前端。
+- [x] 不改造 FlowCanvas。
+- [x] 不拆算子源码。
+- [x] 不改当前 Desktop 发布流程。
 
 ### M1：Runtime Package 导出与验证
 
@@ -247,9 +247,9 @@ runtime-package/
 
 关键判断：
 
-- [ ] Package export 复用 `OperatorFlowDto` / `FlowEntityMapper` / `OperatorTypeAliasResolver` 的口径。
-- [ ] 不把 `vision.db`、用户 token、AI key、历史结果、Studio cache 打进包。
-- [ ] 如果流程依赖模型/标定/模板文件，V1 要么随包声明并校验 hash，要么明确阻断导出。
+- [x] Package export 复用 `OperatorFlowDto` / `FlowEntityMapper` / `OperatorTypeAliasResolver` 的口径。
+- [x] 不把 `vision.db`、用户 token、AI key、历史结果、Studio cache 打进包。
+- [x] 如果流程依赖模型/标定/模板文件，V1 要么随包声明并校验 hash，要么明确阻断导出。
 
 ### M2：RuntimeHost 与执行核心
 
@@ -306,11 +306,11 @@ MVP UI 边界：
 
 不做：
 
-- [ ] 不做全量画布编辑。
-- [ ] 不做 AI 生成。
-- [ ] 不做算子库浏览。
-- [ ] 不做复杂设备中心。
-- [ ] 不做远程 Web 管理。
+- [x] 不做全量画布编辑。
+- [x] 不做 AI 生成。
+- [x] 不做算子库浏览。
+- [x] 不做复杂设备中心。
+- [x] 不做远程 Web 管理。
 
 ### M4：Studio / Station 一致性与回放证据
 
@@ -366,10 +366,10 @@ Select-String -Path "Acme.Product/src/Acme.Product.Station/**/*.cs","Acme.Produc
 
 关键边界：
 
-- [ ] V1 Station 可以读取并忽略 `field/`。
-- [ ] V1.1 才启用 StationProfile / TriggerProfile / ResultMappingProfile。
-- [ ] 协议构建 UI 留在 Studio，不放进 Station。
-- [ ] Station 只执行协议模板，不编辑协议模板。
+- [x] V1 Station 可以读取并忽略 `field/`。
+- [x] V1.1 才启用 StationProfile / TriggerProfile / ResultMappingProfile。
+- [x] 协议构建 UI 留在 Studio，不放进 Station。
+- [x] Station 只执行协议模板，不编辑协议模板。
 
 ### M6：现场稳定性硬化
 
@@ -442,17 +442,17 @@ Replay 图片目录
 
 这些任务不完成，不建议进入现场试用：
 
-- [ ] 抽出共享 Runtime DI，Station 不引用 Desktop。
-- [ ] 新增 Runtime/Station 工程并加入 solution。
-- [ ] Runtime Package V1 DTO、Loader、Validator 完成。
-- [ ] Studio 可导出 Runtime Package。
-- [ ] Station 可加载 Runtime Package。
-- [ ] Station 可选择单张图片并执行 Single Run。
-- [ ] RuntimeHost `StopAsync` 幂等、限时、可诊断。
-- [ ] Station/Runtime 依赖扫描门禁通过。
-- [ ] Studio Preview 与 Station Single Run 一致性测试通过。
-- [ ] 图片目录 replay 能跑 30-100 张，UI 不假死。
-- [ ] Runtime MVP 验证报告落地。
+- [x] 抽出共享 Runtime DI，Station 不引用 Desktop。
+- [x] 新增 Runtime/Station 工程并加入 solution。
+- [x] Runtime Package V1 DTO、Loader、Validator 完成。
+- [x] Studio 可导出 Runtime Package。
+- [x] Station 可加载 Runtime Package。
+- [x] Station 可选择单张图片并执行 Single Run。
+- [x] RuntimeHost `StopAsync` 幂等、限时、可诊断。
+- [x] Station/Runtime 依赖扫描门禁通过。
+- [x] Studio Preview 与 Station Single Run 一致性测试通过。
+- [x] 图片目录 replay 能跑 30-100 张，UI 不假死。
+- [x] Runtime MVP 验证报告落地。
 
 ---
 
@@ -460,14 +460,14 @@ Replay 图片目录
 
 这些任务决定能不能进入稳定试点：
 
-- [ ] Runtime 图片保存队列和记录队列有容量上限。
-- [ ] 结果 JSONL 与日志都带 `RunId/PackageId/FlowHash/ImageId`。
-- [ ] Station 最近结果、统计、限频日志可用。
-- [ ] field schema 预留：StationProfile / TriggerProfile / ResultMappingProfile / ModelAssets。
-- [ ] 模拟输出 sink 可预演 OK/NG 写回。
-- [ ] Package 回滚机制可用。
-- [ ] 崩溃恢复提示可用。
-- [ ] 性能 smoke 形成 baseline。
+- [x] Runtime 图片保存队列和记录队列有容量上限。
+- [x] 结果 JSONL 与日志都带 `RunId/PackageId/FlowHash/ImageId`。
+- [x] Station 最近结果、统计、限频日志可用。
+- [x] field schema 预留：StationProfile / TriggerProfile / ResultMappingProfile / ModelAssets。
+- [ ] 模拟输出 sink 可预演 OK/NG 写回。<!-- ❌ mock PLC writeback 未实现 -->
+- [~] Package 回滚机制可用。<!-- ⚠️ last-good 指针有；自动回滚逻辑未实现 -->
+- [x] 崩溃恢复提示可用。
+- [~] 性能 smoke 形成 baseline。<!-- ⚠️ 软件基线已建立；工控机硬件数字待现场采集 -->
 
 ---
 
@@ -491,28 +491,28 @@ Replay 图片目录
 
 MVP 完成标准：
 
-- [ ] `Acme.Product.Desktop` 原有功能未被破坏。
-- [ ] `Acme.Product.Station` 可独立启动。
-- [ ] Station 无 WebView2 / wwwroot / Kestrel / Desktop 引用。
-- [ ] Studio 可导出 Runtime Package。
-- [ ] Runtime 可拒绝非法 package，并给出可读原因。
-- [ ] Station 可加载合法 package。
-- [ ] Station 可执行单张图片。
-- [ ] Station 可执行图片目录。
-- [ ] 同一 package + 同一图片，Studio Preview 与 Station Single Run 关键结果一致。
-- [ ] UI 不假死，停止可用。
-- [ ] 队列、日志、结果记录都有边界。
-- [ ] 有 `quality/runtime/runtime-performance-smoke.md`。
-- [ ] 有 `docs/runtime/Runtime-MVP-Validation-Report.md` 或等价验收报告。
+- [x] `Acme.Product.Desktop` 原有功能未被破坏。
+- [x] `Acme.Product.Station` 可独立启动。
+- [x] Station 无 WebView2 / wwwroot / Kestrel / Desktop 引用。
+- [x] Studio 可导出 Runtime Package。
+- [x] Runtime 可拒绝非法 package，并给出可读原因。
+- [x] Station 可加载合法 package。
+- [x] Station 可执行单张图片。
+- [x] Station 可执行图片目录。
+- [x] 同一 package + 同一图片，Studio Preview 与 Station Single Run 关键结果一致。
+- [x] UI 不假死，停止可用。
+- [x] 队列、日志、结果记录都有边界。
+- [x] 有 `quality/runtime/runtime-performance-smoke.md`。
+- [x] 有 `docs/runtime/Runtime-MVP-Validation-Report.md` 或等价验收报告。
 
 现场试点前标准：
 
-- [ ] 至少一个黄金场景 package 可回放。
-- [ ] 模拟设备/触发/写回链路可跑通。
-- [ ] 缺模型、缺相机、缺 mapping、package 版本不兼容都能提前诊断。
-- [ ] last-good package 回滚可用。
-- [ ] StopAsync、异常退出、写队列失败都有记录。
-- [ ] 现场操作员不需要进入 Studio 画布即可启动、停止、看结果、看报警。
+- [~] 至少一个黄金场景 package 可回放。<!-- ⚠️ 测试用 mock 包可回放；真实生产工程包待 Studio 导出验证 -->
+- [ ] 模拟设备/触发/写回链路可跑通。<!-- ❌ mock PLC writeback 未实现 -->
+- [x] 缺模型、缺相机、缺 mapping、package 版本不兼容都能提前诊断。
+- [~] last-good package 回滚可用。<!-- ⚠️ 手动 Load Last Good 可用；自动回滚逻辑未实现 -->
+- [x] StopAsync、异常退出、写队列失败都有记录。
+- [x] 现场操作员不需要进入 Studio 画布即可启动、停止、看结果、看报警。
 
 ---
 

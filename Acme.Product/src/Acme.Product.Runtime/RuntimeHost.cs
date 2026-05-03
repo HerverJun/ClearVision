@@ -18,8 +18,10 @@ public sealed class RuntimeHost : IAsyncDisposable
     private readonly RuntimeResultNormalizer _resultNormalizer;
     private readonly ILogger<RuntimeHost> _logger;
     private readonly SemaphoreSlim _stateGate = new(1, 1);
+    private readonly object _profileGate = new();
     private RuntimeHostState _state = RuntimeHostState.Idle;
     private RuntimePackage? _loadedPackage;
+    private RuntimeSiteProfile? _activeSiteProfile;
     private CancellationTokenSource? _activeRunCts;
     private Task? _backgroundRunTask;
     private Guid? _currentFlowId;
@@ -30,6 +32,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     private int _pendingCount;
     private RuntimeResultRecordWriter? _resultWriter;
     private RuntimeImageWriter? _imageWriter;
+    private int _disposeStarted;
 
     public RuntimeHost(
         IFlowExecutionService flowExecutionService,
@@ -50,6 +53,19 @@ public sealed class RuntimeHost : IAsyncDisposable
     public event Action<string>? LogMessage;
 
     public RuntimePackage? LoadedPackage => _loadedPackage;
+
+    public RuntimeSiteProfile? ActiveSiteProfile
+    {
+        get
+        {
+            lock (_profileGate)
+            {
+                return _activeSiteProfile == null
+                    ? null
+                    : RuntimeParameterOverrideApplier.CloneProfile(_activeSiteProfile);
+            }
+        }
+    }
 
     public RuntimeHostSnapshot GetSnapshot()
     {
@@ -75,6 +91,11 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             EnsureNotRunning();
             _loadedPackage = package;
+            lock (_profileGate)
+            {
+                _activeSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
+            }
+
             ResetSessionCounters();
             await RecreateWritersAsync(package.RuntimeProfile);
             _state = RuntimeHostState.Loaded;
@@ -85,8 +106,37 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
 
         EmitSnapshot();
-        EmitLog($"Loaded package {package.Manifest.PackageName} ({package.Manifest.FlowHash}).");
+        EmitLog($"已加载运行包：{package.Manifest.PackageName}（{package.Manifest.FlowHash}）");
         return package;
+    }
+
+    public void SetActiveSiteProfile(RuntimeSiteProfile? profile)
+    {
+        var package = _loadedPackage;
+        if (package == null)
+        {
+            if (profile != null)
+            {
+                throw new RuntimePackageException("当前尚未加载运行包。");
+            }
+
+            lock (_profileGate)
+            {
+                _activeSiteProfile = null;
+            }
+
+            return;
+        }
+
+        var nextProfile = profile ?? package.DefaultSiteProfile;
+        RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, nextProfile);
+
+        lock (_profileGate)
+        {
+            _activeSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(nextProfile);
+        }
+
+        EmitLog($"现场参数 Profile 已激活：{nextProfile.ProfileId}，Revision {nextProfile.Revision}。");
     }
 
     public async Task<RuntimeNormalizedResult> RunSingleAsync(
@@ -130,7 +180,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             var files = EnumerateReplayFiles(folderPath, _loadedPackage!.RuntimeProfile).ToList();
             if (files.Count == 0)
             {
-                throw new RuntimePackageException("The selected folder does not contain any supported images.");
+                throw new RuntimePackageException("所选文件夹中没有可运行的图片文件。");
             }
 
             _pendingCount = files.Count;
@@ -146,7 +196,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
 
         EmitSnapshot();
-        EmitLog($"Started folder replay with {_pendingCount} image(s).");
+        EmitLog($"已开始批量运行，共 {_pendingCount} 张图片。");
     }
 
     public async Task<RuntimeStopSummary> StopAsync(CancellationToken cancellationToken = default)
@@ -187,7 +237,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
 
         EmitSnapshot();
-        EmitLog("Stop requested.");
+        EmitLog("已收到停止请求。");
 
         try
         {
@@ -223,7 +273,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             }
 
             EmitSnapshot();
-            EmitLog("Stop timed out before the active run exited.");
+            EmitLog("停止等待超时，当前任务未在超时前退出。");
         }
 
         return new RuntimeStopSummary
@@ -239,6 +289,11 @@ public sealed class RuntimeHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        {
+            return;
+        }
+
         try
         {
             await StopAsync();
@@ -247,17 +302,23 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
         }
 
-        if (_resultWriter != null)
+        var resultWriter = _resultWriter;
+        _resultWriter = null;
+        if (resultWriter != null)
         {
-            await _resultWriter.DisposeAsync();
+            await resultWriter.DisposeAsync();
         }
 
-        if (_imageWriter != null)
+        var imageWriter = _imageWriter;
+        _imageWriter = null;
+        if (imageWriter != null)
         {
-            await _imageWriter.DisposeAsync();
+            await imageWriter.DisposeAsync();
         }
 
-        _activeRunCts?.Dispose();
+        var activeRunCts = _activeRunCts;
+        _activeRunCts = null;
+        activeRunCts?.Dispose();
         _stateGate.Dispose();
     }
 
@@ -275,12 +336,12 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-            EmitLog("Folder replay canceled.");
+            EmitLog("批量运行已取消。");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Folder replay failed.");
-            EmitLog($"Folder replay failed: {ex.Message}");
+            EmitLog($"批量运行失败：{ex.Message}");
             await _stateGate.WaitAsync(cancellationToken);
             try
             {
@@ -301,10 +362,10 @@ public sealed class RuntimeHost : IAsyncDisposable
 
     private async Task<RuntimeNormalizedResult> ExecuteSingleCoreAsync(string imagePath, CancellationToken cancellationToken)
     {
-        var package = _loadedPackage ?? throw new RuntimePackageException("No runtime package has been loaded.");
+        var package = _loadedPackage ?? throw new RuntimePackageException("当前尚未加载运行包。");
         if (!File.Exists(imagePath))
         {
-            throw new RuntimePackageException($"Input image does not exist: {imagePath}");
+            throw new RuntimePackageException($"输入图片不存在：{imagePath}");
         }
 
         var sourceImageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
@@ -316,7 +377,9 @@ public sealed class RuntimeHost : IAsyncDisposable
 
         try
         {
-            var flow = RuntimeFlowAdapter.ToEntity(package.Flow);
+            var profile = GetActiveSiteProfileSnapshot(package);
+            var applyResult = RuntimeParameterOverrideApplier.CloneAndApply(package, profile);
+            var flow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
             _currentFlowId = flow.Id;
 
             var validation = _flowExecutionService.ValidateFlow(flow);
@@ -412,7 +475,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
 
         ResultAvailable?.Invoke(result);
-        EmitLog($"{result.ImageId}: {result.Outcome} ({result.ExecutionTimeMs} ms)");
+        EmitLog($"{result.ImageId}: {FormatOutcome(result.Outcome)}（{result.ExecutionTimeMs} ms）");
         EmitSnapshot();
         await Task.CompletedTask;
     }
@@ -473,14 +536,18 @@ public sealed class RuntimeHost : IAsyncDisposable
 
     private async Task RecreateWritersAsync(RuntimeProfile profile)
     {
-        if (_resultWriter != null)
+        var resultWriter = _resultWriter;
+        _resultWriter = null;
+        if (resultWriter != null)
         {
-            await _resultWriter.DisposeAsync();
+            await resultWriter.DisposeAsync();
         }
 
-        if (_imageWriter != null)
+        var imageWriter = _imageWriter;
+        _imageWriter = null;
+        if (imageWriter != null)
         {
-            await _imageWriter.DisposeAsync();
+            await imageWriter.DisposeAsync();
         }
 
         var dataRoot = RuntimePathGuard.GetDefaultStationDataRoot();
@@ -499,7 +566,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     {
         if (!Directory.Exists(folderPath))
         {
-            throw new RuntimePackageException($"Replay folder does not exist: {folderPath}");
+            throw new RuntimePackageException($"批量运行文件夹不存在：{folderPath}");
         }
 
         var allowedExtensions = new HashSet<string>(profile.SupportedInputExtensions, StringComparer.OrdinalIgnoreCase);
@@ -513,7 +580,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     {
         if (_loadedPackage == null)
         {
-            throw new RuntimePackageException("No runtime package has been loaded.");
+            throw new RuntimePackageException("当前尚未加载运行包。");
         }
     }
 
@@ -521,7 +588,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     {
         if (_state is RuntimeHostState.Running or RuntimeHostState.Stopping)
         {
-            throw new RuntimePackageException("The runtime host is already busy.");
+            throw new RuntimePackageException("运行引擎当前正忙，请先等待当前任务结束。");
         }
     }
 
@@ -534,6 +601,26 @@ public sealed class RuntimeHost : IAsyncDisposable
     {
         LogMessage?.Invoke(message);
         _logger.LogInformation("{Message}", message);
+    }
+
+    private RuntimeSiteProfile GetActiveSiteProfileSnapshot(RuntimePackage package)
+    {
+        lock (_profileGate)
+        {
+            return RuntimeParameterOverrideApplier.CloneProfile(_activeSiteProfile ?? package.DefaultSiteProfile);
+        }
+    }
+
+    private static string FormatOutcome(RuntimeRunOutcome outcome)
+    {
+        return outcome switch
+        {
+            RuntimeRunOutcome.Ok => "OK",
+            RuntimeRunOutcome.Ng => "NG",
+            RuntimeRunOutcome.Error => "异常",
+            RuntimeRunOutcome.Canceled => "已取消",
+            _ => outcome.ToString()
+        };
     }
 }
 
@@ -855,6 +942,7 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly Task _consumerTask;
     private readonly ILogger _logger;
+    private int _disposeStarted;
 
     public RuntimeResultRecordWriter(string dataRoot, int capacity, ILogger logger)
     {
@@ -875,6 +963,12 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
 
     public bool TryEnqueue(RuntimeNormalizedResult result)
     {
+        if (Interlocked.CompareExchange(ref _disposeStarted, 0, 0) != 0)
+        {
+            DroppedCount += 1;
+            return false;
+        }
+
         if (_channel.Writer.TryWrite(result))
         {
             return true;
@@ -887,10 +981,21 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        {
+            return;
+        }
+
         _channel.Writer.TryComplete();
-        await _disposeCts.CancelAsync();
-        await _consumerTask;
-        _disposeCts.Dispose();
+        try
+        {
+            await _disposeCts.CancelAsync();
+            await _consumerTask;
+        }
+        finally
+        {
+            _disposeCts.Dispose();
+        }
     }
 
     private async Task ConsumeAsync(CancellationToken cancellationToken)
@@ -923,6 +1028,7 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
     private readonly Task _consumerTask;
     private readonly RuntimeProfile _profile;
     private readonly ILogger _logger;
+    private int _disposeStarted;
 
     public RuntimeImageWriter(string dataRoot, RuntimeProfile profile, ILogger logger)
     {
@@ -973,6 +1079,12 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
 
     public bool TryEnqueue(RuntimeNormalizedResult result)
     {
+        if (Interlocked.CompareExchange(ref _disposeStarted, 0, 0) != 0)
+        {
+            DroppedCount += 1;
+            return false;
+        }
+
         if (_channel.Writer.TryWrite(result))
         {
             return true;
@@ -985,10 +1097,21 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        {
+            return;
+        }
+
         _channel.Writer.TryComplete();
-        await _disposeCts.CancelAsync();
-        await _consumerTask;
-        _disposeCts.Dispose();
+        try
+        {
+            await _disposeCts.CancelAsync();
+            await _consumerTask;
+        }
+        finally
+        {
+            _disposeCts.Dispose();
+        }
     }
 
     private async Task ConsumeAsync(CancellationToken cancellationToken)

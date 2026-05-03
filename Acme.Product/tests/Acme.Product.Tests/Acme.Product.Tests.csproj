@@ -38,6 +38,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Acme.Product.Station\StationSiteProfileStore.cs" Link="Station\StationSiteProfileStore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

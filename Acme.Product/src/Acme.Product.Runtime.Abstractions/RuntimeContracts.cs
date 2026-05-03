@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Acme.Product.Core.Enums;
 
@@ -36,6 +37,101 @@ public sealed class RuntimeFieldExtensions
     public string? ResultMappingProfile { get; set; }
 
     public string? ModelAssets { get; set; }
+
+    public string? RuntimeParameters { get; set; }
+
+    public string? DefaultSiteProfile { get; set; }
+}
+
+public enum RuntimeParameterValueType
+{
+    Number = 0
+}
+
+public enum RuntimeParameterUiKind
+{
+    NumericInput = 0
+}
+
+public enum RuntimeParameterApplyMode
+{
+    NextRun = 0
+}
+
+public sealed class RuntimeParameterSchema
+{
+    public string SchemaVersion { get; set; } = "1.0";
+
+    public string PackageId { get; set; } = string.Empty;
+
+    public string FlowHash { get; set; } = string.Empty;
+
+    public List<RuntimeParameterDefinition> Parameters { get; set; } = [];
+}
+
+public sealed class RuntimeParameterDefinition
+{
+    public string Id { get; set; } = string.Empty;
+
+    public Guid OperatorId { get; set; }
+
+    public string OperatorName { get; set; } = string.Empty;
+
+    public string OperatorType { get; set; } = string.Empty;
+
+    public string ParameterName { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public string GroupName { get; set; } = "现场参数";
+
+    public RuntimeParameterValueType ValueType { get; set; } = RuntimeParameterValueType.Number;
+
+    public RuntimeParameterUiKind UiKind { get; set; } = RuntimeParameterUiKind.NumericInput;
+
+    public JsonElement DefaultValue { get; set; } = JsonSerializer.SerializeToElement(0d);
+
+    public double? Min { get; set; }
+
+    public double? Max { get; set; }
+
+    public double? Step { get; set; }
+
+    public bool SiteTunable { get; set; } = true;
+
+    public bool RequiresEngineerMode { get; set; } = true;
+
+    public RuntimeParameterApplyMode ApplyMode { get; set; } = RuntimeParameterApplyMode.NextRun;
+
+    public int Order { get; set; }
+}
+
+public sealed class RuntimeSiteProfile
+{
+    public string ProfileVersion { get; set; } = "1.0";
+
+    public string ProfileId { get; set; } = string.Empty;
+
+    public string PackageId { get; set; } = string.Empty;
+
+    public string FlowHash { get; set; } = string.Empty;
+
+    public int Revision { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    public string UpdatedBy { get; set; } = "local-engineer";
+
+    public List<RuntimeParameterOverride> Overrides { get; set; } = [];
+}
+
+public sealed class RuntimeParameterOverride
+{
+    public string ParameterId { get; set; } = string.Empty;
+
+    public JsonElement Value { get; set; } = JsonSerializer.SerializeToElement(0d);
 }
 
 public sealed class RuntimePackageManifest
