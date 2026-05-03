@@ -260,6 +260,85 @@ public sealed class StationSiteProfileStoreTests
             RuntimeParameterTestData.SafeDeleteDirectory(root);
         }
     }
+
+    [Fact]
+    public void Store_ShouldExportAndImportProfileForMatchingPackage()
+    {
+        var sourceRoot = RuntimeParameterTestData.CreateTempDirectory("ClearVisionStationSiteProfileStoreExportSource");
+        var targetRoot = RuntimeParameterTestData.CreateTempDirectory("ClearVisionStationSiteProfileStoreExportTarget");
+        try
+        {
+            var operatorId = Guid.NewGuid();
+            var parameterId = RuntimeParameterTestData.ParameterId(operatorId);
+            var package = RuntimeParameterTestData.CreateRuntimePackage(operatorId, parameterId, rootPath: sourceRoot);
+            var sourceStore = new StationSiteProfileStore(sourceRoot);
+            var targetStore = new StationSiteProfileStore(targetRoot);
+
+            var profile = sourceStore.LoadOrCreate(package);
+            profile.Overrides =
+            [
+                RuntimeParameterTestData.CreateOverride(parameterId, 0.73d)
+            ];
+
+            var saved = sourceStore.Save(package, profile);
+            var exportPath = Path.Combine(sourceRoot, "export", sourceStore.GetSuggestedExportFileName(package));
+
+            sourceStore.ExportToFile(package, saved, exportPath);
+
+            File.Exists(exportPath).Should().BeTrue();
+            var exported = JsonSerializer.Deserialize<RuntimeSiteProfile>(File.ReadAllText(exportPath), RuntimeParameterTestData.JsonOptions);
+            exported.Should().NotBeNull();
+            exported!.PackageId.Should().Be(package.Manifest.PackageId);
+            exported.FlowHash.Should().Be(package.Manifest.FlowHash);
+            exported.Overrides.Should().ContainSingle();
+            exported.Overrides.Single().Value.GetDouble().Should().Be(0.73d);
+
+            var imported = targetStore.ImportFromFile(package, exportPath);
+            imported.ProfileId.Should().Be("local-site");
+            imported.Revision.Should().Be(1);
+            imported.Overrides.Should().ContainSingle();
+            imported.Overrides.Single().Value.GetDouble().Should().Be(0.73d);
+            imported.UpdatedBy.Should().Be("local-engineer");
+
+            var reloaded = targetStore.LoadOrCreate(package);
+            reloaded.Revision.Should().Be(1);
+            reloaded.Overrides.Should().ContainSingle();
+            reloaded.Overrides.Single().Value.GetDouble().Should().Be(0.73d);
+        }
+        finally
+        {
+            RuntimeParameterTestData.SafeDeleteDirectory(sourceRoot);
+            RuntimeParameterTestData.SafeDeleteDirectory(targetRoot);
+        }
+    }
+
+    [Fact]
+    public void Import_ShouldRejectProfileWhenPackageBindingDoesNotMatch()
+    {
+        var root = RuntimeParameterTestData.CreateTempDirectory("ClearVisionStationSiteProfileStoreMismatch");
+        try
+        {
+            var operatorId = Guid.NewGuid();
+            var parameterId = RuntimeParameterTestData.ParameterId(operatorId);
+            var package = RuntimeParameterTestData.CreateRuntimePackage(operatorId, parameterId, rootPath: root);
+            var store = new StationSiteProfileStore(root);
+            var mismatchedProfile = RuntimeParameterTestData.CreateProfile(
+                "pkg-other",
+                package.Manifest.FlowHash,
+                RuntimeParameterTestData.CreateOverride(parameterId, 0.66d));
+            var json = JsonSerializer.Serialize(mismatchedProfile, RuntimeParameterTestData.JsonOptions);
+
+            Action act = () => store.Import(package, json);
+
+            act.Should()
+                .Throw<InvalidOperationException>()
+                .WithMessage("*不匹配*");
+        }
+        finally
+        {
+            RuntimeParameterTestData.SafeDeleteDirectory(root);
+        }
+    }
 }
 
 internal static class RuntimeParameterTestData

@@ -5,6 +5,7 @@ status: "active"
 topic: "runtime-station-site-tunable-parameters-v1"
 created: "2026-05-03"
 updated: "2026-05-03"
+v1_completed: "2026-05-03"
 decision: "V1 只交付 schema-driven DeepLearning.Confidence 最小闭环，其余能力进入 V2+"
 sources:
   - "docs/进行中/当前计划/ClearVision-Station现场可调参数Profile机制TODO-2026-05-03.md"
@@ -341,17 +342,17 @@ Acme.Product/src/Acme.Product.Application/DTOs/OperatorDto.cs
 
 任务：
 
-- [ ] 确认 V1 profile 作用域为 `packageId + flowHash`，不承诺跨包版本迁移。
-- [ ] 确认 `OperatorDto.Id` 在导出的 `flow.json` 中存在且唯一。
-- [ ] 确认 `ParameterDto.Name` 对同一算子内唯一；V1 parameterId 使用 `OperatorDto.Id + ParameterName`。
-- [ ] 在 `RuntimeFieldExtensions` 增加 `RuntimeParameters` 和 `DefaultSiteProfile`。
-- [ ] 新增 V1 DTO：`RuntimeParameterSchema`、`RuntimeParameterDefinition`、`RuntimeSiteProfile`、`RuntimeParameterOverride`。
-- [ ] 新增 V1 枚举：`RuntimeParameterValueType.Number`、`RuntimeParameterUiKind.NumericInput`、`RuntimeParameterApplyMode.NextRun`。
+- [x] 确认 V1 profile 作用域为 `packageId + flowHash`，不承诺跨包版本迁移。
+- [x] 确认 `OperatorDto.Id` 在导出的 `flow.json` 中存在且唯一。
+- [x] 确认 `ParameterDto.Name` 对同一算子内唯一；V1 parameterId 使用 `OperatorDto.Id + ParameterName`。
+- [x] 在 `RuntimeFieldExtensions` 增加 `RuntimeParameters` 和 `DefaultSiteProfile`。
+- [x] 新增 V1 DTO：`RuntimeParameterSchema`、`RuntimeParameterDefinition`、`RuntimeSiteProfile`、`RuntimeParameterOverride`。
+- [x] 新增 V1 枚举：`RuntimeParameterValueType.Number`、`RuntimeParameterUiKind.NumericInput`、`RuntimeParameterApplyMode.NextRun`。
 
 验收：
 
-- [ ] DTO 可 JSON 序列化 / 反序列化。
-- [ ] 不引入 ROI、Path、权限三级、热更新等 V2 字段。
+- [x] DTO 可 JSON 序列化 / 反序列化。
+- [x] 不引入 ROI、Path、权限三级、热更新等 V2 字段。
 
 ### P1：Runtime Package 导出 schema/profile
 
@@ -365,22 +366,22 @@ Acme.Product/src/Acme.Product.Runtime/RuntimePackageExportResult.cs
 
 任务：
 
-- [ ] `RuntimePackageExporter` 在 `FieldExtensions` 中写入：
+- [x] `RuntimePackageExporter` 在 `FieldExtensions` 中写入：
   - `RuntimeParameters = "field/runtime-parameters.json"`
   - `DefaultSiteProfile = "field/station-profile.default.json"`
-- [ ] 导出 `field/runtime-parameters.json`。
-- [ ] 导出 `field/station-profile.default.json`。
-- [ ] V1 只自动发现 `OperatorType.DeepLearning` 且存在 `Confidence` 参数的节点。
-- [ ] `Confidence` 默认值优先取 `Value`，没有则取 `DefaultValue`，还没有则用 `0.5`。
-- [ ] `Confidence` 范围优先取参数原有 `MinValue/MaxValue`，没有则用 `0.0/1.0`，步进用 `0.01`。
-- [ ] 如果没有任何可调参数，也导出空 `parameters: []`，Station 显示空状态。
-- [ ] 不在 Station 侧补造 `Confidence` 参数；包里没有就不显示。
+- [x] 导出 `field/runtime-parameters.json`。
+- [x] 导出 `field/station-profile.default.json`。
+- [x] V1 只自动发现 `OperatorType.DeepLearning` 且存在 `Confidence` 参数的节点。
+- [x] `Confidence` 默认值优先取 `Value`，没有则取 `DefaultValue`，还没有则用 `0.5`。
+- [x] `Confidence` 范围优先取参数原有 `MinValue/MaxValue`，没有则用 `0.0/1.0`，步进用 `0.01`。
+- [x] 如果没有任何可调参数，也导出空 `parameters: []`，Station 显示空状态。
+- [x] 不在 Station 侧补造 `Confidence` 参数；包里没有就不显示。
 
 验收：
 
-- [ ] 端子线序检测包导出后包含 `field/runtime-parameters.json`。
-- [ ] 文件中包含 `DeepLearning.Confidence` 定义。
-- [ ] 旧的 `field/station-profile.json`、`trigger-profile.json`、`result-mapping-profile.json`、`model-assets.json` 仍照常导出。
+- [x] 端子线序检测包导出后包含 `field/runtime-parameters.json`。
+- [x] 文件中包含 `DeepLearning.Confidence` 定义。
+- [x] 旧的 `field/station-profile.json`、`trigger-profile.json`、`result-mapping-profile.json`、`model-assets.json` 仍照常导出。
 
 ### P2：Runtime 加载、校验和 override 应用
 
@@ -396,29 +397,29 @@ Acme.Product/src/Acme.Product.Runtime/RuntimeHost.cs
 
 任务：
 
-- [ ] `RuntimePackage` 增加 `ParameterSchema` 和 `DefaultSiteProfile` 属性。
-- [ ] `RuntimePackageLoader` 加载 `field/runtime-parameters.json`，缺失时返回空 schema，不报错。
-- [ ] `RuntimePackageLoader` 加载 `field/station-profile.default.json`，缺失时构造空默认 profile。
-- [ ] `RuntimeParameterValidator` 校验：
+- [x] `RuntimePackage` 增加 `ParameterSchema` 和 `DefaultSiteProfile` 属性。
+- [x] `RuntimePackageLoader` 加载 `field/runtime-parameters.json`，缺失时返回空 schema，不报错。
+- [x] `RuntimePackageLoader` 加载 `field/station-profile.default.json`，缺失时构造空默认 profile。
+- [x] `RuntimeParameterValidator` 校验：
   - profile 的 `packageId` 和 `flowHash` 必须匹配。
   - override 的 `parameterId` 必须存在于 schema。
   - definition 必须 `SiteTunable = true`。
   - V1 value 必须是 number。
   - value 必须在 `Min/Max` 范围内。
-- [ ] `RuntimeParameterOverrideApplier` 负责 clone `package.Flow` 并应用 override。
-- [ ] override 只改 clone，不改 `RuntimePackage.Flow`。
-- [ ] `RuntimeHost` 增加 active site profile 状态。
-- [ ] `RuntimeHost.ExecuteSingleCoreAsync` 改为：
+- [x] `RuntimeParameterOverrideApplier` 负责 clone `package.Flow` 并应用 override。
+- [x] override 只改 clone，不改 `RuntimePackage.Flow`。
+- [x] `RuntimeHost` 增加 active site profile 状态。
+- [x] `RuntimeHost.ExecuteSingleCoreAsync` 改为：
   - clone + apply profile。
   - 对 clone 调用 `RuntimeFlowAdapter.ToEntity(...)`。
-- [ ] profile 无效时，运行返回明确错误或拒绝应用，并写入日志。
+- [x] profile 无效时，运行返回明确错误或拒绝应用，并写入日志。
 
 验收：
 
-- [ ] 无 schema 的旧包仍能加载和运行。
-- [ ] 越界 confidence 被拒绝。
-- [ ] 未知 parameterId 被拒绝。
-- [ ] 执行一次带 override 的运行后，`RuntimePackage.Flow` 默认值不变。
+- [x] 无 schema 的旧包仍能加载和运行。
+- [x] 越界 confidence 被拒绝。
+- [x] 未知 parameterId 被拒绝。
+- [x] 执行一次带 override 的运行后，`RuntimePackage.Flow` 默认值不变。
 
 ### P3：Station 本地 profile store
 
@@ -431,25 +432,25 @@ Acme.Product/src/Acme.Product.Station/StationLocalSettingsStore.cs
 
 任务：
 
-- [ ] 新增 `StationSiteProfileStore`。
-- [ ] 存储根目录沿用：
+- [x] 新增 `StationSiteProfileStore`。
+- [x] 存储根目录沿用：
   - `%LocalAppData%/ClearVisionStation/`
-- [ ] active profile 路径：
+- [x] active profile 路径：
   - `profiles/{packageId}_{flowHash}/site-profile.json`
-- [ ] 加载包后：
+- [x] 加载包后：
   - 如果本地 active profile 存在且匹配，加载它。
   - 否则从 package default profile 构造本地 profile。
-- [ ] 保存 profile 时：
+- [x] 保存 profile 时：
   - 递增 `Revision`。
   - 更新 `UpdatedAtUtc`。
   - `UpdatedBy` 暂写 `local-engineer`。
-- [ ] 支持 `ResetToPackageDefault`：删除 overrides，revision 递增。
+- [x] 支持 `ResetToPackageDefault`：删除 overrides，revision 递增。
 
 验收：
 
-- [ ] Station 关闭重启后，仍能加载上次保存的 profile。
-- [ ] flowHash 不匹配的 profile 不会被应用。
-- [ ] 恢复默认后，profile overrides 为空。
+- [x] Station 关闭重启后，仍能加载上次保存的 profile。
+- [x] flowHash 不匹配的 profile 不会被应用。
+- [x] 恢复默认后，profile overrides 为空。
 
 ### P4：Station 通用参数面板，移除 ONNX 专用 UI
 
@@ -463,22 +464,22 @@ Acme.Product/src/Acme.Product.Station/MainForm.cs
 
 任务：
 
-- [ ] 新增通用 `RuntimeParameterPanel`。
-- [ ] V1 只渲染 `RuntimeParameterValueType.Number + NumericInput` 为 `NumericUpDown`。
-- [ ] 参数控件显示：
+- [x] 新增通用 `RuntimeParameterPanel`。
+- [x] V1 只渲染 `RuntimeParameterValueType.Number + NumericInput` 为 `NumericUpDown`。
+- [x] 参数控件显示：
   - 显示名。
   - 当前值。
   - 默认值。
   - 范围。
   - “下次运行生效”。
-- [ ] 提供按钮：
+- [x] 提供按钮：
   - 应用。
   - 取消修改。
   - 恢复默认。
-- [ ] 加载包后，Station 从 schema 渲染参数。
-- [ ] 用户点击应用后，写入 `StationSiteProfileStore`，并通知 `RuntimeHost` 使用新 active profile。
-- [ ] 空 schema 时显示“当前运行包未开放现场参数”。
-- [ ] 移除 `MainForm.cs` 中以下专用逻辑：
+- [x] 加载包后，Station 从 schema 渲染参数。
+- [x] 用户点击应用后，写入 `StationSiteProfileStore`，并通知 `RuntimeHost` 使用新 active profile。
+- [x] 空 schema 时显示”当前运行包未开放现场参数”。
+- [x] 移除 `MainForm.cs` 中以下专用逻辑：
   - `_onnxParameterDetailLabel`
   - `_confidenceNumericUpDown`
   - `_updatingOnnxParameterControls`
@@ -487,14 +488,14 @@ Acme.Product/src/Acme.Product.Station/MainForm.cs
   - `ApplyConfidenceFromUi()`
   - `GetDeepLearningOperators()`
   - 针对 `Confidence` 的 `EnsureParameter(...)` 调用
-- [ ] Station UI 文案不再出现“ONNX 参数”作为专用卡片标题，改为“现场参数”。
+- [x] Station UI 文案不再出现”ONNX 参数”作为专用卡片标题，改为”现场参数”。
 
 验收：
 
-- [ ] 端子线序包加载后，能显示“线序检测置信度”。
-- [ ] 该控件来自 schema，而不是 Station 识别 DeepLearning 后手写。
-- [ ] 修改数值并点击应用后，下一次运行使用新值。
-- [ ] 当前运行中修改不会重载模型；V1 只承诺 `NextRun`。
+- [x] 端子线序包加载后，能显示”线序检测置信度”。
+- [x] 该控件来自 schema，而不是 Station 识别 DeepLearning 后手写。
+- [x] 修改数值并点击应用后，下一次运行使用新值。
+- [x] 当前运行中修改不会重载模型；V1 只承诺 `NextRun`。
 
 ### P5：测试与收口
 
@@ -508,12 +509,12 @@ scripts/run-dotnet-test-serial.ps1
 
 任务：
 
-- [ ] 增加 DTO JSON roundtrip 测试。
-- [ ] 增加 exporter 测试：DeepLearning.Confidence schema 导出。
-- [ ] 增加 loader 测试：旧包无 schema 兼容。
-- [ ] 增加 validator 测试：越界值、未知 parameterId、flowHash mismatch。
-- [ ] 增加 applier 测试：override 应用到 clone，不污染 package flow。
-- [ ] 增加 StationSiteProfileStore 测试：保存、重载、恢复默认。
+- [x] 增加 DTO JSON roundtrip 测试。
+- [x] 增加 exporter 测试：DeepLearning.Confidence schema 导出。
+- [x] 增加 loader 测试：旧包无 schema 兼容。
+- [x] 增加 validator 测试：越界值、未知 parameterId、flowHash mismatch。
+- [x] 增加 applier 测试：override 应用到 clone，不污染 package flow。
+- [x] 增加 StationSiteProfileStore 测试：保存、重载、恢复默认。
 - [ ] 手工验证 Station 加载端子线序包后的 UI 和运行闭环。
 
 推荐测试命令：
@@ -528,9 +529,9 @@ scripts/run-dotnet-test-serial.ps1
 
 验收：
 
-- [ ] 相关测试通过。
-- [ ] 未新增 Station 对 WebView2 / Kestrel / wwwroot / Desktop UI 的依赖。
-- [ ] `MainForm.cs` 中不再存在 `ONNX 参数` / `ApplyConfidenceFromUi` / `BuildOnnxParameterContent`。
+- [x] 相关测试通过。
+- [x] 未新增 Station 对 WebView2 / Kestrel / wwwroot / Desktop UI 的依赖。
+- [x] `MainForm.cs` 中不再存在 `ONNX 参数` / `ApplyConfidenceFromUi` / `BuildOnnxParameterContent`。
 
 ---
 
@@ -538,24 +539,24 @@ scripts/run-dotnet-test-serial.ps1
 
 ### V1 必须通过
 
-- [ ] Runtime Package 包含 `field/runtime-parameters.json` 和 `field/station-profile.default.json`。
-- [ ] `DeepLearning.Confidence` 通过 schema 暴露为现场参数。
-- [ ] Station 只渲染 schema 中的参数。
-- [ ] Station 修改值保存到本地 `site-profile.json`。
-- [ ] RuntimeHost 下一次运行应用 profile override。
-- [ ] `RuntimePackage.Flow` 不被 Station 修改。
-- [ ] 旧包没有 schema 时仍可运行。
-- [ ] Station 不再硬编码 ONNX/Confidence 面板。
+- [x] Runtime Package 包含 `field/runtime-parameters.json` 和 `field/station-profile.default.json`。
+- [x] `DeepLearning.Confidence` 通过 schema 暴露为现场参数。
+- [x] Station 只渲染 schema 中的参数。
+- [x] Station 修改值保存到本地 `site-profile.json`。
+- [x] RuntimeHost 下一次运行应用 profile override。
+- [x] `RuntimePackage.Flow` 不被 Station 修改。
+- [x] 旧包没有 schema 时仍可运行。
+- [x] Station 不再硬编码 ONNX/Confidence 面板。
 
 ### V1 明确不验收
 
-- [ ] 不验收 ROI。
-- [ ] 不验收 PathPicker。
-- [ ] 不验收 profile 导入导出。
-- [ ] 不验收 Studio 吸收现场 profile。
-- [ ] 不验收热更新。
-- [ ] 不验收多级权限。
-- [ ] 不验收历史审计 jsonl。
+- [x] 不验收 ROI。
+- [x] 不验收 PathPicker。
+- [x] 不验收 profile 导入导出。
+- [x] 不验收 Studio 吸收现场 profile。
+- [x] 不验收热更新。
+- [x] 不验收多级权限。
+- [x] 不验收历史审计 jsonl。
 
 ---
 
@@ -715,17 +716,39 @@ V1 不追求复杂布局，建议直接把当前右侧 `ONNX 参数` 卡片替�
 
 ## 9. V2+ 停车场
 
-这些方向正确，但不进入 V1：
+V1 已于 2026-05-03 完成。以下按 **投入产出比** 和 **依赖关系** 分层排列，供挑下一轮时参考。
 
-- Bool / Enum / String 参数类型。
-- ROI 编辑器。
-- 光源、曝光、PLC 超时等现场参数。
-- Profile 导入 / 导出。
-- Station 工程师密码门禁。
-- 参数修改历史。
-- Studio 导入现场 profile 并选择性吸收。
-- 跨包版本的 profile 迁移。
-- Profile diff 视图。
-- 大量参数搜索、折叠和虚拟化。
+### Tier 1 — 框架自然延伸，改动小、收益大
 
-V1 完成后，再从这个停车场挑下一轮，而不是在第一轮一口气做完。
+| 编号 | 方向 | 概述 | 前置依赖 | 预估工作量 | 推荐理由 |
+|:---:|:---|:---|:---|:---|:---|
+| T1-a | **Bool / Enum / String 参数类型** | 扩展 `RuntimeParameterValueType` 和 `RuntimeParameterUiKind` 枚举，`RuntimeParameterControlFactory` 增加 `CheckBox`、`ComboBox`、`TextBox` 分支。 | 无（纯框架扩展） | 1-2 天 | 当前 V1 只支持 Number，但实际业务中布尔开关（启用/禁用）、枚举选择（模式 A/B/C）、字符串输入（阈值名称）很常见。改动集中在 ControlFactory 和 Validator，风险低。 |
+| T1-b | **Profile 导入 / 导出** | Station 提供导出为 `.json` 文件和从文件导入的按钮，导入时校验 `packageId + flowHash` 匹配。 | 无 | 1 天 | 现场多台同型号设备部署时，工程师调好一台的参数后可以批量复制，减少重复劳动。实现简单：序列化 `RuntimeSiteProfile` + 文件对话框。 |
+| T1-c | **参数分组与折叠** | 按 `GroupName` 分组渲染，支持折叠/展开。 | 无 | 0.5 天 | 当前 V1 只有一个参数所以不明显，但一旦参数超过 5 个就需要分组，否则界面混乱。在 `RuntimeParameterPanel` 的 `TableLayoutPanel` 外层加 `GroupBox` 即可。 |
+
+### Tier 2 — 业务驱动，需要 Studio 或硬件配合
+
+| 编号 | 方向 | 概述 | 前置依赖 | 预估工作量 | 推荐理由 |
+|:---:|:---|:---|:---|:---|:---|
+| T2-a | **光源 / 曝光 / PLC 超时等硬件参数** | Exporter 自动发现光源控制器、相机、PLC 算子的可调参数并写入 schema。 | 需确认哪些算子有硬件参数可暴露 | 3-5 天 | 比 Confidence 更高频——生产线换料时光源亮度、曝光时间经常要调。需要和算子开发者对齐参数命名和范围。 |
+| T2-b | **ROI 参数** | 支持 `RuntimeParameterValueType.Roi`，Station 端渲染 ROI 框选编辑器。 | 需设计 ROI 的 JsonElement 表示格式 | 3-5 天 | 很多视觉算子的检测区域需要现场微调。但 ROI 编辑涉及坐标系、图像叠加渲染，UI 复杂度高。建议先定义数据格式，再做 UI。 |
+| T2-c | **Path / PathPicker 参数** | 支持 `RuntimeParameterValueType.Path`，Station 端渲染文件/目录选择器。 | 需定义相对路径 vs 绝对路径策略 | 1-2 天 | 模型文件路径、输出目录等在不同设备上可能不同。实现相对简单，但需要考虑路径安全（防止目录遍历）。 |
+| T2-d | **Immediate / NextFrame 热更新** | 扩展 `RuntimeParameterApplyMode`，支持 `Immediate`（当前帧生效）和 `NextFrame`（下一帧生效）。 | 需 RuntimeHost 支持运行中参数注入 | 3-5 天 | 对于调光源/曝光等实时性要求高的参数很有用。但需要 RuntimeHost 在运行循环中检查参数变更，涉及并发安全。 |
+
+### Tier 3 — 流程与治理，适合生产稳定后
+
+| 编号 | 方向 | 概述 | 前置依赖 | 预估工作量 | 推荐理由 |
+|:---:|:---|:---|:---|:---|:---|
+| T3-b | **参数修改历史 (history.jsonl)** | 每次修改 profile 时追加一行到 `history.jsonl`，记录时间、操作人、旧值、新值。 | 无 | 1 天 | 审计追溯需求。V1 的 `UpdatedAtUtc` / `UpdatedBy` 只记录最后一次，不保留历史。jsonl 格式简单追加，不需数据库。 |
+| T3-c | **Studio 导入现场 profile 并选择性吸收** | Studio 端可以读取 Station 导出的 profile，选择性地将现场值写回 `flow.json` 默认值。 | 需 Studio UI 支持 | 3-5 天 | 用于"现场调好后回写到工程包"的闭环。依赖 T1-b（导入导出）作为基础。 |
+| T3-d | **跨包版本的 profile 迁移** | Studio 重新导出包后，旧 profile 能通过参数迁移表映射到新包。 | 需设计稳定参数标识（`nodeAlias` 或迁移表） | 3-5 天 | 当 flowHash 变化时旧 profile 会被拒绝。如果 Studio 频繁迭代包版本，工程师每次都要重新调参。需要引入稳定的参数别名机制。 |
+
+### 推荐下一轮组合
+
+如果要挑一个 V2 sprint，建议组合：
+
+1. **T1-a（Bool/Enum/String 类型）** — 扩展框架，为后续更多参数类型打基础。
+2. **T1-b（Profile 导入导出）** — 现场工程师立刻能用的实用功能。
+3. **T3-b（参数修改历史）** — 低成本审计能力，生产合规需要。
+
+这三者互相无依赖，可以并行开发，总工作量约 3-4 天。

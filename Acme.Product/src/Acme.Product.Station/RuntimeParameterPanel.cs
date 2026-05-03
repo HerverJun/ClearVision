@@ -11,6 +11,8 @@ public sealed class RuntimeParameterPanel : UserControl
     private readonly Button _applyButton = new();
     private readonly Button _cancelButton = new();
     private readonly Button _resetButton = new();
+    private readonly Button _importButton = new();
+    private readonly Button _exportButton = new();
     private readonly List<RuntimeParameterEditor> _editors = [];
     private RuntimePackage? _package;
     private RuntimeSiteProfile? _profile;
@@ -24,6 +26,10 @@ public sealed class RuntimeParameterPanel : UserControl
     public Action<RuntimeSiteProfile>? ApplyRequested { get; set; }
 
     public Action? ResetRequested { get; set; }
+
+    public Action? ImportRequested { get; set; }
+
+    public Action<RuntimeSiteProfile>? ExportRequested { get; set; }
 
     public void LoadPackage(RuntimePackage? package, RuntimeSiteProfile? profile)
     {
@@ -44,6 +50,8 @@ public sealed class RuntimeParameterPanel : UserControl
         _applyButton.Enabled = enabled && hasEditors;
         _cancelButton.Enabled = enabled && hasEditors;
         _resetButton.Enabled = enabled && hasEditors;
+        _importButton.Enabled = enabled && hasEditors;
+        _exportButton.Enabled = enabled && hasEditors;
     }
 
     private void BuildUi()
@@ -88,7 +96,9 @@ public sealed class RuntimeParameterPanel : UserControl
         ConfigureButton(_applyButton, "应用", OnApply);
         ConfigureButton(_cancelButton, "取消修改", Render);
         ConfigureButton(_resetButton, "恢复默认", () => ResetRequested?.Invoke());
-        buttons.Controls.AddRange([_applyButton, _cancelButton, _resetButton]);
+        ConfigureButton(_importButton, "导入", () => ImportRequested?.Invoke());
+        ConfigureButton(_exportButton, "导出", OnExport);
+        buttons.Controls.AddRange([_applyButton, _cancelButton, _resetButton, _importButton, _exportButton]);
 
         _layout.Controls.Add(_emptyLabel, 0, 0);
         _layout.Controls.Add(_parameterRows, 0, 1);
@@ -146,9 +156,31 @@ public sealed class RuntimeParameterPanel : UserControl
 
     private void OnApply()
     {
-        if (_package == null)
+        var profile = CreateDraftProfile();
+        if (profile == null)
         {
             return;
+        }
+
+        ApplyRequested?.Invoke(profile);
+    }
+
+    private void OnExport()
+    {
+        var profile = CreateDraftProfile();
+        if (profile == null)
+        {
+            return;
+        }
+
+        ExportRequested?.Invoke(profile);
+    }
+
+    private RuntimeSiteProfile? CreateDraftProfile()
+    {
+        if (_package == null)
+        {
+            return null;
         }
 
         var profile = _profile == null
@@ -157,6 +189,8 @@ public sealed class RuntimeParameterPanel : UserControl
         profile.ProfileId = string.IsNullOrWhiteSpace(profile.ProfileId) ? "local-site" : profile.ProfileId;
         profile.PackageId = _package.Manifest.PackageId;
         profile.FlowHash = _package.Manifest.FlowHash;
+        profile.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        profile.UpdatedBy = string.IsNullOrWhiteSpace(profile.UpdatedBy) ? "local-engineer" : profile.UpdatedBy;
         profile.Overrides = _editors
             .Where(editor => !RuntimeParameterControlFactory.IsSameNumber(editor.CurrentValue, editor.DefaultValue))
             .Select(editor => new RuntimeParameterOverride
@@ -165,8 +199,7 @@ public sealed class RuntimeParameterPanel : UserControl
                 Value = RuntimeParameterControlFactory.CreateNumberElement(editor.CurrentValue)
             })
             .ToList();
-
-        ApplyRequested?.Invoke(profile);
+        return profile;
     }
 
     private static void ConfigureButton(Button button, string text, Action onClick)

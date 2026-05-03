@@ -8,6 +8,7 @@ namespace Acme.Product.Station;
 public sealed class StationSiteProfileStore
 {
     private const string LocalProfileId = "local-site";
+    private const string LocalUpdatedBy = "local-engineer";
     private readonly string _rootPath;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -78,15 +79,69 @@ public sealed class StationSiteProfileStore
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(profile);
 
-        var nextProfile = RuntimeParameterOverrideApplier.CloneProfile(profile);
-        nextProfile.ProfileId = LocalProfileId;
-        nextProfile.PackageId = package.Manifest.PackageId;
-        nextProfile.FlowHash = package.Manifest.FlowHash;
-        nextProfile.Revision += 1;
-        nextProfile.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        nextProfile.UpdatedBy = "local-engineer";
+        var nextProfile = PrepareProfileForWrite(package, profile, profile.Revision + 1);
+        WriteProfile(package, nextProfile);
+        return RuntimeParameterOverrideApplier.CloneProfile(nextProfile);
+    }
 
-        RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, nextProfile);
+    public string GetSuggestedExportFileName(RuntimePackage package)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+
+        return $"{SanitizePathSegment(package.Manifest.PackageId, "package")}-site-profile.json";
+    }
+
+    public void ExportToFile(RuntimePackage package, RuntimeSiteProfile? profile, string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        var exportProfile = NormalizeProfileForExport(package, profile);
+        var resolvedPath = Path.GetFullPath(filePath);
+        var directory = Path.GetDirectoryName(resolvedPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var json = JsonSerializer.Serialize(exportProfile, _jsonOptions);
+        File.WriteAllText(resolvedPath, json);
+    }
+
+    public RuntimeSiteProfile ImportFromFile(RuntimePackage package, string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        var resolvedPath = Path.GetFullPath(filePath);
+        var json = File.ReadAllText(resolvedPath);
+        return Import(package, json);
+    }
+
+    public RuntimeSiteProfile Import(RuntimePackage package, string json)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+
+        RuntimeSiteProfile importedProfile;
+        try
+        {
+            importedProfile = JsonSerializer.Deserialize<RuntimeSiteProfile>(json, _jsonOptions)
+                ?? throw new InvalidOperationException("导入的 Profile 文件为空或格式无效。");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("导入的 Profile 文件不是有效的 JSON。", ex);
+        }
+
+        if (!MatchesPackage(importedProfile, package))
+        {
+            throw new InvalidOperationException("导入的 Profile 与当前运行包不匹配。");
+        }
+
+        RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, importedProfile);
+        var currentRevision = LoadOrCreate(package).Revision;
+        var nextProfile = PrepareProfileForWrite(package, importedProfile, currentRevision + 1);
         WriteProfile(package, nextProfile);
         return RuntimeParameterOverrideApplier.CloneProfile(nextProfile);
     }
@@ -103,7 +158,7 @@ public sealed class StationSiteProfileStore
             FlowHash = package.Manifest.FlowHash,
             Revision = revision + 1,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
-            UpdatedBy = "local-engineer",
+            UpdatedBy = LocalUpdatedBy,
             Overrides = []
         };
 
@@ -118,8 +173,43 @@ public sealed class StationSiteProfileStore
         profile.ProfileId = LocalProfileId;
         profile.PackageId = package.Manifest.PackageId;
         profile.FlowHash = package.Manifest.FlowHash;
-        profile.UpdatedBy = "local-engineer";
+        profile.UpdatedBy = LocalUpdatedBy;
         return profile;
+    }
+
+    private RuntimeSiteProfile NormalizeProfileForExport(RuntimePackage package, RuntimeSiteProfile? profile)
+    {
+        var exportProfile = profile == null
+            ? CreateLocalProfileFromPackageDefault(package)
+            : RuntimeParameterOverrideApplier.CloneProfile(profile);
+        exportProfile.ProfileId = string.IsNullOrWhiteSpace(exportProfile.ProfileId)
+            ? LocalProfileId
+            : exportProfile.ProfileId;
+        exportProfile.PackageId = package.Manifest.PackageId;
+        exportProfile.FlowHash = package.Manifest.FlowHash;
+        exportProfile.UpdatedAtUtc = exportProfile.UpdatedAtUtc == default
+            ? DateTimeOffset.UtcNow
+            : exportProfile.UpdatedAtUtc;
+        exportProfile.UpdatedBy = string.IsNullOrWhiteSpace(exportProfile.UpdatedBy)
+            ? LocalUpdatedBy
+            : exportProfile.UpdatedBy;
+
+        RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, exportProfile);
+        return exportProfile;
+    }
+
+    private RuntimeSiteProfile PrepareProfileForWrite(RuntimePackage package, RuntimeSiteProfile sourceProfile, int revision)
+    {
+        var nextProfile = RuntimeParameterOverrideApplier.CloneProfile(sourceProfile);
+        nextProfile.ProfileId = LocalProfileId;
+        nextProfile.PackageId = package.Manifest.PackageId;
+        nextProfile.FlowHash = package.Manifest.FlowHash;
+        nextProfile.Revision = revision;
+        nextProfile.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        nextProfile.UpdatedBy = LocalUpdatedBy;
+
+        RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, nextProfile);
+        return nextProfile;
     }
 
     private void WriteProfile(RuntimePackage package, RuntimeSiteProfile profile)

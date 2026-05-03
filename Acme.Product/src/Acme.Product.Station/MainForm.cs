@@ -86,6 +86,8 @@ public sealed class MainForm : Form
         BuildUi();
         _runtimeParameterPanel.ApplyRequested = ApplyRuntimeParameterProfile;
         _runtimeParameterPanel.ResetRequested = ResetRuntimeParameterProfileToDefault;
+        _runtimeParameterPanel.ImportRequested = ImportRuntimeParameterProfile;
+        _runtimeParameterPanel.ExportRequested = ExportRuntimeParameterProfile;
         BindRuntimeEvents();
         LoadSettings();
         ApplySnapshot(_runtimeHost.GetSnapshot());
@@ -838,6 +840,74 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, ex.Message, "恢复现场参数失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
             AppendLog($"现场参数恢复默认失败：{ex.Message}");
+        }
+    }
+
+    private void ImportRuntimeParameterProfile()
+    {
+        if (_loadedPackage == null)
+        {
+            return;
+        }
+
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "JSON 文件|*.json|所有文件|*.*",
+            Multiselect = false,
+            Title = "导入现场参数 Profile"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            _activeSiteProfile = _siteProfileStore.ImportFromFile(_loadedPackage, dialog.FileName);
+            _runtimeHost.SetActiveSiteProfile(_activeSiteProfile);
+            _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
+            AppendLog($"现场参数已导入：Revision {_activeSiteProfile.Revision}，{_activeSiteProfile.Overrides.Count} 项覆盖，下次运行生效。");
+            UpdateButtonStates();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "导入现场参数失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"现场参数导入失败：{ex.Message}");
+        }
+    }
+
+    private void ExportRuntimeParameterProfile(RuntimeSiteProfile profile)
+    {
+        if (_loadedPackage == null)
+        {
+            return;
+        }
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "JSON 文件|*.json|所有文件|*.*",
+            DefaultExt = "json",
+            AddExtension = true,
+            OverwritePrompt = true,
+            Title = "导出现场参数 Profile",
+            FileName = _siteProfileStore.GetSuggestedExportFileName(_loadedPackage)
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            _siteProfileStore.ExportToFile(_loadedPackage, profile, dialog.FileName);
+            AppendLog($"现场参数已导出：{dialog.FileName}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "导出现场参数失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"现场参数导出失败：{ex.Message}");
         }
     }
 
