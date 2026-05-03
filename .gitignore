@@ -3,6 +3,7 @@
 
 # .NET SDK local cache and telemetry
 .dotnet/
+.dotnet_cli_home/.nuget/
 
 # General build output
 [Bb]in/
