@@ -150,6 +150,6 @@ public sealed partial class RuntimePackageValidator
     [GeneratedRegex("(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})", RegexOptions.CultureInvariant)]
     private static partial Regex SecretValuePattern();
 
-    [GeneratedRegex("\"[A-Za-z]:\\\\(?:Users|Temp|Windows|Program Files|ProgramData)\\\\", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("\"[A-Za-z]:(?:\\\\\\\\|/)(?:Users|Temp|Windows|Program Files|ProgramData)(?:\\\\\\\\|/)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex LocalAbsolutePathPattern();
 }

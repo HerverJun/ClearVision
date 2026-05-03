@@ -1544,15 +1544,61 @@ async function triggerAutoSave() {
 /**
  * 【阶段B-B5】导出工程为JSON文件
  */
-function exportProjectToJson() {
-    const project = getCurrentProject();
-    if (!project) {
+function createProjectExportFilename(projectName, extension = '.cvproj.json') {
+    const normalizedName = String(projectName || 'project')
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, '_');
+    const safeName = normalizedName || 'project';
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    return `${safeName}_${dateStamp}${extension}`;
+}
+
+function triggerDownload(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function resolveProjectExportSource(projectId = null) {
+    const currentProject = getCurrentProject();
+    const targetProjectId = projectId || currentProject?.id || null;
+
+    if (!targetProjectId) {
+        return null;
+    }
+
+    if (currentProject && currentProject.id === targetProjectId) {
+        return {
+            project: currentProject,
+            flow: flowCanvas ? flowCanvas.serialize() : currentProject.flow,
+            isCurrentProject: true
+        };
+    }
+
+    const project = await httpClient.get(`/projects/${targetProjectId}`);
+    return {
+        project,
+        flow: project.flow,
+        isCurrentProject: false
+    };
+}
+
+async function exportProjectToJson(projectId = null) {
+    const exportSource = await resolveProjectExportSource(projectId);
+    if (!exportSource?.project) {
         showToast('没有可导出的工程', 'warning');
         return;
     }
     
     try {
         // 准备导出数据
+        const { project, flow } = exportSource;
         const exportData = {
             version: '1.0',
             exportTime: new Date().toISOString(),
@@ -1562,20 +1608,16 @@ function exportProjectToJson() {
                 description: project.description,
                 createdAt: project.createdAt,
                 updatedAt: new Date().toISOString(),
-            flow: flowCanvas ? flowCanvas.serialize() : project.flow
+                flow
             }
         };
         
         // 创建下载链接
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${project.name || 'project'}_${new Date().toISOString().slice(0, 10)}.cvproj.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        triggerDownload(
+            JSON.stringify(exportData, null, 2),
+            createProjectExportFilename(project.name),
+            'application/json'
+        );
         
         showToast('工程导出成功', 'success');
         console.log('[Export] 工程已导出:', project.name);
@@ -1585,33 +1627,40 @@ function exportProjectToJson() {
     }
 }
 
-async function exportRuntimePackage() {
-    const project = getCurrentProject();
-    if (!project) {
-        showToast('娌℃湁鍙鍑虹殑宸ョ▼', 'warning');
+async function exportRuntimePackage(projectId = null) {
+    const currentProject = getCurrentProject();
+    const targetProjectId = projectId || currentProject?.id || null;
+    if (!targetProjectId) {
+        showToast('没有可导出的工程', 'warning');
         return;
     }
-
     try {
-        const flow = flowCanvas ? flowCanvas.serialize() : project.flow;
-        await projectManager.saveProject({
-            ...project,
-            flow
-        });
+        const requestBody = {};
+        if (currentProject && currentProject.id === targetProjectId) {
+            const flow = flowCanvas ? flowCanvas.serialize() : currentProject.flow;
+            await projectManager.saveProject({
+                ...currentProject,
+                flow
+            });
+            requestBody.flow = flow;
+        }
 
-        const response = await httpClient.post(`/projects/${project.id}/runtime-package/export`, {
-            flow
-        });
+        const response = await httpClient.post(`/projects/${targetProjectId}/runtime-package/export`, requestBody);
 
-        showToast('Runtime Package 瀵煎嚭鎴愬姛', 'success');
+        showToast('Runtime Package 导出成功', 'success');
         Dialog.alert(
-            'Runtime Package 宸插鍑?',
-            `鐩綍: ${response.packageRootPath || '-'}<br>FlowHash: ${response.flowHash || '-'}`,
+            'Runtime Package 已导出',
+            `路径: ${response.packageRootPath || '-'}<br>FlowHash: ${response.flowHash || '-'}`,
             null
         );
     } catch (err) {
         console.error('[Export] Runtime Package export failed:', err);
-        showToast(`Runtime Package 瀵煎嚭澶辫触: ${err.message}`, 'error');
+        const msg = err.message || '未知错误';
+        if (msg.includes('\n')) {
+            Dialog.alert('导出失败', msg.replace(/\n/g, '<br>'), null);
+        } else {
+            showToast(`Runtime Package 导出失败: ${msg}`, 'error');
+        }
     }
 }
 
@@ -1619,45 +1668,140 @@ function showProjectExportDialog() {
     const content = document.createElement('div');
     content.innerHTML = `
         <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label for="project-export-select" style="font-weight:600;">选择工程</label>
+                <select id="project-export-select" class="cv-input" disabled>
+                    <option value="">正在加载工程库...</option>
+                </select>
+                <div id="project-export-hint" style="color:var(--text-muted); font-size:12px;">
+                    可直接从工程库选择已有工程，无需先打开。
+                </div>
+            </div>
             <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
                 <div style="font-weight:600; margin-bottom:4px;">Project JSON</div>
-                <div style="color:var(--text-muted); font-size:12px;">Export the editable Studio project snapshot.</div>
+                <div style="color:var(--text-muted); font-size:12px;">导出可继续在 Studio 中编辑的工程快照。</div>
             </div>
             <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
                 <div style="font-weight:600; margin-bottom:4px;">Runtime Package</div>
-                <div style="color:var(--text-muted); font-size:12px;">Export the current flow as a Station-ready runtime package.</div>
+                <div style="color:var(--text-muted); font-size:12px;">导出可供 Station 使用的运行包；如果选中当前已打开工程，会带上画布上的最新修改。</div>
             </div>
         </div>
     `;
 
+    const projectSelect = content.querySelector('#project-export-select');
+    const projectExportHint = content.querySelector('#project-export-hint');
+    const currentProject = getCurrentProject();
+    const preferredProjectId = currentProject?.id || null;
+
     let modalOverlay = null;
     const btnCancel = createButton({
-        text: '鍙栨秷',
+        text: '取消',
         type: 'secondary',
         onClick: () => closeModal(modalOverlay)
     });
     const btnJson = createButton({
         text: 'Project JSON',
         type: 'secondary',
-        onClick: () => {
+        disabled: true,
+        onClick: async () => {
+            const selectedProjectId = projectSelect.value;
+            if (!selectedProjectId) {
+                showToast('请选择要导出的工程', 'warning');
+                return;
+            }
+
             closeModal(modalOverlay);
-            exportProjectToJson();
+            await exportProjectToJson(selectedProjectId);
         }
     });
     const btnRuntime = createButton({
         text: 'Runtime Package',
+        disabled: true,
         onClick: async () => {
+            const selectedProjectId = projectSelect.value;
+            if (!selectedProjectId) {
+                showToast('请选择要导出的工程', 'warning');
+                return;
+            }
+
             closeModal(modalOverlay);
-            await exportRuntimePackage();
+            await exportRuntimePackage(selectedProjectId);
         }
     });
 
+    const setExportActionsEnabled = (enabled) => {
+        btnJson.disabled = !enabled;
+        btnRuntime.disabled = !enabled;
+    };
+
+    const populateProjectOptions = (projects) => {
+        projectSelect.innerHTML = '';
+
+        projects.forEach((project, index) => {
+            const option = document.createElement('option');
+            const fallbackName = `未命名工程 ${index + 1}`;
+            const modifiedAt = project.modifiedAt || project.updatedAt || project.createdAt;
+            const dateLabel = modifiedAt
+                ? new Date(modifiedAt).toLocaleDateString('zh-CN')
+                : null;
+
+            option.value = project.id;
+            option.textContent = dateLabel
+                ? `${project.name || fallbackName} (${dateLabel})`
+                : (project.name || fallbackName);
+            projectSelect.appendChild(option);
+        });
+
+        const hasPreferredProject = preferredProjectId
+            && projects.some(project => project.id === preferredProjectId);
+        projectSelect.value = hasPreferredProject
+            ? preferredProjectId
+            : projects[0]?.id || '';
+        projectSelect.disabled = !projectSelect.value;
+        setExportActionsEnabled(Boolean(projectSelect.value));
+    };
+
     modalOverlay = createModal({
-        title: '瀵煎嚭',
+        title: '导出',
         content,
         footer: [btnCancel, btnJson, btnRuntime],
         width: '420px'
     });
+
+    (async () => {
+        try {
+            const projects = await projectManager.getProjectList();
+            const exportableProjects = Array.isArray(projects)
+                ? projects.filter(project => Boolean(project?.id))
+                : [];
+
+            if (exportableProjects.length === 0) {
+                projectSelect.innerHTML = '<option value="">工程库暂无可导出工程</option>';
+                projectSelect.disabled = true;
+                projectExportHint.textContent = '工程库里还没有工程，请先创建工程。';
+                setExportActionsEnabled(false);
+                return;
+            }
+
+            populateProjectOptions(exportableProjects);
+            projectExportHint.textContent = preferredProjectId
+                ? '已默认选中当前打开工程，你也可以切换为工程库里的其他工程。'
+                : '请选择工程库中的已有工程进行导出。';
+        } catch (error) {
+            console.error('[Export] 加载工程库失败:', error);
+
+            if (currentProject?.id) {
+                populateProjectOptions([currentProject]);
+                projectExportHint.textContent = '工程库加载失败，已回退为当前打开工程。';
+                return;
+            }
+
+            projectSelect.innerHTML = '<option value="">工程库加载失败</option>';
+            projectSelect.disabled = true;
+            projectExportHint.textContent = '暂时无法读取工程库，请稍后重试。';
+            setExportActionsEnabled(false);
+        }
+    })();
 }
 
 /**

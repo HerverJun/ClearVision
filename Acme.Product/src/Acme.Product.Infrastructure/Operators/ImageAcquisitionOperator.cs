@@ -216,6 +216,22 @@ public class ImageAcquisitionOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        var sourceType = GetStringParam(@operator, "SourceType", GetStringParam(@operator, "sourceType", "File"));
+        if (!sourceType.Equals("File", StringComparison.OrdinalIgnoreCase) &&
+            !sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Invalid("SourceType must be File or Camera.");
+        }
+
+        if (sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
+        {
+            var cameraId = GetStringParam(@operator, "CameraId", GetStringParam(@operator, "cameraId", string.Empty));
+            if (string.IsNullOrWhiteSpace(cameraId))
+            {
+                return ValidationResult.Invalid("CameraId is required when SourceType is Camera.");
+            }
+        }
+
         return ValidationResult.Valid();
     }
 

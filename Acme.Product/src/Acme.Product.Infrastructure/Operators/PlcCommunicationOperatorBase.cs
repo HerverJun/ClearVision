@@ -27,7 +27,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     // ─── 心跳巡检 ─────────────────────────────────────────────
     private static Task? _heartbeatTask;
     private static CancellationTokenSource? _heartbeatCts;
-    private static readonly Dictionary<string, bool> _lastKnownState = new();
+    private static readonly ConcurrentDictionary<string, bool> _lastKnownState = new(StringComparer.Ordinal);
     private static ILogger? _heartbeatLogger;
     private static bool _heartbeatStarted;
 
@@ -103,6 +103,32 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             _heartbeatCts = null;
             _heartbeatTask = null;
         }
+    }
+
+    public static IReadOnlyDictionary<string, bool> GetConnectionStateSnapshot()
+    {
+        if (_poolLock.Wait(50))
+        {
+            try
+            {
+                var snapshot = new Dictionary<string, bool>(StringComparer.Ordinal);
+                foreach (var (key, client) in _connectionPool)
+                {
+                    var isAlive = _lastKnownState.TryGetValue(key, out var knownState)
+                        ? knownState
+                        : client.IsConnected;
+                    snapshot[key] = isAlive;
+                }
+
+                return snapshot;
+            }
+            finally
+            {
+                _poolLock.Release();
+            }
+        }
+
+        return _lastKnownState.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 
     /// <summary>
