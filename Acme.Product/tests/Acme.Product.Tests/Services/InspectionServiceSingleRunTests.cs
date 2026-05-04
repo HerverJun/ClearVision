@@ -125,6 +125,64 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WhenStoredFlowExists_ShouldPreferFileFlowOverDatabaseSnapshot()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var project = new Project("prefer-stored-flow");
+        var databaseFlow = CreateFlow("db-flow");
+        var fileFlowJson = SerializeFlowDto("file-flow");
+        OperatorFlow? executedFlow = null;
+
+        project.UpdateFlow(databaseFlow);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowStorage.LoadFlowJsonAsync(projectId).Returns(fileFlowJson);
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                executedFlow = callInfo.Arg<OperatorFlow>();
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 7,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        await service.ExecuteSingleAsync(projectId, new byte[] { 5, 6, 7 }, flow: null);
+
+        executedFlow.Should().NotBeNull();
+        executedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Name == "file-flow");
+        executedFlow.Operators.Should().NotContain(operatorEntity => operatorEntity.Name == "db-flow");
+        _ = projectRepository.Received(1).GetWithFlowAsync(projectId);
+        _ = flowStorage.Received(1).LoadFlowJsonAsync(projectId);
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WhenJudgmentSignalMissing_ShouldFailClosed()
     {
         var projectId = Guid.NewGuid();

@@ -8,6 +8,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -21,16 +22,22 @@ public class Sprint2_ForEachTests
 {
     private readonly ILogger<ForEachOperator> _loggerMock;
     private readonly IFlowExecutionService _flowExecutorMock;
-    private readonly IServiceProvider _serviceProviderMock;
+    private readonly IServiceProvider _scopedServiceProviderMock;
+    private readonly IServiceScope _serviceScopeMock;
+    private readonly IServiceScopeFactory _serviceScopeFactoryMock;
     private readonly ForEachOperator _operator;
 
     public Sprint2_ForEachTests()
     {
         _loggerMock = Substitute.For<ILogger<ForEachOperator>>();
         _flowExecutorMock = Substitute.For<IFlowExecutionService>();
-        _serviceProviderMock = Substitute.For<IServiceProvider>();
-        _serviceProviderMock.GetService(typeof(IFlowExecutionService)).Returns(_flowExecutorMock);
-        _operator = new ForEachOperator(_loggerMock, _serviceProviderMock);
+        _scopedServiceProviderMock = Substitute.For<IServiceProvider>();
+        _serviceScopeMock = Substitute.For<IServiceScope>();
+        _serviceScopeFactoryMock = Substitute.For<IServiceScopeFactory>();
+        _scopedServiceProviderMock.GetService(typeof(IFlowExecutionService)).Returns(_flowExecutorMock);
+        _serviceScopeMock.ServiceProvider.Returns(_scopedServiceProviderMock);
+        _serviceScopeFactoryMock.CreateScope().Returns(_serviceScopeMock);
+        _operator = new ForEachOperator(_loggerMock, _serviceScopeFactoryMock);
     }
 
     /// <summary>
@@ -239,6 +246,39 @@ public class Sprint2_ForEachTests
         Assert.Equal(0, result.OutputData!["Count"]);
         Assert.Equal(0, result.OutputData["PassCount"]);
         Assert.True((bool)result.OutputData["AllPass"]);
+    }
+
+    [Fact]
+    public async Task ForEach_ExecutesSubGraphWithinCreatedScope()
+    {
+        var op = CreateOperator();
+        var inputs = new Dictionary<string, object>
+        {
+            { "Items", new List<object> { 1 } }
+        };
+
+        _flowExecutorMock.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>>(),
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                OutputData = new Dictionary<string, object> { { "Result", true } }
+            }));
+
+        _operator.SubGraph = new OperatorFlow("ScopedSubGraph");
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess);
+        _serviceScopeFactoryMock.Received(1).CreateScope();
+        await _flowExecutorMock.Received(1).ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>>(),
+            false,
+            Arg.Any<CancellationToken>());
     }
 
     /// <summary>

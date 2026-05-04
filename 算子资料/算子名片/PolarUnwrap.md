@@ -1,4 +1,4 @@
-# 极坐标展开 / PolarUnwrap
+﻿# 极坐标展开 / PolarUnwrap
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -8,116 +8,123 @@
 | 分类 (Category) | 图像处理 |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 作者 (Author) | 蘅芜君 |
-| 关键词 (Keywords) | polar, unwrap, ring, annular |
-| 图标 (Icon) | polar |
 
 ## 算法原理 / Algorithm Principle
-极坐标展开将笛卡尔坐标系下的环形区域转换为矩形图像。变换的数学关系为：
+该算子把以某个中心为参考的环形区域，从笛卡尔坐标系展开到极坐标平面。
 
-```
-极坐标 (r, theta) -> 直角坐标 (x, y):
-x = centerX + r * cos(theta)
-y = centerY + r * sin(theta)
-```
+当前展开区域由以下参数定义：
 
-展开后图像的几何语义：
-- **横轴**：角度方向，对应 `StartAngle` 到 `EndAngle` 的范围。
-- **纵轴**：半径方向，对应 `InnerRadius` 到 `OuterRadius` 的范围。
+- 中心点：`Center` 输入端口，或参数 `CenterX / CenterY`
+- 半径范围：`InnerRadius ~ OuterRadius`
+- 角度范围：`StartAngle ~ EndAngle`
 
-输出尺寸规则：
+展开后图像的几何语义是：
+
+- **横轴**：角度方向
+- **纵轴**：半径方向
+
+当前实现的输出尺寸规则为：
+
 - `height = OuterRadius - InnerRadius`
-- `width = OutputWidth > 0 ? OutputWidth : round(2*pi * OuterRadius * angleSpan / 360)`
+- `width = OutputWidth > 0 ? OutputWidth : round(2π × OuterRadius × angleSpan / 360)`
 
-若不指定 `OutputWidth`，算子按外圈弧长自动推导宽度，保证近似各向同性采样。
+因此，如果你不显式指定 `OutputWidth`，算子会按外圈弧长近似来自动推导展开宽度。
 
-> English: The operator maps an annular region in Cartesian coordinates to a rectangular image in polar coordinates. The horizontal axis represents angle and the vertical axis represents radius. Output width defaults to the outer arc length for approximately isotropic sampling.
+> English: The operator unwraps an annular region around a center point into a rectangular image, where the horizontal axis represents angle and the vertical axis represents radius.
 
 ## 实现策略 / Implementation Strategy
-当前实现提供两条展开路径：
+当前实现实际上有两套展开路径：
 
-**优先路径：WarpPolar**
-1. 调用 `Cv2.WarpPolar()` 生成整圈极坐标展开图（行数 = max(OutputWidth, 360)）。
-2. 按 `StartAngle` 和角度跨度 `angleSpan` 从展开图中切出对应行范围。
-3. 若角度跨越 0/360 度边界，通过 `SliceRowsWithWrap()` 做环绕拼接。
-4. 对径向切片（InnerRadius 到 OuterRadius 列范围）后转置。
-5. 必要时 `Cv2.Resize()` 调整到目标尺寸。
+- **优先路径：`WarpPolar`**
+  - 若 `UseWarpPolar=true`，先尝试用 OpenCV 的 `Cv2.WarpPolar(...)` 做极坐标展开。
+  - 随后按角度范围切行、必要时做环绕拼接，再转置成最终方向。
+- **回退路径：`Remap`**
+  - 如果 `WarpPolar` 失败，或 `UseWarpPolar=false`，则使用自定义 `mapX/mapY + Cv2.Remap(...)` 做逐像素极坐标映射。
 
-**回退路径：Remap**
-1. 构建 `mapX / mapY` 两张浮点映射表，逐像素计算极坐标到直角坐标的映射。
-2. 调用 `Cv2.Remap(src, unwrapped, mapX, mapY, Linear, Constant, Black)` 执行重映射。
+源码中的 `WarpPolar` 路径不是直接输出最终结果，而是：
 
-WarpPolar 路径在大尺寸展开时性能更优，但实现更复杂；Remap 路径更直接但逐像素构图开销较大。当 `UseWarpPolar=true` 时优先尝试 WarpPolar，失败时静默回退到 Remap。
+1. 先生成整圈展开结果；
+2. 根据 `StartAngle` 与角度跨度切出所需行；
+3. 若跨越 `0/360°` 边界，则通过 `SliceRowsWithWrap(...)` 做拼接；
+4. 转置后再按目标宽高调整尺寸。
 
-> English: The operator prefers OpenCV WarpPolar for performance, with angle slicing and optional wrap-around merging. On failure or when UseWarpPolar=false, it falls back to a custom per-pixel remap implementation.
+这也是它相对简单 `Remap` 方案更高效，但实现更复杂的原因。
+
+> English: The operator prefers OpenCV `WarpPolar` for performance, but falls back to a custom remap implementation when needed or when `UseWarpPolar` is disabled.
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(inputs, out imageWrapper)` -- 获取输入图像
-2. `ResolveCenter(@operator, inputs, width, height)` -- 解析中心点（输入端口优先于参数）
-3. `GetIntParam / GetDoubleParam / GetBoolParam` -- 读取半径、角度、输出宽度等参数
-4. 计算 `angleSpan`、自动输出宽度、输出高度
-5. **分支一：`TryUnwrapByWarpPolar(...)`**
-   - `Cv2.WarpPolar(src, polar, Size(outerRadius, fullAngleRows), center, outerRadius, Linear, Linear)` -- 整圈展开
-   - `SliceRowsWithWrap(polar, startRow, rowsForSpan)` -- 角度切片（支持环绕）
-   - `angleSlice.ColRange(inner, inner + span)` -- 径向切片
-   - `Cv2.Transpose(radialSlice, transposed)` -- 转置为最终方向
-   - `Cv2.Resize(transposed, unwrapped, targetSize)` -- 尺寸调整
-6. **分支二：`UnwrapByRemap(...)`**
-   - 构建 `mapX[y,x] = centerX + r*cos(theta)`, `mapY[y,x] = centerY + r*sin(theta)`
-   - `Cv2.Remap(src, unwrapped, mapX, mapY, Linear, Constant, Black)` -- 极坐标重映射
-7. `CreateImageOutput(unwrapped, { "Method", "UseWarpPolar" })` -- 封装输出
+1. `TryGetInputImage(inputs)`
+2. `ResolveCenter(...)`
+3. `GetIntParam / GetDoubleParam / GetBoolParam`
+4. 计算 `angleSpan`、自动输出宽度和输出高度
+5. 分支一：`TryUnwrapByWarpPolar(...)`
+   - `Cv2.WarpPolar(...)`
+   - `SliceRowsWithWrap(...)`
+   - `Cv2.Transpose(...)`
+   - `Cv2.Resize(...)`
+6. 分支二：`UnwrapByRemap(...)`
+   - 构建 `mapX / mapY`
+   - `Cv2.Remap(...)`
+7. `CreateImageOutput(unwrapped, additionalData)`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
 |--------|------|--------|------|------|
-| `CenterX` | `int` | `0` | - | 展开中心 X 坐标。未提供 `Center` 输入端口时使用；默认退化为图像中心。 |
-| `CenterY` | `int` | `0` | - | 展开中心 Y 坐标。未提供 `Center` 输入端口时使用；默认退化为图像中心。 |
-| `InnerRadius` | `int` | `0` | [0, min(W,H)/2] | 内圆半径（展开起始半径）。 |
-| `OuterRadius` | `int` | `100` | [1, min(W,H)/2] | 外圆半径（展开终止半径）。必须大于 InnerRadius。 |
-| `StartAngle` | `double` | `0.0` | [-3600.0, 3600.0] | 起始角度（度）。 |
-| `EndAngle` | `double` | `360.0` | [-3600.0, 3600.0] | 结束角度（度）。若 EndAngle < StartAngle，自动加 360 处理。 |
-| `OutputWidth` | `int` | `0` | [0, 20000] | 输出图像宽度。为 0 时按外圈弧长自动估算。 |
-| `UseWarpPolar` | `bool` | `true` | true / false | 是否优先使用 `Cv2.WarpPolar()`。失败时自动回退到 Remap。 |
+| `CenterX` | `int` | `0` | - | 中心点 `X` 坐标。未提供 `Center` 输入端口时使用；默认会退化为图像中心。 |
+| `CenterY` | `int` | `0` | - | 中心点 `Y` 坐标。未提供 `Center` 输入端口时使用；默认会退化为图像中心。 |
+| `InnerRadius` | `int` | `0` | `[0, min(width,height)/2]` | 展开起始半径。 |
+| `OuterRadius` | `int` | `min(width,height)/2` | `[1, min(width,height)/2]` | 展开终止半径，必须大于 `InnerRadius`。 |
+| `StartAngle` | `double` | `0.0` | `[-3600.0, 3600.0]` | 起始角度，单位为度。 |
+| `EndAngle` | `double` | `360.0` | `[-3600.0, 3600.0]` | 结束角度，单位为度。若 `EndAngle < StartAngle`，源码会通过加 `360` 处理角度跨度。 |
+| `OutputWidth` | `int` | `0` | `[0, 20000]` | 输出图宽度。为 `0` 时自动按外圈弧长估算。 |
+| `UseWarpPolar` | `bool` | `true` | `true` / `false` | 是否优先使用 `Cv2.WarpPolar(...)`。失败时会回退到 `Remap` 方案。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | Image | `Image` | Yes | 待展开的输入图像。 |
-| `Center` | Center | `Point` | No | 可选中心点输入。若提供，优先于 CenterX/CenterY 参数。支持 Position、Point、Point2f、Point2d 和字典格式。 |
+| `Image` | Image | `Image` | Yes | 待展开图像。 |
+| `Center` | Center | `Point` | No | 可选中心点输入。若提供，将优先于 `CenterX/CenterY`。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | Image | `Image` | 展开后的极坐标矩形图像。 |
+| `Image` | Image | `Image` | 展开后的极坐标图像。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+|------|------|------|
+| `Width` | `Integer` | 输出图像宽度。测试中 `OutputWidth=180` 时可直接得到 `Width=180`。 |
+| `Height` | `Integer` | 输出图像高度，等于 `OuterRadius - InnerRadius`。 |
+| `Method` | `String` | 本次执行实际采用的展开方法：`WarpPolar` 或 `Remap`。 |
+| `UseWarpPolar` | `Boolean` | 当前请求是否优先使用 `WarpPolar`。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | WarpPolar 路径：O(fullAngleRows * outerRadius) 极坐标变换 + O(outputW * outputH) 切片转置缩放。Remap 路径：O(outputW * outputH) 映射表构建 + O(outputW * outputH) 重映射。 |
-| 典型耗时 (Typical Latency) | 1920x1080 图像、完整 360 度展开约 10-50ms（取决于半径和输出尺寸）。 |
-| 内存特征 (Memory Profile) | WarpPolar 路径分配中间极坐标图、切片图、转置图。Remap 路径分配 mapX/mapY 两张浮点映射表（各 outputW*outputH*4 字节）。 |
+| 时间复杂度 (Time Complexity) | 两种路径整体都近似与输出像素数 `Width × Height` 成正相关；`Remap` 路径逐像素构图更直接，`WarpPolar` 路径额外包含切片、转置和可选缩放。 |
+| 典型耗时 (Typical Latency) | 在大尺寸环形展开场景下，`WarpPolar` 通常更有优势；当退回 `Remap` 时，性能更依赖输出分辨率。 |
+| 内存特征 (Memory Profile) | `WarpPolar` 路径会产生中间极坐标图、切片图和转置图；`Remap` 路径会分配两张映射表 `mapX / mapY`。 |
 
 ## 适用场景 / Use Cases
-- **适合 (Suitable)**：圆环形目标的展开查看，如瓶盖、轴承、O 型圈、法兰密封面。
-- **适合 (Suitable)**：圆柱面缺陷检测，将侧面展开为平面后做模板匹配或缺陷分析。
-- **适合 (Suitable)**：环形字符识别（如瓶盖日期码、轮胎标识），展开后做 OCR。
-- **适合 (Suitable)**：需要指定部分角度区间的扇形展开。
-- **不适合 (Not Suitable)**：中心点位置未知或估计不准确的情况（偏差直接导致展开畸变）。
-- **不适合 (Not Suitable)**：期望自动识别环形区域的任务（需外部提供中心、半径参数）。
-- **不适合 (Not Suitable)**：对数极坐标展开需求（当前仅支持线性极坐标）。
+- **适合 (Suitable)**：圆环、瓶盖、轴承、卷材、标签环形区域等需要“拉直查看”的任务。
+- **适合 (Suitable)**：后续在展开图上做字符检测、缺陷检测、条纹分析或模板匹配的流程。
+- **适合 (Suitable)**：需要指定部分角度区间，而不是整圈展开的场景。
+- **不适合 (Not Suitable)**：中心点估计不准确的情况，中心偏差会直接导致展开畸变。
+- **不适合 (Not Suitable)**：期望自动识别环形中心、半径和角度范围的任务；当前实现需要外部提供这些参数。
+- **不适合 (Not Suitable)**：把输出高度误认为 `OuterRadius` 本身；当前高度只等于径向厚度。
 
 ## 已知限制 / Known Limitations
-1. 输出高度固定为 `OuterRadius - InnerRadius`，不支持独立的径向分辨率控制。
-2. 当 `UseWarpPolar=true` 时，WarpPolar 失败会静默回退到 Remap，仅通过输出的 `Method` 字段可区分实际使用的方法。
-3. 中心点优先级：输入端口 `Center` > 参数 `CenterX/CenterY` > 图像中心（默认值）。
-4. 自动宽度估计依赖 `OuterRadius`，不同外半径直接影响横向分辨率和后续检测尺度。
-5. 不支持对数极坐标展开，也未暴露插值方式或边界填充值的配置。
-6. Remap 路径的边界超出区域固定填充黑色，不支持镜像或复制边界。
+1. 输出高度固定为 `OuterRadius - InnerRadius`，因此最外圈本身不是额外增加一行，而是按径向厚度离散采样。
+2. 当 `UseWarpPolar=true` 时，如果 `WarpPolar` 失败，源码会静默回退到 `Remap`，成功输出中只通过 `Method` 字段体现本次实际方法。
+3. 中心点优先级是输入端口 `Center` 高于参数 `CenterX/CenterY`；若流程里同时提供两者，参数值会被忽略。
+4. 自动宽度估计依赖 `OuterRadius` 外圈弧长，因此不同 `OuterRadius` 会直接影响横向分辨率和后续检测尺度。
+5. 当前实现只支持线性极坐标展开，不是对数极坐标展开，也未暴露插值方式或边界填充值配置。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 2.0.0 | 2026-05-04 | 金牌质量重写：补充完整算法原理（极坐标数学映射、双路径策略）、WarpPolar 切片与环绕逻辑、参数语义、性能分析与限制说明 |
 | 1.0.2 | 2026-03-14 | 第二轮基于源码补充 WarpPolar/Remap 双路径、输出尺寸规则和中心点优先级说明 |
 | 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
 | 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+

@@ -609,7 +609,7 @@ internal static class FlowEntityMapper
 
     private static bool IsCompatible(PortDataType source, PortDataType target)
     {
-        return source == target || source == PortDataType.Any || target == PortDataType.Any;
+        return PortDataTypeCompatibility.AreCompatible(source, target);
     }
 
     private static string ResolveDataType(object? value)

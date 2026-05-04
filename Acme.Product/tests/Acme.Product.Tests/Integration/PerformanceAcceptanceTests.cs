@@ -10,6 +10,7 @@ using Acme.Product.Infrastructure.Memory;
 using Acme.Product.Infrastructure.Operators;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using OpenCvSharp;
@@ -254,7 +255,9 @@ namespace Acme.Product.Tests.Integration
             foreachNode.AddParameter(new Parameter(Guid.NewGuid(), "SubGraph", "SubGraph", "", "object", innerFlow));
             flow.AddOperator(foreachNode);
 
-            var mockServiceProvider = Substitute.For<IServiceProvider>();
+            var mockScopedProvider = Substitute.For<IServiceProvider>();
+            var mockScope = Substitute.For<IServiceScope>();
+            var mockScopeFactory = Substitute.For<IServiceScopeFactory>();
             var mockSubFlowService = Substitute.For<IFlowExecutionService>();
             mockSubFlowService.ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
                 .Returns(async _ =>
@@ -267,9 +270,11 @@ namespace Acme.Product.Tests.Integration
                     };
                 });
 
-            mockServiceProvider.GetService(typeof(IFlowExecutionService)).Returns(mockSubFlowService);
+            mockScopedProvider.GetService(typeof(IFlowExecutionService)).Returns(mockSubFlowService);
+            mockScope.ServiceProvider.Returns(mockScopedProvider);
+            mockScopeFactory.CreateScope().Returns(mockScope);
 
-            var foreachExec = new ForEachOperator(Substitute.For<ILogger<ForEachOperator>>(), mockServiceProvider);
+            var foreachExec = new ForEachOperator(Substitute.For<ILogger<ForEachOperator>>(), mockScopeFactory);
             var flowService = new FlowExecutionService(new IOperatorExecutor[] { foreachExec }, Substitute.For<ILogger<FlowExecutionService>>(), Substitute.For<IVariableContext>());
 
             var inputArray = Enumerable.Range(0, 15).Select(x => (object)x).ToList();

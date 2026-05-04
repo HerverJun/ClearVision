@@ -180,9 +180,7 @@ public class OperatorFlow : Entity
         if (targetPort == null)
             throw new InvalidOperationException($"目标端口 {connection.TargetPortId} 不存在");
 
-        if (sourcePort.DataType != targetPort.DataType &&
-            sourcePort.DataType != PortDataType.Any &&
-            targetPort.DataType != PortDataType.Any)
+        if (!PortDataTypeCompatibility.AreCompatible(sourcePort.DataType, targetPort.DataType))
         {
             throw new InvalidOperationException($"端口数据类型不匹配: {sourcePort.DataType} -> {targetPort.DataType}");
         }

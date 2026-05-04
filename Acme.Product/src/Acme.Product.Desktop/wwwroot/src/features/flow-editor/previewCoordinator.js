@@ -111,7 +111,7 @@ export function extractPreviewImageBase64(result) {
     const outputData = result.outputData || result.OutputData;
     if (outputData && typeof outputData === 'object') {
         for (const value of Object.values(outputData)) {
-            if (typeof value === 'string' && isImageLikePayload(value)) {
+            if (typeof value === 'string' && isPreviewImageLikePayload(value)) {
                 return normalizeBase64Image(value);
             }
         }

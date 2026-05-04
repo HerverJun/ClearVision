@@ -283,11 +283,8 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
-        var project = await _projectRepository.GetWithFlowAsync(projectId);
-        if (project == null)
-            throw new ProjectNotFoundException(projectId);
-
-        await StartRealtimeInspectionFlowAsync(projectId, project.Flow, cameraId, cancellationToken, onResultReady);
+        var actualFlow = await ResolveExecutionFlowAsync(projectId, flow: null);
+        await StartRealtimeInspectionFlowAsync(projectId, actualFlow, cameraId, cancellationToken, onResultReady);
     }
 
     /// <summary>
@@ -561,19 +558,19 @@ public class InspectionService : IInspectionService
             throw new ProjectNotFoundException(projectId);
         }
 
-        if (HasExecutableFlow(project.Flow))
+        var fileFlow = await LoadFlowFromStorageAsync(projectId);
+        if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
         {
             return project.Flow;
         }
 
-        var fileFlow = await LoadFlowFromStorageAsync(projectId);
         if (HasExecutableFlow(fileFlow))
         {
             _logger.LogWarning(
                 "[InspectionService] 椤圭洰 {ProjectId} 鏁版嵁搴撴祦绋嬩负绌猴紝宸插洖閫€鍒?ProjectFlows 鏂囦欢娴? (绠楀瓙鏁? {OperatorCount})",
                 projectId,
                 fileFlow!.Operators.Count);
-            return fileFlow;
+            return fileFlow!;
         }
 
         throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");

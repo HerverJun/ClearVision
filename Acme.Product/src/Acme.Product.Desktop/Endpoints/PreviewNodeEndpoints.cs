@@ -26,6 +26,12 @@ namespace Acme.Product.Desktop.Endpoints;
 /// </summary>
 public static class PreviewNodeEndpoints
 {
+    private static readonly JsonSerializerOptions FlowJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
     /// <summary>
     /// 映射节点预览端点
     /// </summary>
@@ -36,6 +42,7 @@ public static class PreviewNodeEndpoints
             PreviewNodeRequest request,
             IFlowExecutionService flowService,
             IProjectRepository projectRepository,
+            IProjectFlowStorage flowStorage,
             ILogger<object> logger) =>
         {
             try
@@ -55,8 +62,7 @@ public static class PreviewNodeEndpoints
                 else
                 {
                     // 从数据库加载
-                    var project = await projectRepository.GetWithFlowAsync(request.ProjectId);
-                    flow = project?.Flow;
+                    flow = await ResolveStoredProjectFlowAsync(request.ProjectId, projectRepository, flowStorage);
                 }
 
                 if (flow == null)
@@ -172,6 +178,57 @@ public static class PreviewNodeEndpoints
         });
 
         return app;
+    }
+
+    private static async Task<Acme.Product.Core.Entities.OperatorFlow?> ResolveStoredProjectFlowAsync(
+        Guid projectId,
+        IProjectRepository projectRepository,
+        IProjectFlowStorage flowStorage)
+    {
+        var project = await projectRepository.GetWithFlowAsync(projectId);
+        if (project == null)
+        {
+            return null;
+        }
+
+        var storedFlow = await LoadFlowFromStorageAsync(projectId, flowStorage);
+        if (HasExecutableFlow(storedFlow))
+        {
+            return storedFlow;
+        }
+
+        return HasExecutableFlow(project.Flow) ? project.Flow : null;
+    }
+
+    private static async Task<Acme.Product.Core.Entities.OperatorFlow?> LoadFlowFromStorageAsync(
+        Guid projectId,
+        IProjectFlowStorage flowStorage)
+    {
+        try
+        {
+            var flowJson = await flowStorage.LoadFlowJsonAsync(projectId);
+            if (string.IsNullOrWhiteSpace(flowJson))
+            {
+                return null;
+            }
+
+            var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, FlowJsonOptions);
+            if (flowDto?.Operators?.Count > 0)
+            {
+                return flowDto.ToEntity();
+            }
+        }
+        catch
+        {
+            // Fall back to the database snapshot if the stored flow JSON is missing or invalid.
+        }
+
+        return null;
+    }
+
+    private static bool HasExecutableFlow(Acme.Product.Core.Entities.OperatorFlow? flow)
+    {
+        return flow?.Operators?.Count > 0;
     }
 
     private static Dictionary<string, object> BuildResponseOutputData(Dictionary<string, object> nodeOutput)

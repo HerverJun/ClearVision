@@ -118,6 +118,66 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_ShouldPreferStoredFlow_WhenRequestOmitsInlineFlowData()
+    {
+        var projectId = Guid.NewGuid();
+        var storedNodeId = Guid.NewGuid();
+        var databaseNodeId = Guid.NewGuid();
+        OperatorFlow? capturedFlow = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            configureFlowExecution: flowExecution =>
+            {
+                flowExecution.ExecuteFlowDebugAsync(
+                        Arg.Any<OperatorFlow>(),
+                        Arg.Any<DebugOptions>(),
+                        Arg.Any<Dictionary<string, object>?>(),
+                        Arg.Any<CancellationToken>())
+                    .Returns(callInfo =>
+                    {
+                        capturedFlow = callInfo.ArgAt<OperatorFlow>(0);
+                        return Task.FromResult(new FlowDebugExecutionResult
+                        {
+                            IsSuccess = true,
+                            DebugSessionId = Guid.NewGuid(),
+                            ExecutionTimeMs = 6,
+                            IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                            {
+                                [storedNodeId] = new()
+                                {
+                                    ["Image"] = new byte[] { 1, 2, 3 }
+                                }
+                            }
+                        });
+                    });
+            },
+            configureProjectRepository: projectRepository =>
+            {
+                var project = new Project("preview-stored-flow");
+                var databaseFlow = new OperatorFlow("DatabaseFlow");
+                databaseFlow.AddOperator(new Operator(databaseNodeId, "db-node", OperatorType.ResultOutput, 0, 0));
+                project.UpdateFlow(databaseFlow);
+                projectRepository.GetWithFlowAsync(projectId).Returns(project);
+            },
+            configureFlowStorage: flowStorage =>
+            {
+                flowStorage.LoadFlowJsonAsync(projectId).Returns(CreateStoredFlowJson(
+                    CreateOperatorDto(storedNodeId, "stored-node", OperatorType.ResultOutput)));
+            });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = storedNodeId
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        capturedFlow.Should().NotBeNull();
+        capturedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Id == storedNodeId);
+        capturedFlow.Operators.Should().NotContain(operatorEntity => operatorEntity.Id == databaseNodeId);
+    }
+
+    [Fact]
     public async Task PreviewNode_ReturnsMinimalFeedbackMetrics()
     {
         var projectId = Guid.NewGuid();
@@ -868,6 +928,23 @@ public class PreviewNodeEndpointsTests
         };
     }
 
+    private static string CreateStoredFlowJson(params OperatorDto[] operators)
+    {
+        var flowDto = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "StoredPreviewFlow",
+            Operators = operators.ToList(),
+            Connections = new List<OperatorConnectionDto>()
+        };
+
+        return JsonSerializer.Serialize(flowDto, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        });
+    }
+
     private sealed class PreviewNodeTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -880,7 +957,10 @@ public class PreviewNodeEndpointsTests
 
         public HttpClient Client { get; }
 
-        public static async Task<PreviewNodeTestHost> CreateAsync(Action<IFlowExecutionService> configureFlowExecution)
+        public static async Task<PreviewNodeTestHost> CreateAsync(
+            Action<IFlowExecutionService> configureFlowExecution,
+            Action<IProjectRepository>? configureProjectRepository = null,
+            Action<IProjectFlowStorage>? configureFlowStorage = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -891,10 +971,14 @@ public class PreviewNodeEndpointsTests
 
             var flowExecution = Substitute.For<IFlowExecutionService>();
             var projectRepository = Substitute.For<IProjectRepository>();
+            var flowStorage = Substitute.For<IProjectFlowStorage>();
             configureFlowExecution(flowExecution);
+            configureProjectRepository?.Invoke(projectRepository);
+            configureFlowStorage?.Invoke(flowStorage);
 
             builder.Services.AddSingleton(flowExecution);
             builder.Services.AddSingleton(projectRepository);
+            builder.Services.AddSingleton(flowStorage);
 
             var app = builder.Build();
             app.MapPreviewNodeEndpoints();

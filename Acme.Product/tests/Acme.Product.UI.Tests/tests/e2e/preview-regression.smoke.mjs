@@ -22,6 +22,10 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function runPreviewCoordinatorChecks() {
   assert.equal(resolvePreviewInputImageBase64({ outputImageBase64: PNG_BASE64 }), PNG_BASE64);
   assert.equal(resolvePreviewInputImageBase64({ OutputImage: `data:image/png;base64,${PNG_BASE64}` }), PNG_BASE64);
+  assert.equal(
+    resolvePreviewInputImageBase64({ outputData: { PreviewImage: `data:image/png;base64,${PNG_BASE64}` } }),
+    PNG_BASE64
+  );
 
   assert.equal(getCanvasPreviewEligibility({ type: 'ImageAcquisition', outputs: [] }).eligible, true);
   assert.equal(

@@ -42,13 +42,13 @@ public class ForEachOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.ForEach;
 
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public ForEachOperator(
         ILogger<ForEachOperator> logger,
-        IServiceProvider serviceProvider) : base(logger)
+        IServiceScopeFactory serviceScopeFactory) : base(logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
     /// <summary>
@@ -343,7 +343,10 @@ public class ForEachOperator : OperatorBase
         CancellationToken cancellationToken)
     {
         // 对于子图执行，禁用并行模式（子图内部已经是并行了）
-        return await _serviceProvider.GetRequiredService<IFlowExecutionService>().ExecuteFlowAsync(
+        using var scope = _serviceScopeFactory.CreateScope();
+        var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
+
+        return await flowExecution.ExecuteFlowAsync(
             subGraph,
             inputs,
             enableParallel: false,

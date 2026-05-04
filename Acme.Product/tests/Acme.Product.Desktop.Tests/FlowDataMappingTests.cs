@@ -1,5 +1,8 @@
+using Acme.Product.Application.DTOs;
 using Acme.Product.Desktop.Endpoints;
 using FluentAssertions;
+using PortDataType = Acme.Product.Core.Enums.PortDataType;
+using PortDirection = Acme.Product.Core.Enums.PortDirection;
 using OperatorType = Acme.Product.Core.Enums.OperatorType;
 
 namespace Acme.Product.Desktop.Tests;
@@ -121,5 +124,72 @@ public class FlowDataMappingTests
         flow.Connections.Single().TargetOperatorId.Should().Be(targetOperatorId);
         flow.Connections.Single().SourcePortId.Should().NotBe(Guid.Empty);
         flow.Connections.Single().TargetPortId.Should().NotBe(Guid.Empty);
+    }
+
+    [Fact]
+    public void OperatorFlowDto_ToEntity_AllowsFrontendNumberCompatibilityGroups()
+    {
+        var sourceOperatorId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetOperatorId = Guid.NewGuid();
+        var targetPortId = Guid.NewGuid();
+
+        var dto = new OperatorFlowDto
+        {
+            Name = "NumberCompatibilityFlow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = sourceOperatorId,
+                    Name = "Counter",
+                    Type = OperatorType.VariableIncrement,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = sourcePortId,
+                            Name = "Count",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Integer
+                        }
+                    ]
+                },
+                new OperatorDto
+                {
+                    Id = targetOperatorId,
+                    Name = "Threshold",
+                    Type = OperatorType.Thresholding,
+                    InputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = targetPortId,
+                            Name = "Threshold",
+                            Direction = PortDirection.Input,
+                            DataType = PortDataType.Float,
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = Guid.NewGuid(),
+                    SourceOperatorId = sourceOperatorId,
+                    SourcePortId = sourcePortId,
+                    TargetOperatorId = targetOperatorId,
+                    TargetPortId = targetPortId
+                }
+            ]
+        };
+
+        var flow = dto.ToEntity();
+
+        flow.Connections.Should().ContainSingle();
+        flow.Connections.Single().SourcePortId.Should().Be(sourcePortId);
+        flow.Connections.Single().TargetPortId.Should().Be(targetPortId);
     }
 }
