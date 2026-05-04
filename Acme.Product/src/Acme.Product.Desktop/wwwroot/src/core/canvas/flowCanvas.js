@@ -1,4 +1,13 @@
 /**
+ * 调试开关：默认关闭。开启后 serialize/deserialize 会打印详细日志。
+ * 需要排查时通过 `window.__FLOW_CANVAS_DEBUG__ = true` 或修改此常量启用。
+ */
+const DEBUG_FLOW_CANVAS = false;
+function flowDebugEnabled() {
+    return DEBUG_FLOW_CANVAS || (typeof window !== 'undefined' && window.__FLOW_CANVAS_DEBUG__ === true);
+}
+
+/**
  * 端口类型颜色映射表 (模块级常量，提高兼容性)
  */
 const PORT_TYPE_COLORS = {
@@ -17,7 +26,7 @@ const PORT_TYPE_COLORS = {
     'LineData':        '#2f54eb',  // 靛蓝 - 直线数据 (Sprint 1.2)
     'Any':             '#bfbfbf',  // 灰色 - 任意
     // 兼容枚举数字值
-    0: '#52c41a', 
+    0: '#52c41a',
     1: '#fa8c16', 2: '#fa8c16', 3: '#f5222d',
     4: '#1890ff', 5: '#eb2f96', 6: '#eb2f96', 7: '#722ed1',
     8: '#eb2f96', 9: '#13c2c2', 10: '#13c2c2', 11: '#2f54eb', 12: '#2f54eb',
@@ -40,6 +49,14 @@ const LEGACY_OPERATOR_TYPE_ALIASES = {
     'ModbusRtuCommunication': 'ModbusCommunication'
 };
 
+const PORT_HIT_RADIUS_PX = 12;       // 端口屏幕命中半径
+const CONNECTION_HIT_RADIUS_PX = 10; // 连线屏幕命中半径
+const CONNECTION_HIT_SAMPLES = 16;   // 贝塞尔曲线采样点数
+
+function portKey(nodeId, portIndex) {
+    return `${nodeId}:${portIndex}`;
+}
+
 
 class FlowCanvas {
 
@@ -57,10 +74,15 @@ class FlowCanvas {
         this.viewStateListeners = new Set();
         this.structureStateListeners = new Set();
 
+        // 逻辑尺寸（CSS 像素）与 DPR：所有绘制坐标在逻辑像素空间，通过 setTransform 缩放到 backing store
+        this._dpr = 1;
+        this._logicalWidth = 0;
+        this._logicalHeight = 0;
+
         // 网格设置
         this.gridSize = 20;
         this.gridColor = 'rgba(0, 0, 0, 0.08)'; // 浅色网格 (适配浅色背景)
-        
+
         // 事件回调
         this.onNodeSelected = null;
         this.onConnectionCreated = null;
@@ -80,21 +102,33 @@ class FlowCanvas {
         this._contextMenuHandler = this.handleContextMenu.bind(this);
         this._keyDownHandler = this.handleKeyDown.bind(this);
         this._dblClickHandler = this.handleDoubleClick.bind(this);
-        // 【修复】页面可见性变化处理器
         this._visibilityHandler = this.handleVisibilityChange.bind(this);
+        this._drawFrameBound = this._drawFrame.bind(this);
 
-        // 动画帧ID
+        // 渲染调度状态（脏标记 + 单一 RAF）
         this._animationFrameId = null;
-        
-        // 【修复】渲染暂停标志
-        this._isPaused = false;
+        this._dirty = true;          // 是否需要重绘
+        this._lastFrameTime = 0;     // 上一帧时间戳，用于 dt 推进动画
+        this._isPaused = false;      // 页面隐藏时暂停
 
-        // 【修复】ResizeObserver
+        // ResizeObserver 与节流
         this._resizeObserver = null;
-
+        this._resizeRafId = null;
 
         // 选中的连接
         this.selectedConnection = null;
+
+        // 连接索引：用于 O(1) 查找，避免每帧 mousemove 上的 .find/.filter 全表扫描
+        this._connectionById = new Map();
+        this._connectionsByOutputPort = new Map();  // key=portKey -> Set<connection>
+        this._connectionByInputPort = new Map();    // key=portKey -> connection（输入端口仅允许 1 条）
+
+        // 粒子精灵缓存（避免每帧 createRadialGradient）
+        this._particleSprite = null;
+        this._particleSpriteSize = 0;
+
+        // ForEach 子图节点数解析缓存
+        this._subGraphNodeCountCache = new WeakMap();
 
         // 右键菜单
         this.contextMenu = null;
@@ -108,25 +142,27 @@ class FlowCanvas {
      */
     initialize() {
         this.resize();
-        // 移除 window.resize，改用 ResizeObserver
-        // window.addEventListener('resize', this._resizeHandler);
-        
-        // 【修复】使用 ResizeObserver
-        if (window.ResizeObserver) {
-            this._resizeObserver = new ResizeObserver(entries => {
-                for (let entry of entries) {
-                    // 只有当尺寸确实变化且均大于0时才调整
+
+        // 使用 ResizeObserver 替代 window.resize；用 RAF 合帧，防止拖拽窗口连续触发
+        const ResizeObserverCtor = window.ResizeObserver;
+        if (ResizeObserverCtor) {
+            this._resizeObserver = new ResizeObserverCtor(entries => {
+                for (const entry of entries) {
                     if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-                        this.resize();
+                        if (this._resizeRafId === null) {
+                            this._resizeRafId = requestAnimationFrame(() => {
+                                this._resizeRafId = null;
+                                this.resize();
+                            });
+                        }
+                        break;
                     }
                 }
             });
             this._resizeObserver.observe(this.canvas.parentElement);
         } else {
-            // 降级方案
             window.addEventListener('resize', this._resizeHandler);
         }
-
 
         // 绑定事件
         this.canvas.addEventListener('mousedown', this._mouseDownHandler);
@@ -137,32 +173,28 @@ class FlowCanvas {
         this.canvas.addEventListener('dblclick', this._dblClickHandler);
         window.addEventListener('keydown', this._keyDownHandler);
 
-        // 【修复】监听页面可见性变化，后台时暂停渲染
         document.addEventListener('visibilitychange', this._visibilityHandler);
 
-        // 开始渲染循环
-        this.render();
+        // 启动渲染（请求一次重绘，后续根据脏标记/动画状态决定是否继续 RAF）
+        this.invalidate();
 
         // 初始化小地图
         this.initMinimap();
     }
 
     /**
-     * 【修复】处理页面可见性变化
+     * 处理页面可见性变化：后台暂停 RAF，回前台立即调度一次重绘
      */
     handleVisibilityChange() {
         if (document.hidden) {
-            // 页面隐藏时暂停渲染
             this._isPaused = true;
-            console.log('[FlowCanvas] 页面进入后台，暂停渲染');
-        } else {
-            // 页面显示时恢复渲染
-            this._isPaused = false;
-            console.log('[FlowCanvas] 页面回到前台，恢复渲染');
-            // 触发一次渲染
-            if (!this._animationFrameId) {
-                this.render();
+            if (this._animationFrameId !== null) {
+                cancelAnimationFrame(this._animationFrameId);
+                this._animationFrameId = null;
             }
+        } else {
+            this._isPaused = false;
+            this.invalidate();
         }
     }
 
@@ -170,13 +202,15 @@ class FlowCanvas {
      * 销毁画布，清理所有事件监听和动画循环
      */
     destroy() {
-        // 停止渲染循环
-        if (this._animationFrameId) {
+        if (this._animationFrameId !== null) {
             cancelAnimationFrame(this._animationFrameId);
             this._animationFrameId = null;
         }
+        if (this._resizeRafId !== null) {
+            cancelAnimationFrame(this._resizeRafId);
+            this._resizeRafId = null;
+        }
 
-        // 移除窗口事件监听
         if (!this._resizeObserver) {
             window.removeEventListener('resize', this._resizeHandler);
         } else {
@@ -185,11 +219,8 @@ class FlowCanvas {
         }
 
         window.removeEventListener('keydown', this._keyDownHandler);
-        
-        // 【修复】移除页面可见性监听
         document.removeEventListener('visibilitychange', this._visibilityHandler);
 
-        // 移除画布事件监听
         this.canvas.removeEventListener('mousedown', this._mouseDownHandler);
         this.canvas.removeEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.removeEventListener('mouseup', this._mouseUpHandler);
@@ -197,33 +228,57 @@ class FlowCanvas {
         this.canvas.removeEventListener('contextmenu', this._contextMenuHandler);
         this.canvas.removeEventListener('dblclick', this._dblClickHandler);
 
-        // 清理资源
         this.nodes.clear();
         this.connections = [];
+        this._connectionById.clear();
+        this._connectionsByOutputPort.clear();
+        this._connectionByInputPort.clear();
         this.selectedNode = null;
         this.draggedNode = null;
         this.selectedConnection = null;
         this.viewStateListeners.clear();
         this.structureStateListeners.clear();
-        
-        // 清理小地图
+        this._particleSprite = null;
+
         if (this.minimap) {
             this.minimap.remove();
             this.minimap = null;
+            this.minimapCanvas = null;
         }
-        
-        // 清理右键菜单
+
         this.hideContextMenu();
     }
 
     /**
-     * 调整画布大小
+     * 调整画布大小，支持 devicePixelRatio。
+     * - canvas.width/height（backing store）使用 dpr 放大
+     * - canvas.style.width/height 保持 CSS 像素
+     * - ctx.setTransform(dpr,0,0,dpr,0,0) 让所有绘制坐标使用逻辑像素
      */
     resize() {
         const container = this.canvas.parentElement;
-        this.canvas.width = container.clientWidth;
-        this.canvas.height = container.clientHeight;
-        this.render();
+        if (!container) {
+            return;
+        }
+        const cssWidth = container.clientWidth;
+        const cssHeight = container.clientHeight;
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+
+        const backingWidth = Math.max(0, Math.round(cssWidth * dpr));
+        const backingHeight = Math.max(0, Math.round(cssHeight * dpr));
+
+        if (this.canvas.width !== backingWidth) this.canvas.width = backingWidth;
+        if (this.canvas.height !== backingHeight) this.canvas.height = backingHeight;
+        if (this.canvas.style.width !== `${cssWidth}px`) this.canvas.style.width = `${cssWidth}px`;
+        if (this.canvas.style.height !== `${cssHeight}px`) this.canvas.style.height = `${cssHeight}px`;
+
+        this._dpr = dpr;
+        this._logicalWidth = cssWidth;
+        this._logicalHeight = cssHeight;
+
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        this.invalidate();
         this.notifyViewStateChanged();
     }
 
@@ -266,34 +321,46 @@ class FlowCanvas {
             color: config.color || '#1890ff',
             ...config
         };
-        
+
         this.nodes.set(node.id, node);
-        this.render();
+        this.invalidate();
         this.markFlowStructureChanged('addNode');
         return node;
     }
 
     /**
-     * 删除节点
+     * 删除节点（同时清理相关连接与索引）。
+     * 系统节点 (_systemNode) 受保护，不可删除。
      */
     removeNode(nodeId) {
-        // 保护系统节点（如 CurrentItem）不可删除
         const node = this.nodes.get(nodeId);
-        if (node && node._systemNode) {
+        if (!node) {
+            return;
+        }
+        if (node._systemNode) {
             console.warn('[FlowCanvas] 系统节点不可删除:', node.title || node.type);
             return;
         }
-        
-        // 删除相关连接
-        this.connections = this.connections.filter(
-            conn => conn.source !== nodeId && conn.target !== nodeId
-        );
-        
+
+        // 清理与本节点相关的连接（同时同步索引）
+        const remaining = [];
+        for (const conn of this.connections) {
+            if (conn.source === nodeId || conn.target === nodeId) {
+                this._unindexConnection(conn);
+            } else {
+                remaining.push(conn);
+            }
+        }
+        this.connections = remaining;
+
         this.nodes.delete(nodeId);
         if (this.selectedNode === nodeId) {
             this.selectedNode = null;
         }
-        this.render();
+        if (this.selectedConnection && (this.selectedConnection.source === nodeId || this.selectedConnection.target === nodeId)) {
+            this.selectedConnection = null;
+        }
+        this.invalidate();
         this.markFlowStructureChanged('removeNode');
     }
 
@@ -308,11 +375,50 @@ class FlowCanvas {
             target: targetId,
             targetPort
         };
-        
+
         this.connections.push(connection);
-        this.render();
+        this._indexConnection(connection);
+        this.invalidate();
         this.markFlowStructureChanged('addConnection');
         return connection;
+    }
+
+    _indexConnection(connection) {
+        this._connectionById.set(connection.id, connection);
+        const outKey = portKey(connection.source, connection.sourcePort);
+        let outSet = this._connectionsByOutputPort.get(outKey);
+        if (!outSet) {
+            outSet = new Set();
+            this._connectionsByOutputPort.set(outKey, outSet);
+        }
+        outSet.add(connection);
+        this._connectionByInputPort.set(portKey(connection.target, connection.targetPort), connection);
+    }
+
+    _unindexConnection(connection) {
+        if (!connection) return;
+        this._connectionById.delete(connection.id);
+        const outKey = portKey(connection.source, connection.sourcePort);
+        const outSet = this._connectionsByOutputPort.get(outKey);
+        if (outSet) {
+            outSet.delete(connection);
+            if (outSet.size === 0) {
+                this._connectionsByOutputPort.delete(outKey);
+            }
+        }
+        const inKey = portKey(connection.target, connection.targetPort);
+        if (this._connectionByInputPort.get(inKey) === connection) {
+            this._connectionByInputPort.delete(inKey);
+        }
+    }
+
+    _rebuildConnectionIndex() {
+        this._connectionById.clear();
+        this._connectionsByOutputPort.clear();
+        this._connectionByInputPort.clear();
+        for (const conn of this.connections) {
+            this._indexConnection(conn);
+        }
     }
 
     getFlowRevision() {
@@ -326,8 +432,9 @@ class FlowCanvas {
                 x: this.offset.x,
                 y: this.offset.y
             },
-            canvasWidth: this.canvas.width,
-            canvasHeight: this.canvas.height,
+            // 逻辑像素（CSS 像素），便于消费者按 getBoundingClientRect 等价对比
+            canvasWidth: this._logicalWidth,
+            canvasHeight: this._logicalHeight,
             flowRevision: this.flowRevision
         };
     }
@@ -338,6 +445,7 @@ class FlowCanvas {
             return null;
         }
 
+        // 返回逻辑像素坐标，与 nodePreviewOverlay 等基于 CSS 容器尺寸的逻辑保持一致
         return {
             x: (node.x - this.offset.x) * this.scale,
             y: (node.y - this.offset.y) * this.scale,
@@ -396,42 +504,44 @@ class FlowCanvas {
         });
 
         this.notifyViewStateChanged();
+        // 结构变化时清除 SubGraph 解析缓存（WeakMap 无法批量清，但重赋引用可释放旧键）
+        this._subGraphNodeCountCache = new WeakMap();
     }
 
     /**
      * 绘制网格
      */
     drawGrid() {
-        const { width, height } = this.canvas;
-        
+        const width = this._logicalWidth;
+        const height = this._logicalHeight;
+
         this.ctx.strokeStyle = this.gridColor;
         this.ctx.lineWidth = 1;
-        
+
         // 计算偏移后的起始位置
         const startX = Math.floor(this.offset.x / this.gridSize) * this.gridSize;
         const startY = Math.floor(this.offset.y / this.gridSize) * this.gridSize;
-        
-        // 计算当前缩放下的可视区域宽度
-        // 之前只考虑 offset.x 没除以 scale，导致缩小时网格绘制范围不足
+
+        // 可视区域使用逻辑尺寸，避免 DPR 导致重复绘制
         const visibleWidth = width / this.scale;
         const visibleHeight = height / this.scale;
-        
+
         this.ctx.beginPath();
-        
-        // 垂直线 (渲染范围需覆盖 offset + visibleWidth)
+
+        // 垂直线
         for (let x = startX; x < this.offset.x + visibleWidth; x += this.gridSize) {
             const screenX = (x - this.offset.x) * this.scale;
             this.ctx.moveTo(screenX, 0);
             this.ctx.lineTo(screenX, height);
         }
-        
+
         // 水平线
         for (let y = startY; y < this.offset.y + visibleHeight; y += this.gridSize) {
             const screenY = (y - this.offset.y) * this.scale;
             this.ctx.moveTo(0, screenY);
             this.ctx.lineTo(width, screenY);
         }
-        
+
         this.ctx.stroke();
     }
 
@@ -495,7 +605,8 @@ class FlowCanvas {
             glowColor = `${node.color}80`; // 50% opacity
         }
 
-        // 状态发光效果
+        // 状态发光效果（save/restore 包裹避免阴影泄漏到后续绘制）
+        this.ctx.save();
         if (glowColor) {
             this.ctx.shadowColor = glowColor;
             this.ctx.shadowBlur = 15;
@@ -512,7 +623,7 @@ class FlowCanvas {
         const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
         gradient.addColorStop(0, isSelected ? 'rgba(45, 74, 94, 0.9)' : 'rgba(26, 58, 82, 0.8)');
         gradient.addColorStop(1, isSelected ? 'rgba(26, 58, 82, 0.95)' : 'rgba(13, 27, 42, 0.9)');
-        
+
         this.ctx.fillStyle = gradient;
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = borderWidth;
@@ -532,8 +643,7 @@ class FlowCanvas {
             this.ctx.setLineDash([]);
         }
 
-        // 重置阴影
-        this.ctx.shadowColor = 'transparent';
+        this.ctx.restore();
 
         // 标题栏 - 渐变
         const headerGradient = this.ctx.createLinearGradient(x, y, x + w, y);
@@ -581,18 +691,23 @@ class FlowCanvas {
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(ioLabel, x + w - 6 * this.scale, y + 12 * this.scale);
             
-            // 显示子图内算子数量提示
-            const subGraphParam = node.parameters?.find(p => p.name === 'SubGraph' || p.Name === 'SubGraph');
+            // 显示子图内算子数量提示（带缓存，避免每帧重复 JSON.parse）
             let subNodeCount = 0;
-            if (subGraphParam && subGraphParam.value) {
-                try {
-                    const subGraphData = typeof subGraphParam.value === 'string' ? JSON.parse(subGraphParam.value) : subGraphParam.value;
-                    if (subGraphData && Array.isArray(subGraphData.nodes)) {
-                        subNodeCount = subGraphData.nodes.length;
+            if (this._subGraphNodeCountCache.has(node)) {
+                subNodeCount = this._subGraphNodeCountCache.get(node);
+            } else {
+                const subGraphParam = node.parameters?.find(p => p.name === 'SubGraph' || p.Name === 'SubGraph');
+                if (subGraphParam && subGraphParam.value) {
+                    try {
+                        const subGraphData = typeof subGraphParam.value === 'string' ? JSON.parse(subGraphParam.value) : subGraphParam.value;
+                        if (subGraphData && Array.isArray(subGraphData.nodes)) {
+                            subNodeCount = subGraphData.nodes.length;
+                        }
+                    } catch (e) {
+                        // 静默忽略解析失败，不污染控制台
                     }
-                } catch (e) {
-                    console.warn('[FlowCanvas] Failed to parse SubGraph parameter', e);
                 }
+                this._subGraphNodeCountCache.set(node, subNodeCount);
             }
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
             this.ctx.font = `${10 * this.scale}px sans-serif`;
@@ -771,7 +886,7 @@ class FlowCanvas {
     getPortAt(x, y) {
         const screenX = (x - this.offset.x) * this.scale;
         const screenY = (y - this.offset.y) * this.scale;
-        const hitRadius = 15 * this.scale; // 点击检测半径
+        const hitRadiusSq = (PORT_HIT_RADIUS_PX * this.scale) ** 2; // 使用距离平方，避免 Math.sqrt
 
         for (const [nodeId, node] of this.nodes) {
             const nodeScreenX = (node.x - this.offset.x) * this.scale;
@@ -784,7 +899,7 @@ class FlowCanvas {
                 const portY = nodeScreenY + (h * (i + 1)) / (node.inputs.length + 1);
                 const dx = screenX - nodeScreenX;
                 const dy = screenY - portY;
-                if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
+                if (dx * dx + dy * dy < hitRadiusSq) {
                     return { nodeId, portIndex: i, isOutput: false };
                 }
             }
@@ -794,7 +909,7 @@ class FlowCanvas {
                 const portY = nodeScreenY + (h * (i + 1)) / (node.outputs.length + 1);
                 const dx = screenX - (nodeScreenX + w);
                 const dy = screenY - portY;
-                if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
+                if (dx * dx + dy * dy < hitRadiusSq) {
                     return { nodeId, portIndex: i, isOutput: true };
                 }
             }
@@ -804,7 +919,7 @@ class FlowCanvas {
     }
 
     /**
-     * 获取指定端口上的连接
+     * 获取指定端口上的连接（O(1) 查找）
      * @param {string} nodeId - 节点ID
      * @param {number} portIndex - 端口索引
      * @param {boolean} isOutput - 是否是输出端口
@@ -812,36 +927,24 @@ class FlowCanvas {
      */
     getConnectionAtPort(nodeId, portIndex, isOutput) {
         if (isOutput) {
-            // 输出端口可能有多个连接，返回第一个
-            return this.connections.find(conn => 
-                conn.source === nodeId && conn.sourcePort === portIndex
-            ) || null;
-        } else {
-            // 输入端口只能有一个连接
-            return this.connections.find(conn => 
-                conn.target === nodeId && conn.targetPort === portIndex
-            ) || null;
+            const set = this._connectionsByOutputPort.get(portKey(nodeId, portIndex));
+            if (!set || set.size === 0) return null;
+            // 输出端口可能有多条连接，返回第一条
+            return set.values().next().value;
         }
+        return this._connectionByInputPort.get(portKey(nodeId, portIndex)) || null;
     }
 
     /**
      * 获取指定端口上的所有连接（用于输出端口）
-     * @param {string} nodeId - 节点ID
-     * @param {number} portIndex - 端口索引
-     * @param {boolean} isOutput - 是否是输出端口
-     * @returns {Array} 连接对象数组
      */
     getConnectionsAtPort(nodeId, portIndex, isOutput) {
         if (isOutput) {
-            return this.connections.filter(conn => 
-                conn.source === nodeId && conn.sourcePort === portIndex
-            );
-        } else {
-            const conn = this.connections.find(conn => 
-                conn.target === nodeId && conn.targetPort === portIndex
-            );
-            return conn ? [conn] : [];
+            const set = this._connectionsByOutputPort.get(portKey(nodeId, portIndex));
+            return set ? Array.from(set) : [];
         }
+        const conn = this._connectionByInputPort.get(portKey(nodeId, portIndex));
+        return conn ? [conn] : [];
     }
 
     /**
@@ -1012,8 +1115,16 @@ class FlowCanvas {
      * @param {string} connectionId - 连接ID
      */
     removeConnection(connectionId) {
+        const connection = this._connectionById.get(connectionId);
+        if (!connection) {
+            return;
+        }
         this.connections = this.connections.filter(conn => conn.id !== connectionId);
-        this.render();
+        this._unindexConnection(connection);
+        if (this.selectedConnection && this.selectedConnection.id === connectionId) {
+            this.selectedConnection = null;
+        }
+        this.invalidate();
         this.markFlowStructureChanged('removeConnection');
     }
 
@@ -1060,22 +1171,26 @@ class FlowCanvas {
     /**
      * 绘制连接线 - 阶段四增强版，带数据流动粒子动画
      */
-    drawConnection(connection) {
+    drawConnection(connection, dt) {
         const sourceNode = this.nodes.get(connection.source);
         const targetNode = this.nodes.get(connection.target);
-        
+
         if (!sourceNode || !targetNode) return;
-        
+
         // 【修正】使用 getPortPosition 以支持垂直分布
         const start = this.getPortPosition(connection.source, connection.sourcePort, true);
         const end = this.getPortPosition(connection.target, connection.targetPort, false);
-        
+
         if (!start || !end) return;
 
         const controlPoint1X = start.x + (end.x - start.x) / 2;
         const controlPoint2X = start.x + (end.x - start.x) / 2;
-        
-        // 绘制贝塞尔曲线基础线
+
+        const isSelected = this.selectedConnection &&
+            this.selectedConnection.source === connection.source &&
+            this.selectedConnection.target === connection.target;
+
+        this.ctx.save();
         this.ctx.beginPath();
         this.ctx.moveTo(start.x, start.y);
         this.ctx.bezierCurveTo(
@@ -1083,7 +1198,7 @@ class FlowCanvas {
             controlPoint2X, end.y,
             end.x, end.y
         );
-        
+
         // 根据连接状态设置样式
         if (connection.status === 'active') {
             this.ctx.strokeStyle = '#34c759';
@@ -1094,26 +1209,27 @@ class FlowCanvas {
             this.ctx.shadowColor = 'rgba(231, 76, 60, 0.5)';
             this.ctx.shadowBlur = 10;
         } else {
-            this.ctx.strokeStyle = '#5ac8fa';
-            this.ctx.shadowColor = 'transparent';
-            this.ctx.shadowBlur = 0;
+            this.ctx.strokeStyle = isSelected ? '#ffffff' : '#5ac8fa';
+            this.ctx.shadowColor = isSelected ? 'rgba(255, 255, 255, 0.4)' : 'transparent';
+            this.ctx.shadowBlur = isSelected ? 8 : 0;
         }
-        
-        this.ctx.lineWidth = 2 * this.scale;
+
+        this.ctx.lineWidth = isSelected ? 3 * this.scale : 2 * this.scale;
         this.ctx.stroke();
-        this.ctx.shadowBlur = 0;
-        
+        this.ctx.restore();
+
         // 绘制数据流动粒子动画
         if (connection.status === 'active' || connection.status === 'flowing') {
-            this.drawFlowParticles(start.x, start.y, controlPoint1X, start.y, 
-                                   controlPoint2X, end.y, end.x, end.y, connection);
+            this.drawFlowParticles(start.x, start.y, controlPoint1X, start.y,
+                                   controlPoint2X, end.y, end.x, end.y, connection, dt);
         }
     }
     
     /**
      * 绘制数据流动粒子 - 阶段四增强
+     * @param {number} dt - 距上一帧的毫秒数，用于基于时间的平滑推进
      */
-    drawFlowParticles(startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY, connection) {
+    drawFlowParticles(startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY, connection, dt) {
         // 初始化粒子系统
         if (!connection.particles) {
             connection.particles = [];
@@ -1124,91 +1240,219 @@ class FlowCanvas {
                 });
             }
         }
-        
-        // 更新和绘制粒子
+
+        // 缓存粒子发光精灵（按当前 scale 只创建一次）
+        const spriteRadius = 6 * this.scale;
+        const spriteKey = `particle_${spriteRadius.toFixed(1)}`;
+        if (!this._particleSprite || this._particleSprite.key !== spriteKey) {
+            const size = Math.ceil(spriteRadius * 2);
+            const off = document.createElement('canvas');
+            off.width = size;
+            off.height = size;
+            const octx = off.getContext('2d');
+            const grad = octx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, spriteRadius);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.5, 'rgba(52, 152, 219, 0.8)');
+            grad.addColorStop(1, 'rgba(52, 152, 219, 0)');
+            octx.fillStyle = grad;
+            octx.fillRect(0, 0, size, size);
+            this._particleSprite = { key: spriteKey, canvas: off, size };
+        }
+
+        const sprite = this._particleSprite;
+        const timeScale = dt / 16; // 以 60fps 为基准归一化
+
         connection.particles.forEach(particle => {
-            // 更新位置
-            particle.t += particle.speed;
+            // 【修复】基于 dt 推进，避免帧率波动导致速度不均
+            particle.t += particle.speed * timeScale;
             if (particle.t > 1) particle.t = 0;
-            
+
             // 计算贝塞尔曲线上的点
             const t = particle.t;
             const mt = 1 - t;
-            const x = mt * mt * mt * startX + 
-                     3 * mt * mt * t * cp1x + 
-                     3 * mt * t * t * cp2x + 
+            const x = mt * mt * mt * startX +
+                     3 * mt * mt * t * cp1x +
+                     3 * mt * t * t * cp2x +
                      t * t * t * endX;
-            const y = mt * mt * mt * startY + 
-                     3 * mt * mt * t * cp1y + 
-                     3 * mt * t * t * cp2y + 
+            const y = mt * mt * mt * startY +
+                     3 * mt * mt * t * cp1y +
+                     3 * mt * t * t * cp2y +
                      t * t * t * endY;
-            
-            // 绘制发光粒子
-            const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, 6 * this.scale);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            gradient.addColorStop(0.5, 'rgba(52, 152, 219, 0.8)');
-            gradient.addColorStop(1, 'rgba(52, 152, 219, 0)');
-            
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, 6 * this.scale, 0, Math.PI * 2);
-            this.ctx.fillStyle = gradient;
-            this.ctx.fill();
+
+            // 绘制缓存的发光粒子
+            this.ctx.drawImage(sprite.canvas, x - sprite.size / 2, y - sprite.size / 2, sprite.size, sprite.size);
         });
     }
 
     /**
      * 绘制圆角矩形
+     * @param {number} x
+     * @param {number} y
+     * @param {number} w
+     * @param {number} h
+     * @param {number|{tl?:number,tr?:number,bl?:number,br?:number}} r 半径，可统一传入或按角分别指定
      */
     roundRect(x, y, w, h, r) {
+        let tl;
+        let tr;
+        let br;
+        let bl;
+        if (typeof r === 'number') {
+            tl = tr = br = bl = r;
+        } else if (r && typeof r === 'object') {
+            tl = r.tl || 0;
+            tr = r.tr || 0;
+            br = r.br || 0;
+            bl = r.bl || 0;
+        } else {
+            tl = tr = br = bl = 0;
+        }
+
+        // 限制半径，防止 w/h 较小时出现交叉
+        const maxR = Math.min(w, h) / 2;
+        tl = Math.min(tl, maxR);
+        tr = Math.min(tr, maxR);
+        br = Math.min(br, maxR);
+        bl = Math.min(bl, maxR);
+
         this.ctx.beginPath();
-        this.ctx.moveTo(x + r, y);
-        this.ctx.lineTo(x + w - r, y);
-        this.ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        this.ctx.lineTo(x + w, y + h - r);
-        this.ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        this.ctx.lineTo(x + r, y + h);
-        this.ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        this.ctx.lineTo(x, y + r);
-        this.ctx.quadraticCurveTo(x, y, x + r, y);
+        this.ctx.moveTo(x + tl, y);
+        this.ctx.lineTo(x + w - tr, y);
+        this.ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
+        this.ctx.lineTo(x + w, y + h - br);
+        this.ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+        this.ctx.lineTo(x + bl, y + h);
+        this.ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
+        this.ctx.lineTo(x, y + tl);
+        this.ctx.quadraticCurveTo(x, y, x + tl, y);
         this.ctx.closePath();
     }
 
     /**
-     * 渲染循环
+     * 请求重绘：标记画布为脏，并调度一次 RAF。
+     * 这是新代码推荐使用的入口；render() 保留为兼容别名。
+     */
+    invalidate() {
+        this._dirty = true;
+        this._scheduleFrame();
+    }
+
+    /**
+     * 兼容入口：等价于 invalidate()。
+     * 历史调用大量 `this.render()`，保留语义不变（请求一次重绘），
+     * 但不再创建无限循环。
      */
     render() {
-        // 【修复】如果暂停，不执行渲染
+        this.invalidate();
+    }
+
+    _scheduleFrame() {
         if (this._isPaused) {
-            this._animationFrameId = null;
             return;
         }
-        
-        // 清空画布
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this._animationFrameId !== null) {
+            return;
+        }
+        this._animationFrameId = requestAnimationFrame(this._drawFrameBound);
+    }
+
+    /**
+     * 当前帧是否需要持续动画（连线拖拽、活跃数据流粒子、运行中节点等）。
+     */
+    _hasAnimation() {
+        if (this.isConnecting) return true;
+        for (const conn of this.connections) {
+            if (conn.status === 'active' || conn.status === 'flowing') {
+                return true;
+            }
+        }
+        for (const node of this.nodes.values()) {
+            if (node.status === 'running') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 视口裁剪：判断节点是否在当前可视区域内（含一点缓冲）。
+     * @private
+     */
+    _isNodeInViewport(node) {
+        const vw = this._logicalWidth / this.scale;
+        const vh = this._logicalHeight / this.scale;
+        const vx = this.offset.x;
+        const vy = this.offset.y;
+        // 留 100px 缓冲，避免边缘裁切突兀
+        return node.x + node.width >= vx - 100 && node.x <= vx + vw + 100 &&
+               node.y + node.height >= vy - 100 && node.y <= vy + vh + 100;
+    }
+
+    /**
+     * 视口裁剪：判断连接是否至少有一个端点在可视区域内。
+     * @private
+     */
+    _isConnectionVisible(conn) {
+        const src = this.nodes.get(conn.source);
+        const tgt = this.nodes.get(conn.target);
+        return (src && this._isNodeInViewport(src)) || (tgt && this._isNodeInViewport(tgt));
+    }
+
+    /**
+     * 实际绘制一帧。决定是否继续 RAF 循环。
+     */
+    _drawFrame(now) {
+        this._animationFrameId = null;
+
+        if (this._isPaused) {
+            return;
+        }
+
+        const timestamp = typeof now === 'number' ? now : performance.now();
+        const dt = this._lastFrameTime > 0 ? Math.max(0, timestamp - this._lastFrameTime) : 16;
+        this._lastFrameTime = timestamp;
+
+        // 清空画布（逻辑像素）
+        this.ctx.clearRect(0, 0, this._logicalWidth, this._logicalHeight);
 
         // 绘制网格
         this.drawGrid();
 
-        // 绘制连接线
-        this.connections.forEach(conn => this.drawConnection(conn));
+        // 绘制连接线（dt 用于粒子动画）
+        for (const conn of this.connections) {
+            if (this._isConnectionVisible(conn)) {
+                this.drawConnection(conn, dt);
+            }
+        }
 
-        // 绘制临时连线（拖拽过程中）
+        // 绘制临时连线
         if (this.isConnecting) {
             this.drawTempConnection();
         }
 
-        // 绘制节点
-        this.nodes.forEach(node => this.drawNode(node));
+        // 绘制节点（视口裁剪）
+        for (const node of this.nodes.values()) {
+            if (this._isNodeInViewport(node)) {
+                this.drawNode(node);
+            }
+        }
 
         // 绘制悬停端口高亮
         if (this.hoveredPort && !this.isConnecting) {
             this.drawPortHighlight(this.hoveredPort);
         }
 
-        this._animationFrameId = requestAnimationFrame(() => this.render());
-        
         // 绘制小地图
         this.drawMinimap();
+
+        this._dirty = false;
+
+        // 如果有活动动画，继续 RAF；否则等待下一次 invalidate()
+        if (this._hasAnimation()) {
+            this._scheduleFrame();
+        } else {
+            this._lastFrameTime = 0;
+        }
     }
 
     /**
@@ -1293,27 +1537,26 @@ class FlowCanvas {
         }));
 
         // 构建 Connections 列表 (camelCase)
-        console.log('[DEBUG serialize] === START SERIALIZE ===');
-        console.log('[DEBUG serialize] Raw connections count:', this.connections.length);
-        console.log('[DEBUG serialize] Raw connections:', JSON.stringify(this.connections, null, 2));
-        console.log('[DEBUG serialize] Nodes in canvas:', Array.from(this.nodes.keys()));
-        
+        const debug = flowDebugEnabled();
+        if (debug) {
+            console.log('[FlowCanvas serialize] === START ===');
+            console.log('[FlowCanvas serialize] Raw connections count:', this.connections.length);
+            console.log('[FlowCanvas serialize] Nodes in canvas:', Array.from(this.nodes.keys()));
+        }
+
         const connections = this.connections
             .filter(conn => {
                 // 过滤掉无效的连接（source 或 target 为空、undefined 或空GUID）
                 const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
                 const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
                 if (!isValidSource || !isValidTarget) {
-                    console.warn(`[DEBUG serialize] 过滤掉无效连接: source=${conn.source}, target=${conn.target}`);
+                    console.warn(`[FlowCanvas serialize] 过滤掉无效连接: source=${conn.source}, target=${conn.target}`);
                 }
                 return isValidSource && isValidTarget;
             })
             .map(conn => {
                 const sourceNode = this.nodes.get(conn.source);
                 const targetNode = this.nodes.get(conn.target);
-
-                console.log(`[DEBUG serialize] Processing connection: source=${conn.source}, target=${conn.target}`);
-                console.log(`[DEBUG serialize]   sourceNode exists: ${!!sourceNode}, targetNode exists: ${!!targetNode}`);
 
                 // 【修复】添加端口索引边界检查，并同时检查 id/Id 属性
                 let sourcePortId = null;
@@ -1323,44 +1566,39 @@ class FlowCanvas {
                     const port = sourceNode.outputs[conn.sourcePort];
                     sourcePortId = port?.id || port?.Id;
                     if (!sourcePortId) {
-                        console.error(`[DEBUG serialize] 源端口索引 ${conn.sourcePort} 存在但没有ID，生成新ID`);
-                        port.id = this.generateUUID(); // 为端口分配ID
+                        port.id = this.generateUUID();
                         sourcePortId = port.id;
                     }
-                } else {
-                    console.error(`[DEBUG serialize] 源端口索引越界: ${conn.sourcePort}, 可用端口数: ${sourceNode?.outputs?.length || 0}`);
+                } else if (debug) {
+                    console.warn(`[FlowCanvas serialize] 源端口索引越界: ${conn.sourcePort}, 可用端口数: ${sourceNode?.outputs?.length || 0}`);
                 }
 
                 if (targetNode && conn.targetPort >= 0 && conn.targetPort < targetNode.inputs.length) {
                     const port = targetNode.inputs[conn.targetPort];
                     targetPortId = port?.id || port?.Id;
                     if (!targetPortId) {
-                        console.error(`[DEBUG serialize] 目标端口索引 ${conn.targetPort} 存在但没有ID，生成新ID`);
-                        port.id = this.generateUUID(); // 为端口分配ID
+                        port.id = this.generateUUID();
                         targetPortId = port.id;
                     }
-                } else {
-                    console.error(`[DEBUG serialize] 目标端口索引越界: ${conn.targetPort}, 可用端口数: ${targetNode?.inputs?.length || 0}`);
+                } else if (debug) {
+                    console.warn(`[FlowCanvas serialize] 目标端口索引越界: ${conn.targetPort}, 可用端口数: ${targetNode?.inputs?.length || 0}`);
                 }
-
-                console.log(`[DEBUG serialize]   sourcePortId: ${sourcePortId}, targetPortId: ${targetPortId}`);
 
                 // 【修复】如果无法获取端口ID，跳过此连接而不是生成错误的UUID
                 if (!sourcePortId || !targetPortId) {
-                    console.error(`[DEBUG serialize] 跳过无效连接: sourcePortId=${sourcePortId}, targetPortId=${targetPortId}`);
+                    if (debug) {
+                        console.warn(`[FlowCanvas serialize] 跳过无效连接: sourcePortId=${sourcePortId}, targetPortId=${targetPortId}`);
+                    }
                     return null;
                 }
 
-                const result = {
+                return {
                     id: conn.id,
                     sourceOperatorId: conn.source,
                     sourcePortId: sourcePortId,
                     targetOperatorId: conn.target,
                     targetPortId: targetPortId
                 };
-
-                console.log(`[DEBUG serialize]   Serialized connection:`, JSON.stringify(result));
-                return result;
             })
             .filter(conn => conn !== null); // 过滤掉无效的连接
 
@@ -1369,14 +1607,13 @@ class FlowCanvas {
             operators: operators,
             connections: connections
         };
-        
-        console.log('[DEBUG serialize] === FINAL SERIALIZED DATA ===');
-        console.log('[DEBUG serialize] Operators count:', operators.length);
-        console.log('[DEBUG serialize] Operator IDs:', operators.map(o => o.id));
-        console.log('[DEBUG serialize] Connections count:', connections.length);
-        console.log('[DEBUG serialize] Connections:', JSON.stringify(connections, null, 2));
-        console.log('[DEBUG serialize] === END SERIALIZE ===');
-        
+
+        if (debug) {
+            console.log('[FlowCanvas serialize] Operators count:', operators.length);
+            console.log('[FlowCanvas serialize] Connections count:', connections.length);
+            console.log('[FlowCanvas serialize] === END ===');
+        }
+
         return result;
     }
 
@@ -1389,12 +1626,14 @@ class FlowCanvas {
 
         // 支持多种嵌套结构 (后端 DTO 可能包装在 project.flow 中)
         const flowData = data.project?.flow || data.flow || data;
-        
+
         // 处理列表属性 (驼峰/帕斯卡/旧版 nodes 键)
         const operators = flowData.operators || flowData.Operators || flowData.nodes || [];
         const connections = flowData.connections || flowData.Connections || [];
 
-        console.log('[FlowCanvas] 开始反序列化. 算子数:', operators.length, '连接数:', connections.length);
+        if (flowDebugEnabled()) {
+            console.log('[FlowCanvas] 开始反序列化. 算子数:', operators.length, '连接数:', connections.length);
+        }
 
         if (operators) {
             operators.forEach(op => {
@@ -1402,7 +1641,7 @@ class FlowCanvas {
                 const id = op.id ?? op.Id;
                 const type = this.normalizeOperatorType(op.type ?? op.Type);
                 const title = op.name ?? op.Name ?? op.title ?? type;
-                
+
                 // 【修复】标准化端口数据，统一使用小写属性名（id/name/type）
                 const normalizePort = (p) => ({
                     id: p.id || p.Id || this.generateUUID(),
@@ -1416,8 +1655,8 @@ class FlowCanvas {
                 const node = {
                     id: id,
                     type: type,
-                    x: op.x || op.X || 0,
-                    y: op.y || op.Y || 0,
+                    x: op.x ?? op.X ?? 0,
+                    y: op.y ?? op.Y ?? 0,
                     width: 140,
                     height: 60,
                     title: title,
@@ -1430,7 +1669,7 @@ class FlowCanvas {
                 // Restore color logic based on type
                 if (node.type === 'ImageAcquisition') node.color = '#52c41a';
                 if (node.type === 'ResultOutput') node.color = '#595959';
-                
+
                 this.nodes.set(node.id, node);
             });
         }
@@ -1448,20 +1687,11 @@ class FlowCanvas {
                 const sourceNode = this.nodes.get(sourceId);
                 const targetNode = this.nodes.get(targetId);
 
-                let sourcePortIndex = conn.sourcePort || 0;
-                let targetPortIndex = conn.targetPort || 0;
+                let sourcePortIndex = conn.sourcePort ?? 0;
+                let targetPortIndex = conn.targetPort ?? 0;
 
                 // Find index by Port ID if available (Backend/DTO usually provides IDs)
                 if (sourcePortId && sourceNode && sourceNode.outputs) {
-                    // Note: Node outputs might be objects with 'Id' or 'id' depending on how they were deserialized above
-                    // But we simply copied the array. Let's check the array content structure if it came from DTO
-                    // DTO InputPorts/OutputPorts have 'Id'. Frontend 'inputs/outputs' have 'id'.
-                    // We need to handle that map above?
-                    // Actually, in 'node' construction above, we assigned 'inputs' directly.
-                    // If it came from DTO, the objects inside have 'Id', 'Name', etc.
-                    // If it came from frontend, they have 'id', 'name'.
-                    // We should normalize ports too?
-                    // For now, let's just find by checking both 'id' and 'Id'.
                     const idx = sourceNode.outputs.findIndex(p => (p.id === sourcePortId) || (p.Id === sourcePortId));
                     if (idx !== -1) sourcePortIndex = idx;
                 }
@@ -1487,9 +1717,12 @@ class FlowCanvas {
                 }
                 return isValidSource && isValidTarget;
             });
+
+            // 反序列化后必须重建连线索引，否则后续 O(1) 查询失效
+            this._rebuildConnectionIndex();
         }
 
-        this.render();
+        this.invalidate();
         this.markFlowStructureChanged('deserialize');
     }
 
@@ -1676,22 +1909,22 @@ class FlowCanvas {
 
             const node = this.nodes.get(this.draggedNode);
             if (node) {
-                node.x = Math.round(dragX / 10) * 10; // 对齐网格
-                node.y = Math.round(dragY / 10) * 10;
+                // 【修复】使用 this.gridSize 对齐网格，而非硬编码 10
+                node.x = Math.round(dragX / this.gridSize) * this.gridSize;
+                node.y = Math.round(dragY / this.gridSize) * this.gridSize;
             }
             this.canvas.style.cursor = 'grabbing';
             this.hoveredPort = null;
             return;
         }
 
-        // 检测端口悬停（改变光标）
+        // 检测端口悬停（改变光标）。getPortAt 内部已遍历所有节点/端口，
+        // 此处不再重复遍历节点列表做 body hover，避免每帧双次 O(n)。
         const port = this.getPortAt(x, y);
         if (port) {
-            // 【新增】检测端口是否有连接
             const hasConnection = this.getConnectionAtPort(port.nodeId, port.portIndex, port.isOutput) !== null;
-            
+
             if (hasConnection && !this.isConnecting) {
-                // 已连接且不在连线模式下，显示可断开提示
                 this.canvas.style.cursor = 'pointer';
                 this.hoveredPort = { ...port, hasConnection: true };
             } else if (this.isConnecting) {
@@ -1703,18 +1936,7 @@ class FlowCanvas {
             }
         } else {
             this.hoveredPort = null;
-
-            // 端口优先级更高；只有不在端口上时才检测节点悬停
-            let isHoveringNode = false;
-            for (const [, node] of this.nodes) {
-                if (x >= node.x && x <= node.x + node.width &&
-                    y >= node.y && y <= node.y + node.height) {
-                    isHoveringNode = true;
-                    break;
-                }
-            }
-
-            this.canvas.style.cursor = isHoveringNode ? 'grab' : 'default';
+            this.canvas.style.cursor = 'default';
         }
     }
 
@@ -1762,43 +1984,37 @@ class FlowCanvas {
      * @returns {boolean}
      */
     isPointOnConnection(x, y, connection) {
-        const sourceNode = this.nodes.get(connection.source);
-        const targetNode = this.nodes.get(connection.target);
+        // 使用 getPortPosition 获得准确端口位置，而不是用节点中心近似
+        const start = this.getPortPosition(connection.source, connection.sourcePort, true);
+        const end = this.getPortPosition(connection.target, connection.targetPort, false);
 
-        if (!sourceNode || !targetNode) return false;
-
-        const startX = (sourceNode.x + sourceNode.width - this.offset.x) * this.scale;
-        const startY = (sourceNode.y + sourceNode.height / 2 - this.offset.y) * this.scale;
-        const endX = (targetNode.x - this.offset.x) * this.scale;
-        const endY = (targetNode.y + targetNode.height / 2 - this.offset.y) * this.scale;
+        if (!start || !end) return false;
 
         const screenX = (x - this.offset.x) * this.scale;
         const screenY = (y - this.offset.y) * this.scale;
 
-        // 简单的点到线段距离检测（使用贝塞尔曲线的控制点近似）
-        const controlPoint1X = startX + (endX - startX) / 2;
-        const controlPoint1Y = startY;
-        const controlPoint2X = startX + (endX - startX) / 2;
-        const controlPoint2Y = endY;
+        const controlPoint1X = start.x + (end.x - start.x) / 2;
+        const controlPoint1Y = start.y;
+        const controlPoint2X = start.x + (end.x - start.x) / 2;
+        const controlPoint2Y = end.y;
 
-        // 采样贝塞尔曲线上的点
-        const samples = 10;
-        const threshold = 10 * this.scale;
+        const thresholdSq = CONNECTION_HIT_RADIUS_PX * CONNECTION_HIT_RADIUS_PX;
+        const step = 1 / CONNECTION_HIT_SAMPLES;
 
-        for (let t = 0; t <= 1; t += 1 / samples) {
+        for (let t = 0; t <= 1; t += step) {
             const mt = 1 - t;
-            const px = mt * mt * mt * startX +
+            const px = mt * mt * mt * start.x +
                        3 * mt * mt * t * controlPoint1X +
                        3 * mt * t * t * controlPoint2X +
-                       t * t * t * endX;
-            const py = mt * mt * mt * startY +
+                       t * t * t * end.x;
+            const py = mt * mt * mt * start.y +
                        3 * mt * mt * t * controlPoint1Y +
                        3 * mt * t * t * controlPoint2Y +
-                       t * t * t * endY;
+                       t * t * t * end.y;
 
             const dx = screenX - px;
             const dy = screenY - py;
-            if (Math.sqrt(dx * dx + dy * dy) < threshold) {
+            if (dx * dx + dy * dy < thresholdSq) {
                 return true;
             }
         }
@@ -1952,7 +2168,7 @@ class FlowCanvas {
         const menuItems = [
             { icon: '▶️', label: '运行', action: () => this.runNode(nodeId) },
             { icon: '📋', label: '复制', action: () => this.duplicateNode(nodeId) },
-            { icon: '❌', label: '删除', action: () => this.deleteNode(nodeId), danger: true },
+            { icon: '❌', label: '删除', action: () => this.removeNode(nodeId), danger: true },
             { icon: '🚫', label: node.disabled ? '启用' : '禁用', action: () => this.toggleNodeDisabled(nodeId) },
             { icon: '❓', label: '查看帮助', action: () => this.showNodeHelp(node) }
         ];
@@ -1972,7 +2188,7 @@ class FlowCanvas {
             `;
             menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
             menuItem.addEventListener('mouseenter', () => {
-                menuItem.style.background = item.danger ? 'rgba(231, 76, 60, 0.2)' : 'rgba(231, 76, 60, 0.1)';
+                menuItem.style.background = item.danger ? 'rgba(231, 76, 60, 0.2)' : 'rgba(255, 255, 255, 0.1)';
             });
             menuItem.addEventListener('mouseleave', () => {
                 menuItem.style.background = 'transparent';
@@ -2023,11 +2239,13 @@ class FlowCanvas {
     clear(silent = false) {
         this.nodes.clear();
         this.connections = [];
+        this._connectionById.clear();
+        this._connectionsByOutputPort.clear();
+        this._connectionByInputPort.clear();
         this.selectedNode = null;
         this.draggedNode = null;
         this.selectedConnection = null;
-        this.render();
-        console.log('[FlowCanvas] 画布已清空');
+        this.invalidate();
         if (!silent) {
             this.markFlowStructureChanged('clear');
         }
@@ -2051,7 +2269,7 @@ class FlowCanvas {
     duplicateNode(nodeId) {
         const node = this.nodes.get(nodeId);
         if (!node) return;
-        
+
         const newNode = {
             ...node,
             id: this.generateUUID(),
@@ -2059,28 +2277,18 @@ class FlowCanvas {
             y: node.y + 30,
             title: node.title + ' (副本)'
         };
-        
+
         this.nodes.set(newNode.id, newNode);
         this.selectedNode = newNode.id;
-        this.render();
+        this.invalidate();
         this.markFlowStructureChanged('duplicateNode');
     }
 
     /**
-     * 删除节点
+     * 删除节点（右键菜单及 API 兼容入口）。委托给 removeNode 以保留 _systemNode 保护与索引同步。
      */
     deleteNode(nodeId) {
-        // 删除相关连接
-        this.connections = this.connections.filter(conn => 
-            conn.source !== nodeId && conn.target !== nodeId
-        );
-        
-        this.nodes.delete(nodeId);
-        if (this.selectedNode === nodeId) {
-            this.selectedNode = null;
-        }
-        this.render();
-        this.markFlowStructureChanged('deleteNode');
+        this.removeNode(nodeId);
     }
 
     /**
@@ -2139,16 +2347,17 @@ class FlowCanvas {
             const rect = this.minimapCanvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
             const y = (e.clientY - rect.top) / rect.height;
-            
+
             // 计算视口中心位置
             const bounds = this.getNodesBounds();
             if (bounds) {
-                const targetX = bounds.minX + x * (bounds.maxX - bounds.minX + bounds.width);
-                const targetY = bounds.minY + y * (bounds.maxY - bounds.minY + bounds.height);
-                
-                this.offset.x = targetX - this.canvas.width / 2 / this.scale;
-                this.offset.y = targetY - this.canvas.height / 2 / this.scale;
-                this.render();
+                // 【修复】bounds.width 已是 maxX-minX，不应再加一次
+                const targetX = bounds.minX + x * bounds.width;
+                const targetY = bounds.minY + y * bounds.height;
+
+                this.offset.x = targetX - (this._logicalWidth / 2) / this.scale;
+                this.offset.y = targetY - (this._logicalHeight / 2) / this.scale;
+                this.invalidate();
                 this.notifyViewStateChanged();
             }
         });
@@ -2216,11 +2425,11 @@ class FlowCanvas {
             }
         });
         
-        // 绘制视口框
+        // 绘制视口框（使用逻辑尺寸，避免 DPR 导致框体翻倍）
         const viewportX = offsetX + (this.offset.x - bounds.minX) * scale;
         const viewportY = offsetY + (this.offset.y - bounds.minY) * scale;
-        const viewportW = this.canvas.width / this.scale * scale;
-        const viewportH = this.canvas.height / this.scale * scale;
+        const viewportW = (this._logicalWidth / this.scale) * scale;
+        const viewportH = (this._logicalHeight / this.scale) * scale;
         
         ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
         ctx.lineWidth = 2;

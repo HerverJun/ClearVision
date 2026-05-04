@@ -50,6 +50,23 @@ class ImageCanvas {
         // 【关键修复】记录是否有待处理的重置视图（当画布尺寸为0时）
         this._pendingResetView = false;
 
+        // 逻辑尺寸与 DPR
+        this._dpr = 1;
+        this._logicalWidth = 0;
+        this._logicalHeight = 0;
+
+        // 渲染调度（脏标记 + 单一 RAF）
+        this._animationFrameId = null;
+        this._dirty = true;
+        this._drawFrameBound = this._drawFrame.bind(this);
+
+        // ResizeObserver 节流
+        this._resizeObserver = null;
+        this._resizeRafId = null;
+
+        // Blob URL 待清理（避免内存泄漏）
+        this._imageUrlToRevoke = null;
+
         // 事件处理器引用（用于销毁时移除）
         this._resizeHandler = this.resize.bind(this);
         this._mouseDownHandler = this.handleMouseDown.bind(this);
@@ -59,9 +76,6 @@ class ImageCanvas {
         this._dblClickHandler = this.handleDoubleClick.bind(this);
         this._contextMenuHandler = this.handleContextMenu.bind(this);
 
-        // 动画帧ID
-        this._animationFrameId = null;
-
         this.initialize();
     }
 
@@ -70,7 +84,17 @@ class ImageCanvas {
      */
     initialize() {
         this.resize();
-        window.addEventListener('resize', this._resizeHandler);
+
+        // ResizeObserver：容器尺寸变化时自动 resize，避免 window.resize 精度不足
+        if (typeof window !== 'undefined' && typeof window.ResizeObserver !== 'undefined' && this.canvas.parentElement) {
+            this._resizeObserver = new window.ResizeObserver(() => {
+                if (this._resizeRafId) cancelAnimationFrame(this._resizeRafId);
+                this._resizeRafId = requestAnimationFrame(() => this.resize());
+            });
+            this._resizeObserver.observe(this.canvas.parentElement);
+        } else {
+            window.addEventListener('resize', this._resizeHandler);
+        }
 
         // 绑定事件
         this.canvas.addEventListener('mousedown', this._mouseDownHandler);
@@ -80,8 +104,8 @@ class ImageCanvas {
         this.canvas.addEventListener('dblclick', this._dblClickHandler);
         this.canvas.addEventListener('contextmenu', this._contextMenuHandler);
 
-        // 开始渲染循环
-        this.render();
+        // 启动渲染循环（由脏标记驱动）
+        this.invalidate();
     }
 
     /**
@@ -94,6 +118,16 @@ class ImageCanvas {
             this._animationFrameId = null;
         }
 
+        // 移除 ResizeObserver
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
+        if (this._resizeRafId) {
+            cancelAnimationFrame(this._resizeRafId);
+            this._resizeRafId = null;
+        }
+
         // 移除窗口事件监听
         window.removeEventListener('resize', this._resizeHandler);
 
@@ -104,6 +138,14 @@ class ImageCanvas {
         this.canvas.removeEventListener('wheel', this._wheelHandler);
         this.canvas.removeEventListener('dblclick', this._dblClickHandler);
         this.canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+
+        // 释放旧的 Blob URL
+        this._revokeImageUrl();
+
+        // 释放 ImageBitmap
+        if (typeof ImageBitmap !== 'undefined' && this.image instanceof ImageBitmap) {
+            this.image.close();
+        }
 
         // 清理资源
         this.image = null;
@@ -120,23 +162,31 @@ class ImageCanvas {
      */
     resize() {
         const container = this.canvas.parentElement;
-        const newWidth = container.clientWidth;
-        const newHeight = container.clientHeight;
-        
+        const cssWidth = container ? container.clientWidth : 0;
+        const cssHeight = container ? container.clientHeight : 0;
+
         // 【关键修复】如果尺寸从0变为非0且有待处理的重置视图，执行重置
-        const wasZero = this.canvas.width === 0 || this.canvas.height === 0;
-        const isNowNonZero = newWidth > 0 && newHeight > 0;
-        
-        this.canvas.width = newWidth;
-        this.canvas.height = newHeight;
-        
+        const wasZero = this._logicalWidth === 0 || this._logicalHeight === 0;
+        const isNowNonZero = cssWidth > 0 && cssHeight > 0;
+
+        const dpr = window.devicePixelRatio || 1;
+        this._dpr = dpr;
+        this._logicalWidth = cssWidth;
+        this._logicalHeight = cssHeight;
+
+        this.canvas.width = Math.round(cssWidth * dpr);
+        this.canvas.height = Math.round(cssHeight * dpr);
+        this.canvas.style.width = cssWidth ? `${cssWidth}px` : '';
+        this.canvas.style.height = cssHeight ? `${cssHeight}px` : '';
+
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
         // 如果之前因为尺寸为0而延迟了resetView，现在重新尝试
         if (wasZero && isNowNonZero && this._pendingResetView && this.image) {
-            console.log('[ImageCanvas] 画布尺寸变为非0，执行延迟的重置视图');
             this._pendingResetView = false;
             this.resetView();
         } else {
-            this.render();
+            this.invalidate();
         }
     }
 
@@ -146,30 +196,62 @@ class ImageCanvas {
     loadImage(imageSource) {
         return new Promise((resolve, reject) => {
             const img = new Image();
-            
+            let urlToRevoke = null;
+
             img.onload = () => {
+                this._releaseCurrentImage();
+                this._imageUrlToRevoke = urlToRevoke;
                 this.image = img;
                 this.resetView();
-                this.render();
+                this.invalidate();
                 resolve(img);
             };
-            
+
             img.onerror = () => {
+                if (urlToRevoke) {
+                    URL.revokeObjectURL(urlToRevoke);
+                }
                 reject(new Error('图像加载失败'));
             };
-            
+
             if (typeof imageSource === 'string') {
                 img.src = imageSource;
             } else if (imageSource instanceof Blob) {
-                img.src = URL.createObjectURL(imageSource);
+                urlToRevoke = URL.createObjectURL(imageSource);
+                img.src = urlToRevoke;
             } else if (imageSource instanceof ArrayBuffer) {
                 const blob = new Blob([imageSource]);
-                img.src = URL.createObjectURL(blob);
+                urlToRevoke = URL.createObjectURL(blob);
+                img.src = urlToRevoke;
             } else if (imageSource instanceof Uint8Array) {
                 const blob = new Blob([imageSource]);
-                img.src = URL.createObjectURL(blob);
+                urlToRevoke = URL.createObjectURL(blob);
+                img.src = urlToRevoke;
             }
         });
+    }
+
+    /**
+     * 释放当前图像资源（ImageBitmap 或 Blob URL）
+     * @private
+     */
+    _releaseCurrentImage() {
+        if (typeof ImageBitmap !== 'undefined' && this.image instanceof ImageBitmap) {
+            this.image.close();
+        }
+        this._revokeImageUrl();
+        this.image = null;
+    }
+
+    /**
+     * 清理已登记的 Blob URL
+     * @private
+     */
+    _revokeImageUrl() {
+        if (this._imageUrlToRevoke) {
+            URL.revokeObjectURL(this._imageUrlToRevoke);
+            this._imageUrlToRevoke = null;
+        }
     }
 
     /**
@@ -185,19 +267,17 @@ class ImageCanvas {
      */
     loadImageFromBuffer(buffer, width, height) {
         try {
-            // buffer 是 ArrayBuffer
-            // 假设格式为 RGBA (4 bytes per pixel)
             const pixelData = new Uint8ClampedArray(buffer);
             const imageData = new ImageData(pixelData, width, height);
-            
+
             createImageBitmap(imageData).then(bitmap => {
+                this._releaseCurrentImage();
                 this.image = bitmap;
                 // 如果是第一帧，重置视图；否则保持视图状态以支持视频流
-                // 但这里简单处理，如果是第一次加载才重置
                 if (this.scale === 1 && this.offset.x === 0 && this.offset.y === 0) {
                     this.resetView();
                 }
-                this.render();
+                this.invalidate();
             }).catch(err => {
                 console.error('CreateImageBitmap failed:', err);
             });
@@ -211,16 +291,15 @@ class ImageCanvas {
      */
     resetView() {
         if (!this.image) return;
-        
-        const canvasWidth = this.canvas.width;
-        const canvasHeight = this.canvas.height;
+
+        const canvasWidth = this._logicalWidth;
+        const canvasHeight = this._logicalHeight;
         const imageWidth = this.image.width;
         const imageHeight = this.image.height;
-        
+
         // 【关键修复】如果画布尺寸为0（容器隐藏时），不计算缩放，等到可见时再处理
         if (canvasWidth === 0 || canvasHeight === 0) {
-            console.warn('[ImageCanvas] 画布尺寸为0, 延迟重置视图');
-            this._pendingResetView = true; // 标记有待处理的重置
+            this._pendingResetView = true;
             return;
         }
         
@@ -236,7 +315,7 @@ class ImageCanvas {
         this.offset.x = (canvasWidth - imageWidth * this.scale) / 2;
         this.offset.y = (canvasHeight - imageHeight * this.scale) / 2;
         
-        this.render();
+        this.invalidate();
     }
 
     /**
@@ -252,9 +331,9 @@ class ImageCanvas {
     actualSize() {
         if (!this.image) return;
         this.scale = 1;
-        this.offset.x = (this.canvas.width - this.image.width) / 2;
-        this.offset.y = (this.canvas.height - this.image.height) / 2;
-        this.render();
+        this.offset.x = (this._logicalWidth - this.image.width) / 2;
+        this.offset.y = (this._logicalHeight - this.image.height) / 2;
+        this.invalidate();
     }
 
     /**
@@ -275,7 +354,7 @@ class ImageCanvas {
         };
         
         this.overlays.push(overlay);
-        this.render();
+        this.invalidate();
         return overlay;
     }
 
@@ -307,7 +386,7 @@ class ImageCanvas {
         if (existing) {
             Object.assign(existing, normalized, overlayStyle);
             this.selectedOverlay = existing.id;
-            this.render();
+            this.invalidate();
             return existing;
         }
 
@@ -315,7 +394,7 @@ class ImageCanvas {
         overlay.editable = true;
         this.activeOverlayId = overlay.id;
         this.selectedOverlay = overlay.id;
-        this.render();
+        this.invalidate();
         return overlay;
     }
 
@@ -341,7 +420,7 @@ class ImageCanvas {
         if (this.selectedOverlay === overlayId) {
             this.selectedOverlay = null;
         }
-        this.render();
+        this.invalidate();
     }
 
     /**
@@ -351,7 +430,7 @@ class ImageCanvas {
         this.overlays = [];
         this.selectedOverlay = null;
         this.activeOverlayId = null;
-        this.render();
+        this.invalidate();
     }
 
     /**
@@ -445,26 +524,46 @@ class ImageCanvas {
     }
 
     /**
-     * 渲染循环
+     * 请求重绘：标记画布为脏，并调度一次 RAF。
+     * 替代原来的无限 render 循环，避免无用帧。
+     */
+    invalidate() {
+        this._dirty = true;
+        if (this._animationFrameId === null) {
+            this._animationFrameId = requestAnimationFrame(this._drawFrameBound);
+        }
+    }
+
+    /**
+     * 兼容入口：等价于 invalidate()。
      */
     render() {
+        this.invalidate();
+    }
+
+    _drawFrame() {
+        this._animationFrameId = null;
+        if (!this._dirty) return;
+        this._dirty = false;
+
+        const w = this._logicalWidth;
+        const h = this._logicalHeight;
+
         // 清空画布
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
+        this.ctx.clearRect(0, 0, w, h);
+
         // 绘制背景 - 浅色主题
         this.ctx.fillStyle = '#f5f5f5';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
+        this.ctx.fillRect(0, 0, w, h);
+
         // 绘制图像
         this.drawImage();
-        
+
         // 绘制标注
         this.drawOverlays();
-        
+
         // 显示信息
         this.drawInfo();
-
-        this._animationFrameId = requestAnimationFrame(() => this.render());
     }
 
     /**
@@ -507,7 +606,7 @@ class ImageCanvas {
                 this.selectedOverlay = overlay.id;
                 this.isDragging = true;
                 this.dragStart = { x: x - overlay.x, y: y - overlay.y };
-                this.render();
+                this.invalidate();
                 return;
             }
         }
@@ -612,7 +711,7 @@ class ImageCanvas {
     setViewState(state) {
         this.scale = state.scale;
         this.offset = { ...state.offset };
-        this.render();
+        this.invalidate();
     }
 
     /**

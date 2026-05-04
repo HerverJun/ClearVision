@@ -12,7 +12,9 @@
       "Bash(dotnet restore *)",
       "Bash(python *)",
       "Bash(dotnet run *)",
-      "Bash(powershell -ExecutionPolicy Bypass -File scripts/dotnet-env-fix.ps1 -SkipNetworkCheck)"
+      "Bash(powershell -ExecutionPolicy Bypass -File scripts/dotnet-env-fix.ps1 -SkipNetworkCheck)",
+      "Bash(npm run *)",
+      "Bash(npx node *)"
     ]
   }
 }

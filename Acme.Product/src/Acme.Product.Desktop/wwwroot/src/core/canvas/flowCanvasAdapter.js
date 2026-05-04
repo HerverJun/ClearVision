@@ -102,8 +102,7 @@ class FlowCanvasAdapter {
     emitFlowChanged(reason) {
         this.eventBus?.emit?.('flow:changed', {
             reason,
-            revision: this.getRevision(),
-            flow: this.serialize()
+            revision: this.getRevision()
         });
     }
 }

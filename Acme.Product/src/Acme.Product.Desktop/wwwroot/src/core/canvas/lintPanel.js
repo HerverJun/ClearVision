@@ -79,13 +79,37 @@ class LintPanel {
             this.issues.forEach(issue => {
                 const item = document.createElement('div');
                 item.className = `lint-panel__item lint-panel__item--${issue.severity.toLowerCase()}`;
-                item.innerHTML = `
-                    <span class="lint-panel__code">${issue.code}</span>
-                    <span class="lint-panel__severity ${issue.severity.toLowerCase()}">${issue.severity}</span>
-                    <span class="lint-panel__message">${issue.message}</span>
-                    ${issue.operatorName ? `<span class="lint-panel__operator">@ ${issue.operatorName}</span>` : ''}
-                    ${issue.suggestion ? `<div class="lint-panel__suggestion">💡 ${issue.suggestion}</div>` : ''}
-                `;
+
+                const codeSpan = document.createElement('span');
+                codeSpan.className = 'lint-panel__code';
+                codeSpan.textContent = issue.code || '';
+
+                const sevSpan = document.createElement('span');
+                sevSpan.className = `lint-panel__severity ${issue.severity.toLowerCase()}`;
+                sevSpan.textContent = issue.severity;
+
+                const msgSpan = document.createElement('span');
+                msgSpan.className = 'lint-panel__message';
+                msgSpan.textContent = issue.message || '';
+
+                item.appendChild(codeSpan);
+                item.appendChild(sevSpan);
+                item.appendChild(msgSpan);
+
+                if (issue.operatorName) {
+                    const opSpan = document.createElement('span');
+                    opSpan.className = 'lint-panel__operator';
+                    opSpan.textContent = '@ ' + issue.operatorName;
+                    item.appendChild(opSpan);
+                }
+
+                if (issue.suggestion) {
+                    const sugDiv = document.createElement('div');
+                    sugDiv.className = 'lint-panel__suggestion';
+                    sugDiv.textContent = '💡 ' + issue.suggestion;
+                    item.appendChild(sugDiv);
+                }
+
                 list.appendChild(item);
             });
 
