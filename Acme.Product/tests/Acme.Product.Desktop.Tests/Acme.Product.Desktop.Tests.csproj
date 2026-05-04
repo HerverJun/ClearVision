@@ -13,6 +13,7 @@
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
     <PackageReference Include="NSubstitute" Version="5.1.0" />
     <PackageReference Include="xunit" Version="2.7.0" />
@@ -23,6 +24,11 @@
     <ProjectReference Include="..\..\src\Acme.Product.Core\Acme.Product.Core.csproj" />
     <ProjectReference Include="..\..\src\Acme.Product.Infrastructure\Acme.Product.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSpoolStore.cs" Link="Station\Sync\StationSpoolStore.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncOptions.cs" Link="Station\Sync\StationSyncOptions.cs" />
   </ItemGroup>
 
   <ItemGroup>

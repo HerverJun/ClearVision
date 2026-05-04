@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Services;
@@ -12,6 +13,15 @@ namespace Acme.Product.Desktop.Endpoints;
 
 public static class InspectionEventEndpoints
 {
+    private static readonly JsonSerializerOptions SseJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters =
+        {
+            new JsonStringEnumConverter(allowIntegerValues: true)
+        }
+    };
+
     public static IEndpointRouteBuilder MapInspectionEventEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/inspection/realtime/{projectId:guid}/events", HandleSseEventsAsync);
@@ -159,7 +169,7 @@ public static class InspectionEventEndpoints
 
         var json = JsonSerializer.Serialize(
             message.Data,
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            SseJsonOptions);
 
         if (message.SequenceId.HasValue)
         {

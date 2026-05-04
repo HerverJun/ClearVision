@@ -3,6 +3,7 @@ const VIEW_CONTAINER_IDS = {
     image: 'image-viewer',
     inspection: 'inspection-view',
     results: 'results-view',
+    stations: 'stations-view',
     project: 'project-view',
     ai: 'ai-view',
     settings: 'settings-view'
@@ -40,6 +41,7 @@ function hideAllViews(containers) {
  * @property {() => void} initializeInspectionImageViewer
  * @property {() => Promise<any>} ensureResultPanel
  * @property {() => Promise<void>} loadInspectionHistory
+ * @property {() => Promise<any>} ensureStationMonitorView
  * @property {() => Promise<any>} ensureProjectView
  * @property {() => Promise<any>} ensureAiPanel
  */
@@ -62,6 +64,7 @@ export function createViewManager(options) {
         initializeInspectionImageViewer,
         ensureResultPanel,
         loadInspectionHistory,
+        ensureStationMonitorView,
         ensureProjectView,
         ensureAiPanel
     } = options;
@@ -136,6 +139,12 @@ export function createViewManager(options) {
                     panel.render();
                     await loadInspectionHistory();
                 }
+                break;
+            }
+            case 'stations': {
+                containers.stations?.classList.remove('hidden');
+                const monitorView = await ensureStationMonitorView();
+                await monitorView?.activate?.();
                 break;
             }
             case 'project': {

@@ -107,6 +107,7 @@ let nodePreviewOverlay = null;
 let projectView = null;
 let resultPanel = null;
 let inspectionPanel = null;
+let stationMonitorView = null;
 let aiPanel = null;
 let viewManager = null;
 let toolbarCommandDisposer = null;
@@ -120,6 +121,7 @@ let themeUpdateInFlight = false;
 let projectViewModulePromise = null;
 let resultPanelModulePromise = null;
 let inspectionPanelModulePromise = null;
+let stationMonitorModulePromise = null;
 let aiPanelModulePromise = null;
 
 // 自动保存定时器
@@ -140,6 +142,14 @@ function loadResultPanelModule() {
     }
 
     return resultPanelModulePromise;
+}
+
+function loadStationMonitorModule() {
+    if (!stationMonitorModulePromise) {
+        stationMonitorModulePromise = import('./features/stations/stationMonitorView.js');
+    }
+
+    return stationMonitorModulePromise;
 }
 
 function loadInspectionPanelModule() {
@@ -183,6 +193,7 @@ function getViewManager() {
             initializeInspectionImageViewer,
             ensureResultPanel,
             loadInspectionHistory,
+            ensureStationMonitorView,
             ensureProjectView,
             ensureAiPanel
         });
@@ -397,6 +408,24 @@ async function ensureInspectionPanelReady() {
     inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
     console.log('[App] 检测控制面板初始化完成');
     return inspectionPanel;
+}
+
+async function ensureStationMonitorView() {
+    if (stationMonitorView) {
+        return stationMonitorView;
+    }
+
+    const container = document.getElementById('stations-view');
+    if (!container) {
+        console.warn('[App] Station monitor container not found.');
+        return null;
+    }
+
+    const { StationMonitorView } = await loadStationMonitorModule();
+    stationMonitorView = new StationMonitorView('stations-view');
+    serviceRegistry.register('stationMonitorView', stationMonitorView);
+    console.log('[App] Station monitor view initialized.');
+    return stationMonitorView;
 }
 
 async function ensureAiPanel() {

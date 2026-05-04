@@ -2,6 +2,7 @@ using Acme.Product.Infrastructure.DependencyInjection;
 using Acme.Product.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace Acme.Product.Station;
 
@@ -24,6 +25,11 @@ internal static class Program
                 services.AddSingleton<RuntimeHost>();
                 services.AddSingleton<StationLocalSettingsStore>();
                 services.AddSingleton<StationSiteProfileStore>();
+                services.Configure<Sync.StationSyncOptions>(context.Configuration.GetSection(Sync.StationSyncOptions.SectionName));
+                services.AddSingleton<Sync.StationIdentityResolver>();
+                services.AddSingleton<Sync.StationSpoolStore>();
+                services.AddSingleton<Sync.StationHubClient>();
+                services.AddHostedService<Sync.StationSyncHostedService>();
                 services.AddSingleton<MainForm>();
             })
             .Build();
@@ -33,11 +39,13 @@ internal static class Program
 
         try
         {
+            host.StartAsync().GetAwaiter().GetResult();
             System.Windows.Forms.Application.Run(host.Services.GetRequiredService<MainForm>());
             settingsStore.MarkCleanExit();
         }
         finally
         {
+            host.StopAsync().GetAwaiter().GetResult();
             host.Services.GetRequiredService<RuntimeHost>().DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }

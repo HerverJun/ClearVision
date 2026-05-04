@@ -1,7 +1,9 @@
 using Acme.Product.Application.Services;
 using Acme.Product.Desktop.Endpoints;
 using Acme.Product.Desktop.Handlers;
+using Acme.Product.Desktop.Hubs;
 using Acme.Product.Desktop.Middleware;
+using Acme.Product.Desktop.Station;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Logging;
 using Acme.Product.Infrastructure.Services;
@@ -20,6 +22,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Configuration;
 
 namespace Acme.Product.Desktop;
 
@@ -107,9 +110,14 @@ static class Program
     {
         try
         {
-            _webPort = FindAvailablePort(MinWebPort, MaxWebPort);
-
             var builder = WebApplication.CreateBuilder();
+            builder.Services.Configure<StationIngressOptions>(builder.Configuration.GetSection(StationIngressOptions.SectionName));
+            var stationIngressOptions = builder.Configuration
+                .GetSection(StationIngressOptions.SectionName)
+                .Get<StationIngressOptions>()
+                ?? new StationIngressOptions();
+            var ingressListenMode = ResolveStationIngressListenMode(stationIngressOptions);
+            _webPort = ResolveWebPort(stationIngressOptions);
 
             builder.Services.AddVisionServices(builder.Configuration);
             builder.Services.AddAiFlowGeneration(builder.Configuration);
@@ -118,6 +126,9 @@ static class Program
             builder.Services.AddScoped<RuntimePackageLoader>();
             builder.Services.AddSingleton<RuntimeResultNormalizer>();
             builder.Services.AddSingleton<WebMessageHandler>();
+            builder.Services.AddSingleton<StationIngressAuthService>();
+            builder.Services.AddSingleton<StationRegistryService>();
+            builder.Services.AddSignalR();
             builder.Services.ConfigureHttpJsonOptions(options =>
             {
                 options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
@@ -137,10 +148,18 @@ static class Program
 
             builder.WebHost.ConfigureKestrel(options =>
             {
-                options.ListenLocalhost(_webPort);
+                if (ingressListenMode == StationIngressListenMode.Lan)
+                {
+                    options.ListenAnyIP(_webPort);
+                }
+                else
+                {
+                    options.ListenLocalhost(_webPort);
+                }
             });
 
             var app = builder.Build();
+            app.UseMiddleware<StationIngressIsolationMiddleware>();
 
             using (var scope = app.Services.CreateScope())
             {
@@ -185,11 +204,13 @@ static class Program
             app.UseMiddleware<AuthMiddleware>();
 
             app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Port = _webPort }));
+            app.MapHub<StationHub>("/hubs/station-ingest");
             app.MapAuthEndpoints();
             app.MapUserEndpoints();
             app.MapVisionApiEndpoints();
             app.MapSettingsEndpoints();
             app.MapPlcEndpoints();
+            app.MapStationEndpoints();
 
             RegisterExtendedApiEndpoints(app);
             app.MapAutoTuneEndpoints();
@@ -342,6 +363,26 @@ static class Program
     }
 
     public static int GetWebPort() => _webPort;
+
+    private static int ResolveWebPort(StationIngressOptions options)
+    {
+        if (options.Enabled && options.Port > 0)
+        {
+            return options.Port;
+        }
+
+        return FindAvailablePort(MinWebPort, MaxWebPort);
+    }
+
+    private static StationIngressListenMode ResolveStationIngressListenMode(StationIngressOptions options)
+    {
+        if (!options.Enabled)
+        {
+            return StationIngressListenMode.Loopback;
+        }
+
+        return options.ListenMode;
+    }
 
     internal static bool IsAllowedApiOrigin(string? origin, int webPort)
     {

@@ -105,6 +105,11 @@ public class AuthMiddleware
         }
 
         // API 文档和其他公开端点
+        if (path.StartsWith("/hubs/station-ingest", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase))
         {
             return true;

@@ -47,6 +47,7 @@
                     "src/shared/styles/analysisCards.css",
                     "src/shared/styles/inspection.css",
                     "src/shared/styles/results.css",
+                    "src/shared/styles/stations.css",
                     "src/shared/styles/visual-upgrade.css",
                     "css/planarScaleOffsetCalibWizard.css",
                 ];
@@ -81,6 +82,9 @@
                         </button>
                         <button class="nav-btn" data-view="results">
                             结果
+                        </button>
+                        <button class="nav-btn" data-view="stations">
+                            监控
                         </button>
                         <button class="nav-btn" data-view="ai">
                             AI
@@ -712,6 +716,8 @@
                     </div>
                     
                     <!-- AI 视图（默认隐藏） -->
+                    <div class="stations-view-container hidden" id="stations-view">
+                    </div>
                     <div class="ai-view-container hidden" id="ai-view">
                         <!-- 由 aiPanel.js 动态填充 -->
                     </div>
