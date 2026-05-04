@@ -133,3 +133,4 @@ __pycache__/
 # Local production/field datasets; repo stores only manifests, splits, and reports.
 /quality/production_datasets/
 /quality/field_datasets/
+.claude/settings.local.json

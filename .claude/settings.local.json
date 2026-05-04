@@ -14,7 +14,11 @@
       "Bash(dotnet run *)",
       "Bash(powershell -ExecutionPolicy Bypass -File scripts/dotnet-env-fix.ps1 -SkipNetworkCheck)",
       "Bash(npm run *)",
-      "Bash(npx node *)"
+      "Bash(npx node *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)"
     ]
   }
 }
