@@ -69,6 +69,40 @@ async function runPreviewCoordinatorChecks() {
   assert.equal(acquisitionCoordinator.getState().presenter.statusText, '请先配置文件路径');
   acquisitionCoordinator.destroy();
 
+  let noProjectPreviewCalls = 0;
+  const noProjectCoordinator = new NodePreviewCoordinator({
+    getProjectId: () => null,
+    getFlowRevision: () => 1,
+    getNodeById: () => ({
+      id: 'no-project-node',
+      type: 'PreviewImageNode',
+      title: 'Preview without project',
+      parameters: [],
+      outputs: [{ name: 'Image', type: 'Image' }],
+    }),
+    getOperatorMetadata: () => null,
+    getInputImageBase64: () => PNG_BASE64,
+    previewExecutor: async () => {
+      noProjectPreviewCalls += 1;
+      return { success: true };
+    },
+    debounceMs: 10,
+  });
+
+  noProjectCoordinator.setActiveNode({
+    id: 'no-project-node',
+    type: 'PreviewImageNode',
+    title: 'Preview without project',
+    parameters: [],
+    outputs: [{ name: 'Image', type: 'Image' }],
+  });
+  await sleep(30);
+  assert.equal(noProjectPreviewCalls, 0, 'missing project should not execute preview');
+  assert.equal(noProjectCoordinator.getState().status, 'idle');
+  assert.equal(noProjectCoordinator.getState().presenter.hasError, false);
+  assert.equal(noProjectCoordinator.getState().presenter.statusText, '等待预览');
+  noProjectCoordinator.destroy();
+
   let previewCalls = 0;
   let node = {
     id: 'node-1',

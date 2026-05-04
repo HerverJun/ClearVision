@@ -176,6 +176,44 @@ function createMockWindow(canvas) {
   };
 }
 
+function installRafSpy() {
+  const previousRaf = global.requestAnimationFrame;
+  const previousCancel = global.cancelAnimationFrame;
+  const scheduled = [];
+  let nextId = 1;
+
+  global.requestAnimationFrame = (fn) => {
+    const id = nextId++;
+    scheduled.push({ id, fn });
+    return id;
+  };
+  global.cancelAnimationFrame = (id) => {
+    const index = scheduled.findIndex(item => item.id === id);
+    if (index !== -1) scheduled.splice(index, 1);
+  };
+
+  return {
+    get count() {
+      return scheduled.length;
+    },
+    reset() {
+      scheduled.length = 0;
+    },
+    restore() {
+      global.requestAnimationFrame = previousRaf;
+      global.cancelAnimationFrame = previousCancel;
+    }
+  };
+}
+
+function clearPendingFrame(instance, rafSpy) {
+  if (instance._animationFrameId !== null && instance._animationFrameId !== undefined) {
+    cancelAnimationFrame(instance._animationFrameId);
+    instance._animationFrameId = null;
+  }
+  rafSpy.reset();
+}
+
 // =============================================================================
 // FlowCanvas tests (module-level helpers only, no full instantiation in Node)
 // =============================================================================
@@ -323,6 +361,127 @@ test('FlowCanvas deserialize rebuilds connection index', async () => {
   fc.destroy();
 });
 
+test('FlowCanvas expands node height for multi-port operators', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const ports = Array.from({ length: 5 }, (_, index) => ({
+    id: `in-${index}`,
+    name: `Input ${index + 1}`,
+    type: 'Image'
+  }));
+
+  const node = fc.addNode('RegionUnion', 0, 0, {
+    inputs: ports,
+    outputs: [{ id: 'out-1', name: 'Region', type: 'Region' }]
+  });
+
+  assert.ok(node.height > 60, 'multi-port node should be taller than the legacy fixed height');
+
+  const firstPort = fc.getPortPosition(node.id, 0, false);
+  const lastPort = fc.getPortPosition(node.id, ports.length - 1, false);
+  assert.ok(firstPort.y > 24, 'first port should render below the title bar');
+  assert.ok(lastPort.y < node.height, 'last port should stay inside the node body');
+  assert.ok(lastPort.y - firstPort.y >= 60, 'ports should have enough vertical spread to avoid collapsing');
+
+  fc.destroy();
+});
+
+test('FlowCanvas deserialize expands saved multi-port nodes and keeps port hit testing aligned', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const inputPorts = Array.from({ length: 4 }, (_, index) => ({
+    id: `p-${index}`,
+    name: `Input ${index + 1}`,
+    dataType: 'Region'
+  }));
+
+  fc.deserialize({
+    operators: [
+      {
+        id: 'region-union',
+        name: 'RegionUnion',
+        type: 'RegionUnion',
+        x: 100,
+        y: 80,
+        height: 60,
+        inputPorts,
+        outputPorts: [{ id: 'out', name: 'Region', dataType: 'Region' }]
+      }
+    ],
+    connections: []
+  });
+
+  const node = fc.nodes.get('region-union');
+  assert.ok(node.height > 60, 'deserialize should expand legacy saved height for multi-port nodes');
+
+  const port = fc.getPortPosition(node.id, inputPorts.length - 1, false);
+  const hit = fc.getPortAt(node.x, port.y);
+  assert.deepEqual(hit, { nodeId: node.id, portIndex: inputPorts.length - 1, isOutput: false });
+
+  fc.destroy();
+});
+
+test('FlowCanvas interactive state changes schedule redraws', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  try {
+    const fc = new FlowCanvas('canvas');
+    const n1 = fc.addNode('ImageAcquisition', 0, 0, {
+      inputs: [],
+      outputs: [{ id: 'o1', name: 'out', type: 'Image' }]
+    });
+    const n2 = fc.addNode('ResultOutput', 200, 0, {
+      inputs: [{ id: 'i2', name: 'in', type: 'Image' }],
+      outputs: []
+    });
+
+    clearPendingFrame(fc, rafSpy);
+    fc.startConnection(n1.id, 0);
+    assert.equal(rafSpy.count, 1, 'starting a temp connection should schedule a redraw');
+
+    clearPendingFrame(fc, rafSpy);
+    fc.handleMouseMove({ clientX: 320, clientY: 20 });
+    assert.equal(rafSpy.count, 1, 'moving a temp connection should schedule a redraw');
+
+    fc.cancelConnection();
+    clearPendingFrame(fc, rafSpy);
+    fc.draggedNode = n2.id;
+    fc.dragOffset = { x: 0, y: 0 };
+    fc.handleMouseMove({ clientX: 260, clientY: 40 });
+    assert.equal(rafSpy.count, 1, 'dragging a node should schedule a redraw');
+
+    fc.draggedNode = null;
+    clearPendingFrame(fc, rafSpy);
+    fc.handleWheel({ deltaY: -1, clientX: 100, clientY: 100, preventDefault() {} });
+    assert.equal(rafSpy.count, 1, 'zooming the flow canvas should schedule a redraw');
+
+    fc.destroy();
+  } finally {
+    rafSpy.restore();
+  }
+});
+
 // =============================================================================
 // lintPanel XSS-safe rendering
 // =============================================================================
@@ -425,4 +584,133 @@ test('ImageCanvas revokes blob URL on destroy', async () => {
 
   ic.destroy();
   assert.equal(global.URL._lastRevoked, trackedUrl, 'blob URL should be revoked on destroy');
+});
+
+test('ImageCanvas pan, zoom, and ROI edits schedule redraws', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  try {
+    const ic = new ImageCanvas('canvas');
+    ic.image = { width: 400, height: 300 };
+
+    clearPendingFrame(ic, rafSpy);
+    ic.isDragging = true;
+    ic.lastMouse = { x: 10, y: 10 };
+    ic.handleMouseMove({ clientX: 30, clientY: 40 });
+    assert.equal(rafSpy.count, 1, 'panning the image canvas should schedule a redraw');
+
+    clearPendingFrame(ic, rafSpy);
+    ic.handleWheel({ deltaY: -1, clientX: 100, clientY: 100, preventDefault() {} });
+    assert.equal(rafSpy.count, 1, 'zooming the image canvas should schedule a redraw');
+
+    clearPendingFrame(ic, rafSpy);
+    ic.interactionMode = 'roi-rect';
+    ic.interactionState = {
+      type: 'draw',
+      overlayId: 'roi-1',
+      startPoint: { x: 10, y: 10 }
+    };
+    ic.overlays = [{ id: 'roi-1', x: 10, y: 10, width: 20, height: 20, editable: true }];
+    ic.handleRoiMouseMove({ clientX: 80, clientY: 90 });
+    assert.equal(rafSpy.count, 1, 'editing an ROI should schedule a redraw');
+
+    clearPendingFrame(ic, rafSpy);
+    ic.interactionState = {
+      type: 'pan',
+      startCanvasPoint: { x: 10, y: 10 },
+      startOffset: { x: 0, y: 0 }
+    };
+    ic.handleRoiMouseMove({ clientX: 40, clientY: 45 });
+    assert.equal(rafSpy.count, 1, 'right-button ROI pan should schedule a redraw');
+
+    ic.destroy();
+  } finally {
+    rafSpy.restore();
+  }
+});
+
+test('ImageCanvas blank click clears selection and schedules redraw', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  try {
+    const ic = new ImageCanvas('canvas');
+    ic.image = { width: 400, height: 300 };
+    ic.overlays = [{ id: 'roi-1', x: 10, y: 10, width: 20, height: 20, editable: true }];
+    ic.selectedOverlay = 'roi-1';
+
+    clearPendingFrame(ic, rafSpy);
+    ic.handleMouseDown({ button: 0, clientX: 200, clientY: 200 });
+
+    assert.equal(ic.selectedOverlay, null, 'blank click should clear selected overlay');
+    assert.equal(rafSpy.count, 1, 'blank click selection clear should schedule a redraw');
+
+    ic.destroy();
+  } finally {
+    rafSpy.restore();
+  }
+});
+
+test('ImageCanvas clear releases image resources and redraws empty canvas', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+  global.URL = {
+    createObjectURL() {
+      return 'blob:mock-url/clear-test';
+    },
+    revokeObjectURL(url) {
+      this._lastRevoked = url;
+    },
+    _lastRevoked: null
+  };
+
+  try {
+    const ic = new ImageCanvas('canvas');
+    const blob = new Blob(['fake-image']);
+    await ic.loadImage(blob);
+    const trackedUrl = ic._imageUrlToRevoke;
+
+    ic.overlays = [{ id: 'roi-1', x: 10, y: 10, width: 20, height: 20, editable: true }];
+    ic.selectedOverlay = 'roi-1';
+    ic.activeOverlayId = 'roi-1';
+    ic.interactionState = { type: 'draw', overlayId: 'roi-1', startPoint: { x: 10, y: 10 } };
+    ic.activeHandle = 'se';
+    ic._pendingResetView = true;
+
+    clearPendingFrame(ic, rafSpy);
+    ic.clear();
+
+    assert.equal(ic.image, null, 'clear should remove the current image');
+    assert.equal(ic.overlays.length, 0, 'clear should remove overlays');
+    assert.equal(ic.selectedOverlay, null, 'clear should reset selected overlay');
+    assert.equal(ic.activeOverlayId, null, 'clear should reset active overlay');
+    assert.equal(ic.interactionState, null, 'clear should cancel active ROI interaction');
+    assert.equal(ic.activeHandle, null, 'clear should reset active handle');
+    assert.equal(ic._pendingResetView, false, 'clear should not leave a pending reset for a removed image');
+    assert.equal(global.URL._lastRevoked, trackedUrl, 'clear should revoke the tracked blob URL');
+    assert.equal(rafSpy.count, 1, 'clear should schedule a redraw for the empty canvas');
+
+    ic.destroy();
+  } finally {
+    rafSpy.restore();
+  }
 });

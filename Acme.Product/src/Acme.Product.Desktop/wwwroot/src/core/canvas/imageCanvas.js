@@ -615,6 +615,7 @@ class ImageCanvas {
         this.isDragging = true;
         this.dragStart = { x: e.clientX, y: e.clientY };
         this.lastMouse = { x: e.clientX, y: e.clientY };
+        this.invalidate();
     }
 
     /**
@@ -646,6 +647,7 @@ class ImageCanvas {
                 this.offset.y += dy;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
             }
+            this.invalidate();
         }
     }
 
@@ -679,6 +681,7 @@ class ImageCanvas {
             this.offset.x = mouseX - (mouseX - this.offset.x) * (newScale / this.scale);
             this.offset.y = mouseY - (mouseY - this.offset.y) * (newScale / this.scale);
             this.scale = newScale;
+            this.invalidate();
         }
     }
 
@@ -718,11 +721,14 @@ class ImageCanvas {
      * 清空画布
      */
     clear() {
-        this.image = null;
+        this._releaseCurrentImage();
         this.overlays = [];
         this.selectedOverlay = null;
         this.activeOverlayId = null;
-        this.resetView();
+        this.interactionState = null;
+        this.activeHandle = null;
+        this._pendingResetView = false;
+        this.invalidate();
     }
 
     getPrimaryEditableOverlay() {
@@ -820,6 +826,7 @@ class ImageCanvas {
                 startCanvasPoint: this.getCanvasPoint(e),
                 startOffset: { ...this.offset }
             };
+            this.invalidate();
             return;
         }
 
@@ -841,6 +848,7 @@ class ImageCanvas {
                 overlayId: overlay.id,
                 originalRect: { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height }
             };
+            this.invalidate();
             return;
         }
 
@@ -854,6 +862,7 @@ class ImageCanvas {
                 originalRect: { x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height },
                 dragAnchor: imagePoint
             };
+            this.invalidate();
             return;
         }
 
@@ -880,6 +889,7 @@ class ImageCanvas {
             const canvasPoint = this.getCanvasPoint(e);
             this.offset.x = this.interactionState.startOffset.x + (canvasPoint.x - this.interactionState.startCanvasPoint.x);
             this.offset.y = this.interactionState.startOffset.y + (canvasPoint.y - this.interactionState.startCanvasPoint.y);
+            this.invalidate();
             return;
         }
 
@@ -918,6 +928,7 @@ class ImageCanvas {
         }
 
         Object.assign(overlay, nextRect);
+        this.invalidate();
         this.emitOverlayChanged(overlay, 'dragging');
     }
 
@@ -928,6 +939,7 @@ class ImageCanvas {
 
         const interaction = this.interactionState;
         this.interactionState = null;
+        this.invalidate();
 
         if (interaction.type === 'pan') {
             return;

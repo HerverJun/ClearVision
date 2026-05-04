@@ -52,6 +52,12 @@ const LEGACY_OPERATOR_TYPE_ALIASES = {
 const PORT_HIT_RADIUS_PX = 12;       // 端口屏幕命中半径
 const CONNECTION_HIT_RADIUS_PX = 10; // 连线屏幕命中半径
 const CONNECTION_HIT_SAMPLES = 16;   // 贝塞尔曲线采样点数
+const NODE_DEFAULT_WIDTH = 140;
+const NODE_MIN_HEIGHT = 60;
+const NODE_HEADER_HEIGHT = 24;
+const NODE_PORT_TOP_PADDING = 10;
+const NODE_PORT_BOTTOM_PADDING = 10;
+const NODE_PORT_ROW_HEIGHT = 18;
 
 function portKey(nodeId, portIndex) {
     return `${nodeId}:${portIndex}`;
@@ -305,8 +311,8 @@ class FlowCanvas {
             type: canonicalType,
             x,
             y,
-            width: 140,
-            height: 60,
+            width: NODE_DEFAULT_WIDTH,
+            height: NODE_MIN_HEIGHT,
             title: config.title || canonicalType,
             inputs: (config.inputs || []).map(p => ({
                 id: p.id || this.generateUUID(),
@@ -321,6 +327,10 @@ class FlowCanvas {
             color: config.color || '#1890ff',
             ...config
         };
+        node.height = Math.max(
+            this.getRequiredNodeHeight(node.inputs, node.outputs),
+            Number(node.height) || NODE_MIN_HEIGHT
+        );
 
         this.nodes.set(node.id, node);
         this.invalidate();
@@ -806,7 +816,7 @@ class FlowCanvas {
         
         // 渲染输入端口 - 垂直均分
         node.inputs.forEach((input, index) => {
-            const portY = y + (h * (index + 1)) / (node.inputs.length + 1);
+            const portY = this.getPortYInScreen(y, h, index, node.inputs.length);
             const color = PORT_TYPE_COLORS[input.type] || PORT_TYPE_COLORS['Any'];
             
             this.ctx.beginPath();
@@ -829,7 +839,7 @@ class FlowCanvas {
         
         // 渲染输出端口 - 垂直均分
         node.outputs.forEach((output, index) => {
-            const portY = y + (h * (index + 1)) / (node.outputs.length + 1);
+            const portY = this.getPortYInScreen(y, h, index, node.outputs.length);
             const color = PORT_TYPE_COLORS[output.type] || PORT_TYPE_COLORS['Any'];
 
             this.ctx.beginPath();
@@ -851,6 +861,26 @@ class FlowCanvas {
         });
     }
 
+    getRequiredNodeHeight(inputs = [], outputs = []) {
+        const portCount = Math.max(inputs?.length || 0, outputs?.length || 0, 1);
+        return Math.max(
+            NODE_MIN_HEIGHT,
+            NODE_HEADER_HEIGHT + NODE_PORT_TOP_PADDING + NODE_PORT_BOTTOM_PADDING + portCount * NODE_PORT_ROW_HEIGHT
+        );
+    }
+
+    getPortYInScreen(nodeScreenY, nodeScreenHeight, portIndex, portCount) {
+        if (portCount <= 0) {
+            return nodeScreenY + nodeScreenHeight / 2;
+        }
+        const top = nodeScreenY + (NODE_HEADER_HEIGHT + NODE_PORT_TOP_PADDING) * this.scale;
+        const bottom = nodeScreenY + nodeScreenHeight - NODE_PORT_BOTTOM_PADDING * this.scale;
+        if (portCount === 1) {
+            return (top + bottom) / 2;
+        }
+        return top + ((bottom - top) * portIndex) / (portCount - 1);
+    }
+
     /**
      * 获取端口在屏幕上的坐标
      * @param {string} nodeId - 节点ID
@@ -868,7 +898,7 @@ class FlowCanvas {
         const h = node.height * this.scale;
 
         const portsCount = isOutput ? node.outputs.length : node.inputs.length;
-        const portY = y + (h * (portIndex + 1)) / (portsCount + 1);
+        const portY = this.getPortYInScreen(y, h, portIndex, portsCount);
 
         if (isOutput) {
             return { x: x + w, y: portY };
@@ -896,7 +926,7 @@ class FlowCanvas {
 
             // 检测输入端口 (垂直分布)
             for (let i = 0; i < node.inputs.length; i++) {
-                const portY = nodeScreenY + (h * (i + 1)) / (node.inputs.length + 1);
+                const portY = this.getPortYInScreen(nodeScreenY, h, i, node.inputs.length);
                 const dx = screenX - nodeScreenX;
                 const dy = screenY - portY;
                 if (dx * dx + dy * dy < hitRadiusSq) {
@@ -906,7 +936,7 @@ class FlowCanvas {
 
             // 检测输出端口 (垂直分布)
             for (let i = 0; i < node.outputs.length; i++) {
-                const portY = nodeScreenY + (h * (i + 1)) / (node.outputs.length + 1);
+                const portY = this.getPortYInScreen(nodeScreenY, h, i, node.outputs.length);
                 const dx = screenX - (nodeScreenX + w);
                 const dy = screenY - portY;
                 if (dx * dx + dy * dy < hitRadiusSq) {
@@ -956,6 +986,7 @@ class FlowCanvas {
         this.isConnecting = true;
         this.connectingFrom = { nodeId, portIndex, isOutput: true };
         this.canvas.style.cursor = 'crosshair';
+        this.invalidate();
         console.log('[FlowCanvas] 开始连线，从节点:', nodeId, '端口:', portIndex);
     }
 
@@ -1657,14 +1688,18 @@ class FlowCanvas {
                     type: type,
                     x: op.x ?? op.X ?? 0,
                     y: op.y ?? op.Y ?? 0,
-                    width: 140,
-                    height: 60,
+                    width: op.width ?? op.Width ?? NODE_DEFAULT_WIDTH,
+                    height: op.height ?? op.Height ?? NODE_MIN_HEIGHT,
                     title: title,
                     inputs: inputs,
                     outputs: outputs,
                     parameters: op.parameters || op.Parameters || [],
                     color: '#1890ff' // Default
                 };
+                node.height = Math.max(
+                    this.getRequiredNodeHeight(node.inputs, node.outputs),
+                    Number(node.height) || NODE_MIN_HEIGHT
+                );
 
                 // Restore color logic based on type
                 if (node.type === 'ImageAcquisition') node.color = '#52c41a';
@@ -1899,6 +1934,7 @@ class FlowCanvas {
                 this.hoveredPort = null;
                 this.canvas.style.cursor = 'crosshair';
             }
+            this.invalidate();
             return;
         }
 
@@ -1915,6 +1951,7 @@ class FlowCanvas {
             }
             this.canvas.style.cursor = 'grabbing';
             this.hoveredPort = null;
+            this.invalidate();
             return;
         }
 
@@ -1938,6 +1975,7 @@ class FlowCanvas {
             this.hoveredPort = null;
             this.canvas.style.cursor = 'default';
         }
+        this.invalidate();
     }
 
     /**
@@ -1969,6 +2007,7 @@ class FlowCanvas {
             this.offset.x += mouseX / this.scale - mouseX / newScale;
             this.offset.y += mouseY / this.scale - mouseY / newScale;
             this.scale = newScale;
+            this.invalidate();
             this.notifyViewStateChanged();
         }
     }

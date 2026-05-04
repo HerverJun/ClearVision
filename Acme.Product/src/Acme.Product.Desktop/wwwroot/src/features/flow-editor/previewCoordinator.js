@@ -479,8 +479,19 @@ export class NodePreviewCoordinator {
             const projectId = this.getProjectId();
             if (!projectId) {
                 this.updateState({
-                    status: 'error',
-                    errorMessage: '未选择工程'
+                    status: 'idle',
+                    executionTimeMs: null,
+                    errorMessage: null,
+                    inputImageBase64: null,
+                    outputImageBase64: null,
+                    outputData: null,
+                    request: buildPreviewRequestKey({
+                        projectId: null,
+                        nodeId: activeNode.id,
+                        flowRevision: this.getFlowRevision(),
+                        parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
+                        inputImageBase64: null
+                    })
                 });
                 return;
             }
