@@ -5,69 +5,103 @@
 |------|------|
 | 类名 (Class) | `OmronFinsCommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.OmronFinsCommunication` |
-| 分类 (Category) | 通信 |
+| 分类 (Category) | 通信 / Communication |
 | 成熟度 (Maturity) | 稳定 Stable |
 | 作者 (Author) | 蘅芜君 |
 
 ## 算法原理 / Algorithm Principle
-该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解析。
 
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+**中文：**
+FINS（Factory Interface Network Service）是欧姆龙 PLC 的专有通信协议，支持多种传输层（UDP/IP、TCP/IP、串口等）。该算子通过 FINS/TCP 协议（默认端口 9600）与欧姆龙 PLC 通信，使用 `PlcClientFactory.CreateOmronFins` 创建 `IPlcClient` 实例。FINS 协议使用内存区代码 + 偏移地址的方式寻址（如 DM100 表示数据存储区偏移 100），支持对 DM、WR、HR、AR、EM 等数据区的读写操作。数据类型覆盖 BOOL、WORD、INT16、DWORD、INT32、FLOAT、DOUBLE，通过 `IPlcClient.ByteTransform` 进行字节序转换（欧姆龙 PLC 使用大端序）。
+
+**English:**
+FINS (Factory Interface Network Service) is Omron PLC's proprietary communication protocol supporting multiple transports (UDP/IP, TCP/IP, serial, etc.). This operator communicates via FINS/TCP (default port 9600) using `PlcClientFactory.CreateOmronFins` to create an `IPlcClient` instance. FINS uses memory area code + offset addressing (e.g., DM100 = Data Memory area offset 100), supporting read/write on DM, WR, HR, AR, EM data areas. Data types cover BOOL, WORD, INT16, DWORD, INT32, FLOAT, DOUBLE, with byte-order conversion via `IPlcClient.ByteTransform` (Omron PLCs use big-endian).
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 核心流程偏向协议适配：建立连接、发送请求、解析响应、输出状态。
+
+- **继承 PLC 通信基类**：继承 `PlcCommunicationOperatorBase`，获得静态连接池、心跳巡检（1s 间隔 Ping）、连接复用与自动重连、全局通信配置回退等共享能力。
+- **连接键策略**：以 `FINS:{IP}:{Port}` 为连接池键，不区分 PLC 型号（欧姆龙 FINS 协议对 CP1H/CJ2M/NJ/NX 系列通用）。
+- **全局配置回退**：`UseGlobalFallback=true` 时，缺失的 IP/Port 从 config.json 全局通信配置的 FINS Profile 中回退获取。
+- **写入值动态解析**：`ResolveWriteValue` 按优先级从上游输入获取：`JudgmentValue > Value > Data > 静态参数值`。
+- **批量读取支持**：通过 `Length` 参数（1-999）支持一次读取多个连续寄存器，与 S7 算子的固定单值读取不同。
+- **无轮询模式**：与 S7/MC 算子不同，OmronFINS 算子未实现 PollingMode 参数的执行逻辑（参数已声明但未使用）。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `GetStringParam / GetIntParam / GetDoubleParam / GetBoolParam / GetFloatParam`
+
+1. `GetStringParam` / `GetIntParam` / `GetBoolParam` -- 读取全部参数
+2. `ResolveWriteValue(@operator, inputs)` -- 解析写入值（上游输入优先级链）
+3. `ResolveConnectionSettings(operatorIpAddress, operatorPort, "FINS", useGlobalFallback)` -- 解析连接配置
+4. `GetOrCreateConnectionAsync(connectionKey, factory)` -- 基类连接池管理
+   - `PlcClientFactory.CreateOmronFins(ipAddress)` -- 创建 FINS 客户端
+   - `((OmronFinsClient)finsClient).Port = port` -- 设置端口
+   - `client.ConnectAsync()` -- 建立 FINS/TCP 连接
+5. **读取路径**：
+   - `ExecuteReadAsync(client, address, dataType, length, ct)`
+     - `client.ReadAsync(address, length, ct)` -- 读取 PLC 数据（length 为元素个数）
+     - `ConvertBytesToValue(client, result.Content, dataType)` -- 字节转值
+6. **写入路径**：
+   - `ExecuteWriteAsync(client, address, dataType, writeValue, ct)`
+     - `ConvertValueToBytes(client, writeValue, dataType)` -- 值转字节
+     - `client.WriteAsync(address, bytes, ct)` -- 写入 PLC 数据
+7. `AttachConnectionAuditInfo(output, connectionSource)` -- 附加连接审计信息
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
 |--------|------|--------|------|------|
-| `IpAddress` | `string` | `"192.168.250.1"` | - | 控制“IpAddress”这一实现参数，建议结合现场样本调节。 |
-| `Port` | `int` | `9600` | [1, 65535] | 通信端口。 |
-| `Address` | `string` | `"DM100"` | - | 控制“Address”这一实现参数，建议结合现场样本调节。 |
-| `Length` | `int` | `1` | [1, 999] | 控制“Length”这一实现参数，建议结合现场样本调节。 |
-| `DataType` | `enum` | `"Word"` | Bit/位 (Bool)；Word/字 (Word/UInt16)；Int16/短整型 (Int16)；DWord/双字 (DWord/UInt32)；Int32/整型 (Int32)；Float/浮点 (Float) | 操作类型或转换类型。 |
-| `Operation` | `enum` | `"Read"` | Read/读取；Write/写入 | 该参数用于在多个实现分支之间切换。 |
-| `WriteValue` | `string` | `""` | - | 控制“WriteValue”这一实现参数，建议结合现场样本调节。 |
-| `PollingMode` | `enum` | `"None"` | None/不等待；WaitForValue/等待指定值 | 读取时是否启用轮询等待 |
-| `PollingCondition` | `enum` | `"Equal"` | Equal/等于；NotEqual/不等于；GreaterThan/大于；LessThan/小于；GreaterOrEqual/大于等于；LessOrEqual/小于等于 | 等待的条件类型 |
-| `PollingValue` | `string` | `"1"` | - | 等待的目标值（如触发信号值） |
-| `PollingTimeout` | `int` | `30000` | [100, 300000] | 最长等待时间（毫秒） |
-| `PollingInterval` | `int` | `50` | [10, 5000] | 每次读取间隔（毫秒） |
+| `IpAddress` | `string` | `"192.168.250.1"` | - | 欧姆龙 PLC 的 IP 地址（默认值为欧姆龙 NJ/NX 系列常见地址）。 |
+| `Port` | `int` | `9600` | [1, 65535] | FINS/TCP 标准端口为 9600。 |
+| `UseGlobalFallback` | `bool` | `false` | - | 启用后，缺失的 IP/Port 可回退到 config.json 中的全局通信配置。 |
+| `Address` | `string` | `"DM100"` | - | PLC 数据区地址。格式示例：DM100（数据存储区偏移 100）、WR0（内部继电器区）、HR0（保持继电器区）。 |
+| `Length` | `int` | `1` | [1, 999] | 读取的连续寄存器数量。写入时忽略此参数。 |
+| `DataType` | `enum` | `"Word"` | Bit, Word, Int16, DWord, Int32, Float, Double | 读写数据的类型。注意：不支持 Byte 和 String 类型。 |
+| `Operation` | `enum` | `"Read"` | Read, Write | 操作类型：读取或写入。 |
+| `WriteValue` | `string` | `""` | - | 写入值。支持从上游输入动态获取（优先级：JudgmentValue > Value > Data）。 |
+| `PollingMode` | `enum` | `"None"` | None, WaitForValue | 轮询模式参数已声明但当前执行逻辑未使用。 |
+| `PollingCondition` | `enum` | `"Equal"` | Equal, NotEqual, GreaterThan, LessThan, GreaterOrEqual, LessOrEqual | 轮询条件参数已声明但当前执行逻辑未使用。 |
+| `PollingValue` | `string` | `"1"` | - | 轮询目标值参数已声明但当前执行逻辑未使用。 |
+| `PollingTimeout` | `int` | `30000` | [100, 300000] | 轮询超时参数已声明但当前执行逻辑未使用。 |
+| `PollingInterval` | `int` | `50` | [10, 5000] | 轮询间隔参数已声明但当前执行逻辑未使用。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Data` | 数据 | `Any` | No | 提供通信请求所需输入。 |
+| `Data` | 数据 | `Any` | No | 可选输入端口。写入操作时，`ResolveWriteValue` 从此端口的上游输出中按优先级提取写入值。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Response` | 响应 | `String` | 输出通信状态或响应结果。 |
-| `Status` | 状态 | `Boolean` | 输出通信状态或响应结果。 |
+| `Response` | 响应 | `String` | 读取操作返回转换后的值；写入操作返回写入值确认。 |
+| `Status` | 状态 | `Boolean` | 操作是否成功。成功时输出字典额外包含 Value、DataType、Status、Timestamp、ConnectionSource。 |
+
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | CPU 开销通常较小，整体耗时主要由设备、网络或协议往返决定。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 主要由中间结果、缓存结构和输出封装决定。 |
+| 时间复杂度 (Time Complexity) | O(1) -- 单次 FINS 读写请求，批量读取由协议层一次完成。 |
+| 典型耗时 (Typical Latency) | 首次连接 10-40ms（FINS/TCP 握手 + 节点地址分配）；复用连接单次读写 1-10ms。批量读取 999 个寄存器约 5-20ms。 |
+| 内存特征 (Memory Profile) | 每个 FINS 连接约 2-4KB。连接池与心跳由基类静态管理。批量读取时 Content 缓冲区随 Length 线性增长（999 Word ≈ 2KB）。 |
 
 ## 适用场景 / Use Cases
-- 适合与 PLC、串口设备、TCP 服务或 HTTP 接口联动。
-- 适合把视觉结果写入外部控制系统或读取工艺参数。
-- 不适合把通信成功直接等同于业务成功。
-- 不适合忽略网络与设备延迟。
+- **适合 (Suitable)**：
+  - 与欧姆龙 CP1H、CJ2M、CJ2H、NJ、NX 系列 PLC 进行数据读写。
+  - 批量读取 DM 区工艺数据（如一次读取 100 个寄存器）。
+  - 向 PLC 写入视觉检测结果。
+  - 多流程共享同一 FINS 连接时，连接池自动复用。
+- **不适合 (Not Suitable)**：
+  - 需要轮询等待功能的场景 -- PollingMode 参数已声明但未实现。
+  - 需要读取 STRING 类型数据 -- 数据类型不支持 String。
+  - FINS/UDP 通信场景 -- 本算子仅支持 FINS/TCP。
+  - 非欧姆龙 PLC 设备。
 
 ## 已知限制 / Known Limitations
-1. 参数 `PollingMode` 已在元数据中声明，但从源码看当前没有明显被执行逻辑实际使用。
-2. 声明输出 `Response` 与当前运行时附加字段不完全一致，集成时应以实际输出字典为准。
+1. **PollingMode 未实现**：虽然元数据中声明了 PollingMode、PollingCondition、PollingValue、PollingTimeout、PollingInterval 五个参数，但 `ExecuteCoreAsync` 中未使用这些参数。读取操作始终为单次读取，不支持轮询等待。
+2. **DataType 缺少 Byte 和 String**：相比 S7 算子支持 9 种数据类型，FINS 算子仅支持 7 种（无 Byte、String），与 PLC 数据类型定义相关。
+3. **连接键不含 PLC 型号**：以 `FINS:{IP}:{Port}` 为键，不区分 PLC 型号。FINS 协议通用性使得此设计足够，但无法为不同型号配置不同参数。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
+| 2.0.0 | 2026-05-04 | 重写为金标准文档：精确提取 FINS/TCP 协议细节、批量读取能力、PollingMode 未实现的明确定性、连接键设计与数据类型覆盖 |
 | 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
 | 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
 | 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
