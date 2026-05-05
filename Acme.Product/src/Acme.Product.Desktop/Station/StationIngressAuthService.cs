@@ -1,3 +1,4 @@
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,10 +28,16 @@ public sealed class StationIngressAuthService
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(_options.SharedToken))
+        if (string.IsNullOrWhiteSpace(_options.SharedToken) && !_options.AllowInsecureDevelopment)
         {
             failureReason = "Station ingress shared token is not configured.";
             return false;
+        }
+
+        if (_options.AllowInsecureDevelopment && string.IsNullOrWhiteSpace(_options.SharedToken))
+        {
+            failureReason = string.Empty;
+            return true;
         }
 
         var suppliedToken = ExtractToken(context);
@@ -50,6 +57,11 @@ public sealed class StationIngressAuthService
         if (context == null)
         {
             return null;
+        }
+
+        if (context.Request.Headers.TryGetValue(StationSyncContractDefaults.StationTokenHeaderName, out var clearVisionHeaderToken))
+        {
+            return clearVisionHeaderToken.FirstOrDefault();
         }
 
         if (context.Request.Headers.TryGetValue("X-Station-Token", out var headerToken))

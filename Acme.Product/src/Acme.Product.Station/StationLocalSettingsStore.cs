@@ -11,10 +11,17 @@ public sealed class StationLocalSettingsStore
     private StationLocalSettings _settings;
 
     public StationLocalSettingsStore()
+        : this(null)
     {
-        var root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ClearVisionStation");
+    }
+
+    public StationLocalSettingsStore(string? rootPath)
+    {
+        var root = string.IsNullOrWhiteSpace(rootPath)
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ClearVisionStation")
+            : rootPath;
         Directory.CreateDirectory(root);
         _settingsPath = Path.Combine(root, "station-settings.json");
         _crashMarkerPath = Path.Combine(root, ".session.lock");
@@ -30,9 +37,19 @@ public sealed class StationLocalSettingsStore
                 return new StationLocalSettings
                 {
                     StationId = _settings.StationId,
+                    StationName = _settings.StationName,
                     LineName = _settings.LineName,
+                    AreaName = _settings.AreaName,
+                    WorkcellName = _settings.WorkcellName,
+                    InspectionNodeName = _settings.InspectionNodeName,
+                    CameraAlias = _settings.CameraAlias,
+                    StationRole = _settings.StationRole,
+                    Owner = _settings.Owner,
                     LastGoodPackagePath = _settings.LastGoodPackagePath,
                     LastRunId = _settings.LastRunId,
+                    CurrentPackageVersion = _settings.CurrentPackageVersion,
+                    LastHealthSequenceId = _settings.LastHealthSequenceId,
+                    LastLogSequenceId = _settings.LastLogSequenceId,
                     LastUnexpectedExitAtUtc = _settings.LastUnexpectedExitAtUtc
                 };
             }
@@ -81,6 +98,26 @@ public sealed class StationLocalSettingsStore
         {
             _settings.LastRunId = runId;
             SaveLocked();
+        }
+    }
+
+    public long NextHealthSequenceId()
+    {
+        lock (_syncRoot)
+        {
+            _settings.LastHealthSequenceId++;
+            SaveLocked();
+            return _settings.LastHealthSequenceId;
+        }
+    }
+
+    public long NextLogSequenceId()
+    {
+        lock (_syncRoot)
+        {
+            _settings.LastLogSequenceId++;
+            SaveLocked();
+            return _settings.LastLogSequenceId;
         }
     }
 

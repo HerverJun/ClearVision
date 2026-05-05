@@ -1,6 +1,6 @@
 # Preprocessing Quality Report
 
-Generated (UTC): 2026-04-08T13:17:43.5662545Z
+Generated (UTC): 2026-05-05T02:32:58.2052443Z
 
 | Case | Operator | Metric | Before | After | Delta | Expectation |
 |---|---|---|---:|---:|---:|---|
@@ -12,5 +12,5 @@ Generated (UTC): 2026-04-08T13:17:43.5662545Z
 | real_wire_sequence | ClaheEnhancement | Entropy | 7.5997 | 7.7743 | 0.1746 | higher_is_better |
 | real_wire_sequence | HistogramEqualization | RMSContrast | 64.3921 | 73.1772 | 8.7851 | higher_is_better |
 | real_wire_sequence | HistogramEqualization | Sharpness | 1980.4888 | 2480.2525 | 499.7637 | higher_is_better |
-| real_wire_sequence | ShadingCorrection | IlluminationCV | 0.4736 | 0.1075 | -0.3661 | lower_is_better |
-| real_wire_sequence | ShadingCorrection | Sharpness | 1980.4888 | 482.5186 | -1497.9701 | higher_is_better |
+| real_wire_sequence | ShadingCorrection | IlluminationCV | 0.4736 | 0.1110 | -0.3626 | lower_is_better |
+| real_wire_sequence | ShadingCorrection | Sharpness | 1980.4888 | 1743.1593 | -237.3294 | higher_is_better |

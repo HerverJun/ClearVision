@@ -335,11 +335,31 @@ public sealed class StationLocalSettings
 {
     public string? StationId { get; set; }
 
+    public string? StationName { get; set; }
+
     public string? LineName { get; set; }
+
+    public string? AreaName { get; set; }
+
+    public string? WorkcellName { get; set; }
+
+    public string? InspectionNodeName { get; set; }
+
+    public string? CameraAlias { get; set; }
+
+    public string? StationRole { get; set; }
+
+    public string? Owner { get; set; }
 
     public string? LastGoodPackagePath { get; set; }
 
     public string? LastRunId { get; set; }
+
+    public string? CurrentPackageVersion { get; set; }
+
+    public long LastHealthSequenceId { get; set; }
+
+    public long LastLogSequenceId { get; set; }
 
     public DateTimeOffset? LastUnexpectedExitAtUtc { get; set; }
 }

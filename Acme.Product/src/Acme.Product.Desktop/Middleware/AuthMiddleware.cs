@@ -4,7 +4,9 @@
 
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Enums;
+using Acme.Product.Desktop.Station;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Acme.Product.Desktop.Middleware;
@@ -46,7 +48,9 @@ public class AuthMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, IAuthService authService)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IAuthService authService)
     {
         var path = context.Request.Path.Value ?? "";
 
@@ -58,6 +62,14 @@ public class AuthMiddleware
         }
 
         // 提取 Token
+        var stationAuthService = context.RequestServices.GetService<StationIngressAuthService>();
+        if (IsStationPackageDownload(path) &&
+            stationAuthService?.TryAuthorize(context, out _) == true)
+        {
+            await _next(context);
+            return;
+        }
+
         var token = ExtractToken(context);
         if (string.IsNullOrEmpty(token))
         {
@@ -116,6 +128,12 @@ public class AuthMiddleware
         }
 
         return false;
+    }
+
+    private static bool IsStationPackageDownload(string path)
+    {
+        return path.StartsWith("/api/station-packages/", StringComparison.OrdinalIgnoreCase) &&
+               path.EndsWith("/download", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

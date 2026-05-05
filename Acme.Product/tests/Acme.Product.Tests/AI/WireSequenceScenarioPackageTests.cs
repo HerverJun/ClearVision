@@ -195,7 +195,7 @@ public class WireSequenceScenarioPackageTests
 
     private static string ResolveScenarioPackageRoot(string repoRoot)
     {
-        var packageRoot = Directory.GetDirectories(repoRoot, "scenario-package-wire-sequence", SearchOption.AllDirectories)
+        var packageRoot = EnumerateDirectoriesSafe(repoRoot, "scenario-package-wire-sequence")
             .SingleOrDefault();
 
         packageRoot.Should().NotBeNullOrWhiteSpace();
@@ -209,7 +209,7 @@ public class WireSequenceScenarioPackageTests
         {
             var acmeProduct = Path.Combine(current.FullName, "Acme.Product");
             var hasScenarioPackage = Directory.Exists(acmeProduct) &&
-                Directory.GetDirectories(current.FullName, "scenario-package-wire-sequence", SearchOption.AllDirectories).Length > 0;
+                EnumerateDirectoriesSafe(current.FullName, "scenario-package-wire-sequence").Any();
             if (hasScenarioPackage)
             {
                 return current.FullName;
@@ -219,5 +219,56 @@ public class WireSequenceScenarioPackageTests
         }
 
         throw new DirectoryNotFoundException("Failed to resolve repository root for wire-sequence scenario package tests.");
+    }
+
+    private static IEnumerable<string> EnumerateDirectoriesSafe(string root, string searchPattern)
+    {
+        var pending = new Stack<string>();
+        pending.Push(root);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            IEnumerable<string> children;
+            try
+            {
+                children = Directory.EnumerateDirectories(current);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                var name = Path.GetFileName(child);
+                if (name.Equals(searchPattern, StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return child;
+                    continue;
+                }
+
+                if (ShouldSkipDirectory(name))
+                {
+                    continue;
+                }
+
+                pending.Push(child);
+            }
+        }
+    }
+
+    private static bool ShouldSkipDirectory(string name)
+    {
+        return name.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".tmp", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("TestResults", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("node_modules", StringComparison.OrdinalIgnoreCase);
     }
 }

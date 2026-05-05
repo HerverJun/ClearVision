@@ -132,7 +132,11 @@ public class InspectionEventEndpointsTests
 
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync();
-        var chunk = await ReadUntilContainsAsync(stream, "event: stateChanged", TimeSpan.FromSeconds(2));
+        var chunk = await ReadUntilContainsAllAsync(
+            stream,
+            TimeSpan.FromSeconds(2),
+            "event: stateChanged",
+            "\"newState\":\"Running\"");
         chunk.Should().Contain("\"newState\":\"Running\"");
     }
 
@@ -157,6 +161,22 @@ public class InspectionEventEndpointsTests
         using var cts = new CancellationTokenSource(timeout);
 
         while (!builder.ToString().Contains(marker, StringComparison.Ordinal))
+        {
+            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
+            bytesRead.Should().BeGreaterThan(0);
+            builder.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+        }
+
+        return builder.ToString();
+    }
+
+    private static async Task<string> ReadUntilContainsAllAsync(Stream stream, TimeSpan timeout, params string[] markers)
+    {
+        var buffer = new byte[512];
+        var builder = new StringBuilder();
+        using var cts = new CancellationTokenSource(timeout);
+
+        while (markers.Any(marker => !builder.ToString().Contains(marker, StringComparison.Ordinal)))
         {
             var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
             bytesRead.Should().BeGreaterThan(0);

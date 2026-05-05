@@ -314,6 +314,32 @@
     padding: 18px;
 }
 
+.station-focus-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 18px 0;
+}
+
+.station-focus-actions button {
+    min-height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.055);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.station-focus-actions button:hover:not(:disabled) {
+    border-color: rgba(212, 175, 55, 0.35);
+    background: rgba(212, 175, 55, 0.08);
+}
+
+.station-focus-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
 .station-focus-kpis div,
 .station-focus-meta div {
     display: flex;
@@ -349,6 +375,10 @@
     overflow: auto;
 }
 
+.station-focus-section {
+    padding: 0 18px 18px;
+}
+
 .station-focus-results-header {
     display: flex;
     justify-content: space-between;
@@ -360,7 +390,10 @@
 }
 
 .station-result-chip,
-.station-stream-row {
+.station-stream-row,
+.station-command-row,
+.station-health-row,
+.station-log-row {
     display: flex;
     justify-content: space-between;
     gap: 12px;
@@ -371,12 +404,18 @@
 }
 
 .station-result-chip + .station-result-chip,
-.station-stream-row + .station-stream-row {
+.station-stream-row + .station-stream-row,
+.station-command-row + .station-command-row,
+.station-health-row + .station-health-row,
+.station-log-row + .station-log-row {
     margin-top: 10px;
 }
 
 .station-result-chip div,
-.station-stream-row div {
+.station-stream-row div,
+.station-command-row div,
+.station-health-row div,
+.station-log-row div {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -384,9 +423,27 @@
 }
 
 .station-result-chip span,
-.station-stream-secondary {
+.station-stream-secondary,
+.station-command-row span,
+.station-health-row span,
+.station-log-row span {
     color: var(--text-secondary);
     font-size: 12px;
+}
+
+.station-command-row strong,
+.station-health-row strong,
+.station-log-row strong,
+.station-log-row span,
+.station-stream-secondary span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.station-log-row--error,
+.station-log-row--fatal,
+.station-stream-row--log {
+    border-color: rgba(248, 113, 113, 0.16);
 }
 
 .station-monitor-stream {
@@ -439,7 +496,8 @@
 
 @media (max-width: 1360px) {
     .station-monitor-summary-grid,
-    .station-focus-kpis {
+    .station-focus-kpis,
+    .station-focus-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 

@@ -29,6 +29,9 @@
   <ItemGroup>
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSpoolStore.cs" Link="Station\Sync\StationSpoolStore.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncOptions.cs" Link="Station\Sync\StationSyncOptions.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\StationLocalSettingsStore.cs" Link="Station\StationLocalSettingsStore.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationIdentityResolver.cs" Link="Station\Sync\StationIdentityResolver.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationLogRelayService.cs" Link="Station\Sync\StationLogRelayService.cs" />
   </ItemGroup>
 
   <ItemGroup>

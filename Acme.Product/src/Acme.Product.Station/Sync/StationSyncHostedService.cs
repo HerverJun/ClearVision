@@ -1,4 +1,7 @@
 using System.Threading.Channels;
+using System.Diagnostics;
+using System.IO.Compression;
+using System.Text.Json;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Hosting;
@@ -13,14 +16,12 @@ public sealed class StationSyncHostedService : BackgroundService
     private readonly StationIdentityResolver _identityResolver;
     private readonly StationSpoolStore _spoolStore;
     private readonly StationHubClient _hubClient;
+    private readonly StationPackageDeploymentService _packageDeploymentService;
+    private readonly StationLogRelayService _logRelayService;
+    private readonly StationLocalSettingsStore _settingsStore;
     private readonly StationSyncOptions _options;
     private readonly ILogger<StationSyncHostedService> _logger;
-    private readonly Channel<StationResultSummaryDto> _resultIngressChannel = Channel.CreateUnbounded<StationResultSummaryDto>(
-        new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false
-        });
+    private readonly Channel<StationResultSummaryDto> _resultIngressChannel;
     private readonly Channel<StationSnapshotDto> _snapshotChannel = Channel.CreateBounded<StationSnapshotDto>(
         new BoundedChannelOptions(1)
         {
@@ -33,18 +34,25 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private readonly Action<RuntimeNormalizedResult> _resultHandler;
     private readonly Action<RuntimeHostSnapshot> _snapshotHandler;
+    private readonly Action<string> _logHandler;
 
     private System.Threading.Timer? _snapshotDebounceTimer;
     private RuntimeHostSnapshot? _debouncedSnapshotSource;
     private StationSnapshotDto? _pendingSnapshot;
     private bool _isRegistered;
     private DateTimeOffset _lastHeartbeatAtUtc = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastHealthAtUtc = DateTimeOffset.MinValue;
+    private DateTimeOffset? _lastResultAtUtc;
+    private long _nextControlSequenceId;
 
     public StationSyncHostedService(
         RuntimeHost runtimeHost,
         StationIdentityResolver identityResolver,
         StationSpoolStore spoolStore,
         StationHubClient hubClient,
+        StationPackageDeploymentService packageDeploymentService,
+        StationLogRelayService logRelayService,
+        StationLocalSettingsStore settingsStore,
         IOptions<StationSyncOptions> options,
         ILogger<StationSyncHostedService> logger)
     {
@@ -52,10 +60,21 @@ public sealed class StationSyncHostedService : BackgroundService
         _identityResolver = identityResolver;
         _spoolStore = spoolStore;
         _hubClient = hubClient;
+        _packageDeploymentService = packageDeploymentService;
+        _logRelayService = logRelayService;
+        _settingsStore = settingsStore;
         _options = options.Value;
         _logger = logger;
+        _resultIngressChannel = Channel.CreateBounded<StationResultSummaryDto>(
+            new BoundedChannelOptions(Math.Max(1, _options.OutboundQueueCapacity))
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false
+        });
         _resultHandler = HandleResultAvailable;
         _snapshotHandler = HandleSnapshotChanged;
+        _logHandler = HandleRuntimeLogMessage;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -93,7 +112,10 @@ public sealed class StationSyncHostedService : BackgroundService
                     didWork |= await TryRegisterAsync(stoppingToken);
                     didWork |= await TryPushSnapshotAsync(stoppingToken);
                     didWork |= await TryPushPendingResultsAsync(stoppingToken);
+                    didWork |= await TryPushHealthAsync(stoppingToken);
+                    didWork |= await TryPushPendingLogsAsync(stoppingToken);
                     didWork |= await TryPushHeartbeatAsync(stoppingToken);
+                    didWork |= await TryPollAndExecuteCommandAsync(stoppingToken);
                 }
 
                 if (!didWork)
@@ -129,9 +151,9 @@ public sealed class StationSyncHostedService : BackgroundService
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(_options.StudioBaseUrl))
+        if (string.IsNullOrWhiteSpace(_options.ResolvedStudioHubUrl))
         {
-            _logger.LogWarning("Station sync is enabled but StudioBaseUrl is empty.");
+            _logger.LogWarning("Station sync is enabled but StudioHubUrl is empty.");
             return false;
         }
 
@@ -148,12 +170,14 @@ public sealed class StationSyncHostedService : BackgroundService
     {
         _runtimeHost.ResultAvailable += _resultHandler;
         _runtimeHost.SnapshotChanged += _snapshotHandler;
+        _runtimeHost.LogMessage += _logHandler;
     }
 
     private void UnbindRuntimeEvents()
     {
         _runtimeHost.ResultAvailable -= _resultHandler;
         _runtimeHost.SnapshotChanged -= _snapshotHandler;
+        _runtimeHost.LogMessage -= _logHandler;
     }
 
     private void HandleResultAvailable(RuntimeNormalizedResult result)
@@ -161,26 +185,14 @@ public sealed class StationSyncHostedService : BackgroundService
         try
         {
             var identity = _identityResolver.GetOrCreate();
-            var summary = new StationResultSummaryDto
-            {
-                SchemaVersion = StationSyncContractDefaults.SchemaVersion,
-                StationId = identity.StationId,
-                LineName = identity.LineName,
-                RunId = result.RunId,
-                PackageId = result.PackageId,
-                PackageName = result.PackageName,
-                FlowHash = result.FlowHash,
-                ImageId = result.ImageId,
-                Outcome = result.Outcome,
-                InspectionStatus = result.InspectionStatus,
-                ExecutionTimeMs = result.ExecutionTimeMs,
-                DiagnosticCode = result.DiagnosticCode,
-                DiagnosticMessage = result.DiagnosticMessage,
-                StartedAtUtc = result.StartedAtUtc,
-                CompletedAtUtc = result.CompletedAtUtc
-            };
+            var summary = StationResultMapper.ToSummary(result, identity);
+            _lastResultAtUtc = summary.CompletedAtUtc;
 
-            _resultIngressChannel.Writer.TryWrite(summary);
+            if (!_resultIngressChannel.Writer.TryWrite(summary))
+            {
+                _spoolStore.Enqueue(summary);
+                SignalSync();
+            }
         }
         catch (Exception ex)
         {
@@ -203,6 +215,21 @@ public sealed class StationSyncHostedService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to queue Station runtime snapshot.");
+        }
+    }
+
+    private void HandleRuntimeLogMessage(string message)
+    {
+        try
+        {
+            if (_logRelayService.TryEnqueue(DetectLogLevel(message), "RuntimeHost", message))
+            {
+                SignalSync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to queue Station log summary.");
         }
     }
 
@@ -235,10 +262,30 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private async Task PersistSummariesToSpoolAsync(CancellationToken stoppingToken)
     {
-        await foreach (var summary in _resultIngressChannel.Reader.ReadAllAsync(stoppingToken))
+        try
         {
-            _spoolStore.Enqueue(summary);
-            SignalSync();
+            await foreach (var summary in _resultIngressChannel.Reader.ReadAllAsync(stoppingToken))
+            {
+                _spoolStore.Enqueue(summary);
+                SignalSync();
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            var drainedAny = false;
+            while (_resultIngressChannel.Reader.TryRead(out var summary))
+            {
+                _spoolStore.Enqueue(summary);
+                drainedAny = true;
+            }
+
+            if (drainedAny)
+            {
+                SignalSync();
+            }
         }
     }
 
@@ -255,10 +302,22 @@ public sealed class StationSyncHostedService : BackgroundService
             {
                 SchemaVersion = StationSyncContractDefaults.SchemaVersion,
                 StationId = identity.StationId,
+                StationName = identity.StationName ?? string.Empty,
                 LineName = identity.LineName,
+                AreaName = identity.AreaName,
+                WorkcellName = identity.WorkcellName,
+                InspectionNodeName = identity.InspectionNodeName,
+                CameraAlias = identity.CameraAlias,
+                StationRole = identity.StationRole ?? string.Empty,
+                Owner = identity.Owner,
                 MachineName = identity.MachineName,
+                ProcessId = Environment.ProcessId,
+                StationVersion = identity.ClientVersion,
+                RuntimeVersion = typeof(RuntimeHost).Assembly.GetName().Version?.ToString() ?? identity.ClientVersion,
                 ClientVersion = identity.ClientVersion,
-                StartedAtUtc = identity.StartedAtUtc
+                StartedAtUtc = identity.StartedAtUtc,
+                RegisteredAtUtc = DateTimeOffset.UtcNow,
+                CreatedAtUtc = DateTimeOffset.UtcNow
             },
             stoppingToken);
 
@@ -325,8 +384,12 @@ public sealed class StationSyncHostedService : BackgroundService
         }
 
         var identity = _identityResolver.GetOrCreate();
+        var heartbeat = BuildHeartbeatDto(identity, _runtimeHost.GetSnapshot());
+        heartbeat.SequenceId = Interlocked.Increment(ref _nextControlSequenceId);
+        heartbeat.SpoolPendingCount = _spoolStore.PendingCount;
+        heartbeat.LastResultAtUtc = _lastResultAtUtc;
         var response = await _hubClient.PushHeartbeatAsync(
-            BuildHeartbeatDto(identity, _runtimeHost.GetSnapshot()),
+            heartbeat,
             stoppingToken);
         if (response == null)
         {
@@ -337,6 +400,207 @@ public sealed class StationSyncHostedService : BackgroundService
         ApplyAck(response);
         _lastHeartbeatAtUtc = DateTimeOffset.UtcNow;
         return true;
+    }
+
+    private async Task<bool> TryPushHealthAsync(CancellationToken stoppingToken)
+    {
+        var interval = TimeSpan.FromSeconds(Math.Max(1, _options.HealthIntervalSeconds));
+        if (DateTimeOffset.UtcNow - _lastHealthAtUtc < interval)
+        {
+            return false;
+        }
+
+        var identity = _identityResolver.GetOrCreate();
+        var response = await _hubClient.PushHealthAsync(
+            BuildHealthDto(identity, _runtimeHost.GetSnapshot(), _spoolStore),
+            stoppingToken);
+        if (response == null)
+        {
+            _isRegistered = false;
+            return false;
+        }
+
+        ApplyAck(response);
+        _lastHealthAtUtc = DateTimeOffset.UtcNow;
+        return true;
+    }
+
+    private async Task<bool> TryPushPendingLogsAsync(CancellationToken stoppingToken)
+    {
+        var sentAny = false;
+        var remaining = Math.Max(1, _options.PendingBatchSize);
+        while (remaining-- > 0 && _logRelayService.TryRead(out var log))
+        {
+            var response = await _hubClient.PushLogAsync(log, stoppingToken);
+            if (response == null)
+            {
+                _isRegistered = false;
+                return sentAny;
+            }
+
+            sentAny = true;
+        }
+
+        return sentAny;
+    }
+
+    private async Task<bool> TryPollAndExecuteCommandAsync(CancellationToken stoppingToken)
+    {
+        var identity = _identityResolver.GetOrCreate();
+        var command = await _hubClient.PollCommandAsync(identity.StationId, stoppingToken);
+        if (command == null)
+        {
+            return false;
+        }
+
+        await ReportCommandAsync(command, StationCommandStatus.Accepted, 0, "Accepted", stoppingToken);
+        await ReportCommandAsync(command, StationCommandStatus.Running, 10, "Running", stoppingToken);
+
+        try
+        {
+            switch (command.CommandType)
+            {
+                case StationCommandType.Ping:
+                    await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Pong", stoppingToken);
+                    break;
+                case StationCommandType.StopRuntime:
+                    await _runtimeHost.StopAsync(stoppingToken);
+                    await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Runtime stop requested.", stoppingToken);
+                    break;
+                case StationCommandType.ReloadPackage:
+                    await ReloadCurrentPackageAsync(command, stoppingToken);
+                    break;
+                case StationCommandType.DeployPackage:
+                    var message = await _packageDeploymentService.DeployAsync(command.PayloadJson, stoppingToken);
+                    await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, message, stoppingToken);
+                    break;
+                case StationCommandType.CollectLogs:
+                    var collectMessage = await CollectLogsAsync(command, stoppingToken);
+                    await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, collectMessage, stoppingToken);
+                    break;
+                default:
+                    await ReportCommandAsync(command, StationCommandStatus.Rejected, 0, $"{command.CommandType} is not supported by this Station build.", stoppingToken, "NotSupported");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Station command failed: {CommandId}", command.CommandId);
+            _logRelayService.TryEnqueue("ERROR", "StationCommand", $"Command {command.CommandId} failed: {ex.Message}", ex);
+            await ReportCommandAsync(command, StationCommandStatus.Failed, 100, ex.Message, stoppingToken, "CommandFailed", ex.ToString());
+        }
+
+        return true;
+    }
+
+    private async Task<string> CollectLogsAsync(StationCommandDto command, CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<CollectLogsPayload>(
+            string.IsNullOrWhiteSpace(command.PayloadJson) ? "{}" : command.PayloadJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new CollectLogsPayload();
+
+        var now = DateTimeOffset.UtcNow;
+        var maxHours = Math.Clamp(payload.MaxHours ?? _options.MaxCollectLogsHours, 1, Math.Max(1, _options.MaxCollectLogsHours));
+        var sinceUtc = payload.SinceUtc ?? now.AddHours(-maxHours);
+        var untilUtc = payload.UntilUtc ?? now;
+        if (untilUtc < sinceUtc)
+        {
+            throw new InvalidOperationException("CollectLogs untilUtc must be greater than or equal to sinceUtc.");
+        }
+
+        if (untilUtc - sinceUtc > TimeSpan.FromHours(maxHours))
+        {
+            sinceUtc = untilUtc.AddHours(-maxHours);
+        }
+
+        var maxBytes = Math.Clamp(
+            payload.MaxBytes ?? _options.MaxCollectLogsMb * 1024L * 1024L,
+            1L,
+            Math.Max(1, _options.MaxCollectLogsMb) * 1024L * 1024L);
+        var logRoot = _options.ResolvedLogDirectory;
+        if (string.IsNullOrWhiteSpace(logRoot) || !Directory.Exists(logRoot))
+        {
+            return "No local log directory is available for collection.";
+        }
+
+        var diagnosticsRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ClearVisionStation",
+            "diagnostics");
+        Directory.CreateDirectory(diagnosticsRoot);
+        var bundlePath = Path.Combine(diagnosticsRoot, $"collectlogs-{command.CommandId}.zip");
+        if (File.Exists(bundlePath))
+        {
+            File.Delete(bundlePath);
+        }
+
+        var includedFiles = 0;
+        long includedBytes = 0;
+        using (var archive = ZipFile.Open(bundlePath, ZipArchiveMode.Create))
+        {
+            foreach (var file in Directory.EnumerateFiles(logRoot, "*", SearchOption.AllDirectories)
+                         .OrderByDescending(File.GetLastWriteTimeUtc))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var info = new FileInfo(file);
+                var writtenUtc = new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero);
+                if (writtenUtc < sinceUtc || writtenUtc > untilUtc)
+                {
+                    continue;
+                }
+
+                if (includedBytes + info.Length > maxBytes)
+                {
+                    break;
+                }
+
+                archive.CreateEntryFromFile(file, Path.GetRelativePath(logRoot, file), CompressionLevel.Fastest);
+                includedFiles++;
+                includedBytes += info.Length;
+            }
+        }
+
+        await Task.CompletedTask;
+        return $"Collected {includedFiles} log file(s), {includedBytes} byte(s), bundle={bundlePath}.";
+    }
+
+    private async Task ReloadCurrentPackageAsync(StationCommandDto command, CancellationToken cancellationToken)
+    {
+        var packageRoot = _runtimeHost.LoadedPackage?.RootPath;
+        if (string.IsNullOrWhiteSpace(packageRoot))
+        {
+            await ReportCommandAsync(command, StationCommandStatus.Rejected, 0, "No active package is loaded.", cancellationToken, "NoActivePackage");
+            return;
+        }
+
+        await _runtimeHost.LoadPackageAsync(packageRoot, cancellationToken);
+        await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Runtime package reloaded.", cancellationToken);
+    }
+
+    private Task ReportCommandAsync(
+        StationCommandDto command,
+        StationCommandStatus status,
+        int progress,
+        string message,
+        CancellationToken cancellationToken,
+        string? errorCode = null,
+        string? errorDetail = null)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return _hubClient.ReportCommandResultAsync(new StationCommandResultDto
+        {
+            CommandId = command.CommandId,
+            StationId = command.StationId,
+            Status = status,
+            ProgressPercent = progress,
+            Message = message,
+            ErrorCode = errorCode,
+            ErrorDetail = errorDetail,
+            StartedAtUtc = status is StationCommandStatus.Running or StationCommandStatus.Succeeded or StationCommandStatus.Failed ? now : null,
+            CompletedAtUtc = status is StationCommandStatus.Succeeded or StationCommandStatus.Failed or StationCommandStatus.Rejected ? now : null,
+            ReportedAtUtc = now,
+            CreatedAtUtc = now
+        }, cancellationToken);
     }
 
     private void DrainSnapshotQueue()
@@ -375,6 +639,14 @@ public sealed class StationSyncHostedService : BackgroundService
         }
     }
 
+    private void ApplyAck(StationAckDto response)
+    {
+        if (response.LastPersistedSequenceId > 0)
+        {
+            _spoolStore.Acknowledge(response.LastPersistedSequenceId);
+        }
+    }
+
     private void SignalSync()
     {
         try
@@ -386,17 +658,43 @@ public sealed class StationSyncHostedService : BackgroundService
         }
     }
 
+    private static string DetectLogLevel(string message)
+    {
+        if (message.Contains("fatal", StringComparison.OrdinalIgnoreCase))
+        {
+            return "FATAL";
+        }
+
+        if (message.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("寮傚父", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("閿欒", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ERROR";
+        }
+
+        if (message.Contains("warn", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WARN";
+        }
+
+        return "INFO";
+    }
+
     private static StationSnapshotDto BuildSnapshotDto(StationIdentityContext identity, RuntimeHostSnapshot snapshot)
     {
         return new StationSnapshotDto
         {
             SchemaVersion = StationSyncContractDefaults.SchemaVersion,
             StationId = identity.StationId,
+            SequenceId = 0,
+            MessageId = $"snapshot_{identity.StationId}_{Guid.NewGuid():N}",
             LineName = identity.LineName,
             CapturedAtUtc = DateTimeOffset.UtcNow,
-            State = snapshot.State,
-            PackageId = snapshot.PackageId,
-            PackageName = snapshot.PackageName,
+            RuntimeState = StationSyncStateMapper.ToStationRuntimeState(snapshot.State),
+            CurrentPackageId = snapshot.PackageId,
+            CurrentPackageName = snapshot.PackageName,
+            CurrentPackageVersion = identity.CurrentPackageVersion,
             FlowHash = snapshot.FlowHash,
             CurrentRunId = snapshot.CurrentRunId,
             SessionOkCount = snapshot.SessionOkCount,
@@ -411,16 +709,67 @@ public sealed class StationSyncHostedService : BackgroundService
         {
             SchemaVersion = StationSyncContractDefaults.SchemaVersion,
             StationId = identity.StationId,
+            SequenceId = 0,
+            MessageId = $"heartbeat_{identity.StationId}_{Guid.NewGuid():N}",
             LineName = identity.LineName,
             SentAtUtc = DateTimeOffset.UtcNow,
-            State = snapshot.State,
-            PackageId = snapshot.PackageId,
-            PackageName = snapshot.PackageName,
+            RuntimeState = StationSyncStateMapper.ToStationRuntimeState(snapshot.State),
+            ConnectionState = "Connected",
+            CurrentPackageId = snapshot.PackageId,
+            CurrentPackageName = snapshot.PackageName,
+            CurrentPackageVersion = identity.CurrentPackageVersion,
             FlowHash = snapshot.FlowHash,
             CurrentRunId = snapshot.CurrentRunId,
             SessionOkCount = snapshot.SessionOkCount,
             SessionNgCount = snapshot.SessionNgCount,
-            SessionErrorCount = snapshot.SessionErrorCount
+            SessionErrorCount = snapshot.SessionErrorCount,
+            StationLocalOffsetMinutes = (int)TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.Now).TotalMinutes
         };
+    }
+
+    private StationHealthSnapshotDto BuildHealthDto(
+        StationIdentityContext identity,
+        RuntimeHostSnapshot snapshot,
+        StationSpoolStore spoolStore)
+    {
+        var process = Process.GetCurrentProcess();
+        var now = DateTimeOffset.UtcNow;
+        var dataDirectory = string.IsNullOrWhiteSpace(_options.ResolvedSpoolDirectory)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            : _options.ResolvedSpoolDirectory;
+        var driveRoot = Path.GetPathRoot(Path.GetFullPath(dataDirectory));
+        var driveInfo = string.IsNullOrWhiteSpace(driveRoot) ? null : new DriveInfo(driveRoot);
+
+        return new StationHealthSnapshotDto
+        {
+            StationId = identity.StationId,
+            SequenceId = _settingsStore.NextHealthSequenceId(),
+            MessageId = $"health_{identity.StationId}_{Guid.NewGuid():N}",
+            RuntimeState = StationSyncStateMapper.ToStationRuntimeState(snapshot.State),
+            ProcessUptimeSeconds = (long)Math.Max(0, (now - identity.StartedAtUtc).TotalSeconds),
+            CpuUsagePercent = null,
+            WorkingSetMb = process.WorkingSet64 / 1024 / 1024,
+            PrivateMemoryMb = process.PrivateMemorySize64 / 1024 / 1024,
+            DiskFreeMb = driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0,
+            DiskTotalMb = driveInfo?.TotalSize / 1024 / 1024 ?? 0,
+            SpoolPendingCount = spoolStore.PendingCount,
+            SpoolBytes = spoolStore.SpoolBytes,
+            CameraStatusSummary = "Unknown",
+            PlcStatusSummary = "Unknown",
+            CurrentPackageId = snapshot.PackageId,
+            CurrentPackageHealth = snapshot.PackageId == null ? "NoPackage" : "Loaded",
+            CreatedAtUtc = now
+        };
+    }
+
+    private sealed class CollectLogsPayload
+    {
+        public DateTimeOffset? SinceUtc { get; set; }
+
+        public DateTimeOffset? UntilUtc { get; set; }
+
+        public long? MaxBytes { get; set; }
+
+        public int? MaxHours { get; set; }
     }
 }

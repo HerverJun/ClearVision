@@ -9,7 +9,8 @@ public sealed class StationIngressIsolationMiddleware
 {
     private static readonly string[] AllowedRemotePathPrefixes =
     [
-        "/hubs/station-ingest"
+        "/hubs/station-ingest",
+        "/api/station-packages/"
     ];
 
     private static readonly string[] AllowedRemotePaths =

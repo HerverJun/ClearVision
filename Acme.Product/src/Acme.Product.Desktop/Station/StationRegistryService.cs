@@ -13,14 +13,17 @@ public sealed class StationRegistryService
     private readonly List<Action<StoredStationRegistryEvent>> _subscribers = [];
     private readonly ILogger<StationRegistryService> _logger;
     private readonly StationIngressOptions _options;
+    private readonly StationCentralStore? _centralStore;
     private long _nextEventSequenceId;
 
     public StationRegistryService(
         IOptions<StationIngressOptions> options,
-        ILogger<StationRegistryService> logger)
+        ILogger<StationRegistryService> logger,
+        StationCentralStore? centralStore = null)
     {
         _options = options.Value;
         _logger = logger;
+        _centralStore = centralStore;
     }
 
     public StationReplayCursorDto UpsertRegistration(
@@ -36,9 +39,20 @@ public sealed class StationRegistryService
             var entry = GetOrCreateEntryLocked(registration.StationId);
             entry.StationId = registration.StationId;
             entry.LineName = registration.LineName;
+            entry.StationName = registration.StationName;
+            entry.AreaName = registration.AreaName;
+            entry.WorkcellName = registration.WorkcellName;
+            entry.InspectionNodeName = registration.InspectionNodeName;
+            entry.CameraAlias = registration.CameraAlias;
+            entry.StationRole = registration.StationRole;
+            entry.Owner = registration.Owner;
             entry.MachineName = registration.MachineName;
             entry.ClientVersion = registration.ClientVersion;
             entry.StartedAtUtc = registration.StartedAtUtc == default ? now : registration.StartedAtUtc;
+            entry.PackageId = registration.CurrentPackageId;
+            entry.PackageName = registration.CurrentPackageName;
+            entry.PackageVersion = registration.CurrentPackageVersion;
+            entry.LastAcceptedSequenceId = Math.Max(entry.LastAcceptedSequenceId, _centralStore?.UpsertRegistration(registration) ?? 0);
             TouchConnectionLocked(entry, connectionId, now);
 
             cursor = BuildCursor(entry);
@@ -64,17 +78,20 @@ public sealed class StationRegistryService
         lock (_syncRoot)
         {
             var entry = GetOrCreateEntryLocked(heartbeat.StationId);
+            entry.LastAcceptedSequenceId = Math.Max(entry.LastAcceptedSequenceId, _centralStore?.UpsertHeartbeat(heartbeat) ?? 0);
             ApplySnapshotLocked(
                 entry,
                 heartbeat.LineName,
                 heartbeat.State,
                 heartbeat.PackageId,
                 heartbeat.PackageName,
+                heartbeat.CurrentPackageVersion,
                 heartbeat.FlowHash,
                 heartbeat.CurrentRunId,
                 heartbeat.SessionOkCount,
                 heartbeat.SessionNgCount,
                 heartbeat.SessionErrorCount,
+                heartbeat.SpoolPendingCount,
                 connectionId,
                 now);
 
@@ -107,11 +124,13 @@ public sealed class StationRegistryService
                 snapshot.State,
                 snapshot.PackageId,
                 snapshot.PackageName,
+                snapshot.CurrentPackageVersion,
                 snapshot.FlowHash,
                 snapshot.CurrentRunId,
                 snapshot.SessionOkCount,
                 snapshot.SessionNgCount,
                 snapshot.SessionErrorCount,
+                entry.SpoolPendingCount,
                 connectionId,
                 now);
 
@@ -144,17 +163,32 @@ public sealed class StationRegistryService
                 entry.LineName = result.LineName;
             }
 
-            if (result.SequenceId <= entry.LastAcceptedSequenceId)
+            var ack = _centralStore?.UpsertResultSummary(result);
+            var duplicate = ack?.Duplicate == true ||
+                (_centralStore == null &&
+                 (result.SequenceId <= entry.LastAcceptedSequenceId || !entry.AcceptedResultSequences.Add(result.SequenceId)));
+            if (_centralStore == null && !duplicate)
+            {
+                AdvanceMemoryCursor(entry, result.SequenceId);
+            }
+            else if (_centralStore != null)
+            {
+                entry.LastAcceptedSequenceId = Math.Max(entry.LastAcceptedSequenceId, ack?.LastPersistedSequenceId ?? 0);
+            }
+
+            if (duplicate)
             {
                 return BuildCursor(entry);
             }
 
-            entry.LastAcceptedSequenceId = result.SequenceId;
             entry.LastOutcome = result.Outcome;
             entry.LastInspectionStatus = result.InspectionStatus;
             entry.LastDiagnosticCode = result.DiagnosticCode;
             entry.LastDiagnosticMessage = result.DiagnosticMessage;
             entry.LastResultAtUtc = result.CompletedAtUtc;
+            entry.PackageId = result.PackageId;
+            entry.PackageName = result.PackageName;
+            entry.PackageVersion = result.PackageVersion;
 
             entry.RecentResults.Insert(0, CloneResult(result));
             while (entry.RecentResults.Count > Math.Max(10, _options.ResultBufferPerStation))
@@ -180,6 +214,174 @@ public sealed class StationRegistryService
 
         PublishEvents(events);
         return cursor;
+    }
+
+    public StationAckDto UpsertHealthSnapshot(string connectionId, StationHealthSnapshotDto snapshot)
+    {
+        List<StoredStationRegistryEvent> events;
+        StationAckDto ack;
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(snapshot.StationId);
+            TouchConnectionLocked(entry, connectionId, now);
+            entry.RuntimeState = snapshot.RuntimeState;
+            entry.State = StationSyncStateMapper.ToRuntimeHostState(snapshot.RuntimeState);
+            entry.SpoolPendingCount = snapshot.SpoolPendingCount;
+            entry.SpoolBytes = snapshot.SpoolBytes;
+            entry.CpuUsagePercent = snapshot.CpuUsagePercent;
+            entry.WorkingSetMb = snapshot.WorkingSetMb;
+            entry.DiskFreeMb = snapshot.DiskFreeMb;
+            entry.DiskTotalMb = snapshot.DiskTotalMb;
+            entry.CameraStatusSummary = snapshot.CameraStatusSummary;
+            entry.PlcStatusSummary = snapshot.PlcStatusSummary;
+            entry.PackageId = snapshot.CurrentPackageId ?? entry.PackageId;
+            entry.CurrentPackageHealth = snapshot.CurrentPackageHealth;
+            entry.LastDiagnosticCode = snapshot.LastErrorCode ?? entry.LastDiagnosticCode;
+            entry.LastDiagnosticMessage = snapshot.LastErrorMessage ?? entry.LastDiagnosticMessage;
+            entry.OnlineState = EvaluateOnlineState(snapshot, now, entry);
+
+            if (snapshot.SequenceId > entry.LastHealthSequenceId)
+            {
+                entry.LastHealthSequenceId = snapshot.SequenceId;
+                entry.RecentHealth.Insert(0, CloneHealth(snapshot));
+                while (entry.RecentHealth.Count > Math.Max(10, _options.HealthBufferPerStation))
+                {
+                    entry.RecentHealth.RemoveAt(entry.RecentHealth.Count - 1);
+                }
+            }
+
+            ack = _centralStore?.UpsertHealthSnapshot(snapshot)
+                ?? new StationAckDto
+                {
+                    StationId = snapshot.StationId,
+                    AcceptedSequenceId = snapshot.SequenceId,
+                    LastPersistedSequenceId = entry.LastAcceptedSequenceId
+                };
+            var stationViewModel = ToStatusViewModelLocked(entry, now);
+            events =
+            [
+                CreateEventLocked("stationHealthUpdated", new { StationId = entry.StationId, Health = CloneHealth(snapshot), Station = stationViewModel }),
+                CreateEventLocked("stationUpserted", stationViewModel),
+                CreateEventLocked("summaryUpdated", BuildSummaryLocked(now))
+            ];
+        }
+
+        PublishEvents(events);
+        return ack;
+    }
+
+    public StationAckDto UpsertLogSummary(string connectionId, StationLogSummaryDto log)
+    {
+        List<StoredStationRegistryEvent> events;
+        StationAckDto ack;
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(log.StationId);
+            TouchConnectionLocked(entry, connectionId, now);
+
+            if (log.SequenceId > entry.LastLogSequenceId)
+            {
+                entry.LastLogSequenceId = log.SequenceId;
+                entry.RecentLogs.Insert(0, CloneLog(log));
+                while (entry.RecentLogs.Count > Math.Max(10, _options.LogBufferPerStation))
+                {
+                    entry.RecentLogs.RemoveAt(entry.RecentLogs.Count - 1);
+                }
+            }
+
+            ack = _centralStore?.UpsertLogSummary(log)
+                ?? new StationAckDto
+                {
+                    StationId = log.StationId,
+                    AcceptedSequenceId = log.SequenceId,
+                    LastPersistedSequenceId = entry.LastAcceptedSequenceId
+                };
+            events =
+            [
+                CreateEventLocked("stationLogAdded", new { StationId = entry.StationId, Log = CloneLog(log), Station = ToStatusViewModelLocked(entry, now) })
+            ];
+        }
+
+        PublishEvents(events);
+        return ack;
+    }
+
+    public StationReplayCursorDto GetReplayCursor(string stationId)
+    {
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(stationId);
+            entry.LastAcceptedSequenceId = Math.Max(
+                entry.LastAcceptedSequenceId,
+                _centralStore?.GetLastPersistedSequenceId(stationId) ?? 0);
+            return BuildCursor(entry);
+        }
+    }
+
+    public StationCommandDto? PollCommand(string stationId)
+    {
+        var command = _centralStore?.PollCommand(stationId);
+        if (command == null)
+        {
+            return null;
+        }
+
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(stationId);
+            UpsertCommandLocked(entry, command);
+        }
+
+        PublishEvents([new StoredStationRegistryEvent(Interlocked.Increment(ref _nextEventSequenceId), "stationCommandUpdated", command, DateTimeOffset.UtcNow)]);
+        return command;
+    }
+
+    public void ReportCommandResult(StationCommandResultDto result)
+    {
+        var command = _centralStore?.ReportCommandResult(result);
+        var payload = command != null ? (object)command : result;
+
+        if (command != null)
+        {
+            lock (_syncRoot)
+            {
+                var entry = GetOrCreateEntryLocked(command.StationId);
+                UpsertCommandLocked(entry, command);
+            }
+        }
+
+        PublishEvents([new StoredStationRegistryEvent(Interlocked.Increment(ref _nextEventSequenceId), "stationCommandUpdated", payload, DateTimeOffset.UtcNow)]);
+    }
+
+    public StationStatusViewModel UpdateIdentity(
+        string stationId,
+        StationIdentityUpdateRequest request,
+        string userName,
+        string? clientIp)
+    {
+        _centralStore?.UpdateStationIdentity(stationId, request, userName, clientIp);
+
+        StationStatusViewModel viewModel;
+        List<StoredStationRegistryEvent> events;
+        var now = DateTimeOffset.UtcNow;
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(stationId);
+            ApplyIdentityLocked(entry, request);
+            viewModel = ToStatusViewModelLocked(entry, now);
+            events =
+            [
+                CreateEventLocked("stationUpserted", viewModel),
+                CreateEventLocked("summaryUpdated", BuildSummaryLocked(now))
+            ];
+        }
+
+        PublishEvents(events);
+        return viewModel;
     }
 
     public void MarkDisconnected(string connectionId)
@@ -241,7 +443,18 @@ public sealed class StationRegistryService
                 LineName = status.LineName,
                 MachineName = status.MachineName,
                 ClientVersion = status.ClientVersion,
+                StationName = status.StationName,
+                AreaName = status.AreaName,
+                WorkcellName = status.WorkcellName,
+                InspectionNodeName = status.InspectionNodeName,
+                CameraAlias = status.CameraAlias,
+                StationRole = status.StationRole,
+                Owner = status.Owner,
+                IsEnabled = status.IsEnabled,
+                Remark = status.Remark,
+                OnlineState = status.OnlineState,
                 State = status.State,
+                RuntimeState = status.RuntimeState,
                 IsOnline = status.IsOnline,
                 StartedAtUtc = status.StartedAtUtc,
                 LastSeenAtUtc = status.LastSeenAtUtc,
@@ -260,7 +473,19 @@ public sealed class StationRegistryService
                 LastSequenceId = status.LastSequenceId,
                 AverageExecutionTimeMs = status.AverageExecutionTimeMs,
                 RecentResultCount = status.RecentResultCount,
-                RecentResults = entry.RecentResults.Select(CloneResult).ToList()
+                SpoolPendingCount = status.SpoolPendingCount,
+                SpoolBytes = status.SpoolBytes,
+                CpuUsagePercent = status.CpuUsagePercent,
+                WorkingSetMb = status.WorkingSetMb,
+                DiskFreeMb = status.DiskFreeMb,
+                DiskTotalMb = status.DiskTotalMb,
+                CameraStatusSummary = status.CameraStatusSummary,
+                PlcStatusSummary = status.PlcStatusSummary,
+                CurrentPackageHealth = status.CurrentPackageHealth,
+                RecentResults = entry.RecentResults.Select(CloneResult).ToList(),
+                RecentHealth = entry.RecentHealth.Select(CloneHealth).ToList(),
+                RecentLogs = entry.RecentLogs.Select(CloneLog).ToList(),
+                RecentCommands = entry.RecentCommands.ToList()
             };
         }
     }
@@ -271,13 +496,66 @@ public sealed class StationRegistryService
         {
             if (!_entries.TryGetValue(stationId, out var entry))
             {
-                return Array.Empty<StationResultSummaryDto>();
+                return _centralStore?.GetRecentResults(stationId, take) ?? Array.Empty<StationResultSummaryDto>();
             }
 
-            return entry.RecentResults
+            var memoryResults = entry.RecentResults
                 .Take(Math.Max(1, take))
                 .Select(CloneResult)
                 .ToList();
+            return memoryResults.Count > 0
+                ? memoryResults
+                : (_centralStore?.GetRecentResults(stationId, take) ?? memoryResults);
+        }
+    }
+
+    public IReadOnlyList<StationHealthSnapshotDto> GetRecentHealth(string stationId, int take)
+    {
+        lock (_syncRoot)
+        {
+            if (!_entries.TryGetValue(stationId, out var entry))
+            {
+                return _centralStore?.GetRecentHealth(stationId, take) ?? Array.Empty<StationHealthSnapshotDto>();
+            }
+
+            var memory = entry.RecentHealth
+                .Take(Math.Max(1, take))
+                .Select(CloneHealth)
+                .ToList();
+            return memory.Count > 0 ? memory : (_centralStore?.GetRecentHealth(stationId, take) ?? memory);
+        }
+    }
+
+    public IReadOnlyList<StationLogSummaryDto> GetRecentLogs(string stationId, int take)
+    {
+        lock (_syncRoot)
+        {
+            if (!_entries.TryGetValue(stationId, out var entry))
+            {
+                return _centralStore?.GetRecentLogs(stationId, take) ?? Array.Empty<StationLogSummaryDto>();
+            }
+
+            var memory = entry.RecentLogs
+                .Take(Math.Max(1, take))
+                .Select(CloneLog)
+                .ToList();
+            return memory.Count > 0 ? memory : (_centralStore?.GetRecentLogs(stationId, take) ?? memory);
+        }
+    }
+
+    public IReadOnlyList<StationCommandDto> GetRecentCommands(string stationId, int take)
+    {
+        lock (_syncRoot)
+        {
+            if (!_entries.TryGetValue(stationId, out var entry))
+            {
+                return _centralStore?.GetCommands(stationId, take) ?? Array.Empty<StationCommandDto>();
+            }
+
+            var memory = entry.RecentCommands
+                .Take(Math.Max(1, take))
+                .ToList();
+            return memory.Count > 0 ? memory : (_centralStore?.GetCommands(stationId, take) ?? memory);
         }
     }
 
@@ -347,11 +625,13 @@ public sealed class StationRegistryService
         RuntimeHostState state,
         string? packageId,
         string? packageName,
+        string? packageVersion,
         string? flowHash,
         string? currentRunId,
         int sessionOkCount,
         int sessionNgCount,
         int sessionErrorCount,
+        int spoolPendingCount,
         string connectionId,
         DateTimeOffset now)
     {
@@ -361,14 +641,44 @@ public sealed class StationRegistryService
         }
 
         entry.State = state;
+        entry.RuntimeState = StationSyncStateMapper.ToStationRuntimeState(state);
         entry.PackageId = packageId;
         entry.PackageName = packageName;
+        entry.PackageVersion = packageVersion;
         entry.FlowHash = flowHash;
         entry.CurrentRunId = currentRunId;
         entry.SessionOkCount = sessionOkCount;
         entry.SessionNgCount = sessionNgCount;
         entry.SessionErrorCount = sessionErrorCount;
+        entry.SpoolPendingCount = spoolPendingCount;
         TouchConnectionLocked(entry, connectionId, now);
+    }
+
+    private static void ApplyIdentityLocked(StationRegistryEntry entry, StationIdentityUpdateRequest request)
+    {
+        entry.StationName = Choose(request.StationName, entry.StationName);
+        entry.LineName = ChooseNullable(request.LineName, entry.LineName);
+        entry.AreaName = ChooseNullable(request.AreaName, entry.AreaName);
+        entry.WorkcellName = ChooseNullable(request.WorkcellName, entry.WorkcellName);
+        entry.InspectionNodeName = ChooseNullable(request.InspectionNodeName, entry.InspectionNodeName);
+        entry.CameraAlias = ChooseNullable(request.CameraAlias, entry.CameraAlias);
+        entry.StationRole = Choose(request.StationRole, entry.StationRole);
+        entry.Owner = ChooseNullable(request.Owner, entry.Owner);
+        entry.Remark = ChooseNullable(request.Remark, entry.Remark);
+        if (request.IsEnabled.HasValue)
+        {
+            entry.IsEnabled = request.IsEnabled.Value;
+        }
+    }
+
+    private static string Choose(string? candidate, string existing)
+    {
+        return string.IsNullOrWhiteSpace(candidate) ? existing : candidate.Trim();
+    }
+
+    private static string? ChooseNullable(string? candidate, string? existing)
+    {
+        return string.IsNullOrWhiteSpace(candidate) ? existing : candidate.Trim();
     }
 
     private void TouchConnectionLocked(StationRegistryEntry entry, string connectionId, DateTimeOffset now)
@@ -385,7 +695,18 @@ public sealed class StationRegistryService
             LineName = entry.LineName,
             MachineName = entry.MachineName,
             ClientVersion = entry.ClientVersion,
+            StationName = entry.StationName,
+            AreaName = entry.AreaName,
+            WorkcellName = entry.WorkcellName,
+            InspectionNodeName = entry.InspectionNodeName,
+            CameraAlias = entry.CameraAlias,
+            StationRole = entry.StationRole,
+            Owner = entry.Owner,
+            IsEnabled = entry.IsEnabled,
+            Remark = entry.Remark,
+            OnlineState = entry.OnlineState,
             State = entry.State,
+            RuntimeState = entry.RuntimeState,
             IsOnline = IsOnlineLocked(entry, now),
             StartedAtUtc = entry.StartedAtUtc,
             LastSeenAtUtc = entry.LastSeenAtUtc,
@@ -405,7 +726,16 @@ public sealed class StationRegistryService
             AverageExecutionTimeMs = entry.RecentResults.Count == 0
                 ? 0
                 : entry.RecentResults.Average(result => result.ExecutionTimeMs),
-            RecentResultCount = entry.RecentResults.Count
+            RecentResultCount = entry.RecentResults.Count,
+            SpoolPendingCount = entry.SpoolPendingCount,
+            SpoolBytes = entry.SpoolBytes,
+            CpuUsagePercent = entry.CpuUsagePercent,
+            WorkingSetMb = entry.WorkingSetMb,
+            DiskFreeMb = entry.DiskFreeMb,
+            DiskTotalMb = entry.DiskTotalMb,
+            CameraStatusSummary = entry.CameraStatusSummary,
+            PlcStatusSummary = entry.PlcStatusSummary,
+            CurrentPackageHealth = entry.CurrentPackageHealth
         };
     }
 
@@ -416,6 +746,8 @@ public sealed class StationRegistryService
         var faultedStations = stations.Count(entry => entry.State == RuntimeHostState.Faulted);
         var runningStations = stations.Count(entry => entry.State == RuntimeHostState.Running && IsOnlineLocked(entry, now));
         var recentResults = stations.SelectMany(entry => entry.RecentResults).ToList();
+        var warningStations = stations.Count(entry => entry.OnlineState == StationOnlineState.Warning || entry.OnlineState == StationOnlineState.Degraded);
+        var criticalStations = stations.Count(entry => entry.OnlineState == StationOnlineState.Critical);
 
         return new StationSummaryViewModel
         {
@@ -424,7 +756,9 @@ public sealed class StationRegistryService
             OfflineStations = stations.Count - onlineStations,
             RunningStations = runningStations,
             FaultedStations = faultedStations,
-            AlertCount = stations.Count(entry => !IsOnlineLocked(entry, now) || entry.State == RuntimeHostState.Faulted),
+            AlertCount = stations.Count(entry => !IsOnlineLocked(entry, now) || entry.State == RuntimeHostState.Faulted || entry.OnlineState is StationOnlineState.Warning or StationOnlineState.Degraded or StationOnlineState.Critical),
+            WarningStations = warningStations,
+            CriticalStations = criticalStations,
             TotalOkCount = stations.Sum(entry => entry.SessionOkCount),
             TotalNgCount = stations.Sum(entry => entry.SessionNgCount),
             TotalErrorCount = stations.Sum(entry => entry.SessionErrorCount),
@@ -436,7 +770,8 @@ public sealed class StationRegistryService
 
     private bool IsOnlineLocked(StationRegistryEntry entry, DateTimeOffset now)
     {
-        return !string.IsNullOrWhiteSpace(entry.ConnectionId) &&
+        return entry.IsEnabled &&
+               !string.IsNullOrWhiteSpace(entry.ConnectionId) &&
                now - entry.LastSeenAtUtc <= TimeSpan.FromSeconds(Math.Max(1, _options.OfflineThresholdSeconds));
     }
 
@@ -457,13 +792,31 @@ public sealed class StationRegistryService
 
     private StationReplayCursorDto BuildCursor(StationRegistryEntry entry)
     {
+        var lastPersisted = Math.Max(
+            entry.LastAcceptedSequenceId,
+            _centralStore?.GetLastPersistedSequenceId(entry.StationId) ?? 0);
+        entry.LastAcceptedSequenceId = lastPersisted;
         return new StationReplayCursorDto
         {
             SchemaVersion = StationSyncContractDefaults.SchemaVersion,
             StationId = entry.StationId,
-            AckedSequenceId = entry.LastAcceptedSequenceId,
+            AckedSequenceId = lastPersisted,
             ServerTimeUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private static void AdvanceMemoryCursor(StationRegistryEntry entry, long sequenceId)
+    {
+        if (entry.LastAcceptedSequenceId == 0 && entry.AcceptedResultSequences.Count == 1)
+        {
+            entry.LastAcceptedSequenceId = sequenceId;
+            return;
+        }
+
+        while (entry.AcceptedResultSequences.Contains(entry.LastAcceptedSequenceId + 1))
+        {
+            entry.LastAcceptedSequenceId++;
+        }
     }
 
     private StoredStationRegistryEvent CreateEventLocked(string eventType, object data)
@@ -481,6 +834,24 @@ public sealed class StationRegistryService
         }
 
         return stored;
+    }
+
+    private void UpsertCommandLocked(StationRegistryEntry entry, StationCommandDto command)
+    {
+        var existingIndex = entry.RecentCommands.FindIndex(item => string.Equals(item.CommandId, command.CommandId, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            entry.RecentCommands[existingIndex] = command;
+        }
+        else
+        {
+            entry.RecentCommands.Insert(0, command);
+        }
+
+        while (entry.RecentCommands.Count > Math.Max(10, _options.CommandBufferPerStation))
+        {
+            entry.RecentCommands.RemoveAt(entry.RecentCommands.Count - 1);
+        }
     }
 
     private void PublishEvents(IReadOnlyList<StoredStationRegistryEvent> events)
@@ -520,9 +891,11 @@ public sealed class StationRegistryService
             StationId = result.StationId,
             LineName = result.LineName,
             SequenceId = result.SequenceId,
+            MessageId = result.MessageId,
             RunId = result.RunId,
             PackageId = result.PackageId,
             PackageName = result.PackageName,
+            PackageVersion = result.PackageVersion,
             FlowHash = result.FlowHash,
             ImageId = result.ImageId,
             Outcome = result.Outcome,
@@ -530,16 +903,129 @@ public sealed class StationRegistryService
             ExecutionTimeMs = result.ExecutionTimeMs,
             DiagnosticCode = result.DiagnosticCode,
             DiagnosticMessage = result.DiagnosticMessage,
+            PrimaryOutputsPreview = new Dictionary<string, string?>(result.PrimaryOutputsPreview, StringComparer.OrdinalIgnoreCase),
             StartedAtUtc = result.StartedAtUtc,
-            CompletedAtUtc = result.CompletedAtUtc
+            CompletedAtUtc = result.CompletedAtUtc,
+            CreatedAtUtc = result.CreatedAtUtc
         };
+    }
+
+    private static StationHealthSnapshotDto CloneHealth(StationHealthSnapshotDto snapshot)
+    {
+        return new StationHealthSnapshotDto
+        {
+            SchemaVersion = snapshot.SchemaVersion,
+            StationId = snapshot.StationId,
+            SequenceId = snapshot.SequenceId,
+            MessageId = snapshot.MessageId,
+            RuntimeState = snapshot.RuntimeState,
+            ProcessUptimeSeconds = snapshot.ProcessUptimeSeconds,
+            CpuUsagePercent = snapshot.CpuUsagePercent,
+            WorkingSetMb = snapshot.WorkingSetMb,
+            PrivateMemoryMb = snapshot.PrivateMemoryMb,
+            DiskFreeMb = snapshot.DiskFreeMb,
+            DiskTotalMb = snapshot.DiskTotalMb,
+            SpoolPendingCount = snapshot.SpoolPendingCount,
+            SpoolBytes = snapshot.SpoolBytes,
+            CameraStatusSummary = snapshot.CameraStatusSummary,
+            PlcStatusSummary = snapshot.PlcStatusSummary,
+            CurrentPackageId = snapshot.CurrentPackageId,
+            CurrentPackageHealth = snapshot.CurrentPackageHealth,
+            LastErrorCode = snapshot.LastErrorCode,
+            LastErrorMessage = snapshot.LastErrorMessage,
+            CreatedAtUtc = snapshot.CreatedAtUtc
+        };
+    }
+
+    private static StationLogSummaryDto CloneLog(StationLogSummaryDto log)
+    {
+        return new StationLogSummaryDto
+        {
+            SchemaVersion = log.SchemaVersion,
+            StationId = log.StationId,
+            SequenceId = log.SequenceId,
+            MessageId = log.MessageId,
+            TimestampUtc = log.TimestampUtc,
+            Level = log.Level,
+            Source = log.Source,
+            EventId = log.EventId,
+            MessageTemplate = log.MessageTemplate,
+            RenderedMessage = log.RenderedMessage,
+            ExceptionType = log.ExceptionType,
+            ExceptionMessage = log.ExceptionMessage,
+            CorrelationId = log.CorrelationId,
+            RunId = log.RunId,
+            PackageId = log.PackageId,
+            CreatedAtUtc = log.CreatedAtUtc
+        };
+    }
+
+    private static StationOnlineState EvaluateOnlineState(
+        StationHealthSnapshotDto snapshot,
+        DateTimeOffset now,
+        StationRegistryEntry entry)
+    {
+        if (now - entry.LastSeenAtUtc > TimeSpan.FromSeconds(1))
+        {
+            return entry.OnlineState;
+        }
+
+        if (snapshot.RuntimeState == StationRuntimeState.Faulted)
+        {
+            return StationOnlineState.Critical;
+        }
+
+        if (snapshot.DiskTotalMb > 0)
+        {
+            var freeRatio = (double)snapshot.DiskFreeMb / snapshot.DiskTotalMb;
+            if (freeRatio < 0.05d)
+            {
+                return StationOnlineState.Critical;
+            }
+
+            if (freeRatio < 0.10d)
+            {
+                return StationOnlineState.Warning;
+            }
+        }
+
+        if (snapshot.SpoolPendingCount > 10_000 ||
+            (snapshot.CameraStatusSummary?.Contains("Disconnected", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            return StationOnlineState.Critical;
+        }
+
+        if (snapshot.SpoolPendingCount > 1_000)
+        {
+            return StationOnlineState.Warning;
+        }
+
+        return StationOnlineState.Online;
     }
 
     private sealed class StationRegistryEntry
     {
         public string StationId { get; set; } = string.Empty;
 
+        public string StationName { get; set; } = string.Empty;
+
         public string? LineName { get; set; }
+
+        public string? AreaName { get; set; }
+
+        public string? WorkcellName { get; set; }
+
+        public string? InspectionNodeName { get; set; }
+
+        public string? CameraAlias { get; set; }
+
+        public string StationRole { get; set; } = string.Empty;
+
+        public string? Owner { get; set; }
+
+        public bool IsEnabled { get; set; } = true;
+
+        public string? Remark { get; set; }
 
         public string MachineName { get; set; } = string.Empty;
 
@@ -547,7 +1033,11 @@ public sealed class StationRegistryService
 
         public string? ConnectionId { get; set; }
 
+        public StationOnlineState OnlineState { get; set; } = StationOnlineState.Unknown;
+
         public RuntimeHostState State { get; set; }
+
+        public StationRuntimeState RuntimeState { get; set; } = StationRuntimeState.Unknown;
 
         public DateTimeOffset StartedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
@@ -556,6 +1046,8 @@ public sealed class StationRegistryService
         public string? PackageId { get; set; }
 
         public string? PackageName { get; set; }
+
+        public string? PackageVersion { get; set; }
 
         public string? FlowHash { get; set; }
 
@@ -579,7 +1071,37 @@ public sealed class StationRegistryService
 
         public long LastAcceptedSequenceId { get; set; }
 
+        public SortedSet<long> AcceptedResultSequences { get; } = [];
+
+        public long LastHealthSequenceId { get; set; }
+
+        public long LastLogSequenceId { get; set; }
+
+        public int SpoolPendingCount { get; set; }
+
+        public long SpoolBytes { get; set; }
+
+        public double? CpuUsagePercent { get; set; }
+
+        public long WorkingSetMb { get; set; }
+
+        public long DiskFreeMb { get; set; }
+
+        public long DiskTotalMb { get; set; }
+
+        public string? CameraStatusSummary { get; set; }
+
+        public string? PlcStatusSummary { get; set; }
+
+        public string? CurrentPackageHealth { get; set; }
+
         public List<StationResultSummaryDto> RecentResults { get; } = [];
+
+        public List<StationHealthSnapshotDto> RecentHealth { get; } = [];
+
+        public List<StationLogSummaryDto> RecentLogs { get; } = [];
+
+        public List<StationCommandDto> RecentCommands { get; } = [];
     }
 
     private sealed class Subscription : IDisposable

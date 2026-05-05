@@ -102,7 +102,21 @@ public class LegacyCalibrationContractAuditTests
             "hand_eye_calib.json"
         };
 
-        foreach (var filePath in includedFiles)
+        var docsRoot = Path.Combine(RepoRoot, "docs");
+        var discoveredFiles = Directory
+            .EnumerateFiles(docsRoot, "*.*", SearchOption.AllDirectories)
+            .Where(path =>
+                !path.Contains($"{Path.DirectorySeparatorChar}归档{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
+                (path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
+                 Path.GetFileName(path).Equals("catalog.json", StringComparison.OrdinalIgnoreCase)));
+        var existingFiles = includedFiles
+            .Where(File.Exists)
+            .Concat(discoveredFiles)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.NotEmpty(existingFiles);
+
+        foreach (var filePath in existingFiles)
         {
             var content = File.ReadAllText(filePath);
             foreach (var token in forbiddenTokens)

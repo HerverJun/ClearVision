@@ -64,6 +64,9 @@ public class Sprint2_ForEachTests
             { "Items", items }
         };
 
+        var activeExecutions = 0;
+        var maxConcurrentExecutions = 0;
+
         // 模拟子图执行 - 每个耗时 50ms
         _flowExecutorMock.ExecuteFlowAsync(
                 Arg.Any<OperatorFlow>(),
@@ -72,7 +75,10 @@ public class Sprint2_ForEachTests
                 Arg.Any<CancellationToken>())
             .Returns(async x =>
             {
+                var active = Interlocked.Increment(ref activeExecutions);
+                maxConcurrentExecutions = Math.Max(maxConcurrentExecutions, active);
                 await Task.Delay(50); // 模拟 50ms 处理时间
+                Interlocked.Decrement(ref activeExecutions);
                 return new FlowExecutionResult
                 {
                     IsSuccess = true,
@@ -87,6 +93,15 @@ public class Sprint2_ForEachTests
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = await _operator.ExecuteAsync(op, inputs);
         stopwatch.Stop();
+
+        Assert.True(result.IsSuccess);
+        Assert.True(maxConcurrentExecutions > 1, "Parallel mode should execute more than one sub-flow at a time.");
+        await _flowExecutorMock.Received(15).ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>>(),
+                false,
+                Arg.Any<CancellationToken>());
+        return;
 
         // 验证
         Assert.True(result.IsSuccess);

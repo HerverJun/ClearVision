@@ -25,7 +25,7 @@ public sealed class StationHubClient : IAsyncDisposable
 
     public async Task<bool> EnsureConnectedAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.StudioBaseUrl))
+        if (string.IsNullOrWhiteSpace(_options.ResolvedStudioHubUrl))
         {
             return false;
         }
@@ -84,6 +84,42 @@ public sealed class StationHubClient : IAsyncDisposable
         return InvokeAsync<StationReplayCursorDto>("PushResultSummaryAsync", payload, cancellationToken);
     }
 
+    public Task<StationAckDto?> PushHealthAsync(
+        StationHealthSnapshotDto payload,
+        CancellationToken cancellationToken)
+    {
+        return InvokeAsync<StationAckDto>("PushHealth", payload, cancellationToken);
+    }
+
+    public Task<StationAckDto?> PushLogAsync(
+        StationLogSummaryDto payload,
+        CancellationToken cancellationToken)
+    {
+        return InvokeAsync<StationAckDto>("PushLog", payload, cancellationToken);
+    }
+
+    public Task<StationCommandDto?> PollCommandAsync(string stationId, CancellationToken cancellationToken)
+    {
+        return InvokeAsync<StationCommandDto?>("PollCommand", stationId, cancellationToken);
+    }
+
+    public async Task ReportCommandResultAsync(StationCommandResultDto payload, CancellationToken cancellationToken)
+    {
+        if (!await EnsureConnectedAsync(cancellationToken))
+        {
+            return;
+        }
+
+        try
+        {
+            await _connection!.InvokeAsync("ReportCommandResult", payload, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Studio Station hub invocation failed: ReportCommandResult");
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_connection != null)
@@ -110,6 +146,7 @@ public sealed class StationHubClient : IAsyncDisposable
                 {
                     options.Transports = HttpTransportType.WebSockets | HttpTransportType.LongPolling;
                     options.AccessTokenProvider = () => Task.FromResult<string?>(_options.SharedToken);
+                    options.Headers[StationSyncContractDefaults.StationTokenHeaderName] = _options.SharedToken;
                 })
             .WithAutomaticReconnect()
             .Build();
@@ -163,7 +200,6 @@ public sealed class StationHubClient : IAsyncDisposable
 
     private string BuildHubUrl()
     {
-        var baseUri = new Uri(_options.StudioBaseUrl.Trim().TrimEnd('/') + "/", UriKind.Absolute);
-        return new Uri(baseUri, "hubs/station-ingest").ToString();
+        return _options.ResolvedStudioHubUrl;
     }
 }

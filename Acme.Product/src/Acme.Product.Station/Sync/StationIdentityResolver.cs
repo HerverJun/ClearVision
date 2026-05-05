@@ -42,7 +42,15 @@ public sealed class StationIdentityResolver
             _cachedIdentity = _cachedIdentity with
             {
                 StationId = stationId,
-                LineName = lineName
+                LineName = lineName,
+                StationName = current.StationName,
+                StationRole = current.StationRole,
+                AreaName = current.AreaName,
+                WorkcellName = current.WorkcellName,
+                InspectionNodeName = current.InspectionNodeName,
+                CameraAlias = current.CameraAlias,
+                Owner = current.Owner,
+                CurrentPackageVersion = current.CurrentPackageVersion
             };
 
             return _cachedIdentity;
@@ -82,9 +90,25 @@ public sealed record StationIdentityContext
 
     public string? LineName { get; init; }
 
+    public string? StationName { get; init; }
+
+    public string? AreaName { get; init; }
+
+    public string? WorkcellName { get; init; }
+
+    public string? InspectionNodeName { get; init; }
+
+    public string? CameraAlias { get; init; }
+
+    public string? StationRole { get; init; }
+
+    public string? Owner { get; init; }
+
     public string MachineName { get; init; } = string.Empty;
 
     public string ClientVersion { get; init; } = string.Empty;
+
+    public string? CurrentPackageVersion { get; init; }
 
     public DateTimeOffset StartedAtUtc { get; init; }
 }

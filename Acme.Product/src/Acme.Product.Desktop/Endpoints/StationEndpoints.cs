@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using Acme.Product.Desktop.Station;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace Acme.Product.Desktop.Endpoints;
@@ -10,28 +11,141 @@ public static class StationEndpoints
 {
     public static IEndpointRouteBuilder MapStationEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/stations", (StationRegistryService registry) =>
+        app.MapGet("/api/stations", ([FromServices] StationRegistryService registry) =>
         {
             return Results.Ok(registry.GetStations());
         });
 
-        app.MapGet("/api/stations/summary", (StationRegistryService registry) =>
+        app.MapGet("/api/stations/summary", ([FromServices] StationRegistryService registry) =>
         {
             return Results.Ok(registry.GetSummary());
         });
 
-        app.MapGet("/api/stations/{stationId}/results", (string stationId, int? take, StationRegistryService registry) =>
+        app.MapGet("/api/stations/{stationId}/results", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
         {
             return Results.Ok(registry.GetRecentResults(stationId, Math.Clamp(take ?? 100, 1, 500)));
         });
 
-        app.MapGet("/api/stations/{stationId}", (string stationId, StationRegistryService registry) =>
+        app.MapGet("/api/stations/{stationId}/health", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
+        {
+            return Results.Ok(registry.GetRecentHealth(stationId, Math.Clamp(take ?? 100, 1, 500)));
+        });
+
+        app.MapGet("/api/stations/{stationId}/logs", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
+        {
+            return Results.Ok(registry.GetRecentLogs(stationId, Math.Clamp(take ?? 100, 1, 500)));
+        });
+
+        app.MapGet("/api/stations/{stationId}/commands", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
+        {
+            return Results.Ok(registry.GetRecentCommands(stationId, Math.Clamp(take ?? 100, 1, 500)));
+        });
+
+        app.MapPatch("/api/stations/{stationId}/identity", (
+            string stationId,
+            [FromBody] StationIdentityUpdateRequest request,
+            [FromServices] StationRegistryService registry,
+            HttpContext context) =>
+        {
+            var userName = context.User?.Identity?.Name;
+            var updated = registry.UpdateIdentity(
+                stationId,
+                request,
+                string.IsNullOrWhiteSpace(userName) ? request.UpdatedBy ?? "Studio" : userName,
+                context.Connection.RemoteIpAddress?.ToString());
+            return Results.Ok(updated);
+        });
+
+        app.MapGet("/api/stations/audit", (string? stationId, int? take, [FromServices] StationCentralStore store) =>
+        {
+            return Results.Ok(store.GetAudits(stationId, Math.Clamp(take ?? 100, 1, 500)));
+        });
+
+        app.MapPost("/api/stations/{stationId}/commands", (
+            string stationId,
+            [FromBody] StationCommandCreateRequest request,
+            [FromServices] StationCentralStore store,
+            HttpContext context) =>
+        {
+            var issuedBy = context.User?.Identity?.Name;
+            var command = store.CreateCommand(
+                stationId,
+                request.CommandType,
+                request.PayloadJson ?? "{}",
+                string.IsNullOrWhiteSpace(issuedBy) ? request.IssuedBy ?? "Studio" : issuedBy,
+                TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)));
+            return Results.Ok(command);
+        });
+
+        app.MapPost("/api/stations/{stationId}/deploy-package", (
+            string stationId,
+            [FromBody] StationDeployPackageRequest request,
+            [FromServices] StationCentralStore commandStore,
+            [FromServices] StationPackageStore packageStore,
+            HttpContext context) =>
+        {
+            var package = packageStore.GetPackage(request.PackageId);
+            if (package == null)
+            {
+                return Results.NotFound(new { error = "PackageNotFound" });
+            }
+
+            var payload = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                packageId = package.PackageId,
+                packageName = package.PackageName,
+                packageVersion = package.PackageVersion,
+                sha256 = package.Sha256,
+                downloadUrl = $"/api/station-packages/{Uri.EscapeDataString(package.PackageId)}/download"
+            });
+            var command = commandStore.CreateCommand(
+                stationId,
+                Acme.Product.Runtime.Abstractions.StationCommandType.DeployPackage,
+                payload,
+                context.User?.Identity?.Name ?? request.IssuedBy ?? "Studio",
+                TimeSpan.FromMinutes(30));
+            return Results.Ok(command);
+        });
+
+        app.MapGet("/api/station-packages", ([FromServices] StationPackageStore packageStore) =>
+        {
+            return Results.Ok(packageStore.GetPackages());
+        });
+
+        app.MapPost("/api/station-packages/test", async ([FromServices] StationPackageStore packageStore, CancellationToken cancellationToken) =>
+        {
+            return Results.Ok(await packageStore.CreateTestPackageAsync(cancellationToken));
+        });
+
+        app.MapGet("/api/station-packages/{packageId}/download", (string packageId, [FromServices] StationPackageStore packageStore) =>
+        {
+            var path = packageStore.GetPackagePath(packageId);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return Results.NotFound(new { error = "PackageNotFound" });
+            }
+
+            return Results.File(path, "application/octet-stream", Path.GetFileName(path));
+        });
+
+        app.MapGet("/api/stations/statistics", (
+            string? range,
+            DateTimeOffset? from,
+            DateTimeOffset? to,
+            [FromServices] StationCentralStore store) =>
+        {
+            var (fromUtc, toUtc) = ResolveStatisticsWindow(range, from, to);
+            return Results.Ok(store.GetStatistics(fromUtc, toUtc));
+        });
+
+        app.MapGet("/api/stations/events", HandleSseEventsAsync);
+
+        app.MapGet("/api/stations/{stationId}", (string stationId, [FromServices] StationRegistryService registry) =>
         {
             var station = registry.GetStation(stationId);
             return station == null ? Results.NotFound() : Results.Ok(station);
         });
 
-        app.MapGet("/api/stations/events", HandleSseEventsAsync);
         return app;
     }
 
@@ -134,4 +248,43 @@ public static class StationEndpoints
             }
         }
     }
+
+    private static (DateTimeOffset FromUtc, DateTimeOffset ToUtc) ResolveStatisticsWindow(
+        string? range,
+        DateTimeOffset? from,
+        DateTimeOffset? to)
+    {
+        if (from.HasValue && to.HasValue && from < to)
+        {
+            return (from.Value.ToUniversalTime(), to.Value.ToUniversalTime());
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var todayLocal = DateTime.Today;
+        var todayUtc = new DateTimeOffset(todayLocal).ToUniversalTime();
+        return string.Equals(range, "week", StringComparison.OrdinalIgnoreCase) switch
+        {
+            true => (now.AddDays(-7), now),
+            _ when string.Equals(range, "month", StringComparison.OrdinalIgnoreCase) => (now.AddMonths(-1), now),
+            _ => (todayUtc, now)
+        };
+    }
+}
+
+public sealed class StationCommandCreateRequest
+{
+    public Acme.Product.Runtime.Abstractions.StationCommandType CommandType { get; set; } = Acme.Product.Runtime.Abstractions.StationCommandType.Ping;
+
+    public string? PayloadJson { get; set; }
+
+    public string? IssuedBy { get; set; }
+
+    public int? ExpiresInSeconds { get; set; }
+}
+
+public sealed class StationDeployPackageRequest
+{
+    public string PackageId { get; set; } = string.Empty;
+
+    public string? IssuedBy { get; set; }
 }

@@ -77,4 +77,22 @@ public sealed class StationSyncContractsSerializationTests
         Assert.Equal(3, restored.SessionNgCount);
         Assert.Equal(1, restored.SessionErrorCount);
     }
+
+    [Fact]
+    public void StationResultSummaryDto_DoesNotExposeBinaryTransportFields()
+    {
+        var binaryFields = typeof(StationResultSummaryDto)
+            .GetProperties()
+            .Where(property =>
+                property.PropertyType == typeof(byte[]) ||
+                property.Name.Contains("Base64", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Contains("Thumbnail", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Contains("ResultImage", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Contains("OriginalImage", StringComparison.OrdinalIgnoreCase))
+            .Select(property => property.Name)
+            .ToList();
+
+        Assert.Empty(binaryFields);
+        Assert.Equal(typeof(Dictionary<string, string?>), typeof(StationResultSummaryDto).GetProperty(nameof(StationResultSummaryDto.PrimaryOutputsPreview))!.PropertyType);
+    }
 }

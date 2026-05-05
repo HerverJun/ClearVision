@@ -35,8 +35,8 @@ public class FrameAveragingOperatorTests
         var first = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame1));
         var second = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame2));
 
-        Assert.True(first.IsSuccess);
-        Assert.True(second.IsSuccess);
+        Assert.True(first.IsSuccess, first.ErrorMessage);
+        Assert.True(second.IsSuccess, second.ErrorMessage);
         Assert.Equal(1, Convert.ToInt32(first.OutputData!["FrameCount"]));
         Assert.Equal(2, Convert.ToInt32(second.OutputData!["FrameCount"]));
     }
@@ -64,9 +64,9 @@ public class FrameAveragingOperatorTests
         var foreign = await sut.ExecuteAsync(secondOperator, TestHelpers.CreateImageInputs(foreignFrame));
         var second = await sut.ExecuteAsync(firstOperator, TestHelpers.CreateImageInputs(secondFrame));
 
-        Assert.True(first.IsSuccess);
-        Assert.True(foreign.IsSuccess);
-        Assert.True(second.IsSuccess);
+        Assert.True(first.IsSuccess, first.ErrorMessage);
+        Assert.True(foreign.IsSuccess, foreign.ErrorMessage);
+        Assert.True(second.IsSuccess, second.ErrorMessage);
         Assert.Equal(1, Convert.ToInt32(first.OutputData!["FrameCount"]));
         Assert.Equal(1, Convert.ToInt32(foreign.OutputData!["FrameCount"]));
         Assert.Equal(2, Convert.ToInt32(second.OutputData!["FrameCount"]));
@@ -105,7 +105,7 @@ public class FrameAveragingOperatorTests
         _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame2));
         var third = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame3));
 
-        Assert.True(third.IsSuccess);
+        Assert.True(third.IsSuccess, third.ErrorMessage);
         Assert.NotNull(third.OutputData);
 
         using var output = Assert.IsType<ImageWrapper>(third.OutputData!["Image"]);
@@ -131,7 +131,7 @@ public class FrameAveragingOperatorTests
         _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame2));
         var third = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame3));
 
-        Assert.True(third.IsSuccess);
+        Assert.True(third.IsSuccess, third.ErrorMessage);
         Assert.NotNull(third.OutputData);
 
         using var output = Assert.IsType<ImageWrapper>(third.OutputData!["Image"]);
@@ -163,7 +163,7 @@ public class FrameAveragingOperatorTests
         _ = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame3));
         var fourth = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(frame4));
 
-        Assert.True(fourth.IsSuccess);
+        Assert.True(fourth.IsSuccess, fourth.ErrorMessage);
         Assert.NotNull(fourth.OutputData);
 
         using var output = Assert.IsType<ImageWrapper>(fourth.OutputData!["Image"]);

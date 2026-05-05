@@ -8,8 +8,11 @@ class StationMonitorView {
         this.summary = null;
         this.stations = new Map();
         this.globalResults = [];
+        this.globalLogs = [];
+        this.packages = [];
         this.selectedStationId = null;
         this.selectedStationDetail = null;
+        this.commandBusy = false;
         this.offlineThresholdSeconds = 15;
         this.refreshTimer = null;
         this.eventSource = null;
@@ -51,9 +54,9 @@ class StationMonitorView {
                 <section class="station-monitor-hero">
                     <div class="station-monitor-heading">
                         <div>
-                            <p class="station-monitor-kicker">Studio registry</p>
-                            <h2 class="station-monitor-title">Station monitor</h2>
-                            <p class="station-monitor-subtitle">REST snapshot plus SSE deltas for the live station fleet.</p>
+                            <p class="station-monitor-kicker">Studio Station</p>
+                            <h2 class="station-monitor-title">Central monitor</h2>
+                            <p class="station-monitor-subtitle">Line status, health, alerts, commands and result summaries.</p>
                         </div>
                         <div class="station-monitor-sync" id="station-monitor-sync">
                             <span class="station-monitor-sync-dot"></span>
@@ -107,7 +110,15 @@ class StationMonitorView {
     }
 
     bindEvents() {
-        this.container?.addEventListener('click', (event) => {
+        this.container?.addEventListener('click', async (event) => {
+            const action = event.target.closest('[data-station-action]');
+            if (action) {
+                event.preventDefault();
+                event.stopPropagation();
+                await this.handleStationAction(action.dataset.stationAction);
+                return;
+            }
+
             const card = event.target.closest('[data-station-id]');
             if (!card) {
                 return;
@@ -122,12 +133,14 @@ class StationMonitorView {
 
     async loadInitialData() {
         try {
-            const [summary, stations] = await Promise.all([
+            const [summary, stations, packages] = await Promise.all([
                 httpClient.get('/stations/summary'),
-                httpClient.get('/stations')
+                httpClient.get('/stations'),
+                httpClient.get('/station-packages').catch(() => [])
             ]);
 
             this.summary = this.normalizeSummary(summary);
+            this.packages = Array.isArray(packages) ? packages : [];
             this.offlineThresholdSeconds = this.summary?.offlineThresholdSeconds || this.offlineThresholdSeconds;
             this.stations.clear();
 
@@ -275,6 +288,15 @@ class StationMonitorView {
             case 'stationResultAdded':
                 this.applyResultEvent(payload);
                 break;
+            case 'stationHealthUpdated':
+                this.applyHealthEvent(payload);
+                break;
+            case 'stationLogAdded':
+                this.applyLogEvent(payload);
+                break;
+            case 'stationCommandUpdated':
+                this.applyCommandEvent(payload);
+                break;
             case 'summaryUpdated':
                 this.summary = this.normalizeSummary(payload);
                 this.offlineThresholdSeconds = this.summary?.offlineThresholdSeconds || this.offlineThresholdSeconds;
@@ -355,6 +377,83 @@ class StationMonitorView {
         }
     }
 
+    applyHealthEvent(payload) {
+        const station = this.normalizeStation(payload?.station);
+        const health = this.normalizeHealth(payload?.health);
+        if (!station.stationId || station.stationId === '--') {
+            return;
+        }
+
+        this.stations.set(station.stationId, station);
+        if (this.selectedStationId === station.stationId) {
+            const detail = this.selectedStationDetail || { ...station, recentHealth: [] };
+            const recentHealth = Array.isArray(detail.recentHealth) ? [...detail.recentHealth] : [];
+            if (health.sequenceId > 0) {
+                recentHealth.unshift(health);
+            }
+
+            this.selectedStationDetail = {
+                ...detail,
+                ...station,
+                recentHealth: recentHealth.slice(0, 20)
+            };
+        }
+    }
+
+    applyLogEvent(payload) {
+        const station = this.normalizeStation(payload?.station);
+        const log = this.normalizeLog(payload?.log);
+        const stationId = station.stationId && station.stationId !== '--' ? station.stationId : log.stationId;
+        if (!stationId) {
+            return;
+        }
+
+        if (station.stationId && station.stationId !== '--') {
+            this.stations.set(station.stationId, station);
+        }
+
+        this.globalLogs.unshift({ stationId, log });
+        this.globalLogs = this.globalLogs.slice(0, 40);
+
+        if (this.selectedStationId === stationId) {
+            const detail = this.selectedStationDetail || { ...station, recentLogs: [] };
+            const recentLogs = Array.isArray(detail.recentLogs) ? [...detail.recentLogs] : [];
+            recentLogs.unshift(log);
+            this.selectedStationDetail = {
+                ...detail,
+                ...station,
+                stationId,
+                recentLogs: recentLogs.slice(0, 30)
+            };
+        }
+    }
+
+    applyCommandEvent(payload) {
+        const command = this.normalizeCommand(payload);
+        if (!command.stationId) {
+            return;
+        }
+
+        if (this.selectedStationId === command.stationId) {
+            const detail = this.selectedStationDetail || {
+                ...(this.stations.get(command.stationId) || { stationId: command.stationId }),
+                recentCommands: []
+            };
+            const commands = Array.isArray(detail.recentCommands) ? [...detail.recentCommands] : [];
+            const existingIndex = commands.findIndex((item) => item.commandId === command.commandId);
+            if (existingIndex >= 0) {
+                commands[existingIndex] = command;
+            } else {
+                commands.unshift(command);
+            }
+
+            this.selectedStationDetail = {
+                ...detail,
+                recentCommands: commands.slice(0, 30)
+            };
+        }
+    }
+
     isActiveConnection(connectionId) {
         return this.eventSource?.connectionId === connectionId;
     }
@@ -394,6 +493,60 @@ class StationMonitorView {
         const error = new Error('Station monitor SSE aborted');
         error.name = 'AbortError';
         return error;
+    }
+
+    async handleStationAction(action) {
+        if (!this.selectedStationId || this.commandBusy) {
+            return;
+        }
+
+        this.commandBusy = true;
+        this.render();
+        try {
+            switch (action) {
+                case 'ping':
+                    await this.createCommand('Ping', {});
+                    break;
+                case 'reload':
+                    await this.createCommand('ReloadPackage', {});
+                    break;
+                case 'stop':
+                    await this.createCommand('StopRuntime', {});
+                    break;
+                case 'deploy':
+                    await this.deployLatestPackage();
+                    break;
+                default:
+                    break;
+            }
+
+            await this.loadStationDetail(this.selectedStationId);
+        } catch (error) {
+            console.error('[StationMonitorView] Station action failed:', error);
+        } finally {
+            this.commandBusy = false;
+            this.render();
+        }
+    }
+
+    async createCommand(commandType, payload) {
+        return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/commands`, {
+            commandType,
+            payloadJson: JSON.stringify(payload || {}),
+            issuedBy: 'Studio'
+        });
+    }
+
+    async deployLatestPackage() {
+        const packageId = this.packages[0]?.packageId ?? this.packages[0]?.PackageId;
+        if (!packageId) {
+            return null;
+        }
+
+        return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
+            packageId,
+            issuedBy: 'Studio'
+        });
     }
 
     startRefreshTimer() {
@@ -465,7 +618,9 @@ class StationMonitorView {
             const isOnline = this.computeIsOnline(station);
             const isSelected = station.stationId === this.selectedStationId;
             const outcomeLabel = this.formatOutcome(station.lastOutcome, station.lastInspectionStatus);
-            const stateLabel = this.formatState(station.state, isOnline);
+            const stateLabel = station.onlineState && station.onlineState !== 'Online'
+                ? station.onlineState
+                : this.formatState(station.state, isOnline);
 
             return `
                 <button
@@ -475,8 +630,8 @@ class StationMonitorView {
                 >
                     <div class="station-card-top">
                         <div>
-                            <span class="station-card-id">${this.escapeHtml(station.stationId)}</span>
-                            <span class="station-card-line">${this.escapeHtml(station.lineName || station.machineName || 'Unassigned')}</span>
+                            <span class="station-card-id">${this.escapeHtml(station.stationName || station.stationId)}</span>
+                            <span class="station-card-line">${this.escapeHtml(station.lineName || station.machineName || station.stationId)}</span>
                         </div>
                         <span class="station-card-state">${stateLabel}</span>
                     </div>
@@ -516,19 +671,31 @@ class StationMonitorView {
 
         const detail = this.selectedStationDetail && this.selectedStationDetail.stationId === selectedStation.stationId
             ? this.selectedStationDetail
-            : { ...selectedStation, recentResults: [] };
+            : { ...selectedStation, recentResults: [], recentHealth: [], recentLogs: [], recentCommands: [] };
         const isOnline = this.computeIsOnline(selectedStation);
         const recentResults = Array.isArray(detail.recentResults) ? detail.recentResults : [];
+        const recentHealth = Array.isArray(detail.recentHealth) ? detail.recentHealth : [];
+        const recentLogs = Array.isArray(detail.recentLogs) ? detail.recentLogs : [];
+        const recentCommands = Array.isArray(detail.recentCommands) ? detail.recentCommands : [];
+        const latestHealth = recentHealth[0] || detail;
+        const actionsDisabled = this.commandBusy ? 'disabled' : '';
+        const deployDisabled = this.commandBusy || this.packages.length === 0 ? 'disabled' : '';
 
         this.focusMeta.textContent = isOnline ? 'Live focus' : 'Stale focus';
         this.focus.innerHTML = `
             <div class="station-focus-hero ${isOnline ? 'is-online' : 'is-offline'}">
                 <div>
                     <span class="station-focus-id">${this.escapeHtml(detail.stationId)}</span>
-                    <h3>${this.escapeHtml(detail.lineName || detail.machineName || 'Unnamed station')}</h3>
-                    <p>${this.escapeHtml(detail.packageName || 'No package loaded')}</p>
+                    <h3>${this.escapeHtml(detail.stationName || detail.lineName || detail.machineName || 'Unnamed station')}</h3>
+                    <p>${this.escapeHtml([detail.lineName, detail.areaName, detail.workcellName].filter(Boolean).join(' / ') || detail.packageName || 'No package loaded')}</p>
                 </div>
                 <div class="station-focus-pill">${this.formatState(detail.state, isOnline)}</div>
+            </div>
+            <div class="station-focus-actions">
+                <button type="button" data-station-action="ping" ${actionsDisabled}>Ping</button>
+                <button type="button" data-station-action="reload" ${actionsDisabled}>Reload</button>
+                <button type="button" data-station-action="stop" ${actionsDisabled}>Stop</button>
+                <button type="button" data-station-action="deploy" ${deployDisabled}>Deploy latest</button>
             </div>
             <div class="station-focus-kpis">
                 <div><span>OK</span><strong>${Number(detail.sessionOkCount || 0)}</strong></div>
@@ -541,7 +708,68 @@ class StationMonitorView {
                 <div><dt>Last result</dt><dd>${this.escapeHtml(this.formatOutcome(detail.lastOutcome, detail.lastInspectionStatus))}</dd></div>
                 <div><dt>Diagnostic</dt><dd>${this.escapeHtml(detail.lastDiagnosticCode || detail.lastDiagnosticMessage || '--')}</dd></div>
                 <div><dt>Package</dt><dd>${this.escapeHtml(detail.packageId || '--')}</dd></div>
+                <div><dt>Spool</dt><dd>${Number(detail.spoolPendingCount || latestHealth.spoolPendingCount || 0)} / ${this.formatBytes(detail.spoolBytes || latestHealth.spoolBytes || 0)}</dd></div>
+                <div><dt>Disk free</dt><dd>${this.formatDisk(latestHealth.diskFreeMb, latestHealth.diskTotalMb)}</dd></div>
+                <div><dt>Memory</dt><dd>${Number(latestHealth.workingSetMb || detail.workingSetMb || 0)} MB</dd></div>
+                <div><dt>Health</dt><dd>${this.escapeHtml(detail.onlineState || latestHealth.currentPackageHealth || '--')}</dd></div>
             </dl>
+            <div class="station-focus-section">
+                <div class="station-focus-results-header">
+                    <span>Commands</span>
+                    <span>${recentCommands.length}</span>
+                </div>
+                ${recentCommands.length === 0
+                    ? '<div class="station-monitor-empty compact"><span>No command history.</span></div>'
+                    : recentCommands.slice(0, 6).map((command) => `
+                        <article class="station-command-row">
+                            <div>
+                                <strong>${this.escapeHtml(command.commandType || '--')}</strong>
+                                <span>${this.escapeHtml(command.commandId || '--')}</span>
+                            </div>
+                            <div>
+                                <span>${this.escapeHtml(command.status || '--')} ${Number(command.progressPercent || 0)}%</span>
+                                <span>${this.escapeHtml(command.resultMessage || command.errorCode || this.formatRelativeTime(command.createdAtUtc))}</span>
+                            </div>
+                        </article>
+                    `).join('')}
+            </div>
+            <div class="station-focus-section">
+                <div class="station-focus-results-header">
+                    <span>Health</span>
+                    <span>${recentHealth.length}</span>
+                </div>
+                ${recentHealth.length === 0
+                    ? '<div class="station-monitor-empty compact"><span>No health samples.</span></div>'
+                    : recentHealth.slice(0, 4).map((health) => `
+                        <article class="station-health-row">
+                            <div>
+                                <strong>${this.escapeHtml(health.runtimeState || '--')}</strong>
+                                <span>${this.escapeHtml(health.currentPackageHealth || '--')}</span>
+                            </div>
+                            <div>
+                                <span>${this.formatDisk(health.diskFreeMb, health.diskTotalMb)}</span>
+                                <span>${this.escapeHtml(this.formatRelativeTime(health.createdAtUtc))}</span>
+                            </div>
+                        </article>
+                    `).join('')}
+            </div>
+            <div class="station-focus-section">
+                <div class="station-focus-results-header">
+                    <span>Logs</span>
+                    <span>${recentLogs.length}</span>
+                </div>
+                ${recentLogs.length === 0
+                    ? '<div class="station-monitor-empty compact"><span>No WARN or ERROR logs.</span></div>'
+                    : recentLogs.slice(0, 5).map((log) => `
+                        <article class="station-log-row station-log-row--${this.escapeHtml(String(log.level || '').toLowerCase())}">
+                            <div>
+                                <strong>${this.escapeHtml(log.level || '--')}</strong>
+                                <span>${this.escapeHtml(log.source || '--')}</span>
+                            </div>
+                            <span>${this.escapeHtml(log.renderedMessage || log.exceptionMessage || '--')}</span>
+                        </article>
+                    `).join('')}
+            </div>
             <div class="station-focus-results">
                 <div class="station-focus-results-header">
                     <span>Recent results</span>
@@ -570,30 +798,63 @@ class StationMonitorView {
             return;
         }
 
-        this.streamMeta.textContent = `${this.globalResults.length} buffered`;
-        if (this.globalResults.length === 0) {
+        const flow = [
+            ...this.globalResults.map((item) => ({
+                type: 'result',
+                stationId: item.stationId,
+                atUtc: item.result?.completedAtUtc,
+                data: item.result
+            })),
+            ...this.globalLogs.map((item) => ({
+                type: 'log',
+                stationId: item.stationId,
+                atUtc: item.log?.timestampUtc,
+                data: item.log
+            }))
+        ].sort((left, right) => new Date(right.atUtc || 0).getTime() - new Date(left.atUtc || 0).getTime());
+
+        this.streamMeta.textContent = `${flow.length} buffered`;
+        if (flow.length === 0) {
             this.stream.innerHTML = `
                 <div class="station-monitor-empty compact">
-                    <span>Recent result summaries will appear here once Station sync starts streaming.</span>
+                    <span>No result or log flow yet.</span>
                 </div>
             `;
             return;
         }
 
-        this.stream.innerHTML = this.globalResults.slice(0, 12).map((item) => `
-            <article class="station-stream-row">
-                <div class="station-stream-primary">
-                    <span class="station-stream-station">${this.escapeHtml(item.stationId)}</span>
-                    <strong>${this.escapeHtml(this.formatOutcome(item.result.outcome, item.result.inspectionStatus))}</strong>
-                    <span>${this.escapeHtml(item.result.imageId || item.result.runId || '--')}</span>
-                </div>
-                <div class="station-stream-secondary">
-                    <span>${this.escapeHtml(item.result.diagnosticCode || '--')}</span>
-                    <span>${this.formatMilliseconds(item.result.executionTimeMs)}</span>
-                    <span>${this.escapeHtml(this.formatRelativeTime(item.result.completedAtUtc))}</span>
-                </div>
-            </article>
-        `).join('');
+        this.stream.innerHTML = flow.slice(0, 12).map((item) => {
+            if (item.type === 'log') {
+                return `
+                    <article class="station-stream-row station-stream-row--log">
+                        <div class="station-stream-primary">
+                            <span class="station-stream-station">${this.escapeHtml(item.stationId)}</span>
+                            <strong>${this.escapeHtml(item.data.level || '--')}</strong>
+                            <span>${this.escapeHtml(item.data.source || '--')}</span>
+                        </div>
+                        <div class="station-stream-secondary">
+                            <span>${this.escapeHtml(item.data.renderedMessage || item.data.exceptionMessage || '--')}</span>
+                            <span>${this.escapeHtml(this.formatRelativeTime(item.data.timestampUtc))}</span>
+                        </div>
+                    </article>
+                `;
+            }
+
+            return `
+                <article class="station-stream-row">
+                    <div class="station-stream-primary">
+                        <span class="station-stream-station">${this.escapeHtml(item.stationId)}</span>
+                        <strong>${this.escapeHtml(this.formatOutcome(item.data.outcome, item.data.inspectionStatus))}</strong>
+                        <span>${this.escapeHtml(item.data.imageId || item.data.runId || '--')}</span>
+                    </div>
+                    <div class="station-stream-secondary">
+                        <span>${this.escapeHtml(item.data.diagnosticCode || '--')}</span>
+                        <span>${this.formatMilliseconds(item.data.executionTimeMs)}</span>
+                        <span>${this.escapeHtml(this.formatRelativeTime(item.data.completedAtUtc))}</span>
+                    </div>
+                </article>
+            `;
+        }).join('');
     }
 
     updateSyncState(text) {
@@ -623,6 +884,10 @@ class StationMonitorView {
     }
 
     computeIsOnline(station) {
+        if (station?.isEnabled === false) {
+            return false;
+        }
+
         if (!station?.lastSeenAtUtc) {
             return Boolean(station?.isOnline);
         }
@@ -646,11 +911,26 @@ class StationMonitorView {
     }
 
     normalizeStation(station) {
+        const recentResults = station?.recentResults ?? station?.RecentResults;
+        const recentHealth = station?.recentHealth ?? station?.RecentHealth;
+        const recentLogs = station?.recentLogs ?? station?.RecentLogs;
+        const recentCommands = station?.recentCommands ?? station?.RecentCommands;
         return {
             stationId: station?.stationId ?? station?.StationId ?? '--',
+            stationName: station?.stationName ?? station?.StationName ?? '',
             lineName: station?.lineName ?? station?.LineName ?? null,
+            areaName: station?.areaName ?? station?.AreaName ?? null,
+            workcellName: station?.workcellName ?? station?.WorkcellName ?? null,
+            inspectionNodeName: station?.inspectionNodeName ?? station?.InspectionNodeName ?? null,
+            cameraAlias: station?.cameraAlias ?? station?.CameraAlias ?? null,
+            stationRole: station?.stationRole ?? station?.StationRole ?? '',
+            owner: station?.owner ?? station?.Owner ?? null,
+            isEnabled: Boolean(station?.isEnabled ?? station?.IsEnabled ?? true),
+            remark: station?.remark ?? station?.Remark ?? null,
             machineName: station?.machineName ?? station?.MachineName ?? '',
             clientVersion: station?.clientVersion ?? station?.ClientVersion ?? '',
+            onlineState: station?.onlineState ?? station?.OnlineState ?? 'Unknown',
+            runtimeState: station?.runtimeState ?? station?.RuntimeState ?? null,
             state: station?.state ?? station?.State ?? 'Idle',
             isOnline: Boolean(station?.isOnline ?? station?.IsOnline),
             startedAtUtc: station?.startedAtUtc ?? station?.StartedAtUtc ?? null,
@@ -670,8 +950,26 @@ class StationMonitorView {
             lastSequenceId: Number(station?.lastSequenceId ?? station?.LastSequenceId ?? 0),
             averageExecutionTimeMs: Number(station?.averageExecutionTimeMs ?? station?.AverageExecutionTimeMs ?? 0),
             recentResultCount: Number(station?.recentResultCount ?? station?.RecentResultCount ?? 0),
-            recentResults: Array.isArray(station?.recentResults)
-                ? station.recentResults.map((result) => this.normalizeResult(result))
+            spoolPendingCount: Number(station?.spoolPendingCount ?? station?.SpoolPendingCount ?? 0),
+            spoolBytes: Number(station?.spoolBytes ?? station?.SpoolBytes ?? 0),
+            cpuUsagePercent: station?.cpuUsagePercent ?? station?.CpuUsagePercent ?? null,
+            workingSetMb: Number(station?.workingSetMb ?? station?.WorkingSetMb ?? 0),
+            diskFreeMb: Number(station?.diskFreeMb ?? station?.DiskFreeMb ?? 0),
+            diskTotalMb: Number(station?.diskTotalMb ?? station?.DiskTotalMb ?? 0),
+            cameraStatusSummary: station?.cameraStatusSummary ?? station?.CameraStatusSummary ?? null,
+            plcStatusSummary: station?.plcStatusSummary ?? station?.PlcStatusSummary ?? null,
+            currentPackageHealth: station?.currentPackageHealth ?? station?.CurrentPackageHealth ?? null,
+            recentResults: Array.isArray(recentResults)
+                ? recentResults.map((result) => this.normalizeResult(result))
+                : [],
+            recentHealth: Array.isArray(recentHealth)
+                ? recentHealth.map((health) => this.normalizeHealth(health))
+                : [],
+            recentLogs: Array.isArray(recentLogs)
+                ? recentLogs.map((log) => this.normalizeLog(log))
+                : [],
+            recentCommands: Array.isArray(recentCommands)
+                ? recentCommands.map((command) => this.normalizeCommand(command))
                 : []
         };
     }
@@ -699,6 +997,60 @@ class StationMonitorView {
         };
     }
 
+    normalizeHealth(health) {
+        return {
+            stationId: health?.stationId ?? health?.StationId ?? null,
+            sequenceId: Number(health?.sequenceId ?? health?.SequenceId ?? 0),
+            runtimeState: health?.runtimeState ?? health?.RuntimeState ?? 'Unknown',
+            workingSetMb: Number(health?.workingSetMb ?? health?.WorkingSetMb ?? 0),
+            privateMemoryMb: Number(health?.privateMemoryMb ?? health?.PrivateMemoryMb ?? 0),
+            diskFreeMb: Number(health?.diskFreeMb ?? health?.DiskFreeMb ?? 0),
+            diskTotalMb: Number(health?.diskTotalMb ?? health?.DiskTotalMb ?? 0),
+            spoolPendingCount: Number(health?.spoolPendingCount ?? health?.SpoolPendingCount ?? 0),
+            spoolBytes: Number(health?.spoolBytes ?? health?.SpoolBytes ?? 0),
+            cameraStatusSummary: health?.cameraStatusSummary ?? health?.CameraStatusSummary ?? null,
+            plcStatusSummary: health?.plcStatusSummary ?? health?.PlcStatusSummary ?? null,
+            currentPackageId: health?.currentPackageId ?? health?.CurrentPackageId ?? null,
+            currentPackageHealth: health?.currentPackageHealth ?? health?.CurrentPackageHealth ?? null,
+            lastErrorCode: health?.lastErrorCode ?? health?.LastErrorCode ?? null,
+            lastErrorMessage: health?.lastErrorMessage ?? health?.LastErrorMessage ?? null,
+            createdAtUtc: health?.createdAtUtc ?? health?.CreatedAtUtc ?? null
+        };
+    }
+
+    normalizeLog(log) {
+        return {
+            stationId: log?.stationId ?? log?.StationId ?? null,
+            sequenceId: Number(log?.sequenceId ?? log?.SequenceId ?? 0),
+            timestampUtc: log?.timestampUtc ?? log?.TimestampUtc ?? null,
+            level: log?.level ?? log?.Level ?? '',
+            source: log?.source ?? log?.Source ?? '',
+            renderedMessage: log?.renderedMessage ?? log?.RenderedMessage ?? '',
+            exceptionType: log?.exceptionType ?? log?.ExceptionType ?? null,
+            exceptionMessage: log?.exceptionMessage ?? log?.ExceptionMessage ?? null,
+            runId: log?.runId ?? log?.RunId ?? null,
+            packageId: log?.packageId ?? log?.PackageId ?? null,
+            createdAtUtc: log?.createdAtUtc ?? log?.CreatedAtUtc ?? null
+        };
+    }
+
+    normalizeCommand(command) {
+        return {
+            commandId: command?.commandId ?? command?.CommandId ?? '',
+            stationId: command?.stationId ?? command?.StationId ?? this.selectedStationId,
+            commandType: command?.commandType ?? command?.CommandType ?? '',
+            status: command?.status ?? command?.Status ?? '',
+            progressPercent: Number(command?.progressPercent ?? command?.ProgressPercent ?? 0),
+            createdAtUtc: command?.createdAtUtc ?? command?.CreatedAtUtc ?? null,
+            deliveredAtUtc: command?.deliveredAtUtc ?? command?.DeliveredAtUtc ?? null,
+            acceptedAtUtc: command?.acceptedAtUtc ?? command?.AcceptedAtUtc ?? null,
+            startedAtUtc: command?.startedAtUtc ?? command?.StartedAtUtc ?? null,
+            completedAtUtc: command?.completedAtUtc ?? command?.CompletedAtUtc ?? null,
+            resultMessage: command?.resultMessage ?? command?.ResultMessage ?? command?.message ?? command?.Message ?? null,
+            errorCode: command?.errorCode ?? command?.ErrorCode ?? null
+        };
+    }
+
     formatMilliseconds(value) {
         const numeric = Number(value || 0);
         if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -706,6 +1058,33 @@ class StationMonitorView {
         }
 
         return `${Math.round(numeric)} ms`;
+    }
+
+    formatBytes(value) {
+        const bytes = Number(value || 0);
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+            return '0 B';
+        }
+
+        if (bytes < 1024) {
+            return `${Math.round(bytes)} B`;
+        }
+
+        if (bytes < 1024 * 1024) {
+            return `${Math.round(bytes / 1024)} KB`;
+        }
+
+        return `${Math.round(bytes / 1024 / 1024)} MB`;
+    }
+
+    formatDisk(freeMb, totalMb) {
+        const free = Number(freeMb || 0);
+        const total = Number(totalMb || 0);
+        if (!Number.isFinite(free) || free <= 0 || !Number.isFinite(total) || total <= 0) {
+            return '--';
+        }
+
+        return `${Math.round(free)} / ${Math.round(total)} MB`;
     }
 
     formatRelativeTime(value) {

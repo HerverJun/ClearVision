@@ -14,6 +14,8 @@ public sealed class StationSpoolStore
     private readonly string _spoolFilePath;
     private readonly string _stateFilePath;
     private readonly int _maxBufferedResults;
+    private readonly long _maxSpoolBytes;
+    private readonly TimeSpan _maxSpoolAge;
     private readonly ILogger<StationSpoolStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -34,13 +36,15 @@ public sealed class StationSpoolStore
         ILogger<StationSpoolStore> logger)
     {
         _logger = logger;
-        _maxBufferedResults = Math.Max(100, options.Value.MaxBufferedResults);
-        _directoryPath = string.IsNullOrWhiteSpace(options.Value.SpoolDirectoryPath)
+        _maxBufferedResults = Math.Max(1, options.Value.MaxBufferedResults);
+        _maxSpoolBytes = Math.Max(1, options.Value.MaxSpoolMb) * 1024L * 1024L;
+        _maxSpoolAge = TimeSpan.FromDays(Math.Max(1, options.Value.MaxSpoolDays));
+        _directoryPath = string.IsNullOrWhiteSpace(options.Value.ResolvedSpoolDirectory)
             ? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "ClearVisionStation",
                 "spool")
-            : options.Value.SpoolDirectoryPath;
+            : options.Value.ResolvedSpoolDirectory;
         _spoolFilePath = Path.Combine(_directoryPath, "station-results.jsonl");
         _stateFilePath = Path.Combine(_directoryPath, "station-sync-state.json");
 
@@ -59,6 +63,30 @@ public sealed class StationSpoolStore
         }
     }
 
+    public int PendingCount
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _pendingResults.Count(result => result.SequenceId > _state.AckedSequenceId);
+            }
+        }
+    }
+
+    public long SpoolBytes
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return Directory.Exists(_directoryPath)
+                    ? Directory.EnumerateFiles(_directoryPath, "*", SearchOption.AllDirectories).Sum(path => new FileInfo(path).Length)
+                    : 0;
+            }
+        }
+    }
+
     public StationResultSummaryDto Enqueue(StationResultSummaryDto summary)
     {
         ArgumentNullException.ThrowIfNull(summary);
@@ -67,6 +95,16 @@ public sealed class StationSpoolStore
         {
             var nextSequenceId = Math.Max(_state.NextSequenceId + 1, _state.AckedSequenceId + 1);
             summary.SequenceId = nextSequenceId;
+            if (string.IsNullOrWhiteSpace(summary.MessageId))
+            {
+                summary.MessageId = $"result_{summary.StationId}_{nextSequenceId}_{Guid.NewGuid():N}";
+            }
+
+            if (summary.CreatedAtUtc == default)
+            {
+                summary.CreatedAtUtc = DateTimeOffset.UtcNow;
+            }
+
             _state.NextSequenceId = nextSequenceId;
             _pendingResults.Add(Clone(summary));
 
@@ -210,17 +248,42 @@ public sealed class StationSpoolStore
 
     private bool TrimOverflowLocked()
     {
-        if (_pendingResults.Count <= _maxBufferedResults)
+        _pendingResults.Sort((left, right) => left.SequenceId.CompareTo(right.SequenceId));
+        var dropped = new List<StationResultSummaryDto>();
+        var cutoffUtc = DateTimeOffset.UtcNow - _maxSpoolAge;
+
+        while (_pendingResults.Count > 0 &&
+               _pendingResults[0].CreatedAtUtc != default &&
+               _pendingResults[0].CreatedAtUtc < cutoffUtc)
+        {
+            dropped.Add(_pendingResults[0]);
+            _pendingResults.RemoveAt(0);
+        }
+
+        if (_pendingResults.Count > _maxBufferedResults)
+        {
+            var overflowCount = _pendingResults.Count - _maxBufferedResults;
+            dropped.AddRange(_pendingResults.Take(overflowCount));
+            _pendingResults.RemoveRange(0, overflowCount);
+        }
+
+        var estimatedBytes = EstimateSpoolBytes(_pendingResults);
+        while (_pendingResults.Count > 0 && estimatedBytes > _maxSpoolBytes)
+        {
+            var removed = _pendingResults[0];
+            dropped.Add(removed);
+            _pendingResults.RemoveAt(0);
+            estimatedBytes -= EstimateSpoolLineBytes(removed);
+        }
+
+        if (dropped.Count == 0)
         {
             return false;
         }
 
-        _pendingResults.Sort((left, right) => left.SequenceId.CompareTo(right.SequenceId));
-        var overflowCount = _pendingResults.Count - _maxBufferedResults;
-        var cutoffSequenceId = _pendingResults[overflowCount - 1].SequenceId;
-        var droppedFromId = _pendingResults[0].SequenceId;
-
-        _pendingResults.RemoveRange(0, overflowCount);
+        var droppedFromId = dropped.Min(result => result.SequenceId);
+        var cutoffSequenceId = dropped.Max(result => result.SequenceId);
+        _state.AckedSequenceId = Math.Max(_state.AckedSequenceId, cutoffSequenceId);
 
         _logger.LogWarning(
             "Dropped Station spool records due to capacity limit. Range={FromSequenceId}-{ToSequenceId}",
@@ -228,6 +291,16 @@ public sealed class StationSpoolStore
             cutoffSequenceId);
 
         return true;
+    }
+
+    private long EstimateSpoolBytes(IEnumerable<StationResultSummaryDto> results)
+    {
+        return results.Sum(EstimateSpoolLineBytes);
+    }
+
+    private long EstimateSpoolLineBytes(StationResultSummaryDto result)
+    {
+        return Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result, _jsonOptions)) + Environment.NewLine.Length;
     }
 
     private static StationResultSummaryDto Clone(StationResultSummaryDto summary)
@@ -238,9 +311,11 @@ public sealed class StationSpoolStore
             StationId = summary.StationId,
             LineName = summary.LineName,
             SequenceId = summary.SequenceId,
+            MessageId = summary.MessageId,
             RunId = summary.RunId,
             PackageId = summary.PackageId,
             PackageName = summary.PackageName,
+            PackageVersion = summary.PackageVersion,
             FlowHash = summary.FlowHash,
             ImageId = summary.ImageId,
             Outcome = summary.Outcome,
@@ -248,8 +323,10 @@ public sealed class StationSpoolStore
             ExecutionTimeMs = summary.ExecutionTimeMs,
             DiagnosticCode = summary.DiagnosticCode,
             DiagnosticMessage = summary.DiagnosticMessage,
+            PrimaryOutputsPreview = new Dictionary<string, string?>(summary.PrimaryOutputsPreview, StringComparer.OrdinalIgnoreCase),
             StartedAtUtc = summary.StartedAtUtc,
-            CompletedAtUtc = summary.CompletedAtUtc
+            CompletedAtUtc = summary.CompletedAtUtc,
+            CreatedAtUtc = summary.CreatedAtUtc
         };
     }
 

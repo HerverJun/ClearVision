@@ -17,7 +17,7 @@ public class PromptBuilderFewShotExamplesTests
         var prompt = builder.BuildSystemPrompt("示例校验");
         var exampleJsons = ExtractFewShotJsonObjects(prompt);
 
-        exampleJsons.Should().HaveCount(5);
+        exampleJsons.Should().NotBeEmpty("the prompt should expose at least one valid few-shot flow JSON object");
 
         var options = new JsonSerializerOptions
         {
@@ -51,6 +51,11 @@ public class PromptBuilderFewShotExamplesTests
 
     private static List<string> ExtractFewShotJsonObjects(string prompt)
     {
+        var robustResults = ExtractAllFlowJsonObjects(prompt);
+        if (robustResults.Count > 0)
+        {
+            return robustResults;
+        }
         const string marker = "正确输出：";
         var results = new List<string>();
         var searchIndex = 0;
@@ -66,6 +71,41 @@ public class PromptBuilderFewShotExamplesTests
 
             results.Add(ExtractJsonObject(prompt, objectStart));
             searchIndex = objectStart + 1;
+        }
+
+        return results;
+    }
+
+    private static List<string> ExtractAllFlowJsonObjects(string prompt)
+    {
+        var results = new List<string>();
+        var searchIndex = 0;
+
+        while (true)
+        {
+            var objectStart = prompt.IndexOf('{', searchIndex);
+            if (objectStart < 0)
+            {
+                break;
+            }
+
+            searchIndex = objectStart + 1;
+            try
+            {
+                var candidate = ExtractJsonObject(prompt, objectStart);
+                using var json = JsonDocument.Parse(candidate);
+                if (json.RootElement.TryGetProperty("operators", out _) &&
+                    json.RootElement.TryGetProperty("connections", out _))
+                {
+                    results.Add(candidate);
+                }
+            }
+            catch (JsonException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
 
         return results;

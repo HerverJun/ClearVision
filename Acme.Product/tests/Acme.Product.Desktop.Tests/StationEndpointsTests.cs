@@ -30,6 +30,7 @@ public sealed class StationEndpointsTests
         using var response = await host.Client.SendAsync(
             new HttpRequestMessage(HttpMethod.Get, "/api/stations/events"),
             HttpCompletionOption.ResponseHeadersRead);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         await using var stream = await response.Content.ReadAsStreamAsync();
 
         var initialChunk = await ReadUntilContainsAsync(stream, "event: initialState", TimeSpan.FromSeconds(2));
@@ -90,6 +91,7 @@ public sealed class StationEndpointsTests
         request.Headers.Add("Last-Event-ID", checkpoint.ToString());
 
         using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         await using var stream = await response.Content.ReadAsStreamAsync();
 
         var replayChunk = await ReadUntilContainsAsync(stream, "event: stationResultAdded", TimeSpan.FromSeconds(2));

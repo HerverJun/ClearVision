@@ -146,7 +146,7 @@ public class GaussianBlurOperatorTests
         var result = _operator.ValidateParameters(op);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain("鏍稿ぇ灏忓繀椤诲湪 1-31 涔嬮棿");
+        result.Errors.Should().Contain("核大小必须在 1-31 之间");
     }
 
     private static Operator CreateTestOperator()

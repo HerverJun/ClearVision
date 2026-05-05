@@ -79,7 +79,7 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
                 old.Dispose();
             }
 
-            snapshot = state.Frames.Select(static frame => new Mat(frame)).ToArray();
+            snapshot = state.Frames.Select(static frame => frame.Clone()).ToArray();
             state.LastTouchedUtc = nowUtc;
         }
 

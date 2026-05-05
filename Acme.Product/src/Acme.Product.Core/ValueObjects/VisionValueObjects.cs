@@ -146,7 +146,33 @@ public class Parameter : ValueObject
 
     private static object? DeserializeValue(string? json)
     {
-        return string.IsNullOrEmpty(json) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(json, _jsonOptions);
+        if (string.IsNullOrEmpty(json))
+        {
+            return null;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        return ConvertJsonElementValue(document.RootElement);
+    }
+
+    private static object? ConvertJsonElementValue(System.Text.Json.JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.String => element.GetString(),
+            System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out var longValue)
+                ? longValue
+                : element.TryGetDouble(out var doubleValue)
+                    ? doubleValue
+                    : element.GetRawText(),
+            System.Text.Json.JsonValueKind.True => true,
+            System.Text.Json.JsonValueKind.False => false,
+            System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined => null,
+            System.Text.Json.JsonValueKind.Array => element.EnumerateArray().Select(ConvertJsonElementValue).ToArray(),
+            System.Text.Json.JsonValueKind.Object => element.EnumerateObject()
+                .ToDictionary(property => property.Name, property => ConvertJsonElementValue(property.Value)),
+            _ => element.GetRawText()
+        };
     }
 
     [NotMapped]

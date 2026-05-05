@@ -73,6 +73,48 @@ public sealed class StationOfflineReplayTests
     }
 
     [Fact]
+    public void OfflineSpool_ShouldReplayTwentyResultsAfterStationRestart()
+    {
+        var spoolDirectory = CreateTempDirectory();
+        try
+        {
+            var spool = CreateSpool(spoolDirectory, maxBufferedResults: 100);
+            for (var index = 1; index <= 20; index++)
+            {
+                spool.Enqueue(BuildResult(0, $"run-offline-{index:D2}"));
+            }
+
+            var restartedSpool = CreateSpool(spoolDirectory, maxBufferedResults: 100);
+            var registry = CreateRegistry();
+            registry.UpsertRegistration("conn-20", new StationRegistrationDto
+            {
+                StationId = "station-offline",
+                LineName = "line-a",
+                MachineName = "station-pc",
+                ClientVersion = "1.0.0",
+                StartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5)
+            });
+
+            foreach (var summary in restartedSpool.GetPendingBatch(50))
+            {
+                var cursor = registry.UpsertResultSummary("conn-20", summary);
+                restartedSpool.Acknowledge(cursor.AckedSequenceId);
+            }
+
+            var station = registry.GetStation("station-offline")!;
+            station.LastSequenceId.Should().Be(20);
+            station.RecentResults.Should().HaveCount(20);
+            station.RecentResults.Select(result => result.SequenceId).Should().Equal(Enumerable.Range(1, 20).Reverse().Select(value => (long)value));
+            restartedSpool.GetPendingBatch(50).Should().BeEmpty();
+            CreateSpool(spoolDirectory, maxBufferedResults: 100).AckedSequenceId.Should().Be(20);
+        }
+        finally
+        {
+            DeleteTempDirectory(spoolDirectory);
+        }
+    }
+
+    [Fact]
     public void Enqueue_ShouldKeepDiskSpoolWithinCapacity_WhenOverflowTrimsPendingResults()
     {
         var spoolDirectory = CreateTempDirectory();
@@ -105,12 +147,64 @@ public sealed class StationOfflineReplayTests
         }
     }
 
-    private static StationSpoolStore CreateSpool(string spoolDirectory, int maxBufferedResults)
+    [Fact]
+    public void Enqueue_ShouldTrimPendingResults_WhenSpoolExceedsByteLimit()
+    {
+        var spoolDirectory = CreateTempDirectory();
+        try
+        {
+            var spool = CreateSpool(spoolDirectory, maxBufferedResults: 100, maxSpoolMb: 1);
+            for (var index = 1; index <= 5; index++)
+            {
+                var result = BuildResult(0, $"run-large-{index:D2}");
+                result.DiagnosticMessage = new string('x', 300_000);
+                spool.Enqueue(result);
+            }
+
+            spool.GetPendingBatch(100).Should().HaveCountLessThan(5);
+            spool.AckedSequenceId.Should().BeGreaterThan(0);
+        }
+        finally
+        {
+            DeleteTempDirectory(spoolDirectory);
+        }
+    }
+
+    [Fact]
+    public void Enqueue_ShouldTrimPendingResults_WhenSpoolExceedsAgeLimit()
+    {
+        var spoolDirectory = CreateTempDirectory();
+        try
+        {
+            var spool = CreateSpool(spoolDirectory, maxBufferedResults: 100, maxSpoolDays: 1);
+            var oldResult = BuildResult(0, "run-old");
+            oldResult.CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-2);
+            spool.Enqueue(oldResult);
+            spool.Enqueue(BuildResult(0, "run-new"));
+
+            var pending = spool.GetPendingBatch(100);
+            pending.Should().ContainSingle();
+            pending[0].RunId.Should().Be("run-new");
+            spool.AckedSequenceId.Should().Be(1);
+        }
+        finally
+        {
+            DeleteTempDirectory(spoolDirectory);
+        }
+    }
+
+    private static StationSpoolStore CreateSpool(
+        string spoolDirectory,
+        int maxBufferedResults,
+        int maxSpoolMb = 512,
+        int maxSpoolDays = 7)
     {
         return new StationSpoolStore(
             Options.Create(new StationSyncOptions
             {
                 MaxBufferedResults = maxBufferedResults,
+                MaxSpoolMb = maxSpoolMb,
+                MaxSpoolDays = maxSpoolDays,
                 SpoolDirectoryPath = spoolDirectory
             }),
             NullLogger<StationSpoolStore>.Instance);

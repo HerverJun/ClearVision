@@ -42,6 +42,26 @@ public class VisionDbContext : DbContext
     /// </summary>
     public DbSet<User> Users { get; set; } = null!;
 
+    public DbSet<StationNodeEntity> StationNodes { get; set; } = null!;
+
+    public DbSet<StationResultSummaryEntity> StationResultSummaries { get; set; } = null!;
+
+    public DbSet<StationHealthSnapshotEntity> StationHealthSnapshots { get; set; } = null!;
+
+    public DbSet<StationConnectionEventEntity> StationConnectionEvents { get; set; } = null!;
+
+    public DbSet<StationAlarmEventEntity> StationAlarmEvents { get; set; } = null!;
+
+    public DbSet<StationCommandRecordEntity> StationCommandRecords { get; set; } = null!;
+
+    public DbSet<StationSyncCursorEntity> StationSyncCursors { get; set; } = null!;
+
+    public DbSet<StationLogSummaryEntity> StationLogSummaries { get; set; } = null!;
+
+    public DbSet<StationAuditRecordEntity> StationAuditRecords { get; set; } = null!;
+
+    public DbSet<StationPackageRecordEntity> StationPackageRecords { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -190,6 +210,124 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.LastLoginAt);
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.IsActive);
+        });
+
+        ConfigureStationSyncEntities(modelBuilder);
+    }
+
+    private static void ConfigureStationSyncEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<StationNodeEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.StationName).HasMaxLength(200);
+            entity.Property(e => e.LineName).HasMaxLength(200);
+            entity.Property(e => e.AreaName).HasMaxLength(200);
+            entity.Property(e => e.WorkcellName).HasMaxLength(200);
+            entity.Property(e => e.InspectionNodeName).HasMaxLength(200);
+            entity.Property(e => e.CameraAlias).HasMaxLength(200);
+            entity.Property(e => e.StationRole).HasMaxLength(100);
+            entity.Property(e => e.MachineName).HasMaxLength(200);
+            entity.Property(e => e.OnlineState).HasMaxLength(50);
+            entity.Property(e => e.RuntimeState).HasMaxLength(50);
+            entity.HasIndex(e => e.StationId).IsUnique();
+            entity.HasIndex(e => e.LastSeenAtUtc);
+        });
+
+        modelBuilder.Entity<StationResultSummaryEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.MessageId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.RunId).HasMaxLength(128);
+            entity.Property(e => e.PackageId).HasMaxLength(128);
+            entity.Property(e => e.PackageVersion).HasMaxLength(80);
+            entity.Property(e => e.Outcome).HasMaxLength(50);
+            entity.Property(e => e.InspectionStatus).HasMaxLength(50);
+            entity.Property(e => e.DiagnosticCode).HasMaxLength(200);
+            entity.HasIndex(e => new { e.StationId, e.SequenceId }).IsUnique();
+            entity.HasIndex(e => new { e.StationId, e.CompletedAtUtc });
+            entity.HasIndex(e => e.MessageId);
+        });
+
+        modelBuilder.Entity<StationHealthSnapshotEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.MessageId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.RuntimeState).HasMaxLength(50);
+            entity.HasIndex(e => new { e.StationId, e.SequenceId }).IsUnique();
+            entity.HasIndex(e => new { e.StationId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<StationConnectionEventEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.EventType).IsRequired().HasMaxLength(80);
+            entity.HasIndex(e => new { e.StationId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<StationAlarmEventEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AlarmId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Severity).HasMaxLength(50);
+            entity.Property(e => e.Code).HasMaxLength(200);
+            entity.HasIndex(e => e.AlarmId).IsUnique();
+            entity.HasIndex(e => new { e.StationId, e.IsActive });
+        });
+
+        modelBuilder.Entity<StationCommandRecordEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CommandId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.CommandType).IsRequired().HasMaxLength(80);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => e.CommandId).IsUnique();
+            entity.HasIndex(e => new { e.StationId, e.CreatedAtUtc });
+            entity.HasIndex(e => new { e.StationId, e.Status });
+        });
+
+        modelBuilder.Entity<StationSyncCursorEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.HasIndex(e => e.StationId).IsUnique();
+        });
+
+        modelBuilder.Entity<StationLogSummaryEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.MessageId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Level).HasMaxLength(20);
+            entity.Property(e => e.Source).HasMaxLength(200);
+            entity.HasIndex(e => new { e.StationId, e.SequenceId }).IsUnique();
+            entity.HasIndex(e => new { e.StationId, e.TimestampUtc });
+        });
+
+        modelBuilder.Entity<StationAuditRecordEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AuditId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Action).IsRequired().HasMaxLength(120);
+            entity.HasIndex(e => e.AuditId).IsUnique();
+            entity.HasIndex(e => new { e.TargetStationId, e.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<StationPackageRecordEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PackageId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.PackageName).HasMaxLength(200);
+            entity.Property(e => e.PackageVersion).HasMaxLength(80);
+            entity.Property(e => e.Sha256).HasMaxLength(128);
+            entity.HasIndex(e => e.PackageId).IsUnique();
+            entity.HasIndex(e => e.CreatedAtUtc);
         });
     }
 }
