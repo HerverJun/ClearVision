@@ -72,7 +72,7 @@ internal static class RuntimeParameterControlFactory
             Maximum = ToDecimal(max),
             Increment = ToDecimal(step <= 0 ? 0.01d : step),
             Value = ToDecimal(current),
-            Width = 92,
+            Width = 120,
             Margin = new Padding(0, 0, 0, 4)
         };
 

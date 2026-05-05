@@ -37,7 +37,6 @@ function bindButton(documentRef, id, handler, cleanup) {
  * @property {() => Promise<any>} ensureInspectionPanelReady
  * @property {() => void} initializeInspectionImageViewer
  * @property {() => Promise<void>} logout
- * @property {() => Promise<void>} openAi
  */
 
 /**
@@ -63,8 +62,7 @@ export function bindToolbarCommands(options) {
         switchView,
         ensureInspectionPanelReady,
         initializeInspectionImageViewer,
-        logout,
-        openAi
+        logout
     } = options;
 
     const cleanup = [];
@@ -141,17 +139,6 @@ export function bindToolbarCommands(options) {
 
     bindButton(documentRef, 'btn-logout', async () => {
         await logout();
-    }, cleanup);
-
-    bindButton(documentRef, 'btn-ai-gen', async () => {
-        if (openAi) {
-            await openAi();
-            return;
-        }
-
-        setCurrentView('ai');
-        syncActiveNavButton('ai');
-        await switchView('ai');
     }, cleanup);
 
     return () => cleanup.splice(0).forEach(dispose => dispose());

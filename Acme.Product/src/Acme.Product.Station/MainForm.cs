@@ -53,7 +53,7 @@ public sealed class MainForm : Form
     private string? _selectedFolderPath;
     private RuntimePackage? _loadedPackage;
     private RuntimeSiteProfile? _activeSiteProfile;
-    private const int LeftSidebarWidth = 240;
+    private const int LeftSidebarWidth = 300;
     private const int RightSidebarWidth = 320;
 
     private static readonly HashSet<OperatorType> PlcOperatorTypes =
@@ -539,12 +539,11 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 6,
+            RowCount = 5,
             BackColor = BackColor,
             AutoScroll = true
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -638,8 +637,8 @@ public sealed class MainForm : Form
     {
         ConfigureCardLabel(_packageSummaryValueLabel, 12, FontStyle.Bold, Color.SteelBlue);
         ConfigureCardLabel(_packageSummaryDetailLabel, 9, FontStyle.Regular, SystemColors.GrayText);
-        _packageSummaryValueLabel.MaximumSize = new Size(210, 0);
-        _packageSummaryDetailLabel.MaximumSize = new Size(210, 0);
+        _packageSummaryValueLabel.MaximumSize = new Size(260, 0);
+        _packageSummaryDetailLabel.MaximumSize = new Size(260, 0);
 
         var layout = new TableLayoutPanel
         {

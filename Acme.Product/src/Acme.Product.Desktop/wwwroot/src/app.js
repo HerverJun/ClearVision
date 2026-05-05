@@ -1346,8 +1346,7 @@ function initializeToolbar() {
         switchView,
         ensureInspectionPanelReady,
         initializeInspectionImageViewer,
-        logout,
-        openAi: () => getAiGenerationController().open()
+        logout
     });
 }
 

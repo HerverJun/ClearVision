@@ -18,7 +18,11 @@
       "Bash(git push *)",
       "Bash(git fetch *)",
       "Bash(git stash *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(git -C \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\" diff --stat)",
+      "Bash(node -c \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\\\\Acme.Product\\\\src\\\\Acme.Product.Desktop\\\\wwwroot\\\\src\\\\features\\\\stations\\\\stationMonitorView.js\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const css=fs.readFileSync\\('Acme.Product/src/Acme.Product.Desktop/wwwroot/src/shared/styles/stations.css','utf8'\\);const open=css.split\\(''\\).filter\\(c=>c==='{'\\).length;const close=css.split\\(''\\).filter\\(c=>c==='}'\\).length;console.log\\('Braces:',open,close,open===close?'OK':'MISMATCH'\\);\")",
+      "Bash(git -C \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\" diff --stat \"Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js\")"
     ]
   }
 }

@@ -57,31 +57,26 @@ public sealed class RuntimeParameterPanel : UserControl
     private void BuildUi()
     {
         Dock = DockStyle.Fill;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-        _layout.Dock = DockStyle.Top;
+        _layout.Dock = DockStyle.Fill;
         _layout.ColumnCount = 1;
         _layout.RowCount = 3;
-        _layout.AutoSize = true;
-        _layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _layout.Margin = new Padding(0);
         _layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        _layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         _emptyLabel.AutoSize = true;
         _emptyLabel.Dock = DockStyle.Top;
         _emptyLabel.ForeColor = SystemColors.GrayText;
-        _emptyLabel.MaximumSize = new Size(240, 0);
+        _emptyLabel.MaximumSize = new Size(260, 0);
         _emptyLabel.Text = "当前运行包未开放现场参数";
 
-        _parameterRows.Dock = DockStyle.Top;
+        _parameterRows.Dock = DockStyle.Fill;
         _parameterRows.ColumnCount = 1;
-        _parameterRows.AutoSize = true;
-        _parameterRows.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         _parameterRows.Margin = new Padding(0);
         _parameterRows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _parameterRows.AutoScroll = true;
 
         var buttons = new FlowLayoutPanel
         {
@@ -90,7 +85,7 @@ public sealed class RuntimeParameterPanel : UserControl
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = true,
-            Margin = new Padding(0, 2, 0, 0)
+            Margin = new Padding(0, 8, 0, 0)
         };
 
         ConfigureButton(_applyButton, "应用", OnApply);

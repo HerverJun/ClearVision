@@ -112,17 +112,6 @@ a, button, input, select, textarea,
     box-shadow: 0 1px 4px rgba(74, 222, 128, 0.15);
 }
 
-/* AI Gen button */
-#btn-ai-gen {
-    color: var(--cinnabar) !important;
-    border-color: rgba(212, 168, 83, 0.2);
-}
-
-#btn-ai-gen:hover {
-    background: rgba(212, 168, 83, 0.08);
-    border-color: rgba(212, 168, 83, 0.35);
-}
-
 /* ==========================================================================
    Panel - Spatial Depth without Borders
    ========================================================================== */

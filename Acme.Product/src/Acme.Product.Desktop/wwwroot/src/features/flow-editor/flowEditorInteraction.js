@@ -69,12 +69,7 @@ export class FlowEditorInteraction {
                 <span>从模板创建</span>
             `;
 
-            const aiButton = document.getElementById('btn-ai-gen');
-            if (aiButton && aiButton.parentElement === toolbar) {
-                toolbar.insertBefore(templateButton, aiButton);
-            } else {
-                toolbar.appendChild(templateButton);
-            }
+            toolbar.insertBefore(templateButton, toolbar.firstChild);
         }
 
         if (templateButton.dataset.boundTemplateSelector === 'true') {
