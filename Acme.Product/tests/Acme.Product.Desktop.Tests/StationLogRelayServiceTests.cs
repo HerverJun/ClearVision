@@ -1,0 +1,87 @@
+using Acme.Product.Station;
+using Acme.Product.Station.Sync;
+using FluentAssertions;
+using Microsoft.Extensions.Options;
+
+namespace Acme.Product.Desktop.Tests;
+
+public sealed class StationLogRelayServiceTests
+{
+    [Fact]
+    public void TryEnqueue_ShouldPersistLogSequenceAcrossServiceRestart()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var first = CreateRelay(root);
+            first.TryEnqueue("WARN", "RuntimeHost", "first warning").Should().BeTrue();
+            first.TryRead(out var firstLog).Should().BeTrue();
+            firstLog.SequenceId.Should().Be(1);
+
+            var restarted = CreateRelay(root);
+            restarted.TryEnqueue("WARN", "RuntimeHost", "second warning").Should().BeTrue();
+            restarted.TryRead(out var secondLog).Should().BeTrue();
+            secondLog.SequenceId.Should().Be(2);
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void TryEnqueue_ShouldRedactTokenValuesFromRenderedMessage()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var relay = CreateRelay(root);
+
+            relay.TryEnqueue(
+                "ERROR",
+                "RuntimeHost",
+                "X-ClearVision-Station-Token: secret-1 StationSync:SharedToken=secret-2 X-Station-Token=secret-3")
+                .Should()
+                .BeTrue();
+
+            relay.TryRead(out var log).Should().BeTrue();
+            log.RenderedMessage.Should().NotContain("secret-1");
+            log.RenderedMessage.Should().NotContain("secret-2");
+            log.RenderedMessage.Should().NotContain("secret-3");
+            log.RenderedMessage.Should().Contain("redacted");
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    private static StationLogRelayService CreateRelay(string root)
+    {
+        var settingsStore = new StationLocalSettingsStore(root);
+        settingsStore.UpdateStationIdentity("station-log", "line-log");
+        return new StationLogRelayService(
+            new StationIdentityResolver(settingsStore),
+            settingsStore,
+            Options.Create(new StationSyncOptions
+            {
+                LogQueueCapacity = 10,
+                MaxLogSummariesPerMinute = 60
+            }));
+    }
+
+    private static string CreateTempDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "ClearVisionStationLogRelayTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static void DeleteTempDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+}
