@@ -56,7 +56,34 @@ public sealed class StationLogRelayServiceTests
         }
     }
 
-    private static StationLogRelayService CreateRelay(string root)
+    [Fact]
+    public void TryEnqueue_ShouldRateLimitHighFrequencyErrors()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var relay = CreateRelay(root, maxSummariesPerMinute: 3);
+
+            for (var index = 0; index < 20; index++)
+            {
+                relay.TryEnqueue("ERROR", "RuntimeHost", $"runtime error burst {index}");
+            }
+
+            var accepted = 0;
+            while (relay.TryRead(out _))
+            {
+                accepted++;
+            }
+
+            accepted.Should().Be(3);
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    private static StationLogRelayService CreateRelay(string root, int maxSummariesPerMinute = 60)
     {
         var settingsStore = new StationLocalSettingsStore(root);
         settingsStore.UpdateStationIdentity("station-log", "line-log");
@@ -66,7 +93,7 @@ public sealed class StationLogRelayServiceTests
             Options.Create(new StationSyncOptions
             {
                 LogQueueCapacity = 10,
-                MaxLogSummariesPerMinute = 60
+                MaxLogSummariesPerMinute = maxSummariesPerMinute
             }));
     }
 

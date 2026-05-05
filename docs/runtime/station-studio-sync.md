@@ -1,5 +1,32 @@
 # Studio-Station Sync SOP
 
+## Alpha Baseline Freeze
+
+Alpha hardening starts from commit `0a4c0b8330e55103f756e9fef0a3bb0b8f3daf4d`.
+
+Baseline status:
+
+- Scope: ClearVision Studio-Station LAN monitoring and remote command/deploy first draft, accepted for initial smoke validation.
+- Default posture: Studio ingress and Station sync are opt-in and disabled by default.
+- Runtime ownership: Station inspection remains autonomous. Studio is only a monitor, command source, package source, and persistence peer.
+- Image policy: this Alpha does not transfer images. Result payloads may carry `ImageId` and scalar/string previews only.
+- Transport: Station initiates outbound SignalR/HTTP to Studio. No Station HTTP server is part of this version.
+- Broker policy: MQTT and external broker stacks are out of scope for this Alpha.
+
+Baseline run modes:
+
+- Local loopback: Studio `StationIngress:Enabled=true`, `ListenMode=Loopback`, Station `StationSync:Enabled=true`, `StudioBaseUrl=http://127.0.0.1:5000`, matching non-empty shared token.
+- LAN trial: Studio `StationIngress:Enabled=true`, `ListenMode=Lan`, approved port and firewall rule, strong shared token, Station `StudioBaseUrl=http://studio-host:port`.
+- Simulator pressure check: `& "./scripts/run-station-simulator.ps1" -Studio "http://127.0.0.1:5000" -Token "<token>" -Stations 10 -Rate 2 -DurationSeconds 3600`.
+
+Alpha known limits:
+
+- Result summaries are best-effort monitoring data. If the Station outbound queue is saturated, the Station may drop Studio-facing summaries to protect inspection latency; local inspection and local runtime result handling remain the priority.
+- Local spool enforces `MaxBufferedResults`, `MaxSpoolMb`, and `MaxSpoolDays`. When caps are exceeded, oldest pending summaries are trimmed, creating a telemetry gap.
+- `.cvpkg` deployment is hardened for hash/manifest/version checks and rollback, but still requires field validation with production-export package layouts.
+- Health CPU usage is currently best-effort and may be null; use working set, private memory, DB size, and spool size as required Alpha metrics.
+- No formal EF migration is included for this Alpha; schema creation remains additive and migration-light.
+
 ## Scope And Guardrails
 
 Studio-Station sync is an opt-in LAN monitoring path for Station telemetry. Station always initiates outbound connections to Studio and keeps local runtime autonomy when Studio is offline.
@@ -108,6 +135,7 @@ Offline handling:
 4. Restart Studio or restore LAN.
 5. Station reconnects, re-registers, and replays unacknowledged summaries in sequence.
 6. Studio ACKs only persisted cursor state; duplicates by `StationId + SequenceId` must not create duplicate records.
+7. If the Station outbound queue saturates before the spool worker can persist summaries, Station drops Studio-facing summaries instead of blocking inspection callbacks.
 
 Remote package deploy:
 
@@ -119,7 +147,7 @@ Remote package deploy:
 6. Station extracts to staging.
 7. Station validates `manifest.json`, `packageId`, manifest `sha256`, and `minStationVersion`.
 8. Station promotes staging without directly overwriting active content.
-9. On load failure, Station keeps or restores last-known-good active package.
+9. If promotion, package load, or activation fails, Station restores `last-known-good` when available.
 10. Deployment status and failures are reported back to Studio command records and audit.
 
 Rollback:
@@ -186,6 +214,52 @@ Simulator behavior:
 - Polls commands and reports command lifecycle states.
 - Randomly disconnects and reconnects when `DisconnectRate` is set.
 
+## Alpha Trial Runs
+
+Single Station 4-hour shadow run:
+
+1. Configure Studio and one Station with matching `StationIngress` / `StationSync` tokens.
+2. Keep production decision-making on the existing proven path; use Studio-Station sync for observation only.
+3. Start metric capture:
+
+```powershell
+& "./scripts/run-station-alpha-trial.ps1" `
+  -Mode Shadow4h `
+  -VisionDbPath ".\vision.db" `
+  -SpoolDirectory "$env:LOCALAPPDATA\ClearVisionStation\spool" `
+  -SampleSeconds 60
+```
+
+4. During the run, inject one Studio restart and one Station network disconnect/reconnect window.
+5. Record CPU, working set, private memory, database size, spool size, and UI stutter notes in the generated notes file.
+
+Ten Simulator Station 1-hour pressure run:
+
+1. Start Studio with Station ingress enabled and a test shared token.
+2. Start metric capture and the simulator:
+
+```powershell
+& "./scripts/run-station-alpha-trial.ps1" `
+  -Mode Simulator10x1h `
+  -Studio "http://127.0.0.1:5000" `
+  -Token "dev-shared-token" `
+  -VisionDbPath ".\vision.db" `
+  -SampleSeconds 30
+```
+
+3. Confirm monitor UI remains usable, SSE keeps updating, and command records/audit remain queryable.
+4. Review `.tmp/station-alpha-trial/*.csv` and notes before approving field trial expansion.
+
+Minimum Alpha trial acceptance:
+
+- Station inspection does not stop when Studio is closed, restarted, or unreachable.
+- RuntimeHost result callbacks do not wait on network and do not synchronously block on Studio persistence.
+- Duplicate replay does not create duplicate Studio result rows.
+- ACK cursor only advances through Studio's persisted cursor and Station only clears ACKed spool summaries.
+- `.cvpkg` hash mismatch and package load failure end as failed commands with audit records, with active package preserved or restored.
+- Spool cap breach trims old monitoring summaries without crashing Station.
+- WARN/ERROR/FATAL log bursts remain rate limited and summary-only.
+
 ## Validation Checklist
 
 1. Restore: `dotnet restore Acme.Product/Acme.Product.sln`.
@@ -203,6 +277,9 @@ Simulator behavior:
 13. Restart Studio and Station during replay; confirm cursor and sequence resume.
 14. Force spool over configured cap in a non-production sandbox; confirm oldest bounded behavior and no runtime crash.
 15. Issue Ping, ReloadPackage, Stop/Start, DeployPackage, and CollectLogs commands; confirm states, command results, and audit records.
+16. Deploy a `.cvpkg` with an intentionally wrong hash; confirm command `Failed`, audit `CommandCompleted`, and active package unchanged.
+17. Deploy a `.cvpkg` whose runtime package fails to load; confirm rollback to `last-known-good`.
+18. Generate high-frequency RuntimeHost errors; confirm log relay rate limit and Station UI/runtime responsiveness.
 
 ## Review Risks
 
@@ -211,3 +288,34 @@ Simulator behavior:
 - Health collection is best-effort for device-level signals; do not let camera or PLC probes block inspection.
 - Log relay is summary-only by design. Full log retrieval remains bounded and command-driven.
 - Future image support requires a separate design and must not be slipped into Station sync DTOs.
+
+## Small Field Trial Configuration
+
+Use this configuration for the first small field trial:
+
+- Studio `StationIngress:Enabled=true`.
+- Studio `StationIngress:ListenMode=Lan`.
+- Studio `StationIngress:AllowInsecureDevelopment=false`.
+- Studio `StationIngress:SharedToken=<site-generated-strong-token>`.
+- Studio `StationIngress:ResultBufferPerStation=200`.
+- Studio `StationIngress:EventBufferSize=1000`.
+- Station `StationSync:Enabled=true`.
+- Station `StationSync:StudioBaseUrl=http://<studio-host>:<port>`.
+- Station `StationSync:SharedToken=<same-token>`.
+- Station `StationSync:PendingBatchSize=100`.
+- Station `StationSync:OutboundQueueCapacity=1000`.
+- Station `StationSync:MaxBufferedResults=10000`.
+- Station `StationSync:MaxSpoolMb=512`.
+- Station `StationSync:MaxSpoolDays=7`.
+- Station `StationSync:LogQueueCapacity=500`.
+- Station `StationSync:MaxLogSummariesPerMinute=60`.
+- Station `StationSync:MaxCollectLogsMb=64`.
+- Station `StationSync:PackageDirectory=%LocalAppData%\ClearVisionStation\packages`.
+
+Rollback plan:
+
+1. Disable Station sync locally: set `StationSync:Enabled=false` and restart Station. Inspection remains local.
+2. Disable Studio ingress: set `StationIngress:Enabled=false` and restart Studio.
+3. If a deployed package is suspect, use Station monitor to deploy the previous known-good package, or restore `%LocalAppData%\ClearVisionStation\packages\last-known-good` to `active`.
+4. Keep local spool files until the trial review is complete; only clear them after confirming Studio cursor and audit state.
+5. Preserve `.tmp/station-alpha-trial` metrics and Station local logs for post-run review.

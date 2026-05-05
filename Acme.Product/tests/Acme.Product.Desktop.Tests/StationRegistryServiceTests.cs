@@ -147,6 +147,94 @@ public sealed class StationRegistryServiceTests
     }
 
     [Fact]
+    public async Task CentralStore_ShouldPersistDeployCommandFailuresAndAuditTrail()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandAuditTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var command = store.CreateCommand(
+                "station-deploy",
+                StationCommandType.DeployPackage,
+                """{"packageId":"pkg-bad","sha256":"sha256:bad"}""",
+                "unit-test",
+                TimeSpan.FromMinutes(30));
+            var delivered = store.PollCommand("station-deploy");
+            delivered.Should().NotBeNull();
+            delivered!.Status.Should().Be(StationCommandStatus.Delivered);
+
+            store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-deploy",
+                Status = StationCommandStatus.Accepted,
+                ProgressPercent = 0,
+                Message = "Accepted"
+            });
+            store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-deploy",
+                Status = StationCommandStatus.Running,
+                ProgressPercent = 50,
+                Message = "Verifying package"
+            });
+            var failed = store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-deploy",
+                Status = StationCommandStatus.Failed,
+                ProgressPercent = 100,
+                Message = "Downloaded package hash does not match the Studio manifest.",
+                ErrorCode = "CommandFailed",
+                ErrorDetail = "hash mismatch"
+            });
+
+            failed.Should().NotBeNull();
+            failed!.Status.Should().Be(StationCommandStatus.Failed);
+            failed.ErrorCode.Should().Be("CommandFailed");
+
+            await using var verifyScope = provider.CreateAsyncScope();
+            var db = verifyScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var persisted = await db.StationCommandRecords.SingleAsync(item => item.CommandId == command.CommandId);
+            persisted.Status.Should().Be(StationCommandStatus.Failed.ToString());
+            persisted.ResultMessage.Should().Contain("hash");
+
+            var audits = db.StationAuditRecords
+                .Where(item => item.CommandId == command.CommandId)
+                .AsEnumerable()
+                .OrderBy(item => item.CreatedAtUtc)
+                .ToList();
+            audits.Select(item => item.Action).Should().Contain(StationCommandType.DeployPackage.ToString());
+            audits.Select(item => item.Action).Should().Contain("CommandCompleted");
+            audits.Last().Result.Should().Be(StationCommandStatus.Failed.ToString());
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
     public void MarkDisconnected_ShouldMoveStationIntoOfflineSummaryBucket()
     {
         var registry = CreateRegistry();

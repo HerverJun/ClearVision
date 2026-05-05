@@ -44,6 +44,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private DateTimeOffset _lastHealthAtUtc = DateTimeOffset.MinValue;
     private DateTimeOffset? _lastResultAtUtc;
     private long _nextControlSequenceId;
+    private long _droppedResultSummaries;
 
     public StationSyncHostedService(
         RuntimeHost runtimeHost,
@@ -188,10 +189,18 @@ public sealed class StationSyncHostedService : BackgroundService
             var summary = StationResultMapper.ToSummary(result, identity);
             _lastResultAtUtc = summary.CompletedAtUtc;
 
-            if (!_resultIngressChannel.Writer.TryWrite(summary))
+            if (_resultIngressChannel.Writer.TryWrite(summary))
             {
-                _spoolStore.Enqueue(summary);
                 SignalSync();
+                return;
+            }
+
+            var dropped = Interlocked.Increment(ref _droppedResultSummaries);
+            if (dropped == 1 || dropped % 100 == 0)
+            {
+                _logger.LogWarning(
+                    "Dropped Station Studio result summary because the outbound queue is full. DroppedResultSummaries={DroppedResultSummaries}",
+                    dropped);
             }
         }
         catch (Exception ex)

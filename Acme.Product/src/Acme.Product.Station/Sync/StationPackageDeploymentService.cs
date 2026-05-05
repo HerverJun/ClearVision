@@ -69,21 +69,21 @@ public sealed class StationPackageDeploymentService
             CopyDirectory(activeRoot, lastKnownGoodRoot);
         }
 
-        var archiveTarget = Path.Combine(archiveRoot, $"{payload.PackageId}-{DateTime.UtcNow:yyyyMMddHHmmss}");
-        if (Directory.Exists(archiveTarget))
-        {
-            Directory.Delete(archiveTarget, recursive: true);
-        }
-
-        if (Directory.Exists(activeRoot))
-        {
-            Directory.Move(activeRoot, archiveTarget);
-        }
-
-        Directory.Move(runtimeRoot, activeRoot);
-
         try
         {
+            var archiveTarget = Path.Combine(archiveRoot, $"{payload.PackageId}-{DateTime.UtcNow:yyyyMMddHHmmss}");
+            if (Directory.Exists(archiveTarget))
+            {
+                Directory.Delete(archiveTarget, recursive: true);
+            }
+
+            if (Directory.Exists(activeRoot))
+            {
+                Directory.Move(activeRoot, archiveTarget);
+            }
+
+            Directory.Move(runtimeRoot, activeRoot);
+
             if (!File.Exists(Path.Combine(activeRoot, "package.json")))
             {
                 throw new InvalidOperationException("Package is missing runtime package.json.");

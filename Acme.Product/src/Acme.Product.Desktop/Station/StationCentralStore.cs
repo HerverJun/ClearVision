@@ -319,6 +319,7 @@ public sealed class StationCentralStore
         }
 
         return query
+            .AsEnumerable()
             .OrderByDescending(item => item.CreatedAtUtc)
             .Take(Math.Clamp(take, 1, 500))
             .Select(item => new StationAuditViewModel
@@ -379,13 +380,16 @@ public sealed class StationCentralStore
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         var now = DateTimeOffset.UtcNow;
+        var createdStatus = StationCommandStatus.Created.ToString();
+        var deliveredStatus = StationCommandStatus.Delivered.ToString();
 
         var expired = db.StationCommandRecords
             .Where(item =>
                 item.StationId == stationId &&
-                (item.Status == StationCommandStatus.Created.ToString() ||
-                 item.Status == StationCommandStatus.Delivered.ToString()) &&
-                item.ExpiresAtUtc <= now)
+                (item.Status == createdStatus ||
+                 item.Status == deliveredStatus))
+            .AsEnumerable()
+            .Where(item => item.ExpiresAtUtc <= now)
             .ToList();
         foreach (var item in expired)
         {
@@ -397,8 +401,9 @@ public sealed class StationCentralStore
         var command = db.StationCommandRecords
             .Where(item =>
                 item.StationId == stationId &&
-                item.Status == StationCommandStatus.Created.ToString() &&
-                item.ExpiresAtUtc > now)
+                item.Status == createdStatus)
+            .AsEnumerable()
+            .Where(item => item.ExpiresAtUtc > now)
             .OrderBy(item => item.CreatedAtUtc)
             .FirstOrDefault();
 
@@ -483,9 +488,9 @@ public sealed class StationCentralStore
         return db.StationCommandRecords
             .AsNoTracking()
             .Where(item => item.StationId == stationId)
+            .AsEnumerable()
             .OrderByDescending(item => item.CreatedAtUtc)
             .Take(Math.Clamp(take, 1, 500))
-            .AsEnumerable()
             .Select(ToDto)
             .ToList();
     }

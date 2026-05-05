@@ -32,6 +32,8 @@
     <Compile Include="..\..\src\Acme.Product.Station\StationLocalSettingsStore.cs" Link="Station\StationLocalSettingsStore.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationIdentityResolver.cs" Link="Station\Sync\StationIdentityResolver.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationLogRelayService.cs" Link="Station\Sync\StationLogRelayService.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationPackageDeploymentService.cs" Link="Station\Sync\StationPackageDeploymentService.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationResultMapper.cs" Link="Station\Sync\StationResultMapper.cs" />
   </ItemGroup>
 
   <ItemGroup>
