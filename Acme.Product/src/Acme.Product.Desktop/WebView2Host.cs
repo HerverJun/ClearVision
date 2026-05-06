@@ -23,6 +23,16 @@ public sealed class WebView2Host : IAsyncDisposable
     private bool _isDisposed;
     private readonly WebMessageHandler? _messageHandler;
 
+    internal static Uri CreateInitialPageUri(int webPort)
+    {
+        if (webPort < 1 || webPort > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(webPort), "Web port must be between 1 and 65535.");
+        }
+
+        return new Uri($"http://localhost:{webPort}/index.html");
+    }
+
     /// <summary>
     /// WebView2 初始化完成事件。
     /// </summary>
@@ -339,8 +349,10 @@ public sealed class WebView2Host : IAsyncDisposable
 
         if (File.Exists(indexPath))
         {
-            // 使用虚拟主机名加载，支持ES6模块
-            _webView.Source = new Uri("http://app.local/index.html");
+            // Keep the WebView2 document and API calls on the same localhost
+            // origin. In packaged installs, app.local -> localhost can be
+            // blocked or misreported as a missing backend.
+            _webView.Source = CreateInitialPageUri(Program.GetWebPort());
         }
         else
         {
