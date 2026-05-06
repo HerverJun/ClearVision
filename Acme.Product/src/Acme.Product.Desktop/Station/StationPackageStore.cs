@@ -1,6 +1,9 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Acme.Product.Application.DTOs;
+using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +13,28 @@ namespace Acme.Product.Desktop.Station;
 
 public sealed class StationPackageStore
 {
+    private static readonly JsonSerializerOptions PackageJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        Converters =
+        {
+            new JsonStringEnumConverter()
+        }
+    };
+
+    private static readonly JsonSerializerOptions StablePackageJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = false,
+        Converters =
+        {
+            new JsonStringEnumConverter()
+        }
+    };
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<StationPackageStore> _logger;
     private readonly string _rootDirectory;
@@ -34,7 +59,7 @@ public sealed class StationPackageStore
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         return db.StationPackageRecords
-            .OrderByDescending(item => item.CreatedAtUtc)
+            .OrderByDescending(item => item.Id)
             .Select(item => new StationPackageManifestDto
             {
                 PackageId = item.PackageId,
@@ -93,15 +118,79 @@ public sealed class StationPackageStore
             Directory.Delete(staging, recursive: true);
         }
 
-        Directory.CreateDirectory(Path.Combine(staging, "package"));
-        await File.WriteAllTextAsync(Path.Combine(staging, "package", "README.txt"), "ClearVision Station deployment test package.", cancellationToken);
+        var runtimeRoot = Path.Combine(staging, "package");
+        Directory.CreateDirectory(runtimeRoot);
+        Directory.CreateDirectory(Path.Combine(runtimeRoot, "quality"));
+        Directory.CreateDirectory(Path.Combine(runtimeRoot, "field"));
+
+        var flow = CreateSmokeFlow(packageId);
+        var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, StablePackageJsonOptions);
+        var flowHash = ComputeSha256WithPrefix(flowBytes);
+        var runtimeManifest = new RuntimePackageManifest
+        {
+            PackageId = packageId,
+            PackageName = packageName,
+            RuntimeApiVersion = "1.0",
+            MinStationVersion = "0.1.0",
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "Studio",
+            SourceProjectId = Guid.Empty,
+            EntryFlow = "flow.json",
+            FlowHash = flowHash,
+            OperatorCatalogVersion = "test-package",
+            ExportAllowed = true,
+            PendingParameters = [],
+            MissingResources = [],
+            FieldExtensions = new RuntimeFieldExtensions
+            {
+                RuntimeParameters = "field/runtime-parameters.json",
+                DefaultSiteProfile = "field/station-profile.default.json"
+            }
+        };
+        var runtimeProfile = new RuntimeProfile();
+        var validationReport = new RuntimeValidationReport
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            IsValid = true,
+            FlowHash = flowHash,
+            Notes =
+            [
+                "Purpose=Station remote deployment smoke test",
+                "OperatorCount=1",
+                "ConnectionCount=0"
+            ]
+        };
+        var parameterSchema = new RuntimeParameterSchema
+        {
+            PackageId = packageId,
+            FlowHash = flowHash,
+            Parameters = []
+        };
+        var defaultSiteProfile = new RuntimeSiteProfile
+        {
+            ProfileId = "package-default",
+            PackageId = packageId,
+            FlowHash = flowHash,
+            Revision = 0,
+            UpdatedAtUtc = runtimeManifest.CreatedAt,
+            UpdatedBy = "Studio",
+            Overrides = []
+        };
+
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "package.json"), JsonSerializer.SerializeToUtf8Bytes(runtimeManifest, PackageJsonOptions), cancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "flow.json"), flowBytes, cancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "runtime-profile.json"), JsonSerializer.SerializeToUtf8Bytes(runtimeProfile, PackageJsonOptions), cancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "quality", "validation-report.json"), JsonSerializer.SerializeToUtf8Bytes(validationReport, PackageJsonOptions), cancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "field", "runtime-parameters.json"), JsonSerializer.SerializeToUtf8Bytes(parameterSchema, PackageJsonOptions), cancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "field", "station-profile.default.json"), JsonSerializer.SerializeToUtf8Bytes(defaultSiteProfile, PackageJsonOptions), cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(runtimeRoot, "README.runtime.md"), "ClearVision Station deployment smoke-test runtime package.", cancellationToken);
 
         var manifest = new StationPackageManifestDto
         {
             PackageId = packageId,
             PackageName = packageName,
             PackageVersion = packageVersion,
-            FlowHash = $"sha256:{Guid.NewGuid():N}",
+            FlowHash = flowHash,
             CreatedBy = "Studio",
             MinStationVersion = "0.1.0",
             CreatedAtUtc = DateTimeOffset.UtcNow
@@ -124,6 +213,56 @@ public sealed class StationPackageStore
         manifest.Sha256 = await ComputeSha256Async(targetFile, cancellationToken);
         Persist(manifest, targetFile);
         return manifest;
+    }
+
+    private static OperatorFlowDto CreateSmokeFlow(string packageId)
+    {
+        return new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Station deploy smoke {packageId}",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "DeploymentSmokeResult",
+                    Type = OperatorType.ResultOutput,
+                    X = 0,
+                    Y = 0,
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Format",
+                            DisplayName = "Format",
+                            DataType = "enum",
+                            DefaultValue = "JSON",
+                            Value = "JSON",
+                            IsRequired = false,
+                            Options =
+                            [
+                                new Acme.Product.Core.ValueObjects.ParameterOption { Label = "JSON", Value = "JSON" },
+                                new Acme.Product.Core.ValueObjects.ParameterOption { Label = "CSV", Value = "CSV" },
+                                new Acme.Product.Core.ValueObjects.ParameterOption { Label = "Text", Value = "Text" }
+                            ]
+                        },
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SaveToFile",
+                            DisplayName = "SaveToFile",
+                            DataType = "bool",
+                            DefaultValue = false,
+                            Value = false,
+                            IsRequired = false
+                        }
+                    ]
+                }
+            ],
+            Connections = []
+        };
     }
 
     private void Persist(StationPackageManifestDto manifest, string path)
@@ -159,5 +298,11 @@ public sealed class StationPackageStore
         await using var stream = File.OpenRead(path);
         var hash = await SHA256.HashDataAsync(stream, cancellationToken);
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static string ComputeSha256WithPrefix(byte[] bytes)
+    {
+        var hash = SHA256.HashData(bytes);
+        return $"sha256:{Convert.ToHexString(hash).ToLowerInvariant()}";
     }
 }

@@ -13,6 +13,8 @@ class StationMonitorView {
         this.selectedStationId = null;
         this.selectedStationDetail = null;
         this.commandBusy = false;
+        this.commandStatusMessage = '';
+        this.commandStatusLevel = 'idle';
         this.offlineThresholdSeconds = 15;
         this.refreshTimer = null;
         this.eventSource = null;
@@ -499,6 +501,8 @@ class StationMonitorView {
         }
 
         this.commandBusy = true;
+        this.commandStatusMessage = this.getActionBusyMessage(action);
+        this.commandStatusLevel = 'busy';
         this.render();
         try {
             switch (action) {
@@ -514,13 +518,20 @@ class StationMonitorView {
                 case 'deploy':
                     await this.deployLatestPackage();
                     break;
+                case 'testDeploy':
+                    await this.createAndDeployTestPackage();
+                    break;
                 default:
                     break;
             }
 
             await this.loadStationDetail(this.selectedStationId);
+            this.commandStatusMessage = this.getActionSuccessMessage(action);
+            this.commandStatusLevel = 'success';
         } catch (error) {
             console.error('[StationMonitorView] Station action failed:', error);
+            this.commandStatusMessage = error?.message || 'Station action failed.';
+            this.commandStatusLevel = 'error';
         } finally {
             this.commandBusy = false;
             this.render();
@@ -541,6 +552,54 @@ class StationMonitorView {
             return null;
         }
 
+        return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
+            packageId,
+            issuedBy: 'Studio'
+        });
+    }
+
+    getActionBusyMessage(action) {
+        switch (action) {
+            case 'testDeploy':
+                return '正在生成测试包并创建下发命令...';
+            case 'deploy':
+                return '正在创建运行包下发命令...';
+            case 'reload':
+                return '正在下发重载命令...';
+            case 'stop':
+                return '正在下发停止命令...';
+            case 'ping':
+                return '正在下发 Ping 命令...';
+            default:
+                return '正在下发命令...';
+        }
+    }
+
+    getActionSuccessMessage(action) {
+        switch (action) {
+            case 'testDeploy':
+                return '测试包已生成，部署命令已下发；等待 Station 轮询执行。';
+            case 'deploy':
+                return '部署命令已下发；等待 Station 轮询执行。';
+            case 'reload':
+                return '重载命令已下发。';
+            case 'stop':
+                return '停止命令已下发。';
+            case 'ping':
+                return 'Ping 命令已下发。';
+            default:
+                return '命令已下发。';
+        }
+    }
+
+    async createAndDeployTestPackage() {
+        const createdPackage = await httpClient.post('/station-packages/test', {});
+        const packageId = createdPackage?.packageId ?? createdPackage?.PackageId;
+        if (!packageId) {
+            throw new Error('Test package was created without a packageId.');
+        }
+
+        this.packages = await httpClient.get('/station-packages').catch(() => this.packages);
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
             packageId,
             issuedBy: 'Studio'
@@ -680,6 +739,7 @@ class StationMonitorView {
         const latestHealth = recentHealth[0] || detail;
         const actionsDisabled = this.commandBusy ? 'disabled' : '';
         const deployDisabled = this.commandBusy || this.packages.length === 0 ? 'disabled' : '';
+        const testDeployDisabled = this.commandBusy ? 'disabled' : '';
 
         this.focusMeta.textContent = isOnline ? '实时详情' : '已超时';
         this.focus.innerHTML = `
@@ -696,7 +756,11 @@ class StationMonitorView {
                 <button type="button" data-station-action="reload" ${actionsDisabled}>重载</button>
                 <button type="button" data-station-action="stop" ${actionsDisabled}>停止</button>
                 <button type="button" data-station-action="deploy" ${deployDisabled}>部署</button>
+                <button type="button" class="sm-action-wide" data-station-action="testDeploy" ${testDeployDisabled}>生成测试包并下发</button>
             </div>
+            ${this.commandStatusMessage
+                ? `<div class="sm-command-status" data-level="${this.escapeHtml(this.commandStatusLevel)}">${this.escapeHtml(this.commandStatusMessage)}</div>`
+                : ''}
             <div class="sm-detail-stats">
                 <div><span>良品</span><b>${Number(detail.sessionOkCount || 0)}</b></div>
                 <div><span>不良</span><b>${Number(detail.sessionNgCount || 0)}</b></div>

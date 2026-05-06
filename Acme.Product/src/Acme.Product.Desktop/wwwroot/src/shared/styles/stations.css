@@ -594,6 +594,26 @@
     box-shadow: none;
 }
 
+.sm-detail-actions .sm-action-wide {
+    grid-column: 1 / -1;
+}
+
+.sm-command-status {
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--glass-border-light);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    background: var(--glass-card);
+}
+
+.sm-command-status[data-level="success"] {
+    color: var(--success-jade);
+}
+
+.sm-command-status[data-level="error"] {
+    color: var(--danger-red);
+}
+
 /* Detail Stats */
 
 .sm-detail-stats {
