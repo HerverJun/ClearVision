@@ -833,6 +833,7 @@ function initializeInspectionController() {
         }
 
         // 显示结果提示
+        const isRealtimeResult = inspectionController.getState?.().isRealtime === true;
         let status = 'info';
         let message = '';
 
@@ -847,7 +848,11 @@ function initializeInspectionController() {
             status = 'warning';
             message = `检测到 ${defectCount} 个目标`;
         }
-        showToast(message, status);
+
+        // 实时检测的正常 OK/NG 结果会高频到达，面板已经展示状态与计数；Toast 只保留异常。
+        if (!isRealtimeResult || status === 'error') {
+            showToast(message, status);
+        }
     });
     
     // 设置检测错误回调

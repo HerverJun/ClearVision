@@ -124,12 +124,10 @@ export function bindToolbarCommands(options) {
 
             const testImage = getImageViewer()?.currentTestImage;
             if (testImage) {
-                showToast('Running inspection with imported image...', 'info');
                 await inspectionController.executeSingle(testImage);
                 return;
             }
 
-            showToast('Running inspection flow...', 'info');
             await inspectionController.executeSingle();
         } catch (error) {
             console.error('[CommandHandlers] run failed', error);

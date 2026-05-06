@@ -42,6 +42,8 @@ class InspectionController {
         this.sseReconnectAttempt = 0;
         this.sseReconnectBaseDelayMs = 1000;
         this.sseReconnectMaxDelayMs = 10000;
+        this.recentCompletedResultKeys = new Map();
+        this.resultDedupeWindowMs = 5000;
         
         // 初始化监听
         this.initializeWebMessage();
@@ -434,6 +436,11 @@ class InspectionController {
             this.publishBase64Image(result.outputImageBase64);
         }
 
+        if (!this.markResultAsHandled(result)) {
+            console.debug('[InspectionController] 忽略重复检测结果:', this.getResultDedupeKey(result));
+            return;
+        }
+
         this.notifyInspectionCompleted(result);
     }
 
@@ -716,6 +723,11 @@ class InspectionController {
             this.publishBase64Image(outputImage);
         }
 
+        if (!this.markResultAsHandled(normalizedResult)) {
+            console.debug('[InspectionController] 忽略重复检测完成:', this.getResultDedupeKey(normalizedResult));
+            return;
+        }
+
         this.notifyInspectionCompleted(normalizedResult);
     }
 
@@ -973,6 +985,35 @@ class InspectionController {
 
     readFirstDefined(...values) {
         return values.find(value => value !== undefined && value !== null);
+    }
+
+    getResultDedupeKey(result) {
+        return result?.id
+            ?? result?.resultId
+            ?? result?.ResultId
+            ?? result?.Id
+            ?? null;
+    }
+
+    markResultAsHandled(result) {
+        const key = this.getResultDedupeKey(result);
+        if (!key) {
+            return true;
+        }
+
+        const now = Date.now();
+        for (const [storedKey, timestamp] of this.recentCompletedResultKeys.entries()) {
+            if (now - timestamp > this.resultDedupeWindowMs) {
+                this.recentCompletedResultKeys.delete(storedKey);
+            }
+        }
+
+        if (this.recentCompletedResultKeys.has(key)) {
+            return false;
+        }
+
+        this.recentCompletedResultKeys.set(key, now);
+        return true;
     }
 
     notifyInspectionCompleted(result) {
