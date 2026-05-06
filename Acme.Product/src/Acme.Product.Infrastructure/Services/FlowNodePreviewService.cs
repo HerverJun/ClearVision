@@ -71,7 +71,10 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             ImageFormat = ".png"
         };
 
-        var inputData = BuildInputData(flow, targetNodeId, inputImage);
+        var externalInputImage = ShouldUseExternalInputImage(flow, targetNodeId)
+            ? inputImage
+            : null;
+        var inputData = BuildInputData(externalInputImage);
         var result = await _flowExecution.ExecuteFlowDebugAsync(flow, debugOptions, inputData, ct);
 
         if (!result.IntermediateResults.TryGetValue(targetNodeId, out var nodeOutput))
@@ -87,7 +90,7 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
         var targetDebugResult = result.DebugOperatorResults.FirstOrDefault(item => item.OperatorId == targetNodeId);
         var previewImageBytes = TryGetOutputImageBytes(nodeOutput)
             ?? TryGetImageBytesFromSnapshot(targetDebugResult?.InputSnapshot);
-        var inputSnapshotImage = ResolveInputImageBytes(flow, targetNodeId, result, targetDebugResult, inputImage);
+        var inputSnapshotImage = ResolveInputImageBytes(flow, targetNodeId, result, targetDebugResult, externalInputImage);
         var sanitizedOutputs = BuildResponseOutputData(nodeOutput);
         var metrics = AnalyzePreviewMetrics(previewImageBytes, sanitizedOutputs);
         var diagnosticCodes = BuildDiagnosticCodes(metrics, missingResources);
@@ -141,14 +144,9 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
         }
     }
 
-    private static Dictionary<string, object>? BuildInputData(OperatorFlow flow, Guid targetNodeId, byte[]? inputImage)
+    private static Dictionary<string, object>? BuildInputData(byte[]? inputImage)
     {
         if (inputImage == null || inputImage.Length == 0)
-        {
-            return null;
-        }
-
-        if (HasUpstreamOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition))
         {
             return null;
         }
@@ -336,6 +334,11 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
     {
         var relevantIds = CollectRelevantOperatorIds(flow, targetNodeId);
         return flow.Operators.Any(item => relevantIds.Contains(item.Id) && item.Type == type);
+    }
+
+    private static bool ShouldUseExternalInputImage(OperatorFlow flow, Guid targetNodeId)
+    {
+        return !HasUpstreamOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition);
     }
 
     private static bool PathExists(string path)

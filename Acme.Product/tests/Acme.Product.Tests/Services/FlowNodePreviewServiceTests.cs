@@ -58,6 +58,49 @@ public class FlowNodePreviewServiceTests
     }
 
     [Fact]
+    public async Task PreviewWithMetricsAsync_ShouldNotReturnExternalImage_WhenTargetIsImageAcquisition()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        Dictionary<string, object>? capturedInput = null;
+        var target = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
+        var flow = new OperatorFlow("preview-flow");
+        flow.AddOperator(target);
+
+        flowExecution.ExecuteFlowDebugAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedInput = callInfo.ArgAt<Dictionary<string, object>?>(2);
+                return Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    DebugSessionId = Guid.NewGuid(),
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [target.Id] = new()
+                        {
+                            ["Message"] = "captured-from-camera"
+                        }
+                    }
+                });
+            });
+
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>());
+
+        var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
+
+        result.Success.Should().BeTrue();
+        capturedInput.Should().BeNull();
+        result.InputImage.Should().BeNull();
+    }
+
+    [Fact]
     public async Task PreviewWithMetricsAsync_ShouldUseBundledLabels_WhenLabelsPathIsBlank()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();

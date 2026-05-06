@@ -1164,7 +1164,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var sourceType = GetParameterString(imageOp, "SourceType", "File");
+        var sourceType = GetImageAcquisitionSourceType(imageOp);
         if (sourceType.Equals("File", StringComparison.OrdinalIgnoreCase))
         {
             _cameraStatusValueLabel.Text = "文件模式";
@@ -1261,7 +1261,7 @@ public sealed class MainForm : Form
         var imageOp = flow.Operators.FirstOrDefault(op => op.Type == OperatorType.ImageAcquisition);
         var inputMode = imageOp == null
             ? "无图像采集"
-            : (GetParameterString(imageOp, "SourceType", "File").Equals("File", StringComparison.OrdinalIgnoreCase)
+            : (GetImageAcquisitionSourceType(imageOp).Equals("File", StringComparison.OrdinalIgnoreCase)
                 ? "图片文件"
                 : "现场相机");
         var plcCount = flow.Operators.Count(op => PlcOperatorTypes.Contains(op.Type));
@@ -1363,6 +1363,20 @@ public sealed class MainForm : Form
         var value = parameter?.Value ?? parameter?.DefaultValue;
         var text = value?.ToString()?.Trim();
         return string.IsNullOrWhiteSpace(text) ? fallback : text;
+    }
+
+    private static string GetImageAcquisitionSourceType(Acme.Product.Application.DTOs.OperatorDto op)
+    {
+        return NormalizeOptionValue(GetParameterString(op, "SourceType", "File"), "File");
+    }
+
+    private static string NormalizeOptionValue(string? value, string fallback)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        var separatorIndex = normalized.IndexOf('|', StringComparison.Ordinal);
+        return separatorIndex >= 0
+            ? normalized[..separatorIndex].Trim()
+            : normalized;
     }
 
     private static string ToStateText(RuntimeHostState state)

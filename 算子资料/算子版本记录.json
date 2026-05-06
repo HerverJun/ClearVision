@@ -2635,6 +2635,11 @@
           "version": "1.0.0",
           "sourceHash": "A50DC61A05BE528110942622D17283D5FFD845CA9FF4F4A3E01C48C3044305D5",
           "recordedAt": "2026-05-06T20:33:19.1208969\u002B08:00"
+        },
+        {
+          "version": "1.0.0",
+          "sourceHash": "529DA9900D8E058A313DC6183BAE8C0871BDF2ACD0D9DA384AEC59D61943B447",
+          "recordedAt": "2026-05-06T20:55:32.4532274\u002B08:00"
         }
       ]
     },
@@ -3452,8 +3457,8 @@
     },
     {
       "id": "ModbusCommunication",
-      "displayName": "Modbus\u901A\u4FE1",
-      "category": "\u901A\u4FE1",
+      "displayName": "Modbus Communication",
+      "category": "Communication",
       "records": [
         {
           "version": "1.0.0",

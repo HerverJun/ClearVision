@@ -21,6 +21,7 @@
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | AI检测 | `2.0.0` |
 | `OperatorType.DistanceTransform` | Distance Transform | Analysis | `1.0.1` |
 | `OperatorType.MitsubishiMcCommunication` | Mitsubishi MC Communication | Communication | `1.0.0` |
+| `OperatorType.ModbusCommunication` | Modbus Communication | Communication | `1.0.0` |
 | `OperatorType.AngleMeasurement` | Angle Measurement | Detection | `1.0.0` |
 | `OperatorType.ContourMeasurement` | Contour Measurement | Detection | `1.0.0` |
 | `OperatorType.ResultJudgment` | Result Judgment | Flow Control | `1.0.1` |
@@ -120,7 +121,6 @@
 | `OperatorType.ImageSave` | 图像保存 | 输出 | `1.0.0` |
 | `OperatorType.ResultOutput` | 结果输出 | 输出 | `1.0.1` |
 | `OperatorType.HttpRequest` | HTTP 请求 | 通信 | `1.0.0` |
-| `OperatorType.ModbusCommunication` | Modbus通信 | 通信 | `1.0.0` |
 | `OperatorType.MqttPublish` | MQTT 发布 | 通信 | `1.0.0` |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 通信 | `1.0.0` |
 | `OperatorType.SerialCommunication` | 串口通信 | 通信 | `1.0.0` |
@@ -837,6 +837,7 @@
 ### OperatorType.ImageAcquisition / 图像采集
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.0` | `2026-05-06T20:55:32.4532274+08:00` | `529DA9900D8E` |
 | `1.0.0` | `2026-05-06T20:33:19.1208969+08:00` | `A50DC61A05BE` |
 | `1.0.0` | `2026-05-04T22:48:13.3257374+08:00` | `75F9DB2F8F43` |
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `7583C279AD30` |
@@ -1040,7 +1041,7 @@
 | `1.0.0` | `2026-02-27T21:13:09.9008744+08:00` | `6FCA4034036C` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `5CBB32DC2CED` |
 
-### OperatorType.ModbusCommunication / Modbus通信
+### OperatorType.ModbusCommunication / Modbus Communication
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-04-29T17:13:24.7548110+08:00` | `A44E72F03DB4` |

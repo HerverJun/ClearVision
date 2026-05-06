@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-06T20:33:19.1208969+08:00",
+  "generatedAt": "2026-05-06T21:07:04.3429052+08:00",
   "totalCount": 155,
   "categories": {
     "3D": {
@@ -42,9 +42,10 @@
       ]
     },
     "Communication": {
-      "count": 1,
+      "count": 2,
       "operators": [
-        "MitsubishiMcCommunication"
+        "MitsubishiMcCommunication",
+        "ModbusCommunication"
       ]
     },
     "Detection": {
@@ -241,10 +242,9 @@
       ]
     },
     "通信": {
-      "count": 7,
+      "count": 6,
       "operators": [
         "HttpRequest",
-        "ModbusCommunication",
         "MqttPublish",
         "OmronFinsCommunication",
         "SerialCommunication",
@@ -328,12 +328,6 @@
       ],
       "algorithm": "该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。",
       "inputPorts": [
-        {
-          "name": "Image",
-          "displayName": "输入图像",
-          "dataType": "Image",
-          "isRequired": false
-        },
         {
           "name": "FilePath",
           "displayName": "文件路径输入",
@@ -590,6 +584,26 @@
       ],
       "parameters": [
         {
+          "name": "Method",
+          "displayName": "Method",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Canny",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Canny",
+              "label": "Canny"
+            },
+            {
+              "value": "OnnxEdge",
+              "label": "ONNX Edge"
+            }
+          ]
+        },
+        {
           "name": "Threshold1",
           "displayName": "Low Threshold",
           "dataType": "double",
@@ -632,6 +646,34 @@
           "max": "1",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "AutoThresholdStrategy",
+          "displayName": "Auto Threshold Strategy",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "MedianIntensity",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "MedianIntensity",
+              "label": "Median Intensity"
+            },
+            {
+              "value": "GradientPercentile",
+              "label": "Gradient Percentile"
+            },
+            {
+              "value": "RecallGuardPercentile",
+              "label": "Recall Guard Percentile"
+            },
+            {
+              "value": "OtsuGradient",
+              "label": "Otsu Gradient"
+            }
+          ]
         },
         {
           "name": "EnableGaussianBlur",
@@ -687,6 +729,50 @@
           "defaultValue": "false",
           "min": null,
           "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EdgeModelPath",
+          "displayName": "Edge Model Path",
+          "dataType": "file",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EdgeModelId",
+          "displayName": "Edge Model Id",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ModelCatalogPath",
+          "displayName": "Model Catalog Path",
+          "dataType": "file",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EdgeBinarizationThreshold",
+          "displayName": "Edge Binarization Threshold",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.5",
+          "min": "0",
+          "max": "1",
           "isRequired": true,
           "options": null
         }
@@ -1195,7 +1281,7 @@
       "id": "TemplateMatching",
       "type": 7,
       "displayName": "模板匹配",
-      "description": "Classic grayscale template matching for fixed-scale, low-rotation scenes. Multi-match outputs are filtered by IoU-based NMS.",
+      "description": "Classic template matching with optional bounded rotation/scale pose search. Multi-match outputs are filtered by IoU-based NMS.",
       "category": "匹配定位",
       "version": "1.2.0",
       "tags": [
@@ -1252,6 +1338,36 @@
         {
           "name": "RawResponse",
           "displayName": "原始响应值",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "SubpixelOffsetX",
+          "displayName": "亚像素峰值 X 偏移",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "SubpixelOffsetY",
+          "displayName": "亚像素峰值 Y 偏移",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "PeakCurvature",
+          "displayName": "响应峰曲率",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Angle",
+          "displayName": "匹配角度",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "Scale",
+          "displayName": "匹配尺度",
           "dataType": "Float",
           "isRequired": null
         },
@@ -1455,6 +1571,94 @@
           "defaultValue": "0",
           "min": null,
           "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EnablePoseSearch",
+          "displayName": "启用姿态搜索",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AngleStart",
+          "displayName": "角度起点",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "-180",
+          "max": "180",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AngleExtent",
+          "displayName": "角度范围",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "360",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AngleStep",
+          "displayName": "角度步长",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "1",
+          "min": "0.1",
+          "max": "45",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ScaleMin",
+          "displayName": "最小尺度",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "1",
+          "min": "0.2",
+          "max": "3",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ScaleMax",
+          "displayName": "最大尺度",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "1",
+          "min": "0.2",
+          "max": "3",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ScaleStep",
+          "displayName": "尺度步长",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.05",
+          "min": "0.01",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "PyramidLevels",
+          "displayName": "姿态搜索金字塔层数",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "1",
+          "min": "1",
+          "max": "4",
           "isRequired": true,
           "options": null
         }
@@ -2269,6 +2473,60 @@
           "defaultValue": "true",
           "min": null,
           "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ThresholdMode",
+          "displayName": "Threshold Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "Manual",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Manual",
+              "label": "Manual"
+            },
+            {
+              "value": "Otsu",
+              "label": "Otsu"
+            },
+            {
+              "value": "AdaptiveMean",
+              "label": "Adaptive mean"
+            },
+            {
+              "value": "AdaptiveGaussian",
+              "label": "Adaptive gaussian"
+            },
+            {
+              "value": "InputBinary",
+              "label": "Input binary"
+            }
+          ]
+        },
+        {
+          "name": "AdaptiveBlockSize",
+          "displayName": "Adaptive Block Size",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "31",
+          "min": "3",
+          "max": "301",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AdaptiveC",
+          "displayName": "Adaptive C",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "2",
+          "min": "-255",
+          "max": "255",
           "isRequired": true,
           "options": null
         }
@@ -4027,9 +4285,9 @@
     {
       "id": "ModbusCommunication",
       "type": 27,
-      "displayName": "Modbus通信",
-      "description": "工业设备Modbus RTU/TCP通信",
-      "category": "通信",
+      "displayName": "Modbus Communication",
+      "description": "Industrial Modbus TCP communication. RTU is declared but not packaged in this operator.",
+      "category": "Communication",
       "version": "1.0.0",
       "tags": [
         "功能域:通信",
@@ -4040,7 +4298,7 @@
       "inputPorts": [
         {
           "name": "Data",
-          "displayName": "数据",
+          "displayName": "Data",
           "dataType": "Any",
           "isRequired": false
         }
@@ -4048,13 +4306,13 @@
       "outputPorts": [
         {
           "name": "Response",
-          "displayName": "响应",
+          "displayName": "Response",
           "dataType": "String",
           "isRequired": null
         },
         {
           "name": "Status",
-          "displayName": "状态",
+          "displayName": "Status",
           "dataType": "Boolean",
           "isRequired": null
         }
@@ -4062,7 +4320,7 @@
       "parameters": [
         {
           "name": "Protocol",
-          "displayName": "协议",
+          "displayName": "Protocol",
           "dataType": "enum",
           "description": null,
           "defaultValue": "TCP",
@@ -4082,7 +4340,7 @@
         },
         {
           "name": "IpAddress",
-          "displayName": "IP地址",
+          "displayName": "IP Address",
           "dataType": "string",
           "description": null,
           "defaultValue": "192.168.1.1",
@@ -4093,7 +4351,7 @@
         },
         {
           "name": "Port",
-          "displayName": "端口",
+          "displayName": "Port",
           "dataType": "int",
           "description": null,
           "defaultValue": "502",
@@ -4104,7 +4362,7 @@
         },
         {
           "name": "SlaveId",
-          "displayName": "从机ID",
+          "displayName": "Slave ID",
           "dataType": "int",
           "description": null,
           "defaultValue": "1",
@@ -4115,7 +4373,7 @@
         },
         {
           "name": "RegisterAddress",
-          "displayName": "寄存器地址",
+          "displayName": "Register Address",
           "dataType": "int",
           "description": null,
           "defaultValue": "0",
@@ -4126,7 +4384,7 @@
         },
         {
           "name": "RegisterCount",
-          "displayName": "寄存器数量",
+          "displayName": "Register Count",
           "dataType": "int",
           "description": null,
           "defaultValue": "1",
@@ -4137,7 +4395,7 @@
         },
         {
           "name": "FunctionCode",
-          "displayName": "功能码",
+          "displayName": "Function Code",
           "dataType": "enum",
           "description": null,
           "defaultValue": "ReadHolding",
@@ -4147,30 +4405,41 @@
           "options": [
             {
               "value": "ReadCoils",
-              "label": "读线圈"
+              "label": "Read Coils"
             },
             {
               "value": "ReadHolding",
-              "label": "读保持寄存器"
+              "label": "Read Holding Registers"
             },
             {
               "value": "WriteSingle",
-              "label": "写单寄存器"
+              "label": "Write Single Register"
             },
             {
               "value": "WriteMultiple",
-              "label": "写多寄存器"
+              "label": "Write Multiple Registers"
             }
           ]
         },
         {
           "name": "WriteValue",
-          "displayName": "写入值",
+          "displayName": "Write Value",
           "dataType": "string",
           "description": null,
           "defaultValue": "",
           "min": null,
           "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TimeoutMs",
+          "displayName": "Timeout (ms)",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "5000",
+          "min": "100",
+          "max": "60000",
           "isRequired": true,
           "options": null
         }
@@ -5384,12 +5653,12 @@
       "id": "SubpixelEdgeDetection",
       "type": 44,
       "displayName": "Subpixel Edge Detection",
-      "description": "Extracts subpixel edges using Steger or lightweight gradient/interpolation refinements.",
+      "description": "Non-industrial reference subpixel edge extraction; requires application validation before metrology use.",
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
         "experimental",
-        "industrial-remediation",
+        "non-industrial-reference",
         "subpixel-edge",
         "功能域:检测",
         "成熟度:稳定",
@@ -8652,6 +8921,54 @@
           "displayName": "匹配分数",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "InlierRatio",
+          "displayName": "Inlier Ratio",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MeanReprojectionError",
+          "displayName": "Mean Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MaxReprojectionError",
+          "displayName": "Max Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AreaRatio",
+          "displayName": "Projected Area Ratio",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "CornersInsideCount",
+          "displayName": "Projected Corners Inside",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "ProjectedCenterInside",
+          "displayName": "Projected Center Inside",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "Corners",
+          "displayName": "Projected Corners",
+          "dataType": "PointList",
+          "isRequired": null
+        },
+        {
+          "name": "HomographyFailureReason",
+          "displayName": "Homography Failure Reason",
+          "dataType": "String",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -8707,6 +9024,81 @@
           "defaultValue": "500",
           "min": "100",
           "max": "2000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EnableCandidateProfile",
+          "displayName": "Enable Candidate Profile",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CandidateProfile",
+          "displayName": "Candidate Profile",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "default",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "default",
+              "label": "Default"
+            },
+            {
+              "value": "default_v3",
+              "label": "AKAZE default_v3"
+            }
+          ]
+        },
+        {
+          "name": "MatchRatio",
+          "displayName": "Match Ratio (Lowe's)",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.75",
+          "min": "0.5",
+          "max": "0.95",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RansacThreshold",
+          "displayName": "RANSAC Threshold (px)",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "5",
+          "min": "0.5",
+          "max": "10",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinInlierRatio",
+          "displayName": "Min Inlier Ratio",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.25",
+          "min": "0.1",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AllowCenterOnlyProjection",
+          "displayName": "Allow Center-Only Projection",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         },
@@ -8825,6 +9217,54 @@
           "displayName": "匹配分数",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "InlierRatio",
+          "displayName": "Inlier Ratio",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MeanReprojectionError",
+          "displayName": "Mean Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MaxReprojectionError",
+          "displayName": "Max Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AreaRatio",
+          "displayName": "Projected Area Ratio",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "CornersInsideCount",
+          "displayName": "Projected Corners Inside",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "ProjectedCenterInside",
+          "displayName": "Projected Center Inside",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "Corners",
+          "displayName": "Projected Corners",
+          "dataType": "PointList",
+          "isRequired": null
+        },
+        {
+          "name": "HomographyFailureReason",
+          "displayName": "Homography Failure Reason",
+          "dataType": "String",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -8901,6 +9341,92 @@
           "description": null,
           "defaultValue": "10",
           "min": "3",
+          "max": "100",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EnableCandidateProfile",
+          "displayName": "Enable Candidate Profile",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CandidateProfile",
+          "displayName": "Candidate Profile",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "default",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "default",
+              "label": "Default"
+            },
+            {
+              "value": "replay_safe_dense_strict",
+              "label": "ORB replay_safe_dense_strict"
+            }
+          ]
+        },
+        {
+          "name": "MatchRatio",
+          "displayName": "Match Ratio (Lowe's)",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.75",
+          "min": "0.5",
+          "max": "0.95",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RansacThreshold",
+          "displayName": "RANSAC Threshold (px)",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "5",
+          "min": "0.5",
+          "max": "10",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinInlierRatio",
+          "displayName": "Min Inlier Ratio",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.25",
+          "min": "0.1",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AllowCenterOnlyProjection",
+          "displayName": "Allow Center-Only Projection",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "FastThreshold",
+          "displayName": "ORB FAST Threshold",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "20",
+          "min": "1",
           "max": "100",
           "isRequired": true,
           "options": null
@@ -11400,8 +11926,12 @@
               "label": "gradient_centroid"
             },
             {
+              "value": "gradient_moment",
+              "label": "gradient_moment"
+            },
+            {
               "value": "zernike",
-              "label": "zernike"
+              "label": "zernike (legacy alias)"
             }
           ]
         }
@@ -12484,6 +13014,48 @@
           "displayName": "Reprojection Error",
           "dataType": "Float",
           "isRequired": null
+        },
+        {
+          "name": "MeanReprojectionError",
+          "displayName": "Mean Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MaxReprojectionError",
+          "displayName": "Max Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "InlierMeanReprojectionError",
+          "displayName": "Inlier Mean Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "InlierMaxReprojectionError",
+          "displayName": "Inlier Max Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AllSampleMeanReprojectionError",
+          "displayName": "All Sample Mean Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AllSampleMaxReprojectionError",
+          "displayName": "All Sample Max Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ReprojectionErrorScope",
+          "displayName": "Reprojection Error Scope",
+          "dataType": "String",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -12524,6 +13096,83 @@
           "dataType": "file",
           "description": null,
           "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RansacReprojectionThreshold",
+          "displayName": "RANSAC Reprojection Threshold",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "3",
+          "min": "1E-06",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RansacMaxIterations",
+          "displayName": "RANSAC Max Iterations",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "3000",
+          "min": "1",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RansacConfidence",
+          "displayName": "RANSAC Confidence",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.995",
+          "min": "0.001",
+          "max": "0.999999",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MaxAcceptedReprojectionError",
+          "displayName": "Max Accepted Reprojection Error",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "3",
+          "min": "0",
+          "max": "100000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinInlierCount",
+          "displayName": "Minimum Inlier Count",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "1000000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinInlierRatio",
+          "displayName": "Minimum Inlier Ratio",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.5",
+          "min": "0",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CalibrationUnit",
+          "displayName": "Calibration Unit",
+          "dataType": "string",
+          "description": null,
+          "defaultValue": "mm",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -12807,6 +13456,28 @@
           "defaultValue": "0",
           "min": "0",
           "max": "1000000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "StateTtlMinutes",
+          "displayName": "State TTL Minutes",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "120",
+          "min": "0",
+          "max": "10080",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "Reset",
+          "displayName": "Reset History",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         }
@@ -14295,6 +14966,34 @@
           "options": null
         },
         {
+          "name": "MorphMode",
+          "displayName": "Morph Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "OpenClose",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "None",
+              "label": "None"
+            },
+            {
+              "value": "OpenClose",
+              "label": "Open then close"
+            },
+            {
+              "value": "CloseOpen",
+              "label": "Close then open"
+            },
+            {
+              "value": "CloseOnly",
+              "label": "Close only"
+            }
+          ]
+        },
+        {
           "name": "AlignmentMode",
           "displayName": "Alignment Mode",
           "dataType": "enum",
@@ -14331,6 +15030,10 @@
             {
               "value": "LocalMean",
               "label": "LocalMean"
+            },
+            {
+              "value": "ClaheLocalMean",
+              "label": "CLAHE + LocalMean"
             }
           ]
         },
@@ -14374,6 +15077,28 @@
           "options": null
         },
         {
+          "name": "ClaheClipLimit",
+          "displayName": "CLAHE Clip Limit",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "2",
+          "min": "0.1",
+          "max": "40",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ClaheTileGridSize",
+          "displayName": "CLAHE Tile Grid Size",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "8",
+          "min": "2",
+          "max": "64",
+          "isRequired": true,
+          "options": null
+        },
+        {
           "name": "ReferenceStatsSigma",
           "displayName": "Reference Stats Sigma",
           "dataType": "double",
@@ -14383,6 +15108,162 @@
           "max": "10",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "RobustReferenceStats",
+          "displayName": "Robust Reference Stats",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResponseNormalizeMode",
+          "displayName": "Response Normalize Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "RawClamp",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "RawClamp",
+              "label": "Raw clamp"
+            },
+            {
+              "value": "MinMax",
+              "label": "Min/max"
+            },
+            {
+              "value": "PercentileClip",
+              "label": "Percentile clip"
+            }
+          ]
+        },
+        {
+          "name": "ComponentFilterMode",
+          "displayName": "Component Filter Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "AreaOnly",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "AreaOnly",
+              "label": "Area only"
+            },
+            {
+              "value": "ResponseStats",
+              "label": "Response statistics"
+            },
+            {
+              "value": "ShapeAndResponseStats",
+              "label": "Shape and response statistics"
+            }
+          ]
+        },
+        {
+          "name": "SmallNoiseAreaMax",
+          "displayName": "Small Noise Area Max",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "10000000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinElongationForSmallComponent",
+          "displayName": "Min Elongation For Small Component",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "50",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CompactNoiseAreaMax",
+          "displayName": "Compact Noise Area Max",
+          "dataType": "int",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "10000000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CompactNoiseCircularityMin",
+          "displayName": "Compact Noise Circularity Min",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CompactNoiseFillRatioMin",
+          "displayName": "Compact Noise Fill Ratio Min",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinLocalResponseProminence",
+          "displayName": "Min Local Response Prominence",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0",
+          "min": "0",
+          "max": "255",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "EnableCandidateProfile",
+          "displayName": "Enable Candidate Profile",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CandidateProfile",
+          "displayName": "Candidate Profile",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "default",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "default",
+              "label": "Default"
+            },
+            {
+              "value": "taxonomy_v2",
+              "label": "Surface taxonomy v2"
+            }
+          ]
         }
       ],
       "quality": {
@@ -18231,6 +19112,57 @@
           "max": "1",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "EnableCandidateProfile",
+          "displayName": "Enable Candidate Profile",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CandidateProfile",
+          "displayName": "Candidate Profile",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "default",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "default",
+              "label": "Default"
+            },
+            {
+              "value": "mvtec_lite_v2",
+              "label": "MVTec Lite v2"
+            }
+          ]
+        },
+        {
+          "name": "CandidateFallbackMode",
+          "displayName": "Candidate Fallback Mode",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "UseDefault",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "UseDefault",
+              "label": "Use Default"
+            },
+            {
+              "value": "Fail",
+              "label": "Fail"
+            }
+          ]
         }
       ],
       "quality": {
@@ -19233,6 +20165,42 @@
           "isRequired": null
         },
         {
+          "name": "MeanReprojectionError",
+          "displayName": "Mean Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "MaxReprojectionError",
+          "displayName": "Max Reprojection Error",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "AreaRatio",
+          "displayName": "Area Ratio",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "CornersInsideCount",
+          "displayName": "Corners Inside Count",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "ProjectedCenterInside",
+          "displayName": "Projected Center Inside",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "HomographyFailureReason",
+          "displayName": "Homography Failure Reason",
+          "dataType": "String",
+          "isRequired": null
+        },
+        {
           "name": "VerificationPassed",
           "displayName": "Verification Passed",
           "dataType": "Boolean",
@@ -19389,6 +20357,17 @@
           "defaultValue": "0.5",
           "min": "0",
           "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AllowCenterOnlyProjection",
+          "displayName": "Allow Center-Only Projection",
+          "dataType": "bool",
+          "description": null,
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
           "isRequired": true,
           "options": null
         },

@@ -373,9 +373,9 @@ export class OperatorLibraryPanel {
                 icon: '📷', 
                 description: '从相机或文件获取图像',
                 parameters: [
-                    { name: 'sourceType', displayName: '采集源', type: 'enum', dataType: 'enum', defaultValue: 'camera', options: [{label: '相机', value: 'camera'}, {label: '文件', value: 'file'}] },
-                    { name: 'cameraId', displayName: '相机', type: 'cameraBinding', dataType: 'cameraBinding', defaultValue: '' },
-                    { name: 'filePath', displayName: '文件路径', type: 'file', dataType: 'file', defaultValue: '', description: '支持 .bmp, .png, .jpg' }
+                    { name: 'SourceType', displayName: '采集源', type: 'enum', dataType: 'enum', defaultValue: 'File', options: [{label: '文件', value: 'File'}, {label: '相机', value: 'Camera'}] },
+                    { name: 'CameraId', displayName: '相机', type: 'cameraBinding', dataType: 'cameraBinding', defaultValue: '' },
+                    { name: 'FilePath', displayName: '文件路径', type: 'file', dataType: 'file', defaultValue: '', description: '支持 .bmp, .png, .jpg' }
                 ]
             },
             { 

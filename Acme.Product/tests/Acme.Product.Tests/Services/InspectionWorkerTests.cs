@@ -1,9 +1,12 @@
 using Acme.Product.Application.Analysis;
 using Acme.Product.Application.Services;
+using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
+using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Events;
 using Acme.Product.Infrastructure.Metrics;
 using Acme.Product.Infrastructure.Services;
@@ -13,6 +16,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace Acme.Product.Tests.Services;
 
@@ -218,6 +222,32 @@ public class InspectionWorkerTests
         (await worker.WaitForRunExitAsync(projectId, secondSessionId, TimeSpan.FromSeconds(2))).Should().BeTrue();
     }
 
+    [Fact]
+    public void IsFrameDrivenExecution_WithPipeDelimitedCameraSource_ShouldUseBindingTriggerMode()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-1",
+                TriggerMode = "External"
+            }
+        });
+
+        var services = new ServiceCollection();
+        services.AddSingleton(cameraManager);
+        using var serviceProvider = services.BuildServiceProvider();
+
+        var flow = new OperatorFlow("FrameDrivenFlow");
+        var acquisition = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera|相机"));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "cam-1"));
+        flow.AddOperator(acquisition);
+
+        InvokeIsFrameDrivenExecution(flow, null, serviceProvider).Should().BeTrue();
+    }
+
     private static async Task<FlowExecutionResult> WaitForCancellationAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -240,6 +270,18 @@ public class InspectionWorkerTests
         services.AddScoped(_ => projectRepository);
 
         return services.BuildServiceProvider();
+    }
+
+    private static bool InvokeIsFrameDrivenExecution(
+        OperatorFlow flow,
+        string? cameraId,
+        IServiceProvider serviceProvider)
+    {
+        var method = typeof(InspectionWorker).GetMethod(
+            "IsFrameDrivenExecution",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+        return (bool)method!.Invoke(null, new object?[] { flow, cameraId, serviceProvider })!;
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)

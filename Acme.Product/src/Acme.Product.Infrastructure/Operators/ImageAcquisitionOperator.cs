@@ -24,7 +24,6 @@ namespace Acme.Product.Infrastructure.Operators;
     IconName = "camera",
     Keywords = new[] { "采集", "相机", "拍照", "取图", "摄像头", "图像输入", "Acquire", "Camera", "Capture" }
 )]
-[InputPort("Image", "输入图像", PortDataType.Image, IsRequired = false)]
 [InputPort("FilePath", "文件路径输入", PortDataType.String, IsRequired = false)]
 [OutputPort("Image", "图像", PortDataType.Image)]
 [OperatorParam("SourceType", "采集源", "enum", DefaultValue = "File", Options = new[] { "File|文件", "Camera|相机" })]
@@ -69,48 +68,6 @@ public class ImageAcquisitionOperator : OperatorBase
         var filePath = TryGetStringInput(inputs, "FilePath")
             ?? TryGetStringInput(inputs, "filePath")
             ?? GetStringParam(@operator, "FilePath", GetStringParam(@operator, "filePath", string.Empty));
-
-        // 如果连线输入中有名为 Image 的数据，则直接使用（透传模式）
-        if (inputs != null && inputs.TryGetValue("Image", out var imgObj) && imgObj != null)
-        {
-            if (ImageWrapper.TryGetFromObject(imgObj, out var wrapper) && wrapper != null)
-            {
-                // P0: 透传 ImageWrapper 时必须增加引用计数，因为当前算子结束后会 Release 输入
-                return OperatorExecutionOutput.Success(new Dictionary<string, object>
-                {
-                    { "Image", wrapper.AddRef() },
-                    { "Width", wrapper.Width },
-                    { "Height", wrapper.Height },
-                    { "Channels", wrapper.Channels }
-                });
-            }
-
-            if (imgObj is byte[] rawData)
-            {
-                // 【优化】直接从PNG头部解析尺寸，避免完整解码
-                var dimensions = ImageWrapper.TryParsePngDimensions(rawData);
-                var width = dimensions?.width ?? 0;
-                var height = dimensions?.height ?? 0;
-                var channels = dimensions?.channels ?? 3;
-
-                // 如果PNG解析失败（非PNG格式），回退到ImageWrapper的延迟属性
-                if (width == 0 || height == 0)
-                {
-                    var w = ImageWrapper.FromBytes(rawData);
-                    width = w.Width;
-                    height = w.Height;
-                    channels = w.Channels;
-                }
-
-                return OperatorExecutionOutput.Success(new Dictionary<string, object>
-                {
-                    { "Image", rawData },
-                    { "Width", width },
-                    { "Height", height },
-                    { "Channels", channels }
-                });
-            }
-        }
 
         var hasExplicitFilePath = !string.IsNullOrWhiteSpace(filePath);
 

@@ -549,6 +549,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var sourceType = op.Parameters
                 .FirstOrDefault(parameter => parameter.Name.Equals("SourceType", StringComparison.OrdinalIgnoreCase))
                 ?.Value?.ToString();
+            sourceType = NormalizeOptionValue(sourceType);
             var bindingId = op.Parameters
                 .FirstOrDefault(parameter => parameter.Name.Equals("CameraId", StringComparison.OrdinalIgnoreCase))
                 ?.Value?.ToString();
@@ -570,6 +571,20 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
 
         return false;
+    }
+
+    private static string NormalizeOptionValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Trim();
+        var separatorIndex = normalized.IndexOf('|', StringComparison.Ordinal);
+        return separatorIndex >= 0
+            ? normalized[..separatorIndex].Trim()
+            : normalized;
     }
 
     private static bool IsFrameDrivenBinding(ICameraManager cameraManager, string? cameraId)

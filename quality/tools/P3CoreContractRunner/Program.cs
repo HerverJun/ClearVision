@@ -7,6 +7,7 @@ using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
 
@@ -1159,20 +1160,12 @@ internal static class ContractRunner
             RequireFailure(result);
         });
 
-        for (var i = 0; i < 6; i++)
+        Add(cases, "ImageAcquisition", "image_input_without_file_path_fails", "SourceType contract", async () =>
         {
-            var width = 8 + i;
-            var height = 6 + i;
-            Add(cases, "ImageAcquisition", $"png_bytes_{i}", "Image passthrough", async () =>
-            {
-                var bytes = CreatePngBytes(width, height);
-                var result = await op.ExecuteAsync(CreateOperator(OperatorType.ImageAcquisition), Inputs(("Image", bytes)));
-                RequireSuccess(result);
-                RequireValue(result, "Width", width);
-                RequireValue(result, "Height", height);
-                RequireValue(result, "Channels", 3);
-            });
-        }
+            var bytes = CreatePngBytes(8, 6);
+            var result = await op.ExecuteAsync(CreateOperator(OperatorType.ImageAcquisition), Inputs(("Image", bytes)));
+            RequireFailure(result);
+        });
 
         for (var i = 0; i < 4; i++)
         {
@@ -1184,7 +1177,7 @@ internal static class ContractRunner
                 try
                 {
                     WritePngFile(tempFile, width, height);
-                    var result = await op.ExecuteAsync(CreateOperator(OperatorType.ImageAcquisition, ("SourceType", "Camera"), ("FilePath", tempFile)));
+                    var result = await op.ExecuteAsync(CreateOperator(OperatorType.ImageAcquisition, ("SourceType", "File"), ("FilePath", tempFile)));
                     RequireSuccess(result);
                     RequireValue(result, "Width", width);
                     RequireValue(result, "Height", height);
@@ -1757,11 +1750,29 @@ internal static class JsonSettings
     };
 }
 
-internal sealed class SingleServiceProvider(IFlowExecutionService flowExecutionService) : IServiceProvider
+internal sealed class SingleServiceProvider(IFlowExecutionService flowExecutionService) : IServiceProvider, IServiceScopeFactory, IServiceScope
 {
+    public IServiceProvider ServiceProvider => this;
+
+    public IServiceScope CreateScope() => this;
+
     public object? GetService(Type serviceType)
     {
-        return serviceType == typeof(IFlowExecutionService) ? flowExecutionService : null;
+        if (serviceType == typeof(IFlowExecutionService))
+        {
+            return flowExecutionService;
+        }
+
+        if (serviceType == typeof(IServiceScopeFactory))
+        {
+            return this;
+        }
+
+        return null;
+    }
+
+    public void Dispose()
+    {
     }
 }
 

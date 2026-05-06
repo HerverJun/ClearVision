@@ -28,14 +28,15 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
 |--------|------|--------|------|------|
-| `sourceType` | `enum` | `"file"` | file/文件；camera/相机 | 操作类型或转换类型。 |
-| `filePath` | `file` | `""` | - | 文件或资源路径。 |
-| `cameraId` | `cameraBinding` | `""` | - | 控制“cameraId”这一实现参数，建议结合现场样本调节。 |
+| `SourceType` | `enum` | `"File"` | File/文件；Camera/相机 | 采集源类型。 |
+| `FilePath` | `file` | `""` | - | 文件模式下的图像文件路径。 |
+| `CameraId` | `cameraBinding` | `""` | - | 相机模式下的相机绑定 ID。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
+| `FilePath` | 文件路径输入 | `String` | 否 | 文件模式下可通过连线提供图像文件路径。 |
 
 
 ### 输出 / Outputs
