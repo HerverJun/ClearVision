@@ -267,22 +267,32 @@ function getParameterValue(parameters, ...names) {
     return null;
 }
 
+function normalizeAcquisitionSourceType(value) {
+    const raw = String(value || 'File').trim();
+    const separatorIndex = raw.indexOf('|');
+    return (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
+}
+
+function shouldUseExternalInputImage(node) {
+    return node?.type !== 'ImageAcquisition';
+}
+
 function validatePreviewPrerequisites(node, inputImageBase64) {
     if (!node) {
         return '未选中算子';
     }
 
-    if (inputImageBase64) {
+    if (inputImageBase64 && shouldUseExternalInputImage(node)) {
         return null;
     }
 
     if (node.type === 'ImageAcquisition') {
         const sourceTypeRaw = getParameterValue(node.parameters, 'SourceType', 'sourceType');
-        const sourceType = String(sourceTypeRaw || 'File').trim().toLowerCase();
+        const sourceType = normalizeAcquisitionSourceType(sourceTypeRaw);
         const filePath = String(getParameterValue(node.parameters, 'FilePath', 'filePath') || '').trim();
         const cameraId = String(getParameterValue(node.parameters, 'CameraId', 'cameraId') || '').trim();
 
-        if (filePath) {
+        if (sourceType === 'file' && filePath) {
             return null;
         }
 
@@ -496,7 +506,9 @@ export class NodePreviewCoordinator {
                 return;
             }
 
-            const inputImageBase64 = await Promise.resolve(this.getInputImageBase64());
+            const inputImageBase64 = shouldUseExternalInputImage(activeNode)
+                ? await Promise.resolve(this.getInputImageBase64())
+                : null;
             const prerequisiteError = validatePreviewPrerequisites(activeNode, inputImageBase64);
             if (prerequisiteError) {
                 this.updateState({

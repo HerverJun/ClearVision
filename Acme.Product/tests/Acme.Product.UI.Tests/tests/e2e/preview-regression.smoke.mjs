@@ -73,6 +73,45 @@ async function runPreviewCoordinatorChecks() {
   assert.equal(acquisitionCoordinator.getState().presenter.statusText, '请先配置文件路径');
   acquisitionCoordinator.destroy();
 
+  let cameraPreviewCalls = 0;
+  let cameraPreviewOptions = null;
+  const cameraNode = {
+    id: 'camera-acq-1',
+    type: 'ImageAcquisition',
+    title: '鍥惧儚閲囬泦',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'FilePath', value: 'stale-file.png' },
+      { name: 'CameraId', value: 'cam-1' },
+    ],
+    outputs: [{ name: 'Image', type: 'Image' }],
+  };
+  const cameraCoordinator = new NodePreviewCoordinator({
+    getProjectId: () => 'project-1',
+    getFlowRevision: () => 1,
+    getNodeById: () => cameraNode,
+    getOperatorMetadata: () => null,
+    getInputImageBase64: () => PNG_BASE64,
+    previewExecutor: async (_nodeId, options) => {
+      cameraPreviewCalls += 1;
+      cameraPreviewOptions = options;
+      return {
+        success: true,
+        inputImageBase64: PNG_BASE64,
+        outputImageBase64: PNG_BASE64,
+        outputData: { Source: 'camera' },
+      };
+    },
+    debounceMs: 10,
+  });
+
+  cameraCoordinator.setActiveNode(cameraNode);
+  await sleep(30);
+  assert.equal(cameraPreviewCalls, 1, 'camera acquisition should execute preview with a selected camera');
+  assert.equal(cameraPreviewOptions.inputImageBase64, null, 'camera acquisition should not receive stale external images');
+  assert.equal(cameraCoordinator.getState().status, 'success');
+  cameraCoordinator.destroy();
+
   let noProjectPreviewCalls = 0;
   const noProjectCoordinator = new NodePreviewCoordinator({
     getProjectId: () => null,

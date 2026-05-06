@@ -100,10 +100,12 @@ public static class PreviewNodeEndpoints
 
                 // 准备输入数据
                 Dictionary<string, object>? inputData = null;
-                if (!string.IsNullOrEmpty(request.InputImageBase64)
-                    && !HasUpstreamOperatorType(flow, request.TargetNodeId, OperatorType.ImageAcquisition))
+                var externalInputImageBase64 = ShouldUseExternalInputImage(flow, request.TargetNodeId)
+                    ? request.InputImageBase64
+                    : null;
+                if (!string.IsNullOrEmpty(externalInputImageBase64))
                 {
-                    var imageData = Convert.FromBase64String(request.InputImageBase64);
+                    var imageData = Convert.FromBase64String(externalInputImageBase64);
                     inputData = new Dictionary<string, object>
                     {
                         ["Image"] = imageData
@@ -126,7 +128,7 @@ public static class PreviewNodeEndpoints
 
                 if (nodeOutput == null)
                 {
-                    return Results.Ok(BuildFailureResponse(request, flow, result, request.TargetNodeId));
+                    return Results.Ok(BuildFailureResponse(request, flow, result, request.TargetNodeId, externalInputImageBase64));
                 }
 
                 // 提取输出图像
@@ -142,7 +144,7 @@ public static class PreviewNodeEndpoints
                     request.ProjectId, request.TargetNodeId, result.IsSuccess);
 
                 var targetDebugResult = result.DebugOperatorResults.FirstOrDefault(r => r.OperatorId == request.TargetNodeId);
-                var inputImageBytes = ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, request.InputImageBase64);
+                var inputImageBytes = ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, externalInputImageBase64);
                 var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
 
                 return Results.Ok(new PreviewNodeResponse
@@ -335,6 +337,22 @@ public static class PreviewNodeEndpoints
         return false;
     }
 
+    private static bool IsTargetOperatorType(
+        Acme.Product.Core.Entities.OperatorFlow flow,
+        Guid targetNodeId,
+        OperatorType type)
+    {
+        return flow.Operators.Any(item => item.Id == targetNodeId && item.Type == type);
+    }
+
+    private static bool ShouldUseExternalInputImage(
+        Acme.Product.Core.Entities.OperatorFlow flow,
+        Guid targetNodeId)
+    {
+        return !IsTargetOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition)
+            && !HasUpstreamOperatorType(flow, targetNodeId, OperatorType.ImageAcquisition);
+    }
+
     private static string BuildMissingNodeOutputDetail(
         FlowDebugExecutionResult result,
         Guid targetNodeId)
@@ -367,7 +385,8 @@ public static class PreviewNodeEndpoints
         PreviewNodeRequest request,
         Acme.Product.Core.Entities.OperatorFlow flow,
         FlowDebugExecutionResult result,
-        Guid targetNodeId)
+        Guid targetNodeId,
+        string? externalInputImageBase64)
     {
         var targetResult = result.DebugOperatorResults
             .FirstOrDefault(item => item.OperatorId == targetNodeId);
@@ -378,7 +397,7 @@ public static class PreviewNodeEndpoints
         var failureMessage = BuildMissingNodeOutputDetail(result, targetNodeId);
         var inputImageBytes = TryGetImageBytesFromSnapshot(targetResult?.InputSnapshot)
             ?? TryGetImageBytesFromSnapshot(failedOperator?.InputSnapshot)
-            ?? ResolveInputImageBytes(flow, targetNodeId, result, targetResult, request.InputImageBase64);
+            ?? ResolveInputImageBytes(flow, targetNodeId, result, targetResult, externalInputImageBase64);
         var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
 
         return new PreviewNodeResponse

@@ -51,25 +51,43 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithFilePathConfigured_ShouldPreferFileModeEvenWhenSourceTypeIsCamera()
+    public async Task ExecuteAsync_WithCameraSource_ShouldIgnoreFilePathAndAcquireCameraFrame()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"cv-image-{Guid.NewGuid():N}.png");
         using var mat = new Mat(8, 8, MatType.CV_8UC3, new Scalar(10, 20, 30));
         Cv2.ImWrite(tempFile, mat);
+        using var cameraMat = new Mat(6, 12, MatType.CV_8UC3, new Scalar(80, 90, 100));
+        var cameraFrame = cameraMat.ToBytes(".png");
+
+        var camera = Substitute.For<ICamera>();
+        camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.AcquireSingleFrameAsync().Returns(Task.FromResult(cameraFrame));
+
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        cameraManager.GetOrCreateByBindingAsync("cam-1").Returns(Task.FromResult(camera));
+        var sut = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager);
 
         try
         {
             var op = CreateTestOperator();
             op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera"));
             op.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", tempFile));
+            op.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "cam-1"));
 
-            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+            var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
 
             result.IsSuccess.Should().BeTrue(result.ErrorMessage);
             result.OutputData.Should().NotBeNull();
             result.OutputData!.Should().ContainKey("Image");
-            result.OutputData["Width"].Should().Be(8);
-            result.OutputData["Height"].Should().Be(8);
+            result.OutputData["Width"].Should().Be(12);
+            result.OutputData["Height"].Should().Be(6);
+            result.OutputData["Source"].Should().Be("camera");
+            await cameraManager.Received(1).GetOrCreateByBindingAsync("cam-1");
+            await camera.Received(1).AcquireSingleFrameAsync();
         }
         finally
         {

@@ -64,6 +64,7 @@ public class ImageAcquisitionOperator : OperatorBase
         var sourceType = TryGetStringInput(inputs, "SourceType")
             ?? TryGetStringInput(inputs, "sourceType")
             ?? GetStringParam(@operator, "SourceType", GetStringParam(@operator, "sourceType", string.Empty));
+        var normalizedSourceType = NormalizeSourceType(sourceType);
 
         var filePath = TryGetStringInput(inputs, "FilePath")
             ?? TryGetStringInput(inputs, "filePath")
@@ -111,11 +112,15 @@ public class ImageAcquisitionOperator : OperatorBase
             }
         }
 
-        var hasExplicitFilePath = !string.IsNullOrEmpty(filePath);
+        var hasExplicitFilePath = !string.IsNullOrWhiteSpace(filePath);
 
-        // 如果显式配置了文件路径，文件模式优先于采集源枚举。
-        if (hasExplicitFilePath)
+        if (normalizedSourceType.Equals("File", StringComparison.OrdinalIgnoreCase))
         {
+            if (!hasExplicitFilePath)
+            {
+                return OperatorExecutionOutput.Failure("FilePath is required when SourceType is File.");
+            }
+
             if (!File.Exists(filePath))
             {
                 return OperatorExecutionOutput.Failure($"图像文件不存在: {filePath}");
@@ -129,12 +134,13 @@ public class ImageAcquisitionOperator : OperatorBase
 
             return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
             {
-                { "Channels", mat.Channels() }
+                { "Channels", mat.Channels() },
+                { "Source", "file" },
+                { "FilePath", filePath }
             }));
         }
 
-        // 如果是相机模式
-        if (sourceType?.Equals("Camera", StringComparison.OrdinalIgnoreCase) == true)
+        if (normalizedSourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
         {
             var cameraId = GetStringParam(@operator, "CameraId", GetStringParam(@operator, "cameraId", string.Empty));
             if (string.IsNullOrEmpty(cameraId))
@@ -205,18 +211,13 @@ public class ImageAcquisitionOperator : OperatorBase
             }
         }
 
-        // 如果是文件模式
-        if (sourceType?.Equals("File", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            return OperatorExecutionOutput.Failure("未指定文件路径");
-        }
-
-        return OperatorExecutionOutput.Failure("未提供图像数据或有效的采集设置");
+        return OperatorExecutionOutput.Failure("SourceType must be File or Camera.");
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var sourceType = GetStringParam(@operator, "SourceType", GetStringParam(@operator, "sourceType", "File"));
+        var sourceType = NormalizeSourceType(
+            GetStringParam(@operator, "SourceType", GetStringParam(@operator, "sourceType", "File")));
         if (!sourceType.Equals("File", StringComparison.OrdinalIgnoreCase) &&
             !sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
         {
@@ -233,6 +234,18 @@ public class ImageAcquisitionOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static string NormalizeSourceType(string? value)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? "File" : value.Trim();
+        var separatorIndex = normalized.IndexOf('|', StringComparison.Ordinal);
+        if (separatorIndex >= 0)
+        {
+            normalized = normalized[..separatorIndex].Trim();
+        }
+
+        return normalized;
     }
 
     private static string? TryGetStringInput(Dictionary<string, object>? inputs, string key)

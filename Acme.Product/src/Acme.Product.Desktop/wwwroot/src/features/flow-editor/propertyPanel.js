@@ -68,15 +68,21 @@ class PropertyPanel {
                 return;
             }
 
+            if (this.currentOperator?.type === 'ImageAcquisition' && parameterName.toLowerCase() === 'filepath') {
+                const sourceTypeInput = this.container.querySelector('#param-SourceType, #param-sourceType, select[name="SourceType"], select[name="sourceType"]');
+                if (sourceTypeInput && this.normalizeSourceTypeValue(sourceTypeInput.value) !== 'file') {
+                    const fileOption = Array.from(sourceTypeInput.options || [])
+                        .find(option => this.normalizeSourceTypeValue(option.value) === 'file');
+                    sourceTypeInput.value = fileOption?.value || 'File';
+                    sourceTypeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+
             input.value = filePath;
             input.dispatchEvent(new Event('change', { bubbles: true }));
 
             if (this.currentOperator?.type === 'ImageAcquisition' && parameterName.toLowerCase() === 'filepath') {
-                const sourceTypeInput = this.container.querySelector('#param-SourceType, #param-sourceType, select[name="SourceType"], select[name="sourceType"]');
-                if (sourceTypeInput && sourceTypeInput.value !== 'File') {
-                    sourceTypeInput.value = 'File';
-                    sourceTypeInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
+                this.syncImageAcquisitionSourceControls({ clearFilePathWhenCamera: false });
             }
 
             this.applyChanges();
@@ -512,6 +518,11 @@ class PropertyPanel {
 
         // 实时更新
         const inputs = form.querySelectorAll('input, select');
+        const sourceTypeInput = form.querySelector('#param-SourceType, #param-sourceType, select[name="SourceType"], select[name="sourceType"]');
+        sourceTypeInput?.addEventListener('change', () => {
+            this.syncImageAcquisitionSourceControls({ clearFilePathWhenCamera: true });
+        });
+
         inputs.forEach(input => {
             input.addEventListener('change', () => {
                 this._notifyValueChanged();
@@ -522,6 +533,10 @@ class PropertyPanel {
         const fileBtns = form.querySelectorAll('.btn-pick-file');
         fileBtns.forEach(btn => {
             btn.addEventListener('click', () => {
+                if (btn.disabled) {
+                    return;
+                }
+
                 const paramName = btn.dataset.param;
                 webMessageBridge.sendMessage('PickFileCommand', {
                     parameterName: paramName,
@@ -530,6 +545,7 @@ class PropertyPanel {
             });
         });
 
+        this.syncImageAcquisitionSourceControls();
         this.loadCameraBindingsForSelects(true);
     }
 
@@ -618,6 +634,62 @@ class PropertyPanel {
      * 【修复】同步 UI 值到算子参数对象
      * @param {Object} values - 从 getValues() 获取的键值对
      */
+    normalizeSourceTypeValue(value) {
+        const raw = String(value || 'File').trim();
+        const separatorIndex = raw.indexOf('|');
+        return (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
+    }
+
+    findParamInput(...names) {
+        const form = document.getElementById('property-form');
+        if (!form) return null;
+
+        const normalizedNames = names.map(name => String(name).toLowerCase());
+        return Array.from(form.querySelectorAll('input[name], select[name]'))
+            .find(input => normalizedNames.includes(String(input.name || '').toLowerCase())) || null;
+    }
+
+    syncImageAcquisitionSourceControls(options = {}) {
+        if (this.currentOperator?.type !== 'ImageAcquisition') {
+            return;
+        }
+
+        const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
+        const filePathInput = this.findParamInput('FilePath', 'filePath');
+        if (!sourceTypeInput || !filePathInput) {
+            return;
+        }
+
+        const isCameraMode = this.normalizeSourceTypeValue(sourceTypeInput.value) === 'camera';
+        const fileGroup = filePathInput.closest('.form-group');
+        const pickerButton = fileGroup?.querySelector('.btn-pick-file');
+
+        if (isCameraMode && options.clearFilePathWhenCamera !== false && filePathInput.value) {
+            filePathInput.value = '';
+        }
+
+        filePathInput.disabled = isCameraMode;
+        if (pickerButton) {
+            pickerButton.disabled = isCameraMode;
+        }
+
+        fileGroup?.classList.toggle('hidden', isCameraMode);
+    }
+
+    normalizeImageAcquisitionValues(values) {
+        if (this.currentOperator?.type !== 'ImageAcquisition' || !values) {
+            return values;
+        }
+
+        const sourceKey = Object.keys(values).find(key => key.toLowerCase() === 'sourcetype');
+        const filePathKey = Object.keys(values).find(key => key.toLowerCase() === 'filepath');
+        if (sourceKey && filePathKey && this.normalizeSourceTypeValue(values[sourceKey]) === 'camera') {
+            values[filePathKey] = '';
+        }
+
+        return values;
+    }
+
     updateCurrentOperatorParams(values) {
         if (!this.currentOperator || !this.currentOperator.parameters) return;
         
@@ -754,8 +826,9 @@ class PropertyPanel {
             forcePreview = false,
             syncRoiEditor = true
         } = options;
-        const values = this.getValues();
+        const values = this.normalizeImageAcquisitionValues(this.getValues());
         this.updateCurrentOperatorParams(values);
+        this.syncImageAcquisitionSourceControls();
 
         if (this.onChangeCallback) {
             this.onChangeCallback(values);

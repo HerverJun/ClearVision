@@ -349,6 +349,52 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_ShouldNotInjectExternalImage_WhenTargetIsImageAcquisition()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var targetOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        Dictionary<string, object>? capturedInput = null;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(callInfo =>
+                {
+                    capturedInput = callInfo.ArgAt<Dictionary<string, object>?>(2);
+                    return Task.FromResult(new FlowDebugExecutionResult
+                    {
+                        IsSuccess = true,
+                        DebugSessionId = Guid.NewGuid(),
+                        IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                        {
+                            [targetNodeId] = new()
+                            {
+                                ["Image"] = new byte[] { 1, 2, 3 }
+                            }
+                        }
+                    });
+                });
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            InputImageBase64 = Convert.ToBase64String(new byte[] { 9, 9, 9 }),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "鍥惧儚閲囬泦", OperatorType.ImageAcquisition, outputPorts: [targetOutput]))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        capturedInput.Should().BeNull();
+    }
+
+    [Fact]
     public async Task PreviewNode_ShouldInjectExternalImage_WhenNoImageAcquisitionExistsUpstream()
     {
         var projectId = Guid.NewGuid();
