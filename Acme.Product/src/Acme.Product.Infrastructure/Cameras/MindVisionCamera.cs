@@ -60,9 +60,18 @@ public class MindVisionCamera : ICameraProvider
 
         try
         {
-            // 优先使用应用程序目录（编译时已将原生 DLL 复制到此处）
-            SetDllDirectory(AppContext.BaseDirectory);
-            Debug.WriteLine($"[MindVisionCamera] SetDllDirectory: {AppContext.BaseDirectory}");
+            var baseDir = AppContext.BaseDirectory;
+
+            // 当入口项目设置了 <RuntimeIdentifier>win-x64</RuntimeIdentifier> 时，
+            // .NET 会将原生 DLL 复制到 win-x64 子目录，而非输出根目录。
+            // MVSDK_Net 内部通过 LoadLibrary 加载 MVSDKmd.dll，只搜索 SetDllDirectory 指定的单一路径。
+            var ridSubDir = Path.Combine(baseDir, "win-x64");
+            var nativeDir = Directory.Exists(ridSubDir) && File.Exists(Path.Combine(ridSubDir, "MVSDKmd.dll"))
+                ? ridSubDir
+                : baseDir;
+
+            SetDllDirectory(nativeDir);
+            Debug.WriteLine($"[MindVisionCamera] SetDllDirectory: {nativeDir}");
         }
         catch (Exception ex)
         {
