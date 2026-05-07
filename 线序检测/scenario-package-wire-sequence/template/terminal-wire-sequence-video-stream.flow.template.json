@@ -1,0 +1,220 @@
+{
+  "name": "Terminal Wire Sequence Video Stream Template",
+  "description": "Continuous camera acquisition with frame-change arrival trigger before DeepLearning, for conveyor lines without photoelectric or PLC trigger signals.",
+  "scenarioKey": "wire-sequence-terminal-video-stream",
+  "baseScenarioKey": "wire-sequence-terminal",
+  "templateVersion": "1.5.0",
+  "expectedSequence": [
+    "Wire_Black",
+    "Wire_Blue"
+  ],
+  "expectedDetectionCount": 2,
+  "requiredResources": [
+    "DeepLearning.ModelPath"
+  ],
+  "tunableParameters": [
+    "FrameChangeTrigger.PixelThreshold",
+    "FrameChangeTrigger.MinChangeRatio",
+    "FrameChangeTrigger.MinChangePixels",
+    "FrameChangeTrigger.CooldownMs",
+    "FrameChangeTrigger.RoiX",
+    "FrameChangeTrigger.RoiY",
+    "FrameChangeTrigger.RoiW",
+    "FrameChangeTrigger.RoiH",
+    "BoxNms.ScoreThreshold",
+    "BoxNms.IouThreshold"
+  ],
+  "operators": [
+    {
+      "id": "op_1",
+      "type": "ImageAcquisition",
+      "name": "ContinuousAcquire",
+      "params": {
+        "SourceType": "Camera",
+        "TriggerMode": "Continuous"
+      }
+    },
+    {
+      "id": "op_2",
+      "type": "FrameChangeTrigger",
+      "name": "ArrivalTrigger",
+      "params": {
+        "Enabled": "true",
+        "ShortCircuitWhenNotTriggered": "true",
+        "PixelThreshold": "30",
+        "MinChangeRatio": "0.02",
+        "MinChangePixels": "500",
+        "CooldownMs": "1200",
+        "RoiX": "0",
+        "RoiY": "0",
+        "RoiW": "0",
+        "RoiH": "0"
+      }
+    },
+    {
+      "id": "op_3",
+      "type": "DeepLearning",
+      "name": "WireRootDetection",
+      "params": {
+        "ModelPath": "",
+        "LabelsPath": "",
+        "Confidence": "0.05",
+        "InputSize": "640",
+        "TargetClasses": "Wire_Black,Wire_Blue",
+        "EnableInternalNms": "false",
+        "DetectionMode": "Object"
+      }
+    },
+    {
+      "id": "op_4",
+      "type": "BoxFilter",
+      "name": "RoiDetectionFilter",
+      "params": {
+        "FilterMode": "Region",
+        "RegionX": "0",
+        "RegionY": "0",
+        "RegionW": "999999",
+        "RegionH": "999999",
+        "MinScore": "0.0"
+      }
+    },
+    {
+      "id": "op_5",
+      "type": "BoxNms",
+      "name": "DetectionNms",
+      "params": {
+        "IouThreshold": "0.45",
+        "ScoreThreshold": "0.25",
+        "MaxDetections": "10",
+        "ShowSuppressed": "false"
+      }
+    },
+    {
+      "id": "op_6",
+      "type": "DetectionSequenceJudge",
+      "name": "SequenceJudge",
+      "params": {
+        "ExpectedLabels": "Wire_Black,Wire_Blue",
+        "SortBy": "CenterY",
+        "Direction": "TopToBottom",
+        "ExpectedCount": "2",
+        "MinConfidence": "0.0"
+      }
+    },
+    {
+      "id": "op_7",
+      "type": "ResultOutput",
+      "name": "Output",
+      "params": {
+        "Format": "JSON",
+        "SaveToFile": "true"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source": "op_1",
+      "sourcePort": "Image",
+      "target": "op_2",
+      "targetPort": "Image"
+    },
+    {
+      "source": "op_2",
+      "sourcePort": "Image",
+      "target": "op_3",
+      "targetPort": "Image"
+    },
+    {
+      "source": "op_3",
+      "sourcePort": "Objects",
+      "target": "op_4",
+      "targetPort": "Detections"
+    },
+    {
+      "source": "op_2",
+      "sourcePort": "Image",
+      "target": "op_4",
+      "targetPort": "Image"
+    },
+    {
+      "source": "op_4",
+      "sourcePort": "Detections",
+      "target": "op_5",
+      "targetPort": "Detections"
+    },
+    {
+      "source": "op_2",
+      "sourcePort": "Image",
+      "target": "op_5",
+      "targetPort": "Image"
+    },
+    {
+      "source": "op_5",
+      "sourcePort": "Detections",
+      "target": "op_6",
+      "targetPort": "Detections"
+    },
+    {
+      "source": "op_5",
+      "sourcePort": "Image",
+      "target": "op_7",
+      "targetPort": "Image"
+    },
+    {
+      "source": "op_5",
+      "sourcePort": "Diagnostics",
+      "target": "op_7",
+      "targetPort": "Data"
+    },
+    {
+      "source": "op_6",
+      "sourcePort": "Diagnostics",
+      "target": "op_7",
+      "targetPort": "Result"
+    },
+    {
+      "source": "op_6",
+      "sourcePort": "Message",
+      "target": "op_7",
+      "targetPort": "Text"
+    }
+  ],
+  "parametersNeedingReview": {
+    "op_1": [
+      "CameraId",
+      "TriggerMode"
+    ],
+    "op_2": [
+      "RoiX",
+      "RoiY",
+      "RoiW",
+      "RoiH",
+      "PixelThreshold",
+      "MinChangeRatio",
+      "MinChangePixels",
+      "CooldownMs"
+    ],
+    "op_3": [
+      "ModelPath"
+    ],
+    "op_4": [
+      "RegionX",
+      "RegionY",
+      "RegionW",
+      "RegionH"
+    ],
+    "op_5": [
+      "ScoreThreshold",
+      "IouThreshold"
+    ],
+    "op_6": [
+      "ExpectedLabels",
+      "ExpectedCount"
+    ]
+  },
+  "runtimeNotes": [
+    "Set the camera binding triggerMode to Continuous and start with targetFrameRateFps between 5 and 10.",
+    "Tune FrameChangeTrigger ROI first so belt vibration and glare occupy as little ROI area as possible.",
+    "When FrameChangeTrigger is not triggered, the flow cycle is short-circuited and does not publish OK/NG."
+  ]
+}

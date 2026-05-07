@@ -205,6 +205,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 result.IsSuccess = result.OperatorResults.All(r => r.IsSuccess);
             }
 
+            result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
+
             // 记录流程执行完成日志
             _logger.LogFlowExecution(flow.Id, executionOrder.Count, stopwatch.ElapsedMilliseconds, result.IsSuccess);
 
@@ -316,6 +318,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
 
             completedCount++;
+
+            if (opResult.ShortCircuitedFlow)
+            {
+                _logger.LogDebug(
+                    "[FlowExecution] Operator '{OperatorName}' short-circuited this flow cycle.",
+                    op.Name);
+                break;
+            }
         }
     }
 
@@ -377,6 +387,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     ? "Flow was canceled."
                     : $"算子 '{failedOp.OperatorName}' 执行失败: {failedOp.ErrorMessage}";
             }
+            else if (layerResults.Any(r => r.ShortCircuitedFlow))
+            {
+                break;
+            }
 
             foreach (var op in layer)
             {
@@ -429,6 +443,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (fanOutDegrees != null)
             {
                 ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
+            }
+
+            if (opResult.ShortCircuitedFlow)
+            {
+                _logger.LogDebug(
+                    "[FlowExecution] Operator '{OperatorName}' short-circuited the current parallel layer.",
+                    op.Name);
             }
 
             return opResult;
@@ -539,7 +560,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     OperatorName = op.Name,
                     IsSuccess = true,
                     ExecutionTimeMs = opStopwatch.ElapsedMilliseconds,
-                    OutputData = opResult.OutputData
+                    OutputData = opResult.OutputData,
+                    ShortCircuitedFlow = opResult.ShouldShortCircuitFlow
                 };
             }
             else
@@ -629,7 +651,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 IsSuccess = opResult.IsSuccess,
                 ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
                 OutputData = opResult.OutputData,
-                ErrorMessage = opResult.ErrorMessage
+                ErrorMessage = opResult.ErrorMessage,
+                ShortCircuitedFlow = opResult.ShouldShortCircuitFlow
             };
         }
         catch (Exception ex)
@@ -1317,6 +1340,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     IsSuccess = opResult.IsSuccess,
                     ExecutionTimeMs = opResult.ExecutionTimeMs,
                     ErrorMessage = opResult.ErrorMessage,
+                    ShortCircuitedFlow = opResult.ShortCircuitedFlow,
                     OutputData = CloneNormalizedDictionary(normalizedOutputData),
                     ExecutionOrder = completedCount,
                     StartTime = DateTime.UtcNow.AddMilliseconds(-opResult.ExecutionTimeMs),
@@ -1353,6 +1377,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 TouchDebugSession(options.DebugSessionId);
                 completedCount++;
 
+                if (opResult.ShortCircuitedFlow)
+                {
+                    break;
+                }
+
                 // 【Phase 3】检查是否到达指定的断点算子
                 if (options.BreakAtOperatorId.HasValue && op.Id == options.BreakAtOperatorId.Value)
                 {
@@ -1376,6 +1405,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 result.IsSuccess = result.OperatorResults.All(r => r.IsSuccess);
             }
+
+            result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
 
             var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
             if (flowOutputOperator != null)

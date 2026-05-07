@@ -31,7 +31,7 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("CameraId", "相机", "cameraBinding", DefaultValue = "")]
 [OperatorParam("ExposureTime", "曝光时间(us)", "double", DefaultValue = 5000.0, Min = 1.0)]
 [OperatorParam("Gain", "增益(dB)", "double", DefaultValue = 1.0, Min = 0.0)]
-[OperatorParam("TriggerMode", "触发模式", "enum", DefaultValue = "Software", Options = new[] { "Software|软件触发", "External|外部触发" })]
+[OperatorParam("TriggerMode", "触发模式", "enum", DefaultValue = "Software", Options = new[] { "Software|软件触发", "External|外部触发", "Continuous|连续采集" })]
 public class ImageAcquisitionOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.ImageAcquisition;

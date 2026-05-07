@@ -63,6 +63,12 @@ public class OperatorExecutionOutput
     public string? ErrorMessage { get; set; }
 
     /// <summary>
+    /// True when this operator intentionally ends the current flow cycle without treating it as an error.
+    /// Used by lightweight trigger gates to skip expensive downstream inspection on empty video frames.
+    /// </summary>
+    public bool ShouldShortCircuitFlow { get; set; }
+
+    /// <summary>
     /// 创建成功结果
     /// </summary>
     public static OperatorExecutionOutput Success(Dictionary<string, object>? outputData = null, long executionTimeMs = 0)
@@ -84,6 +90,17 @@ public class OperatorExecutionOutput
         {
             IsSuccess = false,
             ErrorMessage = errorMessage
+        };
+    }
+
+    public static OperatorExecutionOutput ShortCircuit(Dictionary<string, object>? outputData = null, long executionTimeMs = 0)
+    {
+        return new OperatorExecutionOutput
+        {
+            IsSuccess = true,
+            OutputData = outputData,
+            ExecutionTimeMs = executionTimeMs,
+            ShouldShortCircuitFlow = true
         };
     }
 }

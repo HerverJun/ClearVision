@@ -2,8 +2,8 @@
   "SchemaVersion": "1.0",
   "ScenarioKey": "wire-sequence-terminal",
   "ScenarioName": "Terminal Wire Sequence",
-  "Version": "1.4.0",
-  "Description": "Reusable package for fixed-ROI wire-sequence inspection with detection, NMS and order judgment.",
+  "Version": "1.5.0",
+  "Description": "Reusable package for fixed-ROI wire-sequence inspection with detection, NMS, order judgment and optional continuous video-stream arrival triggering.",
   "CreatedAtUtc": "2026-03-23T00:00:00Z",
   "CreatedBy": "clearvision-team",
   "Assets": [
@@ -22,6 +22,26 @@
         "requiredResources": "DeepLearning.ModelPath",
         "thresholdOwner": "BoxNms",
         "diagnosticOutputs": "BoxNms.Diagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
+      }
+    },
+    {
+      "ArtifactType": "Template",
+      "ArtifactName": "terminal-wire-sequence-video-stream-template",
+      "ArtifactVersion": "1.5.0",
+      "RelativePath": "template/terminal-wire-sequence-video-stream.flow.template.json",
+      "Required": false,
+      "ChecksumSha256": null,
+      "Metadata": {
+        "entryPoint": "true",
+        "variant": "videoStream",
+        "baseTemplate": "terminal-wire-sequence-template",
+        "expectedSequence": "Wire_Black,Wire_Blue",
+        "expectedDetectionCount": "2",
+        "arrivalTriggerOperatorType": "FrameChangeTrigger",
+        "judgeOperatorType": "DetectionSequenceJudge",
+        "requiredResources": "DeepLearning.ModelPath",
+        "thresholdOwner": "FrameChangeTrigger,BoxNms",
+        "diagnosticOutputs": "FrameChangeTrigger.Triggered,FrameChangeTrigger.ChangeScore,FrameChangeTrigger.ChangedPixels,FrameChangeTrigger.Reason,BoxNms.Diagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
       }
     },
     {

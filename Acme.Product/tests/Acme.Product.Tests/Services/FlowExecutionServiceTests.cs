@@ -321,6 +321,51 @@ public class FlowExecutionServiceTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenOperatorShortCircuits_ShouldSkipDownstreamOperators()
+    {
+        var gateExecutor = Substitute.For<IOperatorExecutor>();
+        gateExecutor.OperatorType.Returns(OperatorType.TriggerModule);
+        gateExecutor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.ShortCircuit(new Dictionary<string, object>
+            {
+                ["NoMaterialFrame"] = true
+            })));
+
+        var downstreamExecutor = Substitute.For<IOperatorExecutor>();
+        downstreamExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        downstreamExecutor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["ShouldNotRun"] = true
+            })));
+
+        using var sut = new FlowExecutionService(
+            new[] { gateExecutor, downstreamExecutor },
+            _logger,
+            _variableContext);
+
+        var flow = new OperatorFlow("ShortCircuitFlow");
+        flow.AddOperator(CreateOperatorWithPorts("Gate", OperatorType.TriggerModule));
+        flow.AddOperator(CreateOperatorWithPorts("Detector", OperatorType.Thresholding));
+
+        var result = await sut.ExecuteFlowAsync(flow);
+
+        result.IsSuccess.Should().BeTrue();
+        result.WasShortCircuited.Should().BeTrue();
+        result.OutputData.Should().ContainKey("NoMaterialFrame");
+        await downstreamExecutor.DidNotReceive().ExecuteAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public void PrepareOperatorInputs_LargeGraph_ShouldPreserveSemantics_AndHitIndexLookups()
     {
         // Arrange: build a large graph with many unrelated nodes/connections.

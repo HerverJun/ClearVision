@@ -57,6 +57,7 @@ internal static class OperatorMetadataLocalization
             [OperatorType.FisheyeUndistort] = new("鱼眼去畸变", "标定"),
             [OperatorType.ForEach] = new("ForEach 循环", "流程控制"),
             [OperatorType.FrameAveraging] = new("帧平均", "预处理"),
+            [OperatorType.FrameChangeTrigger] = new("帧变化触发", "逻辑工具"),
             [OperatorType.FrequencyFilter] = new("频域滤波", "频域"),
             [OperatorType.GapMeasurement] = new("间隙测量", "检测"),
             [OperatorType.GeoMeasurement] = new("几何测量", "检测"),

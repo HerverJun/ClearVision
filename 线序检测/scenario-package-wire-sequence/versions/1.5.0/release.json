@@ -1,0 +1,39 @@
+{
+  "ScenarioKey": "wire-sequence-terminal",
+  "PackageVersion": "1.5.0",
+  "ReleasedAtUtc": "2026-05-07T00:00:00Z",
+  "ReleaseNote": "Added an optional continuous video-stream template with FrameChangeTrigger arrival gating for lines without external trigger signals.",
+  "ManifestPath": "manifest.json",
+  "Artifacts": [
+    {
+      "ArtifactType": "Template",
+      "ArtifactName": "terminal-wire-sequence-template",
+      "ArtifactVersion": "1.4.0",
+      "RelativePath": "template/terminal-wire-sequence.flow.template.json"
+    },
+    {
+      "ArtifactType": "Template",
+      "ArtifactName": "terminal-wire-sequence-video-stream-template",
+      "ArtifactVersion": "1.5.0",
+      "RelativePath": "template/terminal-wire-sequence-video-stream.flow.template.json"
+    },
+    {
+      "ArtifactType": "Model",
+      "ArtifactName": "wire-seq-yolo",
+      "ArtifactVersion": "1.2.0",
+      "RelativePath": "models/wire-seq-yolo-v1.2.onnx"
+    },
+    {
+      "ArtifactType": "Rule",
+      "ArtifactName": "wire-sequence-rule",
+      "ArtifactVersion": "1.4.0",
+      "RelativePath": "rules/sequence-rule.v1.json"
+    },
+    {
+      "ArtifactType": "Label",
+      "ArtifactName": "wire-label-set",
+      "ArtifactVersion": "1.1.0",
+      "RelativePath": "labels/labels.txt"
+    }
+  ]
+}

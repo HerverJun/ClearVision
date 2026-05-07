@@ -128,6 +128,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, TimerStatisticsOperator>();
         services.AddSingleton<IOperatorExecutor, ScriptOperator>();
         services.AddSingleton<IOperatorExecutor, TriggerModuleOperator>();
+        services.AddSingleton<IOperatorExecutor, FrameChangeTriggerOperator>();
         services.AddSingleton<IOperatorExecutor, PointAlignmentOperator>();
         services.AddSingleton<IOperatorExecutor, PointCorrectionOperator>();
         services.AddSingleton<IOperatorExecutor, GapMeasurementOperator>();

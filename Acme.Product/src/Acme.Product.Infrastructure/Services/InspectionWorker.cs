@@ -429,6 +429,22 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     projectId, sessionId, flow, cameraId, flowExecution, imageAcquisition, ct);
 
                 // 保存结果(异步非阻塞)
+                if (IsNoMaterialSkippedResult(result))
+                {
+                    consecutiveNgCount = 0;
+                    currentIntervalMs = 500;
+                    cycleSucceeded = true;
+
+                    await _eventBus.PublishAsync(new InspectionProgressEvent
+                    {
+                        ProjectId = projectId,
+                        SessionId = sessionId,
+                        ProcessedCount = cycleCount
+                    }, ct);
+
+                    continue;
+                }
+
                 resultChannelWriter.TryWrite(result);
 
                 var outputPayload = EnsureTraceabilityPayload(
@@ -642,6 +658,23 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             stopwatch.Stop();
             _metrics.RecordFlowExecutionLatency(flowResult.ExecutionTimeMs, flowResult.IsSuccess);
 
+            if (flowResult.WasShortCircuited)
+            {
+                outputData["NoMaterialFrame"] = true;
+                outputData["StatusReason"] = "NoMaterialFrame";
+                outputData["MissingJudgmentSignal"] = false;
+
+                result.SetResult(InspectionStatus.NotInspected, flowResult.ExecutionTimeMs, null, null);
+                result.SetTraceability(
+                    ComputeFlowVersionHash(flow),
+                    TryResolveCalibrationBundleId(flowResult.OutputData),
+                    sessionId);
+
+                var skippedPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
+                AnalysisPayloadSerialization.TrySetOutputDataJson(result, skippedPayload, _logger);
+                return result;
+            }
+
             // 判定状态
             var judgmentEvaluation = flowResult.IsSuccess
                 ? DetermineStatusFromFlowOutput(outputData)
@@ -721,6 +754,26 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputData, _logger);
 
             return result;
+        }
+    }
+
+    private static bool IsNoMaterialSkippedResult(InspectionResult result)
+    {
+        if (result.Status != InspectionStatus.NotInspected || string.IsNullOrWhiteSpace(result.OutputDataJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(result.OutputDataJson);
+            return doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("NoMaterialFrame", out var noMaterial)
+                && noMaterial.ValueKind == JsonValueKind.True;
+        }
+        catch
+        {
+            return false;
         }
     }
 

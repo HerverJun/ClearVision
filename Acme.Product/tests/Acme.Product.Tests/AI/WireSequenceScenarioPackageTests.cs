@@ -18,12 +18,13 @@ public class WireSequenceScenarioPackageTests
         using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
         using var rule = JsonDocument.Parse(File.ReadAllText(rulePath));
 
-        manifest.RootElement.GetProperty("Version").GetString().Should().Be("1.4.0");
+        manifest.RootElement.GetProperty("Version").GetString().Should().Be("1.5.0");
         manifest.RootElement.GetProperty("Constraints").GetProperty("RequiredResources")
             .EnumerateArray().Select(item => item.GetString())
             .Should().Equal("DeepLearning.ModelPath");
 
         var assetVersions = manifest.RootElement.GetProperty("Assets").EnumerateArray()
+            .Where(item => item.GetProperty("ArtifactName").GetString() != "terminal-wire-sequence-video-stream-template")
             .ToDictionary(
                 item => item.GetProperty("ArtifactType").GetString()!,
                 item => item.GetProperty("ArtifactVersion").GetString()!);
@@ -117,6 +118,47 @@ public class WireSequenceScenarioPackageTests
         judgeParams.GetProperty("ExpectedLabels").GetString().Should().Be("Wire_Black,Wire_Blue");
         judgeParams.GetProperty("SortBy").GetString().Should().Be("CenterY");
         judgeParams.GetProperty("Direction").GetString().Should().Be("TopToBottom");
+    }
+
+    [Fact]
+    public void ScenarioPackage_VideoStreamTemplate_ShouldBeRegisteredAndUseFrameChangeTrigger()
+    {
+        var repoRoot = ResolveRepoRoot();
+        var packageRoot = ResolveScenarioPackageRoot(repoRoot);
+        var templatePath = Path.Combine(packageRoot, "template", "terminal-wire-sequence-video-stream.flow.template.json");
+        var manifestPath = Path.Combine(packageRoot, "manifest.json");
+
+        using var template = JsonDocument.Parse(File.ReadAllText(templatePath));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+
+        var videoAsset = manifest.RootElement.GetProperty("Assets").EnumerateArray()
+            .Single(item => item.GetProperty("ArtifactName").GetString() == "terminal-wire-sequence-video-stream-template");
+        videoAsset.GetProperty("ArtifactVersion").GetString().Should().Be("1.5.0");
+        videoAsset.GetProperty("RelativePath").GetString()
+            .Should().Be("template/terminal-wire-sequence-video-stream.flow.template.json");
+
+        template.RootElement.GetProperty("scenarioKey").GetString()
+            .Should().Be("wire-sequence-terminal-video-stream");
+        template.RootElement.GetProperty("templateVersion").GetString().Should().Be("1.5.0");
+
+        template.RootElement.GetProperty("operators").EnumerateArray()
+            .Select(item => item.GetProperty("type").GetString())
+            .Should().Equal(
+                "ImageAcquisition",
+                "FrameChangeTrigger",
+                "DeepLearning",
+                "BoxFilter",
+                "BoxNms",
+                "DetectionSequenceJudge",
+                "ResultOutput");
+
+        var triggerParams = template.RootElement.GetProperty("operators").EnumerateArray()
+            .Single(item => item.GetProperty("type").GetString() == "FrameChangeTrigger")
+            .GetProperty("params");
+        triggerParams.GetProperty("ShortCircuitWhenNotTriggered").GetString().Should().Be("true");
+
+        template.RootElement.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
+            .Should().Contain("FrameChangeTrigger.MinChangeRatio");
     }
 
     [Fact]

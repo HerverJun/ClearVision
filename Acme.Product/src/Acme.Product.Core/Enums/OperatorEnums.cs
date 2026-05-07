@@ -206,6 +206,8 @@ public enum OperatorType
 
     TriggerModule = 161,
 
+    FrameChangeTrigger = 1620,
+
     PointAlignment = 162,
 
     PointCorrection = 163,

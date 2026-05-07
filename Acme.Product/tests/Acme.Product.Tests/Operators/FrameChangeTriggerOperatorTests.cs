@@ -1,0 +1,107 @@
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.ValueObjects;
+using Acme.Product.Infrastructure.Operators;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using OpenCvSharp;
+
+namespace Acme.Product.Tests.Operators;
+
+public class FrameChangeTriggerOperatorTests
+{
+    private readonly FrameChangeTriggerOperator _operator =
+        new(Substitute.For<ILogger<FrameChangeTriggerOperator>>());
+
+    [Fact]
+    public void OperatorType_ShouldBeFrameChangeTrigger()
+    {
+        _operator.OperatorType.Should().Be(OperatorType.FrameChangeTrigger);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FirstFrame_ShouldBuildBaselineAndShortCircuit()
+    {
+        using var image = CreateGrayImage(16, 16, 10);
+
+        var result = await _operator.ExecuteAsync(CreateOperator(), new Dictionary<string, object>
+        {
+            ["Image"] = image
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.ShouldShortCircuitFlow.Should().BeTrue();
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Triggered"].Should().Be(false);
+        result.OutputData["Reason"].Should().Be("baseline");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLargeRoiChange_ShouldTrigger()
+    {
+        using var first = CreateGrayImage(16, 16, 10);
+        using var second = CreateGrayImage(16, 16, 240);
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["CooldownMs"] = 0,
+            ["MinChangeRatio"] = 0.1,
+            ["MinChangePixels"] = 10
+        });
+
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = first });
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = second });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.ShouldShortCircuitFlow.Should().BeFalse();
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Triggered"].Should().Be(true);
+        result.OutputData["Reason"].Should().Be("change_detected");
+        Convert.ToDouble(result.OutputData["ChangeScore"]).Should().BeGreaterThan(0.9);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithinCooldown_ShouldShortCircuitDuplicateArrival()
+    {
+        using var first = CreateGrayImage(16, 16, 10);
+        using var second = CreateGrayImage(16, 16, 240);
+        using var third = CreateGrayImage(16, 16, 20);
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["CooldownMs"] = 10_000,
+            ["MinChangeRatio"] = 0.1,
+            ["MinChangePixels"] = 10
+        });
+
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = first });
+        var triggered = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = second });
+        var duplicate = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = third });
+
+        triggered.ShouldShortCircuitFlow.Should().BeFalse();
+        duplicate.IsSuccess.Should().BeTrue(duplicate.ErrorMessage);
+        duplicate.ShouldShortCircuitFlow.Should().BeTrue();
+        duplicate.OutputData!["Reason"].Should().Be("cooldown");
+    }
+
+    private static Operator CreateOperator(Dictionary<string, object>? parameters = null)
+    {
+        var op = new Operator("FrameChangeTrigger", OperatorType.FrameChangeTrigger, 0, 0);
+        if (parameters == null)
+        {
+            return op;
+        }
+
+        foreach (var (name, value) in parameters)
+        {
+            op.AddParameter(new Parameter(Guid.NewGuid(), name, name, string.Empty, value.GetType().Name, value));
+        }
+
+        return op;
+    }
+
+    private static ImageWrapper CreateGrayImage(int width, int height, byte value)
+    {
+        var mat = new Mat(height, width, MatType.CV_8UC1, new Scalar(value));
+        return new ImageWrapper(mat);
+    }
+}

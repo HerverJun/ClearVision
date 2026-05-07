@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `terminal-wire-sequence-video-stream` v1.5.0 template for conveyor lines without photoelectric or PLC trigger signals.
+- Added a continuous-acquisition front end with `FrameChangeTrigger` before YOLO; no-material frames are short-circuited and do not publish OK / NG results.
 - Fixed the wire label-set ordering to match the exported ONNX class order: `Wire_Blue`, `Wire_Black`.
 - Clarified that `labels.txt` represents model `classId -> label` order, while `expectedSequence` remains the business inspection order `Wire_Black -> Wire_Blue`.
 - Reduced `DeepLearning.LabelsPath` from a required resource to an optional compatibility field; the default path now trusts ONNX metadata names first.

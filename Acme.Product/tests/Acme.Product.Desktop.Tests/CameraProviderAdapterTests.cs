@@ -4,11 +4,25 @@ using Acme.Product.Infrastructure.Cameras;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenCvSharp;
 
 namespace Acme.Product.Desktop.Tests;
 
 public class CameraProviderAdapterTests
 {
+    [Theory]
+    [InlineData(0x01080008u, CameraPixelFormat.BayerGR8)]
+    [InlineData(0x01080009u, CameraPixelFormat.BayerRG8)]
+    [InlineData(0x0108000Au, CameraPixelFormat.BayerGB8)]
+    [InlineData(0x0108000Bu, CameraPixelFormat.BayerBG8)]
+    public void HuarayPixelFormatMapping_ShouldUseHuarayGvspBayerConstants(uint pixelType, CameraPixelFormat expected)
+    {
+        var method = typeof(MindVisionCamera).GetMethod("ConvertPixelFormat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        method.Should().NotBeNull();
+        method!.Invoke(null, new object[] { pixelType }).Should().Be(expected);
+    }
+
     [Fact]
     public async Task AcquireSingleFrameAsync_WhenNotGrabbing_ShouldExecuteSoftwareTriggerSequence()
     {
@@ -84,6 +98,47 @@ public class CameraProviderAdapterTests
             provider.Received(1).SetTriggerMode(CameraTriggerMode.Software);
             provider.Received(1).ExecuteSoftwareTrigger();
             provider.Received(1).GetFrame(3000);
+        }
+        finally
+        {
+            handle.Free();
+        }
+    }
+
+    [Theory]
+    [InlineData(CameraPixelFormat.RGB8, new byte[] { 255, 0, 0, 0, 255, 0 }, 2, 1)]
+    [InlineData(CameraPixelFormat.BGR8, new byte[] { 0, 0, 255, 0, 255, 0 }, 2, 1)]
+    [InlineData(CameraPixelFormat.BayerRG8, new byte[] { 255, 128, 128, 0 }, 2, 2)]
+    public async Task AcquireSingleFrameAsync_WhenColorFrame_ShouldEncodeThreeChannelImage(
+        CameraPixelFormat pixelFormat,
+        byte[] frameBuffer,
+        int width,
+        int height)
+    {
+        var provider = Substitute.For<ICameraProvider>();
+        provider.IsGrabbing.Returns(true);
+        provider.SetTriggerMode(CameraTriggerMode.Software).Returns(true);
+        provider.ExecuteSoftwareTrigger().Returns(true);
+
+        var handle = GCHandle.Alloc(frameBuffer, GCHandleType.Pinned);
+
+        try
+        {
+            provider.GetFrame(3000).Returns(new CameraFrame
+            {
+                DataPtr = handle.AddrOfPinnedObject(),
+                Width = width,
+                Height = height,
+                Size = frameBuffer.Length,
+                PixelFormat = pixelFormat
+            });
+
+            var adapter = new CameraProviderAdapter("cam-color", provider, Substitute.For<ILogger<CameraProviderAdapter>>());
+            var pngBytes = await adapter.AcquireSingleFrameAsync();
+            using var decoded = Cv2.ImDecode(pngBytes, ImreadModes.Unchanged);
+
+            decoded.Empty().Should().BeFalse();
+            decoded.Channels().Should().Be(3);
         }
         finally
         {

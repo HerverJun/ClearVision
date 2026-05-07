@@ -99,6 +99,8 @@ public class FlowExecutionResult
     /// </summary>
     public Dictionary<string, object>? OutputData { get; set; }
 
+    public bool WasShortCircuited { get; set; }
+
     /// <summary>
     /// 各算子执行结果
     /// </summary>
@@ -144,6 +146,8 @@ public class OperatorExecutionResult
     /// 错误信息
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    public bool ShortCircuitedFlow { get; set; }
 }
 
 /// <summary>
