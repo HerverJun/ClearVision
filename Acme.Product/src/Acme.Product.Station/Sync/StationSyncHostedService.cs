@@ -22,13 +22,6 @@ public sealed class StationSyncHostedService : BackgroundService
     private readonly StationSyncOptions _options;
     private readonly ILogger<StationSyncHostedService> _logger;
     private readonly Channel<StationResultSummaryDto> _resultIngressChannel;
-    private readonly Channel<StationSnapshotDto> _snapshotChannel = Channel.CreateBounded<StationSnapshotDto>(
-        new BoundedChannelOptions(1)
-        {
-            FullMode = BoundedChannelFullMode.DropOldest,
-            SingleReader = true,
-            SingleWriter = false
-        });
     private readonly SemaphoreSlim _syncSignal = new(0);
     private readonly object _snapshotGate = new();
 
@@ -44,7 +37,10 @@ public sealed class StationSyncHostedService : BackgroundService
     private DateTimeOffset _lastHealthAtUtc = DateTimeOffset.MinValue;
     private DateTimeOffset? _lastResultAtUtc;
     private long _nextControlSequenceId;
+    private long _queuedResultSummaries;
+    private long _resultSummaryBackpressureEvents;
     private long _droppedResultSummaries;
+    private long _overwrittenSnapshots;
 
     public StationSyncHostedService(
         RuntimeHost runtimeHost,
@@ -66,13 +62,12 @@ public sealed class StationSyncHostedService : BackgroundService
         _settingsStore = settingsStore;
         _options = options.Value;
         _logger = logger;
-        _resultIngressChannel = Channel.CreateBounded<StationResultSummaryDto>(
-            new BoundedChannelOptions(Math.Max(1, _options.OutboundQueueCapacity))
+        _resultIngressChannel = Channel.CreateUnbounded<StationResultSummaryDto>(
+            new UnboundedChannelOptions
             {
-                FullMode = BoundedChannelFullMode.Wait,
                 SingleReader = true,
                 SingleWriter = false
-        });
+            });
         _resultHandler = HandleResultAvailable;
         _snapshotHandler = HandleSnapshotChanged;
         _logHandler = HandleRuntimeLogMessage;
@@ -101,8 +96,6 @@ public sealed class StationSyncHostedService : BackgroundService
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                DrainSnapshotQueue();
-
                 var didWork = false;
                 if (!await _hubClient.EnsureConnectedAsync(stoppingToken))
                 {
@@ -189,12 +182,28 @@ public sealed class StationSyncHostedService : BackgroundService
             var summary = StationResultMapper.ToSummary(result, identity);
             _lastResultAtUtc = summary.CompletedAtUtc;
 
+            var queued = Interlocked.Increment(ref _queuedResultSummaries);
             if (_resultIngressChannel.Writer.TryWrite(summary))
             {
+                var capacity = Math.Max(1, _options.OutboundQueueCapacity);
+                if (queued > capacity)
+                {
+                    var backpressureEvents = Interlocked.Increment(ref _resultSummaryBackpressureEvents);
+                    if (backpressureEvents == 1 || backpressureEvents % 100 == 0)
+                    {
+                        _logger.LogWarning(
+                            "Station result summary ingress backlog exceeded configured capacity. QueuedResultSummaries={QueuedResultSummaries}, Capacity={Capacity}, BackpressureEvents={BackpressureEvents}",
+                            queued,
+                            capacity,
+                            backpressureEvents);
+                    }
+                }
+
                 SignalSync();
                 return;
             }
 
+            Interlocked.Decrement(ref _queuedResultSummaries);
             var dropped = Interlocked.Increment(ref _droppedResultSummaries);
             if (dropped == 1 || dropped % 100 == 0)
             {
@@ -260,7 +269,22 @@ public sealed class StationSyncHostedService : BackgroundService
 
             var identity = _identityResolver.GetOrCreate();
             var payload = BuildSnapshotDto(identity, snapshot);
-            _snapshotChannel.Writer.TryWrite(payload);
+            lock (_snapshotGate)
+            {
+                if (_pendingSnapshot != null)
+                {
+                    var overwritten = Interlocked.Increment(ref _overwrittenSnapshots);
+                    if (overwritten == 1 || overwritten % 100 == 0)
+                    {
+                        _logger.LogInformation(
+                            "Coalesced Station runtime snapshot update. OverwrittenSnapshots={OverwrittenSnapshots}",
+                            overwritten);
+                    }
+                }
+
+                _pendingSnapshot = payload;
+            }
+
             SignalSync();
         }
         catch (Exception ex)
@@ -275,8 +299,7 @@ public sealed class StationSyncHostedService : BackgroundService
         {
             await foreach (var summary in _resultIngressChannel.Reader.ReadAllAsync(stoppingToken))
             {
-                _spoolStore.Enqueue(summary);
-                SignalSync();
+                PersistSummaryToSpool(summary);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -287,7 +310,7 @@ public sealed class StationSyncHostedService : BackgroundService
             var drainedAny = false;
             while (_resultIngressChannel.Reader.TryRead(out var summary))
             {
-                _spoolStore.Enqueue(summary);
+                PersistSummaryToSpool(summary);
                 drainedAny = true;
             }
 
@@ -295,6 +318,28 @@ public sealed class StationSyncHostedService : BackgroundService
             {
                 SignalSync();
             }
+        }
+    }
+
+    private void PersistSummaryToSpool(StationResultSummaryDto summary)
+    {
+        try
+        {
+            _spoolStore.Enqueue(summary);
+            SignalSync();
+        }
+        catch (Exception ex)
+        {
+            var dropped = Interlocked.Increment(ref _droppedResultSummaries);
+            _logger.LogError(
+                ex,
+                "Failed to persist Station result summary to local spool. RunId={RunId}, DroppedResultSummaries={DroppedResultSummaries}",
+                summary.RunId,
+                dropped);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _queuedResultSummaries);
         }
     }
 
@@ -367,12 +412,18 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private async Task<bool> TryPushSnapshotAsync(CancellationToken stoppingToken)
     {
-        if (_pendingSnapshot == null)
+        StationSnapshotDto? snapshot;
+        lock (_snapshotGate)
+        {
+            snapshot = _pendingSnapshot;
+        }
+
+        if (snapshot == null)
         {
             return false;
         }
 
-        var response = await _hubClient.PushSnapshotAsync(_pendingSnapshot, stoppingToken);
+        var response = await _hubClient.PushSnapshotAsync(snapshot, stoppingToken);
         if (response == null)
         {
             _isRegistered = false;
@@ -380,7 +431,14 @@ public sealed class StationSyncHostedService : BackgroundService
         }
 
         ApplyAck(response);
-        _pendingSnapshot = null;
+        lock (_snapshotGate)
+        {
+            if (ReferenceEquals(_pendingSnapshot, snapshot))
+            {
+                _pendingSnapshot = null;
+            }
+        }
+
         return true;
     }
 
@@ -610,14 +668,6 @@ public sealed class StationSyncHostedService : BackgroundService
             ReportedAtUtc = now,
             CreatedAtUtc = now
         }, cancellationToken);
-    }
-
-    private void DrainSnapshotQueue()
-    {
-        while (_snapshotChannel.Reader.TryRead(out var snapshot))
-        {
-            _pendingSnapshot = snapshot;
-        }
     }
 
     private async Task WaitForNextSignalAsync(CancellationToken stoppingToken)

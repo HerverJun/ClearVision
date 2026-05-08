@@ -18,6 +18,20 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
     {
     }
 
+    public async Task AddRangeAsync(IEnumerable<InspectionResult> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        var batch = results as IReadOnlyCollection<InspectionResult> ?? results.ToList();
+        if (batch.Count == 0)
+        {
+            return;
+        }
+
+        await _dbSet.AddRangeAsync(batch);
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<IEnumerable<InspectionResult>> GetByProjectIdAsync(Guid projectId, int pageIndex = 0, int pageSize = 20)
     {
         return await _dbSet

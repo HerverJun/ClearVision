@@ -14,6 +14,8 @@ public sealed class StationLogRelayService
     private readonly int _maxSummariesPerMinute;
     private string? _lastFingerprint;
     private DateTimeOffset _lastFingerprintAtUtc;
+    private long _droppedLogSummaries;
+    private long _suppressedLogSummaries;
 
     public StationLogRelayService(
         StationIdentityResolver identityResolver,
@@ -26,11 +28,15 @@ public sealed class StationLogRelayService
         _channel = Channel.CreateBounded<StationLogSummaryDto>(
             new BoundedChannelOptions(Math.Max(1, options.Value.LogQueueCapacity))
             {
-                FullMode = BoundedChannelFullMode.DropWrite,
+                FullMode = BoundedChannelFullMode.Wait,
                 SingleReader = true,
                 SingleWriter = false
             });
     }
+
+    public long DroppedLogSummaryCount => Volatile.Read(ref _droppedLogSummaries);
+
+    public long SuppressedLogSummaryCount => Volatile.Read(ref _suppressedLogSummaries);
 
     public bool TryEnqueue(string level, string source, string message, Exception? exception = null)
     {
@@ -41,12 +47,13 @@ public sealed class StationLogRelayService
 
         if (!TryConsumeLogBudget(level, source, message, exception))
         {
+            Interlocked.Increment(ref _suppressedLogSummaries);
             return false;
         }
 
         var identity = _identityResolver.GetOrCreate();
         var sequenceId = _settingsStore.NextLogSequenceId();
-        return _channel.Writer.TryWrite(new StationLogSummaryDto
+        var accepted = _channel.Writer.TryWrite(new StationLogSummaryDto
         {
             StationId = identity.StationId,
             SequenceId = sequenceId,
@@ -59,6 +66,13 @@ public sealed class StationLogRelayService
             ExceptionMessage = Truncate(Scrub(exception?.Message), 1000),
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
+
+        if (!accepted)
+        {
+            Interlocked.Increment(ref _droppedLogSummaries);
+        }
+
+        return accepted;
     }
 
     public bool TryRead(out StationLogSummaryDto log)

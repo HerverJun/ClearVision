@@ -4,6 +4,7 @@
 
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,12 @@ public interface IInspectionResultChannelWriter
     /// 尝试将检测结果写入后台队列
     /// </summary>
     bool TryWrite(InspectionResult result);
+
+    ValueTask WriteAsync(InspectionResult result, CancellationToken cancellationToken = default)
+    {
+        TryWrite(result);
+        return ValueTask.CompletedTask;
+    }
 }
 
 /// <summary>
@@ -31,20 +38,37 @@ public class InspectionResultBackgroundService : BackgroundService, IInspectionR
     private readonly Channel<InspectionResult> _channel;
     private readonly ILogger<InspectionResultBackgroundService> _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly int _batchSize;
+    private readonly int _queueCapacity;
 
     public InspectionResultBackgroundService(
         ILogger<InspectionResultBackgroundService> logger, 
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IConfiguration? configuration = null)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _batchSize = ResolveConfiguredInt(
+            configuration,
+            "Performance:Persistence:BatchSize",
+            "Performance__Persistence__BatchSize",
+            "CV_PERSISTENCE_BATCH_SIZE",
+            fallback: 50,
+            min: 1,
+            max: 1000);
+        _queueCapacity = ResolveConfiguredInt(
+            configuration,
+            "Performance:Persistence:QueueCapacity",
+            "Performance__Persistence__QueueCapacity",
+            "CV_PERSISTENCE_QUEUE_CAPACITY",
+            fallback: 1000,
+            min: 1,
+            max: 100_000);
         
-        // 创建一个有界容量的通道，防止内存无限胀大。当超过容量时，丢弃最旧的数据（可选）或阻塞/拒绝。
-        // 由于有界通道满时直接 Drop 最旧/最新会导致数据丢失记录，这里我们选择配置为 DropOldest
-        // 以确保系统能继续运行（尽管极限情况下丢失落盘记录，但保障了UI与实时引擎不卡死）。
-        _channel = Channel.CreateBounded<InspectionResult>(new BoundedChannelOptions(1000)
+        // Keep the persistence queue bounded; wait when full instead of silently dropping local critical results.
+        _channel = Channel.CreateBounded<InspectionResult>(new BoundedChannelOptions(_queueCapacity)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true, // 本类唯一消耗
             SingleWriter = false // 多个检测流可能同时写入
         });
@@ -60,12 +84,22 @@ public class InspectionResultBackgroundService : BackgroundService, IInspectionR
         return written;
     }
 
+    public async ValueTask WriteAsync(InspectionResult result, CancellationToken cancellationToken = default)
+    {
+        if (_channel.Writer.TryWrite(result))
+        {
+            return;
+        }
+
+        await _channel.Writer.WriteAsync(result, cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("检测结果异步落盘后台服务已启动。");
 
         // 批处理缓冲
-        var batch = new List<InspectionResult>(50);
+        var batch = new List<InspectionResult>(_batchSize);
         
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -74,8 +108,8 @@ public class InspectionResultBackgroundService : BackgroundService, IInspectionR
                 // 等待有数据可用
                 if (await _channel.Reader.WaitToReadAsync(stoppingToken))
                 {
-                    // 尽最大努力读取出批量，最多合并 50 个结果
-                    while (batch.Count < 50 && _channel.Reader.TryRead(out var result))
+                    // 尽最大努力读取出配置的批量
+                    while (batch.Count < _batchSize && _channel.Reader.TryRead(out var result))
                     {
                         batch.Add(result);
                     }
@@ -100,17 +134,15 @@ public class InspectionResultBackgroundService : BackgroundService, IInspectionR
         }
         
         // 优雅退出前清空队列
-        if (_channel.Reader.TryRead(out var lastResult))
+        while (_channel.Reader.TryRead(out var lastResult))
         {
+            batch.Clear();
             batch.Add(lastResult);
-             while (batch.Count < 50 && _channel.Reader.TryRead(out var result))
+             while (batch.Count < _batchSize && _channel.Reader.TryRead(out var result))
              {
                  batch.Add(result);
              }
-             if (batch.Count > 0)
-             {
-                 await SaveBatchAsync(batch, CancellationToken.None);
-             }
+             await SaveBatchAsync(batch, CancellationToken.None);
         }
     }
 
@@ -121,19 +153,36 @@ public class InspectionResultBackgroundService : BackgroundService, IInspectionR
             using var scope = _serviceProvider.CreateScope();
             var repo = scope.ServiceProvider.GetRequiredService<IInspectionResultRepository>();
 
-            foreach (var result in results)
-            {
-                await repo.AddAsync(result);
-            }
-            
-            // 注意：因为我们使用了 DbContext 的 SaveChangesAsync 或者类似的底层接口
-            // 我们最好做一次性能优化的 bulk insert，但 IRepository.AddAsync 通常会执行 Add + SaveChanges
-            // 如果底层仓储对每一次 AddAsync 都做 SaveChangesAsync，批处理就不怎么管用了。
-            // 目前不修改仓储接口，直接轮询写入，已解除主线程阻塞。未来可引入 AddRangeAsync()。
+            await repo.AddRangeAsync(results);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "异步落盘时出现错误，批次大小: {Count}", results.Count);
         }
+    }
+
+    private static int ResolveConfiguredInt(
+        IConfiguration? configuration,
+        string configurationKey,
+        string environmentKey,
+        string fallbackEnvironmentKey,
+        int fallback,
+        int min,
+        int max)
+    {
+        var configured = configuration?[configurationKey];
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = Environment.GetEnvironmentVariable(environmentKey);
+        }
+
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = Environment.GetEnvironmentVariable(fallbackEnvironmentKey);
+        }
+
+        return int.TryParse(configured, out var parsed)
+            ? Math.Clamp(parsed, min, max)
+            : fallback;
     }
 }

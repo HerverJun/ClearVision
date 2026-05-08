@@ -140,31 +140,26 @@ public class ShadingCorrectionOperator : OperatorBase
 
     private static Mat CorrectByBackground(Mat gray, Mat background)
     {
-        using var backgroundChannel = background.Channels() == 1 ? background.Clone() : ExtractGray(background);
+        using var extractedBackground = background.Channels() == 1 ? null : ExtractGray(background);
+        var backgroundChannel = extractedBackground ?? background;
 
-        using var resizedBg = new Mat();
+        Mat? resizedBg = null;
+        var backgroundForCorrection = backgroundChannel;
         if (backgroundChannel.Size() != gray.Size())
         {
+            resizedBg = new Mat();
             Cv2.Resize(backgroundChannel, resizedBg, gray.Size());
+            backgroundForCorrection = resizedBg;
         }
-        else
+
+        try
         {
-            backgroundChannel.CopyTo(resizedBg);
+            return DivideByIlluminationModel(gray, backgroundForCorrection);
         }
-
-        using var src32 = new Mat();
-        using var bg32 = new Mat();
-        gray.ConvertTo(src32, MatType.CV_32FC1);
-        resizedBg.ConvertTo(bg32, MatType.CV_32FC1);
-
-        using var eps = new Mat(bg32.Size(), bg32.Type(), new Scalar(1.0));
-        using var denom = new Mat();
-        Cv2.Add(bg32, eps, denom);
-
-        using var corrected32 = new Mat();
-        var targetLevel = Math.Max(1.0, Cv2.Mean(bg32).Val0);
-        Cv2.Divide(src32, denom, corrected32, targetLevel);
-        return ConvertBackToSourceDepth(corrected32, gray);
+        finally
+        {
+            resizedBg?.Dispose();
+        }
     }
 
     private static Mat ApplyPerChannel(Mat src, Mat? background, Func<Mat, Mat?, Mat> processor)
@@ -184,7 +179,7 @@ public class ShadingCorrectionOperator : OperatorBase
                 }
                 else if (background.Channels() == 1)
                 {
-                    sharedBackground = background.Clone();
+                    sharedBackground = CreateSharedImageHeader(background);
                 }
                 else
                 {
@@ -240,42 +235,50 @@ public class ShadingCorrectionOperator : OperatorBase
 
         try
         {
-            using var processedLuma = processor(channels[0], backgroundLuma);
-            if (processedLuma.Type() != channels[0].Type())
+            Mat? processedLuma = processor(channels[0], backgroundLuma);
+            try
             {
-                if (!allowByteFallback || processedLuma.Depth() != MatType.CV_8U)
+                if (processedLuma.Type() != channels[0].Type())
                 {
-                    throw new InvalidOperationException("Luma-only shading correction requires matching channel depths before merge.");
-                }
-
-                // When luma processing collapses to 8-bit, re-run on an 8-bit color view so Y/U/V stay in the same contract.
-                using var byteSrc = ConvertToByteCompatibleImage(src);
-                Mat? byteBackground = null;
-
-                try
-                {
-                    if (background != null)
+                    if (!allowByteFallback || processedLuma.Depth() != MatType.CV_8U)
                     {
-                        byteBackground = ConvertToByteCompatibleImage(background);
+                        throw new InvalidOperationException("Luma-only shading correction requires matching channel depths before merge.");
                     }
 
-                    return ApplyLumaChannel(byteSrc, byteBackground, processor, allowByteFallback: false);
+                    // When luma processing collapses to 8-bit, re-run on an 8-bit color view so Y/U/V stay in the same contract.
+                    using var byteSrc = ConvertToByteCompatibleImage(src);
+                    Mat? byteBackground = null;
+
+                    try
+                    {
+                        if (background != null)
+                        {
+                            byteBackground = ConvertToByteCompatibleImage(background);
+                        }
+
+                        return ApplyLumaChannel(byteSrc, byteBackground, processor, allowByteFallback: false);
+                    }
+                    finally
+                    {
+                        byteBackground?.Dispose();
+                    }
                 }
-                finally
-                {
-                    byteBackground?.Dispose();
-                }
+
+                channels[0].Dispose();
+                channels[0] = processedLuma;
+                processedLuma = null;
+
+                using var merged = new Mat();
+                Cv2.Merge(channels, merged);
+
+                var result = new Mat();
+                Cv2.CvtColor(merged, result, ColorConversionCodes.YUV2BGR);
+                return result;
             }
-
-            channels[0].Dispose();
-            channels[0] = processedLuma.Clone();
-
-            using var merged = new Mat();
-            Cv2.Merge(channels, merged);
-
-            var result = new Mat();
-            Cv2.CvtColor(merged, result, ColorConversionCodes.YUV2BGR);
-            return result;
+            finally
+            {
+                processedLuma?.Dispose();
+            }
         }
         finally
         {
@@ -292,7 +295,7 @@ public class ShadingCorrectionOperator : OperatorBase
     {
         if (src.Channels() == 1)
         {
-            return src.Clone();
+            return CreateSharedImageHeader(src);
         }
 
         var gray = new Mat();
@@ -304,7 +307,7 @@ public class ShadingCorrectionOperator : OperatorBase
     {
         if (src.Depth() == MatType.CV_8U)
         {
-            return src.Clone();
+            return CreateSharedImageHeader(src);
         }
 
         var converted = new Mat();
@@ -400,14 +403,18 @@ public class ShadingCorrectionOperator : OperatorBase
         using var background = new Mat();
         Cv2.GaussianBlur(gray, background, new Size(kernelSize, kernelSize), 0);
 
+        return DivideByIlluminationModel(gray, background);
+    }
+
+    private static Mat DivideByIlluminationModel(Mat gray, Mat background)
+    {
         using var src32 = new Mat();
         using var bg32 = new Mat();
         gray.ConvertTo(src32, MatType.CV_32FC1);
         background.ConvertTo(bg32, MatType.CV_32FC1);
 
-        using var eps = new Mat(bg32.Size(), bg32.Type(), new Scalar(1.0));
         using var denom = new Mat();
-        Cv2.Add(bg32, eps, denom);
+        Cv2.Add(bg32, Scalar.All(1.0), denom);
 
         using var corrected32 = new Mat();
         var targetLevel = Math.Max(1.0, Cv2.Mean(bg32).Val0);
@@ -426,6 +433,11 @@ public class ShadingCorrectionOperator : OperatorBase
     private static int ToOdd(int value)
     {
         return value % 2 == 0 ? value + 1 : value;
+    }
+
+    private static Mat CreateSharedImageHeader(Mat src)
+    {
+        return new Mat(src, new Rect(0, 0, src.Width, src.Height));
     }
 
     private static Mat ConvertBackToSourceDepth(Mat corrected32, Mat reference)

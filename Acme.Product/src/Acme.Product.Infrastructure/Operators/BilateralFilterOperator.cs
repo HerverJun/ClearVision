@@ -5,6 +5,7 @@
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
+using Acme.Product.Infrastructure.Memory;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -54,8 +55,16 @@ public class BilateralFilterOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
         }
 
-        var dst = new Mat();
-        Cv2.BilateralFilter(src, dst, diameter, sigmaColor, sigmaSpace);
+        var dst = MatPool.Shared.Rent(src.Width, src.Height, src.Type());
+        try
+        {
+            Cv2.BilateralFilter(src, dst, diameter, sigmaColor, sigmaSpace);
+        }
+        catch
+        {
+            MatPool.Shared.Return(dst);
+            throw;
+        }
 
         // P0: 使用ImageWrapper实现零拷贝输出
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));

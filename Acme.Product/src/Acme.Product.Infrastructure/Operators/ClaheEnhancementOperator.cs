@@ -208,10 +208,10 @@ public class ClaheEnhancementOperator : OperatorBase
 
         try
         {
-            using var enhancedChannel = new Mat();
+            var enhancedChannel = new Mat();
             clahe.Apply(channels[channelIndex], enhancedChannel);
             channels[channelIndex].Dispose();
-            channels[channelIndex] = enhancedChannel.Clone();
+            channels[channelIndex] = enhancedChannel;
 
             using var merged = new Mat();
             Cv2.Merge(channels, merged);

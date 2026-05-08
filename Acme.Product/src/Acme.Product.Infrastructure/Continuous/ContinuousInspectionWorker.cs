@@ -90,7 +90,7 @@ public sealed class ContinuousInspectionWorker
             AppendRuntimeMetrics(result, outputData, metrics.Snapshot(), scheduler.Snapshot(), streamCoordinator.SnapshotFrameBufferStats(cameraId));
             if (mode == ContinuousInspectionMode.Primary)
             {
-                resultChannelWriter.TryWrite(result);
+                await resultChannelWriter.WriteAsync(result, cancellationToken);
                 await PublishResultEventAsync(eventBus, projectId, sessionId, result, cancellationToken);
             }
             else

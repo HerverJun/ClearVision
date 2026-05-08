@@ -29,6 +29,41 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
+    private static readonly HashSet<OperatorType> AutoParallelBlockedOperatorTypes =
+    [
+        OperatorType.ImageAcquisition,
+        OperatorType.ResultOutput,
+        OperatorType.ModbusCommunication,
+        OperatorType.ModbusRtuCommunication,
+        OperatorType.TcpCommunication,
+        OperatorType.SerialCommunication,
+        OperatorType.SiemensS7Communication,
+        OperatorType.MitsubishiMcCommunication,
+        OperatorType.OmronFinsCommunication,
+        OperatorType.DatabaseWrite,
+        OperatorType.HttpRequest,
+        OperatorType.MqttPublish,
+        OperatorType.ImageSave,
+        OperatorType.TextSave,
+        OperatorType.VariableWrite,
+        OperatorType.VariableIncrement,
+        OperatorType.CycleCounter,
+        OperatorType.TimerStatistics,
+        OperatorType.ForEach,
+        OperatorType.ScriptOperator,
+        OperatorType.TriggerModule,
+        OperatorType.FrameChangeTrigger,
+        OperatorType.FrameAveraging,
+        OperatorType.DeepLearning,
+        OperatorType.OnnxInference,
+        OperatorType.SemanticSegmentation,
+        OperatorType.AnomalyDetection,
+        OperatorType.CalibrationLoader,
+        OperatorType.CameraCalibration,
+        OperatorType.TranslationRotationCalibration,
+        OperatorType.StereoCalibration,
+        OperatorType.HandEyeCalibration
+    ];
     private readonly ConcurrentDictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
     private readonly Dictionary<OperatorType, IOperatorExecutor> _executors;
     private readonly ILogger<FlowExecutionService> _logger;
@@ -123,6 +158,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return new FlowInputPreparationIndex(flow);
     }
 
+    private static bool IsFlowSafeForAutoParallelization(OperatorFlow flow)
+    {
+        foreach (var op in flow.Operators)
+        {
+            if (AutoParallelBlockedOperatorTypes.Contains(op.Type))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public FlowExecutionService(
         IEnumerable<IOperatorExecutor> executors,
         ILogger<FlowExecutionService> logger,
@@ -132,6 +180,25 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _logger = logger;
         _variableContext = variableContext;
         _debugCacheCleanupTimer = new Timer(CleanupStaleDebugSessions, null, DebugCleanupInterval, DebugCleanupInterval);
+    }
+
+    public Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        FlowExecutionMode executionMode,
+        CancellationToken cancellationToken = default)
+    {
+        var enableParallel = executionMode == FlowExecutionMode.AutoSafeParallel &&
+            IsFlowSafeForAutoParallelization(flow);
+
+        if (executionMode == FlowExecutionMode.AutoSafeParallel && !enableParallel)
+        {
+            _logger.LogDebug(
+                "[FlowExecution] AutoSafeParallel requested for flow {FlowId}, but the flow contains stateful or side-effect operators. Falling back to sequential execution.",
+                flow.Id);
+        }
+
+        return ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
     }
 
     public async Task<FlowExecutionResult> ExecuteFlowAsync(

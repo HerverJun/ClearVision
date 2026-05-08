@@ -1,20 +1,39 @@
+using System.Collections.Concurrent;
+using System.Threading.Channels;
 using Acme.Product.Core.Interfaces;
+using Microsoft.Extensions.Hosting;
 
 namespace Acme.Product.Infrastructure.Repositories;
 
-public class LruImageCacheRepository : IImageCacheRepository
+public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
 {
     private readonly Dictionary<Guid, CacheEntry> _cache = new();
     private readonly LinkedList<Guid> _accessOrder = new();
+    private readonly ConcurrentDictionary<Guid, CacheEntry> _pendingAdds = new();
+    private readonly Channel<Guid> _addQueue;
     private readonly object _lock = new();
     private readonly long _maxSizeInBytes;
     private long _currentSizeInBytes;
+    private long _pendingSizeInBytes;
     private long _hitCount;
     private long _missCount;
 
-    public LruImageCacheRepository(long maxSizeInBytes = 100 * 1024 * 1024)
+    public LruImageCacheRepository(
+        long maxSizeInBytes = 100 * 1024 * 1024,
+        int queueCapacity = 512)
     {
+        if (maxSizeInBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxSizeInBytes));
+        }
+
         _maxSizeInBytes = maxSizeInBytes;
+        _addQueue = Channel.CreateBounded<Guid>(new BoundedChannelOptions(Math.Max(1, queueCapacity))
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
     }
 
     public Task<Guid> AddAsync(byte[] imageData, string format)
@@ -29,25 +48,22 @@ public class LruImageCacheRepository : IImageCacheRepository
         }
 
         var id = Guid.NewGuid();
-        var size = imageData.Length;
-
-        lock (_lock)
+        var now = DateTime.UtcNow;
+        var entry = new CacheEntry
         {
-            while (_currentSizeInBytes + size > _maxSizeInBytes && _accessOrder.Count > 0)
-            {
-                EvictLeastRecentlyUsed();
-            }
+            Data = imageData,
+            Format = format,
+            CreatedAt = now,
+            LastAccessedAt = now,
+            SizeInBytes = imageData.Length
+        };
 
-            _cache[id] = new CacheEntry
-            {
-                Data = imageData,
-                Format = format,
-                CreatedAt = DateTime.UtcNow,
-                LastAccessedAt = DateTime.UtcNow,
-                SizeInBytes = size
-            };
-            _accessOrder.AddFirst(id);
-            _currentSizeInBytes += size;
+        _pendingAdds[id] = entry;
+        Interlocked.Add(ref _pendingSizeInBytes, entry.SizeInBytes);
+
+        if (!_addQueue.Writer.TryWrite(id))
+        {
+            _ = EnqueueWhenAvailableAsync(id);
         }
 
         return Task.FromResult(id);
@@ -55,6 +71,13 @@ public class LruImageCacheRepository : IImageCacheRepository
 
     public Task<byte[]?> GetAsync(Guid id)
     {
+        if (_pendingAdds.TryGetValue(id, out var pending))
+        {
+            pending.LastAccessedAt = DateTime.UtcNow;
+            Interlocked.Increment(ref _hitCount);
+            return Task.FromResult<byte[]?>(pending.Data);
+        }
+
         lock (_lock)
         {
             if (_cache.TryGetValue(id, out var entry))
@@ -65,14 +88,16 @@ public class LruImageCacheRepository : IImageCacheRepository
                 Interlocked.Increment(ref _hitCount);
                 return Task.FromResult<byte[]?>(entry.Data);
             }
-
-            Interlocked.Increment(ref _missCount);
-            return Task.FromResult<byte[]?>(null);
         }
+
+        Interlocked.Increment(ref _missCount);
+        return Task.FromResult<byte[]?>(null);
     }
 
     public Task DeleteAsync(Guid id)
     {
+        RemovePending(id);
+
         lock (_lock)
         {
             RemoveEntry(id);
@@ -84,6 +109,14 @@ public class LruImageCacheRepository : IImageCacheRepository
     public Task CleanExpiredAsync(TimeSpan expiration)
     {
         var cutoff = DateTime.UtcNow - expiration;
+
+        foreach (var pair in _pendingAdds.ToArray())
+        {
+            if (pair.Value.LastAccessedAt < cutoff)
+            {
+                RemovePending(pair.Key);
+            }
+        }
 
         lock (_lock)
         {
@@ -105,14 +138,16 @@ public class LruImageCacheRepository : IImageCacheRepository
     {
         lock (_lock)
         {
+            var pendingCount = _pendingAdds.Count;
+            var pendingSize = Interlocked.Read(ref _pendingSizeInBytes);
             var hits = Interlocked.Read(ref _hitCount);
             var misses = Interlocked.Read(ref _missCount);
             var total = hits + misses;
 
             return new CacheStatistics
             {
-                TotalEntries = _cache.Count,
-                CurrentSizeInBytes = _currentSizeInBytes,
+                TotalEntries = _cache.Count + pendingCount,
+                CurrentSizeInBytes = _currentSizeInBytes + pendingSize,
                 MaxSizeInBytes = _maxSizeInBytes,
                 HitCount = hits,
                 MissCount = misses,
@@ -123,11 +158,84 @@ public class LruImageCacheRepository : IImageCacheRepository
 
     public void Clear()
     {
+        foreach (var id in _pendingAdds.Keys.ToArray())
+        {
+            RemovePending(id);
+        }
+
         lock (_lock)
         {
             _cache.Clear();
             _accessOrder.Clear();
             _currentSizeInBytes = 0;
+        }
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await foreach (var id in _addQueue.Reader.ReadAllAsync(stoppingToken))
+            {
+                CommitPendingAdd(id);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            while (_addQueue.Reader.TryRead(out var id))
+            {
+                CommitPendingAdd(id);
+            }
+
+            foreach (var id in _pendingAdds.Keys.ToArray())
+            {
+                CommitPendingAdd(id);
+            }
+        }
+    }
+
+    private async Task EnqueueWhenAvailableAsync(Guid id)
+    {
+        try
+        {
+            await _addQueue.Writer.WriteAsync(id);
+        }
+        catch (InvalidOperationException)
+        {
+            CommitPendingAdd(id);
+        }
+    }
+
+    private void CommitPendingAdd(Guid id)
+    {
+        if (!_pendingAdds.TryRemove(id, out var entry))
+        {
+            return;
+        }
+
+        Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
+
+        lock (_lock)
+        {
+            while (_currentSizeInBytes + entry.SizeInBytes > _maxSizeInBytes && _accessOrder.Count > 0)
+            {
+                EvictLeastRecentlyUsed();
+            }
+
+            _cache[id] = entry;
+            _accessOrder.AddFirst(id);
+            _currentSizeInBytes += entry.SizeInBytes;
+        }
+    }
+
+    private void RemovePending(Guid id)
+    {
+        if (_pendingAdds.TryRemove(id, out var entry))
+        {
+            Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
         }
     }
 

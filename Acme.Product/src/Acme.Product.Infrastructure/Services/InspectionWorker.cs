@@ -506,7 +506,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     continue;
                 }
 
-                resultChannelWriter.TryWrite(result);
+                await resultChannelWriter.WriteAsync(result, ct);
 
                 var outputPayload = EnsureTraceabilityPayload(
                     AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),

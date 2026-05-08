@@ -23,6 +23,22 @@ public interface IFlowExecutionService
     Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, System.Threading.CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Executes a flow with an explicit production execution mode.
+    /// </summary>
+    Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        FlowExecutionMode executionMode,
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        return ExecuteFlowAsync(
+            flow,
+            inputData,
+            executionMode == FlowExecutionMode.AutoSafeParallel,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// 执行单个算子
     /// </summary>
     /// <param name="operator">算子</param>
@@ -77,6 +93,12 @@ public interface IFlowExecutionService
     /// </summary>
     /// <param name="debugSessionId">调试会话ID</param>
     Task ClearDebugCacheAsync(Guid debugSessionId);
+}
+
+public enum FlowExecutionMode
+{
+    Sequential = 0,
+    AutoSafeParallel = 1
 }
 
 /// <summary>
