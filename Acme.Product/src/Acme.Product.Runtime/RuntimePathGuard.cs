@@ -11,6 +11,11 @@ internal static class RuntimePathGuard
             throw new RuntimePackageException("Package path is empty.");
         }
 
+        if (Path.IsPathFullyQualified(relativePath) || Path.IsPathRooted(relativePath))
+        {
+            throw new RuntimePackageException($"Package path must be relative: {relativePath}");
+        }
+
         var candidate = Path.GetFullPath(Path.Combine(rootPath, relativePath));
         var normalizedRoot = Path.GetFullPath(rootPath)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)

@@ -18,4 +18,6 @@ public interface IOperatorExecutionResult
     long ExecutionTimeMs { get; }
 
     string? ErrorMessage { get; }
+
+    bool ShouldShortCircuitFlow => false;
 }

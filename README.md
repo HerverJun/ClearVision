@@ -10,8 +10,8 @@ ClearVision 是一个面向工业视觉检测的 .NET 8 项目，核心由桌面
 - 算子库：`Acme.OperatorLibrary`，以 NuGet 包形态封装共享算子实现，当前包版本前缀为 `1.0.2`，包元数据使用 MIT license expression。
 - 算子规模：正式口径为 **155 个算子**；运行时兼容元数据包含 4 个 legacy alias，因此运行时可见口径为 159。
 - 文档口径：当前活跃算子文档位于 [`docs/算子资料/`](./docs/算子资料/)，仓库根 [`算子资料/`](./算子资料/) 是兼容镜像。
-- 质量治理：当前整改主线见 [`docs/进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md`](./docs/进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md)；`quality/evals/reports/operator_quality_matrix.md` 是质量矩阵入口。
-- 工具链：`.NET SDK 10.0.101` 由 [`global.json`](./global.json) 固定，详情见 [`ClearVision-SDK与依赖版本口径`](./docs/参考资料/指南/ClearVision-SDK与依赖版本口径.md)。
+- 质量治理：当前入口见 [`docs/项目总览.md`](./docs/项目总览.md)；[`quality/evals/reports/operator_quality_matrix.md`](./quality/evals/reports/operator_quality_matrix.md) 是质量矩阵入口。
+- 工具链：`.NET SDK 9.0.300` 由 [`global.json`](./global.json) 固定，并允许 roll-forward；本机可能解析到同一/更高可兼容 SDK（例如 `9.0.304`）。详情见 [`ClearVision-SDK与依赖版本口径`](./docs/参考资料/指南/ClearVision-SDK与依赖版本口径.md)。
 
 ## 阅读入口
 

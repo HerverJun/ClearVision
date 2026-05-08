@@ -293,7 +293,7 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         await WriteInChunksAsync(stream, BuildFinsNodeAddressResponse(clientNode: 0x22, serverNode: 0x11), ct, 3, 5, 4);
 
         var request = await ReadFinsWrappedFrameAsync(stream, ct);
-        await WriteInChunksAsync(stream, BuildFinsWriteResponse(), ct, 2, 6, 4, 3);
+        await WriteInChunksAsync(stream, BuildFinsWriteResponse(request), ct, 2, 6, 4, 3);
         return request;
     }
 
@@ -306,8 +306,8 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         await ReadExactAsync(stream, handshakeRequest, ct);
         await WriteInChunksAsync(stream, BuildFinsNodeAddressResponse(clientNode: 0x22, serverNode: 0x11), ct, 4, 4, 4);
 
-        _ = await ReadFinsWrappedFrameAsync(stream, ct);
-        await WriteInChunksAsync(stream, BuildFinsReadResponse(data), ct, 5, 5, 5, 5);
+        var request = await ReadFinsWrappedFrameAsync(stream, ct);
+        await WriteInChunksAsync(stream, BuildFinsReadResponse(request, data), ct, 5, 5, 5, 5);
     }
 
     private static async Task<byte[]> ReadMcFrameAsync(NetworkStream stream, CancellationToken ct)
@@ -438,19 +438,19 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         return response;
     }
 
-    private static byte[] BuildFinsWriteResponse()
+    private static byte[] BuildFinsWriteResponse(byte[] request)
     {
         var finsFrame = new byte[14];
         finsFrame[0] = 0xC0;
         finsFrame[1] = 0x00;
         finsFrame[2] = 0x02;
         finsFrame[3] = 0x00;
-        finsFrame[4] = 0x22;
+        finsFrame[4] = GetFinsRequestClientNode(request);
         finsFrame[5] = 0x00;
         finsFrame[6] = 0x00;
-        finsFrame[7] = 0x11;
+        finsFrame[7] = GetFinsRequestServerNode(request);
         finsFrame[8] = 0x00;
-        finsFrame[9] = 0x01;
+        finsFrame[9] = GetFinsRequestSid(request);
         finsFrame[10] = 0x01;
         finsFrame[11] = 0x02;
         finsFrame[12] = 0x00;
@@ -458,19 +458,19 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         return WrapFinsTcpFrame(finsFrame);
     }
 
-    private static byte[] BuildFinsReadResponse(byte[] data)
+    private static byte[] BuildFinsReadResponse(byte[] request, byte[] data)
     {
         var finsFrame = new byte[14 + data.Length];
         finsFrame[0] = 0xC0;
         finsFrame[1] = 0x00;
         finsFrame[2] = 0x02;
         finsFrame[3] = 0x00;
-        finsFrame[4] = 0x22;
+        finsFrame[4] = GetFinsRequestClientNode(request);
         finsFrame[5] = 0x00;
         finsFrame[6] = 0x00;
-        finsFrame[7] = 0x11;
+        finsFrame[7] = GetFinsRequestServerNode(request);
         finsFrame[8] = 0x00;
-        finsFrame[9] = 0x01;
+        finsFrame[9] = GetFinsRequestSid(request);
         finsFrame[10] = 0x01;
         finsFrame[11] = 0x01;
         finsFrame[12] = 0x00;
@@ -478,6 +478,12 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         data.CopyTo(finsFrame, 14);
         return WrapFinsTcpFrame(finsFrame);
     }
+
+    private static byte GetFinsRequestClientNode(byte[] request) => request[23];
+
+    private static byte GetFinsRequestServerNode(byte[] request) => request[20];
+
+    private static byte GetFinsRequestSid(byte[] request) => request[25];
 
     private static byte[] WrapFinsTcpFrame(byte[] finsFrame)
     {

@@ -162,6 +162,7 @@ public sealed class StationSpoolStore
 
             if (File.Exists(_spoolFilePath))
             {
+                var loadedSequences = new HashSet<long>();
                 foreach (var line in File.ReadLines(_spoolFilePath, Encoding.UTF8))
                 {
                     if (string.IsNullOrWhiteSpace(line))
@@ -174,6 +175,14 @@ public sealed class StationSpoolStore
                         var summary = JsonSerializer.Deserialize<StationResultSummaryDto>(line, _jsonOptions);
                         if (summary == null || summary.SequenceId <= _state.AckedSequenceId)
                         {
+                            continue;
+                        }
+
+                        if (!loadedSequences.Add(summary.SequenceId))
+                        {
+                            _logger.LogWarning(
+                                "Skipped duplicate Station spool sequence while loading. SequenceId={SequenceId}",
+                                summary.SequenceId);
                             continue;
                         }
 
@@ -242,8 +251,10 @@ public sealed class StationSpoolStore
 
     private void SaveStateLocked()
     {
+        var tempPath = _stateFilePath + ".tmp";
         var json = JsonSerializer.Serialize(_state, _jsonOptions);
-        File.WriteAllText(_stateFilePath, json, Encoding.UTF8);
+        File.WriteAllText(tempPath, json, new UTF8Encoding(false));
+        File.Move(tempPath, _stateFilePath, overwrite: true);
     }
 
     private bool TrimOverflowLocked()

@@ -181,6 +181,11 @@ public class McFrameBuilder
         // 数据长度
         var dataLength = BinaryPrimitives.ReadUInt16LittleEndian(response.AsSpan(offset));
         offset += 2;
+        if (dataLength < 2)
+            return (false, null, $"Invalid MC data length: {dataLength}");
+
+        if (response.Length != 9 + dataLength)
+            return (false, null, $"MC response length mismatch: declared {dataLength}, actual {response.Length - 9}");
 
         // 结束代码
         var endCode = BinaryPrimitives.ReadUInt16LittleEndian(response.AsSpan(offset));
@@ -218,6 +223,11 @@ public class McFrameBuilder
         // 数据长度
         var dataLength = BinaryPrimitives.ReadUInt16LittleEndian(response.AsSpan(offset));
         offset += 2;
+        if (dataLength < 2)
+            return (false, $"Invalid MC data length: {dataLength}");
+
+        if (response.Length != 9 + dataLength)
+            return (false, $"MC response length mismatch: declared {dataLength}, actual {response.Length - 9}");
 
         // 结束代码
         var endCode = BinaryPrimitives.ReadUInt16LittleEndian(response.AsSpan(offset));

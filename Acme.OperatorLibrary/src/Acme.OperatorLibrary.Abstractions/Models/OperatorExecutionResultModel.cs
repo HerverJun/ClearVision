@@ -20,15 +20,19 @@ public sealed class OperatorExecutionResultModel : IOperatorExecutionResult
 
     public string? ErrorMessage { get; init; }
 
+    public bool ShouldShortCircuitFlow { get; init; }
+
     public static OperatorExecutionResultModel Success(
         IDictionary<string, object?>? outputData = null,
-        long executionTimeMs = 0)
+        long executionTimeMs = 0,
+        bool shouldShortCircuitFlow = false)
     {
         return new OperatorExecutionResultModel
         {
             IsSuccess = true,
             OutputData = outputData,
-            ExecutionTimeMs = executionTimeMs
+            ExecutionTimeMs = executionTimeMs,
+            ShouldShortCircuitFlow = shouldShortCircuitFlow
         };
     }
 

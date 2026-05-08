@@ -220,6 +220,57 @@ public class RuntimePackageExporterValidationTests
         }
     }
 
+    [Fact]
+    public async Task LoadAsync_ShouldRejectAbsoluteEntryFlowPath()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var exporter = CreateExporter();
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = new ProjectDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "absolute-entry-flow",
+                    Flow = new OperatorFlowDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "main",
+                        Operators =
+                        [
+                            CreateOperatorDto(
+                                "Result output",
+                                OperatorType.ResultOutput,
+                                CreateParameter("Format", "enum", "JSON"))
+                        ]
+                    }
+                },
+                TargetRootDirectory = root
+            });
+
+            var manifestPath = Path.Combine(export.PackageRootPath, "package.json");
+            var manifest = JsonSerializer.Deserialize<RuntimePackageManifest>(
+                await File.ReadAllTextAsync(manifestPath),
+                CreateJsonOptions())!;
+            manifest.EntryFlow = Path.Combine(export.PackageRootPath, "flow.json");
+            await File.WriteAllTextAsync(
+                manifestPath,
+                JsonSerializer.Serialize(manifest, CreateJsonOptions()));
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            var act = () => loader.LoadAsync(export.PackageRootPath);
+
+            await act.Should()
+                .ThrowAsync<RuntimePackageException>()
+                .WithMessage("*relative*");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     private static RuntimePackageExporter CreateExporter()
     {
         var cameraManager = Substitute.For<ICameraManager>();

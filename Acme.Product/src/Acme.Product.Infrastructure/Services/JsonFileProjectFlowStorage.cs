@@ -1,7 +1,3 @@
-// JsonFileProjectFlowStorage.cs
-// JsonFileProjectFlowStorage实现
-// 作者：蘅芜君
-
 using Acme.Product.Core.Interfaces;
 
 namespace Acme.Product.Infrastructure.Services;
@@ -11,17 +7,24 @@ public class JsonFileProjectFlowStorage : IProjectFlowStorage
     private readonly string _basePath;
 
     public JsonFileProjectFlowStorage()
+        : this(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "ProjectFlows"))
     {
-        // 存储在 App_Data/ProjectFlows 目录下
-        _basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "ProjectFlows");
-        if (!Directory.Exists(_basePath))
-        {
-            Directory.CreateDirectory(_basePath);
-        }
+    }
+
+    public JsonFileProjectFlowStorage(string basePath)
+    {
+        if (string.IsNullOrWhiteSpace(basePath))
+            throw new ArgumentException("Base path cannot be empty.", nameof(basePath));
+
+        _basePath = basePath;
+        Directory.CreateDirectory(_basePath);
     }
 
     public async Task SaveFlowJsonAsync(Guid projectId, string flowJson)
     {
+        ArgumentNullException.ThrowIfNull(flowJson);
+
+        Directory.CreateDirectory(_basePath);
         var filePath = GetFilePath(projectId);
         await File.WriteAllTextAsync(filePath, flowJson);
     }

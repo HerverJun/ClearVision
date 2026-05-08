@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
     <!--
-      .NET SDK 10 default compile glob does not exclude artifacts/**.
+      Some SDK compile globs do not exclude artifacts/**.
       If stale generated sources exist under artifacts/obj, they are treated as user code
-      and cause duplicate assembly attributes at compile time.
+      and can cause duplicate assembly attributes at compile time.
     -->
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;**/artifacts/**</DefaultItemExcludes>
     <MSBuildEnableWorkloadResolver>false</MSBuildEnableWorkloadResolver>

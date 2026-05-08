@@ -38,6 +38,20 @@ public class FrameCodecTests
     }
 
     [Fact]
+    public void McFrameBuilder_ParseReadResponse_WithLengthMismatch_ShouldFail()
+    {
+        var builder = new McFrameBuilder();
+        var response = BuildMcReadResponse(0x12, 0x34);
+        BinaryPrimitives.WriteUInt16LittleEndian(response.AsSpan(7, 2), 5);
+
+        var (success, data, error) = builder.ParseReadResponse(response);
+
+        success.Should().BeFalse();
+        data.Should().BeNull();
+        error.Should().Contain("length mismatch");
+    }
+
+    [Fact]
     public void FinsFrameBuilder_BuildMemoryWriteRequest_WordAccess_ShouldUseWordLength()
     {
         var builder = new FinsFrameBuilder();
@@ -90,6 +104,21 @@ public class FrameCodecTests
     }
 
     [Fact]
+    public void FinsFrameBuilder_ParseNodeAddressResponse_WithLengthMismatch_ShouldFail()
+    {
+        var builder = new FinsFrameBuilder();
+        var response = BuildFinsNodeAddressResponse(clientNode: 0x22, serverNode: 0x11);
+        BinaryPrimitives.WriteUInt32BigEndian(response.AsSpan(4, 4), 20u);
+
+        var (success, clientNode, serverNode, error) = builder.ParseNodeAddressResponse(response);
+
+        success.Should().BeFalse();
+        clientNode.Should().Be(0);
+        serverNode.Should().Be(0);
+        error.Should().Contain("length mismatch");
+    }
+
+    [Fact]
     public void FinsFrameBuilder_ParseResponse_ShouldDecodeDataPayload()
     {
         var builder = new FinsFrameBuilder();
@@ -100,6 +129,20 @@ public class FrameCodecTests
         success.Should().BeTrue(error);
         data.Should().NotBeNull();
         data.Should().Equal(0x12, 0x34);
+    }
+
+    [Fact]
+    public void FinsFrameBuilder_ParseResponse_WithLengthMismatch_ShouldFail()
+    {
+        var builder = new FinsFrameBuilder();
+        var response = BuildFinsReadResponse(new byte[] { 0x12, 0x34 });
+        BinaryPrimitives.WriteUInt32BigEndian(response.AsSpan(4, 4), 1u);
+
+        var (success, data, error) = builder.ParseResponse(response);
+
+        success.Should().BeFalse();
+        data.Should().BeNull();
+        error.Should().Contain("length mismatch");
     }
 
     private static byte[] BuildMcReadResponse(params byte[] data)

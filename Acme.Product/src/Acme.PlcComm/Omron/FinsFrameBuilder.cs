@@ -91,6 +91,8 @@ public class FinsFrameBuilder
         offset += 4;
         if (command != NodeAddressResponse)
             return (false, 0, 0, $"无效的响应命令: {command}");
+        if (response.Length != 8 + length)
+            return (false, 0, 0, $"FINS/TCP node response length mismatch: declared {length}, actual {response.Length - 8}");
 
         // 错误码
         var errorCode = BinaryPrimitives.ReadUInt32BigEndian(response.AsSpan(offset));
@@ -260,6 +262,8 @@ public class FinsFrameBuilder
         offset += 4;
         if (command != FinsFrameSend)
             return (false, null, $"无效的命令类型: {command}");
+        if (!HasExpectedFrameLength(response.Length, length))
+            return (false, null, $"FINS/TCP response length mismatch: declared {length}, actual payload {response.Length - 16}");
 
         // 错误码
         var errorCode = BinaryPrimitives.ReadUInt32BigEndian(response.AsSpan(offset));
@@ -324,6 +328,12 @@ public class FinsFrameBuilder
         Array.Copy(finsFrame, 0, result, offset, finsFrame.Length);
 
         return result;
+    }
+
+    private static bool HasExpectedFrameLength(int responseLength, uint declaredLength)
+    {
+        var payloadLength = responseLength - 16;
+        return payloadLength >= 0 && (declaredLength == payloadLength || declaredLength == payloadLength + 8);
     }
 
     /// <summary>

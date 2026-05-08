@@ -29,12 +29,29 @@ public static class RuntimeParameterValidator
             result.Errors.Add($"Profile flowHash '{profile.FlowHash}' does not match schema flowHash '{schema.FlowHash}'.");
         }
 
-        var definitionsById = schema.Parameters.ToDictionary(
-            definition => definition.Id,
-            StringComparer.Ordinal);
+        var definitionsById = new Dictionary<string, RuntimeParameterDefinition>(StringComparer.Ordinal);
+        foreach (var definition in schema.Parameters)
+        {
+            if (string.IsNullOrWhiteSpace(definition.Id))
+            {
+                result.Errors.Add("Runtime parameter definition id must not be empty.");
+                continue;
+            }
+
+            if (!definitionsById.TryAdd(definition.Id, definition))
+            {
+                result.Errors.Add($"Duplicate runtime parameter definition '{definition.Id}'.");
+            }
+        }
 
         foreach (var parameterOverride in profile.Overrides)
         {
+            if (string.IsNullOrWhiteSpace(parameterOverride.ParameterId))
+            {
+                result.Errors.Add("Runtime parameter override id must not be empty.");
+                continue;
+            }
+
             if (!definitionsById.TryGetValue(parameterOverride.ParameterId, out var definition))
             {
                 result.Errors.Add($"Unknown runtime parameter override '{parameterOverride.ParameterId}'.");

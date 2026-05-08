@@ -112,6 +112,7 @@ The package no longer uses the fixed `*-local` version strategy.
 ```
 
 It also reads common CI environment variables (`ACME_OPERATORLIB_PACKAGE_VERSION`, `GITHUB_SHA`, `GITHUB_REF_NAME`, `BUILD_SOURCEVERSION`, `BUILD_SOURCEBRANCHNAME`) when parameters are omitted.
+Package metadata includes project URL, repository traceability, license expression, release notes, README, SBOM, and third-party notices.
 
 NuGet restore reproducibility workflow:
 
@@ -130,7 +131,7 @@ Toolchain policy:
 - Build with .NET SDK `10.0.101` from the repository `global.json`.
 - Target framework remains `net8.0`.
 - Direct `Microsoft.Extensions.*` dependencies are aligned to `10.0.0` to match the main product dependency lane.
-- Consumers should validate OpenCvSharp, ONNX Runtime, PaddleOCRSharp, database, serial-port, and PLC dependencies in their deployment profile before treating the package as a thin abstractions-only dependency.
+- Consumers should validate OpenCvSharp, ONNX Runtime, PaddleOCRSharp, HslCommunication, database, serial-port, and PLC dependencies in their deployment profile before treating the package as a thin abstractions-only dependency.
 
 Use the package smoke/acceptance tests when validating NuGet packaging:
 
@@ -179,6 +180,7 @@ Do not treat a single local benchmark run as a release gate by itself. Prefer co
 - Build profile constant: `ACME_OPERATORLIB_PACKAGE`
 - Host-agnostic contracts/models: `Acme.OperatorLibrary/src/Acme.OperatorLibrary.Abstractions/*`
 - Core adapters (guarded by `#if ACME_OPERATORLIB_PACKAGE`): `Acme.OperatorLibrary/src/Acme.OperatorLibrary.Abstractions/Adapters/CoreTypeAdapters.cs`
+- Execution result abstractions preserve the host short-circuit flag (`ShouldShortCircuitFlow`) for trigger-style operators.
 - Dependency analysis script:
 
 ```powershell

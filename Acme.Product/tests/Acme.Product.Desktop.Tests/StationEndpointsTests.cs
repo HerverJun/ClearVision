@@ -1,10 +1,14 @@
 using System.Text;
+using System.Net;
+using System.Net.Http.Json;
 using Acme.Product.Desktop.Endpoints;
 using Acme.Product.Desktop.Station;
+using Acme.Product.Infrastructure.Data;
 using Acme.Product.Runtime.Abstractions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -100,6 +104,47 @@ public sealed class StationEndpointsTests
         replayChunk.Should().Contain("\"diagnosticCode\":\"OK\"");
     }
 
+    [Fact]
+    public async Task CreateCommand_ShouldRejectInvalidPayloadJson()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/commands",
+            new StationCommandCreateRequest
+            {
+                CommandType = StationCommandType.Ping,
+                PayloadJson = "{not-json",
+                IssuedBy = "unit-test"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        (await db.StationCommandRecords.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectBlankPackageId()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "   ",
+                IssuedBy = "unit-test"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        (await db.StationCommandRecords.CountAsync()).Should().Be(0);
+    }
+
     private static async Task<string> ReadUntilContainsAsync(Stream stream, string marker, TimeSpan timeout)
     {
         var buffer = new byte[1024];
@@ -119,10 +164,12 @@ public sealed class StationEndpointsTests
     private sealed class StationEndpointTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
+        private readonly string? _tempRoot;
 
-        private StationEndpointTestHost(WebApplication app, StationRegistryService registry)
+        private StationEndpointTestHost(WebApplication app, StationRegistryService registry, string? tempRoot = null)
         {
             _app = app;
+            _tempRoot = tempRoot;
             Registry = registry;
             Client = app.GetTestClient();
         }
@@ -130,6 +177,8 @@ public sealed class StationEndpointsTests
         public HttpClient Client { get; }
 
         public StationRegistryService Registry { get; }
+
+        public IServiceProvider Services => _app.Services;
 
         public static async Task<StationEndpointTestHost> CreateAsync()
         {
@@ -158,11 +207,67 @@ public sealed class StationEndpointsTests
             return new StationEndpointTestHost(app, app.Services.GetRequiredService<StationRegistryService>());
         }
 
+        public static async Task<StationEndpointTestHost> CreateWithCentralStoreAsync()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationEndpointTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = Environments.Development
+            });
+            builder.WebHost.UseTestServer();
+
+            builder.Services.AddDbContext<VisionDbContext>(options =>
+                options.UseSqlite($"Data Source={Path.Combine(root, "vision.db")}"));
+            builder.Services.AddSingleton(Options.Create(new StationIngressOptions
+            {
+                Enabled = true,
+                OfflineThresholdSeconds = 15,
+                ResultBufferPerStation = 20,
+                EventBufferSize = 50
+            }));
+            builder.Services.AddSingleton<StationRegistryService>(sp =>
+                new StationRegistryService(
+                    sp.GetRequiredService<IOptions<StationIngressOptions>>(),
+                    NullLogger<StationRegistryService>.Instance));
+            builder.Services.AddSingleton<StationCentralStore>(sp =>
+                new StationCentralStore(
+                    sp.GetRequiredService<IServiceScopeFactory>(),
+                    NullLogger<StationCentralStore>.Instance));
+            builder.Services.AddSingleton<StationPackageStore>(sp =>
+                new StationPackageStore(
+                    sp.GetRequiredService<IServiceScopeFactory>(),
+                    NullLogger<StationPackageStore>.Instance));
+
+            var app = builder.Build();
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            app.MapStationEndpoints();
+            await app.StartAsync();
+
+            return new StationEndpointTestHost(app, app.Services.GetRequiredService<StationRegistryService>(), root);
+        }
+
         public async ValueTask DisposeAsync()
         {
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+
+            if (!string.IsNullOrWhiteSpace(_tempRoot))
+            {
+                try
+                {
+                    Directory.Delete(_tempRoot, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+            }
         }
     }
 }

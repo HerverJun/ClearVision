@@ -228,7 +228,8 @@ class OmronFinsHandler(socketserver.BaseRequestHandler):
                     print(f"FINS handshake: client_node={client_node}, server_node={server_node}", flush=True)
                     self.request.sendall(build_fins_node_response(server_node, client_node))
                 elif command == FINS_FRAME_SEND:
-                    payload = read_exact(self.request, length)
+                    payload_length = resolve_fins_payload_length(length)
+                    payload = read_exact(self.request, payload_length)
                     response = handle_fins_frame(memory, payload, server_node)
                     self.request.sendall(response)
                 else:
@@ -284,6 +285,16 @@ def handle_fins_frame(memory: VirtualFinsMemory, frame: bytes, server_node: int)
         memory.write_words(area_code, start_address, values)
     print(f"FINS write: area=0x{area_code:02X}, address={start_address}, count={count}", flush=True)
     return build_fins_response(frame, server_node, mrc, src, FINS_END_OK, client_node=client_node, sid=sid)
+
+
+def resolve_fins_payload_length(length: int) -> int:
+    if length < 18:
+        return length
+
+    if length - 8 >= 18:
+        return length - 8
+
+    return length
 
 
 def is_fins_bit_area(area_code: int) -> bool:

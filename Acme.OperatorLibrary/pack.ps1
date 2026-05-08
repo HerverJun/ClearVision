@@ -73,6 +73,8 @@ if (-not [string]::IsNullOrWhiteSpace($RepositoryCommit)) {
     Write-Host "[pack] RepositoryCommit   : $RepositoryCommit"
 }
 
+New-Item -Path $nupkgPath -ItemType Directory -Force | Out-Null
+
 dotnet pack $projectPath -c $Configuration -o $nupkgPath @packProperties
 if ($LASTEXITCODE -ne 0) {
     throw "[pack] dotnet pack failed with exit code $LASTEXITCODE"

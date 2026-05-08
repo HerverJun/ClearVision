@@ -2,6 +2,16 @@
   "version": 1,
   "dependencies": {
     "net8.0": {
+      "HslCommunication": {
+        "type": "Direct",
+        "requested": "[12.7.0, )",
+        "resolved": "12.7.0",
+        "contentHash": "P7MbSCFW2462j8UiqU5H9oAsGkKgc2jkqMAqqaydHG3mpxdBIaW/6Ds7nCZ5qRnIhgpz3u73hPGvJotvNrGvrQ==",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1",
+          "System.IO.Ports": "6.0.0"
+        }
+      },
       "Microsoft.Data.SqlClient": {
         "type": "Direct",
         "requested": "[5.2.2, )",
@@ -274,6 +284,11 @@
         "type": "Transitive",
         "resolved": "8.0.0",
         "contentHash": "9opKRyOKMCi2xJ7Bj7kxtZ1r9vbzosMvRrdEhVhDz8j8MoBGgB+WmC94yH839NPH+BclAjtQ/pyagvi/8gDLkw=="
+      },
+      "Newtonsoft.Json": {
+        "type": "Transitive",
+        "resolved": "13.0.1",
+        "contentHash": "ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A=="
       },
       "Paddle.Runtime.win_x64": {
         "type": "Transitive",

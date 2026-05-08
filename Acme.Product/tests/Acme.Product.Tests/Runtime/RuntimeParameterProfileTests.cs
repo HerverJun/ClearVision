@@ -193,6 +193,36 @@ public sealed class RuntimeParameterValidatorTests
                     RuntimeParameterTestData.CreateOverride(parameterId, 1.2d)))
             .Errors.Should().Contain(error => error.Contains("above max", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void Validate_ShouldReportDuplicateDefinitionsAndBlankOverrideIds()
+    {
+        var operatorId = Guid.NewGuid();
+        var parameterId = RuntimeParameterTestData.ParameterId(operatorId);
+        var schema = RuntimeParameterTestData.CreateSchema("pkg-1", "sha256:abc", operatorId, parameterId);
+        schema.Parameters.Add(new RuntimeParameterDefinition
+        {
+            Id = parameterId,
+            OperatorId = Guid.NewGuid(),
+            OperatorName = "duplicate",
+            OperatorType = nameof(OperatorType.DeepLearning),
+            ParameterName = "Confidence"
+        });
+
+        var profile = RuntimeParameterTestData.CreateProfile(
+            "pkg-1",
+            "sha256:abc",
+            new RuntimeParameterOverride
+            {
+                ParameterId = " ",
+                Value = JsonSerializer.SerializeToElement(0.7d)
+            });
+
+        var validation = RuntimeParameterValidator.Validate(schema, profile);
+
+        validation.Errors.Should().Contain(error => error.Contains("Duplicate runtime parameter definition", StringComparison.OrdinalIgnoreCase));
+        validation.Errors.Should().Contain(error => error.Contains("override id", StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 public sealed class RuntimeParameterOverrideApplierTests

@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT' and '$(NETCoreSdkVersion)' == '10.0.101'">
     <!--
-      On some Windows hosts the SDK 10.0.101 native csc.exe exits with
-      0xC0000005 during builds. Invoking the same compiler through dotnet
-      csc.dll is stable and keeps the repository's global.json pin usable.
+      If roll-forward selects SDK 10.0.101 on a Windows host, native csc.exe
+      can exit with 0xC0000005 during builds. Invoking the same compiler through
+      dotnet csc.dll keeps that fallback SDK usable without changing target frameworks.
     -->
     <UseSharedCompilation>false</UseSharedCompilation>
     <CscToolPath>$(MSBuildThisFileDirectory)..\scripts\dotnet-sdk10-csc</CscToolPath>

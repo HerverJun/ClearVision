@@ -266,7 +266,7 @@ Minimum Alpha trial acceptance:
 2. Build: `dotnet build Acme.Product/Acme.Product.sln --no-restore`.
 3. Product tests: `& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj"`.
 4. Desktop tests: `& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj"`.
-5. Total test entry: `dotnet test Acme.Product/Acme.Product.sln`.
+5. Broader gate entry: `& "./scripts/run-operator-library-industrial-gate.ps1" -Profile quick` (or use the targeted fixed regression scripts listed in `AGENTS.md`).
 6. Start Studio with ingress enabled and token configured.
 7. Start Station or the simulator with the same token.
 8. Confirm Station monitor shows overview, station list, recent results, health, alerts, logs, commands, and SSE updates.

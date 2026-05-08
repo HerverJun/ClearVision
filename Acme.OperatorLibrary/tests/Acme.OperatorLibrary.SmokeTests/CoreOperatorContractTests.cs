@@ -1,6 +1,8 @@
 using System.Text.Json;
+using Acme.OperatorLibrary.Abstractions.Adapters;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
+using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,6 +12,21 @@ namespace Acme.OperatorLibrary.SmokeTests;
 
 public class CoreOperatorContractTests
 {
+    [Fact]
+    public void OperatorExecutionOutputAdapter_ShouldPreserveShortCircuitContract()
+    {
+        var source = OperatorExecutionOutput.ShortCircuit(
+            new Dictionary<string, object> { ["Reason"] = "EmptyFrame" },
+            executionTimeMs: 12);
+
+        var model = source.ToModel();
+
+        Assert.True(model.IsSuccess);
+        Assert.True(model.ShouldShortCircuitFlow);
+        Assert.Equal(12, model.ExecutionTimeMs);
+        Assert.Equal("EmptyFrame", model.OutputData?["Reason"]);
+    }
+
     [Fact]
     public async Task MeanFilterOperator_WithKernelOne_PreservesImagePixelsAndContract()
     {
