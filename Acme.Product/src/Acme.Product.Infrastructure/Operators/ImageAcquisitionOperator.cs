@@ -6,6 +6,7 @@ using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
+using Acme.Product.Core.Streaming;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.Extensions.Logging;
@@ -57,6 +58,11 @@ public class ImageAcquisitionOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
+        if (TryGetProvidedFrameEnvelope(inputs, out var envelope) && envelope != null)
+        {
+            return CreateOutputFromEnvelope(envelope);
+        }
+
         // 优先获取 sourceType 和 filePath 参数
         // 1. 尝试从连线输入获取
         // 2. 如果没有连线输入，从算子自身的参数列表中获取 (Metadata-driven)
@@ -213,5 +219,71 @@ public class ImageAcquisitionOperator : OperatorBase
         }
 
         return null;
+    }
+
+    private static bool TryGetProvidedFrameEnvelope(Dictionary<string, object>? inputs, out FrameEnvelope? envelope)
+    {
+        envelope = null;
+        if (inputs == null)
+        {
+            return false;
+        }
+
+        if (!inputs.TryGetValue("ProvidedFrameEnvelope", out var value) &&
+            !inputs.TryGetValue("providedFrameEnvelope", out value))
+        {
+            return false;
+        }
+
+        envelope = value as FrameEnvelope;
+        return envelope != null;
+    }
+
+    private OperatorExecutionOutput CreateOutputFromEnvelope(FrameEnvelope envelope)
+    {
+        try
+        {
+            var mat = DecodeEnvelope(envelope);
+            if (mat.Empty())
+            {
+                return OperatorExecutionOutput.Failure("Provided frame envelope cannot be decoded.");
+            }
+
+            return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
+            {
+                { "Channels", mat.Channels() },
+                { "Source", "provided-frame-envelope" },
+                { "CameraId", envelope.CameraId },
+                { "Sequence", envelope.Sequence },
+                { "TimestampSource", envelope.TimestampSource.ToString() },
+                { "HostReceiveTimestampUtc", envelope.HostReceiveTimestampUtc.UtcDateTime },
+                { "CorrelationId", envelope.EffectiveCorrelationId },
+                { "TrackId", envelope.Tags != null && envelope.Tags.TryGetValue("TrackId", out var trackId) ? trackId : string.Empty }
+            }));
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure($"Provided frame envelope decode failed: {ex.Message}");
+        }
+    }
+
+    private static Mat DecodeEnvelope(FrameEnvelope envelope)
+    {
+        if (envelope.PayloadKind == FramePayloadKind.EncodedImage)
+        {
+            return Cv2.ImDecode(envelope.Payload.ToArray(), ImreadModes.Color);
+        }
+
+        var matType = envelope.PixelFormat.Equals("Mono8", StringComparison.OrdinalIgnoreCase)
+            ? MatType.CV_8UC1
+            : MatType.CV_8UC3;
+        using var raw = new Mat(envelope.Height, envelope.Width, matType, envelope.Payload.ToArray());
+        var decoded = raw.Clone();
+        if (envelope.PixelFormat.Equals("RGB8", StringComparison.OrdinalIgnoreCase))
+        {
+            Cv2.CvtColor(decoded, decoded, ColorConversionCodes.RGB2BGR);
+        }
+
+        return decoded;
     }
 }
