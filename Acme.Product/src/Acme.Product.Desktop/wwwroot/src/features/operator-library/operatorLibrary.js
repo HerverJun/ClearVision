@@ -121,13 +121,16 @@ export class OperatorLibraryPanel {
                 if (node.type === 'operator') {
                     console.log('[OperatorLibrary] renderNode 渲染算子:', node.label);
                     const operator = node.data;
+                    const icon = this.escapeHtml(node.customIcon || node.icon || '📦');
+                    const label = this.escapeHtml(node.label || '');
+                    const description = this.escapeHtml(operator?.description || '');
                     element.innerHTML = `
                         <div class="operator-item-content">
                             <span class="operator-drag-handle">⋮⋮</span>
-                            <span class="operator-icon">${node.customIcon || node.icon || '📦'}</span>
+                            <span class="operator-icon">${icon}</span>
                             <div class="operator-info">
-                                <span class="operator-name">${node.label}</span>
-                                <span class="operator-desc">${operator?.description || ''}</span>
+                                <span class="operator-name">${label}</span>
+                                <span class="operator-desc">${description}</span>
                             </div>
                         </div>
                     `;
@@ -149,8 +152,9 @@ export class OperatorLibraryPanel {
                     // 【新增】分类节点 - 自定义渲染包含展开/收起按钮
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = this.treeView.expandedNodes.has(node.id) || node.expanded;
-                    const icon = node.customIcon || node.icon || '📁';
-                    const label = node.label;
+                    const icon = this.escapeHtml(node.customIcon || node.icon || '📁');
+                    const label = this.escapeHtml(node.label || '');
+                    const nodeId = this.escapeHtml(node.id || '');
                     const count = node.children ? node.children.length : 0;
                     
                     // 构建完整内容
@@ -164,7 +168,7 @@ export class OperatorLibraryPanel {
                         
                         html += `
                             <span class="cv-treeview-toggle ${isExpanded ? 'expanded' : 'collapsed'}"
-                                  data-node-id="${node.id}">
+                                  data-node-id="${nodeId}">
                                 ${arrowIcon}
                             </span>
                         `;
@@ -698,18 +702,34 @@ export class OperatorLibraryPanel {
         const resolvedOperator = this.metadataByType.get(operator.type) || operator;
         const inputPorts = Array.isArray(resolvedOperator.inputPorts) ? resolvedOperator.inputPorts : [];
         const outputPorts = Array.isArray(resolvedOperator.outputPorts) ? resolvedOperator.outputPorts : [];
+        const detailIcon = resolvedOperator.icon
+            ? this.escapeHtml(resolvedOperator.icon)
+            : this.getSvgIcon(this.getOperatorIconPath(resolvedOperator.type, resolvedOperator.category));
+        const displayName = this.escapeHtml(resolvedOperator.displayName || resolvedOperator.name || '未命名算子');
+        const category = this.escapeHtml(resolvedOperator.category || '其他');
+        const type = this.escapeHtml(resolvedOperator.type || '');
+        const description = this.escapeHtml(resolvedOperator.description || '暂无描述');
+        const inputType = this.escapeHtml(resolvedOperator.inputType || '图像');
+        const outputType = this.escapeHtml(resolvedOperator.outputType || '图像/数据');
+        const featureBadge = this.escapeHtml(getFeatureBadge('operator.autotuneStrategies'));
+        const featureDescription = this.escapeHtml(getFeatureDescription('operator.autotuneStrategies'));
+        const renderPortLabel = (port, fallbackName = '未命名') => {
+            const name = port.displayName || port.DisplayName || port.name || port.Name || fallbackName;
+            const dataType = port.dataType || port.DataType || 'Any';
+            return `${this.escapeHtml(name)} (${this.escapeHtml(dataType)})`;
+        };
         
         preview.innerHTML = `
             <div class="operator-detail">
                 <div class="detail-header">
-                    <span class="detail-icon">${resolvedOperator.icon || this.getSvgIcon(this.getOperatorIconPath(resolvedOperator.type, resolvedOperator.category))}</span>
-                    <h4>${resolvedOperator.displayName || resolvedOperator.name}</h4>
+                    <span class="detail-icon">${detailIcon}</span>
+                    <h4>${displayName}</h4>
                 </div>
                 <div class="detail-meta">
-                    <span class="detail-category">${resolvedOperator.category || '其他'}</span>
-                    <span class="detail-type">${resolvedOperator.type}</span>
+                    <span class="detail-category">${category}</span>
+                    <span class="detail-type">${type}</span>
                 </div>
-                <p class="detail-description">${resolvedOperator.description || '暂无描述'}</p>
+                <p class="detail-description">${description}</p>
                 
                 <div class="detail-params">
                     <h5>参数配置</h5>
@@ -723,33 +743,33 @@ export class OperatorLibraryPanel {
                             ? inputPorts.map(port => `
                                 <div class="port-item input">
                                     <span class="port-dot input"></span>
-                                    <span>输入: ${port.displayName || port.DisplayName || port.name || port.Name || '未命名'} (${port.dataType || port.DataType || 'Any'})</span>
+                                    <span>输入: ${renderPortLabel(port)}</span>
                                 </div>
                             `).join('')
                             : `
                                 <div class="port-item input">
                                     <span class="port-dot input"></span>
-                                    <span>输入: ${resolvedOperator.inputType || '图像'}</span>
+                                    <span>输入: ${inputType}</span>
                                 </div>
                             `}
                         ${outputPorts.length > 0
                             ? outputPorts.map(port => `
                                 <div class="port-item output">
                                     <span class="port-dot output"></span>
-                                    <span>输出: ${port.displayName || port.DisplayName || port.name || port.Name || '未命名'} (${port.dataType || port.DataType || 'Any'})</span>
+                                    <span>输出: ${renderPortLabel(port)}</span>
                                 </div>
                             `).join('')
                             : `
                                 <div class="port-item output">
                                     <span class="port-dot output"></span>
-                                    <span>输出: ${resolvedOperator.outputType || '图像/数据'}</span>
+                                    <span>输出: ${outputType}</span>
                                 </div>
                             `}
                     </div>
                 </div>
                 <div class="detail-actions" style="margin-top:16px;">
                     <button class="cv-btn cv-btn-secondary" id="btn-show-autotune-strategies">查看自动调参策略</button>
-                    <div class="params-empty" style="margin-top:8px;">${getFeatureBadge('operator.autotuneStrategies')}：${getFeatureDescription('operator.autotuneStrategies')}</div>
+                    <div class="params-empty" style="margin-top:8px;">${featureBadge}：${featureDescription}</div>
                     <div id="autotune-strategies-panel" style="margin-top:12px;"></div>
                 </div>
             </div>
@@ -765,7 +785,7 @@ export class OperatorLibraryPanel {
             }
 
             if (!isFeatureEnabled('operator.autotuneStrategies')) {
-                panel.innerHTML = `<div class="params-empty">${getFeatureDescription('operator.autotuneStrategies', '该能力当前不可用')}</div>`;
+                panel.innerHTML = `<div class="params-empty">${this.escapeHtml(getFeatureDescription('operator.autotuneStrategies', '该能力当前不可用'))}</div>`;
                 return;
             }
 
@@ -784,9 +804,9 @@ export class OperatorLibraryPanel {
                         <ul class="params-list">
                             ${strategies.map(strategy => `
                                 <li class="param-item">
-                                    <span class="param-name">${strategy.name || strategy.Name || '未命名策略'}</span>
-                                    <span class="param-type">${strategy.category || strategy.Category || '策略'}</span>
-                                    <span class="param-default">${strategy.description || strategy.Description || '暂无描述'}</span>
+                                    <span class="param-name">${this.escapeHtml(strategy.name || strategy.Name || '未命名策略')}</span>
+                                    <span class="param-type">${this.escapeHtml(strategy.category || strategy.Category || '策略')}</span>
+                                    <span class="param-default">${this.escapeHtml(strategy.description || strategy.Description || '暂无描述')}</span>
                                 </li>
                             `).join('')}
                         </ul>
@@ -794,7 +814,7 @@ export class OperatorLibraryPanel {
                 `;
             } catch (error) {
                 console.error('[OperatorLibraryPanel] 获取自动调参策略失败:', error);
-                panel.innerHTML = `<div class="params-empty">加载失败：${error.message}</div>`;
+                panel.innerHTML = `<div class="params-empty">加载失败：${this.escapeHtml(error.message)}</div>`;
             }
         });
     }
@@ -811,13 +831,22 @@ export class OperatorLibraryPanel {
             <ul class="params-list">
                 ${parameters.map(param => `
                     <li class="param-item">
-                        <span class="param-name">${param.name}</span>
-                        <span class="param-type">${param.type}</span>
-                        <span class="param-default">默认: ${param.defaultValue}</span>
+                        <span class="param-name">${this.escapeHtml(param.name)}</span>
+                        <span class="param-type">${this.escapeHtml(param.type)}</span>
+                        <span class="param-default">默认: ${this.escapeHtml(param.defaultValue)}</span>
                     </li>
                 `).join('')}
             </ul>
         `;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**

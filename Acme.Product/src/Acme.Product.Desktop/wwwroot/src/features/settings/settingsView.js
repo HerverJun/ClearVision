@@ -1192,24 +1192,29 @@ class SettingsView {
         
         tbody.innerHTML = this.aiModels.map(m => {
             const isEditing = m.id === this.editingAiModelId;
-            const badgeBg = m.provider.includes('Anthropic') ? '#fce7f3' : (m.provider.includes('OpenAI API') ? '#e0e7ff' : '#f3f4f6');
-            const badgeColor = m.provider.includes('Anthropic') ? '#db2777' : (m.provider.includes('OpenAI API') ? '#4338ca' : '#475569');
+            const id = this.escapeHtml(m.id || '');
+            const name = this.escapeHtml(m.name || '-');
+            const provider = String(m.provider || '');
+            const providerHtml = this.escapeHtml(provider || '-');
+            const model = this.escapeHtml(m.model || '-');
+            const badgeBg = provider.includes('Anthropic') ? '#fce7f3' : (provider.includes('OpenAI API') ? '#e0e7ff' : '#f3f4f6');
+            const badgeColor = provider.includes('Anthropic') ? '#db2777' : (provider.includes('OpenAI API') ? '#4338ca' : '#475569');
             
             return `
                 <tr style="${isEditing ? 'background:#f8fafc;' : ''}">
-                    <td class="font-bold">${m.name || '-'}</td>
-                    <td><span class="type-badge" style="background:${badgeBg}; color:${badgeColor};">${m.provider}</span></td>
-                    <td class="font-mono">${m.model || '-'}</td>
+                    <td class="font-bold">${name}</td>
+                    <td><span class="type-badge" style="background:${badgeBg}; color:${badgeColor};">${providerHtml}</span></td>
+                    <td class="font-mono">${model}</td>
                     <td>
                         ${m.isActive 
                             ? '<span class="settings-status-badge status-connected" style="background:#ecfdf5; padding:2px 8px;"><span class="status-dot"></span> Active</span>' 
-                            : `<button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="activate" data-id="${m.id}">设为激活</button>`}
+                            : `<button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="activate" data-id="${id}">设为激活</button>`}
                     </td>
                     <td>
-                        <button class="action-icon-btn" data-action="edit" data-id="${m.id}" title="编辑">
+                        <button class="action-icon-btn" data-action="edit" data-id="${id}" title="编辑">
                             <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
                         </button>
-                        <button class="action-icon-btn" data-action="delete" data-id="${m.id}" title="删除" style="color:var(--cinnabar);">
+                        <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" style="color:var(--cinnabar);">
                             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                         </button>
                     </td>
@@ -1234,13 +1239,18 @@ class SettingsView {
         const apiKeyPlaceholder = m.hasApiKey ? '●●●●●●（已配置，留空则不修改）' : '请输入 API Key';
         const reasoning = this.normalizeAiReasoning(m.reasoning);
         const support = this.normalizeAiReasoningSupport(this.aiReasoningSupportPreview || m.reasoningSupport);
+        const nameValue = this.escapeHtml(m.name || '');
+        const modelValue = this.escapeHtml(m.model || '');
+        const baseUrlValue = this.escapeHtml(m.baseUrl || '');
+        const apiKeyPlaceholderValue = this.escapeHtml(apiKeyPlaceholder);
+        const timeoutValue = Number.isFinite(Number(m.timeoutMs)) ? Number(m.timeoutMs) : 120000;
         
         formContainer.innerHTML = `
             <div style="display:flex; gap:16px; margin-bottom:16px;">
                  <div class="settings-fieldset" style="flex:1;">
                      <label>模型昵称</label>
-                     <input type="text" class="cv-input" id="cfg-ai-name" value="${m.name || ''}" placeholder="本地别名">
-                 </div>
+                     <input type="text" class="cv-input" id="cfg-ai-name" value="${nameValue}" placeholder="本地别名">
+                  </div>
                  <div class="settings-fieldset" style="flex:1;">
                      <label>API 协议</label>
                      <select class="cv-input" id="cfg-ai-provider">
@@ -1251,27 +1261,27 @@ class SettingsView {
                  </div>
                  <div class="settings-fieldset" style="flex:1;">
                      <label>模型选择</label>
-                     <input type="text" class="cv-input" id="cfg-ai-model" value="${m.model || ''}" placeholder="如 deepseek-chat">
-                 </div>
+                     <input type="text" class="cv-input" id="cfg-ai-model" value="${modelValue}" placeholder="如 deepseek-chat">
+                  </div>
              </div>
              <div class="settings-fieldset" style="margin-bottom:16px;">
                  <label>API Endpoint (Host & Path)</label>
                  <div style="display:flex;">
-                     <span style="padding:10px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-right:none; border-radius:6px 0 0 6px; color:#64748b;">URL:</span>
-                     <input type="text" class="cv-input" id="cfg-ai-baseurl" value="${m.baseUrl || ''}" placeholder="如 https://api.deepseek.com/v1" style="border-radius:0 6px 6px 0;">
-                 </div>
+                      <span style="padding:10px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-right:none; border-radius:6px 0 0 6px; color:#64748b;">URL:</span>
+                      <input type="text" class="cv-input" id="cfg-ai-baseurl" value="${baseUrlValue}" placeholder="如 https://api.deepseek.com/v1" style="border-radius:0 6px 6px 0;">
+                  </div>
              </div>
               <div style="display:flex; gap:16px;">
                   <div class="settings-fieldset" style="flex:2;">
                       <label>API Key</label>
                      <div class="input-with-suffix" style="position:relative;">
-                         <input type="password" class="cv-input" id="cfg-ai-apikey" value="" placeholder="${apiKeyPlaceholder}" style="padding-right:36px; font-family:monospace;">
+                          <input type="password" class="cv-input" id="cfg-ai-apikey" value="" placeholder="${apiKeyPlaceholderValue}" style="padding-right:36px; font-family:monospace;">
                          <button class="icon-action-btn" id="btn-toggle-apikey" style="position:absolute; right:10px; top:50%; transform:translateY(-50%);">👁</button>
                      </div>
                  </div>
                   <div class="settings-fieldset" style="flex:1;">
                       <label>请求超时 (ms)</label>
-                      <input type="number" class="cv-input" id="cfg-ai-timeout" value="${m.timeoutMs || 120000}">
+                      <input type="number" class="cv-input" id="cfg-ai-timeout" value="${timeoutValue}">
                   </div>
               </div>
               <details class="settings-fieldset" style="margin-top:16px; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; background:#fafcff;" open>
@@ -2852,9 +2862,12 @@ class SettingsView {
                     roleColor = '#475569'; roleBg = '#f1f5f9'; roleName = '操作员';
                 }
 
-                const initial = u.username.charAt(0).toUpperCase();
+                const username = String(u.username || '');
+                const usernameHtml = this.escapeHtml(username || '-');
+                const userId = this.escapeHtml(u.id || '');
+                const initial = this.escapeHtml((username.charAt(0) || '?').toUpperCase());
                 // 如果最后登录时间为空，显示"从未登录"，否则格式化
-                const lastLogin = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : '从未登录';
+                const lastLogin = this.escapeHtml(u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : '从未登录');
                 
                 const statusHtml = u.isActive 
                     ? '<span class="settings-status-badge status-connected"><span class="status-dot"></span> 正常</span>'
@@ -2865,24 +2878,24 @@ class SettingsView {
                         <td>
                             <div style="display:flex; align-items:center; gap:12px;">
                                 <div style="width:32px; height:32px; background:${roleBg}; border-radius:50%; display:flex; align-items:center; justify-content:center; color:${roleColor}; font-weight:700; font-size:14px;">${initial}</div>
-                                <div class="font-bold">${u.username}</div>
+                                <div class="font-bold">${usernameHtml}</div>
                             </div>
                         </td>
                         <td><span class="type-badge" style="background:${roleBg}; color:${roleColor};">${roleName}</span></td>
                         <td class="text-muted">${lastLogin}</td>
                         <td>${statusHtml}</td>
                         <td>
-                            <button class="action-icon-btn" data-action="edit" data-id="${u.id}" title="编辑用户"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
-                            ${u.username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="reset-pwd" data-id="${u.id}" title="重置密码"><svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4h2.35l2-2 2 2 2-2 2 2V10h-6.35zM7 14c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2z"/></svg></button>` : ''}
-                            ${u.username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="toggle-status" data-id="${u.id}" title="${u.isActive?'禁用':'启用'}"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></button>` : ''}
-                            ${u.username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="delete" data-id="${u.id}" title="删除用户" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+                            <button class="action-icon-btn" data-action="edit" data-id="${userId}" title="编辑用户"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
+                            ${username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="reset-pwd" data-id="${userId}" title="重置密码"><svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4h2.35l2-2 2 2 2-2 2 2V10h-6.35zM7 14c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2z"/></svg></button>` : ''}
+                            ${username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="toggle-status" data-id="${userId}" title="${u.isActive?'禁用':'启用'}"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></button>` : ''}
+                            ${username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="delete" data-id="${userId}" title="删除用户" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
                         </td>
                     </tr>
                 `;
             }).join('');
         } catch (error) {
             console.error('[SettingsView] loadUsers err', error);
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--cinnabar);">加载失败: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--cinnabar);">加载失败: ${this.escapeHtml(error.message)}</td></tr>`;
         }
     }
 
@@ -2950,12 +2963,14 @@ class SettingsView {
         if (roleVal === 'Admin') roleVal = 0;
         else if (roleVal === 'Engineer') roleVal = 1;
         else if (roleVal === 'Operator') roleVal = 2;
+        const usernameValue = this.escapeHtml(user ? user.username : '');
+        const displayNameValue = this.escapeHtml(user?.displayName || '');
 
         const content = document.createElement('div');
         content.innerHTML = `
             <div class="settings-fieldset" style="margin-bottom:16px;">
                 <label>用户名 (登录账号)</label>
-                <input type="text" class="cv-input" id="modal-user-username" value="${user ? user.username : ''}" ${mode === 'edit' ? 'disabled' : ''}>
+                <input type="text" class="cv-input" id="modal-user-username" value="${usernameValue}" ${mode === 'edit' ? 'disabled' : ''}>
             </div>
             ${mode === 'create' ? `
             <div class="settings-fieldset" style="margin-bottom:16px;">
@@ -2965,7 +2980,7 @@ class SettingsView {
             ` : ''}
             <div class="settings-fieldset" style="margin-bottom:16px;">
                 <label>显示名称 (可选)</label>
-                <input type="text" class="cv-input" id="modal-user-displayname" value="${user?.displayName || ''}">
+                <input type="text" class="cv-input" id="modal-user-displayname" value="${displayNameValue}">
             </div>
             <div class="settings-fieldset" style="margin-bottom:16px;">
                 <label>用户角色</label>

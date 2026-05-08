@@ -199,7 +199,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IOperatorRepository, OperatorRepository>();
         services.AddScoped<IInspectionResultRepository, InspectionResultRepository>();
-        services.AddSingleton<IImageCacheRepository, ImageCacheRepository>();
+        services.AddSingleton<IImageCacheRepository, LruImageCacheRepository>();
         services.AddSingleton<IProjectFlowStorage, JsonFileProjectFlowStorage>();
 
         services.AddSingleton<InspectionResultBackgroundService>();

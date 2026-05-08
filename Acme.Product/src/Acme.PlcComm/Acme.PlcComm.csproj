@@ -15,10 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.IO.Ports" Version="7.0.0" />
-    <Reference Include="HslCommunication">
-      <HintPath>lib\HslCommunication.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
+    <PackageReference Include="HslCommunication" Version="12.7.0" />
   </ItemGroup>
 
 </Project>

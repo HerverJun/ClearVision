@@ -46,9 +46,91 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("Std", "Std", "string", DefaultValue = "1,1,1")]
 public sealed class SemanticSegmentationOperator : OperatorBase
 {
+    private const int MaxCachedSessions = 4;
     private static readonly string[] SupportedCatalogTypes = ["segmentation"];
-    private static readonly ConcurrentDictionary<string, InferenceSession> SessionCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> SessionLocks = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, CachedSession> SessionCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly SemaphoreSlim SessionCacheLock = new(1, 1);
+
+    private sealed class CachedSession
+    {
+        private int _leaseCount;
+        private int _disposeRequested;
+        private int _disposed;
+
+        public CachedSession(InferenceSession session)
+        {
+            Session = session;
+            LastAccessUtc = DateTime.UtcNow;
+        }
+
+        public InferenceSession Session { get; }
+
+        public DateTime LastAccessUtc { get; private set; }
+
+        public bool TryAcquire(out SessionLease lease)
+        {
+            lease = null!;
+            if (Volatile.Read(ref _disposeRequested) != 0)
+            {
+                return false;
+            }
+
+            Interlocked.Increment(ref _leaseCount);
+            if (Volatile.Read(ref _disposeRequested) == 0)
+            {
+                LastAccessUtc = DateTime.UtcNow;
+                lease = new SessionLease(this);
+                return true;
+            }
+
+            Release();
+            return false;
+        }
+
+        public void Retire()
+        {
+            if (Interlocked.Exchange(ref _disposeRequested, 1) == 0 &&
+                Volatile.Read(ref _leaseCount) == 0)
+            {
+                DisposeSession();
+            }
+        }
+
+        public void Release()
+        {
+            if (Interlocked.Decrement(ref _leaseCount) == 0 &&
+                Volatile.Read(ref _disposeRequested) != 0)
+            {
+                DisposeSession();
+            }
+        }
+
+        private void DisposeSession()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                Session.Dispose();
+            }
+        }
+    }
+
+    private sealed class SessionLease : IDisposable
+    {
+        private CachedSession? _owner;
+
+        public SessionLease(CachedSession owner)
+        {
+            _owner = owner;
+        }
+
+        public InferenceSession Session => _owner?.Session
+            ?? throw new ObjectDisposedException(nameof(SessionLease));
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _owner, null)?.Release();
+        }
+    }
 
     public SemanticSegmentationOperator(ILogger<SemanticSegmentationOperator> logger)
         : base(logger)
@@ -113,10 +195,10 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         var channelOrder = ParseChannelOrder(GetStringParam(@operator, "ChannelOrder", "RGB"));
         var classNames = ResolveClassNames(@operator, modelCatalogEntry, numClasses);
 
-        InferenceSession session;
+        SessionLease sessionLease;
         try
         {
-            session = await GetOrCreateSessionAsync(modelPath, executionProvider, cancellationToken);
+            sessionLease = await GetOrCreateSessionLeaseAsync(modelPath, executionProvider, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -127,9 +209,13 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         SegmentationExecutionResult executionResult;
         try
         {
-            executionResult = await RunCpuBoundWork(
-                () => ExecuteSegmentation(session, src, inputWidth, inputHeight, numClasses, classNames, channelOrder, mean, std, useUnitRange),
-                cancellationToken);
+            using (sessionLease)
+            {
+                var session = sessionLease.Session;
+                executionResult = await RunCpuBoundWork(
+                    () => ExecuteSegmentation(session, src, inputWidth, inputHeight, numClasses, classNames, channelOrder, mean, std, useUnitRange),
+                    cancellationToken);
+            }
         }
         catch (OnnxRuntimeException ex)
         {
@@ -263,24 +349,23 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         return ParseClassNames(rawClassNames, numClasses);
     }
 
-    private async Task<InferenceSession> GetOrCreateSessionAsync(string modelPath, string executionProvider, CancellationToken cancellationToken)
+    private async Task<SessionLease> GetOrCreateSessionLeaseAsync(string modelPath, string executionProvider, CancellationToken cancellationToken)
     {
         var resolvedModelPath = Path.GetFullPath(modelPath);
         var effectiveProvider = executionProvider == "cuda" && !GpuAvailabilityChecker.IsCudaAvailable ? "cpu" : executionProvider;
         var cacheKey = $"{resolvedModelPath}|{effectiveProvider}";
 
-        if (SessionCache.TryGetValue(cacheKey, out var cached))
+        if (TryAcquireCachedSession(cacheKey, out var lease))
         {
-            return cached;
+            return lease;
         }
 
-        var gate = SessionLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken);
+        await SessionCacheLock.WaitAsync(cancellationToken);
         try
         {
-            if (SessionCache.TryGetValue(cacheKey, out cached))
+            if (TryAcquireCachedSession(cacheKey, out lease))
             {
-                return cached;
+                return lease;
             }
 
             var options = new SessionOptions
@@ -294,12 +379,49 @@ public sealed class SemanticSegmentationOperator : OperatorBase
             }
 
             var session = new InferenceSession(resolvedModelPath, options);
-            SessionCache[cacheKey] = session;
-            return session;
+            var cached = new CachedSession(session);
+            SessionCache[cacheKey] = cached;
+            EnforceSessionCacheLimit(cacheKey);
+
+            if (cached.TryAcquire(out lease))
+            {
+                return lease;
+            }
+
+            throw new ObjectDisposedException(nameof(InferenceSession), "Segmentation ONNX session was evicted before it could be leased.");
         }
         finally
         {
-            gate.Release();
+            SessionCacheLock.Release();
+        }
+    }
+
+    private static bool TryAcquireCachedSession(string cacheKey, out SessionLease lease)
+    {
+        lease = null!;
+        return SessionCache.TryGetValue(cacheKey, out var cached) && cached.TryAcquire(out lease);
+    }
+
+    private static void EnforceSessionCacheLimit(string protectedKey)
+    {
+        if (SessionCache.Count <= MaxCachedSessions)
+        {
+            return;
+        }
+
+        foreach (var candidate in SessionCache
+                     .Where(entry => !entry.Key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(entry => entry.Value.LastAccessUtc))
+        {
+            if (SessionCache.Count <= MaxCachedSessions)
+            {
+                break;
+            }
+
+            if (SessionCache.TryRemove(new KeyValuePair<string, CachedSession>(candidate.Key, candidate.Value)))
+            {
+                candidate.Value.Retire();
+            }
         }
     }
 

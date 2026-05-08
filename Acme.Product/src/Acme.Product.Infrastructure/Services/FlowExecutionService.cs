@@ -634,40 +634,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
         }
 
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        try
-        {
-            // 对于单独执行算子，目前不支持取消
-            var opResult = await executor.ExecuteAsync(@operator, inputs ?? new Dictionary<string, object>());
-            stopwatch.Stop();
-
-            _logger.LogOperatorExecution(@operator.Id, @operator.Name, stopwatch.ElapsedMilliseconds, opResult.IsSuccess);
-
-            return new OperatorExecutionResult
-            {
-                OperatorId = @operator.Id,
-                OperatorName = @operator.Name,
-                IsSuccess = opResult.IsSuccess,
-                ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                OutputData = opResult.OutputData,
-                ErrorMessage = opResult.ErrorMessage,
-                ShortCircuitedFlow = opResult.ShouldShortCircuitFlow
-            };
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", @operator.Name, @operator.Id);
-            return new OperatorExecutionResult
-            {
-                OperatorId = @operator.Id,
-                OperatorName = @operator.Name,
-                IsSuccess = false,
-                ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                ErrorMessage = ex.Message
-            };
-        }
+        return await ExecuteOperatorInternalAsync(
+            @operator,
+            executor,
+            inputs ?? new Dictionary<string, object>(),
+            CancellationToken.None);
     }
 
     public FlowValidationResult ValidateFlow(OperatorFlow flow)
