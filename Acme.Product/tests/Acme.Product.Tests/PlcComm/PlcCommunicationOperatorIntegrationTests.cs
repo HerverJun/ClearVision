@@ -316,7 +316,7 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         await ReadExactAsync(stream, header, ct);
         var dataLength = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(7, 2));
 
-        var trailingLength = 6 + dataLength;
+        var trailingLength = dataLength;
         var frame = new byte[header.Length + trailingLength];
         Array.Copy(header, frame, header.Length);
 
@@ -334,13 +334,14 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         await ReadExactAsync(stream, header, ct);
         var length = BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(4, 4));
         length.Should().BeGreaterOrEqualTo(0);
+        var payloadLength = Math.Max(0, length - 8);
 
-        var frame = new byte[16 + length];
+        var frame = new byte[16 + payloadLength];
         Array.Copy(header, frame, header.Length);
 
-        if (length > 0)
+        if (payloadLength > 0)
         {
-            await ReadExactAsync(stream, frame.AsMemory(16, length), ct);
+            await ReadExactAsync(stream, frame.AsMemory(16, payloadLength), ct);
         }
 
         return frame;
@@ -485,7 +486,7 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         response[1] = 0x49;
         response[2] = 0x4E;
         response[3] = 0x53;
-        BinaryPrimitives.WriteUInt32BigEndian(response.AsSpan(4, 4), (uint)finsFrame.Length);
+        BinaryPrimitives.WriteUInt32BigEndian(response.AsSpan(4, 4), (uint)(8 + finsFrame.Length));
         BinaryPrimitives.WriteUInt32BigEndian(response.AsSpan(8, 4), 2u);
         BinaryPrimitives.WriteUInt32BigEndian(response.AsSpan(12, 4), 0u);
         finsFrame.CopyTo(response, 16);

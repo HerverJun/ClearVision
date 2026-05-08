@@ -1,43 +1,18 @@
-// SiemensS7Client.cs
-// Slot号
-// 作者：蘅芜君
-
 using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
 using Acme.PlcComm.Interfaces;
+using HslCommunication.Profinet.Siemens;
 using Microsoft.Extensions.Logging;
-using S7.Net;
 
 namespace Acme.PlcComm.Siemens;
 
-/// <summary>
-/// 西门子S7协议客户端实现
-/// 基于S7NetPlus库的封装
-/// </summary>
-public class SiemensS7Client : PlcBaseClient
+public class SiemensS7Client : HaoPlcClientBase
 {
-    private S7.Net.Plc? _s7Plc;
-    private readonly S7AddressParser _addressParser;
+    private readonly SiemensS7Net _client;
+    private readonly S7AddressParser _addressParser = new();
     private readonly SiemensCpuType _cpuType;
     private readonly int _rack;
     private readonly int _slot;
-
-    public override int DefaultPort => 102;
-
-    /// <summary>
-    /// CPU类型
-    /// </summary>
-    public SiemensCpuType CpuType => _cpuType;
-
-    /// <summary>
-    /// Rack号
-    /// </summary>
-    public int Rack => _rack;
-
-    /// <summary>
-    /// Slot号
-    /// </summary>
-    public int Slot => _slot;
 
     public SiemensS7Client(
         string ipAddress,
@@ -45,253 +20,182 @@ public class SiemensS7Client : PlcBaseClient
         int rack = 0,
         int slot = 1,
         ILogger? logger = null)
-        : base(logger)
+        : base(ipAddress, 102, logger)
     {
-        IpAddress = ipAddress;
         _cpuType = cpuType;
         _rack = rack;
         _slot = slot;
-
-        _addressParser = new S7AddressParser();
+        _client = new SiemensS7Net(MapCpuType(cpuType), ipAddress)
+        {
+            Rack = (byte)rack,
+            Slot = (byte)slot
+        };
         ByteTransform = BigEndianTransform.Instance;
     }
 
-    protected override async Task<bool> ConnectCoreAsync(CancellationToken ct)
+    public override int DefaultPort => 102;
+    public SiemensCpuType CpuType => _cpuType;
+    public int Rack => _rack;
+    public int Slot => _slot;
+
+    protected override void ApplyConnectionSettings()
     {
-        try
-        {
-            var s7CpuType = MapCpuType(_cpuType);
-            _s7Plc = new S7.Net.Plc(s7CpuType, IpAddress, (short)_rack, (short)_slot);
-
-            await _s7Plc.OpenAsync(ct);
-
-            if (_s7Plc.IsConnected)
-            {
-                _logger.LogInformation(
-                    "[SiemensS7] 协议握手成功, CPU={CpuType}, Rack={Rack}, Slot={Slot}",
-                    _cpuType, _rack, _slot);
-                return true;
-            }
-
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[SiemensS7] 协议握手失败: {Message}", ex.Message);
-            return false;
-        }
+        _client.IpAddress = IpAddress;
+        _client.Port = Port;
+        _client.Rack = (byte)_rack;
+        _client.Slot = (byte)_slot;
+        _client.ConnectTimeOut = ConnectTimeout;
+        _client.ReceiveTimeOut = ReadTimeout;
     }
 
-    protected override Task DisconnectCoreAsync()
+    protected override async Task<OperateResult> ConnectCoreAsync(CancellationToken ct)
     {
-        try
-        {
-            _s7Plc?.Close();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[SiemensS7] 断开连接时发生异常: {Message}", ex.Message);
-        }
-        finally
-        {
-            _s7Plc = null;
-        }
-        return Task.CompletedTask;
+        ct.ThrowIfCancellationRequested();
+        var result = await _client.ConnectServerAsync();
+        return ToAcmeResult(result);
     }
 
-    protected override async Task<OperateResult<byte[]>> ReadCoreAsync(
-        string address, ushort length, CancellationToken ct)
+    protected override async Task DisconnectCoreAsync()
     {
-        try
-        {
-            if (!IsProtocolConnected())
-                return OperateResult<byte[]>.Failure("PLC未连接");
-
-            var addressResult = _addressParser.Parse(address);
-            if (!addressResult.IsSuccess)
-                return OperateResult<byte[]>.Failure(addressResult.ErrorCode, addressResult.Message);
-
-            var plcAddress = addressResult.Content!;
-            // 位访问需要按 bit offset 处理，不能直接把整字节当作 bool。
-            if (plcAddress.DataType == PlcDataType.Bit && plcAddress.BitOffset >= 0)
-            {
-                if (length != 1)
-                    return OperateResult<byte[]>.Failure("S7 位读取当前仅支持单点读取");
-
-                var rawByte = await ReadProtocolBytesAsync(plcAddress, 1, ct);
-                if (rawByte == null || rawByte.Length == 0)
-                    return OperateResult<byte[]>.Failure("读取返回空数据");
-
-                var bitValue = (rawByte[0] & (1 << plcAddress.BitOffset)) != 0;
-                return OperateResult<byte[]>.Success(new[] { bitValue ? (byte)1 : (byte)0 });
-            }
-
-            var byteCount = GetDataLength(plcAddress.DataType, length);
-            var result = await ReadProtocolBytesAsync(plcAddress, byteCount, ct);
-
-            if (result == null)
-                return OperateResult<byte[]>.Failure("读取返回空数据");
-
-            return OperateResult<byte[]>.Success(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[SiemensS7] 读取失败: {Message}", ex.Message);
-            return OperateResult<byte[]>.Failure($"读取失败: {ex.Message}");
-        }
+        await _client.ConnectCloseAsync();
     }
 
-    protected override async Task<OperateResult> WriteCoreAsync(
-        string address, byte[] value, CancellationToken ct)
+    protected override async Task<OperateResult<byte[]>> ReadCoreAsync(string address, ushort length, CancellationToken ct)
     {
-        try
+        var parsed = _addressParser.Parse(address);
+        if (!parsed.IsSuccess || parsed.Content == null)
         {
-            if (!IsProtocolConnected())
-                return OperateResult.Failure("PLC未连接");
-
-            var addressResult = _addressParser.Parse(address);
-            if (!addressResult.IsSuccess)
-                return OperateResult.Failure(addressResult.ErrorCode, addressResult.Message);
-
-            var plcAddress = addressResult.Content!;
-
-            if (plcAddress.DataType == PlcDataType.Bit && plcAddress.BitOffset >= 0)
-            {
-                // 位写采用读改写，避免覆盖同一字节内其他位。
-                var currentByte = await ReadProtocolBytesAsync(plcAddress, 1, ct);
-                if (currentByte == null || currentByte.Length == 0)
-                    return OperateResult.Failure("读取位地址所在字节失败");
-
-                var bitToWrite = value.Length > 0 && value[0] != 0;
-                if (bitToWrite)
-                    currentByte[0] = (byte)(currentByte[0] | (1 << plcAddress.BitOffset));
-                else
-                    currentByte[0] = (byte)(currentByte[0] & ~(1 << plcAddress.BitOffset));
-
-                await WriteProtocolBytesAsync(plcAddress, currentByte, ct);
-                return OperateResult.Success();
-            }
-
-            await WriteProtocolBytesAsync(plcAddress, value, ct);
-            return OperateResult.Success();
+            return OperateResult<byte[]>.Failure(parsed.ErrorCode, parsed.Message);
         }
-        catch (Exception ex)
+
+        ct.ThrowIfCancellationRequested();
+        var plcAddress = parsed.Content;
+        if (plcAddress.DataType == PlcDataType.Bit)
         {
-            _logger.LogError(ex, "[SiemensS7] 写入失败: {Message}", ex.Message);
-            return OperateResult.Failure($"写入失败: {ex.Message}");
+            var result = length <= 1
+                ? await ReadSingleBoolAsync(address, ct)
+                : await ReadBoolArrayAsync(address, length, ct);
+            return result;
         }
+
+        var byteCount = GetByteCount(plcAddress.DataType, length);
+        return await ReadBytesProtocolAsync(address, byteCount, ct);
+    }
+
+    protected override async Task<OperateResult> WriteCoreAsync(string address, byte[] value, CancellationToken ct)
+    {
+        var parsed = _addressParser.Parse(address);
+        if (!parsed.IsSuccess || parsed.Content == null)
+        {
+            return OperateResult.Failure(parsed.ErrorCode, parsed.Message);
+        }
+
+        ct.ThrowIfCancellationRequested();
+        if (parsed.Content.DataType == PlcDataType.Bit)
+        {
+            return await WriteBoolProtocolAsync(address, value.Length > 0 && value[0] != 0, ct);
+        }
+
+        return await WriteBytesProtocolAsync(address, value, ct);
     }
 
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
-        try
-        {
-            if (!IsProtocolConnected())
-                return false;
-
-            var result = await ReadAsync(GetHeartbeatAddress(), 1, ct);
-            return result.IsSuccess;
-        }
-        catch
-        {
-            return false;
-        }
+        ct.ThrowIfCancellationRequested();
+        var result = await ReadBytesProtocolAsync(GetHeartbeatAddress(), 2, ct);
+        return result.IsSuccess;
     }
 
-    protected override bool HasActiveConnectionResources()
+    protected virtual string GetHeartbeatAddress() => "MW0";
+
+    protected virtual async Task<OperateResult<byte[]>> ReadBytesProtocolAsync(
+        string address,
+        ushort byteCount,
+        CancellationToken ct)
     {
-        return base.HasActiveConnectionResources() || _s7Plc != null;
+        ct.ThrowIfCancellationRequested();
+        return ToAcmeResult(await _client.ReadAsync(address, byteCount));
     }
 
-    protected virtual bool IsProtocolConnected()
+    protected virtual async Task<OperateResult<bool>> ReadBoolProtocolAsync(string address, CancellationToken ct)
     {
-        return _s7Plc?.IsConnected == true;
+        ct.ThrowIfCancellationRequested();
+        var result = await _client.ReadBoolAsync(address);
+        return result.IsSuccess
+            ? OperateResult<bool>.Success(result.Content)
+            : OperateResult<bool>.Failure(result.ErrorCode, result.Message);
     }
 
-    protected virtual string GetHeartbeatAddress()
+    protected virtual async Task<OperateResult<bool[]>> ReadBoolProtocolAsync(
+        string address,
+        ushort length,
+        CancellationToken ct)
     {
-        return "MW0";
+        ct.ThrowIfCancellationRequested();
+        var result = await _client.ReadBoolAsync(address, length);
+        return result.IsSuccess
+            ? OperateResult<bool[]>.Success(result.Content)
+            : OperateResult<bool[]>.Failure(result.ErrorCode, result.Message);
     }
 
-    private static S7.Net.CpuType MapCpuType(SiemensCpuType cpuType)
+    protected virtual async Task<OperateResult> WriteBoolProtocolAsync(
+        string address,
+        bool value,
+        CancellationToken ct)
     {
-        return cpuType switch
-        {
-            SiemensCpuType.S7200 => S7.Net.CpuType.S7200,
-            SiemensCpuType.S7200Smart => S7.Net.CpuType.S7200Smart,
-            SiemensCpuType.S7300 => S7.Net.CpuType.S7300,
-            SiemensCpuType.S7400 => S7.Net.CpuType.S7400,
-            SiemensCpuType.S71200 => S7.Net.CpuType.S71200,
-            SiemensCpuType.S71500 => S7.Net.CpuType.S71500,
-            _ => S7.Net.CpuType.S71200
-        };
+        ct.ThrowIfCancellationRequested();
+        return ToAcmeResult(await _client.WriteAsync(address, value));
     }
 
-    private static int GetDataLength(PlcDataType dataType, ushort count)
+    protected virtual async Task<OperateResult> WriteBytesProtocolAsync(
+        string address,
+        byte[] value,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ToAcmeResult(await _client.WriteAsync(address, value));
+    }
+
+    private async Task<OperateResult<byte[]>> ReadSingleBoolAsync(string address, CancellationToken ct)
+    {
+        var result = await ReadBoolProtocolAsync(address, ct);
+        return result.IsSuccess
+            ? OperateResult<byte[]>.Success(new[] { result.Content ? (byte)1 : (byte)0 })
+            : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
+    }
+
+    private async Task<OperateResult<byte[]>> ReadBoolArrayAsync(string address, ushort length, CancellationToken ct)
+    {
+        var result = await ReadBoolProtocolAsync(address, length, ct);
+        return result.IsSuccess
+            ? OperateResult<byte[]>.Success((result.Content ?? Array.Empty<bool>()).Select(value => value ? (byte)1 : (byte)0).ToArray())
+            : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
+    }
+
+    private static ushort GetByteCount(PlcDataType dataType, ushort count)
     {
         var typeSize = dataType switch
         {
-            PlcDataType.Bit => 1,
             PlcDataType.Byte => 1,
             PlcDataType.Word or PlcDataType.Int16 => 2,
             PlcDataType.DWord or PlcDataType.Int32 or PlcDataType.Float => 4,
             PlcDataType.LWord or PlcDataType.Double => 8,
             _ => 2
         };
-        return typeSize * count;
+        return checked((ushort)(typeSize * count));
     }
 
-    protected virtual async Task<byte[]?> ReadProtocolBytesAsync(PlcAddress plcAddress, int byteCount, CancellationToken ct)
+    private static SiemensPLCS MapCpuType(SiemensCpuType cpuType)
     {
-        if (_s7Plc == null)
-            return null;
-
-        if (plcAddress.AreaType == "DB")
+        return cpuType switch
         {
-            return await _s7Plc.ReadBytesAsync(
-                DataType.DataBlock,
-                plcAddress.DbNumber,
-                plcAddress.StartAddress,
-                byteCount,
-                ct);
-        }
-
-        var dataType = GetS7DataType(plcAddress.AreaType);
-        return await _s7Plc.ReadBytesAsync(
-            dataType, 0, plcAddress.StartAddress, byteCount, ct);
-    }
-
-    protected virtual async Task WriteProtocolBytesAsync(PlcAddress plcAddress, byte[] value, CancellationToken ct)
-    {
-        if (_s7Plc == null)
-            throw new InvalidOperationException("S7 连接对象未初始化");
-
-        if (plcAddress.AreaType == "DB")
-        {
-            await _s7Plc.WriteBytesAsync(
-                DataType.DataBlock,
-                plcAddress.DbNumber,
-                plcAddress.StartAddress,
-                value,
-                ct);
-            return;
-        }
-
-        var dataType = GetS7DataType(plcAddress.AreaType);
-        await _s7Plc.WriteBytesAsync(
-            dataType, 0, plcAddress.StartAddress, value, ct);
-    }
-
-    private static S7.Net.DataType GetS7DataType(string areaType)
-    {
-        return areaType.ToUpper() switch
-        {
-            "M" => S7.Net.DataType.Memory,
-            "I" or "E" => S7.Net.DataType.Input,
-            "Q" or "A" => S7.Net.DataType.Output,
-            "T" => S7.Net.DataType.Timer,
-            "C" => S7.Net.DataType.Counter,
-            _ => S7.Net.DataType.Memory
+            SiemensCpuType.S7200 => SiemensPLCS.S200,
+            SiemensCpuType.S7200Smart => SiemensPLCS.S200Smart,
+            SiemensCpuType.S7300 => SiemensPLCS.S300,
+            SiemensCpuType.S7400 => SiemensPLCS.S400,
+            SiemensCpuType.S71200 => SiemensPLCS.S1200,
+            SiemensCpuType.S71500 => SiemensPLCS.S1500,
+            _ => SiemensPLCS.S1200
         };
     }
 }

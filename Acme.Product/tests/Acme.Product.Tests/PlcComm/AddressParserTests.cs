@@ -41,8 +41,11 @@ public class AddressParserTests
 
     [Theory]
     [InlineData("D100", 100, PlcDataType.Word, 0xA8)]
-    [InlineData("X10", 8, PlcDataType.Bit, 0x9C)]
+    [InlineData("X10", 16, PlcDataType.Bit, 0x9C)]
     [InlineData("B1F", 31, PlcDataType.Bit, 0xA0)]
+    [InlineData("CS10", 10, PlcDataType.Bit, 0xC4)]
+    [InlineData("CC10", 10, PlcDataType.Bit, 0xC3)]
+    [InlineData("CN10", 10, PlcDataType.Word, 0xC5)]
     public void McAddressParser_ShouldParse_ExpectedFormats(
         string address,
         int expectedStartAddress,
@@ -58,6 +61,19 @@ public class AddressParserTests
         result.Content!.StartAddress.Should().Be(expectedStartAddress);
         result.Content.DataType.Should().Be(expectedDataType);
         result.Content.DeviceCode.Should().Be(expectedDeviceCode);
+    }
+
+    [Theory]
+    [InlineData("DB1.DBX10")]
+    [InlineData("DB1.DBW10.3")]
+    [InlineData("M0.8")]
+    public void S7AddressParser_ShouldReject_InvalidBitFormats(string address)
+    {
+        var parser = new S7AddressParser();
+
+        var result = parser.Parse(address);
+
+        result.IsSuccess.Should().BeFalse();
     }
 
     [Fact]
@@ -107,5 +123,36 @@ public class AddressParserTests
         result.Content.BitOffset.Should().Be(-1);
         result.Content.DataType.Should().Be(PlcDataType.Word);
         result.Content.DeviceCode.Should().Be(0xA1);
+    }
+
+    [Theory]
+    [InlineData("EM1.100")]
+    [InlineData("E1.100")]
+    [InlineData("EM1 100")]
+    public void FinsAddressParser_ShouldParse_EmBankAddressAliases(string address)
+    {
+        var parser = new FinsAddressParser();
+
+        var result = parser.Parse(address);
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Content.Should().NotBeNull();
+        result.Content!.AreaType.Should().Be("EM");
+        result.Content.DbNumber.Should().Be(1);
+        result.Content.StartAddress.Should().Be(100);
+        result.Content.DeviceCode.Should().Be(0xA1);
+    }
+
+    [Fact]
+    public void FinsAddressParser_ShouldParse_DAliasAsDm()
+    {
+        var parser = new FinsAddressParser();
+
+        var result = parser.Parse("D100");
+
+        result.IsSuccess.Should().BeTrue(result.Message);
+        result.Content.Should().NotBeNull();
+        result.Content!.AreaType.Should().Be("DM");
+        result.Content.DeviceCode.Should().Be(0x82);
     }
 }

@@ -1,151 +1,132 @@
-// McAddressParser.cs
-// 判断是否为位软元件
-// 作者：蘅芜君
-
-using System.Buffers.Binary;
-using System.Text;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Acme.PlcComm.Core;
 using Acme.PlcComm.Interfaces;
 
 namespace Acme.PlcComm.Mitsubishi;
 
-/// <summary>
-/// 三菱MC协议地址解析器
-/// 支持地址格式: D100, M200, X10, Y17, B1F, W100等
-/// </summary>
 public class McAddressParser : IAddressParser
 {
-    // 软元件代码映射表
-    private static readonly Dictionary<string, byte> DeviceCodes = new(StringComparer.OrdinalIgnoreCase)
+    private sealed record DeviceInfo(byte Code, int NumberBase, PlcDataType DataType);
+
+    private static readonly Dictionary<string, DeviceInfo> Devices = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["D"] = 0xA8,    // 数据寄存器(十进制)
-        ["W"] = 0xB4,    // 链接寄存器(十六进制)
-        ["R"] = 0xAF,    // 文件寄存器(十进制)
-        ["M"] = 0x90,    // 辅助继电器(十进制)
-        ["L"] = 0x92,    // 锁存继电器(十进制)
-        ["B"] = 0xA0,    // 链接继电器(十六进制)
-        ["X"] = 0x9C,    // 输入继电器(八进制)
-        ["Y"] = 0x9D,    // 输出继电器(八进制)
-        ["F"] = 0x93,    // 报警器(十进制)
-        ["V"] = 0x94,    // 边缘继电器(十进制)
-        ["S"] = 0x98,    // 步进继电器(十进制)
-        ["SM"] = 0x91,   // 特殊继电器(十进制)
-        ["SD"] = 0xA9,   // 特殊寄存器(十进制)
-        ["TS"] = 0xC1,   // 定时器触点(十进制)
-        ["TC"] = 0xC0,   // 定时器线圈(十进制)
-        ["TN"] = 0xC2,   // 定时器当前值(十进制)
-        ["CS"] = 0xC5,   // 计数器触点(十进制)
-        ["CC"] = 0xC4,   // 计数器线圈(十进制)
-        ["CN"] = 0xC6,   // 计数器当前值(十进制)
+        ["D"] = new(0xA8, 10, PlcDataType.Word),
+        ["W"] = new(0xB4, 16, PlcDataType.Word),
+        ["R"] = new(0xAF, 10, PlcDataType.Word),
+        ["ZR"] = new(0xB0, 10, PlcDataType.Word),
+        ["SD"] = new(0xA9, 10, PlcDataType.Word),
+        ["SW"] = new(0xB5, 16, PlcDataType.Word),
+        ["TN"] = new(0xC2, 10, PlcDataType.Word),
+        ["CN"] = new(0xC5, 10, PlcDataType.Word),
+        ["Z"] = new(0xCC, 10, PlcDataType.Word),
+
+        ["M"] = new(0x90, 10, PlcDataType.Bit),
+        ["L"] = new(0x92, 10, PlcDataType.Bit),
+        ["B"] = new(0xA0, 16, PlcDataType.Bit),
+        ["X"] = new(0x9C, 16, PlcDataType.Bit),
+        ["Y"] = new(0x9D, 16, PlcDataType.Bit),
+        ["F"] = new(0x93, 10, PlcDataType.Bit),
+        ["V"] = new(0x94, 10, PlcDataType.Bit),
+        ["S"] = new(0x98, 10, PlcDataType.Bit),
+        ["SM"] = new(0x91, 10, PlcDataType.Bit),
+        ["SB"] = new(0xA1, 16, PlcDataType.Bit),
+        ["TS"] = new(0xC1, 10, PlcDataType.Bit),
+        ["TC"] = new(0xC0, 10, PlcDataType.Bit),
+        ["CS"] = new(0xC4, 10, PlcDataType.Bit),
+        ["CC"] = new(0xC3, 10, PlcDataType.Bit),
+        ["DX"] = new(0xA2, 16, PlcDataType.Bit),
+        ["DY"] = new(0xA3, 16, PlcDataType.Bit)
     };
 
-    // 地址解析正则
     private static readonly Regex AddressRegex = new(
-        @"^(?<prefix>[SM]*[A-Z]+)(?<address>[0-9A-Fa-f]+)$",
+        @"^(?<prefix>[A-Z]+)(?<address>[0-9A-F]+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public OperateResult<PlcAddress> Parse(string address)
     {
         if (string.IsNullOrWhiteSpace(address))
-            return OperateResult<PlcAddress>.Failure("地址不能为空");
+        {
+            return OperateResult<PlcAddress>.Failure("Address cannot be empty.");
+        }
 
-        address = address.Trim().ToUpper();
-
+        address = address.Trim().ToUpperInvariant();
         var match = AddressRegex.Match(address);
         if (!match.Success)
-            return OperateResult<PlcAddress>.Failure($"无效的地址格式: {address}");
+        {
+            return OperateResult<PlcAddress>.Failure($"Invalid MC address format: {address}");
+        }
 
         var prefix = match.Groups["prefix"].Value;
-        var addrStr = match.Groups["address"].Value;
-
-        if (!DeviceCodes.TryGetValue(prefix, out var deviceCode))
-            return OperateResult<PlcAddress>.Failure($"不支持的软元件类型: {prefix}");
-
-        try
+        var numberText = match.Groups["address"].Value;
+        if (!Devices.TryGetValue(prefix, out var device))
         {
-            int startAddress;
-            var dataType = PlcDataType.Word;
-
-            // 根据软元件类型解析地址(不同的进制)
-            if (prefix == "X" || prefix == "Y")
-            {
-                // X/Y使用八进制
-                startAddress = Convert.ToInt32(addrStr, 8);
-                dataType = PlcDataType.Bit;
-            }
-            else if (prefix == "B" || prefix == "W")
-            {
-                // B/W使用十六进制
-                startAddress = Convert.ToInt32(addrStr, 16);
-                dataType = prefix == "B" ? PlcDataType.Bit : PlcDataType.Word;
-            }
-            else
-            {
-                // 其他使用十进制
-                startAddress = int.Parse(addrStr);
-                // 判断是位还是字访问
-                dataType = IsBitDevice(prefix) ? PlcDataType.Bit : PlcDataType.Word;
-            }
-
-            var plcAddress = new PlcAddress
-            {
-                AreaType = prefix,
-                StartAddress = startAddress,
-                DataType = dataType,
-                DeviceCode = deviceCode
-            };
-
-            return OperateResult<PlcAddress>.Success(plcAddress);
+            return OperateResult<PlcAddress>.Failure($"Unsupported MC device type: {prefix}");
         }
-        catch (Exception ex)
+
+        if (!TryParseAddress(numberText, device.NumberBase, out var startAddress))
         {
-            return OperateResult<PlcAddress>.Failure($"解析地址失败: {ex.Message}");
+            return OperateResult<PlcAddress>.Failure($"Invalid MC address number for {prefix}: {numberText}");
         }
+
+        return OperateResult<PlcAddress>.Success(new PlcAddress
+        {
+            AreaType = prefix,
+            StartAddress = startAddress,
+            BitOffset = -1,
+            DataType = device.DataType,
+            DeviceCode = device.Code
+        });
     }
 
     public bool TryParse(string address, out PlcAddress result)
     {
         var parseResult = Parse(address);
-        if (parseResult.IsSuccess)
+        if (parseResult.IsSuccess && parseResult.Content != null)
         {
-            result = parseResult.Content!;
+            result = parseResult.Content;
             return true;
         }
+
         result = new PlcAddress();
         return false;
     }
 
     public string ToAddressString(PlcAddress address)
     {
-        return address.ToString();
+        var prefix = address.AreaType.ToUpperInvariant();
+        if (!Devices.TryGetValue(prefix, out var device))
+        {
+            return address.ToString();
+        }
+
+        var number = device.NumberBase == 16
+            ? address.StartAddress.ToString("X", CultureInfo.InvariantCulture)
+            : address.StartAddress.ToString(CultureInfo.InvariantCulture);
+        return prefix + number;
     }
 
     public bool IsValidAddress(string address)
     {
-        if (string.IsNullOrWhiteSpace(address)) return false;
-        
-        var match = AddressRegex.Match(address.Trim().ToUpper());
-        if (!match.Success) return false;
-
-        var prefix = match.Groups["prefix"].Value;
-        return DeviceCodes.ContainsKey(prefix);
+        return Parse(address).IsSuccess;
     }
 
-    /// <summary>
-    /// 获取软元件代码
-    /// </summary>
     public static byte GetDeviceCode(string prefix)
     {
-        return DeviceCodes.TryGetValue(prefix.ToUpper(), out var code) ? code : (byte)0;
+        return Devices.TryGetValue(prefix.ToUpperInvariant(), out var device) ? device.Code : (byte)0;
     }
 
-    /// <summary>
-    /// 判断是否为位软元件
-    /// </summary>
-    private static bool IsBitDevice(string prefix)
+    private static bool TryParseAddress(string value, int numberBase, out int address)
     {
-        var bitDevices = new[] { "X", "Y", "M", "L", "B", "F", "V", "S", "SM", "TS", "TC", "CS", "CC" };
-        return bitDevices.Contains(prefix, StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            address = Convert.ToInt32(value, numberBase);
+            return true;
+        }
+        catch
+        {
+            address = 0;
+            return false;
+        }
     }
 }
