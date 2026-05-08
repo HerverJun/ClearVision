@@ -345,8 +345,13 @@ public abstract class OperatorBase : IOperatorExecutor
             return false;
         }
 
-        if (ImageWrapper.TryGetFromObject(value, out image))
+        if (ImageWrapper.TryGetFromObject(value, out image, out var ownsCreatedWrapper))
         {
+            if (ownsCreatedWrapper && image != null)
+            {
+                inputs[key] = image;
+            }
+
             Logger.LogDebug("[{OperatorType}] 成功获取图像: {Key}, 类型={Type}",
                 OperatorType, key, value?.GetType().Name ?? "null");
             return true;

@@ -67,6 +67,26 @@ public class ThresholdingOperatorTests
         result.ErrorMessage.Should().Contain("UseOtsu");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithByteArrayInput_ShouldReleaseTemporaryWrapper()
+    {
+        var op = CreateOperator();
+        using var image = CreateTwoToneImage();
+        var inputs = new Dictionary<string, object>
+        {
+            ["Image"] = image.GetBytes()
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        using var outputImage = result.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        var temporaryInputWrapper = inputs["Image"].Should().BeOfType<ImageWrapper>().Subject;
+        temporaryInputWrapper.RefCount.Should().Be(0);
+        var readReleasedWrapper = () => temporaryInputWrapper.GetMat();
+        readReleasedWrapper.Should().Throw<ObjectDisposedException>();
+    }
+
     private static Operator CreateOperator()
     {
         return new Operator("Thresholding", OperatorType.Thresholding, 0, 0);

@@ -1,10 +1,17 @@
 namespace Acme.Product.Core.Cameras;
 
+using Acme.Product.Core.Streaming;
+
 public interface ICameraFrameStreamCoordinator : IAsyncDisposable
 {
     Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default);
+    Task<FrameEnvelope> AcquireFrameEnvelopeAsync(string cameraId, CancellationToken cancellationToken = default);
     Task<CameraStreamLease> AcquireStreamLeaseAsync(string cameraId, CancellationToken cancellationToken = default);
     Task<CameraStreamFrame> WaitForNextFrameAsync(
+        CameraStreamLease lease,
+        long? afterSequence = null,
+        CancellationToken cancellationToken = default);
+    Task<FrameEnvelope> WaitForNextFrameEnvelopeAsync(
         CameraStreamLease lease,
         long? afterSequence = null,
         CancellationToken cancellationToken = default);
@@ -12,6 +19,9 @@ public interface ICameraFrameStreamCoordinator : IAsyncDisposable
     Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default);
     Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default);
     Task StopPreviewSessionAsync(string sessionId);
+    bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame);
+    IReadOnlyList<FrameEnvelope> GetFrameEnvelopeWindow(string cameraId, long centerSequence, int before, int after);
+    RingBufferStats SnapshotFrameBufferStats(string cameraId);
 }
 
 public sealed record CameraStreamFrame(
@@ -21,7 +31,10 @@ public sealed record CameraStreamFrame(
     int Width,
     int Height,
     long Sequence,
-    DateTime TimestampUtc);
+    DateTime TimestampUtc,
+    long? CameraTimestampNs = null,
+    long? DeviceFrameCounter = null,
+    int? Stride = null);
 
 public sealed record CameraStreamLease(
     string LeaseId,
@@ -34,3 +47,10 @@ public sealed record CameraPreviewSession(
     string CameraBindingId,
     CameraTriggerMode TriggerMode,
     int TargetFrameRateFps);
+
+public sealed record RingBufferStats(
+    int Capacity,
+    int Count,
+    long OverwrittenCount,
+    long? OldestSequence,
+    long? LatestSequence);

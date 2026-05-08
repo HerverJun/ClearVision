@@ -262,7 +262,17 @@ public class CameraProviderAdapter : IIndustrialCamera
                     if (_frameCallback != null)
                         await _frameCallback(imageData);
 
-                    FrameReceived?.Invoke(this, new CameraFrameReceivedEventArgs { ImageData = imageData, Width = frame.Width, Height = frame.Height });
+                    FrameReceived?.Invoke(this, new CameraFrameReceivedEventArgs
+                    {
+                        ImageData = imageData,
+                        Width = frame.Width,
+                        Height = frame.Height,
+                        Timestamp = DateTime.UtcNow,
+                        DeviceFrameCounter = frame.FrameNumber == 0 ? null : frame.FrameNumber,
+                        CameraTimestampNs = frame.Timestamp == 0 ? null : frame.Timestamp,
+                        PixelFormat = frame.PixelFormat,
+                        Stride = ResolveStride(frame)
+                    });
                 }
             }
             catch (OperationCanceledException)
@@ -384,5 +394,10 @@ public class CameraProviderAdapter : IIndustrialCamera
             return mat.ToBytes(".png");
         }
     }
-}
 
+    private static int? ResolveStride(CameraFrame frame)
+    {
+        var channels = frame.PixelFormat is CameraPixelFormat.RGB8 or CameraPixelFormat.BGR8 ? 3 : 1;
+        return frame.Width > 0 ? frame.Width * channels : null;
+    }
+}
