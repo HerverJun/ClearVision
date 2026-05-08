@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using Acme.Product.Application.Analysis;
 using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
@@ -338,6 +339,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var resultChannelWriter = scope.ServiceProvider.GetRequiredService<IInspectionResultChannelWriter>();
             var projectRepository = scope.ServiceProvider.GetRequiredService<IProjectRepository>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<InspectionWorker>>();
+            var streamCoordinator = scope.ServiceProvider.GetService<ICameraFrameStreamCoordinator>();
 
             // 创建日志上下文
             // Create the logging / correlation scope for this run.
@@ -363,6 +365,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     sessionId,
                     flow,
                     cameraId,
+                    ResolveContinuousInspectionMode(scope.ServiceProvider, cameraId, flow),
+                    streamCoordinator,
                     IsFrameDrivenExecution(flow, cameraId, scope.ServiceProvider),
                     flowExecution,
                     imageAcquisition,
@@ -402,12 +406,43 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         Guid sessionId,
         OperatorFlow flow,
         string? cameraId,
+        ContinuousInspectionMode continuousInspectionMode,
+        ICameraFrameStreamCoordinator? streamCoordinator,
         bool frameDrivenExecution,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
         CancellationToken ct)
     {
+        if (continuousInspectionMode == ContinuousInspectionMode.Primary)
+        {
+            if (streamCoordinator == null ||
+                !TryResolveContinuousInspectionConfig(flow, cameraId, out var continuousCameraId, out var continuousConfig))
+            {
+                _logger.LogWarning(
+                    "[InspectionWorker] Continuous inspection requested but camera/config could not be resolved. Mode={Mode}",
+                    continuousInspectionMode);
+            }
+            else
+            {
+                var continuousWorker = new Acme.Product.Infrastructure.Continuous.ContinuousInspectionWorker(_logger);
+                await continuousWorker.RunAsync(
+                    projectId,
+                    sessionId,
+                    flow,
+                    continuousCameraId,
+                    continuousConfig,
+                    continuousInspectionMode,
+                    streamCoordinator,
+                    flowExecution,
+                    resultChannelWriter,
+                    _eventBus,
+                    ct,
+                    () => ResolveContinuousInspectionMode(flow, cameraId));
+                return;
+            }
+        }
+
         const int minIntervalMs = 100;
         const int maxIntervalMs = 5000;
         int currentIntervalMs = 500;
@@ -416,6 +451,24 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
         while (!ct.IsCancellationRequested)
         {
+            var currentContinuousInspectionMode = ResolveContinuousInspectionMode(flow, cameraId);
+            if (currentContinuousInspectionMode == ContinuousInspectionMode.Primary)
+            {
+                await RunRealtimeLoopAsync(
+                    projectId,
+                    sessionId,
+                    flow,
+                    cameraId,
+                    currentContinuousInspectionMode,
+                    streamCoordinator,
+                    frameDrivenExecution,
+                    flowExecution,
+                    imageAcquisition,
+                    resultChannelWriter,
+                    ct);
+                return;
+            }
+
             var startTime = DateTime.UtcNow;
             cycleCount++;
             var cycleSucceeded = false;
@@ -426,7 +479,15 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
                 // 执行单轮检测
                 var result = await ExecuteCycleAsync(
-                    projectId, sessionId, flow, cameraId, flowExecution, imageAcquisition, ct);
+                    projectId,
+                    sessionId,
+                    flow,
+                    cameraId,
+                    currentContinuousInspectionMode,
+                    streamCoordinator,
+                    flowExecution,
+                    imageAcquisition,
+                    ct);
 
                 // 保存结果(异步非阻塞)
                 if (IsNoMaterialSkippedResult(result))
@@ -615,11 +676,102 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         return CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven();
     }
 
+    private static ContinuousInspectionMode ResolveContinuousInspectionMode(
+        IServiceProvider serviceProvider,
+        string? cameraId,
+        OperatorFlow flow)
+    {
+        var configurationService = serviceProvider.GetService<IConfigurationService>();
+        var config = configurationService?.GetCurrent();
+        if (config?.Features?.ContinuousInspection?.Enabled != true ||
+            config.Features.ContinuousInspection.EmergencyRollback)
+        {
+            return ContinuousInspectionMode.Disabled;
+        }
+
+        if (!TryResolveCycleCameraId(flow, cameraId, out var resolvedCameraId))
+        {
+            return ContinuousInspectionMode.Disabled;
+        }
+
+        var binding = config.Cameras.FirstOrDefault(camera =>
+            camera.Id.Equals(resolvedCameraId, StringComparison.OrdinalIgnoreCase) ||
+            camera.SerialNumber.Equals(resolvedCameraId, StringComparison.OrdinalIgnoreCase));
+        binding?.Normalize();
+        return binding?.ContinuousInspection?.Mode ?? ContinuousInspectionMode.Disabled;
+    }
+
+    private ContinuousInspectionMode ResolveContinuousInspectionMode(OperatorFlow flow, string? cameraId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        return ResolveContinuousInspectionMode(scope.ServiceProvider, cameraId, flow);
+    }
+
+    private bool TryResolveContinuousInspectionConfig(
+        OperatorFlow flow,
+        string? cameraId,
+        out string resolvedCameraId,
+        out ContinuousInspectionConfig config)
+    {
+        resolvedCameraId = string.Empty;
+        config = new ContinuousInspectionConfig();
+
+        using var scope = _scopeFactory.CreateScope();
+        var configurationService = scope.ServiceProvider.GetService<IConfigurationService>();
+        var appConfig = configurationService?.GetCurrent();
+        if (appConfig?.Features?.ContinuousInspection?.Enabled != true ||
+            appConfig.Features.ContinuousInspection.EmergencyRollback ||
+            !TryResolveCycleCameraId(flow, cameraId, out resolvedCameraId))
+        {
+            return false;
+        }
+
+        var lookupCameraId = resolvedCameraId;
+        var binding = appConfig.Cameras.FirstOrDefault(camera =>
+            camera.Id.Equals(lookupCameraId, StringComparison.OrdinalIgnoreCase) ||
+            camera.SerialNumber.Equals(lookupCameraId, StringComparison.OrdinalIgnoreCase));
+        if (binding == null)
+        {
+            return false;
+        }
+
+        binding.Normalize();
+        resolvedCameraId = binding.Id;
+        config = binding.ContinuousInspection;
+        return config.Mode != ContinuousInspectionMode.Disabled;
+    }
+
+    private static bool TryResolveCycleCameraId(OperatorFlow flow, string? cameraId, out string resolvedCameraId)
+    {
+        resolvedCameraId = string.Empty;
+        if (!string.IsNullOrWhiteSpace(cameraId))
+        {
+            resolvedCameraId = cameraId.Trim();
+            return true;
+        }
+
+        foreach (var op in flow.Operators.Where(item => item.Type == OperatorType.ImageAcquisition))
+        {
+            var bindingId = op.Parameters
+                .FirstOrDefault(parameter => parameter.Name.Equals("CameraId", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+            if (!string.IsNullOrWhiteSpace(bindingId))
+            {
+                resolvedCameraId = bindingId.Trim();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private async Task<InspectionResult> ExecuteCycleAsync(
         Guid projectId,
         Guid sessionId,
         OperatorFlow flow,
         string? cameraId,
+        ContinuousInspectionMode continuousInspectionMode,
+        ICameraFrameStreamCoordinator? streamCoordinator,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
         CancellationToken ct)
@@ -633,7 +785,21 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var inputData = new Dictionary<string, object>();
 
             // 如果指定了相机，预加载图像
-            if (!string.IsNullOrEmpty(cameraId))
+            if (continuousInspectionMode == ContinuousInspectionMode.Primary &&
+                streamCoordinator != null &&
+                TryResolveCycleCameraId(flow, cameraId, out var envelopeCameraId))
+            {
+                try
+                {
+                    var envelope = await streamCoordinator.AcquireFrameEnvelopeAsync(envelopeCameraId, ct);
+                    inputData["ProvidedFrameEnvelope"] = envelope;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[InspectionWorker] Failed to acquire continuous frame envelope.");
+                }
+            }
+            else if (!string.IsNullOrEmpty(cameraId))
             {
                 try
                 {
@@ -732,6 +898,18 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var outputPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
             AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputPayload, _logger);
             AnalysisPayloadSerialization.TrySetAnalysisDataJson(result, analysisData, _logger);
+            if (continuousInspectionMode == ContinuousInspectionMode.Shadow && streamCoordinator != null)
+            {
+                await TryAppendShadowComparisonAsync(
+                    result,
+                    flow,
+                    cameraId,
+                    streamCoordinator,
+                    flowExecution,
+                    status,
+                    ct);
+            }
+
             TryAppendTraceabilityToAnalysisPayload(result);
             await CacheResultImageAsync(result);
             return result;
@@ -774,6 +952,81 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         catch
         {
             return false;
+        }
+    }
+
+    private async Task TryAppendShadowComparisonAsync(
+        InspectionResult baselineResult,
+        OperatorFlow flow,
+        string? cameraId,
+        ICameraFrameStreamCoordinator streamCoordinator,
+        IFlowExecutionService flowExecution,
+        InspectionStatus baselineStatus,
+        CancellationToken ct)
+    {
+        try
+        {
+            if (!TryResolveCycleCameraId(flow, cameraId, out var resolvedCameraId))
+            {
+                return;
+            }
+
+            var started = DateTime.UtcNow;
+            var envelope = await streamCoordinator.AcquireFrameEnvelopeAsync(resolvedCameraId, ct);
+            var shadowResult = await flowExecution.ExecuteFlowAsync(
+                flow,
+                new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
+                cancellationToken: ct);
+            var shadowOutput = shadowResult.OutputData ?? new Dictionary<string, object>();
+            var shadowEvaluation = shadowResult.IsSuccess
+                ? DetermineStatusFromFlowOutput(shadowOutput)
+                : new InspectionJudgmentEvaluation(
+                    InspectionStatus.Error,
+                    "ShadowFlowExecution",
+                    string.IsNullOrWhiteSpace(shadowResult.ErrorMessage)
+                        ? "ShadowFlowExecutionFailed"
+                        : $"ShadowFlowExecutionFailed:{shadowResult.ErrorMessage}",
+                    false);
+            var latencyMs = Math.Max(0, (DateTime.UtcNow - started).TotalMilliseconds);
+            var buffer = streamCoordinator.SnapshotFrameBufferStats(resolvedCameraId);
+            var comparison = new Dictionary<string, object?>
+            {
+                ["Mode"] = ContinuousInspectionMode.Shadow.ToString(),
+                ["BaselineStatus"] = baselineStatus.ToString(),
+                ["ContinuousStatus"] = shadowEvaluation.Status.ToString(),
+                ["Matched"] = baselineStatus == shadowEvaluation.Status,
+                ["Sequence"] = envelope.Sequence,
+                ["CorrelationId"] = envelope.EffectiveCorrelationId,
+                ["LatencyMs"] = latencyMs,
+                ["Fps"] = null,
+                ["DroppedFrames"] = buffer.OverwrittenCount,
+                ["QueueDepth"] = null,
+                ["BufferCapacity"] = buffer.Capacity,
+                ["BufferCount"] = buffer.Count,
+                ["BufferOverwrittenCount"] = buffer.OverwrittenCount,
+                ["StatusReason"] = shadowEvaluation.StatusReason,
+                ["ErrorMessage"] = shadowResult.ErrorMessage
+            };
+
+            var outputPayload = AnalysisPayloadSerialization.DeserializeJsonDictionary(baselineResult.OutputDataJson)
+                ?? new Dictionary<string, object>();
+            outputPayload["ContinuousInspection"] = comparison;
+            outputPayload["ShadowComparison"] = comparison;
+            AnalysisPayloadSerialization.TrySetOutputDataJson(baselineResult, outputPayload, _logger);
+
+            var analysisPayload = AnalysisPayloadSerialization.DeserializeJsonDictionary(baselineResult.AnalysisDataJson)
+                ?? new Dictionary<string, object>();
+            analysisPayload["continuousInspection"] = comparison;
+            analysisPayload["shadowComparison"] = comparison;
+            baselineResult.SetAnalysisDataJson(JsonSerializer.Serialize(analysisPayload));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionWorker] Shadow comparison failed.");
         }
     }
 
