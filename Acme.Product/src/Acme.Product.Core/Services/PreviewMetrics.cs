@@ -40,6 +40,27 @@ public class PreviewMetrics
     /// 建议的下一步参数调整
     /// </summary>
     public List<ParameterSuggestion> Suggestions { get; set; } = new();
+
+    public ContinuousPreviewMetrics Continuous { get; set; } = new();
+}
+
+public class ContinuousPreviewMetrics
+{
+    public bool Enabled { get; set; }
+
+    public double? Fps { get; set; }
+
+    public long? DroppedFrames { get; set; }
+
+    public double? LatencyMs { get; set; }
+
+    public int? QueueDepth { get; set; }
+
+    public int? BufferCapacity { get; set; }
+
+    public int? BufferCount { get; set; }
+
+    public long? BufferOverwrittenCount { get; set; }
 }
 
 /// <summary>

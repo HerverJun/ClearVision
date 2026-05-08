@@ -351,6 +351,17 @@ public static class AutoTuneEndpoints
             BlobCount = metrics.BlobStats.Count,
             Diagnostics = metrics.Diagnostics,
             OverallScore = metrics.OverallScore,
+            Continuous = new ContinuousPreviewMetricsDto
+            {
+                Enabled = metrics.Continuous.Enabled,
+                Fps = metrics.Continuous.Fps,
+                DroppedFrames = metrics.Continuous.DroppedFrames,
+                LatencyMs = metrics.Continuous.LatencyMs,
+                QueueDepth = metrics.Continuous.QueueDepth,
+                BufferCapacity = metrics.Continuous.BufferCapacity,
+                BufferCount = metrics.Continuous.BufferCount,
+                BufferOverwrittenCount = metrics.Continuous.BufferOverwrittenCount
+            },
             Goals = new OptimizationGoalsDto
             {
                 CurrentBlobCount = metrics.Goals.CurrentBlobCount,
@@ -750,6 +761,20 @@ public class PreviewMetricsDto
     /// 优化目标
     /// </summary>
     public OptimizationGoalsDto Goals { get; set; } = new();
+
+    public ContinuousPreviewMetricsDto Continuous { get; set; } = new();
+}
+
+public class ContinuousPreviewMetricsDto
+{
+    public bool Enabled { get; set; }
+    public double? Fps { get; set; }
+    public long? DroppedFrames { get; set; }
+    public double? LatencyMs { get; set; }
+    public int? QueueDepth { get; set; }
+    public int? BufferCapacity { get; set; }
+    public int? BufferCount { get; set; }
+    public long? BufferOverwrittenCount { get; set; }
 }
 
 /// <summary>
