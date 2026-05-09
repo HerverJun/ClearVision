@@ -1,0 +1,64 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "Acme.OperatorLibrary-1.0.2",
+  "documentNamespace": "https://clearvision.local/spdx/Acme.OperatorLibrary-1.0.2-20260509",
+  "creationInfo": {
+    "created": "2026-05-09T00:00:00Z",
+    "creators": [
+      "Organization: ClearVision",
+      "Tool: manual-lockfile-baseline"
+    ]
+  },
+  "packages": [
+    {
+      "name": "Acme.OperatorLibrary",
+      "SPDXID": "SPDXRef-Package-Acme-OperatorLibrary",
+      "versionInfo": "1.0.2",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection.Abstractions",
+      "SPDXID": "SPDXRef-Package-Microsoft-Extensions-DependencyInjection-Abstractions",
+      "versionInfo": "8.0.2",
+      "downloadLocation": "https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.Abstractions",
+      "SPDXID": "SPDXRef-Package-Microsoft-Extensions-Logging-Abstractions",
+      "versionInfo": "8.0.3",
+      "downloadLocation": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.Abstractions/8.0.3",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "name": "S7NetPlus",
+      "SPDXID": "SPDXRef-Package-S7NetPlus",
+      "versionInfo": "0.20.0",
+      "downloadLocation": "https://www.nuget.org/packages/S7NetPlus/0.20.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "comment": "License metadata is not declared in the local nuspec; release owners must manually review upstream before external redistribution."
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-Acme-OperatorLibrary"
+    }
+  ]
+}

@@ -11,10 +11,14 @@ param(
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent $scriptRoot
 $projectPath = Join-Path $scriptRoot "Acme.OperatorLibrary.csproj"
 $nupkgPath = Join-Path $scriptRoot "nupkg"
 $smokeTestPath = Join-Path $scriptRoot "tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj"
 $nugetConfigPath = Join-Path $scriptRoot "nuget.config"
+$serialTestRunnerPath = Join-Path $repoRoot "scripts/run-dotnet-test-serial.ps1"
+$smokePackageRoot = Join-Path $repoRoot ".tmp/nuget-packages/operator-library-smoke"
+$smokeLockPath = Join-Path $smokePackageRoot "packages.lock.json"
 
 if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
     $PackageVersion = $env:ACME_OPERATORLIB_PACKAGE_VERSION
@@ -75,7 +79,12 @@ if (-not [string]::IsNullOrWhiteSpace($RepositoryCommit)) {
 
 New-Item -Path $nupkgPath -ItemType Directory -Force | Out-Null
 
-dotnet pack $projectPath -c $Configuration -o $nupkgPath @packProperties
+dotnet restore $projectPath --locked-mode
+if ($LASTEXITCODE -ne 0) {
+    throw "[pack] dotnet restore (locked) failed with exit code $LASTEXITCODE"
+}
+
+dotnet pack $projectPath -c $Configuration -o $nupkgPath --no-restore @packProperties
 if ($LASTEXITCODE -ne 0) {
     throw "[pack] dotnet pack failed with exit code $LASTEXITCODE"
 }
@@ -94,16 +103,28 @@ if (-not (Test-Path -LiteralPath $expectedPackagePath)) {
 if ($RunSmokeTest) {
     Write-Host "[pack] Running package acceptance tests with local package source..."
 
+    New-Item -Path $smokePackageRoot -ItemType Directory -Force | Out-Null
+    $localPackageCachePath = Join-Path (Join-Path $smokePackageRoot "acme.operatorlibrary") $resolvedPackageVersion.ToLowerInvariant()
+    if (Test-Path -LiteralPath $localPackageCachePath) {
+        Remove-Item -LiteralPath $localPackageCachePath -Recurse -Force
+    }
+
     dotnet restore $smokeTestPath `
         --configfile $nugetConfigPath `
-        --source $nupkgPath `
-        --source "https://api.nuget.org/v3/index.json" `
+        --packages $smokePackageRoot `
+        --no-cache `
+        -p:NuGetLockFilePath=$smokeLockPath `
         -p:AcmeOperatorLibraryPackageVersion=$resolvedPackageVersion
     if ($LASTEXITCODE -ne 0) {
         throw "[pack] dotnet restore (smoke test) failed with exit code $LASTEXITCODE"
     }
 
-    dotnet test $smokeTestPath -c $Configuration --no-restore -p:AcmeOperatorLibraryPackageVersion=$resolvedPackageVersion
+    & $serialTestRunnerPath `
+        -Project $smokeTestPath `
+        -Configuration $Configuration `
+        -NoRestore `
+        -Verbosity minimal `
+        -DotNetTestArguments "-p:AcmeOperatorLibraryPackageVersion=$resolvedPackageVersion"
     if ($LASTEXITCODE -ne 0) {
         throw "[pack] dotnet test (smoke test) failed with exit code $LASTEXITCODE"
     }

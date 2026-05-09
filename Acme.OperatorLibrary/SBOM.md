@@ -6,9 +6,9 @@ Version baseline: `1.0.2`
 
 Target framework: `net8.0`
 
-Generated from: `dotnet list Acme.OperatorLibrary/Acme.OperatorLibrary.csproj package --include-transitive` on 2026-04-29.
+Generated from: `dotnet list Acme.OperatorLibrary/Acme.OperatorLibrary.csproj package --include-transitive` and reconciled with `packages.lock.json` on 2026-05-09.
 
-This is a human-readable SBOM baseline for release review. Release automation should replace or supplement it with CycloneDX/SPDX output when a formal publication pipeline is available.
+This is a human-readable SBOM baseline for release review. `SBOM.spdx.json` is the machine-readable SPDX seed artifact; release automation should regenerate it from the exact `.nupkg` before external publication.
 
 ## Direct Components
 
@@ -16,8 +16,8 @@ This is a human-readable SBOM baseline for release review. Release automation sh
 | --- | ---: |
 | Microsoft.Data.SqlClient | 5.2.2 |
 | Microsoft.Data.Sqlite | 8.0.0 |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.0 |
-| Microsoft.Extensions.Logging.Abstractions | 10.0.0 |
+| Microsoft.Extensions.DependencyInjection.Abstractions | 8.0.2 |
+| Microsoft.Extensions.Logging.Abstractions | 8.0.3 |
 | Microsoft.ML.OnnxRuntime | 1.17.0 |
 | Microsoft.ML.OnnxRuntime.Managed | 1.17.0 |
 | MySqlConnector | 2.3.7 |
@@ -65,7 +65,7 @@ This is a human-readable SBOM baseline for release review. Release automation sh
 | SQLitePCLRaw.provider.e_sqlite3 | 2.1.6 |
 | System.ClientModel | 1.0.0 |
 | System.Configuration.ConfigurationManager | 8.0.0 |
-| System.Diagnostics.DiagnosticSource | 10.0.0 |
+| System.Diagnostics.DiagnosticSource | 6.0.1 |
 | System.Diagnostics.EventLog | 8.0.0 |
 | System.IdentityModel.Tokens.Jwt | 6.35.0 |
 | System.Memory | 4.5.5 |

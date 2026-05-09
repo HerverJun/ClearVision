@@ -282,7 +282,7 @@ $smokeArguments = [ordered]@{
     Verbosity = $Verbosity
     ResultsDirectory = $trxDirectory
     LogFileName = "operator-library-smoke-$timestamp.trx"
-    MinimumTotalTests = 1
+    MinimumTotalTests = 40
     ReturnExitCode = $true
 }
 
