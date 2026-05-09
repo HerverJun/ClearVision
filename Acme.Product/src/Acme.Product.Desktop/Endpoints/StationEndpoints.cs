@@ -1,5 +1,7 @@
 using System.Threading.Channels;
 using System.Text.Json;
+using Acme.Product.Core.Enums;
+using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -68,6 +70,11 @@ public static class StationEndpoints
             [FromServices] StationCentralStore store,
             HttpContext context) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             if (string.IsNullOrWhiteSpace(stationId))
             {
                 return Results.BadRequest(new { error = "StationIdRequired" });
@@ -95,6 +102,11 @@ public static class StationEndpoints
             [FromServices] StationPackageStore packageStore,
             HttpContext context) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             if (string.IsNullOrWhiteSpace(stationId))
             {
                 return Results.BadRequest(new { error = "StationIdRequired" });
@@ -133,8 +145,13 @@ public static class StationEndpoints
             return Results.Ok(packageStore.GetPackages());
         });
 
-        app.MapPost("/api/station-packages/test", async ([FromServices] StationPackageStore packageStore, CancellationToken cancellationToken) =>
+        app.MapPost("/api/station-packages/test", async ([FromServices] StationPackageStore packageStore, HttpContext context, CancellationToken cancellationToken) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             return Results.Ok(await packageStore.CreateTestPackageAsync(cancellationToken));
         });
 
@@ -313,6 +330,23 @@ public static class StationEndpoints
             error = "PayloadJsonInvalid";
             return false;
         }
+    }
+
+    private static bool IsStationAdmin(HttpContext context)
+    {
+        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            return false;
+        }
+
+        var role = userObj switch
+        {
+            Acme.Product.Application.Services.UserSession user => user.Role,
+            UserSession user => user.Role,
+            _ => null
+        };
+
+        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
     }
 }
 

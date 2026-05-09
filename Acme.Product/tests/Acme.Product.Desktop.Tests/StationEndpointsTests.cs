@@ -2,6 +2,7 @@ using System.Text;
 using System.Net;
 using System.Net.Http.Json;
 using Acme.Product.Desktop.Endpoints;
+using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Runtime.Abstractions;
@@ -126,6 +127,47 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
+    public async Task CreateCommand_ShouldRejectAnonymousUser()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: null);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/commands",
+            new StationCommandCreateRequest
+            {
+                CommandType = StationCommandType.Ping,
+                PayloadJson = "{}"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectNonAdminUser()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "package-a"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task TestPackage_ShouldRejectNonAdminUser()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
+
+        using var response = await host.Client.PostAsync("/api/station-packages/test", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task DeployPackage_ShouldRejectBlankPackageId()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
@@ -207,7 +249,7 @@ public sealed class StationEndpointsTests
             return new StationEndpointTestHost(app, app.Services.GetRequiredService<StationRegistryService>());
         }
 
-        public static async Task<StationEndpointTestHost> CreateWithCentralStoreAsync()
+        public static async Task<StationEndpointTestHost> CreateWithCentralStoreAsync(string? role = "Admin")
         {
             var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationEndpointTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
@@ -246,6 +288,20 @@ public sealed class StationEndpointsTests
                 await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
             }
 
+            app.Use(async (context, next) =>
+            {
+                if (role is not null)
+                {
+                    context.Items["CurrentUser"] = new UserSession
+                    {
+                        UserId = role.ToLowerInvariant(),
+                        Username = role.ToLowerInvariant(),
+                        Role = role
+                    };
+                }
+
+                await next();
+            });
             app.MapStationEndpoints();
             await app.StartAsync();
 

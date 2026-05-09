@@ -14,6 +14,7 @@ using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Runtime;
 using Acme.Product.Desktop.Handlers;
+using Acme.Product.Desktop.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -179,10 +180,16 @@ public static class ApiEndpoints
             ExportRuntimePackageRequest? request,
             ProjectService service,
             RuntimePackageExporter exporter,
+            HttpContext context,
             CancellationToken cancellationToken) =>
         {
             try
             {
+                if (!IsAdmin(context))
+                {
+                    return Results.Json(new { Error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
                 var project = await service.GetByIdAsync(id);
                 if (project == null)
                 {
@@ -616,6 +623,23 @@ public static class ApiEndpoints
 
             return Results.File(imageData, "image/png");
         });
+    }
+
+    private static bool IsAdmin(HttpContext context)
+    {
+        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            return false;
+        }
+
+        var role = userObj switch
+        {
+            Acme.Product.Application.Services.UserSession user => user.Role,
+            Acme.Product.Desktop.Middleware.UserSession user => user.Role,
+            _ => null
+        };
+
+        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
     }
 
     private static bool TryDecodeImageUpload(

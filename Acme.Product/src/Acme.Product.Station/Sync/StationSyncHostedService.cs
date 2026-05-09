@@ -62,11 +62,12 @@ public sealed class StationSyncHostedService : BackgroundService
         _settingsStore = settingsStore;
         _options = options.Value;
         _logger = logger;
-        _resultIngressChannel = Channel.CreateUnbounded<StationResultSummaryDto>(
-            new UnboundedChannelOptions
+        _resultIngressChannel = Channel.CreateBounded<StationResultSummaryDto>(
+            new BoundedChannelOptions(Math.Max(1, _options.OutboundQueueCapacity))
             {
                 SingleReader = true,
-                SingleWriter = false
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
             });
         _resultHandler = HandleResultAvailable;
         _snapshotHandler = HandleSnapshotChanged;
@@ -185,31 +186,20 @@ public sealed class StationSyncHostedService : BackgroundService
             var queued = Interlocked.Increment(ref _queuedResultSummaries);
             if (_resultIngressChannel.Writer.TryWrite(summary))
             {
-                var capacity = Math.Max(1, _options.OutboundQueueCapacity);
-                if (queued > capacity)
-                {
-                    var backpressureEvents = Interlocked.Increment(ref _resultSummaryBackpressureEvents);
-                    if (backpressureEvents == 1 || backpressureEvents % 100 == 0)
-                    {
-                        _logger.LogWarning(
-                            "Station result summary ingress backlog exceeded configured capacity. QueuedResultSummaries={QueuedResultSummaries}, Capacity={Capacity}, BackpressureEvents={BackpressureEvents}",
-                            queued,
-                            capacity,
-                            backpressureEvents);
-                    }
-                }
-
                 SignalSync();
                 return;
             }
 
             Interlocked.Decrement(ref _queuedResultSummaries);
+            var backpressureEvents = Interlocked.Increment(ref _resultSummaryBackpressureEvents);
             var dropped = Interlocked.Increment(ref _droppedResultSummaries);
             if (dropped == 1 || dropped % 100 == 0)
             {
                 _logger.LogWarning(
-                    "Dropped Station Studio result summary because the outbound queue is full. DroppedResultSummaries={DroppedResultSummaries}",
-                    dropped);
+                    "Dropped Station Studio result summary because the bounded outbound queue is full. DroppedResultSummaries={DroppedResultSummaries}, BackpressureEvents={BackpressureEvents}, Capacity={Capacity}",
+                    dropped,
+                    backpressureEvents,
+                    Math.Max(1, _options.OutboundQueueCapacity));
             }
         }
         catch (Exception ex)
@@ -814,10 +804,41 @@ public sealed class StationSyncHostedService : BackgroundService
             SpoolPendingCount = spoolStore.PendingCount,
             SpoolBytes = spoolStore.SpoolBytes,
             CameraStatusSummary = "Unknown",
-            PlcStatusSummary = "Unknown",
+            PlcStatusSummary = BuildPlcStatusSummary(snapshot),
             CurrentPackageId = snapshot.PackageId,
             CurrentPackageHealth = snapshot.PackageId == null ? "NoPackage" : "Loaded",
+            LastErrorCode = Volatile.Read(ref _droppedResultSummaries) > 0 ? "StationResultBackpressure" : null,
+            LastErrorMessage = BuildBackpressureSummary(),
             CreatedAtUtc = now
+        };
+    }
+
+    private string? BuildBackpressureSummary()
+    {
+        var dropped = Volatile.Read(ref _droppedResultSummaries);
+        var backpressure = Volatile.Read(ref _resultSummaryBackpressureEvents);
+        var queued = Volatile.Read(ref _queuedResultSummaries);
+        if (dropped == 0 && backpressure == 0)
+        {
+            return null;
+        }
+
+        return $"queued={queued}; droppedResultSummaries={dropped}; backpressureEvents={backpressure}; spoolPending={_spoolStore.PendingCount}; spoolBytes={_spoolStore.SpoolBytes}";
+    }
+
+    private static string BuildPlcStatusSummary(RuntimeHostSnapshot snapshot)
+    {
+        if (snapshot.PackageId == null)
+        {
+            return "NotConfigured: no runtime package is loaded.";
+        }
+
+        return snapshot.State switch
+        {
+            RuntimeHostState.Faulted => "Error: runtime host is faulted; PLC operator state may be unavailable.",
+            RuntimeHostState.Loaded => "Ready: runtime package is loaded; PLC status is reported by PLC operators when configured.",
+            RuntimeHostState.Running or RuntimeHostState.Idle => "Ready: PLC status is reported by PLC operators when configured.",
+            _ => $"Disconnected: runtime host state is {snapshot.State}."
         };
     }
 
