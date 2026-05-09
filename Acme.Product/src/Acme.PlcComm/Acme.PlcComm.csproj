@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,14 +8,14 @@
     <RootNamespace>Acme.PlcComm</RootNamespace>
     <Version>1.0.0</Version>
     <Authors>ClearVision Team</Authors>
-    <Description>高性能工业PLC通信框架，支持西门子S7、三菱MC、欧姆龙FINS协议</Description>
+    <Description>High-performance industrial PLC communication framework for Siemens S7, Mitsubishi MC, and Omron FINS protocols</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.IO.Ports" Version="7.0.0" />
-    <PackageReference Include="HslCommunication" Version="12.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="System.IO.Ports" />
+    <PackageReference Include="HslCommunication" />
   </ItemGroup>
 
 </Project>

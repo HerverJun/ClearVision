@@ -19,13 +19,18 @@ param(
 
     [string]$LogFileName,
 
+    [string[]]$Collect,
+
     [int]$MinimumTotalTests = 0,
 
     [int]$MinimumPassedTests = 0,
 
     [int]$LockWaitSeconds = 30,
 
-    [switch]$ReturnExitCode
+    [switch]$ReturnExitCode,
+
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$DotNetTestArguments
 )
 
 $ErrorActionPreference = "Stop"
@@ -213,8 +218,20 @@ try {
         $arguments += @("--logger", "trx;LogFileName=$LogFileName")
     }
 
+    foreach ($collector in $Collect) {
+        if (-not [string]::IsNullOrWhiteSpace($collector)) {
+            $arguments += @("--collect", $collector)
+        }
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($effectiveFilter)) {
         $arguments += @("--filter", $effectiveFilter)
+    }
+
+    foreach ($extraArgument in $DotNetTestArguments) {
+        if (-not [string]::IsNullOrWhiteSpace($extraArgument)) {
+            $arguments += $extraArgument
+        }
     }
 
     $preview = "dotnet " + (($arguments | ForEach-Object { Quote-Argument $_ }) -join " ")

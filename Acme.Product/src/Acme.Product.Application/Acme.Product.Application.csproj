@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -14,25 +14,25 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- CQRS 支持 -->
-    <PackageReference Include="MediatR" Version="12.2.0" />
+    <!-- CQRS 鏀寔 -->
+    <PackageReference Include="MediatR" />
     
-    <!-- 验证 -->
-    <PackageReference Include="FluentValidation" Version="11.9.0" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.0" />
+    <!-- 楠岃瘉 -->
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     
-    <!-- 对象映射 -->
-    <PackageReference Include="AutoMapper" Version="15.1.1" />
+    <!-- 瀵硅薄鏄犲皠 -->
+    <PackageReference Include="AutoMapper" />
     
-    <!-- 依赖注入 -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <!-- 渚濊禆娉ㄥ叆 -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     
-    <!-- 日志 -->
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <!-- 鏃ュ織 -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     
-    <!-- 缓存 -->
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
-    <PackageReference Include="TypeGen" Version="7.0.0" />
+    <!-- 缂撳瓨 -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="TypeGen" />
   </ItemGroup>
 
 </Project>

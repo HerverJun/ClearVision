@@ -35,3 +35,4 @@ finally {
 
 Write-Host "[hooks] Installed. Git now uses '.githooks' as hooks path."
 Write-Host "[hooks] To verify: ./scripts/install-githooks.ps1 -VerifyOnly"
+Write-Host "[hooks] Recommended before pushing: ./scripts/scan-secrets.ps1"
