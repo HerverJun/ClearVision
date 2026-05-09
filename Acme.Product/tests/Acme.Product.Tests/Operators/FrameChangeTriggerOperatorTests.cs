@@ -83,6 +83,36 @@ public class FrameChangeTriggerOperatorTests
         duplicate.OutputData!["Reason"].Should().Be("cooldown");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_DifferentOperatorInstances_ShouldKeepIndependentBaselines()
+    {
+        using var dark = CreateGrayImage(16, 16, 10);
+        using var brightForSecondOperator = CreateGrayImage(16, 16, 240);
+        using var brightForFirstOperator = CreateGrayImage(16, 16, 240);
+        var parameters = new Dictionary<string, object>
+        {
+            ["CooldownMs"] = 0,
+            ["MinChangeRatio"] = 0.1,
+            ["MinChangePixels"] = 10
+        };
+        var firstOperator = CreateOperator(parameters);
+        var secondOperator = CreateOperator(parameters);
+
+        await _operator.ExecuteAsync(firstOperator, new Dictionary<string, object> { ["Image"] = dark });
+        var secondOperatorFirstFrame = await _operator.ExecuteAsync(secondOperator, new Dictionary<string, object> { ["Image"] = brightForSecondOperator });
+        var firstOperatorSecondFrame = await _operator.ExecuteAsync(firstOperator, new Dictionary<string, object> { ["Image"] = brightForFirstOperator });
+
+        secondOperatorFirstFrame.IsSuccess.Should().BeTrue(secondOperatorFirstFrame.ErrorMessage);
+        secondOperatorFirstFrame.ShouldShortCircuitFlow.Should().BeTrue();
+        secondOperatorFirstFrame.OutputData!["Triggered"].Should().Be(false);
+        secondOperatorFirstFrame.OutputData["Reason"].Should().Be("baseline");
+
+        firstOperatorSecondFrame.IsSuccess.Should().BeTrue(firstOperatorSecondFrame.ErrorMessage);
+        firstOperatorSecondFrame.ShouldShortCircuitFlow.Should().BeFalse();
+        firstOperatorSecondFrame.OutputData!["Triggered"].Should().Be(true);
+        firstOperatorSecondFrame.OutputData["Reason"].Should().Be("change_detected");
+    }
+
     private static Operator CreateOperator(Dictionary<string, object>? parameters = null)
     {
         var op = new Operator("FrameChangeTrigger", OperatorType.FrameChangeTrigger, 0, 0);

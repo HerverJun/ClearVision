@@ -55,6 +55,18 @@ public class ModuleNamespaceIndexTests
         Assert.Contains(
             OperatorType.DeepLearning,
             Acme.OperatorLibrary.AI.Operators.Types);
+
+        Assert.Contains(
+            OperatorType.AnomalyDetection,
+            Acme.OperatorLibrary.AI.Operators.Types);
+
+        Assert.Contains(
+            OperatorType.SemanticSegmentation,
+            Acme.OperatorLibrary.AI.Operators.Types);
+
+        Assert.Contains(
+            OperatorType.DetectionSequenceJudge,
+            Acme.OperatorLibrary.AI.Operators.Types);
     }
 
     [Fact]
@@ -66,6 +78,9 @@ public class ModuleNamespaceIndexTests
         Assert.Equal(OperatorModule.Communication, OperatorModuleCatalog.GetModule(OperatorType.ModbusCommunication));
         Assert.Equal(OperatorModule.FlowControl, OperatorModuleCatalog.GetModule(OperatorType.TryCatch));
         Assert.Equal(OperatorModule.AI, OperatorModuleCatalog.GetModule(OperatorType.DeepLearning));
+        Assert.Equal(OperatorModule.AI, OperatorModuleCatalog.GetModule(OperatorType.AnomalyDetection));
+        Assert.Equal(OperatorModule.AI, OperatorModuleCatalog.GetModule(OperatorType.SemanticSegmentation));
+        Assert.Equal(OperatorModule.AI, OperatorModuleCatalog.GetModule(OperatorType.DetectionSequenceJudge));
     }
 
     [Theory]

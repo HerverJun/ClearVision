@@ -42,6 +42,32 @@ public class TriggerModuleOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TimerMode_ShouldKeepIntervalStatePerOperatorInstance()
+    {
+        var sut = CreateSut();
+        var parameters = new Dictionary<string, object>
+        {
+            { "TriggerMode", "Timer" },
+            { "Interval", 1000 },
+            { "AutoRepeat", true }
+        };
+        var firstOperator = CreateOperator(parameters);
+        var secondOperator = CreateOperator(parameters);
+
+        var firstOperatorFirstRun = await sut.ExecuteAsync(firstOperator, null);
+        var firstOperatorSecondRun = await sut.ExecuteAsync(firstOperator, null);
+        var secondOperatorFirstRun = await sut.ExecuteAsync(secondOperator, null);
+
+        Assert.True(firstOperatorFirstRun.IsSuccess);
+        Assert.True(firstOperatorSecondRun.IsSuccess);
+        Assert.True(secondOperatorFirstRun.IsSuccess);
+        Assert.True((bool)firstOperatorFirstRun.OutputData!["Triggered"]);
+        Assert.False((bool)firstOperatorSecondRun.OutputData!["Triggered"]);
+        Assert.True((bool)secondOperatorFirstRun.OutputData!["Triggered"]);
+        Assert.Equal(1, Convert.ToInt32(secondOperatorFirstRun.OutputData["TriggerCount"]));
+    }
+
+    [Fact]
     public void ValidateParameters_WithInvalidMode_ShouldReturnInvalid()
     {
         var sut = CreateSut();

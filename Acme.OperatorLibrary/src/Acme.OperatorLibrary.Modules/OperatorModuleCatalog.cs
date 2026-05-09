@@ -104,6 +104,9 @@ public static class OperatorModuleCatalog
 
             OperatorType.DeepLearning
                 or OperatorType.OnnxInference
+                or OperatorType.AnomalyDetection
+                or OperatorType.SemanticSegmentation
+                or OperatorType.DetectionSequenceJudge
                 or OperatorType.DualModalVoting
                 or OperatorType.SurfaceDefectDetection
                 or OperatorType.EdgePairDefect

@@ -4,6 +4,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
+using System.Collections.Concurrent;
 
 namespace Acme.Product.Infrastructure.Operators;
 
@@ -30,11 +31,14 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("RoiY", "检测区域Y", "int", Description = "到料检测 ROI 左上角 Y。", DefaultValue = 0, Min = 0)]
 [OperatorParam("RoiW", "检测区域宽度", "int", Description = "到料检测 ROI 宽度；0 表示从 X 到图像右边界。", DefaultValue = 0, Min = 0)]
 [OperatorParam("RoiH", "检测区域高度", "int", Description = "到料检测 ROI 高度；0 表示从 Y 到图像下边界。", DefaultValue = 0, Min = 0)]
-public sealed class FrameChangeTriggerOperator : OperatorBase
+public sealed class FrameChangeTriggerOperator : OperatorBase, IDisposable
 {
-    private readonly object _syncRoot = new();
-    private Mat? _previousGrayRoi;
-    private DateTime _lastTriggeredUtc = DateTime.MinValue;
+    private static readonly TimeSpan StateTtl = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
+
+    private readonly ConcurrentDictionary<Guid, FrameChangeState> _states = new();
+    private readonly object _cleanupSync = new();
+    private DateTime _lastCleanupUtc = DateTime.MinValue;
 
     public override OperatorType OperatorType => OperatorType.FrameChangeTrigger;
 
@@ -70,22 +74,29 @@ public sealed class FrameChangeTriggerOperator : OperatorBase
         var cooldownMs = GetIntParam(@operator, "CooldownMs", 1200, 0, 60_000);
         var shortCircuitWhenNotTriggered = GetBoolParam(@operator, "ShortCircuitWhenNotTriggered", true);
         var roi = ResolveRoi(@operator, src);
+        var nowUtc = DateTime.UtcNow;
+        var state = _states.GetOrAdd(@operator.Id, static _ => new FrameChangeState());
 
         using var grayRoi = BuildGrayRoi(src, roi);
         FrameChangeDecision decision;
 
-        lock (_syncRoot)
+        lock (state.SyncRoot)
         {
-            decision = Evaluate(grayRoi, pixelThreshold, minChangeRatio, minChangePixels, cooldownMs);
-            _previousGrayRoi?.Dispose();
-            _previousGrayRoi = grayRoi.Clone();
+            decision = Evaluate(state, grayRoi, pixelThreshold, minChangeRatio, minChangePixels, cooldownMs, nowUtc);
+            state.PreviousGrayRoi?.Dispose();
+            state.PreviousGrayRoi = grayRoi.Clone();
+            state.LastTouchedUtc = nowUtc;
         }
+
+        TryCleanupStaleStates(nowUtc);
 
         var output = CreatePassThroughOutput(src, decision.Triggered, decision.ChangeScore, decision.ChangedPixels, decision.Reason);
         output["RoiX"] = roi.X;
         output["RoiY"] = roi.Y;
         output["RoiW"] = roi.Width;
         output["RoiH"] = roi.Height;
+        output["StateScope"] = "OperatorInstance";
+        output["StateKey"] = @operator.Id;
 
         return Task.FromResult(
             decision.Triggered || !shortCircuitWhenNotTriggered
@@ -110,21 +121,36 @@ public sealed class FrameChangeTriggerOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
+    public void Dispose()
+    {
+        foreach (var state in _states.Values)
+        {
+            lock (state.SyncRoot)
+            {
+                state.Clear();
+            }
+        }
+
+        _states.Clear();
+    }
+
     private FrameChangeDecision Evaluate(
+        FrameChangeState state,
         Mat grayRoi,
         int pixelThreshold,
         double minChangeRatio,
         int minChangePixels,
-        int cooldownMs)
+        int cooldownMs,
+        DateTime nowUtc)
     {
-        if (_previousGrayRoi == null || _previousGrayRoi.Empty() || _previousGrayRoi.Size() != grayRoi.Size())
+        if (state.PreviousGrayRoi == null || state.PreviousGrayRoi.Empty() || state.PreviousGrayRoi.Size() != grayRoi.Size())
         {
             return new FrameChangeDecision(false, 0.0, 0, "baseline");
         }
 
         using var diff = new Mat();
         using var mask = new Mat();
-        Cv2.Absdiff(_previousGrayRoi, grayRoi, diff);
+        Cv2.Absdiff(state.PreviousGrayRoi, grayRoi, diff);
         Cv2.Threshold(diff, mask, pixelThreshold, 255, ThresholdTypes.Binary);
 
         var changedPixels = Cv2.CountNonZero(mask);
@@ -137,14 +163,13 @@ public sealed class FrameChangeTriggerOperator : OperatorBase
             return new FrameChangeDecision(false, changeScore, changedPixels, "below_threshold");
         }
 
-        var now = DateTime.UtcNow;
-        if (cooldownMs > 0 && _lastTriggeredUtc != DateTime.MinValue &&
-            (now - _lastTriggeredUtc).TotalMilliseconds < cooldownMs)
+        if (cooldownMs > 0 && state.LastTriggeredUtc != DateTime.MinValue &&
+            (nowUtc - state.LastTriggeredUtc).TotalMilliseconds < cooldownMs)
         {
             return new FrameChangeDecision(false, changeScore, changedPixels, "cooldown");
         }
 
-        _lastTriggeredUtc = now;
+        state.LastTriggeredUtc = nowUtc;
         return new FrameChangeDecision(true, changeScore, changedPixels, "change_detected");
     }
 
@@ -188,6 +213,59 @@ public sealed class FrameChangeTriggerOperator : OperatorBase
         height = Math.Clamp(height, 1, src.Height - y);
 
         return new Rect(x, y, width, height);
+    }
+
+    private void TryCleanupStaleStates(DateTime nowUtc)
+    {
+        if ((nowUtc - _lastCleanupUtc) < CleanupInterval)
+        {
+            return;
+        }
+
+        lock (_cleanupSync)
+        {
+            if ((nowUtc - _lastCleanupUtc) < CleanupInterval)
+            {
+                return;
+            }
+
+            var staleBefore = nowUtc - StateTtl;
+            foreach (var entry in _states)
+            {
+                var state = entry.Value;
+                var shouldRemove = false;
+                lock (state.SyncRoot)
+                {
+                    shouldRemove = state.LastTouchedUtc < staleBefore;
+                }
+
+                if (!shouldRemove || !_states.TryRemove(entry.Key, out var removedState))
+                {
+                    continue;
+                }
+
+                lock (removedState.SyncRoot)
+                {
+                    removedState.Clear();
+                }
+            }
+
+            _lastCleanupUtc = nowUtc;
+        }
+    }
+
+    private sealed class FrameChangeState
+    {
+        public object SyncRoot { get; } = new();
+        public Mat? PreviousGrayRoi { get; set; }
+        public DateTime LastTriggeredUtc { get; set; } = DateTime.MinValue;
+        public DateTime LastTouchedUtc { get; set; } = DateTime.UtcNow;
+
+        public void Clear()
+        {
+            PreviousGrayRoi?.Dispose();
+            PreviousGrayRoi = null;
+        }
     }
 
     private readonly record struct FrameChangeDecision(bool Triggered, double ChangeScore, int ChangedPixels, string Reason);

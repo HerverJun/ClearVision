@@ -108,6 +108,9 @@ if ($RunSmokeTest) {
     if (Test-Path -LiteralPath $localPackageCachePath) {
         Remove-Item -LiteralPath $localPackageCachePath -Recurse -Force
     }
+    if (Test-Path -LiteralPath $smokeLockPath) {
+        Remove-Item -LiteralPath $smokeLockPath -Force
+    }
 
     dotnet restore $smokeTestPath `
         --configfile $nugetConfigPath `

@@ -10,6 +10,7 @@ param(
         "measurement-performance",
         "calibration",
         "detection-regression",
+        "detection-accuracy",
         "detection-performance",
         "plc"
     )]
@@ -306,6 +307,7 @@ $stepMap = [ordered]@{
     "measurement-performance" = New-GateStep -Name "measurement-performance" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-performance.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-performance" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ GateProfile = $PerfGateProfile; ReportDirectory = $performanceReportDirectory }))
     "calibration" = New-GateStep -Name "calibration" -ScriptPath (Join-Path $scriptRoot "run-tests-calibration-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "calibration" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 11 -Extra ([ordered]@{ Gate = "regression" }))
     "detection-regression" = New-GateStep -Name "detection-regression" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-regression" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 16 -Extra ([ordered]@{ Gate = "regression" }))
+    "detection-accuracy" = New-GateStep -Name "detection-accuracy" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-accuracy" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 9 -Extra ([ordered]@{ Gate = "detection-accuracy" }))
     "detection-performance" = New-GateStep -Name "detection-performance" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-performance.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-performance" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ GateProfile = $PerfGateProfile; ReportDirectory = $performanceReportDirectory }))
     "plc" = New-GateStep -Name "plc" -ScriptPath (Join-Path $scriptRoot "run-tests-plc-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "plc" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1)
 }
@@ -316,6 +318,7 @@ $profileSteps = @{
         "measurement-regression",
         "calibration",
         "detection-regression",
+        "detection-accuracy",
         "plc"
     )
     industrial = @(
@@ -326,6 +329,7 @@ $profileSteps = @{
         "measurement-performance",
         "calibration",
         "detection-regression",
+        "detection-accuracy",
         "detection-performance",
         "plc"
     )
