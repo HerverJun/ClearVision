@@ -11,20 +11,24 @@ $root = Split-Path -Parent $PSScriptRoot
 $workdir = Join-Path $root "tools\virtual-plc\modbus"
 $python = Join-Path $workdir ".venv\Scripts\python.exe"
 
-Set-Location $workdir
+Push-Location $workdir
+try {
+    if (-not (Test-Path $python)) {
+        python -m venv .venv
+    }
 
-if (-not (Test-Path $python)) {
-    python -m venv .venv
+    & $python -c "import pymodbus" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        & $python -m ensurepip --upgrade --default-pip
+        & $python -m pip install -r requirements.txt
+    }
+
+    & $python test_client.py `
+        --host $HostAddress `
+        --port $Port `
+        --unit-id $UnitId `
+        --timeout $TimeoutSeconds
 }
-
-& $python -c "import pymodbus" 2>$null
-if ($LASTEXITCODE -ne 0) {
-    & $python -m ensurepip --upgrade --default-pip
-    & $python -m pip install -r requirements.txt
+finally {
+    Pop-Location
 }
-
-& $python test_client.py `
-    --host $HostAddress `
-    --port $Port `
-    --unit-id $UnitId `
-    --timeout $TimeoutSeconds

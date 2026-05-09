@@ -94,7 +94,7 @@ def test_fins(host: str, port: int, timeout: float) -> None:
             raise RuntimeError("FINS read response command was not 2.")
         if int.from_bytes(header[12:16], "big") != 0:
             raise RuntimeError("FINS/TCP read response returned an error.")
-        response = read_exact(sock, payload_length)
+        response = read_exact(sock, payload_length - 8 if payload_length >= 8 else payload_length)
         if len(response) < 16:
             raise RuntimeError("FINS response payload was too short.")
         end_code = int.from_bytes(response[12:14], "big")

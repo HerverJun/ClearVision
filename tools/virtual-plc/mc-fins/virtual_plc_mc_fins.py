@@ -328,7 +328,7 @@ def build_fins_response(
 def build_fins_tcp_header(payload: bytes, command: int, error_code: int = FINS_ERROR_OK) -> bytes:
     frame = bytearray()
     frame += FINS_MAGIC
-    frame += len(payload).to_bytes(4, "big")
+    frame += (len(payload) + 8).to_bytes(4, "big")
     frame += command.to_bytes(4, "big")
     frame += error_code.to_bytes(4, "big")
     frame += payload

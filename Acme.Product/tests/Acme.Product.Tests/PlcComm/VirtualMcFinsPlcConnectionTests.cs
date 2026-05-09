@@ -34,6 +34,36 @@ public class VirtualMcFinsPlcConnectionTests
     }
 
     [Fact]
+    public async Task MitsubishiMcClient_ShouldReadAndWriteVirtualPlcWord()
+    {
+        if (!ShouldRunVirtualMcFinsTests())
+        {
+            return;
+        }
+
+        using var client = PlcClientFactory.CreateFromConnectionString($"MC://{GetMcHost()}:{GetMcPort()}");
+        client.ConnectTimeout = 3000;
+        client.ReadTimeout = 3000;
+        client.WriteTimeout = 3000;
+
+        try
+        {
+            (await client.ConnectAsync()).Should().BeTrue();
+
+            var writeResult = await client.WriteAsync("D10", new byte[] { 0x78, 0x56 });
+            writeResult.IsSuccess.Should().BeTrue(writeResult.Message);
+
+            var readResult = await client.ReadAsync("D10", 1);
+            readResult.IsSuccess.Should().BeTrue(readResult.Message);
+            readResult.Content.Should().Equal(0x78, 0x56);
+        }
+        finally
+        {
+            await client.DisconnectAsync();
+        }
+    }
+
+    [Fact]
     public async Task OmronFinsClient_ShouldConnectAndPingVirtualPlc()
     {
         if (!ShouldRunVirtualMcFinsTests())
@@ -53,6 +83,36 @@ public class VirtualMcFinsPlcConnectionTests
 
             var pingOk = await client.PingAsync();
             pingOk.Should().BeTrue();
+        }
+        finally
+        {
+            await client.DisconnectAsync();
+        }
+    }
+
+    [Fact]
+    public async Task OmronFinsClient_ShouldReadAndWriteVirtualPlcWord()
+    {
+        if (!ShouldRunVirtualMcFinsTests())
+        {
+            return;
+        }
+
+        using var client = PlcClientFactory.CreateFromConnectionString($"FINS://{GetFinsHost()}:{GetFinsPort()}");
+        client.ConnectTimeout = 3000;
+        client.ReadTimeout = 3000;
+        client.WriteTimeout = 3000;
+
+        try
+        {
+            (await client.ConnectAsync()).Should().BeTrue();
+
+            var writeResult = await client.WriteAsync("DM10", new byte[] { 0x56, 0x78 });
+            writeResult.IsSuccess.Should().BeTrue(writeResult.Message);
+
+            var readResult = await client.ReadAsync("DM10", 1);
+            readResult.IsSuccess.Should().BeTrue(readResult.Message);
+            readResult.Content.Should().Equal(0x56, 0x78);
         }
         finally
         {

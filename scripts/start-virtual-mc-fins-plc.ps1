@@ -13,7 +13,13 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $workdir = Join-Path $root "tools\virtual-plc\mc-fins"
 
-Set-Location $workdir
+if (-not $DisableMc -and (Get-NetTCPConnection -LocalPort $McPort -State Listen -ErrorAction SilentlyContinue)) {
+    throw "Port $McPort is already in use. Stop the existing virtual MC PLC or pass a different -McPort."
+}
+
+if (-not $DisableFins -and (Get-NetTCPConnection -LocalPort $FinsPort -State Listen -ErrorAction SilentlyContinue)) {
+    throw "Port $FinsPort is already in use. Stop the existing virtual FINS PLC or pass a different -FinsPort."
+}
 
 $arguments = @(
     "virtual_plc_mc_fins.py",
@@ -32,4 +38,10 @@ if ($DisableFins) {
     $arguments += "--disable-fins"
 }
 
-python @arguments
+Push-Location $workdir
+try {
+    python @arguments
+}
+finally {
+    Pop-Location
+}
