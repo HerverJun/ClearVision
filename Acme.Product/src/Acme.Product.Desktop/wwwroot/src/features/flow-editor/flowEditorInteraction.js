@@ -5,6 +5,7 @@
 
 import { showToast } from '../../shared/components/uiComponents.js';
 import { buildOperatorNodeConfig } from '../../shared/operatorVisuals.js';
+import debugLogger from '../../core/logging/debugLogger.js';
 import TemplateSelector from './templateSelector.js';
 
 export class FlowEditorInteraction {
@@ -672,8 +673,8 @@ export class FlowEditorInteraction {
     /**     * 结束连线
      */
     endConnection(e, overrideEndPort = null) {
-        console.log('[DEBUG endConnection] === START CONNECTION ===');
-        console.log('[DEBUG endConnection] connectionStart:', JSON.stringify(this.connectionStart));
+        debugLogger.debug('[DEBUG endConnection] === START CONNECTION ===');
+        debugLogger.debug('[DEBUG endConnection] connectionStart:', JSON.stringify(this.connectionStart));
 
         let x = null;
         let y = null;
@@ -691,9 +692,9 @@ export class FlowEditorInteraction {
             endPort = this.getPortAt(x, y);
         }
 
-        console.log(`[DEBUG endConnection] Mouse position: x=${x}, y=${y}`);
-        console.log('[DEBUG endConnection] getPortAt result:', JSON.stringify(endPort));
-        console.log('[DEBUG endConnection] connectionEnd will be:', JSON.stringify({ x, y, port: endPort }));
+        debugLogger.debug(`[DEBUG endConnection] Mouse position: x=${x}, y=${y}`);
+        debugLogger.debug('[DEBUG endConnection] getPortAt result:', JSON.stringify(endPort));
+        debugLogger.debug('[DEBUG endConnection] connectionEnd will be:', JSON.stringify({ x, y, port: endPort }));
 
         if (endPort && endPort.type !== this.connectionStart.type) {
             const source = this.connectionStart.type === 'output' ? this.connectionStart : endPort;
@@ -722,25 +723,25 @@ export class FlowEditorInteraction {
                 conn.targetPort === target.portIndex
             );
 
-            console.log('[DEBUG endConnection] Source:', JSON.stringify(source));
-            console.log('[DEBUG endConnection] Target:', JSON.stringify(target));
-            console.log('[DEBUG endConnection] Connection exists:', exists);
-            console.log('[DEBUG endConnection] Same node check:', source.nodeId === target.nodeId);
+            debugLogger.debug('[DEBUG endConnection] Source:', JSON.stringify(source));
+            debugLogger.debug('[DEBUG endConnection] Target:', JSON.stringify(target));
+            debugLogger.debug('[DEBUG endConnection] Connection exists:', exists);
+            debugLogger.debug('[DEBUG endConnection] Same node check:', source.nodeId === target.nodeId);
 
             if (!exists && source.nodeId !== target.nodeId) {
-                console.log(`[DEBUG endConnection] Adding connection: ${source.nodeId}:${source.portIndex} -> ${target.nodeId}:${target.portIndex}`);
+                debugLogger.debug(`[DEBUG endConnection] Adding connection: ${source.nodeId}:${source.portIndex} -> ${target.nodeId}:${target.portIndex}`);
                 this.canvas.addConnection(source.nodeId, source.portIndex, target.nodeId, target.portIndex);
                 this.saveState();
                 showToast('Connected', 'success');
             } else {
-                console.log('[DEBUG endConnection] Connection skipped - exists or invalid');
+                debugLogger.debug('[DEBUG endConnection] Connection skipped - exists or invalid');
                 showToast('Connection already exists or invalid', 'warning');
             }
         } else {
-            console.log('[DEBUG endConnection] No valid end port found or same type port');
+            debugLogger.debug('[DEBUG endConnection] No valid end port found or same type port');
         }
 
-        console.log('[DEBUG endConnection] === END CONNECTION ===');
+        debugLogger.debug('[DEBUG endConnection] === END CONNECTION ===');
         this.cancelConnection();
     }
 

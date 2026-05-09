@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 鏁版嵁搴?-->
+    <!-- Database -->
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" />
     <PackageReference Include="CsvHelper" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -21,22 +21,22 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="NModbus" />
     
-    <!-- 鍥惧儚澶勭悊 -->
+    <!-- Image processing -->
     <PackageReference Include="OpenCvSharp4" />
-    <!-- 銆怭3-O3.1 GPU鍔犻€熴€戞牴鎹洰鏍囧钩鍙伴€夋嫨杩愯鏃讹細 -->
-    <!-- CPU鐗堟湰锛堥粯璁わ級锛歄penCvSharp4.runtime.win -->
-    <!-- GPU鐗堟湰锛堥渶NVIDIA GPU + CUDA锛夛細OpenCvSharp4.runtime.win_gpu -->
+    <!-- P3-O3.1 GPU acceleration: choose runtime package by target platform. -->
+    <!-- CPU runtime (default): OpenCvSharp4.runtime.win -->
+    <!-- GPU runtime (requires NVIDIA GPU + CUDA): OpenCvSharp4.runtime.win_gpu -->
     <PackageReference Include="OpenCvSharp4.runtime.win" />
     <PackageReference Include="PaddleOCRSharp" />
     <!-- <PackageReference Include="OpenCvSharp4.runtime.win_gpu" /> -->
     
-    <!-- 鏉＄爜璇嗗埆 -->
+    <!-- Barcode recognition -->
     <PackageReference Include="ZXing.Net" />
     
-    <!-- Modbus閫氫俊 -->
+    <!-- Modbus communication -->
     <PackageReference Include="System.IO.Ports" />
     
-    <!-- 瀵嗙爜鍝堝笇 -->
+    <!-- Password hashing -->
     <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     
@@ -46,18 +46,18 @@
     <PackageReference Include="MySqlConnector" />
     
     <!-- ONNX Runtime -->
-    <!-- 銆怭3-O3.1 GPU鍔犻€熴€慍PU鐗堟湰锛堥粯璁わ級 -->
+    <!-- P3-O3.1 GPU acceleration: CPU package (default). -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" />
-    <!-- 銆怭3-O3.1 GPU鍔犻€熴€慓PU鐗堟湰锛堝惎鐢ㄦ椂闇€鏇挎崲CPU鍖咃級 -->
-    <!-- CUDA鏀寔锛歁icrosoft.ML.OnnxRuntime.Gpu -->
-    <!-- TensorRT鏀寔锛歁icrosoft.ML.OnnxRuntime.TensorRT -->
-    <!-- DirectML鏀寔锛歁icrosoft.ML.OnnxRuntime.DirectML -->
+    <!-- P3-O3.1 GPU acceleration: replace the CPU package when enabling GPU runtime. -->
+    <!-- CUDA support: Microsoft.ML.OnnxRuntime.Gpu -->
+    <!-- TensorRT support: Microsoft.ML.OnnxRuntime.TensorRT -->
+    <!-- DirectML support: Microsoft.ML.OnnxRuntime.DirectML -->
     
-    <!-- 鏂囦欢澶勭悊 -->
+    <!-- File processing -->
     <PackageReference Include="System.Drawing.Common" />
     
-    <!-- 鏃ュ織 -->
+    <!-- Logging -->
     <PackageReference Include="Serilog" />
     <PackageReference Include="Serilog.Extensions.Logging" />
     <PackageReference Include="Serilog.Sinks.Console" />
@@ -75,7 +75,7 @@
     <ProjectReference Include="..\Acme.PlcComm\Acme.PlcComm.csproj" />
   </ItemGroup>
 
-  <!-- 鍗庣澘鐩告満 SDK -->
+  <!-- Huaray camera SDK -->
   <ItemGroup>
     <Reference Include="MVSDK_Net">
       <HintPath>..\..\lib\HuaraySDK\x64\MVSDK_Net.dll</HintPath>
@@ -83,7 +83,7 @@
     </Reference>
   </ItemGroup>
 
-  <!-- 鍗庣澘 SDK 鍘熺敓杩愯鏃朵緷璧?鈫?澶嶅埗鍒拌緭鍑虹洰褰?-->
+  <!-- Huaray SDK native runtime dependencies copied to output. -->
   <ItemGroup>
     <None Include="..\..\lib\HuaraySDK\x64\**\*.*"
           Exclude="..\..\lib\HuaraySDK\x64\MVSDK_Net.dll;..\..\lib\HuaraySDK\x64\MVSDK_Net.XML">

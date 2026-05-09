@@ -1,10 +1,12 @@
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using System.Reflection;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -24,6 +26,16 @@ public class MqttPublishOperatorTests
     }
 
     [Fact]
+    public void Metadata_ShouldDeclarePlaceholderDisabledMaturity()
+    {
+        var metadata = typeof(MqttPublishOperator).GetCustomAttribute<OperatorMetaAttribute>();
+
+        metadata.Should().NotBeNull();
+        metadata!.Tags.Should().Contain("maturity:placeholder-disabled");
+        metadata.Tags.Should().Contain("integration:mqtt");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithPayloadInput_ShouldFailFastInsteadOfPretendingSuccess()
     {
         var op = CreateOperator(new Dictionary<string, object>
@@ -40,7 +52,7 @@ public class MqttPublishOperatorTests
         });
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("未启用");
+        result.ErrorMessage.Should().Contain("placeholder-disabled");
         result.OutputData.Should().BeNull();
     }
 

@@ -1,4 +1,3 @@
-using Acme.Product.Application.Services;
 using Acme.Product.Desktop.Data;
 using Acme.Product.Desktop.Endpoints;
 using Acme.Product.Desktop.Configuration;
@@ -8,6 +7,7 @@ using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Logging;
+using Acme.Product.Infrastructure.Metrics;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Runtime;
 using Microsoft.AspNetCore.Builder;
@@ -25,6 +25,8 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 
 namespace Acme.Product.Desktop;
 
@@ -130,6 +132,19 @@ static class Program
 
             builder.Services.AddVisionServices(builder.Configuration);
             builder.Services.AddAiFlowGeneration(builder.Configuration);
+            builder.Services.AddOpenTelemetry()
+                .ConfigureResource(resource => resource
+                    .AddService(
+                        serviceName: "ClearVision.Desktop",
+                        serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown")
+                    .AddAttributes(new[]
+                    {
+                        new KeyValuePair<string, object>("deployment.environment", builder.Environment.EnvironmentName),
+                        new KeyValuePair<string, object>("runtime.host", "desktop")
+                    }))
+                .WithMetrics(metrics => metrics
+                    .AddMeter(InspectionMetrics.MeterName)
+                    .AddConsoleExporter());
             builder.Services.AddScoped<RuntimePackageExporter>();
             builder.Services.AddScoped<RuntimePackageValidator>();
             builder.Services.AddScoped<RuntimePackageLoader>();
@@ -207,8 +222,8 @@ static class Program
             app.MapSettingsEndpoints();
             app.MapPlcEndpoints();
             app.MapStationEndpoints();
-
-            RegisterExtendedApiEndpoints(app);
+            app.MapDemoEndpoints();
+            app.MapAnalysisEndpoints();
             app.MapAutoTuneEndpoints();
             app.MapInspectionEventEndpoints();
 
@@ -223,90 +238,6 @@ static class Program
         {
             MessageBox.Show($"启动Web服务器失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-    }
-
-    private static void RegisterExtendedApiEndpoints(WebApplication app)
-    {
-        app.MapPost("/api/demo/create", async (DemoProjectService demoService) =>
-        {
-            try
-            {
-                var project = await demoService.CreateDemoProjectAsync();
-                return Results.Ok(project);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"创建演示工程失败: {ex.Message}");
-            }
-        });
-
-        app.MapPost("/api/demo/create-simple", async (DemoProjectService demoService) =>
-        {
-            try
-            {
-                var project = await demoService.CreateSimpleDemoProjectAsync();
-                return Results.Ok(project);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"创建简单演示工程失败: {ex.Message}");
-            }
-        });
-
-        app.MapGet("/api/demo/guide", (DemoProjectService demoService) =>
-        {
-            return Results.Ok(demoService.GetDemoGuide());
-        });
-
-        app.MapGet("/api/analysis/statistics/{projectId}", async (
-            Guid projectId,
-            DateTime? startTime,
-            DateTime? endTime,
-            string? status,
-            string? defectType,
-            Acme.Product.Application.Services.IResultAnalysisService analysisService) =>
-        {
-            return Results.Ok(await analysisService.GetStatisticsAsync(projectId, startTime, endTime, status, defectType));
-        });
-
-        app.MapGet("/api/analysis/defect-distribution/{projectId}", async (
-            Guid projectId,
-            DateTime? startTime,
-            DateTime? endTime,
-            string? status,
-            string? defectType,
-            Acme.Product.Application.Services.IResultAnalysisService analysisService) =>
-        {
-            return Results.Ok(await analysisService.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType));
-        });
-
-        app.MapGet("/api/analysis/trend/{projectId}", async (
-            Guid projectId,
-            string interval,
-            DateTime startTime,
-            DateTime endTime,
-            string? status,
-            string? defectType,
-            Acme.Product.Application.Services.IResultAnalysisService analysisService) =>
-        {
-            if (!Enum.TryParse<Acme.Product.Application.Services.TrendInterval>(interval, true, out var trendInterval))
-            {
-                return Results.BadRequest($"无效间隔: {interval}");
-            }
-
-            return Results.Ok(await analysisService.GetTrendAnalysisAsync(projectId, trendInterval, startTime, endTime, status, defectType));
-        });
-
-        app.MapGet("/api/analysis/report/{projectId}", async (
-            Guid projectId,
-            DateTime? startTime,
-            DateTime? endTime,
-            string? status,
-            string? defectType,
-            Acme.Product.Application.Services.IResultAnalysisService analysisService) =>
-        {
-            return Results.Ok(await analysisService.GenerateReportAsync(projectId, startTime, endTime, status, defectType));
-        });
     }
 
     static async Task StopWebServer()

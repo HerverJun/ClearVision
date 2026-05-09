@@ -14,23 +14,23 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- CQRS 鏀寔 -->
+    <!-- CQRS 支持 -->
     <PackageReference Include="MediatR" />
     
-    <!-- 楠岃瘉 -->
+    <!-- 验证 -->
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     
-    <!-- 瀵硅薄鏄犲皠 -->
+    <!-- 对象映射 -->
     <PackageReference Include="AutoMapper" />
     
-    <!-- 渚濊禆娉ㄥ叆 -->
+    <!-- 依赖注入 -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     
-    <!-- 鏃ュ織 -->
+    <!-- 日志 -->
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     
-    <!-- 缂撳瓨 -->
+    <!-- 缓存 -->
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="TypeGen" />
   </ItemGroup>

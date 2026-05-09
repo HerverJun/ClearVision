@@ -127,7 +127,7 @@ public class ImageAcquisitionOperator : OperatorBase
                     var sharedMat = Cv2.ImDecode(sharedFrame.ImageData, ImreadModes.Color);
                     if (sharedMat.Empty())
                     {
-                        return OperatorExecutionOutput.Failure("鐩告満杩斿洖鐨勫浘鍍忔暟鎹棤鏁?");
+                        return OperatorExecutionOutput.Failure("Camera returned invalid image data.");
                     }
 
                     return OperatorExecutionOutput.Success(CreateImageOutput(sharedMat, new Dictionary<string, object>

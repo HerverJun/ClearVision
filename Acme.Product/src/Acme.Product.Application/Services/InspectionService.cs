@@ -512,7 +512,7 @@ public class InspectionService : IInspectionService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[InspectionService] 妫€娴嬪紓甯? {ErrorMessage}", ex.Message);
+            _logger.LogError(ex, "[InspectionService] 检测异常: {ErrorMessage}", ex.Message);
             result.MarkAsError(ex.Message);
             await _resultRepository.AddAsync(result);
             return result;
@@ -527,7 +527,7 @@ public class InspectionService : IInspectionService
 
             if (string.IsNullOrEmpty(imageDto.DataBase64))
             {
-                throw new Exception($"鐩告満 {cameraId} 閲囬泦鐨勫浘鍍忔暟鎹负绌?");
+                throw new Exception($"相机 {cameraId} 采集的图像数据为空");
             }
 
             var imageData = Convert.FromBase64String(imageDto.DataBase64);
@@ -536,7 +536,7 @@ public class InspectionService : IInspectionService
         catch (Exception ex)
         {
             var result = new InspectionResult(projectId);
-            result.MarkAsError($"鐩告満閲囬泦鎴栨娴嬪け璐? {ex.Message}");
+            result.MarkAsError($"相机采集或检测失败: {ex.Message}");
             await _resultRepository.AddAsync(result);
             return result;
         }
@@ -547,7 +547,7 @@ public class InspectionService : IInspectionService
         if (HasExecutableFlow(flow))
         {
             _logger.LogInformation(
-                "[InspectionService] 浣跨敤鍓嶇鎻愪緵鐨勬祦绋嬫暟鎹墽琛屾娴? (绠楀瓙鏁? {OperatorCount})",
+                "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
                 flow!.Operators.Count);
             return flow;
         }
@@ -567,7 +567,7 @@ public class InspectionService : IInspectionService
         if (HasExecutableFlow(fileFlow))
         {
             _logger.LogWarning(
-                "[InspectionService] 椤圭洰 {ProjectId} 鏁版嵁搴撴祦绋嬩负绌猴紝宸插洖閫€鍒?ProjectFlows 鏂囦欢娴? (绠楀瓙鏁? {OperatorCount})",
+                "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
                 projectId,
                 fileFlow!.Operators.Count);
             return fileFlow!;
@@ -594,7 +594,7 @@ public class InspectionService : IInspectionService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[InspectionService] 鍔犺浇椤圭洰娴佺▼鏂囦欢澶辫触: {ProjectId}", projectId);
+            _logger.LogWarning(ex, "[InspectionService] 加载项目流程文件失败: {ProjectId}", projectId);
         }
 
         return null;

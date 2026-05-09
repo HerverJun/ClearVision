@@ -11,7 +11,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Acme.Product.Runtime.Abstractions\Acme.Product.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\Acme.Product.Application\Acme.Product.Application.csproj" />
-    <ProjectReference Include="..\Acme.Product.Infrastructure\Acme.Product.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

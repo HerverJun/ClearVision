@@ -1,6 +1,6 @@
-// FeatureMatchOperatorBase.cs
-// 妯℃澘缂撳瓨缁撴瀯
-// 浣滆€咃細铇呰姕鍚?
+﻿// FeatureMatchOperatorBase.cs
+// Shared feature matching infrastructure.
+// Author: ClearVision Team
 using System.Security.Cryptography;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -11,7 +11,7 @@ using OpenCvSharp;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 鐗瑰緛鍖归厤绠楀瓙鍩虹被 - 鏀寔AKAZE鍜孫RB
+/// Shared feature matching base for AKAZE/ORB style operators.
 /// </summary>
 public abstract class FeatureMatchOperatorBase : OperatorBase
 {
@@ -62,48 +62,45 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     }
 
     /// <summary>
-    /// 浣跨敤瀵圭О娴嬭瘯鍖归厤鎻忚堪绗?    /// </summary>
+    /// Performs a symmetry-checked descriptor match.
+    /// </summary>
     protected List<DMatch> MatchWithSymmetryTest(Mat templateDesc, Mat sceneDesc, double matchRatio = 0.75)
     {
         using var matcher = new BFMatcher(NormTypes.Hamming, crossCheck: false);
 
-        // 姝ｅ悜鍖归厤
         var forwardMatches = matcher.KnnMatch(templateDesc, sceneDesc, k: 2);
-        // 鍙嶅悜鍖归厤
         var backwardMatches = matcher.KnnMatch(sceneDesc, templateDesc, k: 2);
 
-        // 鏋勫缓鍙嶅悜鏈€浣冲尮閰嶅瓧鍏?
         var backwardBest = new Dictionary<int, int>();
-        foreach (var m in backwardMatches)
+        foreach (var match in backwardMatches)
         {
-            if (m.Length >= 2 && m[0].Distance < matchRatio * m[1].Distance)
+            if (match.Length >= 2 && match[0].Distance < matchRatio * match[1].Distance)
             {
-                backwardBest[m[0].QueryIdx] = m[0].TrainIdx;
+                backwardBest[match[0].QueryIdx] = match[0].TrainIdx;
             }
-            else if (m.Length == 1)
+            else if (match.Length == 1)
             {
-                backwardBest[m[0].QueryIdx] = m[0].TrainIdx;
+                backwardBest[match[0].QueryIdx] = match[0].TrainIdx;
             }
         }
 
-        // 瀵圭О娴嬭瘯绛涢€?
         var goodMatches = new List<DMatch>();
-        foreach (var m in forwardMatches)
+        foreach (var match in forwardMatches)
         {
-            if (m.Length < 2) continue;
-            if (m[0].Distance >= matchRatio * m[1].Distance) continue;
+            if (match.Length < 2) continue;
+            if (match[0].Distance >= matchRatio * match[1].Distance) continue;
 
-            if (backwardBest.TryGetValue(m[0].TrainIdx, out var reverseTemplateIdx) && reverseTemplateIdx == m[0].QueryIdx)
+            if (backwardBest.TryGetValue(match[0].TrainIdx, out var reverseTemplateIdx) &&
+                reverseTemplateIdx == match[0].QueryIdx)
             {
-                goodMatches.Add(m[0]);
+                goodMatches.Add(match[0]);
             }
         }
 
         return goodMatches;
     }
-
     /// <summary>
-    /// 璁＄畻鍗曞簲鎬х煩闃?
+    /// Computes a homography from accepted feature matches.
     /// </summary>
     protected (Mat? Homography, int Inliers) ComputeHomography(
         KeyPoint[] templateKeyPoints,
@@ -181,7 +178,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     }
 
     /// <summary>
-    /// 缁樺埗閫忚妗?
+    /// Draws the perspective-transformed template box.
     /// </summary>
     protected void DrawPerspectiveBox(Mat image, Mat homography, int templateWidth, int templateHeight, Scalar color)
     {
@@ -205,8 +202,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     }
 
     /// <summary>
-    /// 鑾峰彇鎴栧姞杞芥ā鏉?
-    /// </summary>
+    /// Gets or loads a template feature cache entry.
+    /// Gets or loads a template feature cache entry.
     protected (Mat Template, KeyPoint[] KeyPoints, Mat Descriptors)? GetOrLoadTemplate(
         string templatePath,
         string cacheDiscriminator,
@@ -223,12 +220,12 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
             return cached;
         }
 
-        // 鍔犺浇妯℃澘
+        // Load template image.
         using var template = Cv2.ImRead(templatePath, ImreadModes.Color);
         if (template.Empty())
             return null;
 
-        // 杞崲涓虹伆搴﹀苟妫€娴嬬壒寰?
+        // Convert to grayscale before feature extraction.
         using var gray = new Mat();
         if (template.Channels() > 1)
             Cv2.CvtColor(template, gray, ColorConversionCodes.BGR2GRAY);
@@ -256,7 +253,7 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     }
 
     /// <summary>
-    /// 杩囨护鐗瑰緛鐐瑰拰鎻忚堪绗﹀埌鏈€澶ф暟閲?
+    /// Filters keypoints and descriptors down to the configured maximum.
     /// </summary>
     protected (KeyPoint[] FilteredKeyPoints, Mat FilteredDescriptors) FilterFeatures(
         KeyPoint[] keyPoints, Mat descriptors, int maxFeatures)
@@ -264,7 +261,6 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         if (keyPoints.Length <= maxFeatures)
             return (keyPoints, descriptors.Clone());
 
-        // 鎸夊搷搴斿€兼帓搴?
         var indices = Enumerable.Range(0, keyPoints.Length)
             .OrderByDescending(i => keyPoints[i].Response)
             .Take(maxFeatures)
@@ -286,8 +282,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
     }
 
     /// <summary>
-    /// 妯℃澘缂撳瓨缁撴瀯
-    /// </summary>
+    /// Cached template feature data.
+    /// Cached template feature data.
     protected class TemplateCacheEntry
     {
         public required Mat Template { get; set; }

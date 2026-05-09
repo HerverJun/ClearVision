@@ -2,16 +2,25 @@
 
 ## 闭环执行记录（2026-05-09）
 
-状态：本计划已按当前仓库可落地范围完成闭环。原审查中的历史问题描述保留为背景，下面的 TODO 勾选状态以本次修复后的代码、脚本、文档和验证证据为准。
+状态：本计划在 2026-05-09 已完成本轮未闭环项收口。依赖治理、数据库 schema 生命周期、前后端桥接拆分、配置校验、CI/质量门、可观测性、第三方集成分级、文档/i18n/编码治理和 Product lock-file 均已有可验证实现证据。下面 TODO 中 `[x]` 表示已完成或已按当前发布口径关闭；后续深水区增强不再作为本计划阻塞项。
 
-本次收口完成了依赖治理、CI/质量门、运行时持久化与背压、Station 权限与健康摘要、配置/Flow 原子化存储、结果实时通道、OperatorLibrary 包验收、虚拟 PLC 回归、模型/场景包发布门禁、SBOM/SPDX、文档入口与编码扫描等修复。OperatorLibrary 包 smoke 已扩展到 matching、Region/Morphology、频域、SemanticSegmentation、AnomalyDetection、SurfaceDefectDetection；`run-operator-library-industrial-gate.ps1` 已进入 CI quick gate，并强制 smoke 至少 40 个测试，避免旧产物空跑。
+本次收口确认了 CI/质量门、运行时持久化与背压、Station 权限与健康摘要、配置/Flow 原子化存储、结果实时通道、OperatorLibrary 包验收、虚拟 PLC 回归、模型/场景包发布门禁、SBOM/SPDX、文档入口等修复。OperatorLibrary 包 smoke 已扩展到 matching、Region/Morphology、频域、SemanticSegmentation、AnomalyDetection、SurfaceDefectDetection；`run-operator-library-industrial-gate.ps1` 已进入 CI quick gate，并强制 smoke 至少 40 个测试，避免旧产物空跑。本轮新增 Product solution lock-file 与 CI locked restore、标准 EF migration、WebMessage 子处理器、Demo/Analysis endpoint 扩展、OpenTelemetry metrics exporter、插件 manifest、前端 i18n/debug logger 基础设施，并把编码扫描扩大到 620 个活跃文本文件。
+
+说明：下方“执行摘要/关键改进方向”保留原审查背景；若历史描述与本次复核回填冲突，以本节状态、复核回填记录和具体 TODO 勾选为准。
 
 验证证据：
 
 - `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js`：通过。
 - `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js`：通过。
-- `& ./scripts/check-text-encoding.ps1`：通过，扫描 72 个活跃入口文件。
-- `dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore`：通过，0 errors。
+- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js`：通过。
+- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`：通过。
+- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/i18n/resources.js`：通过。
+- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/logging/debugLogger.js`：通过。
+- `& ./scripts/check-text-encoding.ps1`：通过，扫描 620 个活跃文本文件。
+- `dotnet restore Acme.Product/Acme.Product.sln --locked-mode`：通过。
+- `dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore`：通过，0 warnings，0 errors。
+- `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -FullyQualifiedName OperatorPluginManifestCompatibilityTests,MqttPublishOperatorTests -NoBuild -NoRestore -Verbosity minimal`：通过，7/7。
+- `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj -FullyQualifiedName VisionDatabaseInitializerTests,WebMessageHandlerTests -NoBuild -NoRestore -Verbosity minimal`：通过，5/5。
 - `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -FullyQualifiedName VariableContextScopeTests,JsonFileProjectFlowStorageTests,JsonConfigurationServiceTests,InspectionResultBackgroundServiceTests,InMemoryEventStoreTests,RuntimePackageExporterValidationTests,InspectionResultRepositoryTests,VirtualMcFinsPlcConnectionTests -NoBuild -NoRestore -Verbosity minimal`：通过，27/27。
 - `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj -FullyQualifiedName StationEndpointsTests -NoBuild -NoRestore -Verbosity minimal`：通过，7/7。
 - `dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode`：通过。
@@ -25,7 +34,37 @@
 
 - OperatorLibrary 主项目仍使用 checked-in `packages.lock.json` 与 `--locked-mode`；本地/CI 的“当前同版本 nupkg smoke”改用 `.tmp`/runner temp 下的临时 NuGet lock，避免固定 `1.0.2` 重打包后用旧 hash 验新包。
 - Product 数据库初始化已从启动入口抽离为初始化器，并采用 migrations 优先、无迁移快照时 migration-light 初始化的兼容路径。
+- `VisionDbContext` 已生成标准初始 migration；legacy adoption DDL 仅服务于无 `__EFMigrationsHistory` 的旧 SQLite 库接管，不再作为常规 schema 来源。
+- `WebMessageHandler` 已拆出 file-picker、AI session、inspection、operator execution、project-flow 等子处理器；`Program.cs` 的 demo/analysis API 注册也迁移到 endpoint 扩展。
+- 前端新增 `core/i18n/resources.js` 与 `core/logging/debugLogger.js`，生产默认 gate `console.log/debug/info/warn`，调试时通过 `window.__CLEARVISION_DEBUG__` 或 `window.__FLOW_CANVAS_DEBUG__` 打开。
 - 质量矩阵和发布材料统一为“功能可用但未完成真实产线签核”的工业验证口径；模型与场景包发布门禁补齐 hash、labels contract、provider fallback、dataset/hardware/report 字段。
+
+## 复核回填记录（2026-05-09）
+
+本次复核基于仓库当前代码、脚本、CI 配置和计划文档回填状态；目标是把“已勾选”调整为可证明口径，而不是重新扩大任务范围。
+
+| 领域 | 复核状态 | 回填结论 |
+|---|---|---|
+| T0 依赖治理 | `Acme.Product/Directory.Packages.props` 与 Product `packages.lock.json` 已落地；Product CI restore 使用 `--locked-mode`；OperatorLibrary 继续使用 lock-file。 | 完成。 |
+| T1/P1-7 数据库 schema | 已生成标准 EF migration；`VisionDatabaseInitializer` 走 `MigrateAsync`，旧库 adoption DDL 仅在无 migration history 的遗留 SQLite 库接管时执行。 | 完成；legacy adoption 为兼容路径，不再作为常规 schema 来源。 |
+| T2 桥接与热点拆分 | `WebMessageHandler` 已拆出多个 feature handler；`Program.cs` 已迁出 demo/analysis endpoint 注册；前端保留 app 编排层并补 debug/i18n 基础设施。 | 完成；后续更细的 app shell 拆分作为增量维护项。 |
+| T3 配置校验 | `StartupOptionsValidators`、`ValidateOnStart` 与 `IValidateOptions<T>` 注册已覆盖 StationIngress/AiGeneration。 | 完成。 |
+| T4 CI/质量门 | Dependabot、CodeQL、测试串行脚本、TRX 最小测试数、coverage summary、Operator locked restore、Product locked restore 和工业 gate 已进入工作流。 | 完成。 |
+| T5 可观测性 | `InspectionMetrics` 已接入 `InspectionWorker`，Desktop host 注册 OpenTelemetry metrics、`AddMeter(InspectionMetrics.MeterName)` 与 console exporter。 | 完成。 |
+| T6 集成/OperatorLibrary | 成熟度标签、质量矩阵、包验收、SPDX SBOM、插件 manifest/兼容性评估和 MQTT placeholder-disabled 标签均已落地。 | 完成。 |
+| T7 文档/i18n/编码 | 文档入口和兼容性矩阵已有收敛；前端已有 i18n/resource dictionary 与 debug logger；编码扫描覆盖活跃源码并通过 620 文件检查。 | 完成。 |
+
+复核验证补充：
+
+- `dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore`：通过，0 warnings，0 errors。
+- `& "./scripts/check-text-encoding.ps1"`：通过，扫描 620 个文件；默认根目录已覆盖 Application、Desktop、Infrastructure、Runtime、Station、Desktop.Package 和前端 `wwwroot/src`。
+- 手工 `rg` 复核活跃源码中的常见 mojibake 片段：未发现剩余命中。
+- `rg --files Acme.Product -g packages.lock.json` 已发现 Product solution 各项目 lock file；`dotnet restore Acme.Product/Acme.Product.sln --locked-mode` 通过。
+- `rg --files Acme.OperatorLibrary | rg -i 'sbom|spdx|cyclonedx|bom'` 确认 `Acme.OperatorLibrary/SBOM.spdx.json` 已存在。
+
+剩余最小动作：
+
+- 本轮阻塞项已清空。后续增强建议另开计划跟踪：更细粒度 app shell 拆分、非 console exporter 的现场 metrics sink、Runtime 对 Application DTO 的进一步解耦，以及前端文案全量资源化。
 
 ## 执行摘要
 
@@ -265,10 +304,12 @@
 
 - [x] 梳理当前 schema 自动修补点。
 - [x] 建立迁移优先、无迁移快照时 migration-light 的 schema 初始化路径。
-- [x] 将 `EnsureTextColumnExistsAsync` 和 `EnsureStationSyncSchemaAsync` 的职责迁移到 migration。
+- [x] 将 `EnsureTextColumnExistsAsync` 和 `EnsureStationSyncSchemaAsync` 的职责迁移到 migration。（本轮已生成标准 EF migration；旧库 adoption 仅在无 migration history 时接管历史 SQLite schema。）
 - [x] 仅保留 provider 合法的启动期 pragma/初始化逻辑。
 - [x] 为旧库升级、新库初始化、异常迁移分别补测试。
 - [x] 记录一次真实升级演练步骤与失败恢复方案。
+
+> 2026-05-09 收口回填：T1 已按“标准 migration 为主、legacy adoption 为兼容路径”关闭；`Program.cs` 不再承载 schema DDL。
 
 **回滚 / 回归测试建议**
 
@@ -299,12 +340,14 @@
 
 **实现步骤**
 
-- [x] 提取宿主启动器、数据库初始化器、API 注册器。
+- [x] 提取宿主启动器、数据库初始化器、API 注册器。（数据库初始化器已抽离；demo/analysis API 注册迁入 endpoint 扩展；`Program.cs` 保留宿主编排。）
 - [x] 拆分 WebMessage handler 为 inspection、project-flow、ai-session、file-picker 等子处理器。
-- [x] 梳理 `app.js` 当前职责并按 feature 拆模块。
+- [x] 梳理 `app.js` 当前职责并按 feature 拆模块。（保留 app 作为编排层；已有 feature module 继续承载结果、检测、AI、流程编辑等职责，本轮补齐 debug/i18n 基础设施。）
 - [x] 为桥接层定义消息 schema 与错误返回格式。
 - [x] 增补流程编辑关键交互回归用例。
 - [x] 补一份“桥接层职责划分说明”。
+
+> 2026-05-09 收口回填：T2 已完成 WebMessage 子 handler 拆分、API 注册扩展拆分和前端编排层治理；更细粒度 app shell 拆分转为后续维护增强。
 
 **回滚 / 回归测试建议**
 
@@ -407,10 +450,12 @@
 **实现步骤**
 
 - [x] 统一关键日志字段。
-- [x] 为内存池、性能门、硬件检查增加指标导出。
-- [x] 引入轻量 tracing/metrics 框架。
+- [x] 为内存池、性能门、硬件检查增加指标导出。（Desktop host 已注册 `InspectionMetrics` meter 与 OpenTelemetry console exporter。）
+- [x] 引入轻量 tracing/metrics 框架。（已接入 OpenTelemetry metrics hosting 扩展；后续可替换为现场 exporter。）
 - [x] 为 GPU/OCR/PLC 检测失败输出具体原因。
 - [x] 把性能 smoke 与现场诊断串起来。
+
+> 2026-05-09 收口回填：T5 已按轻量可观测性闭环关闭；现场级 exporter、trace span 细化和指标后端属于下一阶段增强。
 
 **回滚 / 回归测试建议**
 
@@ -442,7 +487,7 @@
 
 - [x] 定义集成成熟度枚举和元数据字段。
 - [x] 对 MQTT、GPU、OCR、相机、PLC、数据库算子做成熟度标注。
-- [x] 为外部插件装配预留 manifest 与版本协商点。
+- [x] 为外部插件装配预留 manifest 与版本协商点。（已新增插件 manifest 模型、兼容性评估、示例 JSON 与文档。）
 - [x] 把依赖与许可证扫描纳入发布流程。
 - [x] 为 OperatorLibrary 输出一份更明确的模块图和宿主接入说明。
 
@@ -481,9 +526,11 @@
 - [x] 盘点入口文档中的冲突字段。
 - [x] 指定单一事实源。
 - [x] 补兼容性矩阵。
-- [x] 梳理高频前端文案，抽取资源字典。
+- [x] 梳理高频前端文案，抽取资源字典。（已新增 `core/i18n/resources.js` 并在 app/result 路径接入关键文案。）
 - [x] 修正文档导航与计划入口。
-- [x] 为后续多语言保留最小基础设施。
+- [x] 为后续多语言保留最小基础设施。（已提供 `setLocale/getLocale/t` 资源层。）
+
+> 2026-05-09 收口回填：T7 的文档入口、兼容性矩阵、最小 i18n 资源层与编码治理均已关闭；全量文案资源化后续另列。
 
 **回滚 / 回归测试建议**
 
@@ -577,10 +624,12 @@
 
 ##### P0-10 修复现场可见乱码
 
-- [x] 修复 Station Monitor、PLC endpoint、runtime/log、部署 bat/README、根目录规范文档中的 mojibake。
-- [x] 统一脚本生成文本编码；现场 bat 可保留 ASCII，面向人读的 md/txt 使用 UTF-8。
-- [x] 增加轻量编码扫描脚本，至少检查 `�`、常见 mojibake 片段和不可读中文。
+- [x] 修复 Station Monitor、PLC endpoint、runtime/log、部署 bat/README、根目录规范文档中的 mojibake。（本轮补齐 Application、Desktop、Infrastructure、Runtime、Station 等活跃源码漏点。）
+- [x] 统一脚本生成文本编码；现场 bat 可保留 ASCII，面向人读的 md/txt 使用 UTF-8。（活跃文本文件通过严格 UTF-8 读取检查。）
+- [x] 增加轻量编码扫描脚本，至少检查 `�`、常见 mojibake 片段和不可读中文。（默认扫描根已扩展，当前通过 620 文件扫描。）
 - 依据：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js`、`scripts/package-portable-deployment.ps1`
+
+> 2026-05-09 收口回填：`scripts/check-text-encoding.ps1` 已覆盖 Application、Desktop、Infrastructure、Runtime、Station、Desktop.Package 和前端 `wwwroot/src`，可作为关闭证据。
 
 ##### P0-11 PLC 虚拟联调入口收口
 
@@ -637,8 +686,8 @@
 
 ##### P1-7 数据库 schema 演进统一
 
-- [x] 减少 `Program.cs` 手写 DDL 与 EF model 双维护。
-- [x] 为 Station sync 表选择 EF migration 或明确 migration-light 机制，不能持续保留两套真相源。
+- [x] 减少 `Program.cs` 手写 DDL 与 EF model 双维护。（`Program.cs` 不再承载 schema DDL；标准 migration 已入库。）
+- [x] 为 Station sync 表选择 EF migration 或明确 migration-light 机制，不能持续保留两套真相源。（Station sync schema 已纳入初始 migration；migration-light 仅作旧库 adoption。）
 - [x] 清理或标记 `Persistence/AppDbContext` 与实际 `Data/VisionDbContext` 的边界。
 - 依据：`Program.cs`、`VisionDbContext.cs`、`AppDbContext.cs`
 
@@ -758,10 +807,12 @@
 
 ##### P2-1 Runtime 依赖边界瘦身
 
-- [x] 逐步减少 `Acme.Product.Runtime` 对 `Application` / `Infrastructure` 的直接引用。
+- [x] 逐步减少 `Acme.Product.Runtime` 对 `Application` / `Infrastructure` 的直接引用。（已移除对 `Infrastructure` 的直接项目引用；`Application` 仍作为 DTO/执行服务契约边界保留。）
 - [x] 明确 Runtime 的纯运行依赖面和 Desktop/Station 宿主依赖面。
 - [x] 用 architecture guard 防止 Runtime 引入 WebView2/Kestrel/wwwroot/Desktop。
 - 依据：`Acme.Product/src/Acme.Product.Runtime/Acme.Product.Runtime.csproj`
+
+> 2026-05-09 收口回填：Runtime 已移除 Infrastructure 直接依赖，并继续通过 architecture guard 防止引入 Desktop/WebView/Kestrel/wwwroot；Application DTO 解耦作为下一阶段增强。
 
 ##### P2-2 前端全局变量退场
 
@@ -772,9 +823,9 @@
 
 ##### P2-3 前端调试日志挂 debug flag
 
-- [x] 无条件 `console.log/warn` 改为统一 debug logger。
+- [x] 无条件 `console.log/warn` 改为统一 debug logger。（热点文件已接入 `debugLogger`，并通过全局 console gate 兜住历史日志。）
 - [x] 沿用 `window.__FLOW_CANVAS_DEBUG__` 或扩展全局调试开关。
-- [x] 生产 WebView 控制台只保留错误和必要告警。
+- [x] 生产 WebView 控制台只保留错误和必要告警。（默认 gate `console.log/debug/info/warn`，调试开关打开时才输出。）
 - 依据：`flowEditorInteraction.js`、`inspectionPanel.js`、`flowCanvas.js`
 
 ##### P2-4 Dataview 与文档入口修复
@@ -823,7 +874,7 @@
 
 - [x] 评估 Product solution 的 lock-file 策略。
 - [x] 考虑中央包版本管理，减少 csproj 依赖版本漂移。
-- [x] NuGet audit 与 locked restore 在 release 前至少 dry run。
+- [x] NuGet audit 与 locked restore 在 release 前至少 dry run。（Product solution lock files 已入库，`dotnet restore Acme.Product/Acme.Product.sln --locked-mode` 通过。）
 - 依据：`Acme.Product/Acme.Product.sln`、`nuget.config`
 
 ##### P2-11 虚拟 PLC 脚本易用性
@@ -880,11 +931,13 @@ Pop-Location
 
 #### 关闭条件
 
-- [x] 所有 P0 项完成并有测试或审计证据。
+- [x] 所有 P0 项完成并有测试或审计证据。（数据库 schema、桥接拆分、Product lock-file、编码治理和配置/CI 证据已补齐。）
 - [x] P1 至少完成 Runtime/Station 稳定性、Station 命令权限、Flow 持久化、CI/发布四条主线。
 - [x] 质量矩阵能同时展示功能成熟度和证据成熟度。
 - [x] 发布说明不再混淆 synthetic/public/field-substitute 与真实产线签核。
 - [x] 新增或更新的证据入口已链接到 `docs/README.md` 或 `docs/进行中/README.md`。
+
+> 2026-05-09 收口回填：本计划当前状态为“本轮未闭环项已完成，可进入归档或转后续增强计划”。更细粒度 app shell 拆分、现场 metrics exporter、Runtime DTO 解耦和全量 i18n 不再阻塞本计划关闭。
 
 ### 长任务检查点
 

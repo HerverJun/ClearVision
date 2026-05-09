@@ -12,7 +12,7 @@
     <UseWPF>false</UseWPF>
     <UseWinUI>false</UseWinUI>
     
-    <!-- MSIX 鎵撳寘閰嶇疆 -->
+    <!-- MSIX packaging -->
     <PublishProfile>Properties\PublishProfiles\MSIX.pubxml</PublishProfile>
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
@@ -20,13 +20,13 @@
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     
-    <!-- 搴旂敤淇℃伅 -->
+    <!-- Application metadata -->
     <ApplicationTitle>ClearVision</ApplicationTitle>
-    <ApplicationDescription>宸ヤ笟瑙嗚妫€娴嬭蒋浠?- 鍩轰簬.NET 8鍜學ebView2鐨勭幇浠ｆ闈㈠簲鐢?/ApplicationDescription>
+    <ApplicationDescription>Industrial vision inspection software based on .NET 8 and WebView2.</ApplicationDescription>
     <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     
-    <!-- 鍙戝竷閰嶇疆 -->
+    <!-- Publish configuration -->
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
@@ -36,14 +36,14 @@
     <ProjectReference Include="..\Acme.Product.Desktop\Acme.Product.Desktop.csproj" />
   </ItemGroup>
 
-  <!-- MSIX 娓呭崟鏂囦欢 -->
+  <!-- MSIX manifest -->
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
   </ItemGroup>
 
-  <!-- 璧勬簮鏂囦欢 -->
+  <!-- Asset files -->
   <ItemGroup>
     <Content Include="Images\*.png" />
     <Content Include="Images\*.jpg" />

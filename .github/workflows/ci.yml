@@ -68,9 +68,9 @@ jobs:
       - name: Restore Dependencies
         shell: pwsh
         run: |
-          dotnet restore $env:SOLUTION_PATH
-          dotnet restore $env:PRODUCT_TEST_PROJECT
-          dotnet restore $env:DESKTOP_TEST_PROJECT
+          dotnet restore $env:SOLUTION_PATH --locked-mode
+          dotnet restore $env:PRODUCT_TEST_PROJECT --locked-mode
+          dotnet restore $env:DESKTOP_TEST_PROJECT --locked-mode
 
       - name: Generate Operator Catalog
         run: dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
@@ -320,7 +320,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config', '**/packages.lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 

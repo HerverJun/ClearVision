@@ -1,4 +1,4 @@
-// WebMessageHandler.cs
+﻿// WebMessageHandler.cs
 // 发送事件到前端
 // 作者：蘅芜君
 
@@ -33,12 +33,17 @@ namespace Acme.Product.Desktop.Handlers;
 /// <summary>
 /// WebView2 消息处理器
 /// </summary>
-public class WebMessageHandler : IDisposable
+public class WebMessageHandler : IWebMessageClient, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOperatorFactory _operatorFactory;
     private readonly IInspectionEventBus _eventBus;
     private readonly ILogger<WebMessageHandler> _logger;
+    private readonly OperatorExecutionMessageHandler _operatorExecutionHandler;
+    private readonly ProjectFlowMessageHandler _projectFlowHandler;
+    private readonly InspectionMessageHandler _inspectionHandler;
+    private readonly FilePickerMessageHandler _filePickerHandler;
+    private readonly AiSessionMessageHandler _aiSessionHandler;
     private WebView2? _webViewControl;
     private CoreWebView2? _webView;
     private int _disposeState;
@@ -61,12 +66,32 @@ public class WebMessageHandler : IDisposable
         IServiceScopeFactory scopeFactory,
         IOperatorFactory operatorFactory,
         IInspectionEventBus eventBus,
-        ILogger<WebMessageHandler> logger)
+        ILogger<WebMessageHandler> logger,
+        ILoggerFactory loggerFactory)
     {
         _scopeFactory = scopeFactory;
         _operatorFactory = operatorFactory;
         _eventBus = eventBus;
         _logger = logger;
+        _operatorExecutionHandler = new OperatorExecutionMessageHandler(
+            scopeFactory,
+            this,
+            loggerFactory.CreateLogger<OperatorExecutionMessageHandler>());
+        _projectFlowHandler = new ProjectFlowMessageHandler(
+            scopeFactory,
+            operatorFactory,
+            loggerFactory.CreateLogger<ProjectFlowMessageHandler>());
+        _inspectionHandler = new InspectionMessageHandler(
+            scopeFactory,
+            this,
+            loggerFactory.CreateLogger<InspectionMessageHandler>());
+        _filePickerHandler = new FilePickerMessageHandler(
+            this,
+            loggerFactory.CreateLogger<FilePickerMessageHandler>());
+        _aiSessionHandler = new AiSessionMessageHandler(
+            scopeFactory,
+            this,
+            loggerFactory.CreateLogger<AiSessionMessageHandler>());
     }
 
     /// <summary>
@@ -83,19 +108,19 @@ public class WebMessageHandler : IDisposable
             switch (message.Type)
             {
                 case nameof(ExecuteOperatorCommand):
-                    await HandleExecuteOperatorCommand(messageJson);
+                    await _operatorExecutionHandler.HandleAsync(messageJson);
                     break;
                 case nameof(UpdateFlowCommand):
-                    await HandleUpdateFlowCommand(messageJson);
+                    await _projectFlowHandler.HandleUpdateFlowAsync(messageJson);
                     break;
                 case nameof(StartInspectionCommand):
-                    await HandleStartInspectionCommand(messageJson);
+                    await _inspectionHandler.HandleStartAsync(messageJson);
                     break;
                 case nameof(StopInspectionCommand):
-                    await HandleStopInspectionCommand();
+                    await _inspectionHandler.HandleStopAsync();
                     break;
                 case nameof(PickFileCommand):
-                    await HandlePickFileCommand(messageJson);
+                    await _filePickerHandler.HandleAsync(messageJson);
                     break;
                 default:
                     return new WebMessageResponse { RequestId = message.Id, Success = false, Error = "未知消息类型" };
@@ -215,35 +240,35 @@ public class WebMessageHandler : IDisposable
             switch (messageType)
             {
                 case nameof(ExecuteOperatorCommand):
-                    await HandleExecuteOperatorCommand(messageJson);
+                    await _operatorExecutionHandler.HandleAsync(messageJson);
                     break;
 
                 case nameof(UpdateFlowCommand):
-                    await HandleUpdateFlowCommand(messageJson);
+                    await _projectFlowHandler.HandleUpdateFlowAsync(messageJson);
                     break;
 
                 case nameof(StartInspectionCommand):
-                    await HandleStartInspectionCommand(messageJson);
+                    await _inspectionHandler.HandleStartAsync(messageJson);
                     break;
 
                 case nameof(StopInspectionCommand):
-                    await HandleStopInspectionCommand();
+                    await _inspectionHandler.HandleStopAsync();
                     break;
 
                 case nameof(PickFileCommand):
-                    await HandlePickFileCommand(messageJson);
+                    await _filePickerHandler.HandleAsync(messageJson);
                     break;
 
                 case "ListAiSessions":
-                    await HandleListAiSessionsCommand();
+                    await _aiSessionHandler.HandleListAsync();
                     break;
 
                 case "GetAiSession":
-                    await HandleGetAiSessionCommand(messageJson);
+                    await _aiSessionHandler.HandleGetAsync(messageJson);
                     break;
 
                 case "DeleteAiSession":
-                    await HandleDeleteAiSessionCommand(messageJson);
+                    await _aiSessionHandler.HandleDeleteAsync(messageJson);
                     break;
 
                 case "GenerateFlow":
@@ -273,129 +298,6 @@ public class WebMessageHandler : IDisposable
         }
     }
 
-    /// <summary>
-    /// 处理执行算子命令
-    /// </summary>
-    private async Task HandleExecuteOperatorCommand(string messageJson)
-    {
-        var command = JsonSerializer.Deserialize<ExecuteOperatorCommand>(messageJson, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (command == null)
-            return;
-
-        try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var flowService = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
-            var op = await ResolveOperatorAsync(scope.ServiceProvider, command.OperatorId);
-
-            var result = await flowService.ExecuteOperatorAsync(op, NormalizeDictionary(command.Inputs));
-
-            var eventData = new Contracts.Messages.OperatorExecutedEvent
-            {
-                OperatorId = command.OperatorId,
-                OperatorName = op.Name,
-                IsSuccess = result.IsSuccess,
-                OutputData = result.OutputData,
-                ExecutionTimeMs = result.ExecutionTimeMs,
-                ErrorMessage = result.ErrorMessage
-            };
-
-            SendEvent(eventData);
-        }
-        catch (Exception ex)
-        {
-            var eventData = new Contracts.Messages.OperatorExecutedEvent
-            {
-                OperatorId = command.OperatorId,
-                OperatorName = "Unknown",
-                IsSuccess = false,
-                ErrorMessage = ex.Message
-            };
-
-            SendEvent(eventData);
-        }
-    }
-
-    /// <summary>
-    /// 处理更新流程命令
-    /// </summary>
-    private async Task HandleUpdateFlowCommand(string messageJson)
-    {
-        var command = JsonSerializer.Deserialize<UpdateFlowCommand>(messageJson, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (command?.Flow == null)
-            return;
-
-        using var scope = _scopeFactory.CreateScope();
-        var projectService = scope.ServiceProvider.GetRequiredService<ProjectService>();
-        var updateRequest = BuildUpdateFlowRequest(command.Flow);
-
-        _logger.LogInformation(
-            "[WebMessageHandler] 流程更新请求: ProjectId={ProjectId}, OperatorCount={OperatorCount}, ConnectionCount={ConnectionCount}",
-            command.ProjectId,
-            updateRequest.Operators.Count,
-            updateRequest.Connections.Count);
-
-        await projectService.UpdateFlowAsync(command.ProjectId, updateRequest);
-
-        _logger.LogInformation("[WebMessageHandler] 流程已更新: {ProjectId}", command.ProjectId);
-    }
-
-    /// <summary>
-    /// 处理开始检测命令
-    /// </summary>
-    private async Task HandleStartInspectionCommand(string messageJson)
-    {
-        var command = JsonSerializer.Deserialize<StartInspectionCommand>(messageJson, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (command == null)
-            return;
-
-        try
-        {
-            // 创建 Scope
-            using var scope = _scopeFactory.CreateScope();
-            var inspectionService = scope.ServiceProvider.GetRequiredService<IInspectionService>();
-
-            byte[]? imageData = null;
-
-            if (!string.IsNullOrEmpty(command.ImageBase64))
-            {
-                imageData = Convert.FromBase64String(command.ImageBase64);
-            }
-
-            // 执行检测
-            var result = imageData != null
-                ? await inspectionService.ExecuteSingleAsync(command.ProjectId, imageData)
-                : await inspectionService.ExecuteSingleAsync(command.ProjectId, command.CameraId ?? "default");
-
-            NotifyInspectionResult(result, command.ProjectId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[WebMessageHandler] 检测失败");
-        }
-    }
-
-    /// <summary>
-    /// 处理停止检测命令
-    /// </summary>
-    private Task HandleStopInspectionCommand()
-    {
-        throw new NotSupportedException(
-            "StopInspectionCommand 已停用。请改用 /api/inspection/realtime/stop HTTP 接口以避免假成功。");
-    }
-
     private static string ExtractCommandJson(WebMessage message)
     {
         if (!string.IsNullOrWhiteSpace(message.Payload))
@@ -407,460 +309,6 @@ public class WebMessageHandler : IDisposable
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
-    }
-
-    private async Task<Operator> ResolveOperatorAsync(IServiceProvider serviceProvider, Guid operatorId)
-    {
-        var projectRepository = serviceProvider.GetRequiredService<IProjectRepository>();
-        var projectService = serviceProvider.GetRequiredService<ProjectService>();
-
-        foreach (var project in await projectRepository.GetAllAsync())
-        {
-            var projectDto = await projectService.GetByIdAsync(project.Id);
-            var operatorDto = projectDto?.Flow?.Operators?.FirstOrDefault(op => op.Id == operatorId);
-            if (operatorDto != null)
-            {
-                var flowDto = new OperatorFlowDto
-                {
-                    Name = projectDto?.Flow?.Name ?? "WebMessageFlow",
-                    Operators = new List<OperatorDto> { operatorDto }
-                };
-
-                return flowDto.ToEntity().Operators.Single();
-            }
-        }
-
-        var dbContext = serviceProvider.GetRequiredService<VisionDbContext>();
-        var databaseOperator = await dbContext.Operators
-            .Include(op => op.InputPorts)
-            .Include(op => op.OutputPorts)
-            .Include(op => op.Parameters)
-            .FirstOrDefaultAsync(op => op.Id == operatorId);
-
-        return databaseOperator
-            ?? throw new KeyNotFoundException($"未找到算子 {operatorId}");
-    }
-
-    private UpdateFlowRequest BuildUpdateFlowRequest(FlowData flowData)
-    {
-        var operators = flowData.Operators.Select(BuildOperatorDto).ToList();
-        var operatorsById = operators.ToDictionary(op => op.Id);
-        var connections = new List<OperatorConnectionDto>();
-
-        foreach (var connection in flowData.Connections)
-        {
-            if (!operatorsById.TryGetValue(connection.SourceOperatorId, out var sourceOperator))
-            {
-                throw new InvalidOperationException($"流程中不存在源算子 {connection.SourceOperatorId}");
-            }
-
-            if (!operatorsById.TryGetValue(connection.TargetOperatorId, out var targetOperator))
-            {
-                throw new InvalidOperationException($"流程中不存在目标算子 {connection.TargetOperatorId}");
-            }
-
-            var sourcePort = sourceOperator.OutputPorts.FirstOrDefault(port =>
-                string.Equals(port.Name, connection.SourcePort, StringComparison.OrdinalIgnoreCase));
-            if (sourcePort == null)
-            {
-                throw new InvalidOperationException(
-                    $"算子 {sourceOperator.Name} 上不存在输出端口 {connection.SourcePort}");
-            }
-
-            var targetPort = targetOperator.InputPorts.FirstOrDefault(port =>
-                string.Equals(port.Name, connection.TargetPort, StringComparison.OrdinalIgnoreCase));
-            if (targetPort == null)
-            {
-                throw new InvalidOperationException(
-                    $"算子 {targetOperator.Name} 上不存在输入端口 {connection.TargetPort}");
-            }
-
-            connections.Add(new OperatorConnectionDto
-            {
-                Id = Guid.NewGuid(),
-                SourceOperatorId = sourceOperator.Id,
-                SourcePortId = sourcePort.Id,
-                TargetOperatorId = targetOperator.Id,
-                TargetPortId = targetPort.Id
-            });
-        }
-
-        return new UpdateFlowRequest
-        {
-            Operators = operators,
-            Connections = connections
-        };
-    }
-
-    private OperatorDto BuildOperatorDto(OperatorData operatorData)
-    {
-        if (!Enum.TryParse<OperatorType>(operatorData.Type, true, out var parsedType))
-        {
-            throw new InvalidOperationException($"不支持的算子类型: {operatorData.Type}");
-        }
-
-        var operatorType = OperatorTypeAliasResolver.Resolve(parsedType);
-
-        var @operator = _operatorFactory.CreateOperator(
-            operatorType,
-            string.IsNullOrWhiteSpace(operatorData.Name) ? operatorType.ToString() : operatorData.Name,
-            operatorData.X,
-            operatorData.Y);
-
-        typeof(Operator).GetProperty(nameof(Operator.Id))?.SetValue(@operator, operatorData.Id);
-
-        if (operatorData.Parameters != null)
-        {
-            foreach (var (name, value) in operatorData.Parameters)
-            {
-                var normalizedName = NormalizeParameterName(operatorType, name);
-                var parameter = @operator.Parameters.FirstOrDefault(p =>
-                    string.Equals(p.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
-
-                if (parameter != null)
-                {
-                    parameter.SetValue(NormalizeJsonValue(value));
-                }
-            }
-        }
-
-        return new OperatorDto
-        {
-            Id = @operator.Id,
-            Name = @operator.Name,
-            Type = @operator.Type,
-            X = operatorData.X,
-            Y = operatorData.Y,
-            InputPorts = @operator.InputPorts.Select(port => new PortDto
-            {
-                Id = port.Id,
-                Name = port.Name,
-                Direction = port.Direction,
-                DataType = port.DataType,
-                IsRequired = port.IsRequired
-            }).ToList(),
-            OutputPorts = @operator.OutputPorts.Select(port => new PortDto
-            {
-                Id = port.Id,
-                Name = port.Name,
-                Direction = port.Direction,
-                DataType = port.DataType,
-                IsRequired = port.IsRequired
-            }).ToList(),
-            Parameters = @operator.Parameters.Select(parameter => new ParameterDto
-            {
-                Id = parameter.Id,
-                Name = parameter.Name,
-                DisplayName = parameter.DisplayName,
-                Description = parameter.Description,
-                DataType = parameter.DataType,
-                Value = parameter.Value,
-                DefaultValue = parameter.DefaultValue,
-                MinValue = parameter.MinValue,
-                MaxValue = parameter.MaxValue,
-                IsRequired = parameter.IsRequired,
-                Options = parameter.Options
-            }).ToList(),
-            IsEnabled = @operator.IsEnabled,
-            ExecutionStatus = @operator.ExecutionStatus,
-            ExecutionTimeMs = @operator.ExecutionTimeMs,
-            ErrorMessage = @operator.ErrorMessage
-        };
-    }
-
-    private static Dictionary<string, object>? NormalizeDictionary(Dictionary<string, object>? values)
-    {
-        if (values == null)
-        {
-            return null;
-        }
-
-        return values.ToDictionary(
-            item => item.Key,
-            item => NormalizeJsonValue(item.Value) ?? string.Empty,
-            StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static object? NormalizeJsonValue(object? value)
-    {
-        return value switch
-        {
-            JsonElement element => NormalizeJsonElement(element),
-            Dictionary<string, object> dictionary => NormalizeDictionary(dictionary),
-            IEnumerable<object> sequence => sequence.Select(NormalizeJsonValue).ToList(),
-            _ => value
-        };
-    }
-
-    private static object? NormalizeJsonElement(JsonElement element)
-    {
-        return element.ValueKind switch
-        {
-            JsonValueKind.Object => element.EnumerateObject()
-                .ToDictionary(property => property.Name, property => NormalizeJsonElement(property.Value) ?? string.Empty),
-            JsonValueKind.Array => element.EnumerateArray().Select(NormalizeJsonElement).ToList(),
-            JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number when element.TryGetInt64(out var longValue) => longValue,
-            JsonValueKind.Number when element.TryGetDouble(out var doubleValue) => doubleValue,
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Undefined => null,
-            _ => element.ToString()
-        };
-    }
-
-    private static string NormalizeParameterName(OperatorType operatorType, string parameterName)
-    {
-        if (operatorType == OperatorType.HistogramEqualization &&
-            string.Equals(parameterName, "TileSize", StringComparison.OrdinalIgnoreCase))
-        {
-            return "TileGridSize";
-        }
-
-        return parameterName;
-    }
-
-    /// <summary>
-    /// 处理选择文件命令
-    /// </summary>
-    private async Task HandlePickFileCommand(string messageJson)
-    {
-        try
-        {
-            var command = JsonSerializer.Deserialize<PickFileCommand>(messageJson, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (command == null)
-            {
-                _logger.LogWarning("[WebMessageHandler] 无法解析 PickFileCommand");
-                return;
-            }
-
-            // 【关键修复】在独立 STA 线程上显示文件对话框
-            // 原因：OpenFileDialog.ShowDialog() 运行模态消息循环，会劫持 UI 线程，
-            // 导致 WebView2 所需的 COM/IPC 消息无法泵送。WebView2 浏览器进程
-            // 检测到宿主长时间无响应后会终止连接，引发崩溃。
-            // 解决方案：在独立 STA 线程运行对话框，UI 线程完全不被阻塞。
-            var (filePath, isCancelled) = await ShowFileDialogOnNewThreadAsync(command);
-
-            var eventData = new FilePickedEvent
-            {
-                ParameterName = command.ParameterName,
-                FilePath = filePath,
-                IsCancelled = isCancelled
-            };
-
-            SendEvent(eventData);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "处理文件选择命令失败");
-        }
-    }
-
-    /// <summary>
-    /// 在独立 STA 线程上显示文件选择对话框，避免阻塞 UI 线程和 WebView2 消息泵
-    /// </summary>
-    private Task<(string? filePath, bool isCancelled)> ShowFileDialogOnNewThreadAsync(PickFileCommand command)
-    {
-        var tcs = new TaskCompletionSource<(string?, bool)>();
-
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                using var dialog = new System.Windows.Forms.OpenFileDialog
-                {
-                    Filter = command.Filter,
-                    Title = "选择文件"
-                };
-
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    tcs.SetResult((dialog.FileName, false));
-                }
-                else
-                {
-                    tcs.SetResult((null, true));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "文件选择对话框线程异常");
-                tcs.SetResult((null, true));
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.IsBackground = true;
-        thread.Start();
-
-        return tcs.Task;
-    }
-
-    /// <summary>
-    /// 处理列出 AI 历史会话请求
-    /// </summary>
-    private Task HandleListAiSessionsCommand()
-    {
-        try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var conversationalFlowService = scope.ServiceProvider.GetRequiredService<Acme.Product.Infrastructure.AI.IConversationalFlowService>();
-            var sessions = conversationalFlowService.ListSessions();
-
-            SendProgressMessage("ListAiSessionsResult", new
-            {
-                success = true,
-                sessions
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "处理 ListAiSessions 失败");
-            SendProgressMessage("ListAiSessionsResult", new
-            {
-                success = false,
-                errorMessage = $"获取历史会话失败：{ex.Message}",
-                sessions = Array.Empty<Acme.Product.Infrastructure.AI.ConversationSessionSummary>()
-            });
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 处理获取单个 AI 历史会话请求
-    /// </summary>
-    private Task HandleGetAiSessionCommand(string messageJson)
-    {
-        try
-        {
-            var sessionId = ExtractSessionId(messageJson);
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                SendProgressMessage("GetAiSessionResult", new
-                {
-                    success = false,
-                    errorMessage = "缺少 sessionId"
-                });
-                return Task.CompletedTask;
-            }
-
-            using var scope = _scopeFactory.CreateScope();
-            var conversationalFlowService = scope.ServiceProvider.GetRequiredService<Acme.Product.Infrastructure.AI.IConversationalFlowService>();
-            var session = conversationalFlowService.GetSession(sessionId);
-
-            if (session == null)
-            {
-                SendProgressMessage("GetAiSessionResult", new
-                {
-                    success = false,
-                    errorMessage = "会话不存在"
-                });
-                return Task.CompletedTask;
-            }
-
-            SendProgressMessage("GetAiSessionResult", new
-            {
-                success = true,
-                session
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "处理 GetAiSession 失败");
-            SendProgressMessage("GetAiSessionResult", new
-            {
-                success = false,
-                errorMessage = $"读取会话失败：{ex.Message}"
-            });
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 处理删除 AI 历史会话请求
-    /// </summary>
-    private Task HandleDeleteAiSessionCommand(string messageJson)
-    {
-        try
-        {
-            var sessionId = ExtractSessionId(messageJson);
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                SendProgressMessage("DeleteAiSessionResult", new
-                {
-                    success = false,
-                    errorMessage = "缺少 sessionId"
-                });
-                return Task.CompletedTask;
-            }
-
-            using var scope = _scopeFactory.CreateScope();
-            var conversationalFlowService = scope.ServiceProvider.GetRequiredService<Acme.Product.Infrastructure.AI.IConversationalFlowService>();
-            var deleted = conversationalFlowService.DeleteSession(sessionId);
-            if (!deleted)
-            {
-                SendProgressMessage("DeleteAiSessionResult", new
-                {
-                    success = false,
-                    errorMessage = "会话不存在",
-                    sessionId
-                });
-                return Task.CompletedTask;
-            }
-
-            SendProgressMessage("DeleteAiSessionResult", new
-            {
-                success = true,
-                sessionId
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "处理 DeleteAiSession 失败");
-            SendProgressMessage("DeleteAiSessionResult", new
-            {
-                success = false,
-                errorMessage = $"删除会话失败：{ex.Message}"
-            });
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private static string? ExtractSessionId(string messageJson)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(messageJson);
-            if (doc.RootElement.TryGetProperty("payload", out var payload) &&
-                payload.ValueKind == JsonValueKind.Object)
-            {
-                if (payload.TryGetProperty("sessionId", out var payloadSessionId) ||
-                    payload.TryGetProperty("SessionId", out payloadSessionId))
-                {
-                    return payloadSessionId.GetString();
-                }
-            }
-
-            if (doc.RootElement.TryGetProperty("sessionId", out var sessionId) ||
-                doc.RootElement.TryGetProperty("SessionId", out sessionId))
-            {
-                return sessionId.GetString();
-            }
-        }
-        catch (JsonException)
-        {
-            // ignore invalid json
-        }
-
-        return null;
     }
 
     /// <summary>
@@ -1322,7 +770,7 @@ public class WebMessageHandler : IDisposable
     /// <summary>
     /// 发送事件到前端
     /// </summary>
-    private void SendEvent<T>(T eventData)
+    public void SendEvent<T>(T eventData)
     {
         try
         {
@@ -1339,7 +787,7 @@ public class WebMessageHandler : IDisposable
         }
     }
 
-    private void SendProgressMessage(string type, object payload)
+    public void SendProgressMessage(string type, object payload)
     {
         var json = JsonSerializer.Serialize(new
         {

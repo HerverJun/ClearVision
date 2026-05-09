@@ -109,6 +109,7 @@ tools/virtual-plc/modbus/.venv/
 tools/virtual-plc/modbus/.vendor/
 /.tmp/localdeform-debug/
 /.tmp/dotnet-cli-home/
+/.tmp/dotnet-tools/
 /.tmp/python-temp/
 /.tmp/publish-check/
 /.tmp/NuGet/

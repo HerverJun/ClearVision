@@ -7,6 +7,8 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { getStoredToken } from '../auth/authStorage.js';
 import { renderDiagnosticsCardsHtml } from '../inspection/analysisCardsPanel.js';
 import { buildSseHeaders, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
+import debugLogger from '../../core/logging/debugLogger.js';
+import { t } from '../../core/i18n/resources.js';
 import {
     buildResultCardsFromOutputData,
     renderResultCardHtml,
@@ -66,7 +68,7 @@ class ResultPanel {
         // 绑定事件
         this.bindEvents();
         
-        console.log('[ResultPanel] 结果面板初始化完成');
+        debugLogger.debug('[ResultPanel] 结果面板初始化完成');
     }
     
     /**
@@ -147,13 +149,13 @@ class ResultPanel {
 
         if (this.projectId && this.historyLoader) {
             this.requestHistoryPage(0).catch(error => {
-                console.warn('[ResultPanel] 刷新服务端历史失败:', error);
+                debugLogger.warn('[ResultPanel] 刷新服务端历史失败:', error);
             });
         }
 
         if (this.projectId) {
             this.loadServerAnalytics().catch(error => {
-                console.warn('[ResultPanel] 刷新服务端分析失败:', error);
+                debugLogger.warn('[ResultPanel] 刷新服务端分析失败:', error);
             });
         }
     }
@@ -294,7 +296,7 @@ class ResultPanel {
         this._analyticsRefreshTimer = window.setTimeout(() => {
             this._analyticsRefreshTimer = null;
             this.loadServerAnalytics().catch(error => {
-                console.warn('[ResultPanel] Server analytics refresh failed:', error);
+                debugLogger.warn('[ResultPanel] Server analytics refresh failed:', error);
             });
         }, delayMs);
     }
@@ -311,7 +313,7 @@ class ResultPanel {
         this._historyRefreshTimer = window.setTimeout(() => {
             this._historyRefreshTimer = null;
             this.requestHistoryPage(0).catch(error => {
-                console.warn('[ResultPanel] Server history refresh failed:', error);
+                debugLogger.warn('[ResultPanel] Server history refresh failed:', error);
             });
         }, delayMs);
     }
@@ -333,7 +335,7 @@ class ResultPanel {
     normalizeDefectDistribution(defectDistribution) {
         const items = defectDistribution?.items || defectDistribution?.Items || [];
         return items.reduce((accumulator, item) => {
-            const defectType = item.defectType || item.DefectType || '未知';
+            const defectType = item.defectType || item.DefectType || t('common.unknown', '未知');
             const count = item.count ?? item.Count ?? 0;
             accumulator[defectType] = count;
             return accumulator;
@@ -393,18 +395,18 @@ class ResultPanel {
 
         const reportPromise = httpClient.get(`/analysis/report/${projectId}`, commonParams)
             .catch(error => {
-                console.warn('[ResultPanel] Failed to load analysis report:', error);
+                debugLogger.warn('[ResultPanel] Failed to load analysis report:', error);
                 return null;
             });
 
         const statisticsPromise = httpClient.get(`/analysis/statistics/${projectId}`, commonParams)
             .catch(error => {
-                console.warn('[ResultPanel] Failed to load statistics:', error);
+                debugLogger.warn('[ResultPanel] Failed to load statistics:', error);
                 return null;
             });
         const defectDistributionPromise = httpClient.get(`/analysis/defect-distribution/${projectId}`, commonParams)
             .catch(error => {
-                console.warn('[ResultPanel] 获取缺陷分布失败:', error);
+                debugLogger.warn('[ResultPanel] 获取缺陷分布失败:', error);
                 return null;
             });
 
@@ -413,7 +415,7 @@ class ResultPanel {
                 ...commonParams,
                 interval: this.timeRange === 'today' ? 'Hour' : 'Day',
             }).catch(error => {
-                console.warn('[ResultPanel] 获取趋势分析失败:', error);
+                debugLogger.warn('[ResultPanel] 获取趋势分析失败:', error);
                 return null;
             })
             : Promise.resolve(null);
@@ -464,7 +466,7 @@ class ResultPanel {
         if (defectDistribution?.items || defectDistribution?.Items) {
             const items = defectDistribution.items || defectDistribution.Items || [];
             this.defectTypes = items.reduce((accumulator, item) => {
-                const defectType = item.defectType || item.DefectType || '未知';
+                const defectType = item.defectType || item.DefectType || t('common.unknown', '未知');
                 const count = item.count ?? item.Count ?? 0;
                 accumulator[defectType] = count;
                 return accumulator;
@@ -539,7 +541,7 @@ class ResultPanel {
         // 更新缺陷类型统计
         if (result.defects) {
             result.defects.forEach(defect => {
-                const type = defect.type || defect.description || '未知';
+                const type = defect.type || defect.description || t('common.unknown', '未知');
                 this.defectTypes[type] = (this.defectTypes[type] || 0) + 1;
             });
         }
@@ -592,7 +594,7 @@ class ResultPanel {
         this.results.forEach(r => {
             if (r.defects) {
                 r.defects.forEach(defect => {
-                    const type = defect.type || defect.description || '未知';
+                    const type = defect.type || defect.description || t('common.unknown', '未知');
                     this.defectTypes[type] = (this.defectTypes[type] || 0) + 1;
                 });
             }
@@ -653,7 +655,7 @@ class ResultPanel {
             // 缺陷类型筛选
             if (this.filters.defectType !== 'all') {
                 const hasDefectType = r.defects?.some(d => 
-                    (d.type || d.description || '未知') === this.filters.defectType
+                    (d.type || d.description || t('common.unknown', '未知')) === this.filters.defectType
                 );
                 if (!hasDefectType) return false;
             }
@@ -691,10 +693,10 @@ class ResultPanel {
         this.currentPage = 1;
         if (this.serverPaged && this.projectId) {
             this.requestHistoryPage(0).catch(error => {
-                console.warn('[ResultPanel] 刷新服务端历史失败:', error);
+                debugLogger.warn('[ResultPanel] 刷新服务端历史失败:', error);
             });
             this.loadServerAnalytics().catch(error => {
-                console.warn('[ResultPanel] 刷新服务端分析失败:', error);
+                debugLogger.warn('[ResultPanel] 刷新服务端分析失败:', error);
             });
             return;
         }
@@ -711,7 +713,7 @@ class ResultPanel {
 
         if (this.isServerPaginationActive()) {
             this.requestHistoryPage(page - 1).catch(error => {
-                console.warn('[ResultPanel] 翻页加载服务端历史失败:', error);
+                debugLogger.warn('[ResultPanel] 翻页加载服务端历史失败:', error);
             });
             return;
         }
@@ -1224,7 +1226,7 @@ class ResultPanel {
         ];
 
         defectItems.forEach(item => {
-            lines.push(this.toCsvRow(['DefectDistribution', item.defectType || item.DefectType || '未知', item.count ?? item.Count ?? 0]));
+            lines.push(this.toCsvRow(['DefectDistribution', item.defectType || item.DefectType || t('common.unknown', '未知'), item.count ?? item.Count ?? 0]));
         });
 
         trendItems.forEach(point => {
@@ -1239,7 +1241,7 @@ class ResultPanel {
     }
 
     showResultDetail(result) {
-        console.log('[ResultPanel] 查看结果详情:', result);
+        debugLogger.debug('[ResultPanel] 查看结果详情:', result);
         
         const modal = document.createElement('div');
         modal.className = 'result-detail-modal';
@@ -1274,7 +1276,7 @@ class ResultPanel {
                                 <div class="detail-section-title">缺陷列表 (${result.defects.length})</div>
                                 ${result.defects.map(d => `
                                     <div class="detail-item">
-                                        <span class="detail-label">${d.type || d.description || '未知'}</span>
+                                        <span class="detail-label">${d.type || d.description || t('common.unknown', '未知')}</span>
                                         <span class="detail-value">${d.confidenceScore ? (d.confidenceScore * 100).toFixed(1) + '%' : '--'}</span>
                                     </div>
                                 `).join('')}
@@ -1592,7 +1594,7 @@ class ResultPanel {
         this.runResultsStreamWithReconnect(url, token, controller.signal, connectionId)
             .catch((error) => {
                 if (error?.name !== 'AbortError') {
-                    console.warn('[ResultPanel] Results SSE stream failed:', error);
+                    debugLogger.warn('[ResultPanel] Results SSE stream failed:', error);
                 }
             });
     }
@@ -1605,13 +1607,13 @@ class ResultPanel {
                     return;
                 }
 
-                console.warn('[ResultPanel] Results SSE stream ended; reconnecting.');
+                debugLogger.warn('[ResultPanel] Results SSE stream ended; reconnecting.');
             } catch (error) {
                 if (error?.name === 'AbortError' || signal.aborted || !this.isActiveResultsStream(connectionId)) {
                     return;
                 }
 
-                console.warn('[ResultPanel] Results SSE connection failed; reconnecting.', error);
+                debugLogger.warn('[ResultPanel] Results SSE connection failed; reconnecting.', error);
             }
 
             this._resultsStreamReconnectAttempt += 1;
@@ -1742,7 +1744,7 @@ class ResultPanel {
      * 后端需要提供: GET /api/v1/analytics/advanced?timeRange=xxx
      */
     async fetchAdvancedAnalytics() {
-        console.log('[ResultPanel] 高级分析 API 未接入，显示暂无数据。');
+        debugLogger.debug('[ResultPanel] 高级分析 API 未接入，显示暂无数据。');
         // placeholder for fetching CPK, MTBF, Defect Clustering data.
         try {
             // const response = await httpClient.get('/api/v1/analytics/advanced', {
@@ -1755,13 +1757,13 @@ class ResultPanel {
             // Advanced CPK/MTBF/cluster analytics are not yet backed by an API.
             this.serverAnalysis = {
                 ...this.serverAnalysis,
-                cpk: { value: '暂无数据', change: '未接入' },
-                mtbf: { value: '暂无数据', change: '未接入' },
-                defectCluster: { topRegion: '未接入' }
+                cpk: { value: t('common.noData', '暂无数据'), change: t('common.unavailable', '未接入') },
+                mtbf: { value: t('common.noData', '暂无数据'), change: t('common.unavailable', '未接入') },
+                defectCluster: { topRegion: t('common.unavailable', '未接入') }
             };
             this.renderAdvancedStats();
         } catch (error) {
-            console.warn('[ResultPanel] 高级分析数据获取失败:', error);
+            debugLogger.warn('[ResultPanel] 高级分析数据获取失败:', error);
         }
     }
 
@@ -1771,11 +1773,11 @@ class ResultPanel {
      * 后端需要提供: POST /api/v1/results/export-images (打包 ZIP)
      */
     async generatePdfReport(filters) {
-        console.log('[ResultPanel] 深度报告 API 未接入。', filters);
+        debugLogger.debug('[ResultPanel] 深度报告 API 未接入。', filters);
         const btn = document.getElementById('btn-advanced-report');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = '未接入';
+            btn.textContent = t('common.unavailable', '未接入');
         }
     }
 
@@ -1787,9 +1789,9 @@ class ResultPanel {
      */
     renderAdvancedStats() {
         // Advanced analytics remain empty until a backend API provides real data.
-        const cpk = this.serverAnalysis?.cpk ?? { value: '暂无数据', change: '未接入' };
-        const mtbf = this.serverAnalysis?.mtbf ?? { value: '暂无数据', change: '未接入' };
-        const cluster = this.serverAnalysis?.defectCluster ?? { topRegion: '未接入' };
+        const cpk = this.serverAnalysis?.cpk ?? { value: t('common.noData', '暂无数据'), change: t('common.unavailable', '未接入') };
+        const mtbf = this.serverAnalysis?.mtbf ?? { value: t('common.noData', '暂无数据'), change: t('common.unavailable', '未接入') };
+        const cluster = this.serverAnalysis?.defectCluster ?? { topRegion: t('common.unavailable', '未接入') };
 
         const cpkEl = document.getElementById('stat-cpk');
         const cpkChange = document.getElementById('stat-cpk-change');

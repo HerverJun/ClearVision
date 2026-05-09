@@ -716,8 +716,8 @@ public sealed class StationSyncHostedService : BackgroundService
 
         if (message.Contains("error", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("寮傚父", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("閿欒", StringComparison.OrdinalIgnoreCase))
+            message.Contains("异常", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("错误", StringComparison.OrdinalIgnoreCase))
         {
             return "ERROR";
         }
