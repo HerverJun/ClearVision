@@ -1,35 +1,41 @@
-# 模型仓库 / Model Repository
+# Model Repository
 
-该目录用于承载阶段3的模型与特征库索引，入口文件为 `models/model_catalog.json`。
+This directory is the model and feature-library catalog entry point for ClearVision. The canonical index is `models/model_catalog.json`.
 
-当前仓库内默认附带的是轻量级测试资产，便于：
+The repository only carries lightweight test assets by default so CI and demos can resolve `ModelId` values without committing production model binaries.
 
-- 语义分割算子通过 `ModelId` 直接解析 ONNX 模型
-- 异常检测算子通过 `ModelId` 解析特征库文件
-- DeepLearning 真实模型评估通过 manifest 记录 `modelId`、`modelSha256`、license、classes、input shape、preprocess 和 postprocess；ONNX 权重文件不进 git
-- 自动化测试和 Demo 文档引用统一模型索引
+- `SemanticSegmentation` uses catalog entries to resolve ONNX segmentation models.
+- `AnomalyDetection` uses catalog entries to resolve embedding models or feature libraries.
+- `DeepLearning` real-model evaluations use manifests that record `modelId`, `modelSha256`, license, class/label contract, input shape, preprocessing and postprocessing.
+- Production ONNX weights stay outside git unless their license and size are explicitly approved.
 
-推荐目录结构：
+## Release Gate
 
-```text
-models/
-  model_catalog.json
-  segmentation/
-  anomaly_detection/
-  object_detection/
-```
+Every external model attached to a release or field package must include these fields in its manifest or generated catalog entry:
 
-`object_detection/coco_yolo_real_model_manifest.template.json` 是 DeepLearning COCO real-model runner 的模板。落地真实模型时：
+| Field | Requirement |
+| --- | --- |
+| `modelSha256` | SHA-256 of the exact model binary. |
+| `license` | SPDX expression or reviewed upstream license note. |
+| `labelsContract` | Class order, label names and any metadata-name fallback. |
+| `providerFallback` | CPU/GPU execution-provider fallback policy. |
+| `datasetVersion` | Dataset or sample-pack version used for acceptance. |
+| `hardwareProfile` | CPU/GPU/driver profile used for the report. |
+| `reportId` | Linked quality, smoke or release-gate report. |
 
-1. 将 ONNX 模型放在 repo 外部或 ignored 路径。
-2. 填写 manifest 中的 `modelSha256`、`source`、`license` 和 IO schema。
-3. 运行 `quality/tools/DeepLearningCocoRealModelRunner` 并通过 `--model` 指向本地模型。
-4. 报告中必须保持 `AnnotationSeeded=false`，且不得把公开 COCO 结果写成真实产线签核。
+`object_detection/coco_yolo_real_model_manifest.template.json` is the template for the DeepLearning COCO real-model runner. When landing a real model:
 
-`model_catalog.json` 中的 `path` 字段支持：
+1. Put the ONNX model outside the repo or in an ignored path.
+2. Fill `modelSha256`, `source`, `license`, `labelsContract` and IO schema.
+3. Run `quality/tools/DeepLearningCocoRealModelRunner` with `--model` pointing to the local artifact.
+4. Keep `AnnotationSeeded=false` in the report, and do not describe public COCO results as production-line sign-off.
 
-- 绝对路径
-- 相对 `models/` 目录的路径
-- 相对仓库根目录的路径
+## Path Rules
 
-真实业务模型与大文件资产建议按需放置在仓库外部，再通过绝对路径或部署时生成的 catalog 挂载。
+`model_catalog.json` supports:
+
+- absolute paths,
+- paths relative to `models/`,
+- paths relative to the repository root.
+
+Real business models and large feature assets should be deployed outside the repository, then mounted through an absolute path or a deployment-generated catalog.

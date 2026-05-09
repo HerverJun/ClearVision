@@ -13,7 +13,7 @@
       "ArtifactVersion": "1.4.0",
       "RelativePath": "template/terminal-wire-sequence.flow.template.json",
       "Required": true,
-      "ChecksumSha256": null,
+      "ChecksumSha256": "fe3316368b7d462b1d219fc0d72ecb3fbaa701acfc620e83bf7d2920bff09ca2",
       "Metadata": {
         "entryPoint": "true",
         "expectedSequence": "Wire_Black,Wire_Blue",
@@ -30,7 +30,7 @@
       "ArtifactVersion": "1.5.0",
       "RelativePath": "template/terminal-wire-sequence-video-stream.flow.template.json",
       "Required": false,
-      "ChecksumSha256": null,
+      "ChecksumSha256": "74ebc131a83fc6c4a002dc9c1c877bf5bc56deeb72228b246d96255ad4b64a4d",
       "Metadata": {
         "entryPoint": "true",
         "variant": "videoStream",
@@ -40,6 +40,8 @@
         "arrivalTriggerOperatorType": "FrameChangeTrigger",
         "judgeOperatorType": "DetectionSequenceJudge",
         "requiredResources": "DeepLearning.ModelPath",
+        "parametersNeedingReview": "FrameChangeTrigger.RoiX,FrameChangeTrigger.RoiY,FrameChangeTrigger.RoiWidth,FrameChangeTrigger.RoiHeight,DeepLearning.ModelPath",
+        "publishBlockers": "Reject ROI 0,0,0,0 and missing model release gate fields before field package export.",
         "thresholdOwner": "FrameChangeTrigger,BoxNms",
         "diagnosticOutputs": "FrameChangeTrigger.Triggered,FrameChangeTrigger.ChangeScore,FrameChangeTrigger.ChangedPixels,FrameChangeTrigger.Reason,BoxNms.Diagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
       }
@@ -52,6 +54,14 @@
       "Required": false,
       "ChecksumSha256": null,
       "Metadata": {
+        "externalArtifact": "true",
+        "modelSha256": "REQUIRED_AT_DEPLOYMENT",
+        "license": "REQUIRED_AT_DEPLOYMENT",
+        "labelsContract": "labels/labels.txt sha256:b156ec31207dcd782c1501d8119037d1827b7c3384db55bec5291dcf22e0ef44",
+        "providerFallback": "OnnxRuntime CPU fallback required; GPU provider optional and must be recorded in release evidence.",
+        "datasetVersion": "REQUIRED_AT_DEPLOYMENT",
+        "hardwareProfile": "REQUIRED_AT_DEPLOYMENT",
+        "reportId": "REQUIRED_AT_DEPLOYMENT",
         "inputSize": "640x640",
         "requiredLabels": "Wire_Black,Wire_Blue"
       }
@@ -62,7 +72,7 @@
       "ArtifactVersion": "1.4.0",
       "RelativePath": "rules/sequence-rule.v1.json",
       "Required": true,
-      "ChecksumSha256": null,
+      "ChecksumSha256": "704f987ebb7679305c99bda7edf8312b6c173622f164af8c2769b1ab56f22452",
       "Metadata": {
         "judgeOperatorType": "DetectionSequenceJudge",
         "expectedSequence": "Wire_Black,Wire_Blue",
@@ -75,7 +85,7 @@
       "ArtifactVersion": "1.1.0",
       "RelativePath": "labels/labels.txt",
       "Required": true,
-      "ChecksumSha256": null,
+      "ChecksumSha256": "b156ec31207dcd782c1501d8119037d1827b7c3384db55bec5291dcf22e0ef44",
       "Metadata": {}
     },
     {
@@ -84,7 +94,7 @@
       "ArtifactVersion": "1.0.0",
       "RelativePath": "samples/README.md",
       "Required": false,
-      "ChecksumSha256": null,
+      "ChecksumSha256": "4ce17493a5a70af569672a059d497dc741da6526ea65ec3ee68ac378dfeba06a",
       "Metadata": {
         "optional": "true"
       }
@@ -95,7 +105,7 @@
       "ArtifactVersion": "1.0.0",
       "RelativePath": "faq/README.md",
       "Required": false,
-      "ChecksumSha256": null,
+      "ChecksumSha256": "4ed97a5d40082d6668524c79589ce0f3d665c849ada86cea950b6a21fb10bb80",
       "Metadata": {
         "optional": "true"
       }
@@ -114,6 +124,27 @@
     "JudgeOperatorType": "DetectionSequenceJudge",
     "RequiredResources": [
       "DeepLearning.ModelPath"
+    ]
+  },
+  "PublishChecks": {
+    "RequireAssetChecksums": true,
+    "RequireExternalModelManifest": true,
+    "BlockVideoTemplateIfParametersNeedReview": true,
+    "RejectedParameterValues": [
+      {
+        "Parameter": "FrameChangeTrigger.Roi",
+        "Value": "0,0,0,0",
+        "Reason": "The arrival-trigger ROI must be tuned per station before field release."
+      }
+    ],
+    "RequiredModelGateFields": [
+      "modelSha256",
+      "license",
+      "labelsContract",
+      "providerFallback",
+      "datasetVersion",
+      "hardwareProfile",
+      "reportId"
     ]
   }
 }

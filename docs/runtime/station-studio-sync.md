@@ -23,6 +23,7 @@ Alpha known limits:
 
 - Result summaries are best-effort monitoring data. If the Station outbound queue is saturated, the Station may drop Studio-facing summaries to protect inspection latency; local inspection and local runtime result handling remain the priority.
 - Local spool enforces `MaxBufferedResults`, `MaxSpoolMb`, and `MaxSpoolDays`. When caps are exceeded, oldest pending summaries are trimmed, creating a telemetry gap.
+- Health snapshots include result queue/backpressure/drop/spool counters where available. Use those counters to distinguish "runtime inspection failed" from "Studio-facing telemetry was intentionally dropped".
 - `.cvpkg` deployment is hardened for hash/manifest/version checks and rollback, but still requires field validation with production-export package layouts.
 - Health CPU usage is currently best-effort and may be null; use working set, private memory, DB size, and spool size as required Alpha metrics.
 - No formal EF migration is included for this Alpha; schema creation remains additive and migration-light.
@@ -230,8 +231,10 @@ Single Station 4-hour shadow run:
   -SampleSeconds 60
 ```
 
-4. During the run, inject one Studio restart and one Station network disconnect/reconnect window.
-5. Record CPU, working set, private memory, database size, spool size, and UI stutter notes in the generated notes file.
+4. The script performs Studio/Station preflight unless `-SkipPreflight` is passed.
+5. During the run, inject one Studio restart and one Station network disconnect/reconnect window.
+6. Record CPU, working set, private memory, database size, spool size, and UI stutter notes in the generated notes file.
+7. Review the generated CSV, preflight JSON, notes and summary markdown under `.tmp/station-alpha-trial/`.
 
 Ten Simulator Station 1-hour pressure run:
 
@@ -248,7 +251,7 @@ Ten Simulator Station 1-hour pressure run:
 ```
 
 3. Confirm monitor UI remains usable, SSE keeps updating, and command records/audit remain queryable.
-4. Review `.tmp/station-alpha-trial/*.csv` and notes before approving field trial expansion.
+4. Review `.tmp/station-alpha-trial/*.csv`, `*-preflight.json`, `*-summary.md` and notes before approving field trial expansion.
 
 Minimum Alpha trial acceptance:
 

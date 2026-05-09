@@ -19,7 +19,7 @@ EvidenceDefinitions: `docs/operator-quality/operator_quality_evidence_manifest.m
 - Dataset evidence status: Yes=20, Partial=1, Not yet evidenced=134
 - Field replay status: Yes=5, Not yet evidenced=150
 - Precision claim basis: Field replay=5, Dataset=16, Partial dataset=0, Golden=35, Contract-only=99, Not yet evidenced=0
-- Industrial status: Real industrial validation complete=0, Field replay substitute=5, 功能可用但未完成现场工业验证=155
+- Industrial status: Real industrial validation complete=0, Field replay substitute=5, Functional available but not real-site signed off=155
 - Cards with TODO: 0
 - P0 without evidence signal: 0
 - C-level without evidence signal: 0
@@ -31,7 +31,7 @@ EvidenceDefinitions: `docs/operator-quality/operator_quality_evidence_manifest.m
 - Dataset: public/licensed/semi-synthetic/curated dataset-tier evidence with manifest, fixed version/seed, metrics, and failure taxonomy. Missing coverage is written as `Not yet evidenced`.
 - Field replay: anonymized or substitute replay drill with manifest, replay command, triage labels, reproducibility, and regressionization counts. Missing coverage is written as `Not yet evidenced`.
 - Precision Claim: strongest available precision basis in descending order Field replay > Dataset > Golden > Contract. It is a claim about available evidence, not a guarantee of real-site capability.
-- Industrial Status: real production-site validation is not complete for any operator in this matrix; operators without real industrial data are explicitly marked `功能可用但未完成现场工业验证`.
+- Industrial Status: real production-site validation is not complete for any operator in this matrix; operators without real industrial data are explicitly marked `Functional available but not real-site signed off`.
 - Local closure boundary: external real production-site data, customer sign-off, and line sign-off cannot be closed locally; local evidence only keeps this industrial-validation blocker explicit and machine-auditable.
 
 ## Current Evidence Gaps

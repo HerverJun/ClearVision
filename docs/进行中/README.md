@@ -1,22 +1,17 @@
 # 进行中
 
-这里放当前仍需要推进、复核或跟踪的材料。完成后不要直接删除，按状态迁到 `../归档/`。
+This folder keeps active plans, open follow-ups, and review queues. Completed plans should be moved to `docs/归档/` with a short closure note instead of being deleted.
 
-## 分区
+## Current Active Plan
 
-- [当前计划](./当前计划/)：正在执行或仍作为治理主线的计划。
-- [未闭环事项](./未闭环事项/)：排查未完成、结论未确认或仍需回访的问题记录。
-- [待复核](./待复核/)：状态不明，需要人工判断是否闭环的历史材料。
+- [debug计划.md](./当前计划/debug计划.md): the current engineering hardening and closure plan.
 
-## 当前主线
+## Supporting Entrypoints
 
-- [ClearVision 最终整合 TODO](./当前计划/ClearVision-最终整合TODO-2026-05-03.md)：承接当前整合主线，推进质量门禁、运行时、脚本、文档入口与剩余闭环事项。
-- [待复核索引](./待复核/索引.md)（当前无业务待复核文档，保留入口）
+- [当前计划](./当前计划/)
+- [未闭环事项](./未闭环事项/)
+- [待复核](./待复核/)
 
-## 近期归档
+## Closure Rule
 
-- 2026-04-29：`AI闭环`、`架构修复` 两条历史待复核线已完成判断，归档至 [`归档/已关闭事项/2026-04-29-待复核事项闭环归档`](../归档/已关闭事项/2026-04-29-待复核事项闭环归档/)。
-- 2026-04-29：`0407 Qwen 排查剩余 TODO`、`0418 算子与流程骨架剩余 TODO`、`深度学习算子工业化剩余 TODO` 已闭环，归档至 [`归档/已关闭事项/2026-04-29-当前计划闭环归档`](../归档/已关闭事项/2026-04-29-当前计划闭环归档/)。
-- 2026-04-29：`ClearVision 质量飞轮 TODO v0.2` 已完成 G3/G4/G5 证据闭环与 release gate，归档至 [`归档/已关闭事项/2026-04-29-当前计划闭环归档`](../归档/已关闭事项/2026-04-29-当前计划闭环归档/)。
-- 2026-04-30：`ClearVision 准工业算法调优 TODO` 已完成 A/B replay 160-case candidate coverage 与 audit 收口，归档至 [`归档/已关闭事项/2026-04-30-当前计划闭环归档`](../归档/已关闭事项/2026-04-30-当前计划闭环归档/)。
-- 2026-04-30：`ClearVision 算子精度提高下一步计划` 已完成 CameraCalibration bridge、DeepLearning real-model dry-run 与 A/B replay 183-case 收口，归档至 [`归档/已关闭事项/2026-04-30-当前计划闭环归档`](../归档/已关闭事项/2026-04-30-当前计划闭环归档/)。
+Before a plan is closed, update its checklist, add verification evidence, and link any new evidence pages from either [docs/README.md](../README.md) or this file.
