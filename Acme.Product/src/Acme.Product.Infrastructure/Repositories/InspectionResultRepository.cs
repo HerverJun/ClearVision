@@ -93,13 +93,13 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
     {
         var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType);
 
-        var results = await query.ToListAsync();
-
-        var totalCount = results.Count;
-        var okCount = results.Count(r => r.Status == InspectionStatus.OK);
-        var ngCount = results.Count(r => r.Status == InspectionStatus.NG);
-        var errorCount = results.Count(r => r.Status == InspectionStatus.Error);
-        var avgTime = totalCount > 0 ? results.Average(r => r.ProcessingTimeMs) : 0;
+        var totalCount = await query.CountAsync();
+        var okCount = await query.CountAsync(r => r.Status == InspectionStatus.OK);
+        var ngCount = await query.CountAsync(r => r.Status == InspectionStatus.NG);
+        var errorCount = await query.CountAsync(r => r.Status == InspectionStatus.Error);
+        var avgTime = await query
+            .Select(r => (double?)r.ProcessingTimeMs)
+            .AverageAsync() ?? 0;
 
         return new InspectionStatistics
         {

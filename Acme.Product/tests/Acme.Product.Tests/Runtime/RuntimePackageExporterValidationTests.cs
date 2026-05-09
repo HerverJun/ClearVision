@@ -271,6 +271,53 @@ public class RuntimePackageExporterValidationTests
         }
     }
 
+    [Fact]
+    public async Task ExportAsync_ShouldRejectTargetRootOutsideControlledDirectories()
+    {
+        var exporter = CreateExporter();
+        var project = CreateMinimalProject("reject-root");
+        var root = Path.GetPathRoot(Environment.CurrentDirectory)
+            ?? Environment.CurrentDirectory;
+
+        var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+        {
+            Project = project,
+            TargetRootDirectory = root
+        });
+
+        await act.Should()
+            .ThrowAsync<RuntimePackageException>()
+            .WithMessage("*outside the controlled export directories*");
+    }
+
+    [Fact]
+    public async Task ExportAsync_ShouldAllowPublishCheckTargetRoot()
+    {
+        var root = Path.GetFullPath(Path.Combine(
+            Directory.GetCurrentDirectory(),
+            ".tmp",
+            "publish-check",
+            "runtime-exporter-tests",
+            Guid.NewGuid().ToString("N")));
+
+        try
+        {
+            var exporter = CreateExporter();
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateMinimalProject("publish-check-root"),
+                TargetRootDirectory = root
+            });
+
+            export.PackageRootPath.Should().StartWith(root);
+            Directory.Exists(export.PackageRootPath).Should().BeTrue();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     private static RuntimePackageExporter CreateExporter()
     {
         var cameraManager = Substitute.For<ICameraManager>();
@@ -287,6 +334,27 @@ public class RuntimePackageExporterValidationTests
             new OperatorFactory(),
             NullLogger<RuntimePackageExporter>.Instance,
             executors);
+    }
+
+    private static ProjectDto CreateMinimalProject(string name)
+    {
+        return new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "main",
+                Operators =
+                [
+                    CreateOperatorDto(
+                        "Result output",
+                        OperatorType.ResultOutput,
+                        CreateParameter("Format", "enum", "JSON"))
+                ]
+            }
+        };
     }
 
     private static OperatorDto CreateOperatorDto(string name, OperatorType type, params ParameterDto[] parameters)

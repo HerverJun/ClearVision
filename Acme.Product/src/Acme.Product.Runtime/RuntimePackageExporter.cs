@@ -95,10 +95,7 @@ public sealed class RuntimePackageExporter
         }
 
         var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
-        var targetRoot = string.IsNullOrWhiteSpace(request.TargetRootDirectory)
-            ? RuntimePathGuard.GetDefaultStudioExportRoot()
-            : Path.GetFullPath(request.TargetRootDirectory);
-        Directory.CreateDirectory(targetRoot);
+        var targetRoot = RuntimePathGuard.ResolveControlledExportRoot(request.TargetRootDirectory);
 
         var safeProjectName = RuntimePathGuard.SanitizeFileName(project.Name, "runtime-package");
         var packageRoot = Path.Combine(targetRoot, $"{safeProjectName}-{packageId}");

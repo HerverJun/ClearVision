@@ -1,85 +1,74 @@
-// IVariableContext.cs
-// 变量上下文实现 - 线程安全的全局变量存储
-// 作者：蘅芜君
-
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace Acme.Product.Core.Services;
 
-/// <summary>
-/// 全局变量上下文 - 支持算子间共享变量，跨周期累计
-/// 【第三优先级】变量表/全局上下文功能
-/// </summary>
 public interface IVariableContext
 {
-    /// <summary>
-    /// 获取变量值
-    /// </summary>
+    VariableContextScope CurrentScope { get; }
+
+    IDisposable BeginScope(VariableContextScope scope);
+
     T? GetValue<T>(string variableName, T? defaultValue = default);
-    
-    /// <summary>
-    /// 设置变量值
-    /// </summary>
+
     void SetValue<T>(string variableName, T value);
-    
-    /// <summary>
-    /// 递增变量（用于计数器）
-    /// </summary>
+
     long Increment(string variableName, long delta = 1);
-    
-    /// <summary>
-    /// 删除变量
-    /// </summary>
+
     bool Remove(string variableName);
-    
-    /// <summary>
-    /// 检查变量是否存在
-    /// </summary>
+
     bool Contains(string variableName);
-    
-    /// <summary>
-    /// 获取所有变量名称
-    /// </summary>
+
     IEnumerable<string> GetVariableNames();
-    
-    /// <summary>
-    /// 清空所有变量
-    /// </summary>
+
     void Clear();
-    
-    /// <summary>
-    /// 获取循环计数器
-    /// </summary>
+
     long CycleCount { get; }
-    
-    /// <summary>
-    /// 递增循环计数器
-    /// </summary>
+
     void IncrementCycleCount();
-    
-    /// <summary>
-    /// 重置循环计数器
-    /// </summary>
+
     void ResetCycleCount();
 }
 
-/// <summary>
-/// 变量上下文实现 - 线程安全的全局变量存储
-/// </summary>
+public sealed record VariableContextScope(
+    Guid FlowId,
+    Guid RunId,
+    string ExecutionKind,
+    Guid? ProjectId = null,
+    Guid? SessionId = null)
+{
+    public static VariableContextScope Global { get; } =
+        new(Guid.Empty, Guid.Empty, "global");
+}
+
 public class VariableContext : IVariableContext
 {
-    private readonly ConcurrentDictionary<string, object> _variables = new();
-    private long _cycleCount = 0;
-    
-    public long CycleCount => Interlocked.Read(ref _cycleCount);
-    
+    private readonly VariableState _globalState = new(VariableContextScope.Global);
+    private readonly AsyncLocal<VariableState?> _currentState = new();
+
+    public VariableContextScope CurrentScope => Current.Scope;
+
+    public long CycleCount => Interlocked.Read(ref Current.CycleCount);
+
+    public IDisposable BeginScope(VariableContextScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        var previous = _currentState.Value;
+        _currentState.Value = new VariableState(scope);
+        return new ScopeHandle(_currentState, previous);
+    }
+
     public T? GetValue<T>(string variableName, T? defaultValue = default)
     {
-        if (_variables.TryGetValue(variableName, out var value))
+        if (Current.Variables.TryGetValue(variableName, out var value))
         {
             try
             {
-                if (value is T t) return t;
+                if (value is T typed)
+                {
+                    return typed;
+                }
+
                 return (T?)Convert.ChangeType(value, typeof(T));
             }
             catch
@@ -87,62 +76,103 @@ public class VariableContext : IVariableContext
                 return defaultValue;
             }
         }
+
         return defaultValue;
     }
-    
+
     public void SetValue<T>(string variableName, T value)
     {
-        _variables[variableName] = value!;
+        Current.Variables[variableName] = value!;
     }
-    
+
     public long Increment(string variableName, long delta = 1)
     {
-        return _variables.AddOrUpdate(variableName, delta, (_, existingValue) =>
+        return Current.Variables.AddOrUpdate(variableName, delta, (_, existingValue) =>
         {
             var current = existingValue switch
             {
-                long l => l,
-                int i => i,
-                double d => (long)d,
+                long value => value,
+                int value => value,
+                double value => (long)value,
                 _ => 0L
             };
             return current + delta;
         }) switch
         {
-            long l => l,
-            int i => i,
+            long value => value,
+            int value => value,
             _ => 0L
         };
     }
-    
+
     public bool Remove(string variableName)
     {
-        return _variables.TryRemove(variableName, out _);
+        return Current.Variables.TryRemove(variableName, out _);
     }
-    
+
     public bool Contains(string variableName)
     {
-        return _variables.ContainsKey(variableName);
+        return Current.Variables.ContainsKey(variableName);
     }
-    
+
     public IEnumerable<string> GetVariableNames()
     {
-        return _variables.Keys.ToList();
+        return Current.Variables.Keys.ToList();
     }
-    
+
     public void Clear()
     {
-        _variables.Clear();
-        Interlocked.Exchange(ref _cycleCount, 0);
+        Current.Variables.Clear();
+        Interlocked.Exchange(ref Current.CycleCount, 0);
     }
-    
+
     public void IncrementCycleCount()
     {
-        Interlocked.Increment(ref _cycleCount);
+        Interlocked.Increment(ref Current.CycleCount);
     }
-    
+
     public void ResetCycleCount()
     {
-        Interlocked.Exchange(ref _cycleCount, 0);
+        Interlocked.Exchange(ref Current.CycleCount, 0);
+    }
+
+    private VariableState Current => _currentState.Value ?? _globalState;
+
+    private sealed class VariableState
+    {
+        public VariableState(VariableContextScope scope)
+        {
+            Scope = scope;
+        }
+
+        public VariableContextScope Scope { get; }
+
+        public ConcurrentDictionary<string, object> Variables { get; } = new();
+
+        public long CycleCount;
+    }
+
+    private sealed class ScopeHandle : IDisposable
+    {
+        private readonly AsyncLocal<VariableState?> _slot;
+        private readonly VariableState? _previous;
+        private bool _disposed;
+
+        public ScopeHandle(AsyncLocal<VariableState?> slot, VariableState? previous)
+        {
+            _slot = slot;
+            _previous = previous;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _slot.Value = _previous;
+            _disposed = true;
+        }
     }
 }

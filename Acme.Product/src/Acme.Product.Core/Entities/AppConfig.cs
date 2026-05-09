@@ -5,6 +5,8 @@ namespace Acme.Product.Core.Entities;
 
 public class AppConfig
 {
+    public long Revision { get; set; }
+
     public GeneralConfig General { get; set; } = new();
 
     public CommunicationConfig Communication { get; set; } = new();

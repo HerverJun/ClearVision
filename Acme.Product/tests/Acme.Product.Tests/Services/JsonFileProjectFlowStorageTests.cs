@@ -48,6 +48,83 @@ public class JsonFileProjectFlowStorageTests
     }
 
     [Fact]
+    public async Task SaveFlowJsonAsync_ShouldWriteMetadataAndLastGoodCopy()
+    {
+        var basePath = CreateTempPath();
+
+        try
+        {
+            var storage = new JsonFileProjectFlowStorage(basePath);
+            var projectId = Guid.NewGuid();
+            const string first = """{"nodes":[{"id":"a"}],"connections":[]}""";
+            const string second = """{"nodes":[{"id":"b"}],"connections":[]}""";
+
+            await storage.SaveFlowJsonAsync(projectId, first);
+            await storage.SaveFlowJsonAsync(projectId, second);
+
+            (await storage.LoadFlowJsonAsync(projectId)).Should().Be(second);
+            File.ReadAllText(Path.Combine(basePath, $"{projectId}.last-good.json")).Should().Be(first);
+            File.ReadAllText(Path.Combine(basePath, $"{projectId}.metadata.json"))
+                .Should().Contain("flowHash")
+                .And.Contain(projectId.ToString());
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(basePath);
+        }
+    }
+
+    [Fact]
+    public async Task LoadFlowJsonAsync_ShouldRestoreLastGoodAndMarkCorruptFile()
+    {
+        var basePath = CreateTempPath();
+
+        try
+        {
+            var storage = new JsonFileProjectFlowStorage(basePath);
+            var projectId = Guid.NewGuid();
+            const string first = """{"nodes":[{"id":"a"}],"connections":[]}""";
+            const string second = """{"nodes":[{"id":"b"}],"connections":[]}""";
+
+            await storage.SaveFlowJsonAsync(projectId, first);
+            await storage.SaveFlowJsonAsync(projectId, second);
+            await File.WriteAllTextAsync(Path.Combine(basePath, $"{projectId}.json"), "{broken");
+
+            (await storage.LoadFlowJsonAsync(projectId)).Should().Be(first);
+            File.Exists(Path.Combine(basePath, $"{projectId}.json.corrupt")).Should().BeTrue();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(basePath);
+        }
+    }
+
+    [Fact]
+    public async Task SaveFlowJsonAsync_ShouldSerializeConcurrentWriters()
+    {
+        var basePath = CreateTempPath();
+
+        try
+        {
+            var storage = new JsonFileProjectFlowStorage(basePath);
+            var projectId = Guid.NewGuid();
+            var writes = Enumerable.Range(0, 20)
+                .Select(i => storage.SaveFlowJsonAsync(projectId, $$"""{"nodes":[{"id":"{{i}}"}],"connections":[]}"""));
+
+            await Task.WhenAll(writes);
+
+            var loaded = await storage.LoadFlowJsonAsync(projectId);
+            loaded.Should().NotBeNull();
+            Action parse = () => System.Text.Json.JsonDocument.Parse(loaded!).Dispose();
+            parse.Should().NotThrow();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(basePath);
+        }
+    }
+
+    [Fact]
     public async Task SaveFlowJsonAsync_ShouldThrowArgumentNullException_WhenFlowJsonIsNull()
     {
         var basePath = CreateTempPath();

@@ -207,6 +207,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
+        using var variableScope = _variableContext.BeginScope(new VariableContextScope(
+            flow.Id,
+            Guid.NewGuid(),
+            enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
+
         // 【第三优先级】递增循环计数器
         _variableContext.IncrementCycleCount();
         _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
