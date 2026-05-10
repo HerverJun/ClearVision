@@ -443,6 +443,25 @@ public class DeepLearningOperatorTests
     }
 
     [Fact]
+    public void PreprocessImage_WithBgrInput_ShouldPreserveRgbChannelOrderAndScale()
+    {
+        var method = typeof(DeepLearningOperator).GetMethod(
+            "PreprocessImage",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        method.Should().NotBeNull();
+
+        using var bgr = new OpenCvSharp.Mat(64, 64, OpenCvSharp.MatType.CV_8UC3, new OpenCvSharp.Scalar(10, 20, 30));
+
+        var tensor = method!.Invoke(_operator, new object?[] { bgr, 64 }).Should().BeAssignableTo<DenseTensor<float>>().Subject;
+        var values = tensor.ToArray();
+        var channelSize = 64 * 64;
+        values[0].Should().BeApproximately(30f / 255f, 0.0001f);
+        values[channelSize].Should().BeApproximately(20f / 255f, 0.0001f);
+        values[channelSize * 2].Should().BeApproximately(10f / 255f, 0.0001f);
+    }
+
+    [Fact]
     public void PreprocessImage_WithSixteenBitGrayscaleInput_ShouldProduceThreeChannelTensor()
     {
         var method = typeof(DeepLearningOperator).GetMethod(

@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using Acme.Product.Infrastructure.Memory;
 using Acme.Product.Infrastructure.PointCloud.Features;
 using OpenCvSharp;
@@ -28,6 +30,8 @@ public sealed class PPFMatcher
 {
     public const double MinimumRecommendedNormalConsistency = 0.70;
     public const double MinimumRecommendedStabilityScore = 0.12;
+    private const int MaxCachedModelHashes = 32;
+    private static readonly ConcurrentDictionary<ModelHashCacheKey, ModelHash> ModelHashCache = new();
 
     private readonly MatPool _pool;
     private readonly Random _rng;
@@ -82,10 +86,12 @@ public sealed class PPFMatcher
         var sceneNormals = sceneWithNormals.Normals!.GetGenericIndexer<float>();
         var symmetry = ComputeSymmetryDescriptor(modelPoints, modelWithNormals.Count, modelWithNormals.GetAABB());
 
-        var modelHash = BuildModelHash(
+        var modelHash = GetOrBuildModelHash(
+            model,
             modelPoints,
             modelNormals,
             modelWithNormals.Count,
+            normalRadius,
             featureRadius,
             distanceStep,
             angleStepRad,
@@ -470,10 +476,25 @@ public sealed class PPFMatcher
         }
     }
 
+    private readonly record struct ModelHashCacheKey(
+        int ModelIdentity,
+        int Count,
+        float NormalRadius,
+        float FeatureRadius,
+        float DistanceStep,
+        float AngleStepRad,
+        int RefStride,
+        int MaxPairsPerKey);
+
     private readonly record struct ModelPair(int RefIndex, int NeighborIndex);
     private readonly record struct PairCorrespondence(int ModelRefIndex, int ModelNeighborIndex, int SceneRefIndex, int SceneNeighborIndex);
     private readonly record struct Correspondence(int ModelIndex, int SceneIndex);
     private readonly record struct CorrespondenceDistance(Correspondence Correspondence, double DistanceSquared);
+    private readonly record struct RansacSample(Correspondence First, Correspondence Second, Correspondence Third, bool IsValid);
+    private readonly record struct PairRansacSample(PairCorrespondence Correspondence, bool IsValid);
+    private readonly record struct RansacEvaluation(bool IsValid, Hypothesis Hypothesis);
+    private readonly record struct PairRansacEvaluation(bool IsValid, Matrix4x4 Transform, int Support, double Rms);
+    private readonly record struct WorkRange(int Start, int EndExclusive);
     private readonly record struct Hypothesis(Matrix4x4 Transform, int Support, double Rms, int VoteCount, double SupportSum);
     private readonly record struct PoseCandidate(Matrix4x4 Transform, Correspondence[] Inliers, double Rms, double NormalConsistency);
     private readonly record struct HypothesisLandscape(
@@ -483,6 +504,41 @@ public sealed class PPFMatcher
         int CompetitiveClusterCount,
         double PoseSpreadScore);
     private readonly record struct SymmetryDescriptor(double SphericalScore, double AxialScore, double ExtentScore);
+
+    private ModelHash GetOrBuildModelHash(
+        PointCloud sourceModel,
+        MatIndexer<float> modelPoints,
+        MatIndexer<float> modelNormals,
+        int n,
+        float normalRadius,
+        float featureRadius,
+        float distanceStep,
+        float angleStepRad,
+        int refStride,
+        int maxPairsPerKey)
+    {
+        var key = new ModelHashCacheKey(
+            RuntimeHelpers.GetHashCode(sourceModel),
+            sourceModel.Count,
+            normalRadius,
+            featureRadius,
+            distanceStep,
+            angleStepRad,
+            refStride,
+            maxPairsPerKey);
+
+        var hash = ModelHashCache.GetOrAdd(
+            key,
+            _ => BuildModelHash(modelPoints, modelNormals, n, featureRadius, distanceStep, angleStepRad, refStride, maxPairsPerKey));
+
+        if (ModelHashCache.Count > MaxCachedModelHashes)
+        {
+            ModelHashCache.Clear();
+            ModelHashCache.TryAdd(key, hash);
+        }
+
+        return hash;
+    }
 
     private ModelHash BuildModelHash(
         MatIndexer<float> modelPoints,
@@ -806,41 +862,30 @@ public sealed class PPFMatcher
         int bestCount = 0;
         double bestRms = double.PositiveInfinity;
 
-        // If we get a near-perfect fit early, stop.
-        var earlyStop = Math.Max(minInliers, (int)(evalModelIndices.Length * 0.90));
+        var samples = BuildPairRansacSamples(pool, iterations);
+        var evaluations = EvaluatePairRansacSamples(
+            samples,
+            modelPoints,
+            modelNormals,
+            scenePoints,
+            sceneNormals,
+            sceneGrid,
+            evalModelIndices,
+            threshold2);
 
-        for (int it = 0; it < iterations; it++)
+        for (int it = 0; it < evaluations.Length; it++)
         {
-            var pc = pool[_rng.Next(pool.Count)];
-
-            if (!TryEstimateTransformFromPair(
-                modelPoints,
-                modelNormals,
-                scenePoints,
-                sceneNormals,
-                pc,
-                out var tform))
+            var evaluation = evaluations[it];
+            if (!evaluation.IsValid)
             {
                 continue;
             }
 
-            var (count, sum2) = ScoreTransform(modelPoints, scenePoints, sceneGrid, evalModelIndices, tform, threshold2);
-            if (count == 0)
+            if (evaluation.Support > bestCount || (evaluation.Support == bestCount && evaluation.Rms < bestRms))
             {
-                continue;
-            }
-
-            var rms = Math.Sqrt(sum2 / count);
-            if (count > bestCount || (count == bestCount && rms < bestRms))
-            {
-                bestCount = count;
-                bestRms = rms;
-                bestT = tform;
-
-                if (bestCount >= earlyStop)
-                {
-                    break;
-                }
+                bestCount = evaluation.Support;
+                bestRms = evaluation.Rms;
+                bestT = evaluation.Transform;
             }
         }
 
@@ -986,44 +1031,24 @@ public sealed class PPFMatcher
         const double rotationMergeToleranceDeg = 4.0;
         var hypotheses = new List<Hypothesis>(capacity: 6);
 
-        var earlyStop = Math.Max(minInliers, (int)(evalModelIndices.Length * 0.98));
-        var earlyStopRmsThreshold = Math.Max(inlierThreshold * 0.35, 0.0025f);
-        Span<Correspondence> sample = stackalloc Correspondence[3];
+        var samples = BuildRansacSamples(pool, iterations);
+        var evaluations = EvaluateRansacSamples(
+            samples,
+            modelPoints,
+            scenePoints,
+            sceneGrid,
+            evalModelIndices,
+            threshold2);
 
-        for (int it = 0; it < iterations; it++)
+        for (int it = 0; it < evaluations.Length; it++)
         {
-            if (!TrySample3(pool, out var c1, out var c2, out var c3))
+            var evaluation = evaluations[it];
+            if (!evaluation.IsValid)
             {
                 continue;
             }
 
-            if (!IsNonDegenerateTriangle(modelPoints, c1.ModelIndex, c2.ModelIndex, c3.ModelIndex) ||
-                !IsNonDegenerateTriangle(scenePoints, c1.SceneIndex, c2.SceneIndex, c3.SceneIndex))
-            {
-                continue;
-            }
-
-            sample[0] = c1;
-            sample[1] = c2;
-            sample[2] = c3;
-
-            var tform = RigidTransformEstimator.Estimate(modelPoints, scenePoints, sample);
-
-            // Score geometrically against the scene (nearest neighbor within threshold).
-            var (count, sum2) = ScoreTransform(modelPoints, scenePoints, sceneGrid, evalModelIndices, tform, threshold2);
-            if (count == 0)
-            {
-                continue;
-            }
-
-            var rms = Math.Sqrt(sum2 / count);
-            UpsertHypothesis(hypotheses, new Hypothesis(tform, count, rms, 1, count), translationMergeTolerance, rotationMergeToleranceDeg);
-            if (hypotheses.Count > 0 &&
-                hypotheses[0].Support >= earlyStop &&
-                hypotheses[0].Rms <= earlyStopRmsThreshold)
-            {
-                break;
-            }
+            UpsertHypothesis(hypotheses, evaluation.Hypothesis, translationMergeTolerance, rotationMergeToleranceDeg);
         }
 
         hypotheses.Sort(CompareHypotheses);
@@ -1052,6 +1077,136 @@ public sealed class PPFMatcher
 
         var inliers = CollectInliers(modelPoints, scenePoints, sceneGrid, evalModelIndices, bestT, threshold2);
         return (bestT, inliers, bestRms, bestCount, secondT, secondCount, secondRms, landscape);
+    }
+
+    private PairRansacSample[] BuildPairRansacSamples(List<PairCorrespondence> pool, int iterations)
+    {
+        var samples = new PairRansacSample[iterations];
+        for (int it = 0; it < iterations; it++)
+        {
+            samples[it] = new PairRansacSample(pool[_rng.Next(pool.Count)], true);
+        }
+
+        return samples;
+    }
+
+    private static PairRansacEvaluation[] EvaluatePairRansacSamples(
+        PairRansacSample[] samples,
+        MatIndexer<float> modelPoints,
+        MatIndexer<float> modelNormals,
+        MatIndexer<float> scenePoints,
+        MatIndexer<float> sceneNormals,
+        SpatialHashGridIndex sceneGrid,
+        int[] evalModelIndices,
+        double threshold2)
+    {
+        var evaluations = new PairRansacEvaluation[samples.Length];
+        var ranges = BuildWorkRanges(samples.Length);
+
+        Parallel.ForEach(ranges, range =>
+        {
+            for (int it = range.Start; it < range.EndExclusive; it++)
+            {
+                var sample = samples[it];
+                if (!sample.IsValid ||
+                    !TryEstimateTransformFromPair(
+                        modelPoints,
+                        modelNormals,
+                        scenePoints,
+                        sceneNormals,
+                        sample.Correspondence,
+                        out var transform))
+                {
+                    continue;
+                }
+
+                var (count, sum2) = ScoreTransform(modelPoints, scenePoints, sceneGrid, evalModelIndices, transform, threshold2);
+                if (count == 0)
+                {
+                    continue;
+                }
+
+                evaluations[it] = new PairRansacEvaluation(true, transform, count, Math.Sqrt(sum2 / count));
+            }
+        });
+
+        return evaluations;
+    }
+
+    private RansacSample[] BuildRansacSamples(List<Correspondence> pool, int iterations)
+    {
+        var samples = new RansacSample[iterations];
+        for (int it = 0; it < iterations; it++)
+        {
+            samples[it] = TrySample3(pool, out var c1, out var c2, out var c3)
+                ? new RansacSample(c1, c2, c3, true)
+                : default;
+        }
+
+        return samples;
+    }
+
+    private static RansacEvaluation[] EvaluateRansacSamples(
+        RansacSample[] samples,
+        MatIndexer<float> modelPoints,
+        MatIndexer<float> scenePoints,
+        SpatialHashGridIndex sceneGrid,
+        int[] evalModelIndices,
+        double threshold2)
+    {
+        var evaluations = new RansacEvaluation[samples.Length];
+        var ranges = BuildWorkRanges(samples.Length);
+
+        Parallel.ForEach(ranges, range =>
+        {
+            var sampleBuffer = new Correspondence[3];
+            for (int it = range.Start; it < range.EndExclusive; it++)
+            {
+                var sample = samples[it];
+                if (!sample.IsValid ||
+                    !IsNonDegenerateTriangle(modelPoints, sample.First.ModelIndex, sample.Second.ModelIndex, sample.Third.ModelIndex) ||
+                    !IsNonDegenerateTriangle(scenePoints, sample.First.SceneIndex, sample.Second.SceneIndex, sample.Third.SceneIndex))
+                {
+                    continue;
+                }
+
+                sampleBuffer[0] = sample.First;
+                sampleBuffer[1] = sample.Second;
+                sampleBuffer[2] = sample.Third;
+
+                var transform = RigidTransformEstimator.Estimate(modelPoints, scenePoints, sampleBuffer);
+
+                // Score geometrically against the scene (nearest neighbor within threshold).
+                var (count, sum2) = ScoreTransform(modelPoints, scenePoints, sceneGrid, evalModelIndices, transform, threshold2);
+                if (count == 0)
+                {
+                    continue;
+                }
+
+                var rms = Math.Sqrt(sum2 / count);
+                evaluations[it] = new RansacEvaluation(true, new Hypothesis(transform, count, rms, 1, count));
+            }
+        });
+
+        return evaluations;
+    }
+
+    private static WorkRange[] BuildWorkRanges(int count)
+    {
+        if (count <= 0)
+        {
+            return Array.Empty<WorkRange>();
+        }
+
+        var desiredPartitions = Math.Min(count, Math.Max(1, Environment.ProcessorCount * 4));
+        var partitionSize = Math.Max(1, (count + desiredPartitions - 1) / desiredPartitions);
+        var ranges = new List<WorkRange>(capacity: desiredPartitions);
+        for (int start = 0; start < count; start += partitionSize)
+        {
+            ranges.Add(new WorkRange(start, Math.Min(count, start + partitionSize)));
+        }
+
+        return ranges.ToArray();
     }
 
     private static void UpsertHypothesis(List<Hypothesis> hypotheses, Hypothesis candidate, double translationTolerance, double rotationToleranceDeg)

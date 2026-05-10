@@ -29,6 +29,41 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
+    private static readonly HashSet<OperatorType> AutoParallelBlockedOperatorTypes =
+    [
+        OperatorType.ImageAcquisition,
+        OperatorType.ResultOutput,
+        OperatorType.ModbusCommunication,
+        OperatorType.ModbusRtuCommunication,
+        OperatorType.TcpCommunication,
+        OperatorType.SerialCommunication,
+        OperatorType.SiemensS7Communication,
+        OperatorType.MitsubishiMcCommunication,
+        OperatorType.OmronFinsCommunication,
+        OperatorType.DatabaseWrite,
+        OperatorType.HttpRequest,
+        OperatorType.MqttPublish,
+        OperatorType.ImageSave,
+        OperatorType.TextSave,
+        OperatorType.VariableWrite,
+        OperatorType.VariableIncrement,
+        OperatorType.CycleCounter,
+        OperatorType.TimerStatistics,
+        OperatorType.ForEach,
+        OperatorType.ScriptOperator,
+        OperatorType.TriggerModule,
+        OperatorType.FrameChangeTrigger,
+        OperatorType.FrameAveraging,
+        OperatorType.DeepLearning,
+        OperatorType.OnnxInference,
+        OperatorType.SemanticSegmentation,
+        OperatorType.AnomalyDetection,
+        OperatorType.CalibrationLoader,
+        OperatorType.CameraCalibration,
+        OperatorType.TranslationRotationCalibration,
+        OperatorType.StereoCalibration,
+        OperatorType.HandEyeCalibration
+    ];
     private readonly ConcurrentDictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
     private readonly Dictionary<OperatorType, IOperatorExecutor> _executors;
     private readonly ILogger<FlowExecutionService> _logger;
@@ -123,6 +158,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return new FlowInputPreparationIndex(flow);
     }
 
+    private static bool IsFlowSafeForAutoParallelization(OperatorFlow flow)
+    {
+        foreach (var op in flow.Operators)
+        {
+            if (AutoParallelBlockedOperatorTypes.Contains(op.Type))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public FlowExecutionService(
         IEnumerable<IOperatorExecutor> executors,
         ILogger<FlowExecutionService> logger,
@@ -134,12 +182,36 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _debugCacheCleanupTimer = new Timer(CleanupStaleDebugSessions, null, DebugCleanupInterval, DebugCleanupInterval);
     }
 
+    public Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        FlowExecutionMode executionMode,
+        CancellationToken cancellationToken = default)
+    {
+        var enableParallel = executionMode == FlowExecutionMode.AutoSafeParallel &&
+            IsFlowSafeForAutoParallelization(flow);
+
+        if (executionMode == FlowExecutionMode.AutoSafeParallel && !enableParallel)
+        {
+            _logger.LogDebug(
+                "[FlowExecution] AutoSafeParallel requested for flow {FlowId}, but the flow contains stateful or side-effect operators. Falling back to sequential execution.",
+                flow.Id);
+        }
+
+        return ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+    }
+
     public async Task<FlowExecutionResult> ExecuteFlowAsync(
         OperatorFlow flow,
         Dictionary<string, object>? inputData = null,
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
+        using var variableScope = _variableContext.BeginScope(new VariableContextScope(
+            flow.Id,
+            Guid.NewGuid(),
+            enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
+
         // 【第三优先级】递增循环计数器
         _variableContext.IncrementCycleCount();
         _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
@@ -204,6 +276,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 result.IsSuccess = result.OperatorResults.All(r => r.IsSuccess);
             }
+
+            result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
 
             // 记录流程执行完成日志
             _logger.LogFlowExecution(flow.Id, executionOrder.Count, stopwatch.ElapsedMilliseconds, result.IsSuccess);
@@ -316,6 +390,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
 
             completedCount++;
+
+            if (opResult.ShortCircuitedFlow)
+            {
+                _logger.LogDebug(
+                    "[FlowExecution] Operator '{OperatorName}' short-circuited this flow cycle.",
+                    op.Name);
+                break;
+            }
         }
     }
 
@@ -377,6 +459,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     ? "Flow was canceled."
                     : $"算子 '{failedOp.OperatorName}' 执行失败: {failedOp.ErrorMessage}";
             }
+            else if (layerResults.Any(r => r.ShortCircuitedFlow))
+            {
+                break;
+            }
 
             foreach (var op in layer)
             {
@@ -429,6 +515,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (fanOutDegrees != null)
             {
                 ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
+            }
+
+            if (opResult.ShortCircuitedFlow)
+            {
+                _logger.LogDebug(
+                    "[FlowExecution] Operator '{OperatorName}' short-circuited the current parallel layer.",
+                    op.Name);
             }
 
             return opResult;
@@ -539,7 +632,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     OperatorName = op.Name,
                     IsSuccess = true,
                     ExecutionTimeMs = opStopwatch.ElapsedMilliseconds,
-                    OutputData = opResult.OutputData
+                    OutputData = opResult.OutputData,
+                    ShortCircuitedFlow = opResult.ShouldShortCircuitFlow
                 };
             }
             else
@@ -612,39 +706,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
         }
 
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        try
-        {
-            // 对于单独执行算子，目前不支持取消
-            var opResult = await executor.ExecuteAsync(@operator, inputs ?? new Dictionary<string, object>());
-            stopwatch.Stop();
-
-            _logger.LogOperatorExecution(@operator.Id, @operator.Name, stopwatch.ElapsedMilliseconds, opResult.IsSuccess);
-
-            return new OperatorExecutionResult
-            {
-                OperatorId = @operator.Id,
-                OperatorName = @operator.Name,
-                IsSuccess = opResult.IsSuccess,
-                ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                OutputData = opResult.OutputData,
-                ErrorMessage = opResult.ErrorMessage
-            };
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", @operator.Name, @operator.Id);
-            return new OperatorExecutionResult
-            {
-                OperatorId = @operator.Id,
-                OperatorName = @operator.Name,
-                IsSuccess = false,
-                ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                ErrorMessage = ex.Message
-            };
-        }
+        return await ExecuteOperatorInternalAsync(
+            @operator,
+            executor,
+            inputs ?? new Dictionary<string, object>(),
+            CancellationToken.None);
     }
 
     public FlowValidationResult ValidateFlow(OperatorFlow flow)
@@ -1317,6 +1383,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     IsSuccess = opResult.IsSuccess,
                     ExecutionTimeMs = opResult.ExecutionTimeMs,
                     ErrorMessage = opResult.ErrorMessage,
+                    ShortCircuitedFlow = opResult.ShortCircuitedFlow,
                     OutputData = CloneNormalizedDictionary(normalizedOutputData),
                     ExecutionOrder = completedCount,
                     StartTime = DateTime.UtcNow.AddMilliseconds(-opResult.ExecutionTimeMs),
@@ -1353,6 +1420,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 TouchDebugSession(options.DebugSessionId);
                 completedCount++;
 
+                if (opResult.ShortCircuitedFlow)
+                {
+                    break;
+                }
+
                 // 【Phase 3】检查是否到达指定的断点算子
                 if (options.BreakAtOperatorId.HasValue && op.Id == options.BreakAtOperatorId.Value)
                 {
@@ -1376,6 +1448,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 result.IsSuccess = result.OperatorResults.All(r => r.IsSuccess);
             }
+
+            result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
 
             var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
             if (flowOutputOperator != null)

@@ -1,22 +1,17 @@
-// S7AddressParser.cs
-// 西门子S7地址解析器
-// 作者：蘅芜君
-
+using System.Text.RegularExpressions;
 using Acme.PlcComm.Core;
 using Acme.PlcComm.Interfaces;
-using System.Text.RegularExpressions;
 
 namespace Acme.PlcComm.Siemens;
 
-/// <summary>
-/// 西门子S7地址解析器
-/// 支持地址格式: DB1.DBW100, DB1.DBX10.3, M100, I0.0, Q0.0等
-/// </summary>
 public class S7AddressParser : IAddressParser
 {
-    // 正则表达式匹配各种地址格式
     private static readonly Regex DbAddressRegex = new(
         @"^DB(?<db>\d+)\.(?<type>DB[XBWDR])(?<offset>\d+)(?:\.(?<bit>\d+))?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex DbByteAddressRegex = new(
+        @"^DB(?<db>\d+)\.(?<offset>\d+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex SimpleAddressRegex = new(
@@ -30,42 +25,48 @@ public class S7AddressParser : IAddressParser
     public OperateResult<PlcAddress> Parse(string address)
     {
         if (string.IsNullOrWhiteSpace(address))
-            return OperateResult<PlcAddress>.Failure("地址不能为空");
+        {
+            return OperateResult<PlcAddress>.Failure("Address cannot be empty.");
+        }
 
-        address = address.Trim().ToUpper();
+        address = address.Trim().ToUpperInvariant();
 
-        // 尝试匹配DB地址
         var dbMatch = DbAddressRegex.Match(address);
         if (dbMatch.Success)
         {
             return ParseDbAddress(dbMatch);
         }
 
-        // 尝试匹配简单地址(M, I, Q等)
+        var dbByteMatch = DbByteAddressRegex.Match(address);
+        if (dbByteMatch.Success)
+        {
+            return ParseDbByteAddress(dbByteMatch);
+        }
+
         var simpleMatch = SimpleAddressRegex.Match(address);
         if (simpleMatch.Success)
         {
             return ParseSimpleAddress(simpleMatch);
         }
 
-        // 尝试匹配带类型前缀的简单地址(MB/MW/MD 等)
         var typedSimpleMatch = TypedSimpleAddressRegex.Match(address);
         if (typedSimpleMatch.Success)
         {
             return ParseTypedSimpleAddress(typedSimpleMatch);
         }
 
-        return OperateResult<PlcAddress>.Failure($"不支持的地址格式: {address}");
+        return OperateResult<PlcAddress>.Failure($"Unsupported S7 address format: {address}");
     }
 
     public bool TryParse(string address, out PlcAddress result)
     {
         var parseResult = Parse(address);
-        if (parseResult.IsSuccess)
+        if (parseResult.IsSuccess && parseResult.Content != null)
         {
-            result = parseResult.Content!;
+            result = parseResult.Content;
             return true;
         }
+
         result = new PlcAddress();
         return false;
     }
@@ -77,78 +78,94 @@ public class S7AddressParser : IAddressParser
 
     public bool IsValidAddress(string address)
     {
-        if (string.IsNullOrWhiteSpace(address)) return false;
-        
-        address = address.Trim().ToUpper();
-        return DbAddressRegex.IsMatch(address)
-               || SimpleAddressRegex.IsMatch(address)
-               || TypedSimpleAddressRegex.IsMatch(address);
+        return Parse(address).IsSuccess;
     }
 
-    private OperateResult<PlcAddress> ParseDbAddress(Match match)
+    private static OperateResult<PlcAddress> ParseDbAddress(Match match)
     {
         try
         {
-            var dbNumber = int.Parse(match.Groups["db"].Value);
-            var typeCode = match.Groups["type"].Value.ToUpper();
-            var offset = int.Parse(match.Groups["offset"].Value);
+            var typeCode = match.Groups["type"].Value.ToUpperInvariant();
             var bitOffset = match.Groups["bit"].Success ? int.Parse(match.Groups["bit"].Value) : -1;
 
-            // 验证位偏移范围
             if (bitOffset > 7)
-                return OperateResult<PlcAddress>.Failure("位偏移必须在0-7之间");
+            {
+                return OperateResult<PlcAddress>.Failure("Bit offset must be between 0 and 7.");
+            }
 
-            var plcAddress = new PlcAddress
+            if (typeCode == "DBX" && bitOffset < 0)
+            {
+                return OperateResult<PlcAddress>.Failure("DBX bit address must include a bit offset, for example DB1.DBX10.3.");
+            }
+
+            if (typeCode != "DBX" && bitOffset >= 0)
+            {
+                return OperateResult<PlcAddress>.Failure("Only DBX addresses can include a bit offset; use DBW or DBD without .bit.");
+            }
+
+            return OperateResult<PlcAddress>.Success(new PlcAddress
             {
                 AreaType = "DB",
-                DbNumber = dbNumber,
-                StartAddress = offset,
-                BitOffset = bitOffset
-            };
-
-            // 根据类型码确定数据类型
-            plcAddress.DataType = typeCode switch
-            {
-                "DBX" => PlcDataType.Bit,
-                "DBB" => PlcDataType.Byte,
-                "DBW" => PlcDataType.Word,
-                "DBD" => PlcDataType.DWord,
-                "DBR" => PlcDataType.Float,
-                _ => PlcDataType.Word
-            };
-
-            // 设置设备代码(用于协议层)
-            plcAddress.DeviceCode = 0x84; // DB区域代码
-
-            return OperateResult<PlcAddress>.Success(plcAddress);
+                DbNumber = int.Parse(match.Groups["db"].Value),
+                StartAddress = int.Parse(match.Groups["offset"].Value),
+                BitOffset = bitOffset,
+                DataType = typeCode switch
+                {
+                    "DBX" => PlcDataType.Bit,
+                    "DBB" => PlcDataType.Byte,
+                    "DBW" => PlcDataType.Word,
+                    "DBD" => PlcDataType.DWord,
+                    "DBR" => PlcDataType.Float,
+                    _ => PlcDataType.Word
+                },
+                DeviceCode = 0x84
+            });
         }
         catch (Exception ex)
         {
-            return OperateResult<PlcAddress>.Failure($"解析DB地址失败: {ex.Message}");
+            return OperateResult<PlcAddress>.Failure($"Failed to parse DB address: {ex.Message}");
         }
     }
 
-    private OperateResult<PlcAddress> ParseSimpleAddress(Match match)
+    private static OperateResult<PlcAddress> ParseDbByteAddress(Match match)
     {
         try
         {
-            var prefix = match.Groups["prefix"].Value.ToUpper();
-            var offset = int.Parse(match.Groups["offset"].Value);
+            return OperateResult<PlcAddress>.Success(new PlcAddress
+            {
+                AreaType = "DB",
+                DbNumber = int.Parse(match.Groups["db"].Value),
+                StartAddress = int.Parse(match.Groups["offset"].Value),
+                BitOffset = -1,
+                DataType = PlcDataType.Byte,
+                DeviceCode = 0x84
+            });
+        }
+        catch (Exception ex)
+        {
+            return OperateResult<PlcAddress>.Failure($"Failed to parse DB byte address: {ex.Message}");
+        }
+    }
+
+    private static OperateResult<PlcAddress> ParseSimpleAddress(Match match)
+    {
+        try
+        {
+            var prefix = match.Groups["prefix"].Value.ToUpperInvariant();
             var bitOffset = match.Groups["bit"].Success ? int.Parse(match.Groups["bit"].Value) : -1;
-
-            // 验证位偏移范围
             if (bitOffset > 7)
-                return OperateResult<PlcAddress>.Failure("位偏移必须在0-7之间");
+            {
+                return OperateResult<PlcAddress>.Failure("Bit offset must be between 0 and 7.");
+            }
 
-            var plcAddress = new PlcAddress
+            var address = new PlcAddress
             {
                 AreaType = prefix,
-                StartAddress = offset,
+                StartAddress = int.Parse(match.Groups["offset"].Value),
                 BitOffset = bitOffset
             };
 
-            // 根据前缀确定区域和设备代码
-            (plcAddress.DeviceCode, plcAddress.DataType) = prefix switch
+            (address.DeviceCode, address.DataType) = prefix switch
             {
                 "M" => ((byte)0x83, bitOffset >= 0 ? PlcDataType.Bit : PlcDataType.Word),
                 "I" or "E" => ((byte)0x81, bitOffset >= 0 ? PlcDataType.Bit : PlcDataType.Word),
@@ -158,61 +175,51 @@ public class S7AddressParser : IAddressParser
                 _ => ((byte)0x00, PlcDataType.Word)
             };
 
-            return OperateResult<PlcAddress>.Success(plcAddress);
+            return OperateResult<PlcAddress>.Success(address);
         }
         catch (Exception ex)
         {
-            return OperateResult<PlcAddress>.Failure($"解析地址失败: {ex.Message}");
+            return OperateResult<PlcAddress>.Failure($"Failed to parse S7 address: {ex.Message}");
         }
     }
 
-    private OperateResult<PlcAddress> ParseTypedSimpleAddress(Match match)
+    private static OperateResult<PlcAddress> ParseTypedSimpleAddress(Match match)
     {
         try
         {
-            var prefix = match.Groups["prefix"].Value.ToUpper();
-            var typeCode = match.Groups["type"].Value.ToUpper();
-            var offset = int.Parse(match.Groups["offset"].Value);
-
-            var plcAddress = new PlcAddress
+            var prefix = match.Groups["prefix"].Value.ToUpperInvariant();
+            var typeCode = match.Groups["type"].Value.ToUpperInvariant();
+            var address = new PlcAddress
             {
                 AreaType = prefix,
-                StartAddress = offset,
+                StartAddress = int.Parse(match.Groups["offset"].Value),
                 BitOffset = -1
             };
 
-            (plcAddress.DeviceCode, plcAddress.DataType) = prefix switch
+            (address.DeviceCode, address.DataType) = prefix switch
             {
-                "M" => ((byte)0x83, typeCode switch
-                {
-                    "B" => PlcDataType.Byte,
-                    "W" => PlcDataType.Word,
-                    "D" => PlcDataType.DWord,
-                    _ => PlcDataType.Word
-                }),
-                "I" or "E" => ((byte)0x81, typeCode switch
-                {
-                    "B" => PlcDataType.Byte,
-                    "W" => PlcDataType.Word,
-                    "D" => PlcDataType.DWord,
-                    _ => PlcDataType.Word
-                }),
-                "Q" or "A" => ((byte)0x82, typeCode switch
-                {
-                    "B" => PlcDataType.Byte,
-                    "W" => PlcDataType.Word,
-                    "D" => PlcDataType.DWord,
-                    _ => PlcDataType.Word
-                }),
+                "M" => ((byte)0x83, ToSimpleDataType(typeCode)),
+                "I" or "E" => ((byte)0x81, ToSimpleDataType(typeCode)),
+                "Q" or "A" => ((byte)0x82, ToSimpleDataType(typeCode)),
                 _ => ((byte)0x00, PlcDataType.Word)
             };
 
-            return OperateResult<PlcAddress>.Success(plcAddress);
+            return OperateResult<PlcAddress>.Success(address);
         }
         catch (Exception ex)
         {
-            return OperateResult<PlcAddress>.Failure($"解析带类型地址失败: {ex.Message}");
+            return OperateResult<PlcAddress>.Failure($"Failed to parse typed S7 address: {ex.Message}");
         }
     }
 
+    private static PlcDataType ToSimpleDataType(string typeCode)
+    {
+        return typeCode switch
+        {
+            "B" => PlcDataType.Byte,
+            "W" => PlcDataType.Word,
+            "D" => PlcDataType.DWord,
+            _ => PlcDataType.Word
+        };
+    }
 }

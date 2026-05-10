@@ -46,6 +46,7 @@ public sealed class StationPackageDeploymentService
             throw new InvalidOperationException("DeployPackage payload is missing downloadUrl.");
         }
 
+        var packageFileSegment = SanitizePackageFileSegment(payload.PackageId);
         var packageRoot = Path.GetFullPath(_options.ResolvedPackageDirectory);
         var stagingRoot = Path.Combine(packageRoot, "staging");
         var activeRoot = Path.Combine(packageRoot, "active");
@@ -54,7 +55,7 @@ public sealed class StationPackageDeploymentService
         Directory.CreateDirectory(packageRoot);
         Directory.CreateDirectory(archiveRoot);
 
-        var downloadPath = Path.Combine(packageRoot, $"{payload.PackageId}.cvpkg.download");
+        var downloadPath = Path.Combine(packageRoot, $"{packageFileSegment}.cvpkg.download");
         await DownloadAsync(payload, downloadPath, cancellationToken);
         await VerifyHashAsync(downloadPath, payload.Sha256, cancellationToken);
 
@@ -71,7 +72,7 @@ public sealed class StationPackageDeploymentService
 
         try
         {
-            var archiveTarget = Path.Combine(archiveRoot, $"{payload.PackageId}-{DateTime.UtcNow:yyyyMMddHHmmss}");
+            var archiveTarget = Path.Combine(archiveRoot, $"{packageFileSegment}-{DateTime.UtcNow:yyyyMMddHHmmss}");
             if (Directory.Exists(archiveTarget))
             {
                 Directory.Delete(archiveTarget, recursive: true);
@@ -153,7 +154,7 @@ public sealed class StationPackageDeploymentService
     {
         if (string.IsNullOrWhiteSpace(expectedSha256))
         {
-            return;
+            throw new InvalidOperationException("DeployPackage payload is missing sha256.");
         }
 
         await using var stream = File.OpenRead(path);
@@ -163,10 +164,31 @@ public sealed class StationPackageDeploymentService
             ? expectedSha256["sha256:".Length..]
             : expectedSha256;
 
+        if (expected.Length != 64 || expected.Any(ch => !Uri.IsHexDigit(ch)))
+        {
+            throw new InvalidOperationException("DeployPackage payload sha256 is invalid.");
+        }
+
         if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Downloaded package hash does not match the Studio manifest.");
         }
+    }
+
+    private static string SanitizePackageFileSegment(string packageId)
+    {
+        var sanitized = new string(packageId
+            .Trim()
+            .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '_')
+            .ToArray())
+            .Trim('.');
+
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            throw new InvalidOperationException("DeployPackage payload packageId is invalid.");
+        }
+
+        return sanitized.Length <= 128 ? sanitized : sanitized[..128];
     }
 
     private static string ResolveRuntimeRoot(string stagingRoot)

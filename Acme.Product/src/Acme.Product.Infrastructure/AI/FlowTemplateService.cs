@@ -42,7 +42,9 @@ public class FlowTemplateService : IFlowTemplateService
     private const string AirConditioningIndustry = "空调制造";
     private const string TemplateDefaultRegionExtent = "999999";
     private const string WireSequenceScenarioKey = "wire-sequence-terminal";
+    private const string WireSequenceVideoStreamScenarioKey = "wire-sequence-terminal-video-stream";
     private const string WireSequenceTemplateName = "端子线序检测";
+    private const string WireSequenceVideoStreamTemplateName = "端子线序检测-视频流版";
     private const string WireSequenceIndustry = "线束装配";
     private const string WireSequenceDefaultRegionExtent = "999999";
     private static readonly IReadOnlyDictionary<string, string> _deprecatedBuiltInTemplates =
@@ -492,6 +494,136 @@ public class FlowTemplateService : IFlowTemplateService
                         ["op_3"] = ["RegionX", "RegionY", "RegionW", "RegionH"],
                         ["op_4"] = ["ScoreThreshold", "IouThreshold"],
                         ["op_5"] = ["ExpectedLabels", "ExpectedCount"]
+                    }
+                }, _jsonOptions),
+                CreatedAt = DateTime.UtcNow
+            },
+            new FlowTemplate
+            {
+                Id = Guid.NewGuid(),
+                Name = WireSequenceVideoStreamTemplateName,
+                Description = "端子线序检测视频流模板，连续采集后先用帧变化触发判断到料，未到料时跳过本轮，触发后再执行 YOLO、ROI、NMS 与顺序判定。",
+                Industry = WireSequenceIndustry,
+                Tags = ["线序", "视频流", "连续采集", "帧变化触发", "端子", "YOLO"],
+                TemplateVersion = "1.5.0",
+                ScenarioKey = WireSequenceVideoStreamScenarioKey,
+                ScenarioPackage = new ScenarioPackageBinding
+                {
+                    PackageKey = WireSequenceScenarioKey,
+                    PackageVersion = "1.5.0",
+                    AssetVersionIds =
+                    [
+                        "template:terminal-wire-sequence-video-stream-template@1.5.0",
+                        "model:wire-seq-yolo@1.2.0",
+                        "rule:wire-sequence-rule@1.4.0",
+                        "label:wire-label-set@1.1.0"
+                    ],
+                    RequiredResources =
+                    [
+                        "DeepLearning.ModelPath"
+                    ]
+                },
+                FlowJson = JsonSerializer.Serialize(new
+                {
+                    explanation = "适用于没有光电或 PLC 触发信号的皮带线端子线序检测。相机连续采集，帧变化触发算子在到料 ROI 内检测变化；未到料帧短路本轮流程，触发后才进入 YOLO、ROI 框过滤、NMS 和线序判定。",
+                    expectedSequence = new[] { "Wire_Black", "Wire_Blue" },
+                    expectedDetectionCount = 2,
+                    requiredResources = new[] { "DeepLearning.ModelPath" },
+                    tunableParameters = new[]
+                    {
+                        "FrameChangeTrigger.PixelThreshold",
+                        "FrameChangeTrigger.MinChangeRatio",
+                        "FrameChangeTrigger.MinChangePixels",
+                        "FrameChangeTrigger.CooldownMs",
+                        "FrameChangeTrigger.RoiX",
+                        "FrameChangeTrigger.RoiY",
+                        "FrameChangeTrigger.RoiW",
+                        "FrameChangeTrigger.RoiH",
+                        "BoxNms.ScoreThreshold",
+                        "BoxNms.IouThreshold"
+                    },
+                    operators = new object[]
+                    {
+                        Node("op_1", "ImageAcquisition", "连续采集", new Dictionary<string, string>
+                        {
+                            ["SourceType"] = "Camera",
+                            ["TriggerMode"] = "Continuous"
+                        }),
+                        Node("op_2", "FrameChangeTrigger", "到料触发", new Dictionary<string, string>
+                        {
+                            ["Enabled"] = "true",
+                            ["ShortCircuitWhenNotTriggered"] = "true",
+                            ["PixelThreshold"] = "30",
+                            ["MinChangeRatio"] = "0.02",
+                            ["MinChangePixels"] = "500",
+                            ["CooldownMs"] = "1200",
+                            ["RoiX"] = "0",
+                            ["RoiY"] = "0",
+                            ["RoiW"] = "0",
+                            ["RoiH"] = "0"
+                        }),
+                        Node("op_3", "DeepLearning", "线根检测", new Dictionary<string, string>
+                        {
+                            ["ModelPath"] = "",
+                            ["LabelsPath"] = "",
+                            ["Confidence"] = "0.05",
+                            ["InputSize"] = "640",
+                            ["TargetClasses"] = "Wire_Black,Wire_Blue",
+                            ["EnableInternalNms"] = "false",
+                            ["DetectionMode"] = "Object"
+                        }),
+                        Node("op_4", "BoxFilter", "ROI框过滤", new Dictionary<string, string>
+                        {
+                            ["FilterMode"] = "Region",
+                            ["RegionX"] = "0",
+                            ["RegionY"] = "0",
+                            ["RegionW"] = WireSequenceDefaultRegionExtent,
+                            ["RegionH"] = WireSequenceDefaultRegionExtent,
+                            ["MinScore"] = "0.0"
+                        }),
+                        Node("op_5", "BoxNms", "候选框去重", new Dictionary<string, string>
+                        {
+                            ["IouThreshold"] = "0.45",
+                            ["ScoreThreshold"] = "0.25",
+                            ["MaxDetections"] = "10",
+                            ["ShowSuppressed"] = "false"
+                        }),
+                        Node("op_6", "DetectionSequenceJudge", "顺序判定", new Dictionary<string, string>
+                        {
+                            ["ExpectedLabels"] = "Wire_Black,Wire_Blue",
+                            ["SortBy"] = "CenterY",
+                            ["Direction"] = "TopToBottom",
+                            ["ExpectedCount"] = "2",
+                            ["MinConfidence"] = "0.0"
+                        }),
+                        Node("op_7", "ResultOutput", "结果输出", new Dictionary<string, string>
+                        {
+                            ["Format"] = "JSON",
+                            ["SaveToFile"] = "true"
+                        })
+                    },
+                    connections = new object[]
+                    {
+                        Link("op_1", "Image", "op_2", "Image"),
+                        Link("op_2", "Image", "op_3", "Image"),
+                        Link("op_3", "Objects", "op_4", "Detections"),
+                        Link("op_2", "Image", "op_4", "Image"),
+                        Link("op_4", "Detections", "op_5", "Detections"),
+                        Link("op_2", "Image", "op_5", "Image"),
+                        Link("op_5", "Detections", "op_6", "Detections"),
+                        Link("op_5", "Image", "op_7", "Image"),
+                        Link("op_5", "Diagnostics", "op_7", "Data"),
+                        Link("op_6", "Diagnostics", "op_7", "Result"),
+                        Link("op_6", "Message", "op_7", "Text")
+                    },
+                    parametersNeedingReview = new Dictionary<string, List<string>>
+                    {
+                        ["op_1"] = ["CameraId", "TriggerMode"],
+                        ["op_2"] = ["RoiX", "RoiY", "RoiW", "RoiH", "PixelThreshold", "MinChangeRatio", "MinChangePixels", "CooldownMs"],
+                        ["op_3"] = ["ModelPath"],
+                        ["op_4"] = ["RegionX", "RegionY", "RegionW", "RegionH"],
+                        ["op_5"] = ["ScoreThreshold", "IouThreshold"],
+                        ["op_6"] = ["ExpectedLabels", "ExpectedCount"]
                     }
                 }, _jsonOptions),
                 CreatedAt = DateTime.UtcNow

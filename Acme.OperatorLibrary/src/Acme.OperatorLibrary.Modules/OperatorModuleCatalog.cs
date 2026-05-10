@@ -23,8 +23,14 @@ public enum OperatorModule
 
 public static class OperatorModuleCatalog
 {
+    private static readonly HashSet<OperatorType> InternalOnlyTypes =
+    [
+        OperatorType.FrameChangeTrigger
+    ];
+
     private static readonly IReadOnlyDictionary<OperatorType, OperatorModule> _moduleByType =
         System.Enum.GetValues<OperatorType>()
+            .Where(IsPackagePublicType)
             .ToDictionary(type => type, Classify, System.Collections.Generic.EqualityComparer<OperatorType>.Default);
 
     private static readonly IReadOnlyDictionary<OperatorModule, IReadOnlyList<OperatorType>> _typesByModule =
@@ -41,6 +47,14 @@ public static class OperatorModuleCatalog
     {
         return _moduleByType.TryGetValue(type, out var module) ? module : OperatorModule.ImageProcessing;
     }
+
+    public static bool IsPackagePublicType(OperatorType type)
+    {
+        return !OperatorTypeAliasResolver.IsLegacyAlias(type) &&
+               !InternalOnlyTypes.Contains(type);
+    }
+
+    public static IReadOnlyList<OperatorType> InternalOnlyOperatorTypes => InternalOnlyTypes.OrderBy(type => (int)type).ToArray();
 
     public static IReadOnlyList<OperatorType> GetTypes(OperatorModule module)
     {
@@ -90,6 +104,9 @@ public static class OperatorModuleCatalog
 
             OperatorType.DeepLearning
                 or OperatorType.OnnxInference
+                or OperatorType.AnomalyDetection
+                or OperatorType.SemanticSegmentation
+                or OperatorType.DetectionSequenceJudge
                 or OperatorType.DualModalVoting
                 or OperatorType.SurfaceDefectDetection
                 or OperatorType.EdgePairDefect

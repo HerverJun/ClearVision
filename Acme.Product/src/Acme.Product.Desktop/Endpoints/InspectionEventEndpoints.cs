@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Channels;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Services;
@@ -13,6 +14,11 @@ namespace Acme.Product.Desktop.Endpoints;
 
 public static class InspectionEventEndpoints
 {
+    private const int DefaultSseChannelCapacity = 512;
+
+    private static long _sseDroppedMessageCount;
+    private static long _sseReplayedMessageCount;
+
     private static readonly JsonSerializerOptions SseJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -25,6 +31,12 @@ public static class InspectionEventEndpoints
     public static IEndpointRouteBuilder MapInspectionEventEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/inspection/realtime/{projectId:guid}/events", HandleSseEventsAsync);
+        app.MapGet("/api/inspection/realtime/diagnostics", () => Results.Ok(new
+        {
+            droppedMessages = Volatile.Read(ref _sseDroppedMessageCount),
+            replayedMessages = Volatile.Read(ref _sseReplayedMessageCount),
+            channelCapacity = ResolveSseChannelCapacity()
+        }));
         return app;
     }
 
@@ -46,10 +58,11 @@ public static class InspectionEventEndpoints
         var currentState = coordinator.GetState(projectId);
         var replayWatermark = lastSequenceId;
 
-        var channel = Channel.CreateUnbounded<SseMessage>(new UnboundedChannelOptions
+        var channel = Channel.CreateBounded<SseMessage>(new BoundedChannelOptions(ResolveSseChannelCapacity())
         {
             SingleReader = true,
-            SingleWriter = false
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropWrite
         });
 
         using var subscription = eventBus.SubscribeInterface<IInspectionEvent>((evt, _) =>
@@ -62,7 +75,10 @@ public static class InspectionEventEndpoints
             var sequenceId = eventStore.Append(projectId, evt);
             foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(evt))
             {
-                channel.Writer.TryWrite(new SseMessage(sequenceId, mappedEvent.EventType, mappedEvent.Payload));
+                if (!channel.Writer.TryWrite(new SseMessage(sequenceId, mappedEvent.EventType, mappedEvent.Payload)))
+                {
+                    Interlocked.Increment(ref _sseDroppedMessageCount);
+                }
             }
             return Task.CompletedTask;
         });
@@ -87,6 +103,7 @@ public static class InspectionEventEndpoints
                 replayWatermark = Math.Max(replayWatermark, storedEvent.SequenceId);
                 foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(storedEvent.Event))
                 {
+                    Interlocked.Increment(ref _sseReplayedMessageCount);
                     await context.Response.WriteSseMessageAsync(
                         new SseMessage(
                             storedEvent.SequenceId,
@@ -140,6 +157,13 @@ public static class InspectionEventEndpoints
         }
 
         return 0;
+    }
+
+    private static int ResolveSseChannelCapacity()
+    {
+        return int.TryParse(Environment.GetEnvironmentVariable("CV_INSPECTION_SSE_CHANNEL_CAPACITY"), out var configured)
+            ? Math.Clamp(configured, 1, 10_000)
+            : DefaultSseChannelCapacity;
     }
 
     private static async Task SendHeartbeatsAsync(ChannelWriter<SseMessage> writer, CancellationToken ct)

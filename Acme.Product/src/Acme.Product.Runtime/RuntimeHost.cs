@@ -466,12 +466,15 @@ public sealed class RuntimeHost : IAsyncDisposable
         if (_imageWriter != null && _imageWriter.ShouldPersist(result))
         {
             result.SavedImagePath = _imageWriter.PlanPath(result);
-            _imageWriter.TryEnqueue(result);
+            if (!await _imageWriter.EnqueueAsync(result, cancellationToken))
+            {
+                result.SavedImagePath = null;
+            }
         }
 
         if (_resultWriter != null)
         {
-            _resultWriter.TryEnqueue(result);
+            await _resultWriter.EnqueueAsync(result, cancellationToken);
         }
 
         ResultAvailable?.Invoke(result);
@@ -942,15 +945,18 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly Task _consumerTask;
     private readonly ILogger _logger;
+    private int _backpressureWaitCount;
+    private int _droppedCount;
+    private int _persistenceFailureCount;
     private int _disposeStarted;
 
     public RuntimeResultRecordWriter(string dataRoot, int capacity, ILogger logger)
     {
         DataRoot = dataRoot;
         _logger = logger;
-        _channel = Channel.CreateBounded<RuntimeNormalizedResult>(new BoundedChannelOptions(capacity)
+        _channel = Channel.CreateBounded<RuntimeNormalizedResult>(new BoundedChannelOptions(Math.Max(1, capacity))
         {
-            FullMode = BoundedChannelFullMode.DropWrite,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
         });
@@ -959,13 +965,18 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
 
     public string DataRoot { get; }
 
-    public int DroppedCount { get; private set; }
+    public int DroppedCount => Volatile.Read(ref _droppedCount);
 
-    public bool TryEnqueue(RuntimeNormalizedResult result)
+    public int BackpressureWaitCount => Volatile.Read(ref _backpressureWaitCount);
+
+    public int PersistenceFailureCount => Volatile.Read(ref _persistenceFailureCount);
+
+    public async ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken)
     {
         if (Interlocked.CompareExchange(ref _disposeStarted, 0, 0) != 0)
         {
-            DroppedCount += 1;
+            Interlocked.Increment(ref _droppedCount);
+            _logger.LogWarning("Dropped runtime result record for run {RunId} because the writer is disposed.", result.RunId);
             return false;
         }
 
@@ -974,9 +985,31 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
             return true;
         }
 
-        DroppedCount += 1;
-        _logger.LogWarning("Dropped runtime result record for run {RunId}", result.RunId);
-        return false;
+        var waitCount = Interlocked.Increment(ref _backpressureWaitCount);
+        if (waitCount == 1 || waitCount % 100 == 0)
+        {
+            _logger.LogWarning(
+                "Runtime result record writer is applying backpressure instead of dropping records. BackpressureWaitCount={BackpressureWaitCount}",
+                waitCount);
+        }
+
+        try
+        {
+            await _channel.Writer.WriteAsync(result, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (ChannelClosedException)
+        {
+            Interlocked.Increment(ref _droppedCount);
+            _logger.LogWarning("Dropped runtime result record for run {RunId} because the writer is closed.", result.RunId);
+            return false;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Interlocked.Increment(ref _droppedCount);
+            _logger.LogWarning("Dropped runtime result record for run {RunId} because enqueue was canceled.", result.RunId);
+            return false;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -989,11 +1022,11 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
         _channel.Writer.TryComplete();
         try
         {
-            await _disposeCts.CancelAsync();
-            await _consumerTask;
+            await _consumerTask.ConfigureAwait(false);
         }
         finally
         {
+            await _disposeCts.CancelAsync();
             _disposeCts.Dispose();
         }
     }
@@ -1006,12 +1039,28 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
             {
                 while (_channel.Reader.TryRead(out var result))
                 {
-                    var runDate = result.CompletedAtUtc.LocalDateTime.ToString("yyyyMMdd");
-                    var targetDirectory = Path.Combine(DataRoot, "runs", runDate);
-                    Directory.CreateDirectory(targetDirectory);
-                    var targetPath = Path.Combine(targetDirectory, "runtime-results.jsonl");
-                    var line = JsonSerializer.Serialize(result, RuntimeJson.SerializerOptions);
-                    await File.AppendAllTextAsync(targetPath, line + Environment.NewLine, Encoding.UTF8, cancellationToken);
+                    try
+                    {
+                        var runDate = result.CompletedAtUtc.LocalDateTime.ToString("yyyyMMdd");
+                        var targetDirectory = Path.Combine(DataRoot, "runs", runDate);
+                        Directory.CreateDirectory(targetDirectory);
+                        var targetPath = Path.Combine(targetDirectory, "runtime-results.jsonl");
+                        var line = JsonSerializer.Serialize(result, RuntimeJson.StableSerializerOptions);
+                        await File.AppendAllTextAsync(targetPath, line + Environment.NewLine, Encoding.UTF8, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        var failureCount = Interlocked.Increment(ref _persistenceFailureCount);
+                        _logger.LogError(
+                            ex,
+                            "Failed to persist runtime result record for run {RunId}. PersistenceFailureCount={PersistenceFailureCount}",
+                            result.RunId,
+                            failureCount);
+                    }
                 }
             }
         }
@@ -1028,6 +1077,9 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
     private readonly Task _consumerTask;
     private readonly RuntimeProfile _profile;
     private readonly ILogger _logger;
+    private int _backpressureWaitCount;
+    private int _droppedCount;
+    private int _persistenceFailureCount;
     private int _disposeStarted;
 
     public RuntimeImageWriter(string dataRoot, RuntimeProfile profile, ILogger logger)
@@ -1035,9 +1087,9 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
         DataRoot = dataRoot;
         _profile = profile;
         _logger = logger;
-        _channel = Channel.CreateBounded<RuntimeNormalizedResult>(new BoundedChannelOptions(profile.ImageQueueCapacity)
+        _channel = Channel.CreateBounded<RuntimeNormalizedResult>(new BoundedChannelOptions(Math.Max(1, profile.ImageQueueCapacity))
         {
-            FullMode = BoundedChannelFullMode.DropWrite,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
         });
@@ -1046,7 +1098,11 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
 
     public string DataRoot { get; }
 
-    public int DroppedCount { get; private set; }
+    public int DroppedCount => Volatile.Read(ref _droppedCount);
+
+    public int BackpressureWaitCount => Volatile.Read(ref _backpressureWaitCount);
+
+    public int PersistenceFailureCount => Volatile.Read(ref _persistenceFailureCount);
 
     public bool ShouldPersist(RuntimeNormalizedResult result)
     {
@@ -1077,11 +1133,12 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
             $"{result.ImageId}_{result.RunId}{extension}");
     }
 
-    public bool TryEnqueue(RuntimeNormalizedResult result)
+    public async ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken)
     {
         if (Interlocked.CompareExchange(ref _disposeStarted, 0, 0) != 0)
         {
-            DroppedCount += 1;
+            Interlocked.Increment(ref _droppedCount);
+            _logger.LogWarning("Dropped runtime image write for run {RunId} because the writer is disposed.", result.RunId);
             return false;
         }
 
@@ -1090,9 +1147,31 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
             return true;
         }
 
-        DroppedCount += 1;
-        _logger.LogWarning("Dropped runtime image write for run {RunId}", result.RunId);
-        return false;
+        var waitCount = Interlocked.Increment(ref _backpressureWaitCount);
+        if (waitCount == 1 || waitCount % 100 == 0)
+        {
+            _logger.LogWarning(
+                "Runtime image writer is applying backpressure instead of dropping configured image saves. BackpressureWaitCount={BackpressureWaitCount}",
+                waitCount);
+        }
+
+        try
+        {
+            await _channel.Writer.WriteAsync(result, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (ChannelClosedException)
+        {
+            Interlocked.Increment(ref _droppedCount);
+            _logger.LogWarning("Dropped runtime image write for run {RunId} because the writer is closed.", result.RunId);
+            return false;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Interlocked.Increment(ref _droppedCount);
+            _logger.LogWarning("Dropped runtime image write for run {RunId} because enqueue was canceled.", result.RunId);
+            return false;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -1105,11 +1184,11 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
         _channel.Writer.TryComplete();
         try
         {
-            await _disposeCts.CancelAsync();
-            await _consumerTask;
+            await _consumerTask.ConfigureAwait(false);
         }
         finally
         {
+            await _disposeCts.CancelAsync();
             _disposeCts.Dispose();
         }
     }
@@ -1122,19 +1201,35 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
             {
                 while (_channel.Reader.TryRead(out var result))
                 {
-                    var bytes = result.OutputImageBytes ?? result.SourceImageBytes;
-                    if (bytes == null || bytes.Length == 0 || string.IsNullOrWhiteSpace(result.SavedImagePath))
+                    try
                     {
-                        continue;
-                    }
+                        var bytes = result.OutputImageBytes ?? result.SourceImageBytes;
+                        if (bytes == null || bytes.Length == 0 || string.IsNullOrWhiteSpace(result.SavedImagePath))
+                        {
+                            continue;
+                        }
 
-                    var directory = Path.GetDirectoryName(result.SavedImagePath);
-                    if (!string.IsNullOrWhiteSpace(directory))
+                        var directory = Path.GetDirectoryName(result.SavedImagePath);
+                        if (!string.IsNullOrWhiteSpace(directory))
+                        {
+                            Directory.CreateDirectory(directory);
+                        }
+
+                        await File.WriteAllBytesAsync(result.SavedImagePath, bytes, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
-                        Directory.CreateDirectory(directory);
+                        throw;
                     }
-
-                    await File.WriteAllBytesAsync(result.SavedImagePath, bytes, cancellationToken);
+                    catch (Exception ex)
+                    {
+                        var failureCount = Interlocked.Increment(ref _persistenceFailureCount);
+                        _logger.LogError(
+                            ex,
+                            "Failed to persist runtime image for run {RunId}. PersistenceFailureCount={PersistenceFailureCount}",
+                            result.RunId,
+                            failureCount);
+                    }
                 }
             }
         }

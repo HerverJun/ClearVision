@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
+using Acme.Product.Core.Streaming;
+using Acme.Product.Infrastructure.Streaming;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -30,10 +32,16 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         public CameraTriggerMode TriggerMode { get; set; } = CameraTriggerMode.Software;
         public int TargetFrameRateFps { get; set; } = CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
         public CameraStreamFrame? LatestFrame { get; set; }
+        public FrameRingBuffer History { get; set; } = new(24);
         public long Sequence;
         public long LastPublishedTicks;
+        public long MinFrameTicks { get; set; } = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
+        public int PendingFrameWaiters;
+        public object SignalGate { get; } = new();
         public TaskCompletionSource<long> NextFrameSignal { get; set; } = CreateFrameSignal();
         public CancellationTokenSource? IdleStopCts { get; set; }
+        public IIndustrialCamera? EventCamera { get; set; }
+        public EventHandler<CameraFrameReceivedEventArgs>? FrameReceivedHandler { get; set; }
     }
 
     private sealed class PreviewSessionState
@@ -51,7 +59,8 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         double ExposureTimeUs,
         double GainDb,
         CameraTriggerMode TriggerMode,
-        int TargetFrameRateFps);
+        int TargetFrameRateFps,
+        int FrameBufferCapacity);
 
     public CameraFrameStreamCoordinator(
         ICameraManager cameraManager,
@@ -87,6 +96,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         var frame = await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
         ArmDirectAcquireIdleStop(entry);
         return frame;
+    }
+
+    public async Task<FrameEnvelope> AcquireFrameEnvelopeAsync(string cameraId, CancellationToken cancellationToken = default)
+    {
+        var frame = await AcquireFrameAsync(cameraId, cancellationToken);
+        return ToEnvelope(frame);
     }
 
     public async Task<CameraStreamLease> AcquireStreamLeaseAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -125,6 +140,15 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
 
         return await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
+    }
+
+    public async Task<FrameEnvelope> WaitForNextFrameEnvelopeAsync(
+        CameraStreamLease lease,
+        long? afterSequence = null,
+        CancellationToken cancellationToken = default)
+    {
+        var frame = await WaitForNextFrameAsync(lease, afterSequence, cancellationToken);
+        return ToEnvelope(frame);
     }
 
     public async Task ReleaseStreamLeaseAsync(CameraStreamLease lease)
@@ -256,6 +280,37 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
     }
 
+    public bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame)
+    {
+        frame = null;
+        if (!_producers.TryGetValue(cameraId, out var entry))
+        {
+            return false;
+        }
+
+        return entry.History.TryGetLatest(out frame);
+    }
+
+    public IReadOnlyList<FrameEnvelope> GetFrameEnvelopeWindow(string cameraId, long centerSequence, int before, int after)
+    {
+        if (!_producers.TryGetValue(cameraId, out var entry))
+        {
+            return Array.Empty<FrameEnvelope>();
+        }
+
+        return entry.History.SliceAround(centerSequence, before, after);
+    }
+
+    public RingBufferStats SnapshotFrameBufferStats(string cameraId)
+    {
+        if (!_producers.TryGetValue(cameraId, out var entry))
+        {
+            return new RingBufferStats(0, 0, 0, null, null);
+        }
+
+        return entry.History.SnapshotStats();
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var sessionId in _previewSessions.Keys.ToArray())
@@ -292,7 +347,8 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 5000.0,
                 1.0,
                 CameraTriggerMode.Software,
-                CameraTriggerModeExtensions.DefaultTargetFrameRateFps);
+                CameraTriggerModeExtensions.DefaultTargetFrameRateFps,
+                24);
         }
 
         binding.Normalize();
@@ -302,7 +358,8 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             binding.ExposureTimeUs,
             binding.GainDb,
             CameraTriggerModeExtensions.Normalize(binding.TriggerMode),
-            CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps));
+            CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps),
+            ResolveHistoryCapacity(binding));
     }
 
     private async Task<ProducerEntry> EnsureProducerAsync(ResolvedBinding binding, CancellationToken cancellationToken)
@@ -334,11 +391,69 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             await industrialCamera.SetTriggerModeAsync(binding.TriggerMode);
         }
 
+        entry.IsRunning = true;
+        entry.SerialNumber = binding.SerialNumber;
+        entry.TriggerMode = binding.TriggerMode;
+        entry.TargetFrameRateFps = binding.TargetFrameRateFps;
+        entry.LatestFrame = null;
+        entry.History = new FrameRingBuffer(binding.FrameBufferCapacity);
+        entry.Sequence = 0;
+        entry.LastPublishedTicks = 0;
+        entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps);
+        entry.PendingFrameWaiters = 0;
+        lock (entry.SignalGate)
+        {
+            entry.NextFrameSignal = CreateFrameSignal();
+        }
+
+        if (camera is IIndustrialCamera eventCamera)
+        {
+            EventHandler<CameraFrameReceivedEventArgs> handler = (_, args) =>
+            {
+                try
+                {
+                    if (!TryEnterPublishWindow(entry))
+                    {
+                        return;
+                    }
+
+                    var contentType = args.ImageData.Length > 2 &&
+                                      args.ImageData[0] == 0xFF &&
+                                      args.ImageData[1] == 0xD8
+                        ? "image/jpeg"
+                        : "image/png";
+                    var frame = CreateFrame(
+                        binding.CameraBindingId,
+                        args.ImageData,
+                        contentType,
+                        args.Width,
+                        args.Height,
+                        args.CameraTimestampNs.HasValue ? (long?)args.CameraTimestampNs.Value : null,
+                        args.DeviceFrameCounter.HasValue ? (long?)args.DeviceFrameCounter.Value : null,
+                        args.Stride);
+                    PublishFrame(entry, frame);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to publish shared camera frame from metadata event. CameraBindingId={CameraBindingId}", binding.CameraBindingId);
+                }
+            };
+
+            eventCamera.FrameReceived += handler;
+            entry.EventCamera = eventCamera;
+            entry.FrameReceivedHandler = handler;
+        }
+
         await camera.StartContinuousAcquisitionAsync(async imageData =>
         {
             try
             {
-                if (!TryEnterPublishWindow(entry, binding.TargetFrameRateFps))
+                if (entry.EventCamera is CameraProviderAdapter)
+                {
+                    return;
+                }
+
+                if (!TryEnterPublishWindow(entry))
                 {
                     return;
                 }
@@ -353,15 +468,6 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
             await Task.CompletedTask;
         });
-
-        entry.IsRunning = true;
-        entry.SerialNumber = binding.SerialNumber;
-        entry.TriggerMode = binding.TriggerMode;
-        entry.TargetFrameRateFps = binding.TargetFrameRateFps;
-        entry.LatestFrame = null;
-        entry.Sequence = 0;
-        entry.LastPublishedTicks = 0;
-        entry.NextFrameSignal = CreateFrameSignal();
 
         _logger.LogInformation(
             "Shared camera stream started. CameraBindingId={CameraBindingId}, TriggerMode={TriggerMode}, TargetFrameRateFps={TargetFrameRateFps}",
@@ -379,6 +485,13 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         try
         {
+            if (entry.EventCamera != null && entry.FrameReceivedHandler != null)
+            {
+                entry.EventCamera.FrameReceived -= entry.FrameReceivedHandler;
+                entry.EventCamera = null;
+                entry.FrameReceivedHandler = null;
+            }
+
             var camera = _cameraManager.GetCamera(entry.SerialNumber);
             if (camera != null)
             {
@@ -397,9 +510,15 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             entry.IsRunning = false;
             entry.SerialNumber = string.Empty;
             entry.LatestFrame = null;
+            entry.History = new FrameRingBuffer(24);
             entry.Sequence = 0;
             entry.LastPublishedTicks = 0;
-            entry.NextFrameSignal = CreateFrameSignal();
+            entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
+            entry.PendingFrameWaiters = 0;
+            lock (entry.SignalGate)
+            {
+                entry.NextFrameSignal = CreateFrameSignal();
+            }
         }
     }
 
@@ -508,14 +627,32 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         while (!cancellationToken.IsCancellationRequested)
         {
             var latestFrame = entry.LatestFrame;
-            var currentSequence = Interlocked.Read(ref entry.Sequence);
-            if (latestFrame != null && (!afterSequence.HasValue || currentSequence > afterSequence.Value))
+            if (latestFrame != null && (!afterSequence.HasValue || latestFrame.Sequence > afterSequence.Value))
             {
                 return latestFrame;
             }
 
-            var signal = entry.NextFrameSignal;
-            await signal.Task.WaitAsync(cancellationToken);
+            Interlocked.Increment(ref entry.PendingFrameWaiters);
+            try
+            {
+                latestFrame = entry.LatestFrame;
+                if (latestFrame != null && (!afterSequence.HasValue || latestFrame.Sequence > afterSequence.Value))
+                {
+                    return latestFrame;
+                }
+
+                TaskCompletionSource<long> signal;
+                lock (entry.SignalGate)
+                {
+                    signal = entry.NextFrameSignal;
+                }
+
+                await signal.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref entry.PendingFrameWaiters);
+            }
         }
 
         throw new OperationCanceledException(cancellationToken);
@@ -531,14 +668,23 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         };
 
         entry.LatestFrame = publishedFrame;
-        var completedSignal = entry.NextFrameSignal;
-        entry.NextFrameSignal = CreateFrameSignal();
-        completedSignal.TrySetResult(nextSequence);
+        entry.History.Push(ToEnvelope(publishedFrame));
+        if (Volatile.Read(ref entry.PendingFrameWaiters) > 0)
+        {
+            TaskCompletionSource<long> completedSignal;
+            lock (entry.SignalGate)
+            {
+                completedSignal = entry.NextFrameSignal;
+                entry.NextFrameSignal = CreateFrameSignal();
+            }
+
+            completedSignal.TrySetResult(nextSequence);
+        }
     }
 
-    private static bool TryEnterPublishWindow(ProducerEntry entry, int targetFrameRateFps)
+    private static bool TryEnterPublishWindow(ProducerEntry entry)
     {
-        var minFrameTicks = TimeSpan.FromSeconds(1d / CameraTriggerModeExtensions.NormalizeTargetFrameRate(targetFrameRateFps)).Ticks;
+        var minFrameTicks = entry.MinFrameTicks;
         while (true)
         {
             var previousTicks = Interlocked.Read(ref entry.LastPublishedTicks);
@@ -555,22 +701,70 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
     }
 
-    private static CameraStreamFrame CreateFrame(string cameraBindingId, byte[] imageData, string contentType)
+    private static CameraStreamFrame CreateFrame(
+        string cameraBindingId,
+        byte[] imageData,
+        string contentType,
+        int width = 0,
+        int height = 0,
+        long? cameraTimestampNs = null,
+        long? deviceFrameCounter = null,
+        int? stride = null)
     {
-        using var decoded = Cv2.ImDecode(imageData, ImreadModes.Unchanged);
-        if (decoded.Empty())
+        if (width <= 0 || height <= 0)
         {
-            throw new InvalidOperationException("Unable to decode camera frame.");
+            using var decoded = Cv2.ImDecode(imageData, ImreadModes.Unchanged);
+            if (decoded.Empty())
+            {
+                throw new InvalidOperationException("Unable to decode camera frame.");
+            }
+
+            width = decoded.Width;
+            height = decoded.Height;
         }
 
         return new CameraStreamFrame(
             cameraBindingId,
             imageData,
             contentType,
-            decoded.Width,
-            decoded.Height,
+            width,
+            height,
             0,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            cameraTimestampNs,
+            deviceFrameCounter,
+            stride);
+    }
+
+    private static FrameEnvelope ToEnvelope(CameraStreamFrame frame)
+    {
+        return new FrameEnvelope(
+            frame.CameraBindingId,
+            frame.Sequence,
+            new DateTimeOffset(DateTime.SpecifyKind(frame.TimestampUtc, DateTimeKind.Utc)),
+            frame.Width,
+            frame.Height,
+            frame.ContentType,
+            FramePayloadKind.EncodedImage,
+            frame.ImageData,
+            frame.CameraTimestampNs,
+            frame.DeviceFrameCounter,
+            frame.Stride,
+            frame.CameraTimestampNs.HasValue || frame.DeviceFrameCounter.HasValue
+                ? FrameTimestampSource.CameraPreferred
+                : FrameTimestampSource.HostFallback,
+            $"{frame.CameraBindingId}:{frame.Sequence}");
+    }
+
+    private static int ResolveHistoryCapacity(CameraBindingConfig binding)
+    {
+        binding.ContinuousInspection ??= new Acme.Product.Core.Continuous.ContinuousInspectionConfig();
+        binding.ContinuousInspection.Normalize();
+        return Math.Max(
+            1,
+            Math.Max(
+                binding.ContinuousInspection.BufferCapacity,
+                binding.ContinuousInspection.PreEventFrames + binding.ContinuousInspection.PostEventFrames + 1));
     }
 
     private static TaskCompletionSource<long> CreateFrameSignal() =>

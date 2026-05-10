@@ -12,6 +12,11 @@ namespace Acme.Product.Core.Interfaces;
 public interface IInspectionResultRepository : IRepository<InspectionResult>
 {
     /// <summary>
+    /// Batch insert inspection results with a single unit-of-work save.
+    /// </summary>
+    Task AddRangeAsync(IEnumerable<InspectionResult> results);
+
+    /// <summary>
     /// 根据工程ID获取结果列表
     /// </summary>
     Task<IEnumerable<InspectionResult>> GetByProjectIdAsync(Guid projectId, int pageIndex = 0, int pageSize = 20);

@@ -7,7 +7,18 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $operatorsRoot = Join-Path $repoRoot "Acme.Product/src/Acme.Product.Infrastructure/Operators"
-$outputRoot = Join-Path $scriptRoot $OutputDir
+$scriptRootFull = [System.IO.Path]::GetFullPath($scriptRoot)
+$outputRoot = if ([System.IO.Path]::IsPathRooted($OutputDir)) {
+    [System.IO.Path]::GetFullPath($OutputDir)
+}
+else {
+    [System.IO.Path]::GetFullPath((Join-Path $scriptRoot $OutputDir))
+}
+$scriptRootPrefix = $scriptRootFull.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+
+if ($outputRoot -ne $scriptRootFull -and -not $outputRoot.StartsWith($scriptRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "OutputDir must resolve inside Acme.OperatorLibrary: $outputRoot"
+}
 
 if (-not (Test-Path -Path $operatorsRoot -PathType Container)) {
     throw "Operators path not found: $operatorsRoot"

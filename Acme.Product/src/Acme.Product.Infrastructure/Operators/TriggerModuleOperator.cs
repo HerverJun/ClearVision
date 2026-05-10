@@ -2,12 +2,13 @@
 // 触发模块算子
 // 管理软件触发、定时触发与外部触发流程
 // 作者：蘅芜君
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(
@@ -26,9 +27,12 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("AutoRepeat", "Auto Repeat", "bool", DefaultValue = true)]
 public class TriggerModuleOperator : OperatorBase
 {
-    private readonly object _syncRoot = new();
-    private DateTime _lastTriggerUtc = DateTime.MinValue;
-    private int _triggerCount;
+    private static readonly TimeSpan StateTtl = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
+
+    private readonly ConcurrentDictionary<Guid, TriggerModuleState> _states = new();
+    private readonly object _cleanupSync = new();
+    private DateTime _lastCleanupUtc = DateTime.MinValue;
 
     public override OperatorType OperatorType => OperatorType.TriggerModule;
 
@@ -54,8 +58,9 @@ public class TriggerModuleOperator : OperatorBase
 
         var triggered = false;
         var count = 0;
+        var state = _states.GetOrAdd(@operator.Id, static _ => new TriggerModuleState());
 
-        lock (_syncRoot)
+        lock (state.SyncRoot)
         {
             if (mode.Equals("Software", StringComparison.OrdinalIgnoreCase))
             {
@@ -63,7 +68,7 @@ public class TriggerModuleOperator : OperatorBase
             }
             else if (mode.Equals("Timer", StringComparison.OrdinalIgnoreCase))
             {
-                triggered = ShouldTriggerByTimer(now, intervalMs, autoRepeat);
+                triggered = ShouldTriggerByTimer(state, now, intervalMs, autoRepeat);
             }
             else
             {
@@ -72,18 +77,23 @@ public class TriggerModuleOperator : OperatorBase
 
             if (triggered)
             {
-                _lastTriggerUtc = now;
-                _triggerCount++;
+                state.LastTriggerUtc = now;
+                state.TriggerCount++;
             }
 
-            count = _triggerCount;
+            count = state.TriggerCount;
+            state.LastTouchedUtc = now;
         }
+
+        TryCleanupStaleStates(now);
 
         var output = new Dictionary<string, object>
         {
             { "Triggered", triggered },
             { "Timestamp", now.ToString("O") },
-            { "TriggerCount", count }
+            { "TriggerCount", count },
+            { "StateScope", "OperatorInstance" },
+            { "StateKey", @operator.Id }
         };
 
         return Task.FromResult(OperatorExecutionOutput.Success(output));
@@ -110,9 +120,9 @@ public class TriggerModuleOperator : OperatorBase
         return ValidationResult.Valid();
     }
 
-    private bool ShouldTriggerByTimer(DateTime now, int intervalMs, bool autoRepeat)
+    private bool ShouldTriggerByTimer(TriggerModuleState state, DateTime now, int intervalMs, bool autoRepeat)
     {
-        if (_triggerCount == 0)
+        if (state.TriggerCount == 0)
         {
             return true;
         }
@@ -122,12 +132,46 @@ public class TriggerModuleOperator : OperatorBase
             return false;
         }
 
-        if (_lastTriggerUtc == DateTime.MinValue)
+        if (state.LastTriggerUtc == DateTime.MinValue)
         {
             return true;
         }
 
-        return (now - _lastTriggerUtc).TotalMilliseconds >= intervalMs;
+        return (now - state.LastTriggerUtc).TotalMilliseconds >= intervalMs;
+    }
+
+    private void TryCleanupStaleStates(DateTime nowUtc)
+    {
+        if ((nowUtc - _lastCleanupUtc) < CleanupInterval)
+        {
+            return;
+        }
+
+        lock (_cleanupSync)
+        {
+            if ((nowUtc - _lastCleanupUtc) < CleanupInterval)
+            {
+                return;
+            }
+
+            var staleBefore = nowUtc - StateTtl;
+            foreach (var entry in _states)
+            {
+                var state = entry.Value;
+                var shouldRemove = false;
+                lock (state.SyncRoot)
+                {
+                    shouldRemove = state.LastTouchedUtc < staleBefore;
+                }
+
+                if (shouldRemove)
+                {
+                    _states.TryRemove(entry.Key, out _);
+                }
+            }
+
+            _lastCleanupUtc = nowUtc;
+        }
     }
 
     private static bool TryGetSignalInput(Dictionary<string, object>? inputs, out bool signal)
@@ -164,6 +208,14 @@ public class TriggerModuleOperator : OperatorBase
             double d => (value = Math.Abs(d) > double.Epsilon) || Math.Abs(d) <= double.Epsilon,
             _ => bool.TryParse(raw.ToString(), out value)
         };
+    }
+
+    private sealed class TriggerModuleState
+    {
+        public object SyncRoot { get; } = new();
+        public DateTime LastTriggerUtc { get; set; } = DateTime.MinValue;
+        public DateTime LastTouchedUtc { get; set; } = DateTime.UtcNow;
+        public int TriggerCount { get; set; }
     }
 }
 

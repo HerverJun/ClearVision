@@ -1,36 +1,160 @@
 # ClearVision
 
-ClearVision 是一个面向工业视觉检测的 .NET 8 项目，核心由桌面端流程编排、算子运行时、独立算子库打包、质量评测与算子文档体系组成。
+[![CI](https://github.com/HerverJun/ClearVision/actions/workflows/ci.yml/badge.svg)](https://github.com/HerverJun/ClearVision/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/HerverJun/ClearVision/actions/workflows/codeql.yml/badge.svg)](https://github.com/HerverJun/ClearVision/actions/workflows/codeql.yml)
+![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
+![Windows](https://img.shields.io/badge/Windows-Desktop-0078D4)
 
-当前仓库不是一个单纯的 OpenCV 示例集合，而是把图像预处理、检测、测量、标定、匹配定位、AI 推理、通信和流程控制统一到 Operator 元数据、端口、参数和质量证据框架里。
+ClearVision 是一个面向工业视觉检测的 .NET 平台工程，覆盖桌面端流程编排、视觉算子执行、本地运行时 API、现场 Station 同步、质量证据治理和可独立打包的算子库。
 
-## 当前状态
+它不是单一的 OpenCV demo，而是一套把图像采集、预处理、检测、测量、标定、AI 推理、PLC/通信、结果回放与工程化验证串在一起的视觉软件骨架。
 
-- 主应用：`Acme.Product`，Windows 桌面应用，基于 `net8.0-windows`、WinForms、WebView2 与本地后端端点。
-- 算子库：`Acme.OperatorLibrary`，以 NuGet 包形态封装共享算子实现，当前包版本前缀为 `1.0.2`，包元数据使用 MIT license expression。
-- 算子规模：正式口径为 **155 个算子**；运行时兼容元数据包含 4 个 legacy alias，因此运行时可见口径为 159。
-- 文档口径：当前活跃算子文档位于 [`docs/算子资料/`](./docs/算子资料/)，仓库根 [`算子资料/`](./算子资料/) 是兼容镜像。
-- 质量治理：当前整改主线见 [`docs/进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md`](./docs/进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md)；`quality/evals/reports/operator_quality_matrix.md` 是质量矩阵入口。
-- 工具链：`.NET SDK 10.0.101` 由 [`global.json`](./global.json) 固定，详情见 [`ClearVision-SDK与依赖版本口径`](./docs/参考资料/指南/ClearVision-SDK与依赖版本口径.md)。
+## 项目亮点
 
-## 阅读入口
+- Windows 桌面 Studio：WinForms + WebView2 前端，提供项目管理、流程编辑、算子配置、图像预览、检测执行和结果看板。
+- 本地运行时服务：桌面端内嵌 ASP.NET Core endpoints，承载项目、模板、算子预览、实时检测、Station 管理和配置接口。
+- 工业视觉算子库：覆盖图像处理、测量、标定、通信、流程控制、AI 等模块，当前公开算子目录以 155 个算子类型为核心边界。
+- 可打包 OperatorLibrary：`Acme.OperatorLibrary` 可独立构建为 NuGet 包，当前包版本基线为 `1.0.2`。
+- Station 现场链路：支持运行包导出、Station 同步、健康状态、结果摘要、命令下发与审计记录。
+- 质量证据体系：使用 contract、golden、dataset、field replay、benchmark 和 CI gate 区分功能成熟度与证据成熟度。
 
-- [项目总览](./docs/项目总览.md)：当前进度、代码结构、质量证据与风险边界。
-- [文档导航](./docs/导航.md)：仓库文档区总入口。
-- [算子资料导航](./docs/算子资料/导航.md)：算子目录、名片、手册、质量说明的入口。
-- [算子目录](./docs/算子资料/算子目录.md)：155 个正式算子的分类索引。
-- [算子名片索引](./docs/算子资料/算子名片/CATALOG.md)：逐算子卡片入口。
-- [算子文档现状对齐说明](./docs/算子资料/算子文档现状对齐说明-2026-04.md)：代码、目录、名片、手册之间的口径说明。
-- [算子库 README](./Acme.OperatorLibrary/README.md)：独立算子库打包与验收范围。
+## 技术栈
 
-## 常用命令
+| 层级 | 技术 |
+| --- | --- |
+| 运行平台 | .NET 8, C# 12, Windows |
+| 桌面容器 | WinForms, WebView2 |
+| 本地 API | ASP.NET Core minimal APIs, SSE |
+| 视觉与 AI | OpenCvSharp, ONNX Runtime, PaddleOCRSharp, ZXing.Net |
+| 数据与配置 | SQLite, EF Core, 本地配置文件 |
+| 工业通信 | Modbus, Siemens S7, Mitsubishi MC, Omron FINS, TCP/Serial, MQTT |
+| 测试与质量 | xUnit, Playwright, BenchmarkDotNet, GitHub Actions, CodeQL |
 
-```powershell
-dotnet --info
-dotnet restore Acme.Product/Acme.Product.sln
-dotnet build Acme.Product/Acme.Product.sln --configuration Debug
-dotnet build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release
-dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
+## 架构概览
+
+```mermaid
+flowchart LR
+    User[工程师 / 现场操作员] --> Studio[ClearVision Studio<br/>WinForms + WebView2]
+    Studio --> Api[本地 ASP.NET Core API]
+    Api --> App[Application Services]
+    App --> Runtime[Runtime 执行引擎]
+    Runtime --> Operators[视觉算子层]
+    Operators --> CV[OpenCV / ONNX / OCR / PLC]
+    App --> Data[(SQLite / 本地配置)]
+    Runtime --> Package[运行包导出]
+    Package --> Station[Station 现场端]
+    Station --> Results[结果 / 健康 / 审计]
+    Results --> Studio
+    Operators --> NuGet[Acme.OperatorLibrary]
 ```
 
-测试执行请优先使用仓库脚本，例如 `./scripts/run-dotnet-test-serial.ps1` 或固定回归脚本，避免同一 `.csproj` 同时启动多个 `dotnet test`。
+## 仓库结构
+
+| 路径 | 说明 |
+| --- | --- |
+| `Acme.Product/` | ClearVision 主应用解决方案，包含桌面端、运行时、Station、核心领域与基础设施代码 |
+| `Acme.Product/src/Acme.Product.Desktop/` | Windows 桌面入口、WebView2 宿主、本地 API 和前端静态资源 |
+| `Acme.Product/src/Acme.Product.Runtime/` | 流程执行、运行包导出与运行时服务 |
+| `Acme.Product/src/Acme.Product.Station/` | 现场 Station 端同步与运行界面 |
+| `Acme.Product/src/Acme.Product.Infrastructure/Operators/` | 主要视觉算子实现 |
+| `Acme.OperatorLibrary/` | 可独立打包的工业视觉算子 NuGet 项目 |
+| `quality/` | 数据集、回放、质量矩阵、benchmark 和质量 gate 资产 |
+| `models/` | 模型目录与模型发布说明 |
+| `docs/` | 架构、运行时、质量、发布、工程治理文档 |
+| `scripts/` | 测试、打包、虚拟 PLC、文档生成与质量验证脚本 |
+| `线序检测/` | 端子线序检测场景包、模板、样例与版本资料 |
+
+## 快速开始
+
+前置条件：
+
+- Windows 10/11
+- .NET SDK `9.0.300`，仓库根目录 `global.json` 已固定 SDK 版本，并使用 `latestFeature` roll-forward
+- Microsoft Edge WebView2 Runtime
+- PowerShell
+- Node.js 20，仅 UI/Playwright 测试需要
+
+```powershell
+git clone https://github.com/HerverJun/ClearVision.git
+cd ClearVision
+
+dotnet restore .\Acme.Product\Acme.Product.sln --locked-mode
+dotnet build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore
+
+dotnet run --project .\Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj --configuration Debug --no-build
+```
+
+AI 流程生成相关密钥默认不写入仓库。需要联调时，请在本地配置文件或运行环境中配置自己的 provider、base URL 和 API key，避免提交任何密钥。
+
+## 常用验证命令
+
+仓库提供串行测试脚本，避免同一 `.csproj` 的多个 `dotnet test` 进程互相抢占。
+
+```powershell
+& "./scripts/run-dotnet-test-serial.ps1" `
+  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Configuration Debug `
+  -NoRestore `
+  -Verbosity minimal
+
+& "./scripts/run-tests-desktop-endpoints.ps1" -NoBuild -NoRestore
+& "./scripts/run-tests-plc-regression.ps1" -NoBuild -NoRestore
+```
+
+OperatorLibrary 打包与 smoke 验证：
+
+```powershell
+dotnet build .\Acme.OperatorLibrary\Acme.OperatorLibrary.csproj --configuration Release
+& ".\Acme.OperatorLibrary\pack.ps1" -Configuration Release -RunSmokeTest
+```
+
+质量套件入口：
+
+```powershell
+python .\quality\tools\run_quality_suite.py --suite quick_contract_suite --list
+python .\quality\tools\run_quality_suite.py --suite quick_contract_suite --validate-only
+```
+
+## OperatorLibrary
+
+`Acme.OperatorLibrary` 将 ClearVision 的算子层以 NuGet 包形式交付，方便在宿主外复用图像处理、测量、标定、通信、流程控制和 AI 算子。
+
+包项目采用 MSBuild linked compile items 复用主工程源码，同时保留独立的 package metadata、SBOM、third-party notices、smoke tests 和版本注入能力。
+
+```powershell
+& ".\Acme.OperatorLibrary\pack.ps1" `
+  -PackageVersion "1.0.2-ci.local" `
+  -RepositoryBranch "main" `
+  -RepositoryCommit "local" `
+  -RunSmokeTest
+```
+
+更多说明见 [Acme.OperatorLibrary README](./Acme.OperatorLibrary/README.md)。
+
+## 质量与发布边界
+
+ClearVision 把“功能存在”和“可发布证据充分”分开管理：
+
+- 功能成熟度：算子是否存在、是否进入正式目录、是否通过基础契约或 smoke 路径。
+- 证据成熟度：是否具备 contract、golden、dataset、field replay、性能基线和现场签核记录。
+
+公开数据集、半合成样本、field-substitute replay 或 dry-run smoke 不能等同于真实产线签核。真实产线签核应包含现场样本、硬件 profile、数据版本、报告 ID 和审批记录。
+
+CI 当前覆盖构建、编码扫描、密钥扫描、单元测试、桌面端测试、检测回归/性能 gate、OperatorLibrary 打包 smoke、UI 测试、CodeQL 与手动工业 gate。
+
+## 文档导航
+
+- [项目总览](./docs/项目总览.md)
+- [文档索引](./docs/README.md)
+- [Runtime 设计](./docs/runtime/ClearVision-Runtime-Design.md)
+- [Station-Studio 同步](./docs/runtime/station-studio-sync.md)
+- [CI 与质量门禁](./docs/engineering/ci-quality-gates.md)
+- [证据与临时产物规范](./docs/engineering/evidence-artifacts.md)
+- [OperatorLibrary 发布工业化说明](./docs/operator-library/release-package-industrialization.md)
+- [算子质量矩阵](./quality/evals/reports/operator_quality_matrix.md)
+- [算子目录](./算子资料/算子目录.md)
+- [端子线序检测场景包](./线序检测/scenario-package-wire-sequence/README.md)
+
+## 许可证
+
+`Acme.OperatorLibrary` 的 NuGet metadata 当前声明为 MIT license expression。若整个仓库需要对外正式发布，请以根目录许可证文件为准，并在发布前补齐对应的 `LICENSE` 文件。

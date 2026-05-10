@@ -87,6 +87,18 @@ Any release claiming a numerical accuracy target must attach the model/catalog v
 
 External real production-site data, customer sign-off, and line sign-off are release blockers that cannot be closed by local repository work. Local synthetic, dataset, benchmark, smoke, and field-substitute replay evidence may support regression confidence, but it must not be described as completed industrial validation.
 
+## Plugin Manifest And Maturity
+
+External operator packages must ship an operator plugin manifest before they are loaded by a host. The baseline contract is documented in `docs/operator-library/plugin-manifest.md`, with `operator-plugin-manifest.sample.json` as the package-author example.
+
+Operator maturity is explicit:
+
+- `Delivered`: implemented, tested, documented, and visible by default for supported profiles.
+- `Experimental`: usable but still requiring scenario validation or feature flags.
+- `PlaceholderDisabled`: metadata/contract exists but runtime integration is disabled; the operator must not be enabled by default.
+
+`MqttPublishOperator` is intentionally tagged as `maturity:placeholder-disabled` until an MQTT client dependency, connection lifecycle, and CI/smoke evidence are added.
+
 ## Known Limitations
 
 - Windows is the only fully documented native runtime profile for OpenCvSharp and Paddle OCR in this package.
@@ -107,3 +119,4 @@ External real production-site data, customer sign-off, and line sign-off are rel
 7. Attach versioned accuracy evidence for any release note that claims model/OCR/measurement quality.
 8. Attach external real-site evidence before claiming completed industrial validation.
 9. Record unresolved license review items before publishing outside an internal feed.
+10. Validate the operator plugin manifest against the host version and operator contract before exposing package operators in the catalog.

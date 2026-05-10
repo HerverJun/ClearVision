@@ -60,7 +60,8 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
         var nowUtc = DateTime.UtcNow;
         var state = _states.GetOrAdd(@operator.Id, static _ => new FrameWindowState());
 
-        Mat[] snapshot;
+        Mat result;
+        int bufferedFrameCount;
         lock (state.SyncRoot)
         {
             if (state.Frames.Count > 0)
@@ -79,30 +80,19 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
                 old.Dispose();
             }
 
-            snapshot = state.Frames.Select(static frame => frame.Clone()).ToArray();
+            var frames = state.Frames.ToArray();
+            bufferedFrameCount = frames.Length;
+            result = mode.Equals("Median", StringComparison.OrdinalIgnoreCase)
+                ? ComputeMedian(frames)
+                : ComputeMean(frames);
             state.LastTouchedUtc = nowUtc;
         }
 
         TryCleanupStaleStates(nowUtc);
 
-        Mat result;
-        try
-        {
-            result = mode.Equals("Median", StringComparison.OrdinalIgnoreCase)
-                ? ComputeMedian(snapshot)
-                : ComputeMean(snapshot);
-        }
-        finally
-        {
-            foreach (var mat in snapshot)
-            {
-                mat.Dispose();
-            }
-        }
-
         var output = new Dictionary<string, object>
         {
-            { "FrameCount", snapshot.Length }
+            { "FrameCount", bufferedFrameCount }
         };
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(result, output)));
@@ -276,14 +266,14 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
         MatType depth)
         where T : unmanaged, IComparable<T>
     {
-        var resultFlat = new Mat(rows, flatWidth, MatType.MakeType(depth, 1));
+        using var resultFlat = new Mat(rows, flatWidth, MatType.MakeType(depth, 1));
         var resultIndexer = resultFlat.GetGenericIndexer<T>();
         var frameIndexers = flattenedFrames.Select(frame => frame.GetGenericIndexer<T>()).ToArray();
-        var samples = new T[flattenedFrames.Count];
         var medianIndex = flattenedFrames.Count / 2;
 
-        for (var row = 0; row < rows; row++)
+        Parallel.For(0, rows, row =>
         {
+            var samples = new T[flattenedFrames.Count];
             for (var col = 0; col < flatWidth; col++)
             {
                 for (var frame = 0; frame < flattenedFrames.Count; frame++)
@@ -293,7 +283,7 @@ public class FrameAveragingOperator : OperatorBase, IDisposable
 
                 resultIndexer[row, col] = SelectKthInPlace(samples, medianIndex);
             }
-        }
+        });
 
         using var reshaped = resultFlat.Reshape(channels, rows);
         return reshaped.Clone();

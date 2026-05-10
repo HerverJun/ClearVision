@@ -228,7 +228,8 @@ class OmronFinsHandler(socketserver.BaseRequestHandler):
                     print(f"FINS handshake: client_node={client_node}, server_node={server_node}", flush=True)
                     self.request.sendall(build_fins_node_response(server_node, client_node))
                 elif command == FINS_FRAME_SEND:
-                    payload = read_exact(self.request, length)
+                    payload_length = resolve_fins_payload_length(length)
+                    payload = read_exact(self.request, payload_length)
                     response = handle_fins_frame(memory, payload, server_node)
                     self.request.sendall(response)
                 else:
@@ -286,6 +287,16 @@ def handle_fins_frame(memory: VirtualFinsMemory, frame: bytes, server_node: int)
     return build_fins_response(frame, server_node, mrc, src, FINS_END_OK, client_node=client_node, sid=sid)
 
 
+def resolve_fins_payload_length(length: int) -> int:
+    if length < 18:
+        return length
+
+    if length - 8 >= 18:
+        return length - 8
+
+    return length
+
+
 def is_fins_bit_area(area_code: int) -> bool:
     return area_code in {0x02, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33}
 
@@ -317,7 +328,7 @@ def build_fins_response(
 def build_fins_tcp_header(payload: bytes, command: int, error_code: int = FINS_ERROR_OK) -> bytes:
     frame = bytearray()
     frame += FINS_MAGIC
-    frame += len(payload).to_bytes(4, "big")
+    frame += (len(payload) + 8).to_bytes(4, "big")
     frame += command.to_bytes(4, "big")
     frame += error_code.to_bytes(4, "big")
     frame += payload

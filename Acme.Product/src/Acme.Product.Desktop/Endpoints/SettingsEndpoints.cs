@@ -4,7 +4,9 @@
 
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Application.Services;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.AspNetCore.Builder;
@@ -33,8 +35,13 @@ public static class SettingsEndpoints
         });
 
         // 更新配置
-        app.MapPut("/api/settings", async (AppConfig config, IConfigurationService configService) =>
+        app.MapPut("/api/settings", async (AppConfig config, IConfigurationService configService, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             try
             {
                 await configService.SaveAsync(config);
@@ -70,8 +77,13 @@ public static class SettingsEndpoints
         });
 
         // 重置配置为默认值
-        app.MapPost("/api/settings/reset", async (IConfigurationService configService, AiConfigStore aiConfigStore) =>
+        app.MapPost("/api/settings/reset", async (IConfigurationService configService, AiConfigStore aiConfigStore, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             var defaultConfig = new AppConfig();
             await configService.SaveAsync(defaultConfig);
             var defaultModels = aiConfigStore.ResetToDefaults();
@@ -141,8 +153,13 @@ public static class SettingsEndpoints
         });
 
         // 创建新模型
-        app.MapPost("/api/ai/models", (AiModelCreateRequest request, AiConfigStore configStore) =>
+        app.MapPost("/api/ai/models", (AiModelCreateRequest request, AiConfigStore configStore, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             try
             {
                 var model = new AiModelConfig
@@ -176,8 +193,13 @@ public static class SettingsEndpoints
         });
 
         // 更新指定模型
-        app.MapPut("/api/ai/models/{id}", (string id, AiModelUpdateRequest request, AiConfigStore configStore) =>
+        app.MapPut("/api/ai/models/{id}", (string id, AiModelUpdateRequest request, AiConfigStore configStore, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             try
             {
                 var updated = new AiModelConfig
@@ -212,8 +234,13 @@ public static class SettingsEndpoints
         });
 
         // 删除指定模型
-        app.MapDelete("/api/ai/models/{id}", (string id, AiConfigStore configStore) =>
+        app.MapDelete("/api/ai/models/{id}", (string id, AiConfigStore configStore, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             try
             {
                 var ok = configStore.Delete(id);
@@ -228,8 +255,13 @@ public static class SettingsEndpoints
         });
 
         // 设为激活模型
-        app.MapPost("/api/ai/models/{id}/activate", (string id, AiConfigStore configStore) =>
+        app.MapPost("/api/ai/models/{id}/activate", (string id, AiConfigStore configStore, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             var ok = configStore.SetActive(id);
             return ok
                 ? Results.Ok(new { Message = "已切换激活模型" })
@@ -237,8 +269,13 @@ public static class SettingsEndpoints
         });
 
         // 测试指定模型的连接（使用该模型的真实 Key，不影响全局 active 状态）
-        app.MapPost("/api/ai/models/{id}/test", async (string id, AiConfigStore configStore, AiApiClient apiClient) =>
+        app.MapPost("/api/ai/models/{id}/test", async (string id, AiConfigStore configStore, AiApiClient apiClient, HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
             try
             {
                 var model = configStore.GetById(id);
@@ -485,6 +522,13 @@ public static class SettingsEndpoints
         });
 
         return app;
+    }
+
+    private static bool IsAdmin(HttpContext context)
+    {
+        return context.Items.TryGetValue("CurrentUser", out var userObj) &&
+               userObj is UserSession user &&
+               string.Equals(user.Role, UserRole.Admin.ToString(), StringComparison.Ordinal);
     }
 
     private static object ToAiModelResponse(AiModelConfig m) => new

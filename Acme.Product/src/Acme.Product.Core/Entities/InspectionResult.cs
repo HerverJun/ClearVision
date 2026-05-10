@@ -176,6 +176,33 @@ public class InspectionResult : Entity
         SessionId = sessionId;
         MarkAsModified();
     }
+
+    public void RestorePersistenceMetadata(
+        Guid id,
+        DateTime inspectionTime,
+        DateTime createdAt,
+        DateTime? modifiedAt)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Inspection result id cannot be empty.", nameof(id));
+        }
+
+        if (inspectionTime == default)
+        {
+            throw new ArgumentException("Inspection time cannot be default.", nameof(inspectionTime));
+        }
+
+        if (createdAt == default)
+        {
+            throw new ArgumentException("Created time cannot be default.", nameof(createdAt));
+        }
+
+        Id = id;
+        InspectionTime = inspectionTime;
+        CreatedAt = createdAt;
+        ModifiedAt = modifiedAt;
+    }
 }
 
 /// <summary>

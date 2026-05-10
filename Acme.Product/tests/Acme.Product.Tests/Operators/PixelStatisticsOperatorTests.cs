@@ -81,6 +81,35 @@ public class PixelStatisticsOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FloatChannelAll_ShouldFlattenChannelsWithExactRobustStats()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object> { ["Channel"] = "All" });
+
+        using var mat = new Mat(1, 2, MatType.CV_32FC3);
+        mat.Set(0, 0, new Vec3f(1.0f, 10.0f, 100.0f));
+        mat.Set(0, 1, new Vec3f(3.0f, 20.0f, 200.0f));
+
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(new ImageWrapper(mat)));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["AggregationMode"].Should().Be("FlattenedChannels");
+        Convert.ToDouble(result.OutputData["Mean"]).Should().BeApproximately(334.0 / 6.0, 1e-6);
+        Convert.ToDouble(result.OutputData["Median"]).Should().BeApproximately(15.0, 1e-6);
+        Convert.ToDouble(result.OutputData["MedianAbsoluteDeviation"]).Should().BeApproximately(13.0, 1e-6);
+        Convert.ToInt32(result.OutputData["SampleCount"]).Should().Be(6);
+
+        var channelStats = result.OutputData["ChannelStats"]
+            .Should()
+            .BeOfType<Dictionary<string, object>>()
+            .Subject;
+
+        Convert.ToDouble(((Dictionary<string, object>)channelStats["B"])["Mean"]).Should().BeApproximately(2.0, 1e-6);
+        Convert.ToDouble(((Dictionary<string, object>)channelStats["G"])["Mean"]).Should().BeApproximately(15.0, 1e-6);
+        Convert.ToDouble(((Dictionary<string, object>)channelStats["R"])["Mean"]).Should().BeApproximately(150.0, 1e-6);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithMask_ShouldReturnAnalyticStatsAndUncertainty()
     {
         var sut = CreateSut();

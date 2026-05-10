@@ -1,6 +1,7 @@
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
+using Acme.Product.Core.Streaming;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -134,6 +135,47 @@ public class ImageAcquisitionOperatorTests
         result.OutputData["Source"].Should().Be("camera");
         await cameraManager.Received(1).GetOrCreateByBindingAsync("cam-1");
         await camera.Received(1).AcquireSingleFrameAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithProvidedFrameEnvelope_ShouldUseInjectedFrame()
+    {
+        using var mat = new Mat(7, 11, MatType.CV_8UC3, new Scalar(30, 60, 90));
+        var envelope = new FrameEnvelope(
+            "cam-envelope",
+            42,
+            DateTimeOffset.UtcNow,
+            11,
+            7,
+            "image/png",
+            FramePayloadKind.EncodedImage,
+            mat.ToBytes(".png"),
+            TimestampSource: FrameTimestampSource.HostFallback,
+            CorrelationId: "corr-42");
+
+        var cameraManager = Substitute.For<ICameraManager>();
+        var sut = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager);
+
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "cam-1"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["ProvidedFrameEnvelope"] = envelope
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Width"].Should().Be(11);
+        result.OutputData["Height"].Should().Be(7);
+        result.OutputData["Source"].Should().Be("provided-frame-envelope");
+        result.OutputData["CameraId"].Should().Be("cam-envelope");
+        result.OutputData["Sequence"].Should().Be(42L);
+        result.OutputData["CorrelationId"].Should().Be("corr-42");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
     }
 
     [Fact]

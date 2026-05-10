@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Linq;
+using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Desktop.Endpoints;
@@ -114,6 +115,16 @@ public class SettingsResetEndpointTests
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = "admin",
+                    Username = "admin",
+                    Role = "Admin"
+                };
+                await next();
+            });
             app.MapSettingsEndpoints();
             await app.StartAsync();
             return new SettingsResetTestHost(app, configService);

@@ -1,4 +1,5 @@
 using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Streaming;
 
 namespace Acme.Product.Infrastructure.Cameras;
 
@@ -13,10 +14,16 @@ internal sealed class NoOpCameraFrameStreamCoordinator : ICameraFrameStreamCoord
     public Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 
+    public Task<FrameEnvelope> AcquireFrameEnvelopeAsync(string cameraId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
+
     public Task<CameraStreamLease> AcquireStreamLeaseAsync(string cameraId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 
     public Task<CameraStreamFrame> WaitForNextFrameAsync(CameraStreamLease lease, long? afterSequence = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
+
+    public Task<FrameEnvelope> WaitForNextFrameEnvelopeAsync(CameraStreamLease lease, long? afterSequence = null, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 
     public Task ReleaseStreamLeaseAsync(CameraStreamLease lease) => Task.CompletedTask;
@@ -28,6 +35,18 @@ internal sealed class NoOpCameraFrameStreamCoordinator : ICameraFrameStreamCoord
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 
     public Task StopPreviewSessionAsync(string sessionId) => Task.CompletedTask;
+
+    public bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame)
+    {
+        frame = null;
+        return false;
+    }
+
+    public IReadOnlyList<FrameEnvelope> GetFrameEnvelopeWindow(string cameraId, long centerSequence, int before, int after) =>
+        Array.Empty<FrameEnvelope>();
+
+    public RingBufferStats SnapshotFrameBufferStats(string cameraId) =>
+        new(0, 0, 0, null, null);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

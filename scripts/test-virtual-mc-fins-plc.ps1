@@ -12,8 +12,6 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $workdir = Join-Path $root "tools\virtual-plc\mc-fins"
 
-Set-Location $workdir
-
 $arguments = @(
     "test_client.py",
     "--host", $HostAddress,
@@ -30,4 +28,10 @@ if ($SkipFins) {
     $arguments += "--skip-fins"
 }
 
-python @arguments
+Push-Location $workdir
+try {
+    python @arguments
+}
+finally {
+    Pop-Location
+}

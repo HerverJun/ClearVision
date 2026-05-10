@@ -1,5 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Configs;
+using Acme.Product.Core.Cameras;
 using OpenCvSharp;
 using System;
 using System.Runtime.InteropServices;
@@ -81,11 +83,64 @@ namespace Acme.Product.Benchmarks
         }
     }
 
+    [MemoryDiagnoser]
+    [SimpleJob(launchCount: 1, warmupCount: 3, iterationCount: 5)]
+    public class CameraFrameMetadataBenchmark
+    {
+        private byte[] _encodedFrame = Array.Empty<byte>();
+
+        [GlobalSetup]
+        public void Setup()
+        {
+            using var image = new Mat(1536, 2048, MatType.CV_8UC1);
+            image.Randu(new Scalar(0), new Scalar(255));
+            _encodedFrame = image.ToBytes(".jpg", new[] { (int)ImwriteFlags.JpegQuality, 85 });
+        }
+
+        [Benchmark(Baseline = true)]
+        public CameraStreamFrame DecodeDimensionsOnPublish()
+        {
+            using var decoded = Cv2.ImDecode(_encodedFrame, ImreadModes.Unchanged);
+            if (decoded.Empty())
+            {
+                throw new InvalidOperationException("Unable to decode camera frame.");
+            }
+
+            return new CameraStreamFrame(
+                "bench-camera",
+                _encodedFrame,
+                "image/jpeg",
+                decoded.Width,
+                decoded.Height,
+                0,
+                DateTime.UtcNow,
+                CameraTimestampNs: 123,
+                DeviceFrameCounter: 456,
+                Stride: 2048);
+        }
+
+        [Benchmark]
+        public CameraStreamFrame UseCameraMetadataOnPublish()
+        {
+            return new CameraStreamFrame(
+                "bench-camera",
+                _encodedFrame,
+                "image/jpeg",
+                2048,
+                1536,
+                0,
+                DateTime.UtcNow,
+                CameraTimestampNs: 123,
+                DeviceFrameCounter: 456,
+                Stride: 2048);
+        }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
-            var summary = BenchmarkRunner.Run<LOH_GC_Benchmark>();
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, DefaultConfig.Instance);
         }
     }
 }

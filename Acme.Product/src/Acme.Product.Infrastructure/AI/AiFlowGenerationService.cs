@@ -2773,7 +2773,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         AiGeneratedFlowJson generated,
         string userDescription)
     {
-        // tempId 鈫?(IdGuid, Metadata) 鐨勬槧灏?
+        // Map tempId to generated operator ID and metadata.
         var opInfoMapping = new Dictionary<string, (Guid Id, OperatorMetadata Meta)>();
 
         // tempId 鈫?(InputPorts: Name->Guid, OutputPorts: Name->Guid)

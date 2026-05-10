@@ -337,9 +337,7 @@ public sealed class Phase2SpecializedPerformanceAcceptanceTests
 
     private static string WriteReport(IReadOnlyList<PerformanceEntry> entries, double budgetScale)
     {
-        var repoRoot = ResolveAcmeProductRoot();
-        var reportDirectory = Path.Combine(repoRoot, "test_results");
-        Directory.CreateDirectory(reportDirectory);
+        var reportDirectory = ResolvePerformanceReportDirectory("CV_PHASE2_PERF_REPORT_DIR");
 
         var reportPath = Path.Combine(reportDirectory, "stage2_specialized_performance_report.md");
         var builder = new StringBuilder();
@@ -376,6 +374,22 @@ public sealed class Phase2SpecializedPerformanceAcceptanceTests
         }
 
         return Directory.GetCurrentDirectory();
+    }
+
+    private static string ResolvePerformanceReportDirectory(string reportDirectoryEnvName)
+    {
+        var configured = Environment.GetEnvironmentVariable(reportDirectoryEnvName);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = Environment.GetEnvironmentVariable("CV_PERF_REPORT_DIR");
+        }
+
+        var reportDirectory = string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(ResolveAcmeProductRoot(), "test_results")
+            : configured;
+
+        Directory.CreateDirectory(reportDirectory);
+        return reportDirectory;
     }
 
     private static void DisposeObjectGraph(object? value)

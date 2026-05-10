@@ -2,6 +2,7 @@
 // 深度学习算子 - 使用 ONNX 模型进行 AI 缺陷检测
 // 作者：蘅芜君
 
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -91,6 +92,7 @@ public enum YoloVersion
 public class DeepLearningOperator : OperatorBase
 {
     private static readonly string[] SupportedCatalogTypes = ["detection", "object_detection", "deep_learning", "yolo"];
+    private static readonly DeepLearningRuntimeOptions RuntimeOptions = DeepLearningRuntimeOptions.Load();
 
     public override OperatorType OperatorType => OperatorType.DeepLearning;
 
@@ -105,11 +107,14 @@ public class DeepLearningOperator : OperatorBase
     /// 线程锁 - 用于并发加载模型
     /// </summary>
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _modelLocks = new();
-    private const int MaxCachedModels = 3;
+    private const int DefaultMaxCachedModels = 3;
+    private const int DefaultOnnxRuntimeThreadCount = 4;
+    private const long DefaultTensorPoolMaxBytes = 256L * 1024 * 1024;
     private const int DefaultNmsCandidateLimit = 10000;
     private static readonly LinkedList<string> _modelAccessOrder = new();
     private static readonly Dictionary<string, LinkedListNode<string>> _modelAccessNodes = new();
     private static readonly object _modelCacheEvictionLock = new();
+    private static readonly ConcurrentDictionary<int, int[]> _inputTensorDimensions = new();
 
     /// <summary>
     /// 默认输入尺寸（YOLO 模型常用 640x640）
@@ -130,6 +135,51 @@ public class DeepLearningOperator : OperatorBase
         new Scalar(128, 128, 255), // 粉色
         new Scalar(128, 255, 128)  // 浅绿
     };
+
+    private sealed record DeepLearningRuntimeOptions(
+        int MaxCachedModels,
+        int InterOpThreads,
+        int IntraOpThreads,
+        long TensorPoolMaxBytes)
+    {
+        public static DeepLearningRuntimeOptions Load()
+        {
+            return new DeepLearningRuntimeOptions(
+                ReadInt("Performance__DeepLearning__MaxCachedModels", "CV_DEEPLEARNING_MAX_CACHED_MODELS", DefaultMaxCachedModels, 1, 64),
+                ReadInt("Performance__DeepLearning__InterOpThreads", "CV_DEEPLEARNING_INTER_OP_THREADS", DefaultOnnxRuntimeThreadCount, 1, 128),
+                ReadInt("Performance__DeepLearning__IntraOpThreads", "CV_DEEPLEARNING_INTRA_OP_THREADS", DefaultOnnxRuntimeThreadCount, 1, 128),
+                ReadLong("Performance__DeepLearning__TensorPoolMaxBytes", "CV_DEEPLEARNING_TENSOR_POOL_MAX_BYTES", DefaultTensorPoolMaxBytes, 0, long.MaxValue));
+        }
+
+        private static int ReadInt(string configurationKey, string environmentKey, int fallback, int min, int max)
+        {
+            var configured = Environment.GetEnvironmentVariable(configurationKey);
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                configured = Environment.GetEnvironmentVariable(environmentKey);
+            }
+
+            return int.TryParse(configured, out var parsed)
+                ? Math.Clamp(parsed, min, max)
+                : fallback;
+        }
+
+        private static long ReadLong(string configurationKey, string environmentKey, long fallback, long min, long max)
+        {
+            var configured = Environment.GetEnvironmentVariable(configurationKey);
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                configured = Environment.GetEnvironmentVariable(environmentKey);
+            }
+
+            if (!long.TryParse(configured, out var parsed))
+            {
+                return fallback;
+            }
+
+            return Math.Min(Math.Max(parsed, min), max);
+        }
+    }
 
     /// <summary>
     /// COCO 80类标签名映射
@@ -342,11 +392,11 @@ public class DeepLearningOperator : OperatorBase
             labelContract.ResolvedLabelSource,
             labelContract.ValidationStatus);
 
-        var inputTensor = PreprocessImage(src, inputSize);
+        using var inputTensor = PreprocessImageLease(src, inputSize);
         Logger.LogDebug("[DeepLearning] 输入张量形状: [1, 3, {InputSize}, {InputSize}]", inputSize, inputSize);
 
         // 7. 执行推理
-        var inferenceOutput = RunInference(session, inputTensor, labels.Length);
+        var inferenceOutput = RunInference(session, inputTensor.Tensor, labels.Length);
         var outputTensor = inferenceOutput.Tensor;
         Logger.LogInformation(
             "[DeepLearning] Output tensor selected. OutputTensorName={OutputTensorName}, OutputTensorShape={OutputTensorShape}, SelectionRule={SelectionRule}",
@@ -465,8 +515,8 @@ public class DeepLearningOperator : OperatorBase
 
             var sessionOptions = new SessionOptions
             {
-                InterOpNumThreads = 4,
-                IntraOpNumThreads = 4,
+                InterOpNumThreads = RuntimeOptions.InterOpThreads,
+                IntraOpNumThreads = RuntimeOptions.IntraOpThreads,
                 GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
             };
 
@@ -643,7 +693,7 @@ public class DeepLearningOperator : OperatorBase
 
     private void EvictModelsIfNeeded()
     {
-        while (_modelCache.Count >= MaxCachedModels && _modelAccessOrder.Count > 0)
+        while (_modelCache.Count >= RuntimeOptions.MaxCachedModels && _modelAccessOrder.Count > 0)
         {
             var oldestKey = _modelAccessOrder.First!.Value;
             RemoveModelAccessNode(oldestKey);
@@ -672,6 +722,12 @@ public class DeepLearningOperator : OperatorBase
     /// </summary>
     private DenseTensor<float> PreprocessImage(Mat src, int inputSize)
     {
+        using var lease = PreprocessImageLease(src, inputSize);
+        return new DenseTensor<float>(lease.Tensor.ToArray(), GetInputTensorDimensions(inputSize).ToArray());
+    }
+
+    private InputTensorLease PreprocessImageLease(Mat src, int inputSize)
+    {
         using var normalizedSrc = NormalizeToBgr8(src);
 
         // 1. 计算缩放比例（保持宽高比）
@@ -694,15 +750,19 @@ public class DeepLearningOperator : OperatorBase
         resized.CopyTo(targetRoi);
 
         // 4. 转换为 float 并归一化（除以 255）
-        using var floatMat = new Mat();
-        padded.ConvertTo(floatMat, MatType.CV_32FC3, 1.0 / 255.0);
+        // Direct byte-to-float conversion avoids a full CV_32FC3 intermediate Mat.
 
         // 5. 提取数据并转换为 CHW 格式（P3-O3.2: 使用ArrayPool）
         // YOLO 模型期望 RGB 顺序，OpenCV 使用 BGR 顺序
         var tensorSize = 1 * 3 * inputSize * inputSize;
-        var tensorData = new float[tensorSize];
-        var matData = floatMat.GetGenericIndexer<Vec3f>();
+        var tensorBytes = (long)tensorSize * sizeof(float);
+        var returnToPool = tensorBytes <= RuntimeOptions.TensorPoolMaxBytes;
+        var tensorData = returnToPool
+            ? ArrayPool<float>.Shared.Rent(tensorSize)
+            : new float[tensorSize];
+        var matData = padded.GetGenericIndexer<Vec3b>();
         var channelSize = inputSize * inputSize;
+        const double scaleToUnit = 1.0 / 255.0;
 
         for (int h = 0; h < inputSize; h++)
         {
@@ -712,13 +772,47 @@ public class DeepLearningOperator : OperatorBase
                 var pixelIndex = h * inputSize + w;
                 // CHW 格式: [batch, channel, height, width]
                 // OpenCV BGR -> 模型 RGB: Item2=R, Item1=G, Item0=B
-                tensorData[pixelIndex] = pixel.Item2;
-                tensorData[channelSize + pixelIndex] = pixel.Item1;
-                tensorData[(channelSize * 2) + pixelIndex] = pixel.Item0;
+                tensorData[pixelIndex] = (float)(pixel.Item2 * scaleToUnit);
+                tensorData[channelSize + pixelIndex] = (float)(pixel.Item1 * scaleToUnit);
+                tensorData[(channelSize * 2) + pixelIndex] = (float)(pixel.Item0 * scaleToUnit);
             }
         }
 
-        return new DenseTensor<float>(tensorData, new[] { 1, 3, inputSize, inputSize });
+        return new InputTensorLease(tensorData, tensorSize, GetInputTensorDimensions(inputSize), returnToPool);
+    }
+
+    private static int[] GetInputTensorDimensions(int inputSize)
+    {
+        return _inputTensorDimensions.GetOrAdd(inputSize, static size => new[] { 1, 3, size, size });
+    }
+
+    private sealed class InputTensorLease : IDisposable
+    {
+        private readonly float[] _buffer;
+        private readonly bool _returnToPool;
+        private int _disposed;
+
+        public InputTensorLease(float[] buffer, int length, int[] dimensions, bool returnToPool)
+        {
+            _buffer = buffer;
+            _returnToPool = returnToPool;
+            Tensor = new DenseTensor<float>(buffer.AsMemory(0, length), dimensions);
+        }
+
+        public DenseTensor<float> Tensor { get; }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            if (_returnToPool)
+            {
+                ArrayPool<float>.Shared.Return(_buffer);
+            }
+        }
     }
 
     private static Mat NormalizeToBgr8(Mat src)
@@ -728,25 +822,45 @@ public class DeepLearningOperator : OperatorBase
             throw new ArgumentException("Source image must not be empty.", nameof(src));
         }
 
-        using var normalizedDepth = new Mat();
-        ConvertToByteDepth(src, normalizedDepth);
+        var normalizedDepth = new Mat();
+        try
+        {
+            ConvertToByteDepth(src, normalizedDepth);
+        }
+        catch
+        {
+            normalizedDepth.Dispose();
+            throw;
+        }
 
         if (normalizedDepth.Channels() == 3)
         {
-            return normalizedDepth.Clone();
+            return normalizedDepth;
         }
 
         var converted = new Mat();
-        switch (normalizedDepth.Channels())
+        try
         {
-            case 1:
-                Cv2.CvtColor(normalizedDepth, converted, ColorConversionCodes.GRAY2BGR);
-                return converted;
-            case 4:
-                Cv2.CvtColor(normalizedDepth, converted, ColorConversionCodes.BGRA2BGR);
-                return converted;
-            default:
-                throw new NotSupportedException($"Unsupported channel count for deep learning preprocessing: {normalizedDepth.Channels()}.");
+            switch (normalizedDepth.Channels())
+            {
+                case 1:
+                    Cv2.CvtColor(normalizedDepth, converted, ColorConversionCodes.GRAY2BGR);
+                    return converted;
+                case 4:
+                    Cv2.CvtColor(normalizedDepth, converted, ColorConversionCodes.BGRA2BGR);
+                    return converted;
+                default:
+                    throw new NotSupportedException($"Unsupported channel count for deep learning preprocessing: {normalizedDepth.Channels()}.");
+            }
+        }
+        catch
+        {
+            converted.Dispose();
+            throw;
+        }
+        finally
+        {
+            normalizedDepth.Dispose();
         }
     }
 
@@ -835,7 +949,7 @@ public class DeepLearningOperator : OperatorBase
     private InferenceTensorSelection RunInference(InferenceSession session, DenseTensor<float> inputTensor, int knownLabelCount)
     {
         var inputName = session.InputMetadata.Keys.First();
-        var inputs = new List<NamedOnnxValue>
+        var inputs = new[]
         {
             NamedOnnxValue.CreateFromTensor(inputName, inputTensor)
         };

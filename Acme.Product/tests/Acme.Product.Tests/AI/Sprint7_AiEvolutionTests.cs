@@ -257,10 +257,11 @@ public class Sprint7_AiEvolutionTests
             var templates = await service.GetTemplatesAsync();
             var currentAirConditioningTemplates = await service.GetTemplatesAsync("空调制造");
 
-            templates.Should().HaveCount(6);
+            templates.Should().HaveCount(7);
             templates.Select(t => t.ScenarioKey).Should().Contain(new[]
             {
                 "wire-sequence-terminal",
+                "wire-sequence-terminal-video-stream",
                 "carton-appearance-inspection",
                 "aircon-indoor-appearance-inspection",
                 "aircon-outdoor-appearance-inspection",
@@ -339,9 +340,10 @@ public class Sprint7_AiEvolutionTests
 
             var templates = await service.GetTemplatesAsync();
 
-            templates.Should().HaveCount(7);
+            templates.Should().HaveCount(8);
             templates.Select(item => item.Name).Should().Contain("我的自定义模板");
             templates.Select(item => item.Name).Should().Contain("端子线序检测");
+            templates.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
             templates.Select(item => item.Name).Should().Contain("包装箱外观检测");
             templates.Select(item => item.Name).Should().Contain("空调内机外观检测");
             templates.Select(item => item.Name).Should().Contain("空调外机外观检测");
@@ -356,6 +358,7 @@ public class Sprint7_AiEvolutionTests
 
             persisted.Should().NotBeNull();
             persisted!.Select(item => item.Name).Should().Contain("端子线序检测");
+            persisted.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
             persisted.Select(item => item.Name).Should().Contain("我的自定义模板");
             persisted.Select(item => item.Name).Should().Contain("包装箱外观检测");
             persisted.Select(item => item.Name).Should().Contain("空调内机外观检测");
@@ -770,6 +773,59 @@ public class Sprint7_AiEvolutionTests
             deepLearningParams.GetProperty("LabelsPath").GetString().Should().BeEmpty();
 
             judgeParams.GetProperty("MinConfidence").GetString().Should().Be("0.0");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 端子线序视频流模板应包含帧变化触发主链")]
+    public async Task FlowTemplateService_WireSequenceVideoStreamTemplate_ShouldUseFrameChangeTriggerSkeleton()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+
+            var template = (await service.GetTemplatesAsync())
+                .Single(item => item.Name == "端子线序检测-视频流版");
+
+            template.TemplateVersion.Should().Be("1.5.0");
+            template.ScenarioKey.Should().Be("wire-sequence-terminal-video-stream");
+            template.ScenarioPackage.Should().NotBeNull();
+            template.ScenarioPackage!.PackageVersion.Should().Be("1.5.0");
+            template.ScenarioPackage.AssetVersionIds.Should()
+                .Contain("template:terminal-wire-sequence-video-stream-template@1.5.0");
+
+            using var document = JsonDocument.Parse(template.FlowJson);
+            var root = document.RootElement;
+            var operatorTypes = root.GetProperty("operators").EnumerateArray()
+                .Select(item => item.GetProperty("operatorType").GetString())
+                .ToList();
+
+            operatorTypes.Should().Equal(
+                "ImageAcquisition",
+                "FrameChangeTrigger",
+                "DeepLearning",
+                "BoxFilter",
+                "BoxNms",
+                "DetectionSequenceJudge",
+                "ResultOutput");
+
+            var acquisitionParams = root.GetProperty("operators").EnumerateArray()
+                .Single(item => item.GetProperty("tempId").GetString() == "op_1")
+                .GetProperty("parameters");
+            acquisitionParams.GetProperty("TriggerMode").GetString().Should().Be("Continuous");
+
+            var triggerParams = root.GetProperty("operators").EnumerateArray()
+                .Single(item => item.GetProperty("tempId").GetString() == "op_2")
+                .GetProperty("parameters");
+            triggerParams.GetProperty("ShortCircuitWhenNotTriggered").GetString().Should().Be("true");
+
+            root.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
+                .Should().Contain("FrameChangeTrigger.MinChangeRatio");
         }
         finally
         {

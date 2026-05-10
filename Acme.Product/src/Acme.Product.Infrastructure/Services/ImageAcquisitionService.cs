@@ -7,10 +7,12 @@ using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Exceptions;
+using Acme.Product.Core.Streaming;
 using Acme.Product.Infrastructure.Cameras;
 using Acme.Product.Infrastructure.Utilities;
 using OpenCvSharp;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 
 using Microsoft.Extensions.Logging;
 
@@ -151,6 +153,23 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         }
     }
 
+    public async Task<ImageDto> ConvertEnvelopeToImageAsync(FrameEnvelope envelope, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (envelope.PayloadKind != FramePayloadKind.EncodedImage)
+        {
+            throw new ImageProcessingException("Only encoded image envelopes can be converted to ImageDto at this service layer.");
+        }
+
+        return await CreateCameraImageDtoAsync(
+            envelope.CameraId,
+            GetExactPayloadBytes(envelope.Payload),
+            envelope.Width,
+            envelope.Height,
+            cancellationToken);
+    }
+
     public async Task StartContinuousAcquisitionAsync(string cameraId, int frameRate, Func<ImageDto, Task> onFrameAcquired, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
@@ -160,15 +179,13 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         binding?.Normalize();
         var acquisitionKey = binding?.Id ?? cameraId;
 
-        // 检查是否已有该相机的连续采集任务
-        if (_continuousAcquisitionTokens.ContainsKey(acquisitionKey))
-        {
-            throw new CameraException($"相机 {cameraId} 已经在连续采集模式中", cameraId);
-        }
-
         // 创建取消令牌
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _continuousAcquisitionTokens[acquisitionKey] = cts;
+        if (!_continuousAcquisitionTokens.TryAdd(acquisitionKey, cts))
+        {
+            cts.Dispose();
+            throw new CameraException($"相机 {cameraId} 已经在连续采集模式中", cameraId);
+        }
 
         try
         {
@@ -200,6 +217,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
                     {
                         await _streamCoordinator.ReleaseStreamLeaseAsync(lease);
                         _continuousAcquisitionTokens.TryRemove(acquisitionKey, out _);
+                        cts.Dispose();
                     }
                 }, cts.Token);
 
@@ -214,33 +232,41 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
             // 启动连续采集循环
             _ = Task.Run(async () =>
             {
-                while (!cts.Token.IsCancellationRequested)
+                try
                 {
-                    try
+                    while (!cts.Token.IsCancellationRequested)
                     {
-                        var startTime = DateTime.UtcNow;
-
-                        // 采集单帧
-                        var imageDto = await AcquireFromCameraAsync(cameraId, cts.Token);
-                        await onFrameAcquired(imageDto);
-
-                        // 控制帧率
-                        var elapsed = DateTime.UtcNow - startTime;
-                        var delay = frameInterval - elapsed;
-                        if (delay > TimeSpan.Zero)
+                        try
                         {
-                            await Task.Delay(delay, cts.Token);
+                            var startTime = DateTime.UtcNow;
+
+                            // 采集单帧
+                            var imageDto = await AcquireFromCameraAsync(cameraId, cts.Token);
+                            await onFrameAcquired(imageDto);
+
+                            // 控制帧率
+                            var elapsed = DateTime.UtcNow - startTime;
+                            var delay = frameInterval - elapsed;
+                            if (delay > TimeSpan.Zero)
+                            {
+                                await Task.Delay(delay, cts.Token);
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Continuous acquisition error: {Message}. Retrying after {Interval}ms.", ex.Message, frameInterval.TotalMilliseconds);
+                            await Task.Delay(frameInterval, cts.Token);
                         }
                     }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Continuous acquisition error: {Message}. Retrying after {Interval}ms.", ex.Message, frameInterval.TotalMilliseconds);
-                        await Task.Delay(frameInterval, cts.Token);
-                    }
+                }
+                finally
+                {
+                    _continuousAcquisitionTokens.TryRemove(acquisitionKey, out _);
+                    cts.Dispose();
                 }
             }, cts.Token);
         }
@@ -262,7 +288,6 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         if (_continuousAcquisitionTokens.TryRemove(acquisitionKey, out var cts))
         {
             cts.Cancel();
-            cts.Dispose();
         }
 
         return Task.CompletedTask;
@@ -679,28 +704,19 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         int? height,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         Mat? mat = null;
         try
         {
-            if (!width.HasValue || !height.HasValue)
+            mat = Cv2.ImDecode(frameData, ImreadModes.Unchanged);
+            if (mat.Empty())
             {
-                mat = Cv2.ImDecode(frameData, ImreadModes.Unchanged);
-                if (mat.Empty())
-                {
-                    throw new ImageProcessingException("Unable to decode camera image data.");
-                }
+                throw new ImageProcessingException("Unable to decode camera image data.");
+            }
 
-                width = mat.Width;
-                height = mat.Height;
-            }
-            else
-            {
-                mat = Cv2.ImDecode(frameData, ImreadModes.Unchanged);
-                if (mat.Empty())
-                {
-                    throw new ImageProcessingException("Unable to decode camera image data.");
-                }
-            }
+            width ??= mat.Width;
+            height ??= mat.Height;
 
             var imageId = Guid.NewGuid();
             AddToCache(imageId, mat, takeOwnership: true);
@@ -721,6 +737,19 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         {
             mat?.Dispose();
         }
+    }
+
+    private static byte[] GetExactPayloadBytes(ReadOnlyMemory<byte> payload)
+    {
+        if (MemoryMarshal.TryGetArray(payload, out var segment) &&
+            segment.Offset == 0 &&
+            segment.Array != null &&
+            segment.Count == segment.Array.Length)
+        {
+            return segment.Array;
+        }
+
+        return payload.ToArray();
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
+using Acme.Product.Infrastructure.Memory;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -25,8 +26,11 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("RoiY", "ROI Y", "int", DefaultValue = 0)]
 [OperatorParam("RoiW", "ROI Width", "int", DefaultValue = 0)]
 [OperatorParam("RoiH", "ROI Height", "int", DefaultValue = 0)]
+[OperatorParam("OutputImagePolicy", "Output Image Policy", "enum", DefaultValue = "FullOverlay", Options = new[] { "FullOverlay|Full Overlay", "Passthrough|Passthrough", "None|None" })]
 public class SharpnessEvaluationOperator : OperatorBase
 {
+    private static readonly MatPool PassthroughImagePool = new(maxPerBucket: 0, maxTotalGb: 0.0);
+
     private static readonly IReadOnlyDictionary<string, double> DefaultThresholds =
         new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
         {
@@ -71,18 +75,22 @@ public class SharpnessEvaluationOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("ThresholdMode must be PerMethodDefault or Manual"));
         }
 
-        var roi = MeasurementRoiHelper.ResolveRoi(@operator, src.Width, src.Height);
-        using var gray = new Mat();
-        if (src.Channels() == 1)
+        var outputImagePolicy = ResolveOutputImagePolicy(GetStringParam(@operator, "OutputImagePolicy", "FullOverlay"));
+        if (outputImagePolicy == null)
         {
-            src.CopyTo(gray);
-        }
-        else
-        {
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+            return Task.FromResult(OperatorExecutionOutput.Failure("OutputImagePolicy must be FullOverlay, Passthrough, or None"));
         }
 
-        using var roiGray = new Mat(gray, roi);
+        var roi = MeasurementRoiHelper.ResolveRoi(@operator, src.Width, src.Height);
+        using var roiSource = new Mat(src, roi);
+        using var convertedRoiGray = new Mat();
+        var roiGray = roiSource;
+        if (roiSource.Channels() != 1)
+        {
+            Cv2.CvtColor(roiSource, convertedRoiGray, ColorConversionCodes.BGR2GRAY);
+            roiGray = convertedRoiGray;
+        }
+
         var score = method switch
         {
             "Laplacian" => ComputeLaplacianVariance(roiGray),
@@ -102,12 +110,7 @@ public class SharpnessEvaluationOperator : OperatorBase
         var marginToThreshold = score - thresholdUsed;
         var normalizedScore = thresholdUsed > 1e-9 ? score / thresholdUsed : double.NaN;
 
-        var resultImage = src.Clone();
-        Cv2.Rectangle(resultImage, roi, new Scalar(0, 255, 255), 1);
-        Cv2.PutText(resultImage, $"Sharpness[{method}]={score:F2}", new Point(8, 24), HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 255), 2);
-        Cv2.PutText(resultImage, isSharp ? "Sharp" : "Blur", new Point(8, 48), HersheyFonts.HersheySimplex, 0.7, isSharp ? new Scalar(0, 255, 0) : new Scalar(0, 0, 255), 2);
-
-        var output = CreateImageOutput(resultImage, new Dictionary<string, object>
+        var additionalData = new Dictionary<string, object>
         {
             { "Score", score },
             { "IsSharp", isSharp },
@@ -124,7 +127,14 @@ public class SharpnessEvaluationOperator : OperatorBase
             { "StatusMessage", "Success" },
             { "Confidence", MeasurementStatisticsHelper.ComputeConfidenceFromUncertainty(tileStdError) },
             { "UncertaintyPx", tileStdError }
-        });
+        };
+
+        var output = outputImagePolicy switch
+        {
+            "Passthrough" => CreateSharedImageOutput(src, additionalData),
+            "None" => CreateDataOutput(src, additionalData),
+            _ => CreateImageOutput(CreateOverlayImage(src, roi, method, score, isSharp), additionalData)
+        };
 
         return Task.FromResult(OperatorExecutionOutput.Success(output));
     }
@@ -150,6 +160,11 @@ public class SharpnessEvaluationOperator : OperatorBase
             return ValidationResult.Invalid("Threshold must be >= 0");
         }
 
+        if (ResolveOutputImagePolicy(GetStringParam(@operator, "OutputImagePolicy", "FullOverlay")) == null)
+        {
+            return ValidationResult.Invalid("OutputImagePolicy must be FullOverlay, Passthrough, or None");
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -163,6 +178,62 @@ public class SharpnessEvaluationOperator : OperatorBase
             "SMD" => "SMD",
             _ => null
         };
+    }
+
+    private static string? ResolveOutputImagePolicy(string raw)
+    {
+        return raw switch
+        {
+            "FullOverlay" => "FullOverlay",
+            "Passthrough" => "Passthrough",
+            "None" => "None",
+            _ => null
+        };
+    }
+
+    private static Dictionary<string, object> CreateSharedImageOutput(Mat src, Dictionary<string, object> additionalData)
+    {
+        var output = new Dictionary<string, object>
+        {
+            { "Image", new ImageWrapper(new Mat(src, new Rect(0, 0, src.Width, src.Height)), PassthroughImagePool) },
+            { "Width", src.Width },
+            { "Height", src.Height }
+        };
+
+        AddAdditionalData(output, additionalData);
+        return output;
+    }
+
+    private static Dictionary<string, object> CreateDataOutput(Mat src, Dictionary<string, object> additionalData)
+    {
+        var output = new Dictionary<string, object>
+        {
+            { "Width", src.Width },
+            { "Height", src.Height }
+        };
+
+        AddAdditionalData(output, additionalData);
+        return output;
+    }
+
+    private static void AddAdditionalData(Dictionary<string, object> output, Dictionary<string, object> additionalData)
+    {
+        foreach (var kvp in additionalData)
+        {
+            if (!output.ContainsKey(kvp.Key))
+            {
+                output[kvp.Key] = kvp.Value;
+            }
+        }
+    }
+
+    private static Mat CreateOverlayImage(Mat src, Rect roi, string method, double score, bool isSharp)
+    {
+        var resultImage = src.Clone();
+        Cv2.Rectangle(resultImage, roi, new Scalar(0, 255, 255), 1);
+        Cv2.PutText(resultImage, $"Sharpness[{method}]={score:F2}", new Point(8, 24), HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 255), 2);
+        Cv2.PutText(resultImage, isSharp ? "Sharp" : "Blur", new Point(8, 48), HersheyFonts.HersheySimplex, 0.7, isSharp ? new Scalar(0, 255, 0) : new Scalar(0, 0, 255), 2);
+        return resultImage;
     }
 
     private double ResolveThreshold(Operator @operator, string method, string thresholdMode)

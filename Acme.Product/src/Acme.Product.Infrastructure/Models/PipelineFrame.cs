@@ -21,6 +21,14 @@ public class PipelineFrame : IDisposable
     /// </summary>
     public Guid FrameId { get; }
 
+    public long? Sequence { get; set; }
+
+    public string? TrackId { get; set; }
+
+    public string? CorrelationId { get; set; }
+
+    public string? TimestampSource { get; set; }
+
     /// <summary>
     /// 时间戳（Stopwatch ticks）
     /// </summary>

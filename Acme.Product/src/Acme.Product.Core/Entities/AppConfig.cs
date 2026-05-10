@@ -1,9 +1,12 @@
 using System.Text.Json.Serialization;
+using Acme.Product.Core.Continuous;
 
 namespace Acme.Product.Core.Entities;
 
 public class AppConfig
 {
+    public long Revision { get; set; }
+
     public GeneralConfig General { get; set; } = new();
 
     public CommunicationConfig Communication { get; set; } = new();
@@ -11,6 +14,8 @@ public class AppConfig
     public StorageConfig Storage { get; set; } = new();
 
     public RuntimeConfig Runtime { get; set; } = new();
+
+    public FeatureConfig Features { get; set; } = new();
 
     public List<CameraBindingConfig> Cameras { get; set; } = new();
 
@@ -26,6 +31,8 @@ public class AppConfig
         Communication.Normalize();
         Storage ??= new StorageConfig();
         Runtime ??= new RuntimeConfig();
+        Features ??= new FeatureConfig();
+        Features.Normalize();
         Cameras ??= new List<CameraBindingConfig>();
         foreach (var camera in Cameras)
         {
@@ -61,6 +68,44 @@ public class GeneralConfig
             ThemeDark => ThemeDark,
             _ => ThemeDark
         };
+    }
+}
+
+public class FeatureConfig
+{
+    public ContinuousInspectionFeatureConfig ContinuousInspection { get; set; } = new();
+
+    public void Normalize()
+    {
+        ContinuousInspection ??= new ContinuousInspectionFeatureConfig();
+        ContinuousInspection.Normalize();
+    }
+}
+
+public class ContinuousInspectionFeatureConfig
+{
+    public bool Enabled { get; set; }
+
+    public bool EmergencyRollback { get; set; }
+
+    public Dictionary<string, ContinuousInspectionConfig> HardwareProfiles { get; set; } =
+        ContinuousInspectionConfigTemplates.CreateDefaults().ToDictionary(
+            item => item.Key,
+            item => item.Value,
+            StringComparer.OrdinalIgnoreCase);
+
+    public void Normalize()
+    {
+        HardwareProfiles ??= new Dictionary<string, ContinuousInspectionConfig>(StringComparer.OrdinalIgnoreCase);
+        foreach (var template in ContinuousInspectionConfigTemplates.CreateDefaults())
+        {
+            HardwareProfiles.TryAdd(template.Key, template.Value);
+        }
+
+        foreach (var profile in HardwareProfiles.Values)
+        {
+            profile.Normalize();
+        }
     }
 }
 
@@ -389,6 +434,8 @@ public class CameraBindingConfig
 
     public int TargetFrameRateFps { get; set; } = 10;
 
+    public ContinuousInspectionConfig ContinuousInspection { get; set; } = new();
+
     public void Normalize()
     {
         Id = string.IsNullOrWhiteSpace(Id) ? Guid.NewGuid().ToString("N")[..8] : Id.Trim();
@@ -401,5 +448,7 @@ public class CameraBindingConfig
         TriggerMode = Acme.Product.Core.Cameras.CameraTriggerModeExtensions.ToConfigValue(
             Acme.Product.Core.Cameras.CameraTriggerModeExtensions.Normalize(TriggerMode));
         TargetFrameRateFps = Acme.Product.Core.Cameras.CameraTriggerModeExtensions.NormalizeTargetFrameRate(TargetFrameRateFps);
+        ContinuousInspection ??= new ContinuousInspectionConfig();
+        ContinuousInspection.Normalize();
     }
 }

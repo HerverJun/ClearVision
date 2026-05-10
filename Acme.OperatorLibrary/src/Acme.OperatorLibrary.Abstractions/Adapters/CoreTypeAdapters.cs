@@ -31,7 +31,8 @@ public static class CoreTypeAdapters
                 item => (object?)item.Value,
                 System.StringComparer.Ordinal),
             ExecutionTimeMs = source.ExecutionTimeMs,
-            ErrorMessage = source.ErrorMessage
+            ErrorMessage = source.ErrorMessage,
+            ShouldShortCircuitFlow = source.ShouldShortCircuitFlow
         };
     }
 

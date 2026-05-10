@@ -50,6 +50,14 @@ public class CameraFrameReceivedEventArgs : EventArgs
     /// 时间戳
     /// </summary>
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    public ulong? DeviceFrameCounter { get; set; }
+
+    public ulong? CameraTimestampNs { get; set; }
+
+    public int? Stride { get; set; }
+
+    public CameraPixelFormat PixelFormat { get; set; } = CameraPixelFormat.Unknown;
 }
 
 /// <summary>

@@ -40,7 +40,8 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            SystemPrompt = "Key is sk-abc123def456ghi789jkl012mno345pqr678stu and xai-abc123def456ghi789jkl012mno345pqr678stu"
+            SystemPrompt = "Key is " + "sk-" + "abc123def456ghi789jkl012mno345pqr678stu" +
+                           " and xai-abc123def456ghi789jkl012mno345pqr678stu"
         };
 
         var result = trace.Desensitize();
@@ -55,7 +56,7 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            UserPrompt = "Token: ghp_abcdefghijklmnopqrstuvwxyz123456"
+            UserPrompt = "Token: " + "ghp_" + "abcdefghijklmnopqrstuvwxyz123456"
         };
 
         var result = trace.Desensitize();
@@ -99,7 +100,7 @@ public sealed class PromptTraceDesensitizationTests
     {
         var trace = new AiPromptTrace
         {
-            BaseUrl = "https://api.example.com/v1?key=sk-secret123456789abcdef"
+            BaseUrl = "https://api.example.com/v1?key=" + "sk-" + "secret123456789abcdef"
         };
 
         var result = trace.Desensitize();

@@ -66,6 +66,13 @@ MC:   D0  -> 0x1234
 FINS: DM0 -> 0x1234
 ```
 
+The virtual servers also persist simple word writes for regression coverage:
+
+```text
+MC:   write D10  -> read D10
+FINS: write DM10 -> read DM10
+```
+
 ## Optional .NET Verification
 
 Start the virtual PLC first, then run:
@@ -84,6 +91,12 @@ $env:CLEARVISION_VIRTUAL_FINS_PORT = "9600"
 ```
 
 When `CLEARVISION_RUN_VIRTUAL_MC_FINS_TESTS` is not `1`, these tests return immediately and do not connect to a PLC.
+
+To run the combined PLC regression with the local virtual PLCs started and stopped by the script:
+
+```powershell
+& ".\scripts\run-tests-plc-regression.ps1" -Virtual -NoBuild -NoRestore -Verbosity minimal
+```
 
 ## Scope
 

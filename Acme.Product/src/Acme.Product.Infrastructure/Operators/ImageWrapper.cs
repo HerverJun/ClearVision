@@ -181,7 +181,13 @@ public sealed class ImageWrapper : IDisposable
 
     public static bool TryGetFromObject(object? value, out ImageWrapper? image)
     {
+        return TryGetFromObject(value, out image, out _);
+    }
+
+    public static bool TryGetFromObject(object? value, out ImageWrapper? image, out bool ownsCreatedWrapper)
+    {
         image = null;
+        ownsCreatedWrapper = false;
 
         if (value == null)
             return false;
@@ -195,6 +201,7 @@ public sealed class ImageWrapper : IDisposable
         if (value is byte[] bytes)
         {
             image = new ImageWrapper(bytes);
+            ownsCreatedWrapper = true;
             return true;
         }
 

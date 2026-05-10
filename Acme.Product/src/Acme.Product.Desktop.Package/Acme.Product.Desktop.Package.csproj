@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -12,7 +12,7 @@
     <UseWPF>false</UseWPF>
     <UseWinUI>false</UseWinUI>
     
-    <!-- MSIX 打包配置 -->
+    <!-- MSIX packaging -->
     <PublishProfile>Properties\PublishProfiles\MSIX.pubxml</PublishProfile>
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
@@ -20,13 +20,13 @@
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     
-    <!-- 应用信息 -->
+    <!-- Application metadata -->
     <ApplicationTitle>ClearVision</ApplicationTitle>
-    <ApplicationDescription>工业视觉检测软件 - 基于.NET 8和WebView2的现代桌面应用</ApplicationDescription>
+    <ApplicationDescription>Industrial vision inspection software based on .NET 8 and WebView2.</ApplicationDescription>
     <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     
-    <!-- 发布配置 -->
+    <!-- Publish configuration -->
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
@@ -36,14 +36,14 @@
     <ProjectReference Include="..\Acme.Product.Desktop\Acme.Product.Desktop.csproj" />
   </ItemGroup>
 
-  <!-- MSIX 清单文件 -->
+  <!-- MSIX manifest -->
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
   </ItemGroup>
 
-  <!-- 资源文件 -->
+  <!-- Asset files -->
   <ItemGroup>
     <Content Include="Images\*.png" />
     <Content Include="Images\*.jpg" />

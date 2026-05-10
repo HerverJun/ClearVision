@@ -19,6 +19,16 @@ Current golden flow skeleton:
 
 `ImageAcquisition -> DeepLearning -> BoxFilter(FilterMode=Region) -> BoxNms -> DetectionSequenceJudge -> ResultOutput`
 
+## Video Stream Flow
+
+For on-site conveyor lines without photoelectric or PLC trigger signals, use:
+
+`ImageAcquisition(TriggerMode=Continuous) -> FrameChangeTrigger -> DeepLearning -> BoxFilter(FilterMode=Region) -> BoxNms -> DetectionSequenceJudge -> ResultOutput`
+
+The video-stream template is `template/terminal-wire-sequence-video-stream.flow.template.json`. It keeps the same detection, NMS and sequence-judgment contract as the baseline template, but adds a frame-change arrival gate before YOLO. Frames that do not meet the arrival-change threshold are short-circuited as no-material frames, so they do not publish OK / NG inspection results.
+
+Tune `FrameChangeTrigger.RoiX/Y/W/H` first to cover the terminal arrival area and avoid belt-edge vibration or glare. Then tune `PixelThreshold`, `MinChangeRatio`, `MinChangePixels`, and `CooldownMs` according to belt speed and terminal dwell time.
+
 Current diagnostics contract:
 
 - `DeepLearning` runs on the full image, keeps a low confidence floor, and disables internal NMS for this scenario template.

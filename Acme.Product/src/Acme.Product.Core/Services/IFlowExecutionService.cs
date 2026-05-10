@@ -23,6 +23,22 @@ public interface IFlowExecutionService
     Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, System.Threading.CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Executes a flow with an explicit production execution mode.
+    /// </summary>
+    Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        FlowExecutionMode executionMode,
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        return ExecuteFlowAsync(
+            flow,
+            inputData,
+            executionMode == FlowExecutionMode.AutoSafeParallel,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// 执行单个算子
     /// </summary>
     /// <param name="operator">算子</param>
@@ -79,6 +95,12 @@ public interface IFlowExecutionService
     Task ClearDebugCacheAsync(Guid debugSessionId);
 }
 
+public enum FlowExecutionMode
+{
+    Sequential = 0,
+    AutoSafeParallel = 1
+}
+
 /// <summary>
 /// 流程执行结果
 /// </summary>
@@ -98,6 +120,8 @@ public class FlowExecutionResult
     /// 输出数据
     /// </summary>
     public Dictionary<string, object>? OutputData { get; set; }
+
+    public bool WasShortCircuited { get; set; }
 
     /// <summary>
     /// 各算子执行结果
@@ -144,6 +168,8 @@ public class OperatorExecutionResult
     /// 错误信息
     /// </summary>
     public string? ErrorMessage { get; set; }
+
+    public bool ShortCircuitedFlow { get; set; }
 }
 
 /// <summary>

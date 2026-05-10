@@ -14,6 +14,7 @@ using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Runtime;
 using Acme.Product.Desktop.Handlers;
+using Acme.Product.Desktop.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -29,6 +30,10 @@ namespace Acme.Product.Desktop.Endpoints;
 /// </summary>
 public static class ApiEndpoints
 {
+    private const int MaxImageUploadBytes = 25 * 1024 * 1024;
+    private const int MaxImageUploadBase64Chars = ((MaxImageUploadBytes + 2) / 3) * 4;
+    private const int MaxImageUploadPayloadChars = MaxImageUploadBase64Chars + 1024 * 1024;
+
     public static IEndpointRouteBuilder MapVisionApiEndpoints(this IEndpointRouteBuilder app)
     {
         // 健康检查
@@ -175,10 +180,16 @@ public static class ApiEndpoints
             ExportRuntimePackageRequest? request,
             ProjectService service,
             RuntimePackageExporter exporter,
+            HttpContext context,
             CancellationToken cancellationToken) =>
         {
             try
             {
+                if (!IsAdmin(context))
+                {
+                    return Results.Json(new { Error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
                 var project = await service.GetByIdAsync(id);
                 if (project == null)
                 {
@@ -581,9 +592,19 @@ public static class ApiEndpoints
         {
             try
             {
-                var imageData = Convert.FromBase64String(request.DataBase64);
+                if (!TryDecodeImageUpload(request.DataBase64, out var imageData, out var decodeError, out var statusCode))
+                {
+                    return statusCode == StatusCodes.Status413PayloadTooLarge
+                        ? Results.Json(new { Error = decodeError }, statusCode: StatusCodes.Status413PayloadTooLarge)
+                        : Results.BadRequest(new { Error = decodeError });
+                }
+
                 var imageId = await cache.AddAsync(imageData, "png");
                 return Results.Ok(new { ImageId = imageId });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.Json(new { Error = ex.Message }, statusCode: StatusCodes.Status413PayloadTooLarge);
             }
             catch (Exception ex)
             {
@@ -602,5 +623,117 @@ public static class ApiEndpoints
 
             return Results.File(imageData, "image/png");
         });
+    }
+
+    private static bool IsAdmin(HttpContext context)
+    {
+        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            return false;
+        }
+
+        var role = userObj switch
+        {
+            Acme.Product.Application.Services.UserSession user => user.Role,
+            Acme.Product.Desktop.Middleware.UserSession user => user.Role,
+            _ => null
+        };
+
+        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+    }
+
+    private static bool TryDecodeImageUpload(
+        string? dataBase64,
+        out byte[] imageData,
+        out string errorMessage,
+        out int statusCode)
+    {
+        imageData = [];
+        errorMessage = string.Empty;
+        statusCode = StatusCodes.Status400BadRequest;
+
+        if (string.IsNullOrWhiteSpace(dataBase64))
+        {
+            errorMessage = "DataBase64 is required.";
+            return false;
+        }
+
+        var payload = dataBase64.Trim();
+        if (payload.Length > MaxImageUploadPayloadChars)
+        {
+            statusCode = StatusCodes.Status413PayloadTooLarge;
+            errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
+            return false;
+        }
+
+        if (payload.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var commaIndex = payload.IndexOf(',');
+            if (commaIndex < 0 || commaIndex == payload.Length - 1)
+            {
+                errorMessage = "DataBase64 data URL is invalid.";
+                return false;
+            }
+
+            payload = payload[(commaIndex + 1)..];
+        }
+
+        var base64CharCount = 0;
+        var paddingCount = 0;
+        foreach (var ch in payload)
+        {
+            if (char.IsWhiteSpace(ch))
+            {
+                continue;
+            }
+
+            base64CharCount++;
+            if (ch == '=')
+            {
+                paddingCount++;
+            }
+
+            if (base64CharCount > MaxImageUploadBase64Chars)
+            {
+                statusCode = StatusCodes.Status413PayloadTooLarge;
+                errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
+                return false;
+            }
+        }
+
+        if (base64CharCount == 0)
+        {
+            errorMessage = "DataBase64 is required.";
+            return false;
+        }
+
+        var estimatedBytes = (base64CharCount / 4 * 3) - Math.Min(paddingCount, 2);
+        if (estimatedBytes > MaxImageUploadBytes)
+        {
+            statusCode = StatusCodes.Status413PayloadTooLarge;
+            errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
+            return false;
+        }
+
+        var compactPayload = new string(payload.Where(ch => !char.IsWhiteSpace(ch)).ToArray());
+        try
+        {
+            imageData = Convert.FromBase64String(compactPayload);
+        }
+        catch (FormatException)
+        {
+            errorMessage = "DataBase64 format is invalid.";
+            return false;
+        }
+
+        if (imageData.Length > MaxImageUploadBytes)
+        {
+            statusCode = StatusCodes.Status413PayloadTooLarge;
+            errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
+            imageData = [];
+            return false;
+        }
+
+        return true;
     }
 }

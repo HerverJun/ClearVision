@@ -1,29 +1,35 @@
-# docs
+# ClearVision Docs
 
-`docs/` 是 ClearVision 的项目文档主入口。当前按“状态、资料类型、历史归档”分区，目录名统一使用中文，便于直接判断资料该放哪里、从哪里读。
+This directory is the primary documentation entry point. Active release and engineering documents should be UTF-8 text and linked from here or from `docs/进行中/README.md`.
 
-## 常用入口
+## Core
 
 - [项目总览](./项目总览.md)
-- [文档导航](./导航.md)
-- [算子资料导航](./算子资料/导航.md)
-- [算子目录](./算子资料/算子目录.md)
-- [算子文档现状对齐说明](./算子资料/算子文档现状对齐说明-2026-04.md)
-- [当前审计整改 TODO](./进行中/当前计划/ClearVision-审计整改TODO-2026-04-29.md)
-- [SDK 与依赖版本口径](./参考资料/指南/ClearVision-SDK与依赖版本口径.md)
+- [当前 debug 闭环计划](./进行中/当前计划/debug计划.md)
+- [Station-Studio sync SOP](./runtime/station-studio-sync.md)
+- [Desktop/Studio boundary](./runtime/Desktop-Studio-Boundary.md)
 
-## 分区入口
+## Engineering Governance
 
-- [进行中](./进行中/README.md)：当前计划、未闭环事项、待复核清单。
-- [算子资料](./算子资料/导航.md)：算子目录、名片、手册、版本记录和专项说明。
-- [审计资料](./审计资料/README.md)：算子审计、系统审计、外部审计和审计报告。
-- [参考资料](./参考资料/README.md)：规范、指南、手册、PR 门禁说明。
-- [模板](./模板/)：计划、任务、闭环记录和验收报告模板。
-- [归档](./归档/README.md)：已关闭专题、历史资料和过期计划。
+- [CI and quality gates](./engineering/ci-quality-gates.md)
+- [Evidence and temporary artifacts](./engineering/evidence-artifacts.md)
+- [Compatibility matrix](./engineering/compatibility-matrix.md)
+- [Bridge responsibility contract](./runtime/bridge-responsibility-contract.md)
+- [FlowData contract](./runtime/flow-data-contract.md)
+- [Realtime frontend communication](./frontend/realtime-communication.md)
 
-## 门禁与模板
+## Quality And Release
 
-- [测量类 PR 门禁说明](./参考资料/测量类PR门禁说明.md)
-- [检测类 PR 门禁说明](./参考资料/检测类PR门禁说明.md)
-- [测量类最终验收报告模板-精度](./模板/测量类最终验收报告模板-精度.md)
-- [检测类最终验收报告模板-回归](./模板/检测类最终验收报告模板-回归.md)
+- [Operator quality matrix](../quality/evals/reports/operator_quality_matrix.md)
+- [OperatorLibrary release industrialization](./operator-library/release-package-industrialization.md)
+- [Model release gate](../models/README.md)
+
+## Active Planning
+
+- [进行中](./进行中/README.md)
+- [当前计划](./进行中/当前计划/)
+- [未闭环事项](./进行中/未闭环事项/)
+
+## Archive
+
+Historical and closed plans live under [归档](./归档/README.md). They are retained for traceability and are not part of the default text-encoding CI scan.

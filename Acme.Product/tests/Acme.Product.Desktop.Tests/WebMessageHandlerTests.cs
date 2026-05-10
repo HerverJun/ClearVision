@@ -234,7 +234,8 @@ public class WebMessageHandlerTests
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             operatorFactory,
             eventBus,
-            NullLogger<WebMessageHandler>.Instance);
+            NullLogger<WebMessageHandler>.Instance,
+            NullLoggerFactory.Instance);
     }
 
     private static ServiceProvider BuildServiceProvider(Action<IServiceCollection> configure)

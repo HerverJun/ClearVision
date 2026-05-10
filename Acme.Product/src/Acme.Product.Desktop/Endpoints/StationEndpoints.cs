@@ -1,4 +1,7 @@
 using System.Threading.Channels;
+using System.Text.Json;
+using Acme.Product.Core.Enums;
+using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -67,11 +70,26 @@ public static class StationEndpoints
             [FromServices] StationCentralStore store,
             HttpContext context) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            if (string.IsNullOrWhiteSpace(stationId))
+            {
+                return Results.BadRequest(new { error = "StationIdRequired" });
+            }
+
+            if (!TryNormalizePayloadJson(request.PayloadJson, out var payloadJson, out var payloadError))
+            {
+                return Results.BadRequest(new { error = payloadError });
+            }
+
             var issuedBy = context.User?.Identity?.Name;
             var command = store.CreateCommand(
                 stationId,
                 request.CommandType,
-                request.PayloadJson ?? "{}",
+                payloadJson,
                 string.IsNullOrWhiteSpace(issuedBy) ? request.IssuedBy ?? "Studio" : issuedBy,
                 TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)));
             return Results.Ok(command);
@@ -84,6 +102,21 @@ public static class StationEndpoints
             [FromServices] StationPackageStore packageStore,
             HttpContext context) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            if (string.IsNullOrWhiteSpace(stationId))
+            {
+                return Results.BadRequest(new { error = "StationIdRequired" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.PackageId))
+            {
+                return Results.BadRequest(new { error = "PackageIdRequired" });
+            }
+
             var package = packageStore.GetPackage(request.PackageId);
             if (package == null)
             {
@@ -112,8 +145,13 @@ public static class StationEndpoints
             return Results.Ok(packageStore.GetPackages());
         });
 
-        app.MapPost("/api/station-packages/test", async ([FromServices] StationPackageStore packageStore, CancellationToken cancellationToken) =>
+        app.MapPost("/api/station-packages/test", async ([FromServices] StationPackageStore packageStore, HttpContext context, CancellationToken cancellationToken) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             return Results.Ok(await packageStore.CreateTestPackageAsync(cancellationToken));
         });
 
@@ -268,6 +306,47 @@ public static class StationEndpoints
             _ when string.Equals(range, "month", StringComparison.OrdinalIgnoreCase) => (now.AddMonths(-1), now),
             _ => (todayUtc, now)
         };
+    }
+
+    private static bool TryNormalizePayloadJson(string? payloadJson, out string normalizedPayloadJson, out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            normalizedPayloadJson = "{}";
+            error = null;
+            return true;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            normalizedPayloadJson = document.RootElement.GetRawText();
+            error = null;
+            return true;
+        }
+        catch (JsonException)
+        {
+            normalizedPayloadJson = "{}";
+            error = "PayloadJsonInvalid";
+            return false;
+        }
+    }
+
+    private static bool IsStationAdmin(HttpContext context)
+    {
+        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            return false;
+        }
+
+        var role = userObj switch
+        {
+            Acme.Product.Application.Services.UserSession user => user.Role,
+            UserSession user => user.Role,
+            _ => null
+        };
+
+        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
     }
 }
 

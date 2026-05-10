@@ -810,10 +810,7 @@ public class OperatorBenchmarkTests
 
     private static string WriteReport(IReadOnlyList<BenchmarkEntry> entries)
     {
-        var repoRoot = ResolveAcmeProductRoot();
-        var reportDirectory = Path.Combine(repoRoot, "test_results");
-
-        Directory.CreateDirectory(reportDirectory);
+        var reportDirectory = PreprocessingTestSupport.EnsureReportDirectory("CV_OPERATOR_PERF_REPORT_DIR");
 
         var reportPath = Path.Combine(reportDirectory, "operator_benchmark_report.md");
         var builder = new StringBuilder();
@@ -837,10 +834,7 @@ public class OperatorBenchmarkTests
 
     private static string WriteCalibrationReport(IReadOnlyList<BenchmarkEntry> entries)
     {
-        var repoRoot = ResolveAcmeProductRoot();
-        var reportDirectory = Path.Combine(repoRoot, "test_results");
-
-        Directory.CreateDirectory(reportDirectory);
+        var reportDirectory = PreprocessingTestSupport.EnsureReportDirectory("CV_OPERATOR_PERF_REPORT_DIR");
 
         var reportPath = Path.Combine(reportDirectory, "calibration_operator_benchmark_report.md");
         var builder = new StringBuilder();
@@ -864,10 +858,7 @@ public class OperatorBenchmarkTests
 
     private static string WriteMeasurementReport(IReadOnlyList<BenchmarkEntry> entries)
     {
-        var repoRoot = ResolveAcmeProductRoot();
-        var reportDirectory = Path.Combine(repoRoot, "test_results");
-
-        Directory.CreateDirectory(reportDirectory);
+        var reportDirectory = PreprocessingTestSupport.EnsureReportDirectory("CV_OPERATOR_PERF_REPORT_DIR");
 
         var reportPath = Path.Combine(reportDirectory, "measurement_operator_benchmark_report.md");
         var builder = new StringBuilder();

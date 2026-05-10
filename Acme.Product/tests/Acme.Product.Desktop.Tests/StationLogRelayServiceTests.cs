@@ -83,7 +83,31 @@ public sealed class StationLogRelayServiceTests
         }
     }
 
-    private static StationLogRelayService CreateRelay(string root, int maxSummariesPerMinute = 60)
+    [Fact]
+    public void TryEnqueue_ShouldReportDroppedLogSummary_WhenQueueIsFull()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var relay = CreateRelay(root, logQueueCapacity: 1);
+
+            relay.TryEnqueue("ERROR", "RuntimeHost", "runtime error one").Should().BeTrue();
+            relay.TryEnqueue("ERROR", "RuntimeHost", "runtime error two").Should().BeFalse();
+
+            relay.DroppedLogSummaryCount.Should().Be(1);
+            relay.TryRead(out var log).Should().BeTrue();
+            log.RenderedMessage.Should().Be("runtime error one");
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    private static StationLogRelayService CreateRelay(
+        string root,
+        int maxSummariesPerMinute = 60,
+        int logQueueCapacity = 10)
     {
         var settingsStore = new StationLocalSettingsStore(root);
         settingsStore.UpdateStationIdentity("station-log", "line-log");
@@ -92,7 +116,7 @@ public sealed class StationLogRelayServiceTests
             settingsStore,
             Options.Create(new StationSyncOptions
             {
-                LogQueueCapacity = 10,
+                LogQueueCapacity = logQueueCapacity,
                 MaxLogSummariesPerMinute = maxSummariesPerMinute
             }));
     }

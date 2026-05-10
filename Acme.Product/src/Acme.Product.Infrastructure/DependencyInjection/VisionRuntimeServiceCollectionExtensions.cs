@@ -128,6 +128,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, TimerStatisticsOperator>();
         services.AddSingleton<IOperatorExecutor, ScriptOperator>();
         services.AddSingleton<IOperatorExecutor, TriggerModuleOperator>();
+        services.AddSingleton<IOperatorExecutor, FrameChangeTriggerOperator>();
         services.AddSingleton<IOperatorExecutor, PointAlignmentOperator>();
         services.AddSingleton<IOperatorExecutor, PointCorrectionOperator>();
         services.AddSingleton<IOperatorExecutor, GapMeasurementOperator>();
@@ -198,7 +199,16 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IOperatorRepository, OperatorRepository>();
         services.AddScoped<IInspectionResultRepository, InspectionResultRepository>();
-        services.AddSingleton<IImageCacheRepository, ImageCacheRepository>();
+        var imageCacheQueueCapacity = ResolveConfiguredInt(
+            configuration?["Performance:Persistence:ImageCacheQueueCapacity"],
+            "Performance__Persistence__ImageCacheQueueCapacity",
+            "CV_IMAGE_CACHE_QUEUE_CAPACITY",
+            fallback: 512,
+            min: 1,
+            max: 100_000);
+        services.AddSingleton(_ => new LruImageCacheRepository(queueCapacity: imageCacheQueueCapacity));
+        services.AddSingleton<IImageCacheRepository>(sp => sp.GetRequiredService<LruImageCacheRepository>());
+        services.AddHostedService(sp => sp.GetRequiredService<LruImageCacheRepository>());
         services.AddSingleton<IProjectFlowStorage, JsonFileProjectFlowStorage>();
 
         services.AddSingleton<InspectionResultBackgroundService>();
@@ -244,10 +254,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IResultAnalysisService, ResultAnalysisService>();
 
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly));
-        services.AddAutoMapper(cfg =>
-        {
-            cfg.LicenseKey = Environment.GetEnvironmentVariable("AUTOMAPPER_LICENSE") ?? string.Empty;
-        }, typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly);
+        services.AddAutoMapper(typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly);
 
         services.AddSingleton<IProjectSerializer, ProjectJsonSerializer>();
         services.AddSingleton<IResultExporter, CsvResultExporter>();
@@ -329,5 +336,29 @@ public static class VisionRuntimeServiceCollectionExtensions
         {
             Directory.CreateDirectory(directory);
         }
+    }
+
+    private static int ResolveConfiguredInt(
+        string? configuredValue,
+        string environmentKey,
+        string fallbackEnvironmentKey,
+        int fallback,
+        int min,
+        int max)
+    {
+        var raw = configuredValue;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            raw = Environment.GetEnvironmentVariable(environmentKey);
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            raw = Environment.GetEnvironmentVariable(fallbackEnvironmentKey);
+        }
+
+        return int.TryParse(raw, out var parsed)
+            ? Math.Clamp(parsed, min, max)
+            : fallback;
     }
 }

@@ -2,6 +2,7 @@ using Acme.Product.Core.Events;
 using Acme.Product.Infrastructure.Events;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Acme.Product.Tests.Events;
 
@@ -52,5 +53,32 @@ public class InMemoryEventStoreTests
 
         replay.Select(e => e.SequenceId).Should().Equal(secondSequence);
         replay.Select(e => ((InspectionProgressEvent)e.Event).ProcessedCount).Should().Equal(2);
+        store.ReplayedEventCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Append_ShouldTrimByConfiguredCapacityAndRecordDroppedEvents()
+    {
+        var store = new InMemoryEventStore(
+            NullLogger<InMemoryEventStore>.Instance,
+            Options.Create(new InMemoryEventStoreOptions
+            {
+                MaxEventsPerProject = 2,
+                MaxProjects = 50
+            }));
+        var projectId = Guid.NewGuid();
+
+        for (var i = 0; i < 5; i++)
+        {
+            store.Append(projectId, new InspectionProgressEvent
+            {
+                ProjectId = projectId,
+                SessionId = Guid.NewGuid(),
+                ProcessedCount = i
+            });
+        }
+
+        store.GetEventsAfter(projectId, 0).Should().HaveCount(2);
+        store.DroppedEventCount.Should().Be(3);
     }
 }

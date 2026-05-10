@@ -48,6 +48,10 @@ jobs:
         shell: pwsh
         run: '& "./scripts/scan-secrets.ps1"'
 
+      - name: Text Encoding Scan
+        shell: pwsh
+        run: '& "./scripts/check-text-encoding.ps1"'
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -64,9 +68,9 @@ jobs:
       - name: Restore Dependencies
         shell: pwsh
         run: |
-          dotnet restore $env:SOLUTION_PATH
-          dotnet restore $env:PRODUCT_TEST_PROJECT
-          dotnet restore $env:DESKTOP_TEST_PROJECT
+          dotnet restore $env:SOLUTION_PATH --locked-mode
+          dotnet restore $env:PRODUCT_TEST_PROJECT --locked-mode
+          dotnet restore $env:DESKTOP_TEST_PROJECT --locked-mode
 
       - name: Generate Operator Catalog
         run: dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
@@ -84,24 +88,55 @@ jobs:
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
 
       - name: Run Product Tests with Coverage
-        run: >
-          dotnet test ${{ env.PRODUCT_TEST_PROJECT }}
-          --configuration Debug
-          --no-restore
-          --verbosity normal
-          --logger trx
-          --results-directory TestResults/product
-          --collect:"XPlat Code Coverage"
+        shell: pwsh
+        run: |
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:PRODUCT_TEST_PROJECT `
+            -Configuration Debug `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/product `
+            -LogFileName product.trx `
+            -MinimumTotalTests 1 `
+            -MinimumPassedTests 1 `
+            -Collect "XPlat Code Coverage"
 
       - name: Run Desktop Tests with Coverage
-        run: >
-          dotnet test ${{ env.DESKTOP_TEST_PROJECT }}
-          --configuration Debug
-          --no-restore
-          --verbosity normal
-          --logger trx
-          --results-directory TestResults/desktop
-          --collect:"XPlat Code Coverage"
+        shell: pwsh
+        run: |
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:DESKTOP_TEST_PROJECT `
+            -Configuration Debug `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/desktop `
+            -LogFileName desktop.trx `
+            -MinimumTotalTests 1 `
+            -MinimumPassedTests 1 `
+            -Collect "XPlat Code Coverage"
+
+      - name: Write Coverage Summary
+        shell: pwsh
+        if: always()
+        run: |
+          $files = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
+          $lines = @("# Coverage Summary", "")
+          if ($files.Count -eq 0) {
+            $lines += "No Cobertura coverage files were found."
+          } else {
+            $lines += "| File | Line rate | Branch rate |"
+            $lines += "| --- | ---: | ---: |"
+            foreach ($file in $files) {
+              [xml]$xml = Get-Content -LiteralPath $file.FullName
+              $lineRate = [double]$xml.coverage.'line-rate'
+              $branchRate = [double]$xml.coverage.'branch-rate'
+              $relative = Resolve-Path -LiteralPath $file.FullName -Relative
+              $lines += "| $relative | $([Math]::Round($lineRate * 100, 2))% | $([Math]::Round($branchRate * 100, 2))% |"
+            }
+          }
+          New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+          $lines | Set-Content -Path TestResults/coverage-summary.md -Encoding UTF8
+          $lines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Run Detection Regression Gate
         shell: pwsh
@@ -165,9 +200,10 @@ jobs:
           path: |
             TestResults/**/*.trx
             TestResults/**/coverage.cobertura.xml
+            TestResults/coverage-summary.md
 
       - name: Restore OperatorLibrary Package Project
-        run: dotnet restore ${{ env.OPERATOR_PROJECT }}
+        run: dotnet restore ${{ env.OPERATOR_PROJECT }} --locked-mode
 
       - name: Build OperatorLibrary Package Project
         run: dotnet build ${{ env.OPERATOR_PROJECT }} --configuration Release --no-restore
@@ -190,19 +226,22 @@ jobs:
       - name: Smoke Test OperatorLibrary Package with Coverage
         shell: pwsh
         run: |
+          $smokeLockPath = Join-Path $env:RUNNER_TEMP "operator-library-smoke.packages.lock.json"
           dotnet restore ${{ env.OPERATOR_SMOKE_TEST_PROJECT }} `
             --configfile Acme.OperatorLibrary/nuget.config `
-            --source "${{ env.OPERATOR_PACKAGE_DIR }}" `
-            --source "https://api.nuget.org/v3/index.json" `
+            -p:NuGetLockFilePath=$smokeLockPath `
             -p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
-          dotnet test ${{ env.OPERATOR_SMOKE_TEST_PROJECT }} `
-            --configuration Release `
-            --no-restore `
-            --verbosity normal `
-            --logger trx `
-            --results-directory TestResults/operator-library `
-            --collect "Code Coverage" `
-            -p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:OPERATOR_SMOKE_TEST_PROJECT `
+            -Configuration Release `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/operator-library `
+            -LogFileName operator-library.trx `
+            -MinimumTotalTests 1 `
+            -MinimumPassedTests 1 `
+            -Collect "Code Coverage" `
+            -DotNetTestArguments "-p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION"
 
       - name: Upload OperatorLibrary Package Artifacts
         uses: actions/upload-artifact@v4
@@ -214,6 +253,9 @@ jobs:
             ${{ env.OPERATOR_PACKAGE_DIR }}/Acme.OperatorLibrary.*.snupkg
             TestResults/operator-library/**/*.trx
             TestResults/operator-library/**/*.coverage
+            Acme.OperatorLibrary/SBOM.md
+            Acme.OperatorLibrary/SBOM.spdx.json
+            Acme.OperatorLibrary/THIRD-PARTY-NOTICES.md
 
       - name: Run Operator Performance Benchmark Smoke
         run: >
@@ -246,7 +288,9 @@ jobs:
 
       - name: Run UI Tests
         working-directory: Acme.Product/tests/Acme.Product.UI.Tests
-        run: npx playwright test
+        run: |
+          npm run test:unit
+          npx playwright test
 
       - name: Upload UI Test Results
         uses: actions/upload-artifact@v4
@@ -256,6 +300,79 @@ jobs:
           path: |
             Acme.Product/tests/Acme.Product.UI.Tests/playwright-report/
             Acme.Product/tests/Acme.Product.UI.Tests/test-results/
+
+  industrial-gate:
+    name: Operator Industrial Gate
+    runs-on: windows-latest
+    needs: build-and-test
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore Dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
+
+      - name: Prepare OperatorLibrary Smoke Package
+        shell: pwsh
+        run: |
+          dotnet restore $env:OPERATOR_PROJECT --locked-mode
+          dotnet build $env:OPERATOR_PROJECT --configuration Release --no-restore
+          $versionPrefix = (dotnet msbuild $env:OPERATOR_PROJECT -getProperty:VersionPrefix | Select-Object -Last 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($versionPrefix)) {
+            throw "Could not determine OperatorLibrary VersionPrefix."
+          }
+          $packageVersion = "$versionPrefix-industrial.${{ github.run_number }}.${{ github.run_attempt }}"
+          dotnet pack $env:OPERATOR_PROJECT `
+            --configuration Release `
+            --no-build `
+            --output $env:OPERATOR_PACKAGE_DIR `
+            -p:PackageVersion=$packageVersion
+          $smokeLockPath = Join-Path $env:RUNNER_TEMP "operator-library-industrial-smoke.packages.lock.json"
+          dotnet restore $env:OPERATOR_SMOKE_TEST_PROJECT `
+            --configfile Acme.OperatorLibrary/nuget.config `
+            -p:NuGetLockFilePath=$smokeLockPath `
+            -p:AcmeOperatorLibraryPackageVersion=$packageVersion
+          dotnet build $env:OPERATOR_SMOKE_TEST_PROJECT `
+            --no-restore `
+            -p:AcmeOperatorLibraryPackageVersion=$packageVersion
+
+      - name: Run Quick Industrial Gate
+        shell: pwsh
+        run: |
+          & "./scripts/run-operator-library-industrial-gate.ps1" `
+            -Profile quick `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity minimal
+
+      - name: Upload Industrial Gate Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-industrial-gate
+          path: |
+            test_results/operator-library-industrial-gate/**/summary.json
+            test_results/operator-library-industrial-gate/**/summary.md
+            test_results/operator-library-industrial-gate/**/trx/**/*.trx
+            test_results/operator-library-industrial-gate/**/performance-reports/**
 
   release-build:
     name: Release Build
@@ -313,8 +430,8 @@ jobs:
       - name: Create Launcher Script
         shell: pwsh
         run: |
-          $content = "@echo off`nchcp 65001 >nul`necho 正在启动 ClearVision...`nstart `"`" `"%~dp0Acme.Product.Desktop.exe`""
-          $content | Out-File -FilePath "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}/启动 ClearVision.bat" -Encoding UTF8
+          $content = "@echo off`nchcp 65001 >nul`necho Starting ClearVision...`nstart `"`" `"%~dp0Acme.Product.Desktop.exe`""
+          $content | Out-File -FilePath "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}/Start-ClearVision.bat" -Encoding UTF8
 
       - name: Create ZIP Archive
         shell: pwsh
@@ -378,8 +495,7 @@ jobs:
       - name: Build
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore
 
-      - name: Check Code Format (Report Only)
-        continue-on-error: true
+      - name: Check Code Format
         run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity diagnostic
 
       - name: Run Static Analysis

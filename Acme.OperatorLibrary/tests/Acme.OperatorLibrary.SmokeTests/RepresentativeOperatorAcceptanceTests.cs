@@ -1,3 +1,4 @@
+using System.Numerics;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
@@ -184,6 +185,172 @@ public class RepresentativeOperatorAcceptanceTests
 
         Assert.False(result.IsSuccess);
         Assert.NotNull(result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task TemplateMatchOperator_ShouldFindKnownTemplateAndExposeMatchMetadata()
+    {
+        using var template = new Mat(18, 18, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Rectangle(template, new Rect(3, 3, 12, 12), Scalar.White, -1);
+        Cv2.Line(template, new Point(3, 3), new Point(14, 14), Scalar.Black, 2);
+
+        using var source = new Mat(80, 80, MatType.CV_8UC1, Scalar.Black);
+        template.CopyTo(new Mat(source, new Rect(31, 24, template.Width, template.Height)));
+
+        using var inputImage = new ImageWrapper(source.Clone());
+        using var templateImage = new ImageWrapper(template.Clone());
+        var op = CreateOperator(
+            OperatorType.TemplateMatching,
+            ("Method", "CCorrNormed"),
+            ("Domain", "Gray"),
+            ("Threshold", 0.8),
+            ("MaxMatches", 1));
+        var executor = new TemplateMatchOperator(NullLogger<TemplateMatchOperator>.Instance);
+
+        var result = await executor.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = inputImage,
+            ["Template"] = templateImage
+        });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        Assert.True(Assert.IsType<bool>(result.OutputData!["IsMatch"]));
+        Assert.True(Assert.IsType<int>(result.OutputData["MatchCount"]) >= 1);
+        var position = Assert.IsType<Position>(result.OutputData["Position"]);
+        Assert.InRange(position.X, 38.0, 42.0);
+        Assert.InRange(position.Y, 31.0, 35.0);
+    }
+
+    [Fact]
+    public async Task RegionUnionOperator_ShouldMergeOverlappingRunLengthRegions()
+    {
+        var first = new Region(new[]
+        {
+            new RunLength(2, 0, 2),
+            new RunLength(3, 0, 0)
+        });
+        var second = new Region(new[]
+        {
+            new RunLength(2, 2, 4),
+            new RunLength(4, 1, 1)
+        });
+        var op = CreateOperator(OperatorType.RegionUnion);
+        var executor = new RegionUnionOperator(NullLogger<RegionUnionOperator>.Instance);
+
+        var result = await executor.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Region1"] = first,
+            ["Region2"] = second
+        });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        var union = Assert.IsType<Region>(result.OutputData!["Region"]);
+        Assert.Equal(7, union.Area);
+        Assert.Contains(union.RunLengths, run => run.Y == 2 && run.StartX == 0 && run.EndX == 4);
+        Assert.Equal(7, Assert.IsType<int>(result.OutputData["Area"]));
+    }
+
+    [Fact]
+    public async Task MorphologyOperator_ShouldExecuteLegacyImagePathAndRejectUnsupportedOperation()
+    {
+        using var source = new Mat(9, 9, MatType.CV_8UC1, Scalar.Black);
+        source.Set(4, 4, 255);
+        using var inputImage = new ImageWrapper(source.Clone());
+        var validOp = CreateOperator(
+            OperatorType.Morphology,
+            ("Operation", "Dilate"),
+            ("KernelSize", 3),
+            ("KernelShape", "Rect"),
+            ("Iterations", 1));
+        var executor = new MorphologyOperator(NullLogger<MorphologyOperator>.Instance);
+
+        var result = await executor.ExecuteAsync(validOp, new Dictionary<string, object> { ["Image"] = inputImage });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        using var outputImage = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.True(Cv2.CountNonZero(outputImage.GetMat()) > 1);
+
+        var invalidOp = CreateOperator(OperatorType.Morphology, ("Operation", "Unsupported"));
+        var validation = executor.ValidateParameters(invalidOp);
+        Assert.False(validation.IsValid);
+        Assert.NotEmpty(validation.Errors);
+    }
+
+    [Fact]
+    public async Task FFT1DOperator_ShouldTransformNumericSignal()
+    {
+        var op = CreateOperator(OperatorType.FFT1D);
+        var executor = new FFT1DOperator(NullLogger<FFT1DOperator>.Instance);
+
+        var result = await executor.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Input"] = new double[] { 1.0, 0.0, -1.0, 0.0 }
+        });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        var spectrum = Assert.IsType<Complex[]>(result.OutputData!["Spectrum"]);
+        Assert.Equal(4, spectrum.Length);
+        Assert.Equal("1DSignal", Assert.IsType<string>(result.OutputData["TransformKind"]));
+        Assert.Equal(4, Assert.IsType<double[]>(result.OutputData["Magnitude"]).Length);
+    }
+
+    [Fact]
+    public void SemanticSegmentationOperator_ShouldRejectMissingModelTargetInValidation()
+    {
+        var op = CreateOperator(OperatorType.SemanticSegmentation, ("ModelPath", string.Empty));
+        var executor = new SemanticSegmentationOperator(NullLogger<SemanticSegmentationOperator>.Instance);
+
+        var validation = executor.ValidateParameters(op);
+
+        Assert.False(validation.IsValid);
+        Assert.NotEmpty(validation.Errors);
+    }
+
+    [Fact]
+    public void AnomalyDetectionOperator_ShouldRejectMissingFeatureBankForInference()
+    {
+        var missingBank = Path.Combine(Path.GetTempPath(), "acme-oplib-missing-bank-" + Guid.NewGuid().ToString("N") + ".json");
+        var op = CreateOperator(
+            OperatorType.AnomalyDetection,
+            ("Mode", "inference"),
+            ("FeatureBankPath", missingBank));
+        var executor = new AnomalyDetectionOperator(NullLogger<AnomalyDetectionOperator>.Instance);
+
+        var validation = executor.ValidateParameters(op);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains("Feature bank", validation.Errors.FirstOrDefault() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SurfaceDefectDetectionOperator_ShouldDetectGradientDefectAndReturnDiagnostics()
+    {
+        using var source = new Mat(96, 96, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Line(source, new Point(16, 48), new Point(80, 48), Scalar.White, 3);
+
+        using var inputImage = new ImageWrapper(source.Clone());
+        var op = CreateOperator(
+            OperatorType.SurfaceDefectDetection,
+            ("Method", "GradientMagnitude"),
+            ("ThresholdMode", "Manual"),
+            ("Threshold", 20.0),
+            ("MinArea", 1),
+            ("MaxArea", 10_000),
+            ("MorphMode", "None"),
+            ("NormalizationMode", "None"));
+        var executor = new SurfaceDefectDetectionOperator(NullLogger<SurfaceDefectDetectionOperator>.Instance);
+
+        var result = await executor.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = inputImage });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        Assert.True(Assert.IsType<int>(result.OutputData!["DefectCount"]) >= 1);
+        Assert.True(Assert.IsType<double>(result.OutputData["DefectArea"]) > 0.0);
+        Assert.IsAssignableFrom<IDictionary<string, object>>(result.OutputData["Diagnostics"]);
     }
 
     private static Operator CreateOperator(OperatorType operatorType, params (string Name, object? Value)[] parameters)

@@ -1,61 +1,50 @@
 // MqttPublishOperator.cs
-// MQTT 发布算子 - Sprint 3 Task 3.5b
-// 向数字孪生/IoT 平台推送检测状态
-// 作者：蘅芜君
+// MQTT publish operator placeholder.
 
-using System.Text;
 using System.Text.Json;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
-/// MQTT 发布算子 - 向消息队列推送数据
-/// 
-/// 功能：
-/// - 连接 MQTT Broker
-/// - 发布消息到指定 Topic
-/// - 支持 QoS 0/1/2
-/// - 支持保留消息
-/// 
-/// 使用场景：
-/// - 向数字孪生平台推送检测状态
-/// - 向 IoT 平台上报设备数据
-/// - 触发 MQTT 订阅者
-/// 
-/// 注意：此为基础框架，实际 MQTT 连接需要 MQTTnet 等库
+/// MQTT publish placeholder. It validates parameters and fails fast until the
+/// MQTT client dependency and connection lifecycle are explicitly enabled.
 /// </summary>
 [OperatorMeta(
-    DisplayName = "MQTT 发布",
-    Description = "向消息队列推送数据",
-    Category = "通信",
-    IconName = "mqtt"
+    DisplayName = "MQTT Publish",
+    Description = "Publishes inspection data to MQTT when the optional MQTT integration is enabled.",
+    Category = "Communication",
+    IconName = "mqtt",
+    Keywords = new[] { "MQTT", "IoT", "Publish", "Communication" },
+    Tags = new[] { "maturity:placeholder-disabled", "integration:mqtt", "experimental" },
+    Version = "0.1.0"
 )]
-[InputPort("Payload", "消息负载", PortDataType.Any, IsRequired = true)]
-[InputPort("Message", "消息内容", PortDataType.String, IsRequired = false)]
-[OutputPort("IsSuccess", "是否成功", PortDataType.Boolean)]
-[OperatorParam("Broker", "Broker地址", "string", DefaultValue = "localhost")]
-[OperatorParam("Port", "端口", "int", DefaultValue = 1883)]
-[OperatorParam("Topic", "主题", "string", DefaultValue = "cv/results")]
+[InputPort("Payload", "Message Payload", PortDataType.Any, IsRequired = true)]
+[InputPort("Message", "Message Text", PortDataType.String, IsRequired = false)]
+[OutputPort("IsSuccess", "Is Success", PortDataType.Boolean)]
+[OperatorParam("Broker", "Broker Address", "string", DefaultValue = "localhost")]
+[OperatorParam("Port", "Port", "int", DefaultValue = 1883)]
+[OperatorParam("Topic", "Topic", "string", DefaultValue = "cv/results")]
 [OperatorParam("Qos", "QoS", "int", DefaultValue = 1)]
-[OperatorParam("Retain", "保留消息", "bool", DefaultValue = false)]
-[OperatorParam("TimeoutMs", "超时(毫秒)", "int", DefaultValue = 5000)]
+[OperatorParam("Retain", "Retain Message", "bool", DefaultValue = false)]
+[OperatorParam("TimeoutMs", "Timeout (ms)", "int", DefaultValue = 5000)]
 public class MqttPublishOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.MqttPublish;
 
-    public MqttPublishOperator(ILogger<MqttPublishOperator> logger) : base(logger) { }
+    public MqttPublishOperator(ILogger<MqttPublishOperator> logger) : base(logger)
+    {
+    }
 
-    protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
+    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取参数
         var broker = GetStringParam(@operator, "Broker", "localhost");
         var port = GetIntParam(@operator, "Port", 1883, 1, 65535);
         var topic = GetStringParam(@operator, "Topic", "");
@@ -65,10 +54,9 @@ public class MqttPublishOperator : OperatorBase
 
         if (string.IsNullOrWhiteSpace(topic))
         {
-            return OperatorExecutionOutput.Failure("Topic 参数不能为空");
+            return Task.FromResult(OperatorExecutionOutput.Failure("Topic parameter cannot be empty."));
         }
 
-        // 构建消息体
         string message;
         if (TryGetInputValue(inputs, "Payload", out var payloadObj) && payloadObj != null)
         {
@@ -82,7 +70,6 @@ public class MqttPublishOperator : OperatorBase
         }
         else if (inputs != null && inputs.Count > 0)
         {
-            // 将所有输入序列化为 JSON
             message = JsonSerializer.Serialize(inputs);
         }
         else
@@ -91,11 +78,17 @@ public class MqttPublishOperator : OperatorBase
         }
 
         Logger.LogWarning(
-            "[MqttPublish] MQTT publish requested for {Broker}:{Port}/{Topic} with timeout {TimeoutMs}ms, but the runtime integration is not enabled in this build.",
-            broker, port, topic, timeoutMs);
+            "[MqttPublish] MQTT publish requested for {Broker}:{Port}/{Topic}. Qos={Qos}, Retain={Retain}, TimeoutMs={TimeoutMs}, PayloadLength={PayloadLength}. The runtime integration is placeholder-disabled in this build.",
+            broker,
+            port,
+            topic,
+            qos,
+            retain,
+            timeoutMs,
+            message.Length);
 
-        return OperatorExecutionOutput.Failure(
-            "MQTT 发布功能在当前构建中未启用，请先接入 MQTT 客户端实现后再使用该算子。");
+        return Task.FromResult(OperatorExecutionOutput.Failure(
+            "MQTT publish is placeholder-disabled in this build. Enable the MQTT client integration before using this operator."));
     }
 
     private static bool TryGetInputValue(
@@ -153,17 +146,17 @@ public class MqttPublishOperator : OperatorBase
 
         if (string.IsNullOrWhiteSpace(broker))
         {
-            return ValidationResult.Invalid("Broker 不能为空");
+            return ValidationResult.Invalid("Broker cannot be empty.");
         }
 
         if (string.IsNullOrWhiteSpace(topic))
         {
-            return ValidationResult.Invalid("Topic 不能为空");
+            return ValidationResult.Invalid("Topic cannot be empty.");
         }
 
         if (qos < 0 || qos > 2)
         {
-            return ValidationResult.Invalid("QoS 必须是 0/1/2");
+            return ValidationResult.Invalid("QoS must be 0, 1, or 2.");
         }
 
         return ValidationResult.Valid();

@@ -338,7 +338,7 @@ function Write-Readme {
 
 $repoRoot = Resolve-RepoRoot -ScriptRoot $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $repoRoot "publish"
+    $OutputRoot = Join-Path $repoRoot ".tmp\publish-check\portable-deployment"
 }
 
 $desktopProject = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj"

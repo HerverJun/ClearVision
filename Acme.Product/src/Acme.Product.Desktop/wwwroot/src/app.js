@@ -12,6 +12,10 @@ import { createViewManager } from './core/app/viewManager.js';
 import { bindToolbarCommands } from './core/app/commandHandlers.js';
 import { createFlowCanvasAdapter } from './core/canvas/flowCanvasAdapter.js';
 import { createAiGenerationController } from './features/ai/aiGenerationController.js';
+import debugLogger, { installConsoleGate } from './core/logging/debugLogger.js';
+import { t } from './core/i18n/resources.js';
+
+installConsoleGate();
 
 // ============================================
 // 全局错误捕获 - 用于调试
@@ -50,7 +54,7 @@ window.addEventListener('unhandledrejection', function(event) {
     });
 });
 
-console.log('[App] Starting module imports...');
+debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}...`);
 
 // ============================================
 // 认证检查 - 未登录则跳转
@@ -232,10 +236,10 @@ async function handleProjectChange(project) {
     inspectionPanel?.setProjectContext?.(project.id);
 
     if (project.flow && flowCanvas) {
-        console.log('[App] 当前工程已切换，加载流程数据:', project.flow);
+        debugLogger.debug('[App] 当前工程已切换，加载流程数据:', project.flow);
         flowCanvas.deserialize(project.flow);
     } else if (flowCanvas) {
-        console.log('[App] 当前工程没有流程数据，清空画布');
+        debugLogger.debug('[App] 当前工程没有流程数据，清空画布');
         flowCanvas.clear();
     }
 
@@ -255,12 +259,12 @@ async function initializeApp() {
         return true;
     }
 
-    console.log('[App] 初始化应用...');
+    debugLogger.debug('[App] 初始化应用...');
     showLoadingScreen();
 
     const authState = await bootstrapAuthSession();
     if (!authState.ok) {
-        console.warn(`[App] 认证启动失败: ${authState.reason}`);
+        debugLogger.warn(`[App] 认证启动失败: ${authState.reason}`);
         return false;
     }
 
@@ -285,7 +289,7 @@ async function initializeApp() {
 
     appInitialized = true;
 
-    console.log('[App] 应用初始化完成');
+    debugLogger.debug('[App] 应用初始化完成');
     showToast('ClearVision 已就绪', 'success');
     return true;
 }
@@ -332,14 +336,14 @@ async function ensureProjectView() {
 
     const container = document.getElementById('project-view');
     if (!container) {
-        console.warn('[App] 工程视图容器未找到，将在首次切换到工程视图时初始化');
+        debugLogger.warn('[App] 工程视图容器未找到，将在首次切换到工程视图时初始化');
         return null;
     }
 
     const { ProjectView } = await loadProjectViewModule();
     projectView = new ProjectView('project-view');
 
-    console.log('[App] 工程视图初始化完成');
+    debugLogger.debug('[App] 工程视图初始化完成');
     return projectView;
 }
 
@@ -350,7 +354,7 @@ async function ensureResultPanel() {
 
     const container = document.getElementById('results-list-container');
     if (!container) {
-        console.warn('[App] 结果视图容器未找到');
+        debugLogger.warn('[App] 结果视图容器未找到');
         return null;
     }
 
@@ -361,7 +365,7 @@ async function ensureResultPanel() {
     resultPanel.setHistoryLoader(loadInspectionHistory);
 
     resultPanel.onResultClick = (result) => {
-        console.log('[App] 点击结果:', result);
+        debugLogger.debug('[App] 点击结果:', result);
         if (resultPanel && result) {
             resultPanel.showResultDetail(result);
         }
@@ -378,14 +382,14 @@ async function ensureResultPanel() {
         });
     }
 
-    console.log('[App] 结果面板初始化完成（现代化仪表盘）');
+    debugLogger.debug('[App] 结果面板初始化完成（现代化仪表盘）');
     return resultPanel;
 }
 
 async function ensureInspectionPanelReady() {
     const container = document.getElementById('inspection-control-panel');
     if (!container) {
-        console.warn('[App] 检测控制面板容器未找到');
+        debugLogger.warn('[App] 检测控制面板容器未找到');
         return null;
     }
 
@@ -399,14 +403,14 @@ async function ensureInspectionPanelReady() {
 
     const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
     if (existingInspectionPanel && typeof existingInspectionPanel.dispose === 'function') {
-        console.warn('[App] 发现残留的 InspectionPanel 实例，正在销毁...');
+        debugLogger.warn('[App] 发现残留的 InspectionPanel 实例，正在销毁...');
         existingInspectionPanel.dispose();
     }
 
     inspectionPanel = new InspectionPanel('inspection-control-panel');
     serviceRegistry.register('inspectionPanel', inspectionPanel);
     inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
-    console.log('[App] 检测控制面板初始化完成');
+    debugLogger.debug('[App] 检测控制面板初始化完成');
     return inspectionPanel;
 }
 
@@ -417,14 +421,14 @@ async function ensureStationMonitorView() {
 
     const container = document.getElementById('stations-view');
     if (!container) {
-        console.warn('[App] Station monitor container not found.');
+        debugLogger.warn('[App] Station monitor container not found.');
         return null;
     }
 
     const { StationMonitorView } = await loadStationMonitorModule();
     stationMonitorView = new StationMonitorView('stations-view');
     serviceRegistry.register('stationMonitorView', stationMonitorView);
-    console.log('[App] Station monitor view initialized.');
+    debugLogger.debug('[App] Station monitor view initialized.');
     return stationMonitorView;
 }
 
@@ -435,7 +439,7 @@ async function ensureAiPanel() {
 
     const flowCanvasService = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
     if (!flowCanvasService) {
-        console.warn('[App] FlowCanvas 未就绪，无法初始化 AI 面板');
+        debugLogger.warn('[App] FlowCanvas 未就绪，无法初始化 AI 面板');
         return null;
     }
 
@@ -446,7 +450,7 @@ async function ensureAiPanel() {
         onApplied: (flow) => getAiGenerationController().publishApplied(flow)
     });
     serviceRegistry.register('aiPanel', aiPanel);
-    console.log('[App] AI 面板初始化完成');
+    debugLogger.debug('[App] AI 面板初始化完成');
     return aiPanel;
 }
 
@@ -460,7 +464,7 @@ async function switchView(view) {
 function initializeInspectionImageViewer() {
     const container = document.getElementById('inspection-image-area');
     if (!container) {
-        console.warn('[App] 检测图像查看器容器未找到');
+        debugLogger.warn('[App] 检测图像查看器容器未找到');
         return;
     }
     
@@ -484,7 +488,7 @@ function initializeInspectionImageViewer() {
         // 【关键修复】移除重复的回调设置，避免覆盖 initializeInspectionController 中设置的回调
         // 检测完成逻辑统一在 initializeInspectionController 中处理
         
-        console.log('[App] 检测图像查看器初始化完成');
+        debugLogger.debug('[App] 检测图像查看器初始化完成');
     } catch (error) {
         console.error('[App] 检测图像查看器初始化失败:', error);
     }
@@ -508,7 +512,7 @@ function tryParseJsonPayload(payload) {
     try {
         return JSON.parse(payload);
     } catch (error) {
-        console.warn('[App] JSON payload 解析失败:', error);
+        debugLogger.warn('[App] JSON payload 解析失败:', error);
         return null;
     }
 }
@@ -644,12 +648,12 @@ function initializeOperatorLibraryPanel() {
     
     // 设置拖拽回调
     operatorLibraryPanel.onOperatorDragStart = (operatorData) => {
-        console.log('[App] 开始拖拽算子:', operatorData.type);
+        debugLogger.debug('[App] 开始拖拽算子:', operatorData.type);
     };
     
     // 设置选中回调
     operatorLibraryPanel.onOperatorSelected = (operatorData) => {
-        console.log('[App] 选中算子:', operatorData.type);
+        debugLogger.debug('[App] 选中算子:', operatorData.type);
         // 【修复】创建浅拷贝确保 Signal 能检测到变化（Signal 使用 !== 严格相等）
         // 同时补全 title 字段，确保 PropertyPanel 能正确显示标题
         const operatorCopy = {
@@ -660,7 +664,7 @@ function initializeOperatorLibraryPanel() {
         setSelectedOperator(operatorCopy);
     };
     
-    console.log('[App] 算子库面板初始化完成');
+    debugLogger.debug('[App] 算子库面板初始化完成');
 }
 
 /**
@@ -679,15 +683,15 @@ function initializeImageViewer() {
     
     // 设置图像加载回调
     imageViewer.onImageLoaded = (img) => {
-        console.log('[App] 图像已加载:', img.width, 'x', img.height);
+        debugLogger.debug('[App] 图像已加载:', img.width, 'x', img.height);
     };
     
     // 设置标注点击回调
     imageViewer.onAnnotationClicked = (annotation) => {
-        console.log('[App] 点击标注:', annotation);
+        debugLogger.debug('[App] 点击标注:', annotation);
     };
     
-    console.log('[App] 图像查看器初始化完成');
+    debugLogger.debug('[App] 图像查看器初始化完成');
 }
 
 function openImageViewerFromPreview(imageSource) {
@@ -754,7 +758,7 @@ function initializeInspectionController() {
         }
 
         if (normalizedResult.projectId && normalizedResult.projectId !== currentProjectId) {
-            console.warn('[App] Ignore stale inspection result from another project.', {
+            debugLogger.warn('[App] Ignore stale inspection result from another project.', {
                 activeProjectId: currentProjectId,
                 resultProjectId: normalizedResult.projectId
             });
@@ -763,7 +767,7 @@ function initializeInspectionController() {
 
         result = normalizedResult;
         eventBus.emit('inspection:result', result);
-        console.log('[App] 检测完成:', result);
+        debugLogger.debug('[App] 检测完成:', result);
 
         // 【关键修复】保存最新的检测结果，以便切换视图时显示
         serviceRegistry.register('lastInspectionResult', result);
@@ -785,7 +789,7 @@ function initializeInspectionController() {
             updateInspectionResultsPanel(result);
         } else {
             // 【关键修复】如果不在检测视图，显示提示引导用户切换
-            console.log('[App] 检测完成但不在检测视图，已保存结果');
+            debugLogger.debug('[App] 检测完成但不在检测视图，已保存结果');
         }
 
         const appendResultToPanel = (panel) => {
@@ -818,7 +822,7 @@ function initializeInspectionController() {
             if (currentProjectId && typeof panel.loadServerAnalytics === 'function') {
                 setTimeout(() => {
                     panel.loadServerAnalytics().catch(error => {
-                        console.warn('[App] 刷新结果页服务端分析失败:', error);
+                        debugLogger.warn('[App] 刷新结果页服务端分析失败:', error);
                     });
                 }, 300);
             }
@@ -868,7 +872,7 @@ function initializeInspectionController() {
         }
     });
     
-    console.log('[App] 检测控制器初始化完成');
+    debugLogger.debug('[App] 检测控制器初始化完成');
 }
 
 /**
@@ -890,7 +894,7 @@ function initializePropertyPanel() {
     // 【修复】订阅选中算子变化，使用trackedSubscribe防止内存泄漏
     trackedSubscribe(subscribeSelectedOperator, (operator) => {
         if (operator) {
-            console.log('[App] 选中算子变化:', operator.title || operator.type);
+            debugLogger.debug('[App] 选中算子变化:', operator.title || operator.type);
             propertyPanel.setOperator(operator);
         } else {
             propertyPanel.clear();
@@ -899,7 +903,7 @@ function initializePropertyPanel() {
 
     // 设置参数变更回调
     propertyPanel.onChange((values) => {
-        console.log('[App] 算子参数变更:', values);
+        debugLogger.debug('[App] 算子参数变更:', values);
         // 更新流程图中对应节点的参数
         const operator = getSelectedOperator();
         if (operator && flowCanvas) {
@@ -910,7 +914,7 @@ function initializePropertyPanel() {
         }
     });
 
-    console.log('[App] 属性面板初始化完成');
+    debugLogger.debug('[App] 属性面板初始化完成');
 }
 
 /**
@@ -919,7 +923,7 @@ function initializePropertyPanel() {
 function initializePropertySidebarController() {
     const handle = document.querySelector('[data-sidebar-resizer="property"]');
     if (!handle) {
-        console.warn('[App] Property sidebar resizer not found');
+        debugLogger.warn('[App] Property sidebar resizer not found');
         return;
     }
 
@@ -932,7 +936,7 @@ function initializePropertySidebarController() {
 }
 
 /**
- * 鍔犺浇妫€娴嬪巻鍙叉暟鎹?
+ * 加载检测历史数据
  */
 async function loadInspectionHistory({
     pageIndex = 0,
@@ -944,12 +948,12 @@ async function loadInspectionHistory({
 } = {}) {
     const project = getCurrentProject();
     if (!project) {
-        console.log('[App] 没有打开的工程，跳过加载历史数据');
+        debugLogger.debug('[App] 没有打开的工程，跳过加载历史数据');
         return false;
     }
 
     try {
-        console.log('[App] 正在加载检测历史数据...');
+        debugLogger.debug('[App] 正在加载检测历史数据...');
         const response = await httpClient.get(`/inspection/history/${project.id}`, {
             pageIndex,
             pageSize,
@@ -992,7 +996,7 @@ async function loadInspectionHistory({
                 await resultPanel.loadServerAnalytics();
             }
 
-            console.log(`[App] 已加载 ${normalizedResults.length} 条历史检测记录`);
+            debugLogger.debug(`[App] 已加载 ${normalizedResults.length} 条历史检测记录`);
         }
 
         return true;
@@ -1107,7 +1111,7 @@ function initializeFlowEditor() {
     // 设置节点选中回调
     flowCanvas.onNodeSelected = (node) => {
         if (node) {
-            console.log('[App] 节点选中:', node.title || node.type);
+            debugLogger.debug('[App] 节点选中:', node.title || node.type);
             // 【修复】构造算子数据传递给属性面板 —— 使用算子库定义补全信息
             const operatorDef = findOperatorDefinition(node.type);
             setSelectedOperator({
@@ -1141,7 +1145,7 @@ function initializeFlowEditor() {
 
     flowCanvas.onNodeDoubleClicked = (node) => {
         if (node.type === 'ForEach') {
-            console.log('[App] 进入 ForEach 子图:', node.id);
+            debugLogger.debug('[App] 进入 ForEach 子图:', node.id);
             // 序列化主图状态并挂载到临时全局变量
             window._mainFlowState = flowCanvas.serialize();
             window._currentSubgraphNodeId = node.id;
@@ -1175,7 +1179,7 @@ function initializeFlowEditor() {
                     outputs: [{ name: 'Item', type: 'Any' }, { name: 'Index', type: 'Integer' }, { name: 'Total', type: 'Integer' }],
                     _systemNode: true  // 标记为系统节点，不可删除
                 });
-                console.log('[App] 已注入 CurrentItem 系统源节点');
+                debugLogger.debug('[App] 已注入 CurrentItem 系统源节点');
             }
             
             if (breadcrumbContainer) {
@@ -1189,7 +1193,7 @@ function initializeFlowEditor() {
     if (btnExitSubgraph) {
         btnExitSubgraph.addEventListener('click', () => {
             if (window._mainFlowState && window._currentSubgraphNodeId) {
-                console.log('[App] 退出并保存 ForEach 子图');
+                debugLogger.debug('[App] 退出并保存 ForEach 子图');
                 const subFlowData = flowCanvas.serialize();
                 let mainData = window._mainFlowState;
                 
@@ -1235,12 +1239,12 @@ function initializeFlowEditor() {
     // 【阶段B】初始化流程编辑器交互增强（撤销/重做/复制/粘贴/框选）
     flowEditorInteraction = new FlowEditorInteraction(flowCanvas);
     serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
-    console.log('[App] 流程编辑器交互增强已启用');
+    debugLogger.debug('[App] 流程编辑器交互增强已启用');
     
     // 【阶段B】启动自动保存
     startAutoSave();
     
-    console.log('[App] 流程编辑器初始化完成');
+    debugLogger.debug('[App] 流程编辑器初始化完成');
 }
 
 
@@ -1248,7 +1252,7 @@ function initializeFlowEditor() {
  * 添加算子到流程（保留作为备用入口）
  */
 function addOperatorToFlow(type, x, y, data = null) {
-    console.log('[App] 添加算子:', type, '位置:', x, y);
+    debugLogger.debug('[App] 添加算子:', type, '位置:', x, y);
     
     if (!flowCanvas) {
         console.error('[App] FlowCanvas 未初始化');
@@ -1260,7 +1264,7 @@ function addOperatorToFlow(type, x, y, data = null) {
     // 添加节点到画布
     const node = flowCanvas.addNode(type, x, y, nodeConfig);
     
-    console.log('[App] 算子已添加:', node);
+    debugLogger.debug('[App] 算子已添加:', node);
     
     // 选中该节点
     flowCanvas.selectedNode = node.id;
@@ -1360,7 +1364,7 @@ function initializeToolbar() {
  */
 function initializeAiGeneration() {
     getAiGenerationController();
-    console.log('[App] AI 生成功能已升级为独立面板');
+    debugLogger.debug('[App] AI 生成功能已升级为独立面板');
 }
 
 /**
@@ -1373,11 +1377,11 @@ async function loadProject(projectId) {
         
         // 加载流程到画布
     if (project.flow && flowCanvas) {
-            console.log('[App] 加载流程数据:', project.flow);
+            debugLogger.debug('[App] 加载流程数据:', project.flow);
         flowCanvas.deserialize(project.flow);
     } else if (flowCanvas) {
             // 【修复】如果没有流程数据，清空画布
-            console.log('[App] 工程没有流程数据，清空画布');
+            debugLogger.debug('[App] 工程没有流程数据，清空画布');
         flowCanvas.clear();
         }
         
@@ -1411,7 +1415,7 @@ async function createProject(name, description = '', preserveCanvas = false) {
     if (flowCanvas) {
         project.flow = flowCanvas.serialize();
                 await projectManager.saveProject(project);
-                console.log('[App] 画布内容已保存到新工程:', project.name);
+                debugLogger.debug('[App] 画布内容已保存到新工程:', project.name);
             }
         } else {
             // 新建空工程，清空画布
@@ -1531,14 +1535,14 @@ function startAutoSave() {
                     timestamp: new Date().toISOString(),
                     flow: project.flow
                 }));
-                console.log('[AutoSave] 自动保存完成:', new Date().toLocaleTimeString());
+                debugLogger.debug('[AutoSave] 自动保存完成:', new Date().toLocaleTimeString());
             } catch (err) {
                 console.error('[AutoSave] 自动保存失败:', err);
             }
         }
     }, AUTO_SAVE_DELAY);
     
-    console.log('[AutoSave] 自动保存已启动，间隔:', AUTO_SAVE_DELAY / 1000 / 60, '分钟');
+    debugLogger.debug('[AutoSave] 自动保存已启动，间隔:', AUTO_SAVE_DELAY / 1000 / 60, '分钟');
 }
 
 /**
@@ -1548,7 +1552,7 @@ function stopAutoSave() {
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
-        console.log('[AutoSave] 自动保存已停止');
+        debugLogger.debug('[AutoSave] 自动保存已停止');
     }
 }
 
@@ -1565,7 +1569,7 @@ async function triggerAutoSave() {
                 timestamp: new Date().toISOString(),
                 flow: project.flow
             }));
-            console.log('[AutoSave] 手动触发保存完成');
+            debugLogger.debug('[AutoSave] 手动触发保存完成');
             showToast('流程草稿已保存到本地缓存', 'success');
         } catch (err) {
             console.error('[AutoSave] 手动保存失败:', err);
@@ -1653,7 +1657,7 @@ async function exportProjectToJson(projectId = null) {
         );
         
         showToast('工程导出成功', 'success');
-        console.log('[Export] 工程已导出:', project.name);
+        debugLogger.debug('[Export] 工程已导出:', project.name);
     } catch (err) {
         console.error('[Export] 导出失败:', err);
         showToast('工程导出失败', 'error');
@@ -1918,7 +1922,7 @@ async function importProjectFromJson(file) {
         });
         
         showToast('工程导入成功', 'success');
-        console.log('[Import] 工程已导入:', project.name);
+        debugLogger.debug('[Import] 工程已导入:', project.name);
         
         // 刷新工程列表
         if (projectView) {

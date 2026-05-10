@@ -62,6 +62,9 @@ public class PreviewMetricsAnalyzer : IPreviewMetricsAnalyzer
 
             // 6. 参数建议
             metrics.Suggestions = GenerateSuggestions(metrics, outputData);
+
+            // 7. 连续检测运行时指标
+            metrics.Continuous = ExtractContinuousMetrics(outputData);
         }
         catch (Exception ex)
         {
@@ -636,6 +639,64 @@ public class PreviewMetricsAnalyzer : IPreviewMetricsAnalyzer
             .Select(group => group.First())
             .ToList();
     }
+
+    private static ContinuousPreviewMetrics ExtractContinuousMetrics(Dictionary<string, object>? outputData)
+    {
+        var metrics = new ContinuousPreviewMetrics();
+        if (outputData == null)
+        {
+            return metrics;
+        }
+
+        var root = outputData.ToDictionary(
+            item => item.Key,
+            item => (object?)item.Value,
+            StringComparer.OrdinalIgnoreCase);
+        var source = TryGetDictionary(outputData, "ContinuousInspection")
+            ?? TryGetDictionary(outputData, "continuousInspection")
+            ?? root;
+
+        metrics.Fps = TryGetDouble(source, "Fps") ?? TryGetDouble(source, "fps");
+        metrics.DroppedFrames = TryGetLong(source, "DroppedFrames") ?? TryGetLong(source, "droppedFrames") ?? TryGetLong(source, "DroppedInferences");
+        metrics.LatencyMs = TryGetDouble(source, "LatencyMs") ?? TryGetDouble(source, "latencyMs") ?? TryGetDouble(source, "AverageInferenceLatencyMs");
+        metrics.QueueDepth = TryGetInt(source, "QueueDepth") ?? TryGetInt(source, "queueDepth");
+        metrics.BufferCapacity = TryGetInt(source, "BufferCapacity") ?? TryGetInt(source, "bufferCapacity");
+        metrics.BufferCount = TryGetInt(source, "BufferCount") ?? TryGetInt(source, "bufferCount");
+        metrics.BufferOverwrittenCount = TryGetLong(source, "BufferOverwrittenCount") ?? TryGetLong(source, "bufferOverwrittenCount");
+        metrics.Enabled = metrics.Fps.HasValue ||
+            metrics.DroppedFrames.HasValue ||
+            metrics.LatencyMs.HasValue ||
+            metrics.QueueDepth.HasValue ||
+            metrics.BufferCapacity.HasValue ||
+            metrics.BufferCount.HasValue ||
+            metrics.BufferOverwrittenCount.HasValue;
+        return metrics;
+    }
+
+    private static IDictionary<string, object?>? TryGetDictionary(Dictionary<string, object> source, string key)
+    {
+        if (!source.TryGetValue(key, out var value))
+        {
+            return null;
+        }
+
+        return value as IDictionary<string, object?>;
+    }
+
+    private static double? TryGetDouble(IDictionary<string, object?> source, string key) =>
+        source.TryGetValue(key, out var value) && double.TryParse(value?.ToString(), out var parsed)
+            ? parsed
+            : null;
+
+    private static long? TryGetLong(IDictionary<string, object?> source, string key) =>
+        source.TryGetValue(key, out var value) && long.TryParse(value?.ToString(), out var parsed)
+            ? parsed
+            : null;
+
+    private static int? TryGetInt(IDictionary<string, object?> source, string key) =>
+        source.TryGetValue(key, out var value) && int.TryParse(value?.ToString(), out var parsed)
+            ? parsed
+            : null;
 
     /// <summary>
     /// 计算中位数

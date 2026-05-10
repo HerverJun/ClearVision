@@ -111,11 +111,19 @@ public class WidthMeasurementOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("[NoFeature] No valid edge-backed width samples generated"));
         }
 
-        var allWidths = measurements.Select(m => m.Width).ToList();
-        var refinedSampleCount = measurements.Count(m => m.UsedSubpixel);
-        var preferredWidths = refinedSampleCount > 0
-            ? measurements.Where(m => m.UsedSubpixel).Select(m => m.Width).ToList()
-            : allWidths;
+        var allWidths = new List<double>(measurements.Count);
+        var refinedWidths = new List<double>(measurements.Count);
+        foreach (var measurement in measurements)
+        {
+            allWidths.Add(measurement.Width);
+            if (measurement.UsedSubpixel)
+            {
+                refinedWidths.Add(measurement.Width);
+            }
+        }
+
+        var refinedSampleCount = refinedWidths.Count;
+        var preferredWidths = refinedSampleCount > 0 ? refinedWidths : allWidths;
 
         if (minValidSamples > 0 && preferredWidths.Count < minValidSamples)
         {
@@ -230,7 +238,12 @@ public class WidthMeasurementOperator : OperatorBase
         }
 
         var median = ComputePercentile(values, 0.5);
-        var absDeviation = values.Select(v => Math.Abs(v - median)).ToList();
+        var absDeviation = new double[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            absDeviation[i] = Math.Abs(values[i] - median);
+        }
+
         var mad = ComputePercentile(absDeviation, 0.5);
         var robustSigma = mad * 1.4826;
         if (robustSigma < 1e-6)
@@ -239,7 +252,17 @@ public class WidthMeasurementOperator : OperatorBase
         }
 
         var threshold = robustSigma * sigmaK;
-        return values.Where(v => Math.Abs(v - median) <= threshold).ToList();
+        var kept = new List<double>(values.Count);
+        for (var i = 0; i < values.Count; i++)
+        {
+            var value = values[i];
+            if (Math.Abs(value - median) <= threshold)
+            {
+                kept.Add(value);
+            }
+        }
+
+        return kept;
     }
 
     private static double ComputeStandardDeviation(IReadOnlyList<double> values, double mean)
@@ -249,7 +272,14 @@ public class WidthMeasurementOperator : OperatorBase
             return 0.0;
         }
 
-        var variance = values.Select(v => (v - mean) * (v - mean)).Sum() / (values.Count - 1);
+        var sumSquares = 0.0;
+        for (var i = 0; i < values.Count; i++)
+        {
+            var delta = values[i] - mean;
+            sumSquares += delta * delta;
+        }
+
+        var variance = sumSquares / (values.Count - 1);
         return Math.Sqrt(Math.Max(0.0, variance));
     }
 
@@ -260,14 +290,20 @@ public class WidthMeasurementOperator : OperatorBase
             return 0.0;
         }
 
-        var ordered = values.OrderBy(v => v).ToList();
-        if (ordered.Count == 1)
+        var ordered = new double[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            ordered[i] = values[i];
+        }
+
+        Array.Sort(ordered);
+        if (ordered.Length == 1)
         {
             return ordered[0];
         }
 
         var p = Math.Clamp(percentile, 0.0, 1.0);
-        var pos = p * (ordered.Count - 1);
+        var pos = p * (ordered.Length - 1);
         var lower = (int)Math.Floor(pos);
         var upper = (int)Math.Ceiling(pos);
         if (lower == upper)

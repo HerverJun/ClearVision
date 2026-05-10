@@ -1,120 +1,122 @@
-// LruImageCacheRepository.cs
-// 缓存统计信息
-// 作者：蘅芜君
-
+using System.Collections.Concurrent;
+using System.Threading.Channels;
 using Acme.Product.Core.Interfaces;
+using Microsoft.Extensions.Hosting;
 
 namespace Acme.Product.Infrastructure.Repositories;
 
-/// <summary>
-/// LRU (Least Recently Used) 图像缓存仓储实现
-/// Sprint 5: S5-006 实现
-/// </summary>
-public class LruImageCacheRepository : IImageCacheRepository
+public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
 {
     private readonly Dictionary<Guid, CacheEntry> _cache = new();
     private readonly LinkedList<Guid> _accessOrder = new();
+    private readonly ConcurrentDictionary<Guid, CacheEntry> _pendingAdds = new();
+    private readonly Channel<Guid> _addQueue;
     private readonly object _lock = new();
     private readonly long _maxSizeInBytes;
     private long _currentSizeInBytes;
-    
+    private long _pendingSizeInBytes;
     private long _hitCount;
     private long _missCount;
 
-    public LruImageCacheRepository(long maxSizeInBytes = 100 * 1024 * 1024) // 默认100MB
+    public LruImageCacheRepository(
+        long maxSizeInBytes = 100 * 1024 * 1024,
+        int queueCapacity = 512)
     {
-        _maxSizeInBytes = maxSizeInBytes;
-    }
-
-    /// <summary>
-    /// 添加图像到缓存
-    /// </summary>
-    public Task<Guid> AddAsync(byte[] imageData, string format)
-    {
-        var id = Guid.NewGuid();
-        var size = imageData.Length;
-
-        // 检查单体大小是否超过最大缓存限制
-        if (size > _maxSizeInBytes)
+        if (maxSizeInBytes <= 0)
         {
-            throw new ArgumentException($"图像大小 {size} 超过最大缓存限制 {_maxSizeInBytes}");
+            throw new ArgumentOutOfRangeException(nameof(maxSizeInBytes));
         }
 
-        lock (_lock)
+        _maxSizeInBytes = maxSizeInBytes;
+        _addQueue = Channel.CreateBounded<Guid>(new BoundedChannelOptions(Math.Max(1, queueCapacity))
         {
-            // 检查是否需要淘汰
-            while (_currentSizeInBytes + size > _maxSizeInBytes && _accessOrder.Count > 0)
-            {
-                EvictLeastRecentlyUsed();
-            }
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
+    }
 
-            var entry = new CacheEntry
-            {
-                Id = id,
-                Data = imageData,
-                Format = format,
-                CreatedAt = DateTime.UtcNow,
-                LastAccessedAt = DateTime.UtcNow,
-                SizeInBytes = size
-            };
+    public Task<Guid> AddAsync(byte[] imageData, string format)
+    {
+        ArgumentNullException.ThrowIfNull(imageData);
 
-            _cache[id] = entry;
-            _accessOrder.AddFirst(id);
-            _currentSizeInBytes += size;
+        if (imageData.Length > _maxSizeInBytes)
+        {
+            throw new ArgumentException(
+                $"Image size {imageData.Length} exceeds cache limit {_maxSizeInBytes}.",
+                nameof(imageData));
+        }
+
+        var id = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var entry = new CacheEntry
+        {
+            Data = imageData,
+            Format = format,
+            CreatedAt = now,
+            LastAccessedAt = now,
+            SizeInBytes = imageData.Length
+        };
+
+        _pendingAdds[id] = entry;
+        Interlocked.Add(ref _pendingSizeInBytes, entry.SizeInBytes);
+
+        if (!_addQueue.Writer.TryWrite(id))
+        {
+            _ = EnqueueWhenAvailableAsync(id);
         }
 
         return Task.FromResult(id);
     }
 
-    /// <summary>
-    /// 从缓存获取图像
-    /// </summary>
     public Task<byte[]?> GetAsync(Guid id)
     {
+        if (_pendingAdds.TryGetValue(id, out var pending))
+        {
+            pending.LastAccessedAt = DateTime.UtcNow;
+            Interlocked.Increment(ref _hitCount);
+            return Task.FromResult<byte[]?>(pending.Data);
+        }
+
         lock (_lock)
         {
             if (_cache.TryGetValue(id, out var entry))
             {
-                // 更新访问时间
                 entry.LastAccessedAt = DateTime.UtcNow;
-                
-                // 移动到链表头部（最近使用）
                 _accessOrder.Remove(id);
                 _accessOrder.AddFirst(id);
-                
                 Interlocked.Increment(ref _hitCount);
                 return Task.FromResult<byte[]?>(entry.Data);
             }
-            
-            Interlocked.Increment(ref _missCount);
-            return Task.FromResult<byte[]?>(null);
         }
+
+        Interlocked.Increment(ref _missCount);
+        return Task.FromResult<byte[]?>(null);
     }
 
-    /// <summary>
-    /// 删除缓存项
-    /// </summary>
     public Task DeleteAsync(Guid id)
     {
+        RemovePending(id);
+
         lock (_lock)
         {
-            if (_cache.TryGetValue(id, out var entry))
-            {
-                _cache.Remove(id);
-                _accessOrder.Remove(id);
-                _currentSizeInBytes -= entry.SizeInBytes;
-            }
+            RemoveEntry(id);
         }
 
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// 清理过期缓存项
-    /// </summary>
     public Task CleanExpiredAsync(TimeSpan expiration)
     {
         var cutoff = DateTime.UtcNow - expiration;
+
+        foreach (var pair in _pendingAdds.ToArray())
+        {
+            if (pair.Value.LastAccessedAt < cutoff)
+            {
+                RemovePending(pair.Key);
+            }
+        }
 
         lock (_lock)
         {
@@ -125,33 +127,27 @@ public class LruImageCacheRepository : IImageCacheRepository
 
             foreach (var id in expiredIds)
             {
-                if (_cache.TryGetValue(id, out var entry))
-                {
-                    _cache.Remove(id);
-                    _accessOrder.Remove(id);
-                    _currentSizeInBytes -= entry.SizeInBytes;
-                }
+                RemoveEntry(id);
             }
         }
 
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// 获取缓存统计信息
-    /// </summary>
     public CacheStatistics GetStatistics()
     {
         lock (_lock)
         {
+            var pendingCount = _pendingAdds.Count;
+            var pendingSize = Interlocked.Read(ref _pendingSizeInBytes);
             var hits = Interlocked.Read(ref _hitCount);
             var misses = Interlocked.Read(ref _missCount);
             var total = hits + misses;
-            
+
             return new CacheStatistics
             {
-                TotalEntries = _cache.Count,
-                CurrentSizeInBytes = _currentSizeInBytes,
+                TotalEntries = _cache.Count + pendingCount,
+                CurrentSizeInBytes = _currentSizeInBytes + pendingSize,
                 MaxSizeInBytes = _maxSizeInBytes,
                 HitCount = hits,
                 MissCount = misses,
@@ -160,11 +156,13 @@ public class LruImageCacheRepository : IImageCacheRepository
         }
     }
 
-    /// <summary>
-    /// 清空缓存
-    /// </summary>
     public void Clear()
     {
+        foreach (var id in _pendingAdds.Keys.ToArray())
+        {
+            RemovePending(id);
+        }
+
         lock (_lock)
         {
             _cache.Clear();
@@ -173,39 +171,104 @@ public class LruImageCacheRepository : IImageCacheRepository
         }
     }
 
-    /// <summary>
-    /// 淘汰最近最少使用的项
-    /// </summary>
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await foreach (var id in _addQueue.Reader.ReadAllAsync(stoppingToken))
+            {
+                CommitPendingAdd(id);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            while (_addQueue.Reader.TryRead(out var id))
+            {
+                CommitPendingAdd(id);
+            }
+
+            foreach (var id in _pendingAdds.Keys.ToArray())
+            {
+                CommitPendingAdd(id);
+            }
+        }
+    }
+
+    private async Task EnqueueWhenAvailableAsync(Guid id)
+    {
+        try
+        {
+            await _addQueue.Writer.WriteAsync(id);
+        }
+        catch (InvalidOperationException)
+        {
+            CommitPendingAdd(id);
+        }
+    }
+
+    private void CommitPendingAdd(Guid id)
+    {
+        if (!_pendingAdds.TryRemove(id, out var entry))
+        {
+            return;
+        }
+
+        Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
+
+        lock (_lock)
+        {
+            while (_currentSizeInBytes + entry.SizeInBytes > _maxSizeInBytes && _accessOrder.Count > 0)
+            {
+                EvictLeastRecentlyUsed();
+            }
+
+            _cache[id] = entry;
+            _accessOrder.AddFirst(id);
+            _currentSizeInBytes += entry.SizeInBytes;
+        }
+    }
+
+    private void RemovePending(Guid id)
+    {
+        if (_pendingAdds.TryRemove(id, out var entry))
+        {
+            Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
+        }
+    }
+
     private void EvictLeastRecentlyUsed()
     {
-        if (_accessOrder.Count == 0) return;
-        
-        var lruId = _accessOrder.Last!.Value;
-        if (_cache.TryGetValue(lruId, out var entry))
+        if (_accessOrder.Last is null)
         {
-            _cache.Remove(lruId);
-            _accessOrder.RemoveLast();
+            return;
+        }
+
+        RemoveEntry(_accessOrder.Last.Value);
+    }
+
+    private void RemoveEntry(Guid id)
+    {
+        if (_cache.TryGetValue(id, out var entry))
+        {
+            _cache.Remove(id);
+            _accessOrder.Remove(id);
             _currentSizeInBytes -= entry.SizeInBytes;
         }
     }
 
-    /// <summary>
-    /// 缓存项
-    /// </summary>
-    private class CacheEntry
+    private sealed class CacheEntry
     {
-        public Guid Id { get; set; }
-        public byte[] Data { get; set; } = Array.Empty<byte>();
-        public string Format { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
+        public byte[] Data { get; init; } = [];
+        public string Format { get; init; } = string.Empty;
+        public DateTime CreatedAt { get; init; }
         public DateTime LastAccessedAt { get; set; }
-        public long SizeInBytes { get; set; }
+        public long SizeInBytes { get; init; }
     }
 }
 
-/// <summary>
-/// 缓存统计信息
-/// </summary>
 public class CacheStatistics
 {
     public int TotalEntries { get; set; }
@@ -214,7 +277,6 @@ public class CacheStatistics
     public long HitCount { get; set; }
     public long MissCount { get; set; }
     public double HitRate { get; set; }
-    
     public double CurrentSizeInMB => CurrentSizeInBytes / (1024.0 * 1024.0);
     public double MaxSizeInMB => MaxSizeInBytes / (1024.0 * 1024.0);
 }

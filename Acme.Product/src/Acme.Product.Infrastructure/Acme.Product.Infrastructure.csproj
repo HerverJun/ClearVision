@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -12,62 +12,60 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 数据库 -->
-    <PackageReference Include="CsvHelper" Version="33.1.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageReference Include="NModbus" Version="3.0.81" />
+    <!-- Database -->
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" />
+    <PackageReference Include="CsvHelper" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="NModbus" />
     
-    <!-- 图像处理 -->
-    <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
-    <!-- 【P3-O3.1 GPU加速】根据目标平台选择运行时： -->
-    <!-- CPU版本（默认）：OpenCvSharp4.runtime.win -->
-    <!-- GPU版本（需NVIDIA GPU + CUDA）：OpenCvSharp4.runtime.win_gpu -->
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
-    <PackageReference Include="PaddleOCRSharp" Version="4.4.0.1" />
-    <!-- <PackageReference Include="OpenCvSharp4.runtime.win_gpu" Version="4.9.0.20240103" /> -->
+    <!-- Image processing -->
+    <PackageReference Include="OpenCvSharp4" />
+    <!-- P3-O3.1 GPU acceleration: choose runtime package by target platform. -->
+    <!-- CPU runtime (default): OpenCvSharp4.runtime.win -->
+    <!-- GPU runtime (requires NVIDIA GPU + CUDA): OpenCvSharp4.runtime.win_gpu -->
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
+    <PackageReference Include="PaddleOCRSharp" />
+    <!-- <PackageReference Include="OpenCvSharp4.runtime.win_gpu" /> -->
     
-    <!-- 条码识别 -->
-    <PackageReference Include="ZXing.Net" Version="0.16.9" />
+    <!-- Barcode recognition -->
+    <PackageReference Include="ZXing.Net" />
     
-    <!-- Modbus通信 -->
-    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <!-- Modbus communication -->
+    <PackageReference Include="System.IO.Ports" />
     
-    <!-- 密码哈希 -->
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <!-- Password hashing -->
+    <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     
     <!-- SQLite / SQL Server / MySQL -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="MySqlConnector" Version="2.3.7" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="MySqlConnector" />
     
     <!-- ONNX Runtime -->
-    <!-- 【P3-O3.1 GPU加速】CPU版本（默认） -->
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.17.0" />
-    <!-- 【P3-O3.1 GPU加速】GPU版本（启用时需替换CPU包） -->
-    <!-- CUDA支持：Microsoft.ML.OnnxRuntime.Gpu -->
-    <!-- TensorRT支持：Microsoft.ML.OnnxRuntime.TensorRT -->
-    <!-- DirectML支持：Microsoft.ML.OnnxRuntime.DirectML -->
+    <!-- P3-O3.1 GPU acceleration: CPU package (default). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" />
+    <!-- P3-O3.1 GPU acceleration: replace the CPU package when enabling GPU runtime. -->
+    <!-- CUDA support: Microsoft.ML.OnnxRuntime.Gpu -->
+    <!-- TensorRT support: Microsoft.ML.OnnxRuntime.TensorRT -->
+    <!-- DirectML support: Microsoft.ML.OnnxRuntime.DirectML -->
     
-    <!-- 文件处理 -->
-    <PackageReference Include="System.Drawing.Common" Version="8.0.11" />
+    <!-- File processing -->
+    <PackageReference Include="System.Drawing.Common" />
     
-    <!-- 日志 -->
-    <PackageReference Include="Serilog" Version="3.1.1" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
-    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
-    <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
+    <!-- Logging -->
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Exceptions" />
     
-    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
-    <PackageReference Include="Microsoft.AspNetCore.Hosting.Abstractions" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 
   <ItemGroup>
@@ -77,7 +75,7 @@
     <ProjectReference Include="..\Acme.PlcComm\Acme.PlcComm.csproj" />
   </ItemGroup>
 
-  <!-- 华睿相机 SDK -->
+  <!-- Huaray camera SDK -->
   <ItemGroup>
     <Reference Include="MVSDK_Net">
       <HintPath>..\..\lib\HuaraySDK\x64\MVSDK_Net.dll</HintPath>
@@ -85,7 +83,7 @@
     </Reference>
   </ItemGroup>
 
-  <!-- 华睿 SDK 原生运行时依赖 → 复制到输出目录 -->
+  <!-- Huaray SDK native runtime dependencies copied to output. -->
   <ItemGroup>
     <None Include="..\..\lib\HuaraySDK\x64\**\*.*"
           Exclude="..\..\lib\HuaraySDK\x64\MVSDK_Net.dll;..\..\lib\HuaraySDK\x64\MVSDK_Net.XML">

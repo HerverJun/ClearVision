@@ -1,7 +1,7 @@
 ﻿// LocalDeformableMatchingOperator.cs
-// 灞€閮ㄥ彲鍙樺舰鍖归厤绠楀瓙 (瀹為獙绾?MVP)
-// 瀵规爣 Halcon: find_local_deformable_model
-// 浣滆€咃細AI Assistant
+// Local deformable matching operator (experimental MVP)
+// HALCON reference: find_local_deformable_model
+// Author: AI Assistant
 
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
@@ -15,9 +15,9 @@ using System.Security.Cryptography;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 灞€閮ㄥ彲鍙樺舰鍖归厤绠楀瓙 - 鏀寔灞€閮ㄥ舰鍙樺拰閬尅鐨勬ā鏉垮尮閰?
-/// 瀵规爣 Halcon find_local_deformable_model
-/// Phase 4.2: 鎵╁睍涓哄鐩爣鍊欓€夈€丯MS 鍘婚噸鍜屾壒閲忓彉褰㈣瘎浼?
+/// Local deformable matching operator with local deformation and occlusion-aware template matching.
+/// HALCON reference: find_local_deformable_model.
+/// Phase 4.2 extends the operator with multi-target candidates, NMS, and batched deformation evaluation.
 /// </summary>
 [OperatorMeta(
     DisplayName = "Local Deformable Matching",
@@ -68,7 +68,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
     private const double OcclusionDifferenceThreshold = 32.0;
     public override OperatorType OperatorType => OperatorType.LocalDeformableMatching;
 
-    // 妯℃澘缂撳瓨
+    // Template cache.
     private static readonly Dictionary<string, TemplateData> TemplateCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly LinkedList<string> TemplateCacheOrder = new();
     private static readonly object CacheLock = new();
@@ -84,7 +84,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        // 鍙傛暟
+        // Parameters.
         var pyramidLevels = GetIntParam(@operator, "PyramidLevels", 3, 1, 6);
         var tpsGridSize = GetIntParam(@operator, "TPSGridSize", 4, 2, 8);
         var tpsLambda = GetDoubleParam(@operator, "TPSLambda", 0.01, 0.001, 1.0);
@@ -112,7 +112,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid."));
         }
 
-        // 鑾峰彇妯℃澘
+        // Load template.
         TemplateData? template = null;
         if (TryGetInputImage(inputs, "Template", out var templateWrapper) && templateWrapper != null)
         {
@@ -217,10 +217,10 @@ public class LocalDeformableMatchingOperator : OperatorBase
         };
         var currentLevel = pyramidLevels - 1;
 
-        // 鏋勫缓鎼滅储鍥惧儚閲戝瓧濉?
+        // Build the search image pyramid.
         var searchPyramid = BuildImagePyramid(searchImage, pyramidLevels);
 
-        // 浠庣矖鍒扮粏杩唬
+        // Iterate from coarse to fine.
         Mat? currentHomography = null;
         Point2f[]? controlPoints = null;
         Point2f[]? deformedPoints = null;
@@ -235,16 +235,16 @@ public class LocalDeformableMatchingOperator : OperatorBase
                 var levelTemplate = template.Pyramid[level];
                 var levelSearch = searchPyramid[level];
 
-                // 缂╂斁鎺у埗鐐瑰埌褰撳墠灞傜骇
+                // Scale control points to the current pyramid level.
                 var scale = Math.Pow(2, level);
                 if (controlPoints == null)
                 {
-                    // 鍒濆鍖栧潎鍖€缃戞牸鎺у埗鐐?
+                    // Initialize a uniform control grid.
                     controlPoints = InitializeControlPoints(
                         levelTemplate.Width, levelTemplate.Height, tpsGridSize);
                 }
 
-                // 鐗瑰緛鍖归厤
+                // Feature matching.
                 var (matches, templateKpts, searchKpts) = MatchFeaturesAtLevel(
                     levelTemplate.Image, levelSearch, levelTemplate.KeyPoints, levelTemplate.Descriptors);
 
@@ -261,7 +261,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
                     return result;
                 }
 
-                // 浼拌鍒濆鍒氭€у彉鎹紙椴佹浼拌锛?
+                // Estimate the initial rigid transform.
                 if (currentHomography == null)
                 {
                     currentHomography = EstimateRigidTransform(
@@ -278,7 +278,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
                     }
                 }
 
-                // TPS褰㈠彉缁嗗寲
+                // Refine the MLS deformation.
                 var levelBaselineDeformedPoints = deformedPoints?.ToArray()
                     ?? Cv2.PerspectiveTransform(controlPoints, currentHomography);
                 var iterationDeformedPoints = levelBaselineDeformedPoints.ToArray();
@@ -291,19 +291,19 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
                 while (iteration < maxIterations && !converged)
                 {
-                    // 璁＄畻褰撳墠鍙樻崲涓嬬殑鐗瑰緛鐐瑰搴?
+                    // Compute feature correspondences under the current transform.
                     var correspondences = ComputeCorrespondences(
                         matches, templateKpts, searchKpts, controlPoints, iterationDeformedPoints, currentHomography);
 
-                    // 浼拌褰㈠彉鍦?
+                    // Estimate the deformation field.
                     var refinedDeformedPoints = EstimateTPSDeformation(
                         iterationDeformedPoints, correspondences, tpsLambda, maxDeformation / scale);
 
-                    // 搴旂敤褰㈠彉骞惰绠楄宸?
+                    // Apply deformation and compute residual error.
                     var (warpedImage, warpedMask) = ApplyTPSWarp(
                         levelTemplate.Image, controlPoints, refinedDeformedPoints, levelSearch.Size());
 
-                    // 璁＄畻鍖归厤鍒嗘暟鍜岄伄鎸?
+                    // Compute match score and occlusion.
                     var (score, occlusionMask, meanError, _) = ComputeMatchScoreAndOcclusion(
                         warpedImage, warpedMask, levelSearch, occlusionThreshold);
 
@@ -336,7 +336,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
                 bestVerifiedMatchCount = Math.Max(bestVerifiedMatchCount, matches.Count);
                 bestVerifiedInlierRatio = Math.Max(bestVerifiedInlierRatio, matches.Count / (double)Math.Max(1, levelTemplate.KeyPoints.Length));
 
-                // 涓婇噰鏍峰埌涓嬩竴灞?
+                // Upsample to the next pyramid level.
                 if (level > 0)
                 {
                     controlPoints = UpsampleControlPoints(controlPoints, 2.0);
@@ -347,7 +347,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
                 }
             }
 
-            // 鏈€缁堥獙璇?
+            // Final verification.
             if (currentHomography != null && controlPoints != null && deformedPoints != null)
             {
                 var (finalScore, finalOcclusionMask, finalOcclusionRate, finalDeformation) = ValidateFinalMatch(
@@ -693,7 +693,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
                     Scale = Math.Pow(2, i)
                 });
 
-                // 涓嬮噰鏍?
+                // Downsample.
                 if (i < levels - 1)
                 {
                     using var nextImage = new Mat();
@@ -757,7 +757,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
     private (List<DMatch> matches, KeyPoint[] templateKpts, KeyPoint[] searchKpts) MatchFeaturesAtLevel(
         Mat templateImage, Mat searchImage, KeyPoint[] templateKpts, Mat templateDesc)
     {
-        // 鎻愬彇鎼滅储鍥惧儚鐗瑰緛
+        // Extract search image features.
         using var graySearch = searchImage.Channels() == 1
             ? searchImage.Clone()
             : new Mat();
@@ -777,7 +777,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             return (new List<DMatch>(), templateKpts, searchKpts);
         }
 
-        // KNN鍖归厤
+        // KNN matching.
         using var matcher = new BFMatcher(NormTypes.Hamming, crossCheck: false);
         var knnMatches = matcher.KnnMatch(templateDesc, searchDesc, k: 2);
 
@@ -1066,7 +1066,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             out var transformedCorners,
             out var metrics);
 
-        // 璁＄畻鍒嗘暟
+        // Compute score.
         #if false
         var corners = new[]
         {
@@ -1148,7 +1148,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
         var bestMatch = matches[0];
         var resultImage = image.Clone();
 
-        // 缁樺埗褰㈠彉缃戞牸
+        // Draw the deformation grid.
         if (bestMatch.ControlPoints != null && bestMatch.DeformedPoints != null)
         {
             DrawDeformationGrid(resultImage, bestMatch.ControlPoints, bestMatch.DeformedPoints, new Scalar(0, 255, 0));
@@ -1172,7 +1172,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             }
         }
 
-        // 缁樺埗淇℃伅
+        // Draw diagnostic text.
         Cv2.PutText(resultImage, $"Matches: {matches.Count}", new Point(10, 30),
             HersheyFonts.HersheySimplex, 0.7, new Scalar(0, 255, 0), 2);
         Cv2.PutText(resultImage, $"Best Score: {bestMatch.Score:F3}", new Point(10, 60),
@@ -1224,7 +1224,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
         if (fallback != null)
         {
-            // 缁樺埗鍒氭€у彉鎹㈢粨鏋?
+            // Draw rigid transform fallback result.
             for (int i = 0; i < 4; i++)
             {
                 var pt1 = new Point((int)fallback.Corners[i].X, (int)fallback.Corners[i].Y);
@@ -1349,7 +1349,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
     private void DrawDeformationGrid(Mat image, Point2f[] controlPoints, Point2f[] deformedPoints, Scalar color)
     {
-        // 缁樺埗鎺у埗鐐硅繛绾?
+        // Draw control point connections.
         var gridSize = (int)Math.Sqrt(controlPoints.Length);
         for (int y = 0; y < gridSize; y++)
         {

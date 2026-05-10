@@ -1,247 +1,119 @@
-// OmronFinsClient.cs
-// 欧姆龙FINS// 功能实现TCP协议客户端实现
-// 作者：蘅芜君
-
 using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
+using HslCommunication.Profinet.Omron;
 using Microsoft.Extensions.Logging;
 
 namespace Acme.PlcComm.Omron;
 
-/// <summary>
-/// 欧姆龙FINS/TCP协议客户端实现
-/// </summary>
-public class OmronFinsClient : PlcBaseClient
+public class OmronFinsClient : HaoPlcClientBase
 {
-    private readonly FinsAddressParser _addressParser;
-    private readonly FinsFrameBuilder _frameBuilder;
+    private readonly OmronFinsNet _client;
+    private readonly FinsAddressParser _addressParser = new();
 
-    // FINS/TCP握手后获取的节点号
-    private byte _clientNode = 0;
-    private byte _serverNode = 0;
+    public OmronFinsClient(string ipAddress, ILogger? logger = null)
+        : base(ipAddress, 9600, logger)
+    {
+        _client = new OmronFinsNet(ipAddress, 9600);
+        ByteTransform = BigEndianTransform.Instance;
+    }
 
     public override int DefaultPort => 9600;
 
-    public OmronFinsClient(string ipAddress, ILogger? logger = null)
-        : base(logger)
+    protected override void ApplyConnectionSettings()
     {
-        IpAddress = ipAddress;
-        Port = DefaultPort;
-        
-        _addressParser = new FinsAddressParser();
-        _frameBuilder = new FinsFrameBuilder();
-        ByteTransform = BigEndianTransform.Instance; // FINS使用大端序
+        _client.IpAddress = IpAddress;
+        _client.Port = Port;
+        _client.ConnectTimeOut = ConnectTimeout;
+        _client.ReceiveTimeOut = ReadTimeout;
     }
 
-    protected override async Task<bool> ConnectCoreAsync(CancellationToken ct)
+    protected override async Task<OperateResult> ConnectCoreAsync(CancellationToken ct)
     {
-        try
-        {
-            // FINS/TCP需要握手过程
-            // 第一步：发送节点地址请求
-            var nodeRequest = _frameBuilder.BuildNodeAddressRequest();
-            LogFrame("TX(Handshake)", nodeRequest);
-
-            if (_networkStream == null)
-                return false;
-
-            await _networkStream.WriteAsync(nodeRequest, 0, nodeRequest.Length, ct);
-
-            // 读取节点地址响应
-            var responseBuffer = new byte[24];
-            var handshakeReadOk = await ReadExactAsync(_networkStream, responseBuffer, 0, responseBuffer.Length, ct);
-            if (!handshakeReadOk)
-            {
-                _logger.LogError("[OmronFINS] 握手响应太短");
-                return false;
-            }
-
-            LogFrame("RX(Handshake)", responseBuffer);
-
-            // 解析节点地址响应
-            var (success, clientNode, serverNode, error) = _frameBuilder.ParseNodeAddressResponse(responseBuffer);
-            if (!success)
-            {
-                _logger.LogError("[OmronFINS] 握手失败: {Error}", error);
-                return false;
-            }
-
-            _clientNode = clientNode;
-            _serverNode = serverNode;
-
-            _logger.LogInformation(
-                "[OmronFINS] 握手成功, 客户端节点={ClientNode}, 服务器节点={ServerNode}",
-                _clientNode, _serverNode);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[OmronFINS] 握手异常: {Message}", ex.Message);
-            return false;
-        }
+        ct.ThrowIfCancellationRequested();
+        return ToAcmeResult(await _client.ConnectServerAsync());
     }
 
     protected override async Task DisconnectCoreAsync()
     {
-        _clientNode = 0;
-        _serverNode = 0;
-        await Task.CompletedTask;
+        await _client.ConnectCloseAsync();
     }
 
-    protected override async Task<OperateResult<byte[]>> ReadCoreAsync(
-        string address, ushort length, CancellationToken ct)
+    protected override async Task<OperateResult<byte[]>> ReadCoreAsync(string address, ushort length, CancellationToken ct)
     {
-        try
+        var parsed = _addressParser.Parse(address);
+        if (!parsed.IsSuccess || parsed.Content == null)
         {
-            if (_clientNode == 0 || _serverNode == 0)
-                return OperateResult<byte[]>.Failure("FINS握手未完成");
-
-            // 解析地址
-            var addressResult = _addressParser.Parse(address);
-            if (!addressResult.IsSuccess)
-                return OperateResult<byte[]>.Failure(addressResult.ErrorCode, addressResult.Message);
-
-            var plcAddress = addressResult.Content!;
-
-            // 构建读取请求
-            var bitAddress = (byte)(plcAddress.BitOffset >= 0 ? plcAddress.BitOffset : 0);
-            var requestFrame = _frameBuilder.BuildMemoryReadRequest(
-                plcAddress.DeviceCode,
-                (ushort)plcAddress.StartAddress,
-                bitAddress,
-                length,
-                _clientNode,
-                _serverNode);
-
-            LogFrame("TX", requestFrame);
-
-            // 发送请求
-            if (_networkStream == null)
-                return OperateResult<byte[]>.Failure("网络流未初始化");
-
-            await _networkStream.WriteAsync(requestFrame, 0, requestFrame.Length, ct);
-
-            // 读取响应(先读取头部以确定总长度)
-            var headerBuffer = new byte[16];
-            var headerReadOk = await ReadExactAsync(_networkStream, headerBuffer, 0, headerBuffer.Length, ct);
-            if (!headerReadOk)
-                return OperateResult<byte[]>.Failure("读取响应头失败");
-
-            // 计算剩余数据长度
-            var dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(headerBuffer.AsSpan(4, 4));
-            var totalLength = 16 + (int)dataLength;
-            var remainingBytes = totalLength - 16;
-
-            // 读取完整响应
-            var responseBuffer = new byte[totalLength];
-            Array.Copy(headerBuffer, responseBuffer, 16);
-
-            if (remainingBytes > 0)
-            {
-                var payloadReadOk = await ReadExactAsync(_networkStream, responseBuffer, 16, remainingBytes, ct);
-                if (!payloadReadOk)
-                    return OperateResult<byte[]>.Failure("读取响应数据不完整");
-            }
-
-            LogFrame("RX", responseBuffer);
-
-            // 解析响应
-            var (success, data, error) = _frameBuilder.ParseResponse(responseBuffer);
-            if (!success)
-                return OperateResult<byte[]>.Failure(error ?? "未知错误");
-
-            return OperateResult<byte[]>.Success(data!);
+            return OperateResult<byte[]>.Failure(parsed.ErrorCode, parsed.Message);
         }
-        catch (Exception ex)
+
+        var hslAddress = ToHslAddress(parsed.Content);
+        ct.ThrowIfCancellationRequested();
+        if (parsed.Content.DataType == PlcDataType.Bit)
         {
-            _logger.LogError(ex, "[OmronFINS] 读取失败: {Message}", ex.Message);
-            return OperateResult<byte[]>.Failure($"读取失败: {ex.Message}");
+            var result = length <= 1
+                ? await ReadSingleBoolAsync(hslAddress)
+                : await ReadBoolArrayAsync(hslAddress, length);
+            return result;
         }
+
+        return ToAcmeResult(await _client.ReadAsync(hslAddress, length));
     }
 
-    protected override async Task<OperateResult> WriteCoreAsync(
-        string address, byte[] value, CancellationToken ct)
+    protected override async Task<OperateResult> WriteCoreAsync(string address, byte[] value, CancellationToken ct)
     {
-        try
+        var parsed = _addressParser.Parse(address);
+        if (!parsed.IsSuccess || parsed.Content == null)
         {
-            if (_clientNode == 0 || _serverNode == 0)
-                return OperateResult.Failure("FINS握手未完成");
+            return OperateResult.Failure(parsed.ErrorCode, parsed.Message);
+        }
 
-            // 解析地址
-            var addressResult = _addressParser.Parse(address);
-            if (!addressResult.IsSuccess)
-                return OperateResult.Failure(addressResult.ErrorCode, addressResult.Message);
-
-            var plcAddress = addressResult.Content!;
-
-            // 构建写入请求
-            var bitAddress = (byte)(plcAddress.BitOffset >= 0 ? plcAddress.BitOffset : 0);
-            var isBitAccess = plcAddress.DataType == PlcDataType.Bit;
-            var requestFrame = _frameBuilder.BuildMemoryWriteRequest(
-                plcAddress.DeviceCode,
-                (ushort)plcAddress.StartAddress,
-                bitAddress,
-                value,
-                isBitAccess,
-                _clientNode,
-                _serverNode);
-
-            LogFrame("TX", requestFrame);
-
-            // 发送请求
-            if (_networkStream == null)
-                return OperateResult.Failure("网络流未初始化");
-
-            await _networkStream.WriteAsync(requestFrame, 0, requestFrame.Length, ct);
-
-            // 读取响应
-            var headerBuffer = new byte[16];
-            var headerReadOk = await ReadExactAsync(_networkStream, headerBuffer, 0, headerBuffer.Length, ct);
-            if (!headerReadOk)
-                return OperateResult.Failure("读取响应头失败");
-
-            var dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(headerBuffer.AsSpan(4, 4));
-            var totalLength = 16 + (int)dataLength;
-            var remainingBytes = totalLength - 16;
-
-            var responseBuffer = new byte[totalLength];
-            Array.Copy(headerBuffer, responseBuffer, 16);
-
-            if (remainingBytes > 0)
+        var hslAddress = ToHslAddress(parsed.Content);
+        ct.ThrowIfCancellationRequested();
+        if (parsed.Content.DataType == PlcDataType.Bit)
+        {
+            if (value.Length <= 1)
             {
-                var payloadReadOk = await ReadExactAsync(_networkStream, responseBuffer, 16, remainingBytes, ct);
-                if (!payloadReadOk)
-                    return OperateResult.Failure("读取响应数据不完整");
+                return ToAcmeResult(await _client.WriteAsync(hslAddress, value.Length > 0 && value[0] != 0));
             }
 
-            LogFrame("RX", responseBuffer);
-
-            // 解析响应
-            var (success, data, error) = _frameBuilder.ParseResponse(responseBuffer);
-            if (!success)
-                return OperateResult.Failure(error ?? "写入失败");
-
-            return OperateResult.Success();
+            return ToAcmeResult(await _client.WriteAsync(hslAddress, value.Select(item => item != 0).ToArray()));
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[OmronFINS] 写入失败: {Message}", ex.Message);
-            return OperateResult.Failure($"写入失败: {ex.Message}");
-        }
+
+        return ToAcmeResult(await _client.WriteAsync(hslAddress, value));
     }
 
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
-        try
+        ct.ThrowIfCancellationRequested();
+        var result = await _client.ReadAsync("DM0", 1);
+        return result.IsSuccess;
+    }
+
+    private async Task<OperateResult<byte[]>> ReadSingleBoolAsync(string address)
+    {
+        var result = await _client.ReadBoolAsync(address);
+        return result.IsSuccess
+            ? OperateResult<byte[]>.Success(new[] { result.Content ? (byte)1 : (byte)0 })
+            : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
+    }
+
+    private async Task<OperateResult<byte[]>> ReadBoolArrayAsync(string address, ushort length)
+    {
+        var result = await _client.ReadBoolAsync(address, length);
+        return result.IsSuccess
+            ? OperateResult<byte[]>.Success((result.Content ?? Array.Empty<bool>()).Select(item => item ? (byte)1 : (byte)0).ToArray())
+            : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
+    }
+
+    private static string ToHslAddress(PlcAddress address)
+    {
+        var bitSuffix = address.BitOffset >= 0 ? "." + address.BitOffset.ToString() : string.Empty;
+        return address.AreaType.ToUpperInvariant() switch
         {
-            // 尝试读取一个字来检测连接
-            var result = await ReadAsync("DM0", 1, ct);
-            return result.IsSuccess;
-        }
-        catch
-        {
-            return false;
-        }
+            "D" or "DM" => $"DM{address.StartAddress}{bitSuffix}",
+            "CNT" => $"TIM{address.StartAddress}{bitSuffix}",
+            "EM" => $"EM{address.DbNumber}.{address.StartAddress}{bitSuffix}",
+            _ => $"{address.AreaType.ToUpperInvariant()}{address.StartAddress}{bitSuffix}"
+        };
     }
 }

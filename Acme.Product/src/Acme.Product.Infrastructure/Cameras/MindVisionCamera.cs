@@ -15,6 +15,14 @@ namespace Acme.Product.Infrastructure.Cameras;
 /// </summary>
 public class MindVisionCamera : ICameraProvider
 {
+    private const uint PixelType_Gvsp_Mono8 = 0x01080001;
+    private const uint PixelType_Gvsp_RGB8 = 0x02180014;
+    private const uint PixelType_Gvsp_BGR8 = 0x02180015;
+    private const uint PixelType_Gvsp_BayerGR8 = 0x01080008;
+    private const uint PixelType_Gvsp_BayerRG8 = 0x01080009;
+    private const uint PixelType_Gvsp_BayerGB8 = 0x0108000A;
+    private const uint PixelType_Gvsp_BayerBG8 = 0x0108000B;
+
     private MyCamera? _cam;
     private bool _disposed = false;
     private bool _isConnected = false;
@@ -25,6 +33,8 @@ public class MindVisionCamera : ICameraProvider
     // 最近一帧引用（用于释放）
     private IMVDefine.IMV_Frame _lastFrame;
     private bool _hasUnreleasedFrame = false;
+    private byte[]? _convertedFrameBuffer;
+    private GCHandle _convertedFrameHandle;
 
     // 原生 DLL 搜索路径设置
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -411,6 +421,13 @@ public class MindVisionCamera : ICameraProvider
             var height = frame.frameInfo.height;
             var size = frame.frameInfo.size;
             var pixelFormat = frame.frameInfo.pixelFormat;
+            var mappedPixelFormat = ConvertPixelFormat((uint)pixelFormat);
+
+            if (TryConvertFrameToBgr8(frame, mappedPixelFormat, out var convertedFrame))
+            {
+                ReleaseLastFrame();
+                return convertedFrame;
+            }
 
             return new CameraFrame
             {
@@ -418,7 +435,7 @@ public class MindVisionCamera : ICameraProvider
                 Width = (int)width,
                 Height = (int)height,
                 Size = (int)size,
-                PixelFormat = ConvertPixelFormat((uint)pixelFormat),
+                PixelFormat = mappedPixelFormat,
                 FrameNumber = 0,
                 Timestamp = 0,
                 NeedsNativeRelease = true
@@ -429,6 +446,95 @@ public class MindVisionCamera : ICameraProvider
             Debug.WriteLine($"[MindVisionCamera] GetFrame error: {ex.Message}");
             return null;
         }
+    }
+
+    private bool TryConvertFrameToBgr8(
+        IMVDefine.IMV_Frame frame,
+        CameraPixelFormat mappedPixelFormat,
+        out CameraFrame convertedFrame)
+    {
+        convertedFrame = null!;
+
+        if (_cam == null || !IsColorPixelFormat(mappedPixelFormat))
+        {
+            return false;
+        }
+
+        if (frame.frameInfo.width == 0 || frame.frameInfo.height == 0)
+        {
+            return false;
+        }
+
+        var destinationSize = checked((int)frame.frameInfo.width * (int)frame.frameInfo.height * 3);
+        EnsureConvertedFrameBuffer(destinationSize);
+
+        var convertParam = new IMVDefine.IMV_PixelConvertParam
+        {
+            nWidth = frame.frameInfo.width,
+            nHeight = frame.frameInfo.height,
+            ePixelFormat = frame.frameInfo.pixelFormat,
+            pSrcData = frame.pData,
+            nSrcDataLen = frame.frameInfo.size,
+            nPaddingX = frame.frameInfo.paddingX,
+            nPaddingY = frame.frameInfo.paddingY,
+            eBayerDemosaic = IMVDefine.IMV_EBayerDemosaic.demosaicEdgeSensing,
+            eDstPixelFormat = IMVDefine.IMV_EPixelType.gvspPixelBGR8,
+            pDstBuf = _convertedFrameHandle.AddrOfPinnedObject(),
+            nDstBufSize = (uint)destinationSize
+        };
+
+        var res = _cam.IMV_PixelConvert(ref convertParam);
+        if (res != IMVDefine.IMV_OK || convertParam.nDstDataLen == 0)
+        {
+            Debug.WriteLine($"[MindVisionCamera] PixelConvert to BGR8 failed: {res}, pixelFormat={frame.frameInfo.pixelFormat}");
+            return false;
+        }
+
+        convertedFrame = new CameraFrame
+        {
+            DataPtr = _convertedFrameHandle.AddrOfPinnedObject(),
+            Width = (int)frame.frameInfo.width,
+            Height = (int)frame.frameInfo.height,
+            Size = (int)convertParam.nDstDataLen,
+            PixelFormat = CameraPixelFormat.BGR8,
+            FrameNumber = 0,
+            Timestamp = 0,
+            NeedsNativeRelease = false
+        };
+
+        return true;
+    }
+
+    private void EnsureConvertedFrameBuffer(int size)
+    {
+        if (_convertedFrameBuffer != null && _convertedFrameBuffer.Length >= size && _convertedFrameHandle.IsAllocated)
+        {
+            return;
+        }
+
+        ReleaseConvertedFrameBuffer();
+        _convertedFrameBuffer = new byte[size];
+        _convertedFrameHandle = GCHandle.Alloc(_convertedFrameBuffer, GCHandleType.Pinned);
+    }
+
+    private void ReleaseConvertedFrameBuffer()
+    {
+        if (_convertedFrameHandle.IsAllocated)
+        {
+            _convertedFrameHandle.Free();
+        }
+
+        _convertedFrameBuffer = null;
+    }
+
+    private static bool IsColorPixelFormat(CameraPixelFormat pixelFormat)
+    {
+        return pixelFormat is CameraPixelFormat.RGB8
+            or CameraPixelFormat.BGR8
+            or CameraPixelFormat.BayerRG8
+            or CameraPixelFormat.BayerGB8
+            or CameraPixelFormat.BayerGR8
+            or CameraPixelFormat.BayerBG8;
     }
 
     /// <summary>
@@ -455,8 +561,17 @@ public class MindVisionCamera : ICameraProvider
 
     private static CameraPixelFormat ConvertPixelFormat(uint pixelType)
     {
-        // gvspPixelMono8 = 0x01080001
-        return pixelType == 0x01080001 ? CameraPixelFormat.Mono8 : CameraPixelFormat.Unknown;
+        return pixelType switch
+        {
+            PixelType_Gvsp_Mono8 => CameraPixelFormat.Mono8,
+            PixelType_Gvsp_RGB8 => CameraPixelFormat.RGB8,
+            PixelType_Gvsp_BGR8 => CameraPixelFormat.BGR8,
+            PixelType_Gvsp_BayerRG8 => CameraPixelFormat.BayerRG8,
+            PixelType_Gvsp_BayerGB8 => CameraPixelFormat.BayerGB8,
+            PixelType_Gvsp_BayerGR8 => CameraPixelFormat.BayerGR8,
+            PixelType_Gvsp_BayerBG8 => CameraPixelFormat.BayerBG8,
+            _ => CameraPixelFormat.Unknown
+        };
     }
 
     public bool SetExposure(double microseconds)
@@ -554,6 +669,7 @@ public class MindVisionCamera : ICameraProvider
         try
         {
             ForceRelease();
+            ReleaseConvertedFrameBuffer();
         }
         catch (Exception ex)
         {

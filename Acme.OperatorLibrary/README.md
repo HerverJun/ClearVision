@@ -80,12 +80,12 @@ See also: `docs/参考资料/指南/Acme.OperatorLibrary-快速开始与质量�
 
 Package acceptance tests are not limited to smoke instantiation. The baseline now includes representative operators across all major modules:
 
-- ImageProcessing: mean filter runtime boundary path (kernel clamp + image output contract)
+- ImageProcessing: mean filter runtime boundary path, template matching, legacy morphology, region union, and FFT1D signal transform contracts
 - Measurement: caliper success path and expected-count failure path
 - Calibration: parameter validation and missing folder failure path
 - Communication: Modbus validation boundary and RTU fail-fast path
 - FlowControl: TryCatch passthrough contract
-- AI: DeepLearning missing model validation/runtime failure path
+- AI: DeepLearning, SemanticSegmentation, and AnomalyDetection missing-asset gates plus SurfaceDefectDetection runtime diagnostics
 
 Acceptance criteria: each representative operator must cover at least one normal path plus parameter, exception, or boundary behavior.
 
@@ -96,7 +96,8 @@ The package no longer uses the fixed `*-local` version strategy.
 - Default local version: `VersionPrefix` (`1.0.2` currently)
 - CI version injection: pass `PackageVersion` (for example `1.0.2-ci.20260419.1`)
 - Reproducibility metadata: `SourceRevisionId`, `RepositoryCommit`, `RepositoryBranch`, `PublishRepositoryUrl`, deterministic/CI build flags
-- NuGet lock-file mode: the project sets `RestorePackagesWithLockFile=true`; generate/review `packages.lock.json` with restore before enforcing locked mode in CI.
+- NuGet lock-file mode: the project sets `RestorePackagesWithLockFile=true`; `packages.lock.json` is checked in and CI/release restores use `--locked-mode`.
+- Local package smoke restores use a temporary lock file under `.tmp/nuget-packages/operator-library-smoke` so fixed-version `.nupkg` hash changes do not rewrite the checked-in smoke-test lock file.
 - Symbols: `.snupkg` is still generated for debugging compatibility
 - Release package evidence: root package files include `THIRD-PARTY-NOTICES.md` and `SBOM.md`; release checklist and native runtime matrix live in `docs/operator-library/release-package-industrialization.md`.
 
@@ -112,6 +113,7 @@ The package no longer uses the fixed `*-local` version strategy.
 ```
 
 It also reads common CI environment variables (`ACME_OPERATORLIB_PACKAGE_VERSION`, `GITHUB_SHA`, `GITHUB_REF_NAME`, `BUILD_SOURCEVERSION`, `BUILD_SOURCEBRANCHNAME`) when parameters are omitted.
+Package metadata includes project URL, repository traceability, license expression, release notes, README, SBOM, and third-party notices.
 
 NuGet restore reproducibility workflow:
 
@@ -121,16 +123,16 @@ git diff -- Acme.OperatorLibrary/packages.lock.json
 dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
 ```
 
-Do not use `--locked-mode` until `packages.lock.json` has been generated, reviewed, and checked in. This local documentation step intentionally does not generate or modify the lock file.
+Dependency upgrade PRs must include the reviewed `packages.lock.json` diff; local restore without `--locked-mode` is only for intentionally updating that lock file.
 
 ## Tests, CI, and Benchmark Notes
 
 Toolchain policy:
 
-- Build with .NET SDK `10.0.101` from the repository `global.json`.
+- Build with .NET SDK `9.0.300` from the repository `global.json` (`rollForward: latestFeature`).
 - Target framework remains `net8.0`.
-- Direct `Microsoft.Extensions.*` dependencies are aligned to `10.0.0` to match the main product dependency lane.
-- Consumers should validate OpenCvSharp, ONNX Runtime, PaddleOCRSharp, database, serial-port, and PLC dependencies in their deployment profile before treating the package as a thin abstractions-only dependency.
+- Direct `Microsoft.Extensions.*` dependencies are aligned to the repository net8-compatible package lane through `Directory.Packages.props`.
+- Consumers should validate OpenCvSharp, ONNX Runtime, PaddleOCRSharp, HslCommunication, database, serial-port, and PLC dependencies in their deployment profile before treating the package as a thin abstractions-only dependency.
 
 Use the package smoke/acceptance tests when validating NuGet packaging:
 
@@ -179,6 +181,7 @@ Do not treat a single local benchmark run as a release gate by itself. Prefer co
 - Build profile constant: `ACME_OPERATORLIB_PACKAGE`
 - Host-agnostic contracts/models: `Acme.OperatorLibrary/src/Acme.OperatorLibrary.Abstractions/*`
 - Core adapters (guarded by `#if ACME_OPERATORLIB_PACKAGE`): `Acme.OperatorLibrary/src/Acme.OperatorLibrary.Abstractions/Adapters/CoreTypeAdapters.cs`
+- Execution result abstractions preserve the host short-circuit flag (`ShouldShortCircuitFlow`) for trigger-style operators.
 - Dependency analysis script:
 
 ```powershell

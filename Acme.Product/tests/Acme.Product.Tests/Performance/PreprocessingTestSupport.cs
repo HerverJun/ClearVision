@@ -44,9 +44,22 @@ internal static class PreprocessingTestSupport
         return candidate;
     }
 
-    public static string EnsureReportDirectory()
+    public static string EnsureReportDirectory(string? reportDirectoryEnvName = null)
     {
-        var path = Path.Combine(ResolveWorkspaceRoot(), "Acme.Product", "test_results");
+        var path = !string.IsNullOrWhiteSpace(reportDirectoryEnvName)
+            ? Environment.GetEnvironmentVariable(reportDirectoryEnvName)
+            : null;
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = Environment.GetEnvironmentVariable("CV_PERF_REPORT_DIR");
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = Path.Combine(ResolveWorkspaceRoot(), "Acme.Product", "test_results");
+        }
+
         Directory.CreateDirectory(path);
         return path;
     }

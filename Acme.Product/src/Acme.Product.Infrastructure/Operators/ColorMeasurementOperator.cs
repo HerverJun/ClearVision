@@ -43,6 +43,8 @@ public class ColorMeasurementOperator : OperatorBase
     private const double MinHueValue = 12.0;
     private const int MaxDeltaEStatisticsSamples = 4096;
     private static readonly MatPool PassthroughImagePool = new(maxPerBucket: 0, maxTotalGb: 0.0);
+    private static readonly double[] HueSinLookup = CreateHueLookup(Math.Sin);
+    private static readonly double[] HueCosLookup = CreateHueLookup(Math.Cos);
 
     public override OperatorType OperatorType => OperatorType.ColorMeasurement;
 
@@ -264,9 +266,8 @@ public class ColorMeasurementOperator : OperatorBase
                     continue;
                 }
 
-                var radians = pixel.Item0 * (Math.PI / 90.0);
-                sinSum += Math.Sin(radians);
-                cosSum += Math.Cos(radians);
+                sinSum += HueSinLookup[pixel.Item0];
+                cosSum += HueCosLookup[pixel.Item0];
                 validHueCount++;
             }
         }
@@ -404,9 +405,21 @@ public class ColorMeasurementOperator : OperatorBase
         return double.NaN;
     }
 
+    private static double[] CreateHueLookup(Func<double, double> projection)
+    {
+        var values = new double[180];
+        for (var hue = 0; hue < values.Length; hue++)
+        {
+            values[hue] = projection(hue * (Math.PI / 90.0));
+        }
+
+        return values;
+    }
+
     private static LabStatistics ComputeLabStatistics(Mat roiMat)
     {
         var indexer = roiMat.GetGenericIndexer<Vec3b>();
+        var labCache = new Dictionary<int, CieLab>(capacity: 256);
         var count = 0;
         var sumL = 0.0;
         var sumA = 0.0;
@@ -420,7 +433,7 @@ public class ColorMeasurementOperator : OperatorBase
             for (var x = 0; x < roiMat.Cols; x++)
             {
                 var pixel = indexer[y, x];
-                var lab = CieLabConverter.BgrToLab(pixel.Item0, pixel.Item1, pixel.Item2);
+                var lab = GetCachedLab(pixel, labCache);
                 count++;
                 sumL += lab.L;
                 sumA += lab.A;
@@ -453,6 +466,7 @@ public class ColorMeasurementOperator : OperatorBase
         var totalPixels = roiMat.Rows * roiMat.Cols;
         var stride = Math.Max(1, totalPixels / MaxDeltaEStatisticsSamples);
         var indexer = roiMat.GetGenericIndexer<Vec3b>();
+        var labCache = new Dictionary<int, CieLab>(capacity: Math.Min(MaxDeltaEStatisticsSamples, 256));
         var useCie76 = deltaEMethod.Equals("CIE76", StringComparison.OrdinalIgnoreCase);
         var ordinal = 0;
         var nextSampleOrdinal = 0;
@@ -471,7 +485,7 @@ public class ColorMeasurementOperator : OperatorBase
 
                 nextSampleOrdinal += stride;
                 var pixel = indexer[y, x];
-                var lab = CieLabConverter.BgrToLab(pixel.Item0, pixel.Item1, pixel.Item2);
+                var lab = GetCachedLab(pixel, labCache);
                 var deltaE = useCie76
                     ? ColorDifference.DeltaE76(lab, reference)
                     : ColorDifference.DeltaE00(lab, reference);
@@ -494,6 +508,19 @@ public class ColorMeasurementOperator : OperatorBase
             mean,
             stdDev,
             MeasurementStatisticsHelper.ComputeStandardError(stdDev, sampleCount));
+    }
+
+    private static CieLab GetCachedLab(Vec3b pixel, Dictionary<int, CieLab> labCache)
+    {
+        var key = pixel.Item0 | (pixel.Item1 << 8) | (pixel.Item2 << 16);
+        if (labCache.TryGetValue(key, out var lab))
+        {
+            return lab;
+        }
+
+        lab = CieLabConverter.BgrToLab(pixel.Item0, pixel.Item1, pixel.Item2);
+        labCache[key] = lab;
+        return lab;
     }
 
     private readonly record struct LabStatistics(CieLab Mean, CieLab StdDev, int SampleCount);

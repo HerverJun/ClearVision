@@ -10,8 +10,8 @@ Release owners must verify third-party notices against the exact `.nupkg` conten
 | --- | ---: | --- | --- |
 | Microsoft.Data.SqlClient | 5.2.2 | MIT | Includes SQL Server client runtime assets and SNI native assets transitively. |
 | Microsoft.Data.Sqlite | 8.0.0 | MIT | Pulls SQLitePCLRaw/e_sqlite3 native runtime assets transitively. |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.0 | MIT | Managed dependency. |
-| Microsoft.Extensions.Logging.Abstractions | 10.0.0 | MIT | Managed dependency. |
+| Microsoft.Extensions.DependencyInjection.Abstractions | 8.0.2 | MIT | Managed dependency. |
+| Microsoft.Extensions.Logging.Abstractions | 8.0.3 | MIT | Managed dependency. |
 | Microsoft.ML.OnnxRuntime | 1.17.0 | package license file | Carries ONNX Runtime native assets for multiple RIDs; review package `LICENSE` and native notices. |
 | Microsoft.ML.OnnxRuntime.Managed | 1.17.0 | package license file | Managed ONNX Runtime API companion; review package `LICENSE.txt`. |
 | MySqlConnector | 2.3.7 | MIT | Managed MySQL client. |
@@ -41,4 +41,5 @@ Before publishing outside an internal feed:
 2. Unpack the `.nupkg` and enumerate `lib/`, `runtimes/`, and root notice files.
 3. Compare the unpacked native payload with this notice and `SBOM.md`.
 4. Attach the generated dependency report from `./analyze-deps.ps1`.
-5. Record any manually reviewed license text that is not represented by SPDX expressions in NuGet metadata.
+5. Regenerate or review `SBOM.spdx.json` from the exact package contents.
+6. Record any manually reviewed license text that is not represented by SPDX expressions in NuGet metadata.

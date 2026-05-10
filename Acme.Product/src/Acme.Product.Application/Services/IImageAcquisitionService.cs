@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using Acme.Product.Application.DTOs;
+using Acme.Product.Core.Streaming;
 
 namespace Acme.Product.Application.Services;
 
@@ -50,6 +51,8 @@ public interface IImageAcquisitionService
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>图像数据传输对象</returns>
     Task<ImageDto> AcquireFromCameraAsync(string cameraId, CancellationToken cancellationToken = default);
+
+    Task<ImageDto> ConvertEnvelopeToImageAsync(FrameEnvelope envelope, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 开始连续采集（实时模式）

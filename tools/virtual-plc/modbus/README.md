@@ -78,6 +78,12 @@ $env:CLEARVISION_VIRTUAL_MODBUS_UNIT_ID = "1"
 
 When `CLEARVISION_RUN_VIRTUAL_PLC_TESTS` is not `1`, these tests return immediately and do not connect to a PLC.
 
+To run the combined PLC regression with the local virtual PLCs started and stopped by the script:
+
+```powershell
+& ".\scripts\run-tests-plc-regression.ps1" -Virtual -NoBuild -NoRestore -Verbosity minimal
+```
+
 ## Docker Startup
 
 Docker is only an optional path.

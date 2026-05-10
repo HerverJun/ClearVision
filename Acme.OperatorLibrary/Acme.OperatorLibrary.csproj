@@ -15,9 +15,12 @@
     <Authors>蘅芜君</Authors>
     <Description>工业视觉算子库 - 包含 100+ 图像处理、测量、标定、通信算子 / Industrial Vision Operator Library</Description>
     <PackageTags>opencv;machine-vision;operator;image-processing;measurement;calibration</PackageTags>
+    <PackageProjectUrl>https://github.com/HerverJun/ClearVision</PackageProjectUrl>
+    <PackageReleaseNotes>Packaged operator library with host-agnostic contracts, module namespace indexes, SBOM, and representative smoke tests.</PackageReleaseNotes>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/HerverJun/ClearVision</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -88,21 +91,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.17.0" />
-    <PackageReference Include="MySqlConnector" Version="2.3.7" />
-    <PackageReference Include="NModbus" Version="3.0.81" />
-    <PackageReference Include="OpenCvSharp4" Version="4.9.0.20240103" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
-    <PackageReference Include="PaddleOCRSharp" Version="4.4.0.1" />
-    <PackageReference Include="S7NetPlus" Version="0.20.0" />
-    <PackageReference Include="System.Drawing.Common" Version="8.0.11" />
-    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
-    <PackageReference Include="ZXing.Net" Version="0.16.9" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" />
+    <PackageReference Include="HslCommunication" />
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="NModbus" />
+    <PackageReference Include="OpenCvSharp4" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
+    <PackageReference Include="PaddleOCRSharp" />
+    <PackageReference Include="S7NetPlus" />
+    <PackageReference Include="System.Drawing.Common" />
+    <PackageReference Include="System.IO.Ports" />
+    <PackageReference Include="ZXing.Net" />
   </ItemGroup>
 
 </Project>

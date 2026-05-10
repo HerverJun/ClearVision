@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-05-06 21:07:04 +08:00`
+> 生成时间 / Generated At: `2026-05-10 12:48:32 +08:00`
 > 算子总数 / Total Operators: **155**
 
 ## 分类统计 / Category Summary
@@ -39,7 +39,7 @@
 | 颜色处理 | 2 | 1.3% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.5**
+- 平均分 / Average: **95.6**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 155 |
@@ -296,7 +296,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AdaptiveThreshold` | Adaptive Threshold | 1 | 1 | 5 | 94 (A) | `1.0.0` | 自适应阈值不会对整幅图使用一个全局阈值，而是针对每个像素在其邻域窗口 W(x, y)… | [AdaptiveThreshold](./AdaptiveThreshold.md) |
-| `OperatorType.BilateralFilter` | 双边滤波 | 1 | 1 | 3 | 94 (A) | `1.0.0` | 该算子使用双边滤波同时考虑空间距离与像素差异，在保边前提下降低噪声。 | [BilateralFilter](./BilateralFilter.md) |
+| `OperatorType.BilateralFilter` | 双边滤波 | 1 | 1 | 3 | 100 (A) | `1.0.0` | 该算子使用双边滤波同时考虑空间距离与像素差异，在保边前提下降低噪声。 | [BilateralFilter](./BilateralFilter.md) |
 | `OperatorType.ClaheEnhancement` | CLAHE增强 | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [ClaheEnhancement](./ClaheEnhancement.md) |
 | `OperatorType.ColorConversion` | 颜色空间转换 | 1 | 1 | 2 | 94 (A) | `1.0.0` | 该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。 | [ColorConversion](./ColorConversion.md) |
 | `OperatorType.Filtering` | Gaussian Blur | 1 | 1 | 4 | 94 (A) | `1.0.0` | Gaussian Blur (OpenCV) | [Filtering](./Filtering.md) |

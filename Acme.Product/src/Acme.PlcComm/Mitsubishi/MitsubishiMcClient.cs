@@ -1,180 +1,105 @@
-// MitsubishiMcClient.cs
-// 三菱MC协议客户端实现
-// 作者：蘅芜君
-
 using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
+using HslCommunication.Profinet.Melsec;
 using Microsoft.Extensions.Logging;
 
 namespace Acme.PlcComm.Mitsubishi;
 
-/// <summary>
-/// 三菱MC协议客户端实现
-/// 原生3E帧实现
-/// </summary>
-public class MitsubishiMcClient : PlcBaseClient
+public class MitsubishiMcClient : HaoPlcClientBase
 {
-    private readonly McAddressParser _addressParser;
-    private readonly McFrameBuilder _frameBuilder;
+    private readonly MelsecMcNet _client;
+    private readonly McAddressParser _addressParser = new();
+
+    public MitsubishiMcClient(string ipAddress, ILogger? logger = null)
+        : base(ipAddress, 5002, logger)
+    {
+        _client = new MelsecMcNet(ipAddress, 5002);
+        ByteTransform = LittleEndianTransform.Instance;
+    }
 
     public override int DefaultPort => 5002;
 
-    public MitsubishiMcClient(string ipAddress, ILogger? logger = null)
-        : base(logger)
+    protected override void ApplyConnectionSettings()
     {
-        IpAddress = ipAddress;
-        Port = DefaultPort;
-        
-        _addressParser = new McAddressParser();
-        _frameBuilder = new McFrameBuilder();
-        ByteTransform = LittleEndianTransform.Instance; // MC使用小端序
+        _client.IpAddress = IpAddress;
+        _client.Port = Port;
+        _client.ConnectTimeOut = ConnectTimeout;
+        _client.ReceiveTimeOut = ReadTimeout;
     }
 
-    protected override async Task<bool> ConnectCoreAsync(CancellationToken ct)
+    protected override async Task<OperateResult> ConnectCoreAsync(CancellationToken ct)
     {
-        // MC协议不需要特殊的握手，TCP连接成功即可
-        _logger.LogInformation("[MitsubishiMC] TCP连接成功，MC协议就绪");
-        return true;
+        ct.ThrowIfCancellationRequested();
+        return ToAcmeResult(await _client.ConnectServerAsync());
     }
 
     protected override async Task DisconnectCoreAsync()
     {
-        // TCP断开即可
-        await Task.CompletedTask;
+        await _client.ConnectCloseAsync();
     }
 
-    protected override async Task<OperateResult<byte[]>> ReadCoreAsync(
-        string address, ushort length, CancellationToken ct)
+    protected override async Task<OperateResult<byte[]>> ReadCoreAsync(string address, ushort length, CancellationToken ct)
     {
-        try
+        var parsed = _addressParser.Parse(address);
+        if (!parsed.IsSuccess || parsed.Content == null)
         {
-            // 解析地址
-            var addressResult = _addressParser.Parse(address);
-            if (!addressResult.IsSuccess)
-                return OperateResult<byte[]>.Failure(addressResult.ErrorCode, addressResult.Message);
+            return OperateResult<byte[]>.Failure(parsed.ErrorCode, parsed.Message);
+        }
 
-            var plcAddress = addressResult.Content!;
+        ct.ThrowIfCancellationRequested();
+        if (parsed.Content.DataType == PlcDataType.Bit)
+        {
+            var result = length <= 1
+                ? await ReadSingleBoolAsync(address)
+                : await ReadBoolArrayAsync(address, length);
+            return result;
+        }
 
-            // 构建请求帧
-            var isBitAccess = plcAddress.DataType == PlcDataType.Bit;
-            var requestFrame = _frameBuilder.BuildReadRequest(
-                plcAddress.DeviceCode,
-                plcAddress.StartAddress,
-                length,
-                isBitAccess);
+        return ToAcmeResult(await _client.ReadAsync(address, length));
+    }
 
-            LogFrame("TX", requestFrame);
+    protected override async Task<OperateResult> WriteCoreAsync(string address, byte[] value, CancellationToken ct)
+    {
+        var parsed = _addressParser.Parse(address);
+        if (!parsed.IsSuccess || parsed.Content == null)
+        {
+            return OperateResult.Failure(parsed.ErrorCode, parsed.Message);
+        }
 
-            // 发送请求
-            if (_networkStream == null)
-                return OperateResult<byte[]>.Failure("网络流未初始化");
-
-            await _networkStream.WriteAsync(requestFrame, 0, requestFrame.Length, ct);
-
-            // 读取响应头
-            var headerBuffer = new byte[11]; // 最小响应头长度
-            var headerReadOk = await ReadExactAsync(_networkStream, headerBuffer, 0, headerBuffer.Length, ct);
-            if (!headerReadOk)
-                return OperateResult<byte[]>.Failure("读取响应头失败");
-
-            // 计算响应数据长度（长度字段包含结束代码 2 字节 + 实际数据）
-            var dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(headerBuffer.AsSpan(7, 2));
-            var payloadLength = Math.Max(0, dataLength - 2);
-            var totalResponseLength = headerBuffer.Length + payloadLength;
-
-            // 读取完整响应
-            var responseBuffer = new byte[totalResponseLength];
-            Array.Copy(headerBuffer, responseBuffer, headerBuffer.Length);
-            
-            var remainingBytes = payloadLength;
-            if (remainingBytes > 0)
+        ct.ThrowIfCancellationRequested();
+        if (parsed.Content.DataType == PlcDataType.Bit)
+        {
+            if (value.Length <= 1)
             {
-                var payloadReadOk = await ReadExactAsync(
-                    _networkStream, responseBuffer, headerBuffer.Length, remainingBytes, ct);
-                if (!payloadReadOk)
-                    return OperateResult<byte[]>.Failure("读取响应数据不完整");
+                return ToAcmeResult(await _client.WriteAsync(address, value.Length > 0 && value[0] != 0));
             }
 
-            LogFrame("RX", responseBuffer);
-
-            // 解析响应
-            var (success, data, error) = _frameBuilder.ParseReadResponse(responseBuffer);
-            if (!success)
-                return OperateResult<byte[]>.Failure(error ?? "未知错误");
-
-            return OperateResult<byte[]>.Success(data!);
+            return ToAcmeResult(await _client.WriteAsync(address, value.Select(item => item != 0).ToArray()));
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[MitsubishiMC] 读取失败: {Message}", ex.Message);
-            return OperateResult<byte[]>.Failure($"读取失败: {ex.Message}");
-        }
-    }
 
-    protected override async Task<OperateResult> WriteCoreAsync(
-        string address, byte[] value, CancellationToken ct)
-    {
-        try
-        {
-            // 解析地址
-            var addressResult = _addressParser.Parse(address);
-            if (!addressResult.IsSuccess)
-                return OperateResult.Failure(addressResult.ErrorCode, addressResult.Message);
-
-            var plcAddress = addressResult.Content!;
-
-            // 构建请求帧
-            var isBitAccess = plcAddress.DataType == PlcDataType.Bit;
-            var length = (ushort)(isBitAccess ? value.Length : value.Length / 2);
-            
-            var requestFrame = _frameBuilder.BuildWriteRequest(
-                plcAddress.DeviceCode,
-                plcAddress.StartAddress,
-                length,
-                value,
-                isBitAccess);
-
-            LogFrame("TX", requestFrame);
-
-            // 发送请求
-            if (_networkStream == null)
-                return OperateResult.Failure("网络流未初始化");
-
-            await _networkStream.WriteAsync(requestFrame, 0, requestFrame.Length, ct);
-
-            // 读取响应
-            var responseBuffer = new byte[11]; // 写入响应最小长度
-            var responseReadOk = await ReadExactAsync(_networkStream, responseBuffer, 0, responseBuffer.Length, ct);
-            if (!responseReadOk)
-                return OperateResult.Failure("读取响应失败");
-
-            LogFrame("RX", responseBuffer);
-
-            // 解析响应
-            var (success, error) = _frameBuilder.ParseWriteResponse(responseBuffer);
-            if (!success)
-                return OperateResult.Failure(error ?? "写入失败");
-
-            return OperateResult.Success();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[MitsubishiMC] 写入失败: {Message}", ex.Message);
-            return OperateResult.Failure($"写入失败: {ex.Message}");
-        }
+        return ToAcmeResult(await _client.WriteAsync(address, value));
     }
 
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
-        try
-        {
-            // 尝试读取一个字来检测连接
-            var result = await ReadAsync("D0", 1, ct);
-            return result.IsSuccess;
-        }
-        catch
-        {
-            return false;
-        }
+        ct.ThrowIfCancellationRequested();
+        var result = await _client.ReadAsync("D0", 1);
+        return result.IsSuccess;
+    }
+
+    private async Task<OperateResult<byte[]>> ReadSingleBoolAsync(string address)
+    {
+        var result = await _client.ReadBoolAsync(address);
+        return result.IsSuccess
+            ? OperateResult<byte[]>.Success(new[] { result.Content ? (byte)1 : (byte)0 })
+            : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
+    }
+
+    private async Task<OperateResult<byte[]>> ReadBoolArrayAsync(string address, ushort length)
+    {
+        var result = await _client.ReadBoolAsync(address, length);
+        return result.IsSuccess
+            ? OperateResult<byte[]>.Success((result.Content ?? Array.Empty<bool>()).Select(item => item ? (byte)1 : (byte)0).ToArray())
+            : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
     }
 }

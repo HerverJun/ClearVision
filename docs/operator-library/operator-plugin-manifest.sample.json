@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "pluginId": "clearvision.operator-library",
+  "packageId": "Acme.OperatorLibrary",
+  "packageVersion": "1.0.2",
+  "displayName": "ClearVision Operator Library",
+  "description": "Package-facing ClearVision operator set.",
+  "maturity": "Experimental",
+  "hostCompatibility": {
+    "minHostVersion": "1.0.0",
+    "maxHostVersion": "1.9.0",
+    "operatorContractVersion": "1.0"
+  },
+  "nativeProfiles": [
+    "win-x64"
+  ],
+  "capabilities": [
+    "operators",
+    "metadata"
+  ],
+  "operators": [
+    {
+      "operatorType": "TemplateMatching",
+      "runtimeTypeName": "Acme.Product.Infrastructure.Operators.TemplateMatchOperator",
+      "maturity": "Experimental",
+      "enabledByDefault": true,
+      "tags": [
+        "matching"
+      ]
+    },
+    {
+      "operatorType": "MqttPublish",
+      "runtimeTypeName": "Acme.Product.Infrastructure.Operators.MqttPublishOperator",
+      "maturity": "PlaceholderDisabled",
+      "enabledByDefault": false,
+      "tags": [
+        "integration:mqtt",
+        "maturity:placeholder-disabled"
+      ]
+    }
+  ]
+}
