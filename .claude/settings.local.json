@@ -22,7 +22,12 @@
       "Bash(git -C \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\" diff --stat)",
       "Bash(node -c \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\\\\Acme.Product\\\\src\\\\Acme.Product.Desktop\\\\wwwroot\\\\src\\\\features\\\\stations\\\\stationMonitorView.js\")",
       "Bash(node -e \"const fs=require\\('fs'\\);const css=fs.readFileSync\\('Acme.Product/src/Acme.Product.Desktop/wwwroot/src/shared/styles/stations.css','utf8'\\);const open=css.split\\(''\\).filter\\(c=>c==='{'\\).length;const close=css.split\\(''\\).filter\\(c=>c==='}'\\).length;console.log\\('Braces:',open,close,open===close?'OK':'MISMATCH'\\);\")",
-      "Bash(git -C \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\" diff --stat \"Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js\")"
+      "Bash(git -C \"c:\\\\Users\\\\11234\\\\Desktop\\\\ClearVision\" diff --stat \"Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js\")",
+      "Bash(code --list-extensions)",
+      "Bash(curl -sSL https://dot.net/v1/dotnet-install.ps1 -o /tmp/dotnet-install.ps1)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(ls \"C:/Program Files/dotnet/sdk/\" | grep -i 9.0)",
+      "Read(//c/Program Files/dotnet/sdk/**)"
     ]
   }
 }
