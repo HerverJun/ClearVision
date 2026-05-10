@@ -104,6 +104,30 @@ public sealed class StationPackageStore
             .FirstOrDefault();
     }
 
+    public bool TryGetPackageFileForDownload(string packageId, out string path)
+    {
+        path = string.Empty;
+        var storedPath = GetPackagePath(packageId);
+        if (string.IsNullOrWhiteSpace(storedPath))
+        {
+            return false;
+        }
+
+        if (!TryNormalizeAllowedPackagePath(storedPath, out var normalizedPath))
+        {
+            _logger.LogWarning("Rejected Station package download for {PackageId}; stored path is outside the package directory.", packageId);
+            return false;
+        }
+
+        if (!File.Exists(normalizedPath))
+        {
+            return false;
+        }
+
+        path = normalizedPath;
+        return true;
+    }
+
     public async Task<StationPackageManifestDto> CreateTestPackageAsync(CancellationToken cancellationToken)
     {
         var packageId = $"pkg_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}"[..32];
@@ -291,6 +315,35 @@ public sealed class StationPackageStore
         db.SaveChanges();
 
         _logger.LogInformation("Stored Station package {PackageId} at {PackagePath}", manifest.PackageId, path);
+    }
+
+    private bool TryNormalizeAllowedPackagePath(string storedPath, out string normalizedPath)
+    {
+        normalizedPath = string.Empty;
+
+        try
+        {
+            var fullPath = Path.GetFullPath(storedPath);
+            var filesRoot = EnsureTrailingSeparator(Path.GetFullPath(FilesDirectory));
+            if (!fullPath.StartsWith(filesRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            normalizedPath = fullPath;
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static string EnsureTrailingSeparator(string path)
+    {
+        return path.EndsWith(Path.DirectorySeparatorChar)
+            ? path
+            : path + Path.DirectorySeparatorChar;
     }
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)

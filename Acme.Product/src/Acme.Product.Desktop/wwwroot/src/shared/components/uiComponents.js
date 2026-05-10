@@ -113,7 +113,13 @@ export function createLabeledInput(options = {}) {
 
     const labelEl = document.createElement('label');
     labelEl.className = 'cv-input-label';
-    labelEl.innerHTML = `${label}${required ? '<span class="required">*</span>' : ''}`;
+    labelEl.textContent = String(label ?? '');
+    if (required) {
+        const requiredEl = document.createElement('span');
+        requiredEl.className = 'required';
+        requiredEl.textContent = '*';
+        labelEl.appendChild(requiredEl);
+    }
 
     const input = createInput(inputOptions);
     input.id = `input_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -264,9 +270,11 @@ export function showToast(message, type = 'info', duration = 3000) {
 
     toast.innerHTML = `
         <span class="cv-toast-icon">${icons[type]}</span>
-        <span class="cv-toast-message">${message}</span>
+        <span class="cv-toast-message"></span>
         <button class="cv-toast-close">×</button>
     `;
+
+    toast.querySelector('.cv-toast-message').textContent = String(message ?? '');
 
     // 关闭按钮
     toast.querySelector('.cv-toast-close').addEventListener('click', () => {
@@ -382,13 +390,14 @@ export function createModal(options = {}) {
     const header = document.createElement('div');
     header.className = 'cv-modal-header';
     header.innerHTML = `
-        <h3 class="cv-modal-title">${title}</h3>
+        <h3 class="cv-modal-title"></h3>
         <button class="cv-modal-close" title="关闭">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
     `;
+    header.querySelector('.cv-modal-title').textContent = String(title ?? '');
     
     // Close event
     const closeBtn = header.querySelector('.cv-modal-close');

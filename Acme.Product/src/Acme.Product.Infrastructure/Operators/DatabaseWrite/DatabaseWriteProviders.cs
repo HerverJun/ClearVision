@@ -154,10 +154,12 @@ internal sealed class SqlServerDatabaseWriteProvider : DatabaseWriteProviderBase
     public override DbCommand CreateEnsureTableCommand(DbConnection connection, string tableName)
     {
         var command = connection.CreateCommand();
+        var identifier = QuoteIdentifier(tableName);
+        var objectName = EscapeSqlStringLiteral($"[dbo].{identifier}");
         command.CommandText = $"""
-            IF OBJECT_ID(N'[dbo].[{tableName}]', N'U') IS NULL
+            IF OBJECT_ID(N'{objectName}', N'U') IS NULL
             BEGIN
-                CREATE TABLE [dbo].[{tableName}] (
+                CREATE TABLE [dbo].{identifier} (
                     [Id] NVARCHAR(128) NOT NULL PRIMARY KEY,
                     [Data] NVARCHAR(MAX) NOT NULL,
                     [Timestamp] DATETIME2 NOT NULL
@@ -175,8 +177,9 @@ internal sealed class SqlServerDatabaseWriteProvider : DatabaseWriteProviderBase
         DateTime timestampUtc)
     {
         var command = connection.CreateCommand();
+        var identifier = QuoteIdentifier(tableName);
         command.CommandText = $"""
-            MERGE [dbo].[{tableName}] WITH (HOLDLOCK) AS target
+            MERGE [dbo].{identifier} WITH (HOLDLOCK) AS target
             USING (VALUES (@Id, @Data, @Timestamp)) AS source ([Id], [Data], [Timestamp])
               ON target.[Id] = source.[Id]
             WHEN MATCHED THEN
@@ -198,6 +201,16 @@ internal sealed class SqlServerDatabaseWriteProvider : DatabaseWriteProviderBase
         }
 
         return base.IsTransient(exception);
+    }
+
+    private static string QuoteIdentifier(string tableName)
+    {
+        return "[" + tableName.Replace("]", "]]", StringComparison.Ordinal) + "]";
+    }
+
+    private static string EscapeSqlStringLiteral(string value)
+    {
+        return value.Replace("'", "''", StringComparison.Ordinal);
     }
 }
 
@@ -226,8 +239,9 @@ internal sealed class MySqlDatabaseWriteProvider : DatabaseWriteProviderBase
     public override DbCommand CreateEnsureTableCommand(DbConnection connection, string tableName)
     {
         var command = connection.CreateCommand();
+        var identifier = QuoteIdentifier(tableName);
         command.CommandText = $"""
-            CREATE TABLE IF NOT EXISTS `{tableName}` (
+            CREATE TABLE IF NOT EXISTS {identifier} (
                 `Id` VARCHAR(128) NOT NULL,
                 `Data` LONGTEXT NOT NULL,
                 `Timestamp` DATETIME(6) NOT NULL,
@@ -245,8 +259,9 @@ internal sealed class MySqlDatabaseWriteProvider : DatabaseWriteProviderBase
         DateTime timestampUtc)
     {
         var command = connection.CreateCommand();
+        var identifier = QuoteIdentifier(tableName);
         command.CommandText = $"""
-            INSERT INTO `{tableName}` (`Id`, `Data`, `Timestamp`)
+            INSERT INTO {identifier} (`Id`, `Data`, `Timestamp`)
             VALUES (@Id, @Data, @Timestamp)
             ON DUPLICATE KEY UPDATE
               `Data` = VALUES(`Data`),
@@ -266,5 +281,10 @@ internal sealed class MySqlDatabaseWriteProvider : DatabaseWriteProviderBase
         }
 
         return base.IsTransient(exception);
+    }
+
+    private static string QuoteIdentifier(string tableName)
+    {
+        return "`" + tableName.Replace("`", "``", StringComparison.Ordinal) + "`";
     }
 }

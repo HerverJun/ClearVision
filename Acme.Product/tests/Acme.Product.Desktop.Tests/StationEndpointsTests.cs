@@ -143,6 +143,21 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
+    public async Task UpdateIdentity_ShouldRejectNonAdminUser()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
+
+        using var response = await host.Client.PatchAsJsonAsync(
+            "/api/stations/station-a/identity",
+            new StationIdentityUpdateRequest
+            {
+                StationName = "Line station A"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task DeployPackage_ShouldRejectNonAdminUser()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
@@ -185,6 +200,50 @@ public sealed class StationEndpointsTests
         await using var scope = host.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         (await db.StationCommandRecords.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DownloadPackage_ShouldRejectStoredPathOutsidePackageDirectory()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        var externalPath = Path.Combine(Path.GetTempPath(), "ClearVisionStationEndpointTests", Guid.NewGuid().ToString("N"), "outside.cvpkg");
+        Directory.CreateDirectory(Path.GetDirectoryName(externalPath)!);
+        await File.WriteAllTextAsync(externalPath, "not a package");
+
+        try
+        {
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+                db.StationPackageRecords.Add(new StationPackageRecordEntity
+                {
+                    PackageId = "package-outside",
+                    PackageName = "Outside",
+                    PackageVersion = "1.0.0",
+                    FlowHash = "sha256:test",
+                    FileName = Path.GetFileName(externalPath),
+                    FilePath = externalPath,
+                    SizeBytes = new FileInfo(externalPath).Length,
+                    Sha256 = "test",
+                    CreatedAtUtc = DateTimeOffset.UtcNow
+                });
+                await db.SaveChangesAsync();
+            }
+
+            using var response = await host.Client.GetAsync("/api/station-packages/package-outside/download");
+
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(Path.GetDirectoryName(externalPath)!, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
     }
 
     private static async Task<string> ReadUntilContainsAsync(Stream stream, string marker, TimeSpan timeout)

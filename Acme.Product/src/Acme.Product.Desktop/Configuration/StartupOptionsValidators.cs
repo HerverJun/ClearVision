@@ -23,9 +23,9 @@ public sealed class StationIngressOptionsValidator : IValidateOptions<StationIng
         if (options.Enabled &&
             options.ListenMode == StationIngressListenMode.Lan &&
             string.IsNullOrWhiteSpace(options.SharedToken) &&
-            !options.AllowInsecureDevelopment)
+            !IsInsecureDevelopmentAllowed(options))
         {
-            failures.Add("StationIngress:SharedToken is required for LAN mode unless AllowInsecureDevelopment is true.");
+            failures.Add("StationIngress:SharedToken is required for LAN mode.");
         }
 
         if (options.ResultBufferPerStation < 1 ||
@@ -40,6 +40,15 @@ public sealed class StationIngressOptionsValidator : IValidateOptions<StationIng
         return failures.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);
+    }
+
+    private static bool IsInsecureDevelopmentAllowed(StationIngressOptions options)
+    {
+#if DEBUG
+        return options.AllowInsecureDevelopment;
+#else
+        return false;
+#endif
     }
 }
 

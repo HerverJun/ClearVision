@@ -1451,7 +1451,7 @@ class SettingsView {
         } catch (error) {
             console.error('Failed to load camera bindings:', error);
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color:var(--accent);">加载配置失败: ` + error.message + `</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color:var(--accent);">加载配置失败: ${this.escapeHtml(error.message)}</td></tr>`;
             }
             this.updateCameraParameterPanel(null);
         }
@@ -1504,6 +1504,7 @@ class SettingsView {
             connectionType: device.connectionType ?? device.ConnectionType ?? '',
             ipAddress: device.ipAddress ?? device.IpAddress ?? ''
         }));
+        const vendorLabel = this.escapeHtml(vendorText);
 
         const contentDiv = document.createElement('div');
         contentDiv.innerHTML = `
@@ -1521,16 +1522,16 @@ class SettingsView {
                     <tbody>
                         ${normalizedDevices.map(d => `
                             <tr>
-                                <td><code style="background:var(--panel-bg); padding:2px 6px; border-radius:4px; font-size:13px; font-family:var(--font-mono); word-break:break-all;">${d.cameraId || '-'}</code></td>
-                                <td>${d.manufacturer || '-'}</td>
-                                <td>${d.model || '-'}</td>
-                                <td>${d.connectionType || '-'}</td>
+                                <td><code style="background:var(--panel-bg); padding:2px 6px; border-radius:4px; font-size:13px; font-family:var(--font-mono); word-break:break-all;">${this.escapeHtml(d.cameraId || '-')}</code></td>
+                                <td>${this.escapeHtml(d.manufacturer || '-')}</td>
+                                <td>${this.escapeHtml(d.model || '-')}</td>
+                                <td>${this.escapeHtml(d.connectionType || '-')}</td>
                                 <td>
                                     <button class="cv-btn cv-btn-primary btn-bind-camera"
-                                            data-sn="${d.cameraId || ''}"
-                                            data-man="${d.manufacturer}"
-                                            data-model="${d.model}"
-                                            data-ip="${d.ipAddress || d.IpAddress || ''}"
+                                            data-sn="${this.escapeHtml(d.cameraId || '')}"
+                                            data-man="${this.escapeHtml(d.manufacturer)}"
+                                            data-model="${this.escapeHtml(d.model)}"
+                                            data-ip="${this.escapeHtml(d.ipAddress || d.IpAddress || '')}"
                                             style="padding:6px 12px; font-size:13px; border-radius:6px;">
                                         添加绑定
                                     </button>
@@ -1541,7 +1542,7 @@ class SettingsView {
                 </table>
             </div>
             <p style="margin-top:16px; font-size:13px; color:var(--text-muted);">
-                * 当前展示 ${vendorText} 搜索结果。点击“添加绑定”可将设备加入当前工程。
+                * 当前展示 ${vendorLabel} 搜索结果。点击“添加绑定”可将设备加入当前工程。
             </p>
         `;
 
@@ -1637,26 +1638,31 @@ class SettingsView {
             const statusDotClass = isConnected
                 ? 'status-dot'
                 : (isDisconnected ? 'status-dot status-error' : 'status-dot');
-            const statusText = rawConnectionStatus || '未知';
+            const statusText = this.escapeHtml(rawConnectionStatus || '未知');
             const bgClass = index === 0 ? '#fee2e2' : '#e0e7ff';
             const fgClass = index === 0 ? 'var(--cinnabar)' : 'var(--primary)';
             const isSelected = this.selectedCameraBindingId === b.id;
+            const bindingId = this.escapeHtml(b.id || '');
+            const displayName = this.escapeHtml(b.displayName || '未命名相机');
+            const serialNumber = this.escapeHtml(b.serialNumber || '未知');
+            const ipAddress = this.escapeHtml(b.ipAddress || b.IpAddress || '未知');
+            const manufacturer = this.escapeHtml(b.manufacturer || '未知');
 
             return `
-            <tr class="camera-row" data-id="${b.id}" style="cursor: pointer; background:${isSelected ? 'var(--panel-bg)' : 'transparent'};">
+            <tr class="camera-row" data-id="${bindingId}" style="cursor: pointer; background:${isSelected ? 'var(--panel-bg)' : 'transparent'};">
                 <td>
                     <div style="display:flex; align-items:center; gap:12px;">
                         <div style="width:32px; height:32px; background:${bgClass}; border-radius:8px; display:flex; align-items:center; justify-content:center; color:${fgClass};">
                             <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M12 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zM12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
                         </div>
                         <div>
-                            <div class="font-bold">${b.displayName || '未命名相机'}</div>
-                            <div class="text-muted" style="font-size:12px;">${b.serialNumber || '未知'}</div>
+                            <div class="font-bold">${displayName}</div>
+                            <div class="text-muted" style="font-size:12px;">${serialNumber}</div>
                         </div>
                     </div>
                 </td>
-                <td><span class="font-mono">${b.ipAddress || b.IpAddress || '未知'}</span></td>
-                <td>${b.manufacturer || '未知'}</td>
+                <td><span class="font-mono">${ipAddress}</span></td>
+                <td>${manufacturer}</td>
                 <td><span class="settings-status-badge ${statusClass}"><span class="${statusDotClass}"></span> ${statusText}</span></td>
                 <td><button class="action-icon-btn" title="删除" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
             </tr>
@@ -1865,11 +1871,12 @@ class SettingsView {
         let previewLoopToken = 0;
 
         const content = document.createElement('div');
+        const bindingLabel = this.escapeHtml(binding.displayName || binding.serialNumber || binding.id);
         content.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                     <div style="font-size:13px; color:var(--text-muted);">
-                        当前相机: <strong style="color:var(--text-primary);">${binding.displayName || binding.serialNumber || binding.id}</strong>
+                        当前相机: <strong style="color:var(--text-primary);">${bindingLabel}</strong>
                     </div>
                     <button class="cv-btn cv-btn-secondary" id="btn-toggle-camera-preview" type="button">停止预览</button>
                 </div>
@@ -1984,11 +1991,12 @@ class SettingsView {
 
         let currentPreviewUrl = null;
         const content = document.createElement('div');
+        const bindingLabel = this.escapeHtml(binding.displayName || binding.serialNumber || binding.id);
         content.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                     <div style="font-size:13px; color:var(--text-muted);">
-                        当前相机: <strong style="color:var(--text-primary);">${binding.displayName || binding.serialNumber || binding.id}</strong>
+                        当前相机: <strong style="color:var(--text-primary);">${bindingLabel}</strong>
                     </div>
                     <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">刷新预览</button>
                 </div>

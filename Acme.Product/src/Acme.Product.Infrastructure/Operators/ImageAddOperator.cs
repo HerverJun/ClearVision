@@ -127,7 +127,7 @@ public class ImageAddOperator : OperatorBase
         out string appliedPolicy,
         out string message)
     {
-        aligned = new Mat();
+        aligned = null!;
         appliedPolicy = NormalizePolicy(policyRaw);
         message = "Image sizes already match.";
 
@@ -168,7 +168,7 @@ public class ImageAddOperator : OperatorBase
                 if (overlapWidth <= 0 || overlapHeight <= 0)
                 {
                     aligned.Dispose();
-                    aligned = new Mat();
+                    aligned = null!;
                     message = "No overlap region between Image1 and Image2 when applying Crop policy.";
                     return false;
                 }
@@ -185,6 +185,8 @@ public class ImageAddOperator : OperatorBase
                 aligned = new Mat(reference.Size(), reference.Type(), Scalar.Black);
                 if (!TryCopyWithOffset(convertedSource, aligned, offsetX, offsetY, out var copiedRect))
                 {
+                    aligned.Dispose();
+                    aligned = null!;
                     message = $"Image2 is fully outside Image1 canvas after offset ({offsetX},{offsetY}).";
                     return false;
                 }

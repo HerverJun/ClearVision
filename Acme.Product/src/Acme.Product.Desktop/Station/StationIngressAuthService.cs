@@ -34,10 +34,19 @@ public sealed class StationIngressAuthService
             return false;
         }
 
+#if DEBUG
         if (_options.AllowInsecureDevelopment && string.IsNullOrWhiteSpace(_options.SharedToken))
         {
+            _logger.LogWarning("Station ingress accepted without a shared token because AllowInsecureDevelopment is enabled in a DEBUG build.");
             failureReason = string.Empty;
             return true;
+        }
+#endif
+
+        if (string.IsNullOrWhiteSpace(_options.SharedToken))
+        {
+            failureReason = "Station ingress shared token is not configured.";
+            return false;
         }
 
         var suppliedToken = ExtractToken(context);

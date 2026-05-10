@@ -339,10 +339,10 @@ export class ImageViewerComponent {
             const displayConf = confidenceScore !== undefined ? (confidenceScore * 100).toFixed(1) : '0.0';
             
             return `
-            <div class="defect-item" data-id="${id}">
+            <div class="defect-item" data-id="${this.escapeHtml(id)}">
                 <span class="defect-index" style="background: ${this.getDefectColor(type)}">${index + 1}</span>
                 <div class="defect-info">
-                    <span class="defect-type">${displayType}</span>
+                    <span class="defect-type">${this.escapeHtml(displayType)}</span>
                     <span class="defect-position">位置: (${Math.round(x)}, ${Math.round(y)})</span>
                     <span class="defect-confidence">置信度: ${displayConf}%</span>
                 </div>
@@ -500,6 +500,15 @@ export class ImageViewerComponent {
      */
     getDefects() {
         return this.defects;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 }
 

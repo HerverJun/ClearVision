@@ -310,12 +310,21 @@ static class Program
 
         if (options.ListenMode == StationIngressListenMode.Lan &&
             string.IsNullOrWhiteSpace(options.SharedToken) &&
-            !options.AllowInsecureDevelopment)
+            !IsStationIngressInsecureDevelopmentAllowed(options))
         {
             return StationIngressListenMode.Loopback;
         }
 
         return options.ListenMode;
+    }
+
+    private static bool IsStationIngressInsecureDevelopmentAllowed(StationIngressOptions options)
+    {
+#if DEBUG
+        return options.AllowInsecureDevelopment;
+#else
+        return false;
+#endif
     }
 
     internal static bool IsAllowedApiOrigin(string? origin, int webPort)

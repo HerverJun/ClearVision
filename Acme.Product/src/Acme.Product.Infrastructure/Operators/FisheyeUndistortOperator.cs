@@ -241,8 +241,8 @@ public class FisheyeUndistortOperator : OperatorBase
             }
         }
 
-        map1 = new Mat();
-        map2 = new Mat();
+        map1 = null!;
+        map2 = null!;
         return false;
     }
 

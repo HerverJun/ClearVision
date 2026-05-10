@@ -46,12 +46,15 @@ class TooltipSystem {
         const content = target.dataset.tooltip;
         const shortcut = target.dataset.shortcut;
         
-        let html = content;
+        this.tooltip.textContent = content || '';
         if (shortcut) {
-            html += ` <span style="color: #aaa; margin-left: 8px;">${shortcut}</span>`;
+            const shortcutEl = document.createElement('span');
+            shortcutEl.style.color = '#aaa';
+            shortcutEl.style.marginLeft = '8px';
+            shortcutEl.textContent = shortcut;
+            this.tooltip.appendChild(shortcutEl);
         }
 
-        this.tooltip.innerHTML = html;
         this.tooltip.style.opacity = '1';
         
         // 初始位置

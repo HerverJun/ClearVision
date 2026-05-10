@@ -95,6 +95,19 @@ public class PlcSettingsEndpointTests
     }
 
     [Fact]
+    public async Task PutPlcSettings_ShouldRejectNonAdminUser()
+    {
+        await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig(), role: "Operator");
+
+        using var response = await host.Client.PutAsync(
+            "/api/plc/settings",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
+    [Fact]
     public async Task PutPlcSettings_ShouldPersistNormalizedCommunicationProfile()
     {
         await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig());
@@ -146,6 +159,19 @@ public class PlcSettingsEndpointTests
             && config.Communication.Fins.Mappings[0].Address == "DM100"));
     }
 
+    [Fact]
+    public async Task PutPlcMappings_ShouldRejectNonAdminUser()
+    {
+        await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig(), role: "Operator");
+
+        using var response = await host.Client.PutAsync(
+            "/api/plc/mappings",
+            new StringContent("[]", Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
     [Theory]
     [InlineData("S7", "S7-1200", 0, 1)]
     [InlineData("MC", null, null, null)]
@@ -193,7 +219,7 @@ public class PlcSettingsEndpointTests
 
         public IConfigurationService ConfigurationService { get; }
 
-        public static async Task<PlcSettingsTestHost> CreateAsync(AppConfig initialConfig)
+        public static async Task<PlcSettingsTestHost> CreateAsync(AppConfig initialConfig, string? role = "Admin")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -209,6 +235,20 @@ public class PlcSettingsEndpointTests
             builder.Services.AddSingleton(configService);
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                if (role is not null)
+                {
+                    context.Items["CurrentUser"] = new Acme.Product.Application.Services.UserSession
+                    {
+                        UserId = role.ToLowerInvariant(),
+                        Username = role.ToLowerInvariant(),
+                        Role = role
+                    };
+                }
+
+                await next();
+            });
             app.MapPlcEndpoints();
             await app.StartAsync();
             return new PlcSettingsTestHost(app, configService);

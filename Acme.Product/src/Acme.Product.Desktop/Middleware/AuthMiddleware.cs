@@ -122,10 +122,12 @@ public class AuthMiddleware
             return true;
         }
 
+#if DEBUG
         if (path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
+#endif
 
         return false;
     }

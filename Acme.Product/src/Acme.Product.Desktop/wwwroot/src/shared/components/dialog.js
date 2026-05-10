@@ -25,9 +25,10 @@ class Dialog {
         const header = document.createElement('div');
         header.className = 'cv-modal-header';
         header.innerHTML = `
-            <h3 class="cv-modal-title">${title}</h3>
+            <h3 class="cv-modal-title"></h3>
             <button class="cv-modal-close">&times;</button>
         `;
+        header.querySelector('.cv-modal-title').textContent = String(title ?? '');
         
         // 内容
         const body = document.createElement('div');
@@ -102,7 +103,7 @@ class Dialog {
     static confirm(title, message, onConfirm, onCancel) {
         const dialog = new Dialog();
         dialog.create(title, `
-            <p class="dialog-message">${message}</p>
+            <p class="dialog-message">${Dialog.escapeHtml(message)}</p>
         `, [
             {
                 text: '取消',
@@ -130,7 +131,7 @@ class Dialog {
     static alert(title, message, onClose) {
         const dialog = new Dialog();
         dialog.create(title, `
-            <p class="dialog-message">${message}</p>
+            <p class="dialog-message">${Dialog.escapeHtml(message)}</p>
         `, [
             {
                 text: '确定',
@@ -152,11 +153,11 @@ class Dialog {
         const inputId = `prompt-input-${Date.now()}`;
         
         dialog.create(title, `
-            <p class="dialog-message">${message}</p>
+            <p class="dialog-message">${Dialog.escapeHtml(message)}</p>
             <input type="text" 
                    id="${inputId}" 
                    class="cv-input" 
-                   value="${defaultValue}"
+                   value="${Dialog.escapeHtml(defaultValue)}"
                    placeholder="请输入...">
         `, [
             {
@@ -254,12 +255,12 @@ class Dialog {
             : `
                 <div class="project-list">
                     ${projects.map(p => `
-                        <div class="project-list-item" data-id="${p.id}">
+                        <div class="project-list-item" data-id="${Dialog.escapeHtml(p.id)}">
                             <div class="project-info">
-                                <span class="project-name">${p.name}</span>
+                                <span class="project-name">${Dialog.escapeHtml(p.name)}</span>
                                 <span class="project-date">${new Date(p.modifiedAt || p.createdAt).toLocaleDateString()}</span>
                             </div>
-                            ${onDelete ? `<button class="cv-btn cv-btn-icon btn-delete" data-id="${p.id}">🗑️</button>` : ''}
+                            ${onDelete ? `<button class="cv-btn cv-btn-icon btn-delete" data-id="${Dialog.escapeHtml(p.id)}">🗑️</button>` : ''}
                         </div>
                     `).join('')}
                 </div>
@@ -295,7 +296,7 @@ class Dialog {
                     const id = btn.dataset.id;
                     const project = projects.find(p => p.id === id);
                     
-                    Dialog.confirm('确认删除', `确定要删除工程 "${project.name}" 吗？`, () => {
+                    Dialog.confirm('确认删除', `确定要删除工程 "${project?.name ?? ''}" 吗？`, () => {
                         onDelete(project);
                         dialog.close();
                     });
@@ -304,6 +305,15 @@ class Dialog {
         }
         
         return dialog;
+    }
+
+    static escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 }
 

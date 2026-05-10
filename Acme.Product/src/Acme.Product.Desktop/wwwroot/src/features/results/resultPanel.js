@@ -980,7 +980,8 @@ class ResultPanel {
         }
 
         gridContainer.innerHTML = pageResults.map((result, index) => {
-            const statusClass = result.status?.toLowerCase() || 'unknown';
+            const statusClass = this.toCssToken(result.status || 'unknown');
+            const statusText = this.escapeHtml(result.status || 'Unknown');
             const time = result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : '--:--:--';
             const processingTime = result.processingTime || result.executionTimeMs || '--';
             const outputDataHtml = this.renderAnalysisDataPreview(result.analysisData);
@@ -988,11 +989,11 @@ class ResultPanel {
             return `
                 <div class="result-card result-${statusClass}" data-index="${index}" style="cursor:pointer;">
                     <div class="result-card-header">
-                        <span class="result-status-badge ${statusClass}">${result.status || 'Unknown'}</span>
+                        <span class="result-status-badge ${statusClass}">${statusText}</span>
                         <span class="result-time">${time}</span>
                     </div>
                     <div class="result-card-body">
-                        <span class="result-processing-time">${processingTime}ms</span>
+                        <span class="result-processing-time">${this.escapeHtml(processingTime)}ms</span>
                         ${result.defects?.length > 0 ? `<span class="result-defect-count">${result.defects.length} 缺陷</span>` : ''}
                         ${outputDataHtml}
                     </div>
@@ -1246,7 +1247,8 @@ class ResultPanel {
         const modal = document.createElement('div');
         modal.className = 'result-detail-modal';
         
-        const statusClass = result.status?.toLowerCase() || 'unknown';
+        const statusClass = this.toCssToken(result.status || 'unknown');
+        const statusText = this.escapeHtml(result.status || 'Unknown');
         const time = result.timestamp ? new Date(result.timestamp).toLocaleString() : '--';
         const processingTime = result.processingTime || result.executionTimeMs || '--';
         const imageSrc = this.getResultImageSrc(result);
@@ -1256,16 +1258,16 @@ class ResultPanel {
             <div class="result-detail-content">
                 <div class="result-detail-header">
                     <h3>检测结果详情</h3>
-                    <span class="result-status-badge ${statusClass}" style="font-size:12px;padding:4px 12px;">${result.status || 'Unknown'}</span>
+                    <span class="result-status-badge ${statusClass}" style="font-size:12px;padding:4px 12px;">${statusText}</span>
                     <button class="result-detail-close">✕</button>
                 </div>
                 <div class="result-detail-body">
                     ${imageSrc ? `<div class="result-detail-image"><img src="${imageSrc}" alt="检测结果图像" /></div>` : ''}
                     <div class="result-detail-data">
                         <div class="detail-section">
-                            <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value status-${statusClass}">${result.status || '--'}</span></div>
+                            <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value status-${statusClass}">${this.escapeHtml(result.status || '--')}</span></div>
                             <div class="detail-item"><span class="detail-label">时间</span><span class="detail-value">${time}</span></div>
-                            <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${processingTime}ms</span></div>
+                            <div class="detail-item"><span class="detail-label">处理耗时</span><span class="detail-value">${this.escapeHtml(processingTime)}ms</span></div>
                         </div>
                         ${this.renderAnalysisDataSection(result.analysisData)}
                         ${this.renderStructuredOutputSection(result.outputData, result.status)}
@@ -1276,7 +1278,7 @@ class ResultPanel {
                                 <div class="detail-section-title">缺陷列表 (${result.defects.length})</div>
                                 ${result.defects.map(d => `
                                     <div class="detail-item">
-                                        <span class="detail-label">${d.type || d.description || t('common.unknown', '未知')}</span>
+                                        <span class="detail-label">${this.escapeHtml(d.type || d.description || t('common.unknown', '未知'))}</span>
                                         <span class="detail-value">${d.confidenceScore ? (d.confidenceScore * 100).toFixed(1) + '%' : '--'}</span>
                                     </div>
                                 `).join('')}
@@ -1559,6 +1561,11 @@ class ResultPanel {
         const div = document.createElement('div');
         div.textContent = String(text);
         return div.innerHTML;
+    }
+
+    toCssToken(value) {
+        const token = String(value ?? 'unknown').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+        return token || 'unknown';
     }
     
     /**

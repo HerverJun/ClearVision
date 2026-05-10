@@ -50,6 +50,11 @@ public static class StationEndpoints
             [FromServices] StationRegistryService registry,
             HttpContext context) =>
         {
+            if (!IsStationAdmin(context))
+            {
+                return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             var userName = context.User?.Identity?.Name;
             var updated = registry.UpdateIdentity(
                 stationId,
@@ -157,8 +162,7 @@ public static class StationEndpoints
 
         app.MapGet("/api/station-packages/{packageId}/download", (string packageId, [FromServices] StationPackageStore packageStore) =>
         {
-            var path = packageStore.GetPackagePath(packageId);
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            if (!packageStore.TryGetPackageFileForDownload(packageId, out var path))
             {
                 return Results.NotFound(new { error = "PackageNotFound" });
             }

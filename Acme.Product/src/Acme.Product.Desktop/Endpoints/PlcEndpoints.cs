@@ -1,7 +1,9 @@
 using System.Net.Sockets;
 using Acme.PlcComm;
 using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Desktop.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -26,8 +28,14 @@ public static class PlcEndpoints
 
         app.MapPut("/api/plc/settings", async (
             CommunicationConfig? settings,
-            IConfigurationService configService) =>
+            IConfigurationService configService,
+            HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             settings ??= new CommunicationConfig();
             settings.Normalize();
 
@@ -148,8 +156,14 @@ public static class PlcEndpoints
 
         app.MapPut("/api/plc/mappings", async (
             List<PlcAddressMapping>? mappings,
-            IConfigurationService configService) =>
+            IConfigurationService configService,
+            HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             var config = await configService.LoadAsync();
             config.Normalize();
             var communication = config.Communication ?? new CommunicationConfig();
@@ -193,6 +207,23 @@ public static class PlcEndpoints
         {
             // Ignore disconnect errors in test endpoint.
         }
+    }
+
+    private static bool IsAdmin(HttpContext context)
+    {
+        if (!context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            return false;
+        }
+
+        var role = userObj switch
+        {
+            Acme.Product.Application.Services.UserSession user => user.Role,
+            UserSession user => user.Role,
+            _ => null
+        };
+
+        return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
     }
 
     private static bool TryBuildPlcCommConnectionString(
