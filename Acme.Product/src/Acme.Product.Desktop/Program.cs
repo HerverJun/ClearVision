@@ -190,8 +190,7 @@ static class Program
             using (var scope = app.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
-                var dbContext = services.GetRequiredService<Acme.Product.Infrastructure.Data.VisionDbContext>();
-                VisionDatabaseInitializer.InitializeAsync(dbContext).GetAwaiter().GetResult();
+                InitializeVisionDatabase(services);
 
                 var cameraManager = services.GetRequiredService<Acme.Product.Core.Cameras.ICameraManager>();
                 var configService = services.GetRequiredService<Acme.Product.Core.Interfaces.IConfigurationService>();
@@ -238,6 +237,48 @@ static class Program
         {
             MessageBox.Show($"启动Web服务器失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private static void InitializeVisionDatabase(IServiceProvider services)
+    {
+        var dbContext = services.GetRequiredService<Acme.Product.Infrastructure.Data.VisionDbContext>();
+        var options = new VisionDatabaseInitializationOptions
+        {
+            OutdatedDatabaseDecisionProvider = PromptForOutdatedDatabaseDecisionAsync
+        };
+
+        VisionDatabaseInitializer.InitializeAsync(dbContext, options).GetAwaiter().GetResult();
+    }
+
+    private static Task<OutdatedVisionDatabaseDecision> PromptForOutdatedDatabaseDecisionAsync(
+        OutdatedVisionDatabase database,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var missingPreview = database.MissingSchemaItems.Count == 0
+            ? "未能自动识别缺失项"
+            : string.Join(Environment.NewLine, database.MissingSchemaItems.Take(8).Select(item => "- " + item));
+        var suffix = database.MissingSchemaItems.Count > 8
+            ? $"{Environment.NewLine}- 以及另外 {database.MissingSchemaItems.Count - 8} 项"
+            : string.Empty;
+
+        var result = MessageBox.Show(
+            "检测到本地数据库版本过旧或结构不兼容，ClearVision 无法自动迁移。" +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            $"数据库：{database.DatabasePath}" +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            $"缺失项：{Environment.NewLine}{missingPreview}{suffix}" +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            "选择“是”会丢弃旧数据库并创建新的空数据库；选择“否”会保留旧数据库并停止启动。",
+            "数据库需要更新",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+
+        return Task.FromResult(result == DialogResult.Yes
+            ? OutdatedVisionDatabaseDecision.Discard
+            : OutdatedVisionDatabaseDecision.Keep);
     }
 
     static async Task StopWebServer()

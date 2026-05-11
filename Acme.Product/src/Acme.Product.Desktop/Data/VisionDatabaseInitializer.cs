@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using Acme.Product.Infrastructure.Data;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -14,6 +15,43 @@ internal static class VisionDatabaseInitializer
         VisionDbContext dbContext,
         CancellationToken cancellationToken = default)
     {
+        await InitializeAsync(dbContext, options: null, cancellationToken);
+    }
+
+    public static async Task InitializeAsync(
+        VisionDbContext dbContext,
+        VisionDatabaseInitializationOptions? options,
+        CancellationToken cancellationToken = default)
+    {
+        var handledOutdatedDatabase = false;
+
+        while (true)
+        {
+            try
+            {
+                await InitializeCoreAsync(dbContext, cancellationToken);
+                return;
+            }
+            catch (OutdatedVisionDatabaseException ex) when (
+                options?.OutdatedDatabaseDecisionProvider != null &&
+                !handledOutdatedDatabase)
+            {
+                var decision = await options.OutdatedDatabaseDecisionProvider(ex.Database, cancellationToken);
+                if (decision != OutdatedVisionDatabaseDecision.Discard)
+                {
+                    throw;
+                }
+
+                await DiscardSqliteDatabaseAsync(dbContext, ex.Database.DatabasePath, cancellationToken);
+                handledOutdatedDatabase = true;
+            }
+        }
+    }
+
+    private static async Task InitializeCoreAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
         var migrations = dbContext.Database.GetMigrations().ToList();
         if (migrations.Count > 0)
         {
@@ -22,7 +60,14 @@ internal static class VisionDatabaseInitializer
                 await AdoptCompleteLegacySqliteSchemaAsync(dbContext, migrations[0], cancellationToken);
             }
 
-            await dbContext.Database.MigrateAsync(cancellationToken);
+            try
+            {
+                await dbContext.Database.MigrateAsync(cancellationToken);
+            }
+            catch (SqliteException ex) when (IsSqliteSchemaConflict(ex))
+            {
+                throw CreateOutdatedDatabaseMigrationException(dbContext, ex);
+            }
         }
         else
         {
@@ -34,6 +79,31 @@ internal static class VisionDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken);
         }
+    }
+
+    private static OutdatedVisionDatabaseException CreateOutdatedDatabaseMigrationException(
+        VisionDbContext dbContext,
+        SqliteException exception)
+    {
+        return new OutdatedVisionDatabaseException(
+            new OutdatedVisionDatabase(
+                GetDatabasePath(dbContext.Database.GetDbConnection()),
+                new[] { "migration:" + exception.Message }),
+            "Existing SQLite database could not be migrated because its schema conflicts with the current EF baseline. " +
+            exception.Message);
+    }
+
+    private static bool IsSqliteSchemaConflict(SqliteException exception)
+    {
+        if (exception.SqliteErrorCode != 1)
+        {
+            return false;
+        }
+
+        return exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
+               exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase) ||
+               exception.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase) ||
+               exception.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task AdoptCompleteLegacySqliteSchemaAsync(
@@ -56,31 +126,43 @@ internal static class VisionDatabaseInitializer
                 return;
             }
 
+            var existingTables = await GetExistingUserTablesAsync(connection, cancellationToken);
+            if (existingTables.Count == 0)
+            {
+                return;
+            }
+
             var hasLegacyCoreTables =
                 await TableExistsAsync(connection, "Projects", cancellationToken) &&
                 await TableExistsAsync(connection, "Operators", cancellationToken) &&
                 await TableExistsAsync(connection, "InspectionResults", cancellationToken) &&
                 await TableExistsAsync(connection, "Defects", cancellationToken) &&
                 await TableExistsAsync(connection, "Users", cancellationToken);
-            if (!hasLegacyCoreTables)
-            {
-                return;
-            }
-
-            if (!await IsBaselineSqliteSchemaCompleteAsync(dbContext, connection, cancellationToken))
-            {
-                await RepairLegacySqliteSchemaAsync(dbContext, cancellationToken);
-            }
 
             var missingSchemaItems = await GetMissingBaselineSqliteSchemaItemsAsync(
                 dbContext,
                 connection,
                 cancellationToken);
+
+            if (missingSchemaItems.Count > 0 &&
+                hasLegacyCoreTables &&
+                IsRepairableLegacySqliteSchemaGap(missingSchemaItems))
+            {
+                await RepairLegacySqliteSchemaAsync(dbContext, cancellationToken);
+
+                missingSchemaItems = await GetMissingBaselineSqliteSchemaItemsAsync(
+                    dbContext,
+                    connection,
+                    cancellationToken);
+            }
+
             if (missingSchemaItems.Count > 0)
             {
                 var preview = string.Join(", ", missingSchemaItems.Take(8));
                 var suffix = missingSchemaItems.Count > 8 ? $" and {missingSchemaItems.Count - 8} more" : string.Empty;
-                throw new InvalidOperationException(
+                throw new OutdatedVisionDatabaseException(new OutdatedVisionDatabase(
+                    GetDatabasePath(connection),
+                    missingSchemaItems),
                     "Existing SQLite database looks like a legacy ClearVision database, but its schema is not complete enough " +
                     $"to adopt the EF migration baseline. Missing schema items: {preview}{suffix}.");
             }
@@ -111,6 +193,35 @@ internal static class VisionDatabaseInitializer
             if (shouldCloseConnection)
             {
                 await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static bool IsRepairableLegacySqliteSchemaGap(IReadOnlyCollection<string> missingSchemaItems)
+    {
+        return missingSchemaItems.All(item => RepairableLegacySqliteSchemaItems.Contains(item));
+    }
+
+    private static async Task DiscardSqliteDatabaseAsync(
+        VisionDbContext dbContext,
+        string databasePath,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(databasePath) ||
+            string.Equals(databasePath, ":memory:", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The outdated SQLite database path is not a removable file path.");
+        }
+
+        await dbContext.Database.GetDbConnection().CloseAsync();
+        SqliteConnection.ClearAllPools();
+
+        foreach (var path in GetSqliteDatabaseFiles(databasePath))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(path))
+            {
+                File.Delete(path);
             }
         }
     }
@@ -236,6 +347,32 @@ internal static class VisionDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
         }
     }
+
+    private static readonly HashSet<string> RepairableLegacySqliteSchemaItems = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "column:InspectionResults.AnalysisDataJson",
+        "table:StationAlarmEvents",
+        "table:StationAuditRecords",
+        "table:StationCommandRecords",
+        "table:StationConnectionEvents",
+        "table:StationHealthSnapshots",
+        "table:StationLogSummaries",
+        "table:StationNodes",
+        "table:StationPackageRecords",
+        "table:StationResultSummaries",
+        "table:StationSyncCursors",
+        "index:IX_StationAlarmEvents_AlarmId",
+        "index:IX_StationAuditRecords_AuditId",
+        "index:IX_StationCommandRecords_CommandId",
+        "index:IX_StationCommandRecords_StationId_Status",
+        "index:IX_StationHealthSnapshots_StationId_SequenceId",
+        "index:IX_StationLogSummaries_StationId_SequenceId",
+        "index:IX_StationNodes_StationId",
+        "index:IX_StationPackageRecords_PackageId",
+        "index:IX_StationResultSummaries_StationId_CompletedAtUtc",
+        "index:IX_StationResultSummaries_StationId_SequenceId",
+        "index:IX_StationSyncCursors_StationId"
+    };
 
     private static readonly string[] LegacyStationSyncSchemaStatements =
     {
@@ -498,6 +635,52 @@ internal static class VisionDatabaseInitializer
         return result != null;
     }
 
+    private static async Task<HashSet<string>> GetExistingUserTablesAsync(
+        IDbConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = (DbCommand)connection.CreateCommand();
+        command.CommandText = """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name NOT LIKE 'sqlite_%'
+            ORDER BY name;
+            """;
+
+        var tableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var name = reader["name"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                tableNames.Add(name);
+            }
+        }
+
+        return tableNames;
+    }
+
+    private static string GetDatabasePath(IDbConnection connection)
+    {
+        var databasePath = connection.Database;
+        if (connection is DbConnection dbConnection &&
+            !string.IsNullOrWhiteSpace(dbConnection.DataSource))
+        {
+            databasePath = dbConnection.DataSource;
+        }
+
+        return databasePath;
+    }
+
+    private static IEnumerable<string> GetSqliteDatabaseFiles(string databasePath)
+    {
+        yield return databasePath;
+        yield return databasePath + "-wal";
+        yield return databasePath + "-shm";
+    }
+
     private sealed class BaselineSchemaRequirements
     {
         public Dictionary<string, TableSchemaRequirement> Tables { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -520,4 +703,30 @@ internal static class VisionDatabaseInitializer
     {
         public HashSet<string> Columns { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
+}
+
+internal sealed class VisionDatabaseInitializationOptions
+{
+    public Func<OutdatedVisionDatabase, CancellationToken, Task<OutdatedVisionDatabaseDecision>>? OutdatedDatabaseDecisionProvider { get; init; }
+}
+
+internal enum OutdatedVisionDatabaseDecision
+{
+    Keep,
+    Discard
+}
+
+internal sealed record OutdatedVisionDatabase(
+    string DatabasePath,
+    IReadOnlyList<string> MissingSchemaItems);
+
+internal sealed class OutdatedVisionDatabaseException : InvalidOperationException
+{
+    public OutdatedVisionDatabaseException(OutdatedVisionDatabase database, string message)
+        : base(message)
+    {
+        Database = database;
+    }
+
+    public OutdatedVisionDatabase Database { get; }
 }

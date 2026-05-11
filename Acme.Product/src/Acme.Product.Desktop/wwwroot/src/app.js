@@ -5,6 +5,7 @@
 
 import { Dialog } from './shared/components/dialog.js';
 import { buildOperatorNodeConfig } from './shared/operatorVisuals.js';
+import { createOperatorIconElement } from './shared/operatorIconRenderer.js';
 import eventBus from './core/app/eventBus.js';
 import serviceRegistry from './core/app/serviceRegistry.js';
 import { installLegacyGlobalAccessors } from './core/app/legacyGlobals.js';
@@ -1027,26 +1028,53 @@ async function initializeOperatorLibrary() {
  */
 function renderOperatorLibrary(operators) {
     const container = document.getElementById('operator-library');
-    
-    // 按类别分组
-    const categories = groupByCategory(operators);
-    
-    container.innerHTML = Object.entries(categories).map(([category, items]) => `
-        <div class="operator-category">
-            <div class="category-title">${category}</div>
-            ${items.map(op => `
-                <div class="operator-item" draggable="true" data-type="${op.type}">
-                    <div class="operator-icon">${op.iconName?.charAt(0).toUpperCase() || '?'}</div>
-                    <span class="operator-name">${op.displayName}</span>
-                </div>
-            `).join('')}
-        </div>
-    `).join('');
-    
-    // 添加拖拽事件
-    container.querySelectorAll('.operator-item').forEach(item => {
-        item.addEventListener('dragstart', handleDragStart);
+    if (!container) {
+        return;
+    }
+
+    const categories = groupByCategory(Array.isArray(operators) ? operators : []);
+    const fragment = document.createDocumentFragment();
+
+    Object.entries(categories).forEach(([category, items]) => {
+        const categoryElement = document.createElement('div');
+        categoryElement.className = 'operator-category';
+
+        const title = document.createElement('div');
+        title.className = 'category-title';
+        title.textContent = category;
+        categoryElement.appendChild(title);
+
+        items.forEach((op) => {
+            const normalizedOperator = {
+                ...op,
+                type: op?.type || op?.Type || '',
+                category: op?.category || op?.Category || category
+            };
+
+            const item = document.createElement('div');
+            item.className = 'operator-item';
+            item.draggable = true;
+            item.dataset.type = normalizedOperator.type;
+
+            const icon = createOperatorIconElement(normalizedOperator, 'operator-icon');
+
+            const name = document.createElement('span');
+            name.className = 'operator-name';
+            name.textContent = normalizedOperator.displayName ||
+                normalizedOperator.DisplayName ||
+                normalizedOperator.name ||
+                normalizedOperator.Name ||
+                normalizedOperator.type;
+
+            item.append(icon, name);
+            item.addEventListener('dragstart', handleDragStart);
+            categoryElement.appendChild(item);
+        });
+
+        fragment.appendChild(categoryElement);
     });
+
+    container.replaceChildren(fragment);
 }
 
 /**
@@ -1054,7 +1082,7 @@ function renderOperatorLibrary(operators) {
  */
 function groupByCategory(operators) {
     return operators.reduce((acc, op) => {
-        const category = op.category || '其他';
+        const category = op?.category || op?.Category || '其他';
         if (!acc[category]) {
             acc[category] = [];
         }
@@ -1082,7 +1110,7 @@ function getDeprecatedDefaultOperators() {
  * 处理拖拽开始
  */
 function handleDragStart(event) {
-    const operatorType = event.target.dataset.type;
+    const operatorType = event.currentTarget?.dataset.type || event.target?.dataset.type || '';
     event.dataTransfer.setData('operatorType', operatorType);
 }
 

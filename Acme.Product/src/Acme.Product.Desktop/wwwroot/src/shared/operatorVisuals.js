@@ -50,6 +50,146 @@ Script|ScriptOperator
 SemanticSegmentation_local|SemanticSegmentation
 TemplateMatch|TemplateMatching
 Threshold|Thresholding
+activity|FrameChangeTrigger
+adaptive-threshold|AdaptiveThreshold
+add|ImageAdd
+affine|AffineTransform
+ai|DeepLearning
+align-point|PointAlignment
+angle-measure|AngleMeasurement
+anomaly-detection|AnomalyDetection
+arc-caliper|ArcCaliper
+barcode|CodeRecognition
+blend|ImageBlend
+blob|BlobAnalysis
+blob-label|BlobLabeling
+border|CopyMakeBorder
+branch|ConditionalBranch
+calc|MathOperation
+calibration|CameraCalibration
+caliper|CaliperTool
+camera|ImageAcquisition
+circle-measure|CircleMeasurement
+clahe|ClaheEnhancement
+cluster|EuclideanClusterExtraction
+color|ColorDetection
+color-convert|ColorConversion
+color-measure|ColorMeasurement
+comment|Comment
+compare|Comparator
+compose|ImageCompose
+contour|FindContours
+contour-extrema|ContourExtrema
+contour-measure|ContourMeasurement
+convert|TypeConvert
+coordinate-transform|CoordinateTransform
+corner|CornerDetection
+counter|VariableIncrement
+crop|ImageCrop
+cycle|CycleCounter
+database|DatabaseWrite
+deformable-match|LocalDeformableMatching
+diff|ImageDiff
+distance|PointLineDistance
+distance-transform|DistanceTransform
+edge|EdgeDetection
+edge-pair-defect|EdgePairDefect
+edge-subpixel|SubpixelEdgeDetection
+enclosing-geometry|MinEnclosingGeometry
+fft-1d|FFT1D
+file-open|CalibrationLoader
+filter|Filtering
+fins|OmronFinsCommunication
+fisheye-calibration|FisheyeCalibration
+fisheye-undistort|FisheyeUndistort
+fit|GeometricFitting
+focus|SharpnessEvaluation
+frame-average|FrameAveraging
+frequency-filter|FrequencyFilter
+gap|GapMeasurement
+geometric-tolerance|GeometricTolerance
+geometry|GeoMeasurement
+hand-eye-calibration|HandEyeCalibration
+hand-eye-validation|HandEyeCalibrationValidator
+histogram|HistogramAnalysis
+http|HttpRequest
+ifft-1d|InverseFFT1D
+index|ArrayIndexer
+intersection|EdgeIntersection
+json|JsonExtractor
+line-measure|LineMeasurement
+logic|LogicGate
+loop|ForEach
+match3d|PPFMatch
+mc-plc|MitsubishiMcCommunication
+measure|MeasureDistance
+merge|Aggregator
+modbus|ModbusCommunication
+morphology|MorphologicalOperation
+mqtt|MqttPublish
+nms|BoxNms
+normalize|ImageNormalize
+n-point|NPointCalibration
+output|ResultOutput
+parallel|ParallelLineFind
+perspective|PerspectiveTransform
+phase-closure|PhaseClosure
+pixel-stats|PixelStatistics
+planar-match|PlanarMatching
+plane|RansacPlaneSegmentation
+point-correction|PointCorrection
+point-set|PointSetTool
+polar|PolarUnwrap
+position|PositionCorrection
+ppf|PPFEstimation
+quadrilateral|QuadrilateralFind
+rectangle|RectangleDetection
+region-closing|RegionClosing
+region-complement|RegionComplement
+region-difference|RegionDifference
+region-dilation|RegionDilation
+region-erosion|RegionErosion
+region-intersection|RegionIntersection
+region-opening|RegionOpening
+region-skeleton|RegionSkeleton
+region-union|RegionUnion
+resize|ImageResize
+result-judgment|ResultJudgment
+roi|RoiManager
+roi-track|RoiTransform
+rotate|ImageRotate
+rule|DetectionSequenceJudge
+ruler|WidthMeasurement
+s7|SiemensS7Communication
+save|ImageSave
+save-text|TextSave
+script|ScriptOperator
+semantic-segmentation|SemanticSegmentation
+serial|SerialCommunication
+shading|ShadingCorrection
+shape-match|ShapeMatching
+sharpen|LaplacianSharpen
+stats|Statistics
+stereo-calibration|StereoCalibration
+stitch|ImageStitching
+subtract|ImageSubtract
+surface-defect|SurfaceDefectDetection
+tcp|TcpCommunication
+template|TemplateMatching
+text|StringFormat
+text-recognition|OcrRecognition
+texture|GlcmTexture
+threshold|Thresholding
+tile|ImageTiling
+timer|TimerStatistics
+trigger|TriggerModule
+trycatch|TryCatch
+undistort|Undistort
+unit|UnitConvert
+variable-read|VariableRead
+variable-write|VariableWrite
+voting|DualModalVoting
+voxel|VoxelDownsample
 `
 ];
 
@@ -333,13 +473,27 @@ function resolveOperatorAlias(type) {
         return '';
     }
 
-    return OPERATOR_ICON_ALIASES[type] || type;
+    let key = String(type).trim();
+    const visited = new Set();
+    while (key && !visited.has(key)) {
+        visited.add(key);
+        const next = OPERATOR_ICON_ALIASES[key] || OPERATOR_ICON_ALIASES[key.toLowerCase()];
+        if (!next) {
+            break;
+        }
+
+        key = next;
+    }
+
+    return key;
 }
 
-export function getOperatorIconPath(type, category = null) {
-    const resolvedType = resolveOperatorAlias(type);
-    if (resolvedType && OPERATOR_ICON_PATHS[resolvedType]) {
-        return OPERATOR_ICON_PATHS[resolvedType];
+export function getOperatorIconPath(type, category = null, iconName = null) {
+    for (const candidate of [type, iconName]) {
+        const resolvedType = resolveOperatorAlias(candidate);
+        if (resolvedType && OPERATOR_ICON_PATHS[resolvedType]) {
+            return OPERATOR_ICON_PATHS[resolvedType];
+        }
     }
 
     return getCategoryIconPath(category);
@@ -388,6 +542,7 @@ function clonePorts(ports, fallbackName) {
 export function buildOperatorNodeConfig(type, data = null) {
     const resolvedType = type || data?.type || data?.Type || '';
     const category = data?.category || data?.Category || null;
+    const iconName = data?.iconName || data?.IconName || data?.icon || data?.Icon || null;
     const title =
         data?.displayName ||
         data?.DisplayName ||
@@ -398,7 +553,7 @@ export function buildOperatorNodeConfig(type, data = null) {
     return {
         title,
         color: data?.color || getOperatorColor(resolvedType, category),
-        iconPath: data?.iconPath || getOperatorIconPath(resolvedType, category),
+        iconPath: data?.iconPath || data?.IconPath || getOperatorIconPath(resolvedType, category, iconName),
         parameters: cloneParameters(data?.parameters || data?.Parameters),
         inputs: clonePorts(data?.inputPorts || data?.InputPorts, 'input'),
         outputs: clonePorts(data?.outputPorts || data?.OutputPorts, 'output')
