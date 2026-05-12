@@ -26,7 +26,6 @@
 | `PixelX` | `double` | 0 | - | - |
 | `PixelY` | `double` | 0 | - | - |
 | `PixelSize` | `double` | 0.01 | [0.0001, 100] | - |
-| `CalibrationFile` | `file` | "" | - | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs

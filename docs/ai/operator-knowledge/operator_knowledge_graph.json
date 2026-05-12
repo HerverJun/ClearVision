@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-05-01T15:57:24.1805924Z",
+  "GeneratedAtUtc": "2026-05-12T10:47:07.9160218Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -2089,6 +2089,7 @@
       "TypicalUpstream": [
         "DeepLearning",
         "ImageAcquisition",
+        "FrameChangeTrigger",
         "ImageResize"
       ],
       "TypicalDownstream": [
@@ -2253,6 +2254,7 @@
         "BoxFilter",
         "ImageAcquisition",
         "DeepLearning",
+        "FrameChangeTrigger",
         "ImageResize"
       ],
       "TypicalDownstream": [
@@ -5420,6 +5422,7 @@
       ],
       "TypicalUpstream": [
         "ImageAcquisition",
+        "FrameChangeTrigger",
         "ImageResize"
       ],
       "TypicalDownstream": [
@@ -7431,6 +7434,216 @@
       }
     },
     {
+      "OperatorType": "FrameChangeTrigger",
+      "DisplayName": "\u5E27\u53D8\u5316\u89E6\u53D1",
+      "Category": "\u903B\u8F91\u5DE5\u5177",
+      "Aliases": [
+        "\u5E27\u53D8\u5316\u89E6\u53D1",
+        "FrameChangeTrigger",
+        "\u89E6\u53D1",
+        "\u5230\u6599",
+        "\u5E27\u5DEE",
+        "\u89C6\u9891\u6D41",
+        "\u8FDE\u7EED\u91C7\u96C6",
+        "\u8F6F\u89E6\u53D1",
+        "\u53BB\u91CD",
+        "\u51B7\u5374",
+        "trigger",
+        "arrival",
+        "frame change",
+        "continuous",
+        "video"
+      ],
+      "IntentTags": [
+        "general"
+      ],
+      "ScenarioTags": [
+        "wire_sequence"
+      ],
+      "Inputs": [
+        {
+          "Name": "Image",
+          "DisplayName": "\u8F93\u5165\u56FE\u50CF",
+          "DataType": "Image",
+          "IsRequired": true,
+          "Description": ""
+        }
+      ],
+      "Outputs": [
+        {
+          "Name": "Image",
+          "DisplayName": "\u8F93\u51FA\u56FE\u50CF",
+          "DataType": "Image",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Triggered",
+          "DisplayName": "\u662F\u5426\u89E6\u53D1",
+          "DataType": "Boolean",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ChangeScore",
+          "DisplayName": "\u53D8\u5316\u6BD4\u4F8B",
+          "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "ChangedPixels",
+          "DisplayName": "\u53D8\u5316\u50CF\u7D20\u6570",
+          "DataType": "Integer",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "Reason",
+          "DisplayName": "\u5224\u5B9A\u539F\u56E0",
+          "DataType": "String",
+          "IsRequired": false,
+          "Description": ""
+        }
+      ],
+      "Parameters": [
+        {
+          "Name": "Enabled",
+          "DisplayName": "\u542F\u7528\u68C0\u6D4B",
+          "DataType": "bool",
+          "Description": "\u5173\u95ED\u540E\u56FE\u50CF\u76F4\u63A5\u653E\u884C\uFF0C\u4E0D\u505A\u5E27\u5DEE\u5224\u65AD\u3002",
+          "DefaultValue": "True",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "ShortCircuitWhenNotTriggered",
+          "DisplayName": "\u672A\u89E6\u53D1\u65F6\u8DF3\u8FC7\u672C\u8F6E",
+          "DataType": "bool",
+          "Description": "\u5F00\u542F\u540E\uFF0C\u672A\u68C0\u6D4B\u5230\u5230\u6599\u53D8\u5316\u65F6\u77ED\u8DEF\u5F53\u524D\u6D41\u7A0B\uFF0C\u4E0D\u6267\u884C\u540E\u7EED YOLO \u548C\u7ED3\u679C\u8F93\u51FA\u3002",
+          "DefaultValue": "True",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "PixelThreshold",
+          "DisplayName": "\u50CF\u7D20\u5DEE\u9608\u503C",
+          "DataType": "int",
+          "Description": "\u5355\u4E2A\u50CF\u7D20\u7070\u5EA6\u5DEE\u8D85\u8FC7\u8BE5\u503C\u624D\u8BA1\u5165\u53D8\u5316\u533A\u57DF\u3002\u73B0\u573A\u53CD\u5149/\u6296\u52A8\u591A\u65F6\u53EF\u9002\u5F53\u8C03\u9AD8\u3002",
+          "DefaultValue": "30",
+          "MinValue": "1",
+          "MaxValue": "255",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "MinChangeRatio",
+          "DisplayName": "\u6700\u5C0F\u53D8\u5316\u6BD4\u4F8B",
+          "DataType": "double",
+          "Description": "ROI \u5185\u53D8\u5316\u50CF\u7D20\u5360\u6BD4\u8FBE\u5230\u8BE5\u503C\u624D\u8BA4\u4E3A\u5230\u6599\u3002\u8BEF\u89E6\u53D1\u591A\u65F6\u8C03\u9AD8\uFF0C\u6F0F\u68C0\u65F6\u8C03\u4F4E\u3002",
+          "DefaultValue": "0.02",
+          "MinValue": "0",
+          "MaxValue": "1",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "MinChangePixels",
+          "DisplayName": "\u6700\u5C0F\u53D8\u5316\u50CF\u7D20\u6570",
+          "DataType": "int",
+          "Description": "ROI \u5185\u53D8\u5316\u50CF\u7D20\u6570\u91CF\u4E0B\u9650\uFF0C\u7528\u4E8E\u8FC7\u6EE4\u5C0F\u9762\u79EF\u566A\u58F0\u3002",
+          "DefaultValue": "500",
+          "MinValue": "0",
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "CooldownMs",
+          "DisplayName": "\u51B7\u5374\u65F6\u95F4(ms)",
+          "DataType": "int",
+          "Description": "\u89E6\u53D1\u540E\u5728\u8BE5\u65F6\u95F4\u5185\u6291\u5236\u91CD\u590D\u89E6\u53D1\uFF0C\u9632\u6B62\u540C\u4E00\u7AEF\u5B50\u505C\u7559\u671F\u95F4\u91CD\u590D\u5224\u5B9A\u3002",
+          "DefaultValue": "1200",
+          "MinValue": "0",
+          "MaxValue": "60000",
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "RoiX",
+          "DisplayName": "\u68C0\u6D4B\u533A\u57DFX",
+          "DataType": "int",
+          "Description": "\u5230\u6599\u68C0\u6D4B ROI \u5DE6\u4E0A\u89D2 X\u3002",
+          "DefaultValue": "0",
+          "MinValue": "0",
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "RoiY",
+          "DisplayName": "\u68C0\u6D4B\u533A\u57DFY",
+          "DataType": "int",
+          "Description": "\u5230\u6599\u68C0\u6D4B ROI \u5DE6\u4E0A\u89D2 Y\u3002",
+          "DefaultValue": "0",
+          "MinValue": "0",
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "RoiW",
+          "DisplayName": "\u68C0\u6D4B\u533A\u57DF\u5BBD\u5EA6",
+          "DataType": "int",
+          "Description": "\u5230\u6599\u68C0\u6D4B ROI \u5BBD\u5EA6\uFF1B0 \u8868\u793A\u4ECE X \u5230\u56FE\u50CF\u53F3\u8FB9\u754C\u3002",
+          "DefaultValue": "0",
+          "MinValue": "0",
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "RoiH",
+          "DisplayName": "\u68C0\u6D4B\u533A\u57DF\u9AD8\u5EA6",
+          "DataType": "int",
+          "Description": "\u5230\u6599\u68C0\u6D4B ROI \u9AD8\u5EA6\uFF1B0 \u8868\u793A\u4ECE Y \u5230\u56FE\u50CF\u4E0B\u8FB9\u754C\u3002",
+          "DefaultValue": "0",
+          "MinValue": "0",
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        }
+      ],
+      "RequiredResources": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "DeepLearning",
+        "BoxFilter",
+        "BoxNms"
+      ],
+      "AntiPatterns": [],
+      "KnownLimitations": [
+        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+      ],
+      "Evidence": {
+        "Contract": "Not yet evidenced",
+        "Golden": "Not yet evidenced",
+        "Dataset": "Not yet evidenced",
+        "FieldReplay": "Not yet evidenced",
+        "PrecisionClaim": "Not yet evidenced",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "QScore": null
+      }
+    },
+    {
       "OperatorType": "FrequencyFilter",
       "DisplayName": "\u9891\u57DF\u6EE4\u6CE2",
       "Category": "\u9891\u57DF",
@@ -9437,7 +9650,7 @@
       "Inputs": [
         {
           "Name": "Image",
-          "DisplayName": "\u8F93\u5165\u56FE\u50CF",
+          "DisplayName": "Runtime supplied image",
           "DataType": "Image",
           "IsRequired": false,
           "Description": ""
@@ -9529,7 +9742,8 @@
           "IsRequired": true,
           "AllowedValues": [
             "\u8F6F\u4EF6\u89E6\u53D1",
-            "\u5916\u90E8\u89E6\u53D1"
+            "\u5916\u90E8\u89E6\u53D1",
+            "\u8FDE\u7EED\u91C7\u96C6"
           ]
         }
       ],
@@ -9541,6 +9755,7 @@
         "DeepLearning",
         "BoxFilter",
         "BoxNms",
+        "FrameChangeTrigger",
         "ImageResize",
         "Filtering"
       ],
@@ -13120,9 +13335,16 @@
       "Category": "\u901A\u4FE1",
       "Aliases": [
         "MQTT \u53D1\u5E03",
-        "MqttPublish"
+        "MqttPublish",
+        "MQTT",
+        "IoT",
+        "Publish",
+        "Communication"
       ],
       "IntentTags": [
+        "maturity:placeholder-disabled",
+        "integration:mqtt",
+        "experimental",
         "integration",
         "plc_comm"
       ],
@@ -13132,14 +13354,14 @@
       "Inputs": [
         {
           "Name": "Payload",
-          "DisplayName": "\u6D88\u606F\u8D1F\u8F7D",
+          "DisplayName": "Message Payload",
           "DataType": "Any",
           "IsRequired": true,
           "Description": ""
         },
         {
           "Name": "Message",
-          "DisplayName": "\u6D88\u606F\u5185\u5BB9",
+          "DisplayName": "Message Text",
           "DataType": "String",
           "IsRequired": false,
           "Description": ""
@@ -13148,7 +13370,7 @@
       "Outputs": [
         {
           "Name": "IsSuccess",
-          "DisplayName": "\u662F\u5426\u6210\u529F",
+          "DisplayName": "Is Success",
           "DataType": "Boolean",
           "IsRequired": false,
           "Description": ""
@@ -13157,7 +13379,7 @@
       "Parameters": [
         {
           "Name": "Broker",
-          "DisplayName": "Broker\u5730\u5740",
+          "DisplayName": "Broker Address",
           "DataType": "string",
           "Description": "",
           "DefaultValue": "localhost",
@@ -13168,7 +13390,7 @@
         },
         {
           "Name": "Port",
-          "DisplayName": "\u7AEF\u53E3",
+          "DisplayName": "Port",
           "DataType": "int",
           "Description": "",
           "DefaultValue": "1883",
@@ -13179,7 +13401,7 @@
         },
         {
           "Name": "Topic",
-          "DisplayName": "\u4E3B\u9898",
+          "DisplayName": "Topic",
           "DataType": "string",
           "Description": "",
           "DefaultValue": "cv/results",
@@ -13201,7 +13423,7 @@
         },
         {
           "Name": "Retain",
-          "DisplayName": "\u4FDD\u7559\u6D88\u606F",
+          "DisplayName": "Retain Message",
           "DataType": "bool",
           "Description": "",
           "DefaultValue": "False",
@@ -13212,7 +13434,7 @@
         },
         {
           "Name": "TimeoutMs",
-          "DisplayName": "\u8D85\u65F6(\u6BEB\u79D2)",
+          "DisplayName": "\u8D85\u65F6\uFF08ms\uFF09",
           "DataType": "int",
           "Description": "",
           "DefaultValue": "5000",
@@ -19840,6 +20062,21 @@
           "MaxValue": null,
           "IsRequired": true,
           "AllowedValues": []
+        },
+        {
+          "Name": "OutputImagePolicy",
+          "DisplayName": "Output Image Policy",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "FullOverlay",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "Full Overlay",
+            "Passthrough",
+            "\u65E0"
+          ]
         }
       ],
       "RequiredResources": [],
@@ -23563,6 +23800,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "arrival",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "Average",
       "Target": "Aggregator",
       "Weight": 1,
@@ -24033,6 +24277,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "Communication",
+      "Target": "MqttPublish",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Communication",
       "Target": "TcpCommunication",
       "Weight": 1,
       "Metadata": {}
@@ -24104,6 +24355,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "connector",
       "Target": "DetectionSequenceJudge",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "continuous",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -24767,6 +25025,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "frame change",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "Frequency",
       "Target": "FFT1D",
       "Weight": 1,
@@ -25084,6 +25349,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "Invert",
       "Target": "RegionComplement",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "IoT",
+      "Target": "MqttPublish",
       "Weight": 1,
       "Metadata": {}
     },
@@ -25579,6 +25851,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "MQTT",
+      "Target": "MqttPublish",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "MQTT \u53D1\u5E03",
       "Target": "MqttPublish",
       "Weight": 1,
@@ -26064,6 +26343,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "PPF\u8868\u9762\u5339\u914D",
       "Target": "PPFMatch",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "Publish",
+      "Target": "MqttPublish",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27015,6 +27301,13 @@
     {
       "RelationType": "ALIAS_OF",
       "Source": "trigger",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "trigger",
       "Target": "TriggerModule",
       "Weight": 1,
       "Metadata": {}
@@ -27086,6 +27379,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "vertex",
       "Target": "CornerDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "video",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27364,6 +27664,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u51B7\u5374",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u51E0\u4F55\u516C\u5DEE",
       "Target": "GeometricTolerance",
       "Weight": 1,
@@ -27422,6 +27729,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5224\u65AD\u7455\u75B5",
       "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5230\u6599",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27534,6 +27848,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u53BB\u566A",
       "Target": "MedianBlur",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u53BB\u91CD",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -27919,6 +28240,20 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5C40\u90E8\u53EF\u53D8\u5F62\u5339\u914D",
       "Target": "LocalDeformableMatching",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5E27\u53D8\u5316\u89E6\u53D1",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u5E27\u5DEE",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -28715,6 +29050,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u89C6\u9891\u6D41",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u89D2\u5EA6",
       "Target": "ImageRotate",
       "Weight": 1,
@@ -28738,6 +29080,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u89D2\u70B9\u68C0\u6D4B",
       "Target": "CornerDetection",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u89E6\u53D1",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -28855,6 +29204,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u8F6F\u89E6\u53D1",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u8F93\u51FA",
       "Target": "ResultOutput",
       "Weight": 1,
@@ -28920,6 +29276,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u8FD0\u7B97",
       "Target": "MathOperation",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u8FDE\u7EED\u91C7\u96C6",
+      "Target": "FrameChangeTrigger",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29126,6 +29489,17 @@
     {
       "RelationType": "COMMONLY_FOLLOWS",
       "Source": "BoxFilter",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "BoxFilter",
       "Target": "ImageAcquisition",
       "Weight": 1,
       "Metadata": {
@@ -29170,6 +29544,17 @@
     {
       "RelationType": "COMMONLY_FOLLOWS",
       "Source": "BoxNms",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "BoxNms",
       "Target": "ImageAcquisition",
       "Weight": 1,
       "Metadata": {
@@ -29185,6 +29570,17 @@
       "Weight": 1,
       "Metadata": {
         "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "DeepLearning",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -29240,6 +29636,17 @@
       "Weight": 1,
       "Metadata": {
         "template": "\u4E24\u5668\u94DC\u5B54\u95F4\u8DDD\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "FrameChangeTrigger",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -29433,6 +29840,39 @@
     },
     {
       "RelationType": "COMMONLY_PRECEDES",
+      "Source": "FrameChangeTrigger",
+      "Target": "BoxFilter",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "FrameChangeTrigger",
+      "Target": "BoxNms",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "FrameChangeTrigger",
+      "Target": "DeepLearning",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
       "Source": "GapMeasurement",
       "Target": "ResultJudgment",
       "Weight": 1,
@@ -29493,6 +29933,17 @@
       "Weight": 1,
       "Metadata": {
         "template": "\u4E24\u5668\u94DC\u5B54\u95F4\u8DDD\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
+      "Target": "FrameChangeTrigger",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -30140,6 +30591,15 @@
     {
       "RelationType": "CONSUMES",
       "Source": "FrameAveraging",
+      "Target": "Image",
+      "Weight": 1,
+      "Metadata": {
+        "port": "Image"
+      }
+    },
+    {
+      "RelationType": "CONSUMES",
+      "Source": "FrameChangeTrigger",
       "Target": "Image",
       "Weight": 1,
       "Metadata": {
@@ -31730,6 +32190,13 @@
       "RelationType": "HAS_EVIDENCE",
       "Source": "FrameAveraging",
       "Target": "Contract evidenced (21 cases)|Not yet evidenced|Not yet evidenced|Not yet evidenced",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "HAS_EVIDENCE",
+      "Source": "FrameChangeTrigger",
+      "Target": "Not yet evidenced|Not yet evidenced|Not yet evidenced|Not yet evidenced",
       "Weight": 1,
       "Metadata": {}
     },
@@ -33686,6 +34153,51 @@
       "Weight": 1,
       "Metadata": {
         "port": "FrameCount"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "FrameChangeTrigger",
+      "Target": "Boolean",
+      "Weight": 1,
+      "Metadata": {
+        "port": "Triggered"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "FrameChangeTrigger",
+      "Target": "Float",
+      "Weight": 1,
+      "Metadata": {
+        "port": "ChangeScore"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "FrameChangeTrigger",
+      "Target": "Image",
+      "Weight": 1,
+      "Metadata": {
+        "port": "Image"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "FrameChangeTrigger",
+      "Target": "Integer",
+      "Weight": 1,
+      "Metadata": {
+        "port": "ChangedPixels"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "FrameChangeTrigger",
+      "Target": "String",
+      "Weight": 1,
+      "Metadata": {
+        "port": "Reason"
       }
     },
     {
@@ -36220,6 +36732,16 @@
     },
     {
       "RelationType": "REQUIRES_RESOURCE",
+      "Source": "FrameChangeTrigger",
+      "Target": "DeepLearning.ModelPath",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "scenarioKey": "wire-sequence-terminal-video-stream"
+      }
+    },
+    {
+      "RelationType": "REQUIRES_RESOURCE",
       "Source": "GeoMeasurement",
       "Target": "GeoMeasurement.DistanceModel",
       "Weight": 1,
@@ -36443,6 +36965,16 @@
     },
     {
       "RelationType": "USED_IN_TEMPLATE",
+      "Source": "BoxFilter",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
       "Source": "BoxNms",
       "Target": "aircon-indoor-appearance-inspection",
       "Weight": 1,
@@ -36493,6 +37025,16 @@
     },
     {
       "RelationType": "USED_IN_TEMPLATE",
+      "Source": "BoxNms",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
       "Source": "DeepLearning",
       "Target": "aircon-indoor-appearance-inspection",
       "Weight": 1,
@@ -36539,6 +37081,16 @@
       "Metadata": {
         "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B",
         "templateVersion": "1.4.2"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "DeepLearning",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
       }
     },
     {
@@ -36549,6 +37101,16 @@
       "Metadata": {
         "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B",
         "templateVersion": "1.4.2"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "DetectionSequenceJudge",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
       }
     },
     {
@@ -36569,6 +37131,16 @@
       "Metadata": {
         "templateName": "\u4E24\u5668\u94DC\u5B54\u95F4\u8DDD\u68C0\u6D4B",
         "templateVersion": "1.1.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "FrameChangeTrigger",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
       }
     },
     {
@@ -36643,6 +37215,16 @@
     },
     {
       "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
       "Source": "ImageResize",
       "Target": "aircon-indoor-appearance-inspection",
       "Weight": 1,
@@ -36789,6 +37371,16 @@
       "Metadata": {
         "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B",
         "templateVersion": "1.4.2"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "wire-sequence-terminal-video-stream",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
+        "templateVersion": "1.5.0"
       }
     }
   ]

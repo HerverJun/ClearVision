@@ -51,7 +51,9 @@ public class PromptBuilderFewShotExamplesTests
 
     private static List<string> ExtractFewShotJsonObjects(string prompt)
     {
-        var robustResults = ExtractAllFlowJsonObjects(prompt);
+        var fewShotStart = prompt.IndexOf("# Few Shot Examples", StringComparison.Ordinal);
+        var fewShotSection = fewShotStart >= 0 ? prompt[fewShotStart..] : prompt;
+        var robustResults = ExtractAllFlowJsonObjects(fewShotSection);
         if (robustResults.Count > 0)
         {
             return robustResults;

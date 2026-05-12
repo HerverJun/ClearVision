@@ -126,4 +126,15 @@
 | `OperatorType.ColorMeasurement` | 颜色测量 | 颜色处理 | `1.0.0` |
 
 ## 历史变更 / Historical Changes
-- 当前暂无历史版本变更（均为基线版本记录）。
+
+### OperatorType.ImageAcquisition / 图像采集
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.0` | `2026-05-12T20:03:52.7193054+08:00` | `872DBEFFDC39` |
+| `1.0.0` | `2026-05-09T15:22:06.0243662+08:00` | `CF45EDA52ADC` |
+
+### OperatorType.PixelStatistics / 像素统计
+| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
+|------|------|------|
+| `1.0.0` | `2026-05-12T20:03:52.7193054+08:00` | `60AFE6AC3B29` |
+| `1.0.0` | `2026-05-09T15:22:06.0243662+08:00` | `46BEAB9EF27C` |
