@@ -409,7 +409,9 @@ public static class SettingsEndpoints
         app.MapPost("/api/cameras/soft-trigger-capture", async (
             CameraSoftTriggerCaptureRequest request,
             HttpContext context,
+            [FromServices]
             Acme.Product.Core.Cameras.ICameraManager cameraManager,
+            [FromServices]
             ITriggerInputService triggerInputService) =>
         {
             if (string.IsNullOrWhiteSpace(request.CameraBindingId))
@@ -466,13 +468,14 @@ public static class SettingsEndpoints
             }
         });
 
-        app.MapGet("/api/trigger-input/diagnostics", (ITriggerInputService triggerInputService) =>
+        app.MapGet("/api/trigger-input/diagnostics", ([FromServices] ITriggerInputService triggerInputService) =>
         {
             return Results.Ok(triggerInputService.GetDiagnostics());
         });
 
         app.MapPost("/api/trigger-input/learn-enter-device", async (
             TriggerDeviceLearnRequest request,
+            [FromServices]
             ITriggerInputService triggerInputService,
             CancellationToken cancellationToken) =>
         {
