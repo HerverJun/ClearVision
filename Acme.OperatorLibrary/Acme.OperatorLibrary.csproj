@@ -72,6 +72,8 @@
              Link="Calibration\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Cameras\NoOpCameraFrameStreamCoordinator.cs"
              Link="Cameras\NoOpCameraFrameStreamCoordinator.cs" />
+    <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\Cameras\NoOpTriggerInputService.cs"
+             Link="Cameras\NoOpTriggerInputService.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\AI\Anomaly\SimplePatchCoreDetector.cs"
              Link="AI\Anomaly\SimplePatchCoreDetector.cs" />
     <Compile Include="..\Acme.Product\src\Acme.Product.Infrastructure\AI\Anomaly\OnnxPatchEmbeddingExtractor.cs"
