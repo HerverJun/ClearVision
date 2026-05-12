@@ -2846,7 +2846,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         var json = StripJsonFences(rawResponse);
         var candidate = EnumerateBalancedJsonObjects(json).FirstOrDefault();
-        return candidate ?? json;
+        return candidate ?? string.Empty;
     }
 
     private static string StripJsonFences(string rawResponse)
@@ -3008,8 +3008,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             // 清理 Markdown 包装并从混合文本中提取完整 JSON 对象。
             var json = StripJsonFences(rawResponse);
             var candidates = EnumerateBalancedJsonObjects(json);
-            if (candidates.Count == 0 && json.StartsWith("{", StringComparison.Ordinal))
-                candidates.Add(json);
 
             if (candidates.Count == 0)
             {

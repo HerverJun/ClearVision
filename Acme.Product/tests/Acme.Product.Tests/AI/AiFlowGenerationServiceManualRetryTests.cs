@@ -103,6 +103,46 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
     }
 
+    [Fact(DisplayName = "GenerateFlowAsync should route truncated JSON to manual retry without converter exceptions")]
+    public async Task GenerateFlowAsync_TruncatedJsonParameterValue_ShouldReturnManualRetry()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = """
+                          {
+                            "explanation": "broken",
+                            "operators": [
+                              {
+                                "tempId": "op_1",
+                                "operatorType": "Thresholding",
+                                "parameters": {
+                                  "Threshold": 0.
+                          """
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "生成一个基础检测流程",
+            SessionId: "parse-truncated-json-value"));
+
+        result.Success.Should().BeFalse();
+        result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeManualRetryRequired);
+        result.ManualRetry.Should().NotBeNull();
+        result.ManualRetry!.Stage.Should().Be("parse");
+        result.LastAttemptDiagnostics.Should().ContainSingle();
+        result.LastAttemptDiagnostics[0].Stage.Should().Be("parse");
+        validator.DidNotReceive().Validate(Arg.Any<AiGeneratedFlowJson>());
+    }
+
     [Fact(DisplayName = "GenerateFlowAsync should prefer the later workflow JSON when old output is echoed")]
     public async Task GenerateFlowAsync_ResponseEchoesOldFlowBeforeCorrectedFlow_ShouldUseCorrectedFlow()
     {
