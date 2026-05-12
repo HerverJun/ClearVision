@@ -288,11 +288,14 @@ public static class SettingsEndpoints
 
                 var options = model.ToGenerationOptions();
                 var response = await apiClient.StreamCompleteAsync(
-                    "You are a helpful assistant.",
-                    new List<ChatMessage> { new("user", "Reply with exactly: OK") },
+                    "You are a connection health-check assistant. Respond only with valid JSON.",
+                    new List<ChatMessage> { new("user", "Reply with a JSON object exactly: {\"ok\": true}") },
                     _ => { },
                     options,
                     CancellationToken.None);
+
+                if (!IsSuccessfulAiHealthCheck(response.Content))
+                    return Results.Ok(new { Success = false, Message = "连接失败: AI 返回内容不是预期的 JSON health-check 响应" });
 
                 return Results.Ok(new { Success = true, Message = "连接成功" });
             }
@@ -529,6 +532,25 @@ public static class SettingsEndpoints
         return context.Items.TryGetValue("CurrentUser", out var userObj) &&
                userObj is UserSession user &&
                string.Equals(user.Role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+    }
+
+    private static bool IsSuccessfulAiHealthCheck(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(content);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("ok", out var ok) &&
+                ok.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static object ToAiModelResponse(AiModelConfig m) => new

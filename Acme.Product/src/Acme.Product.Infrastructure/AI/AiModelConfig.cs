@@ -93,7 +93,7 @@ public class AiModelConfig
             Provider = GetLegacyProviderByProtocol(protocol);
 
         AuthMode = NormalizeAuthMode(AuthMode, protocol);
-        AuthHeaderName = NormalizeAuthHeaderName(AuthHeaderName, AuthMode!);
+        AuthHeaderName = NormalizeAuthHeaderName(AuthHeaderName, AuthMode!, protocol);
         RoleBindings = NormalizeRoleBindings(RoleBindings);
         Priority ??= 100;
 
@@ -184,11 +184,12 @@ public class AiModelConfig
         {
             ProtocolOllamaNative => AuthModeNone,
             ProtocolAnthropic => AuthModeHeaderKey,
+            ProtocolAzureOpenAi => AuthModeHeaderKey,
             _ => AuthModeBearer
         };
     }
 
-    public static string NormalizeAuthHeaderName(string? authHeaderName, string authMode)
+    public static string NormalizeAuthHeaderName(string? authHeaderName, string authMode, string? protocol = null)
     {
         var normalizedAuthMode = NormalizeAuthMode(authMode, ProtocolOpenAiCompatible);
         if (normalizedAuthMode == AuthModeNone)
@@ -197,7 +198,11 @@ public class AiModelConfig
         if (!string.IsNullOrWhiteSpace(authHeaderName))
             return authHeaderName.Trim();
 
-        return normalizedAuthMode == AuthModeHeaderKey ? "x-api-key" : "Authorization";
+        if (normalizedAuthMode != AuthModeHeaderKey)
+            return "Authorization";
+
+        var normalizedProtocol = NormalizeProtocol(protocol, null);
+        return normalizedProtocol == ProtocolAzureOpenAi ? "api-key" : "x-api-key";
     }
 
     private static List<string> NormalizeRoleBindings(IEnumerable<string>? roleBindings)
@@ -274,6 +279,7 @@ public class AiModelConfig
             ExtraHeaders = CloneStringMap(ExtraHeaders),
             ExtraQuery = CloneStringMap(ExtraQuery),
             ExtraBody = CloneJsonMap(ExtraBody),
+            Capabilities = GetEffectiveCapabilities(),
             ReasoningMode = Reasoning?.Mode ?? AiReasoningModes.Auto,
             ReasoningEffort = Reasoning?.Effort ?? AiReasoningEfforts.Medium,
             TimeoutSeconds = TimeoutMs / 1000,

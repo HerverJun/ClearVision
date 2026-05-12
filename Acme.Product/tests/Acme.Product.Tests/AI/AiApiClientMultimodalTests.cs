@@ -197,6 +197,349 @@ public class AiApiClientMultimodalTests : IDisposable
         chunks.Count(c => c.ChunkType == AiStreamChunkType.Done).Should().Be(1);
     }
 
+    [Fact(DisplayName = "AiApiClient stream should ignore null usage chunks")]
+    public async Task StreamCompleteAsync_OpenAi_ShouldIgnoreNullUsageChunks()
+    {
+        var ssePayload = string.Join("\n",
+        [
+            "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}],\"usage\":null}",
+            "",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"ok\\\":true}\"}}],\"usage\":null}",
+            "",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":null}",
+            "",
+            "data: [DONE]",
+            ""
+        ]);
+
+        var handler = new CaptureHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ssePayload, Encoding.UTF8, "text/event-stream")
+        }));
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        var result = await apiClient.StreamCompleteAsync(
+            systemPrompt: "system",
+            messages: new List<ChatMessage> { new("user", "test") },
+            onChunk: _ => { },
+            options: new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                ApiKey = "test-key",
+                Model = "deepseek-chat",
+                BaseUrl = "https://api.deepseek.com/v1",
+                MaxTokens = 256,
+                TimeoutSeconds = 10
+            });
+
+        result.Content.Should().Be("{\"ok\":true}");
+        result.TokenUsage.Should().BeNull();
+    }
+
+    [Fact(DisplayName = "AiApiClient OpenAI request snapshot should include JSON mode when capability allows it")]
+    public async Task CompleteAsync_OpenAi_ShouldMatchRequestSnapshot()
+    {
+        string? capturedUrl = null;
+        string? capturedAuthorization = null;
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            capturedAuthorization = request.Headers.Authorization?.ToString();
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateOpenAiJsonResponse();
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.CompleteAsync(
+            systemPrompt: "system json",
+            messages: new List<ChatMessage> { new("user", "return json") },
+            options: new AiGenerationOptions
+            {
+                Provider = "OpenAI",
+                Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+                ApiKey = "openai-key",
+                Model = "gpt-4o-mini",
+                MaxTokens = 256,
+                Temperature = 0.2,
+                TimeoutSeconds = 10,
+                Capabilities = new AiModelCapabilities { SupportsJsonMode = true }
+            });
+
+        capturedUrl.Should().Be("https://api.openai.com/v1/chat/completions");
+        capturedAuthorization.Should().Be("Bearer openai-key");
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        var root = document.RootElement;
+        root.GetProperty("model").GetString().Should().Be("gpt-4o-mini");
+        root.GetProperty("max_tokens").GetInt32().Should().Be(256);
+        root.GetProperty("temperature").GetDouble().Should().Be(0.2);
+        root.GetProperty("response_format").GetProperty("type").GetString().Should().Be("json_object");
+        root.GetProperty("messages")[0].GetProperty("role").GetString().Should().Be("system");
+        root.GetProperty("messages")[1].GetProperty("content").GetString().Should().Be("return json");
+    }
+
+    [Fact(DisplayName = "AiApiClient DeepSeek request snapshot should disable thinking explicitly")]
+    public async Task StreamCompleteAsync_DeepSeek_ShouldMatchRequestSnapshot()
+    {
+        string? capturedUrl = null;
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateOpenAiSseResponse();
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.StreamCompleteAsync(
+            systemPrompt: "system json",
+            messages: new List<ChatMessage> { new("user", "return json") },
+            onChunk: _ => { },
+            options: new AiGenerationOptions
+            {
+                Provider = "DeepSeek",
+                Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+                ApiKey = "deepseek-key",
+                Model = "deepseek-v4-flash",
+                BaseUrl = "https://api.deepseek.com",
+                MaxTokens = 512,
+                TimeoutSeconds = 10,
+                ReasoningMode = AiReasoningModes.Off,
+                Capabilities = new AiModelCapabilities { SupportsJsonMode = true, SupportsStreamOptions = true }
+            });
+
+        capturedUrl.Should().Be("https://api.deepseek.com/v1/chat/completions");
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        var root = document.RootElement;
+        root.GetProperty("model").GetString().Should().Be("deepseek-v4-flash");
+        root.GetProperty("stream").GetBoolean().Should().BeTrue();
+        root.GetProperty("stream_options").GetProperty("include_usage").GetBoolean().Should().BeTrue();
+        root.GetProperty("response_format").GetProperty("type").GetString().Should().Be("json_object");
+        root.GetProperty("thinking").GetProperty("type").GetString().Should().Be("disabled");
+    }
+
+    [Fact(DisplayName = "AiApiClient should omit JSON mode and stream options when capabilities disable them")]
+    public async Task StreamCompleteAsync_OpenAiCompatible_ShouldRespectDisabledCapabilities()
+    {
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateOpenAiSseResponse();
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.StreamCompleteAsync(
+            systemPrompt: "system",
+            messages: new List<ChatMessage> { new("user", "test") },
+            onChunk: _ => { },
+            options: new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                ApiKey = "test-key",
+                Model = "custom-chat",
+                BaseUrl = "https://proxy.example.com/openai",
+                MaxTokens = 256,
+                TimeoutSeconds = 10,
+                Capabilities = new AiModelCapabilities
+                {
+                    SupportsJsonMode = false,
+                    SupportsStreamOptions = false
+                }
+            });
+
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        document.RootElement.TryGetProperty("response_format", out _).Should().BeFalse();
+        document.RootElement.TryGetProperty("stream_options", out _).Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "AiApiClient should preserve query string on full OpenAI-compatible endpoint")]
+    public async Task CompleteAsync_OpenAiCompatible_ShouldPreserveFullEndpointQuery()
+    {
+        string? capturedUrl = null;
+        var handler = new CaptureHandler((request, _) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            return Task.FromResult(CreateOpenAiJsonResponse());
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.CompleteAsync(
+            systemPrompt: "system json",
+            messages: new List<ChatMessage> { new("user", "return json") },
+            options: new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                ApiKey = "test-key",
+                Model = "custom-chat",
+                BaseUrl = "https://proxy.example.com/v1/chat/completions?tenant=cn",
+                ExtraQuery = new Dictionary<string, string> { ["trace"] = "1" },
+                MaxTokens = 256,
+                TimeoutSeconds = 10
+            });
+
+        capturedUrl.Should().Be("https://proxy.example.com/v1/chat/completions?tenant=cn&trace=1");
+    }
+
+    [Fact(DisplayName = "AiApiClient Azure OpenAI request snapshot should use deployment URL and api-key")]
+    public async Task CompleteAsync_AzureOpenAi_ShouldMatchRequestSnapshot()
+    {
+        string? capturedUrl = null;
+        string? capturedApiKey = null;
+        string? capturedAuthorization = null;
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            capturedApiKey = request.Headers.TryGetValues("api-key", out var apiKeyValues)
+                ? apiKeyValues.Single()
+                : null;
+            capturedAuthorization = request.Headers.Authorization?.ToString();
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateOpenAiJsonResponse();
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.CompleteAsync(
+            systemPrompt: "system json",
+            messages: new List<ChatMessage> { new("user", "return json") },
+            options: new AiGenerationOptions
+            {
+                Provider = "Azure OpenAI",
+                Protocol = AiModelConfig.ProtocolAzureOpenAi,
+                ApiKey = "azure-key",
+                Model = "deployment-a",
+                BaseUrl = "https://clearvision.openai.azure.com",
+                MaxTokens = 256,
+                TimeoutSeconds = 10,
+                ExtraQuery = new Dictionary<string, string> { ["api-version"] = "2024-02-15-preview" },
+                Capabilities = new AiModelCapabilities { SupportsJsonMode = true }
+            });
+
+        capturedUrl.Should().Be("https://clearvision.openai.azure.com/openai/deployments/deployment-a/chat/completions?api-version=2024-02-15-preview");
+        capturedApiKey.Should().Be("azure-key");
+        capturedAuthorization.Should().BeNull();
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        document.RootElement.TryGetProperty("model", out _).Should().BeFalse();
+        document.RootElement.GetProperty("response_format").GetProperty("type").GetString().Should().Be("json_object");
+    }
+
+    [Fact(DisplayName = "AiApiClient Anthropic request snapshot should use x-api-key and thinking budget")]
+    public async Task CompleteAsync_Anthropic_ShouldMatchRequestSnapshot()
+    {
+        string? capturedUrl = null;
+        string? capturedApiKey = null;
+        string? capturedAnthropicVersion = null;
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            capturedApiKey = request.Headers.TryGetValues("x-api-key", out var apiKeyValues)
+                ? apiKeyValues.Single()
+                : null;
+            capturedAnthropicVersion = request.Headers.TryGetValues("anthropic-version", out var versionValues)
+                ? versionValues.Single()
+                : null;
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateAnthropicJsonResponse();
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.CompleteAsync(
+            systemPrompt: "system json",
+            messages: new List<ChatMessage> { new("user", "return json") },
+            options: new AiGenerationOptions
+            {
+                Provider = "Anthropic Claude",
+                Protocol = AiModelConfig.ProtocolAnthropic,
+                ApiKey = "anthropic-key",
+                Model = "claude-sonnet-4-5",
+                MaxTokens = 1024,
+                TimeoutSeconds = 10,
+                ReasoningMode = AiReasoningModes.On,
+                ReasoningEffort = AiReasoningEfforts.Low
+            });
+
+        capturedUrl.Should().Be("https://api.anthropic.com/v1/messages");
+        capturedApiKey.Should().Be("anthropic-key");
+        capturedAnthropicVersion.Should().Be("2023-06-01");
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        var root = document.RootElement;
+        root.GetProperty("model").GetString().Should().Be("claude-sonnet-4-5");
+        root.GetProperty("system").GetString().Should().Be("system json");
+        root.GetProperty("thinking").GetProperty("type").GetString().Should().Be("enabled");
+        root.GetProperty("thinking").GetProperty("budget_tokens").GetInt32().Should().Be(1024);
+        root.TryGetProperty("response_format", out _).Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "AiApiClient Ollama native request snapshot should use api chat and format json")]
+    public async Task CompleteAsync_OllamaNative_ShouldMatchRequestSnapshot()
+    {
+        string? capturedUrl = null;
+        string? capturedAuthorization = null;
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            capturedAuthorization = request.Headers.Authorization?.ToString();
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                {
+                  "model": "llama3",
+                  "message": { "role": "assistant", "content": "{\"ok\":true}" },
+                  "done": true
+                }
+                """, Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        await apiClient.CompleteAsync(
+            systemPrompt: "system json",
+            messages: new List<ChatMessage> { new("user", "return json") },
+            options: new AiGenerationOptions
+            {
+                Provider = "Ollama",
+                Protocol = AiModelConfig.ProtocolOllamaNative,
+                AuthMode = AiModelConfig.AuthModeNone,
+                Model = "llama3",
+                BaseUrl = "http://localhost:11434",
+                MaxTokens = 256,
+                TimeoutSeconds = 10,
+                Temperature = 0.1,
+                Capabilities = new AiModelCapabilities { SupportsJsonMode = true }
+            });
+
+        capturedUrl.Should().Be("http://localhost:11434/api/chat");
+        capturedAuthorization.Should().BeNull();
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        var root = document.RootElement;
+        root.GetProperty("model").GetString().Should().Be("llama3");
+        root.GetProperty("stream").GetBoolean().Should().BeFalse();
+        root.GetProperty("format").GetString().Should().Be("json");
+        root.GetProperty("options").GetProperty("temperature").GetDouble().Should().Be(0.1);
+        root.GetProperty("messages")[0].GetProperty("role").GetString().Should().Be("system");
+        root.GetProperty("messages")[1].GetProperty("content").GetString().Should().Be("return json");
+    }
+
     [Fact(DisplayName = "AiApiClient stream should recover JSON from reasoning when content chunk is missing")]
     public async Task StreamCompleteAsync_OpenAi_ShouldRecoverJsonFromReasoning()
     {
@@ -614,6 +957,54 @@ public class AiApiClientMultimodalTests : IDisposable
             Options.Create(new AiGenerationOptions()),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiConfigStore>>(),
             dir);
+    }
+
+    private static HttpResponseMessage CreateOpenAiJsonResponse()
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "{\"ok\":true}"
+                  }
+                }
+              ]
+            }
+            """, Encoding.UTF8, "application/json")
+        };
+    }
+
+    private static HttpResponseMessage CreateOpenAiSseResponse()
+    {
+        var ssePayload = string.Join("\n",
+        [
+            "data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"ok\\\":true}\"}}]}",
+            "",
+            "data: [DONE]",
+            ""
+        ]);
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ssePayload, Encoding.UTF8, "text/event-stream")
+        };
+    }
+
+    private static HttpResponseMessage CreateAnthropicJsonResponse()
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""
+            {
+              "content": [
+                { "type": "text", "text": "{\"ok\":true}" }
+              ]
+            }
+            """, Encoding.UTF8, "application/json")
+        };
     }
 
     private static string CreateTinyPngFile()

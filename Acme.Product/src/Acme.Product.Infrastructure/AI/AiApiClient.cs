@@ -61,14 +61,20 @@ public class AiApiClient
         List<object> apiMessages,
         AiGenerationOptions options,
         bool stream,
-        AiReasoningSupportInfo support)
+        AiReasoningSupportInfo support,
+        AiModelCapabilities capabilities,
+        bool includeModel = true)
     {
         var isReasonerPayload = support.FamilyId == AiReasoningModelFamilyCatalog.FamilyDeepSeekReasonerLocked;
         var reasoningPayload = ResolveOpenAiReasoningPayload(options, support);
         var body = CreateObjectMap(
-            ("model", options.Model),
             ("max_tokens", isReasonerPayload ? Math.Max(options.MaxTokens, 8192) : options.MaxTokens),
             ("messages", apiMessages));
+        if (includeModel)
+        {
+            body["model"] = options.Model;
+        }
+
         if (!isReasonerPayload)
         {
             if (reasoningPayload.AllowTemperature)
@@ -76,14 +82,17 @@ public class AiApiClient
                 body["temperature"] = options.Temperature;
             }
 
-            body["response_format"] = CreateObjectMap(("type", "json_object"));
+            if (capabilities.SupportsJsonMode)
+            {
+                body["response_format"] = CreateObjectMap(("type", "json_object"));
+            }
         }
 
         if (stream)
         {
             body["stream"] = true;
             // Anthropic uses message_start/message_delta for usage, not stream_options
-            if (!string.Equals(options.Protocol, "anthropic", StringComparison.OrdinalIgnoreCase))
+            if (capabilities.SupportsStreamOptions)
             {
                 body["stream_options"] = CreateObjectMap(("include_usage", true));
             }
@@ -141,6 +150,10 @@ public class AiApiClient
                 if (mode == AiReasoningModes.On)
                 {
                     body["thinking"] = CreateObjectMap(("type", "enabled"));
+                }
+                else if (mode == AiReasoningModes.Off)
+                {
+                    body["thinking"] = CreateObjectMap(("type", "disabled"));
                 }
                 break;
             case AiReasoningModelFamilyCatalog.FamilyGlmToggle:
@@ -227,6 +240,19 @@ public class AiApiClient
         }
     }
 
+    private static int ReadIntPropertyOrZero(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.Number ||
+            !property.TryGetInt32(out var value))
+        {
+            return 0;
+        }
+
+        return value;
+    }
+
     private static void MergeAdditionalBody(Dictionary<string, object?> body, Dictionary<string, JsonElement>? extraBody)
     {
         if (extraBody == null || extraBody.Count == 0)
@@ -296,24 +322,102 @@ public class AiApiClient
         if (!string.IsNullOrWhiteSpace(options.BaseUrl))
         {
             apiUrl = options.BaseUrl.Trim();
-            if (!apiUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+            if (!UrlPathEndsWith(apiUrl, "/chat/completions"))
             {
-                if (!apiUrl.EndsWith("/"))
+                if (!UrlPathContains(apiUrl, "/v1/") &&
+                    !UrlPathEndsWith(apiUrl, "/v1"))
                 {
-                    apiUrl += "/";
+                    apiUrl = AppendPathSegment(apiUrl, "v1");
                 }
 
-                if (!apiUrl.Contains("/v1/", StringComparison.OrdinalIgnoreCase) &&
-                    !apiUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-                {
-                    apiUrl += "v1/";
-                }
-
-                apiUrl += "chat/completions";
+                apiUrl = AppendPathSegment(apiUrl, "chat/completions");
             }
         }
 
         return AppendQueryParameters(apiUrl, options.ExtraQuery);
+    }
+
+    private static string BuildAzureOpenAiApiUrl(AiGenerationOptions options)
+    {
+        var apiUrl = options.BaseUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(apiUrl))
+        {
+            throw new InvalidOperationException("Azure OpenAI 协议需要配置 BaseUrl。");
+        }
+
+        if (!UrlPathEndsWith(apiUrl, "/chat/completions"))
+        {
+            if (UrlPathContains(apiUrl, "/openai/deployments/"))
+            {
+                apiUrl = AppendPathSegment(apiUrl, "chat/completions");
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(options.Model))
+                    throw new InvalidOperationException("Azure OpenAI 协议需要将模型字段配置为 DeploymentName。");
+
+                apiUrl = AppendPathSegment(apiUrl, $"openai/deployments/{Uri.EscapeDataString(options.Model.Trim())}/chat/completions");
+            }
+        }
+
+        var extraQuery = options.ExtraQuery == null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(options.ExtraQuery, StringComparer.OrdinalIgnoreCase);
+        if (!apiUrl.Contains("api-version=", StringComparison.OrdinalIgnoreCase) &&
+            !extraQuery.ContainsKey("api-version"))
+        {
+            extraQuery["api-version"] = "2024-02-15-preview";
+        }
+
+        return AppendQueryParameters(apiUrl, extraQuery);
+    }
+
+    private static string BuildOllamaChatApiUrl(AiGenerationOptions options)
+    {
+        var apiUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
+            ? "http://localhost:11434"
+            : options.BaseUrl!.Trim();
+
+        if (!UrlPathEndsWith(apiUrl, "/api/chat"))
+        {
+            apiUrl = AppendPathSegment(apiUrl, "api/chat");
+        }
+
+        return AppendQueryParameters(apiUrl, options.ExtraQuery);
+    }
+
+    private static string ResolveProtocol(AiGenerationOptions options)
+    {
+        return AiModelConfig.NormalizeProtocol(options.Protocol, options.Provider);
+    }
+
+    private static AiModelCapabilities ResolveCapabilities(AiGenerationOptions options)
+    {
+        return (options.Capabilities?.Clone() ?? AiModelCapabilities.Infer(options.Provider, options.Model)).Normalize();
+    }
+
+    private static bool UrlPathEndsWith(string url, string suffix)
+    {
+        return GetUrlWithoutQuery(url).TrimEnd('/').EndsWith(suffix.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool UrlPathContains(string url, string value)
+    {
+        return GetUrlWithoutQuery(url).Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetUrlWithoutQuery(string url)
+    {
+        var queryIndex = url.IndexOf('?', StringComparison.Ordinal);
+        return queryIndex < 0 ? url : url[..queryIndex];
+    }
+
+    private static string AppendPathSegment(string url, string segment)
+    {
+        var queryIndex = url.IndexOf('?', StringComparison.Ordinal);
+        var path = queryIndex < 0 ? url : url[..queryIndex];
+        var query = queryIndex < 0 ? string.Empty : url[queryIndex..];
+        return $"{path.TrimEnd('/')}/{segment.TrimStart('/')}{query}";
     }
 
     private static string AppendQueryParameters(string url, Dictionary<string, string>? extraQuery)
@@ -449,18 +553,23 @@ public class AiApiClient
         CancellationToken cancellationToken = default)
     {
         var currentOptions = options ?? _configStore.Get();
-        var providerKey = currentOptions.Provider.ToLowerInvariant();
-        if (providerKey.Contains("anthropic"))
+        var protocol = ResolveProtocol(currentOptions);
+        if (protocol == AiModelConfig.ProtocolAnthropic)
         {
             return await CallAnthropicAsync(systemPrompt, messages, currentOptions, cancellationToken);
         }
 
-        if (providerKey.Contains("openai"))
+        if (protocol == AiModelConfig.ProtocolOllamaNative)
+        {
+            return await CallOllamaAsync(systemPrompt, messages, currentOptions, cancellationToken);
+        }
+
+        if (protocol is AiModelConfig.ProtocolOpenAiCompatible or AiModelConfig.ProtocolAzureOpenAi)
         {
             return await CallOpenAiAsync(systemPrompt, messages, currentOptions, cancellationToken);
         }
 
-        throw new InvalidOperationException($"不支持的 AI 提供商：{currentOptions.Provider}");
+        throw new InvalidOperationException($"不支持的 AI 协议：{protocol}");
     }
 
     /// <summary>
@@ -474,18 +583,41 @@ public class AiApiClient
         CancellationToken cancellationToken = default)
     {
         var currentOptions = options ?? _configStore.Get();
-        var providerKey = currentOptions.Provider.ToLowerInvariant();
-        if (providerKey.Contains("anthropic"))
+        var protocol = ResolveProtocol(currentOptions);
+        var capabilities = ResolveCapabilities(currentOptions);
+        if (!capabilities.SupportsStreaming)
+        {
+            var completion = await CompleteAsync(systemPrompt, messages, currentOptions, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(completion.Reasoning))
+            {
+                onChunk(new AiStreamChunk(AiStreamChunkType.Thinking, completion.Reasoning));
+            }
+
+            if (!string.IsNullOrWhiteSpace(completion.Content))
+            {
+                onChunk(new AiStreamChunk(AiStreamChunkType.Content, completion.Content));
+            }
+
+            onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
+            return completion;
+        }
+
+        if (protocol == AiModelConfig.ProtocolAnthropic)
         {
             return await StreamAnthropicAsync(systemPrompt, messages, currentOptions, onChunk, cancellationToken);
         }
 
-        if (providerKey.Contains("openai"))
+        if (protocol == AiModelConfig.ProtocolOllamaNative)
+        {
+            return await StreamOllamaAsync(systemPrompt, messages, currentOptions, onChunk, cancellationToken);
+        }
+
+        if (protocol is AiModelConfig.ProtocolOpenAiCompatible or AiModelConfig.ProtocolAzureOpenAi)
         {
             return await StreamOpenAiAsync(systemPrompt, messages, currentOptions, onChunk, cancellationToken);
         }
 
-        throw new InvalidOperationException($"不支持的 AI 提供商：{currentOptions.Provider}");
+        throw new InvalidOperationException($"不支持的 AI 协议：{protocol}");
     }
 
     private async Task<AiCompletionResult> CallAnthropicAsync(
@@ -540,12 +672,13 @@ public class AiApiClient
         }
 
         AiTokenUsage? tokenUsage = null;
-        if (doc.RootElement.TryGetProperty("usage", out var anthropicUsage))
+        if (doc.RootElement.TryGetProperty("usage", out var anthropicUsage) &&
+            anthropicUsage.ValueKind == JsonValueKind.Object)
         {
             tokenUsage = new AiTokenUsage
             {
-                InputTokens = anthropicUsage.TryGetProperty("input_tokens", out var it) ? it.GetInt32() : 0,
-                OutputTokens = anthropicUsage.TryGetProperty("output_tokens", out var ot) ? ot.GetInt32() : 0
+                InputTokens = ReadIntPropertyOrZero(anthropicUsage, "input_tokens"),
+                OutputTokens = ReadIntPropertyOrZero(anthropicUsage, "output_tokens")
             };
         }
 
@@ -581,16 +714,16 @@ public class AiApiClient
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
 
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
         using var reader = new StreamReader(stream);
 
         var fullContent = new StringBuilder();
         var fullReasoning = new StringBuilder();
         AiTokenUsage? tokenUsage = null;
 
-        while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+        while (!reader.EndOfStream && !cts.Token.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
+            var line = await reader.ReadLineAsync(cts.Token);
             if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                 continue;
 
@@ -624,15 +757,17 @@ public class AiApiClient
                 }
                 // Anthropic sends usage in message_start (input_tokens) and message_delta (output_tokens)
                 else if (type == "message_start" && root.TryGetProperty("message", out var msgEl)
-                    && msgEl.TryGetProperty("usage", out var startUsage))
+                    && msgEl.TryGetProperty("usage", out var startUsage)
+                    && startUsage.ValueKind == JsonValueKind.Object)
                 {
                     tokenUsage ??= new AiTokenUsage();
-                    tokenUsage.InputTokens = startUsage.TryGetProperty("input_tokens", out var it) ? it.GetInt32() : 0;
+                    tokenUsage.InputTokens = ReadIntPropertyOrZero(startUsage, "input_tokens");
                 }
-                else if (type == "message_delta" && root.TryGetProperty("usage", out var deltaUsage))
+                else if (type == "message_delta" && root.TryGetProperty("usage", out var deltaUsage)
+                    && deltaUsage.ValueKind == JsonValueKind.Object)
                 {
                     tokenUsage ??= new AiTokenUsage();
-                    tokenUsage.OutputTokens = deltaUsage.TryGetProperty("output_tokens", out var ot) ? ot.GetInt32() : 0;
+                    tokenUsage.OutputTokens = ReadIntPropertyOrZero(deltaUsage, "output_tokens");
                 }
             }
             catch (JsonException) { }
@@ -658,39 +793,28 @@ public class AiApiClient
         // 判断是否为推理模型（如 deepseek-reasoner）
         var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
         var isReasonerModel = support.FamilyId == AiReasoningModelFamilyCatalog.FamilyDeepSeekReasonerLocked;
+        var protocol = ResolveProtocol(options);
+        var capabilities = ResolveCapabilities(options);
 
         // 推理模型不支持 response_format 和 temperature 参数
         // 推理模型的 max_tokens 包含推理 token，需要更多配额
-        var requestBody = BuildOpenAiRequestBody(apiMessages, options, stream: false, support);
-        
+        var requestBody = BuildOpenAiRequestBody(
+            apiMessages,
+            options,
+            stream: false,
+            support,
+            capabilities,
+            includeModel: protocol != AiModelConfig.ProtocolAzureOpenAi);
 
-        var apiUrl = "https://api.openai.com/v1/chat/completions";
-        if (!string.IsNullOrWhiteSpace(options.BaseUrl))
-        {
-            apiUrl = options.BaseUrl.Trim();
-            // 如果用户填写的 URL 不包含完整的端点路径，自动补齐
-            if (!apiUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!apiUrl.EndsWith("/"))
-                {
-                    apiUrl += "/";
-                }
-
-                // 兼容有些用户只填到域名，有些填了 v1 的情况
-                // 通常 OpenAI 兼容协议都支持 /v1/chat/completions，如果已经有 v1 则不加
-                if (!apiUrl.Contains("/v1/", StringComparison.OrdinalIgnoreCase) &&
-                    !apiUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-                {
-                    apiUrl += "v1/";
-                }
-
-                apiUrl += "chat/completions";
-            }
-        }
-
-        apiUrl = BuildOpenAiApiUrl(options);
+        var apiUrl = protocol == AiModelConfig.ProtocolAzureOpenAi
+            ? BuildAzureOpenAiApiUrl(options)
+            : BuildOpenAiApiUrl(options);
         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl);
-        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeBearer, "Authorization");
+        ApplyAuthHeaders(
+            request,
+            options,
+            protocol == AiModelConfig.ProtocolAzureOpenAi ? AiModelConfig.AuthModeHeaderKey : AiModelConfig.AuthModeBearer,
+            protocol == AiModelConfig.ProtocolAzureOpenAi ? "api-key" : "Authorization");
         request.Content = new StringContent(
             JsonSerializer.Serialize(requestBody, _jsonOptions),
             Encoding.UTF8,
@@ -730,12 +854,13 @@ public class AiApiClient
         }
 
         AiTokenUsage? tokenUsage = null;
-        if (doc.RootElement.TryGetProperty("usage", out var openAiUsage))
+        if (doc.RootElement.TryGetProperty("usage", out var openAiUsage) &&
+            openAiUsage.ValueKind == JsonValueKind.Object)
         {
             tokenUsage = new AiTokenUsage
             {
-                InputTokens = openAiUsage.TryGetProperty("prompt_tokens", out var pt) ? pt.GetInt32() : 0,
-                OutputTokens = openAiUsage.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : 0
+                InputTokens = ReadIntPropertyOrZero(openAiUsage, "prompt_tokens"),
+                OutputTokens = ReadIntPropertyOrZero(openAiUsage, "completion_tokens")
             };
         }
 
@@ -759,25 +884,25 @@ public class AiApiClient
 
         var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
         var isReasonerModel = support.FamilyId == AiReasoningModelFamilyCatalog.FamilyDeepSeekReasonerLocked;
-        var requestBody = BuildOpenAiRequestBody(apiMessages, options, stream: true, support);
+        var protocol = ResolveProtocol(options);
+        var capabilities = ResolveCapabilities(options);
+        var requestBody = BuildOpenAiRequestBody(
+            apiMessages,
+            options,
+            stream: true,
+            support,
+            capabilities,
+            includeModel: protocol != AiModelConfig.ProtocolAzureOpenAi);
 
-        var apiUrl = "https://api.openai.com/v1/chat/completions";
-        if (!string.IsNullOrWhiteSpace(options.BaseUrl))
-        {
-            apiUrl = options.BaseUrl.Trim();
-            if (!apiUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!apiUrl.EndsWith("/"))
-                    apiUrl += "/";
-                if (!apiUrl.Contains("/v1/", StringComparison.OrdinalIgnoreCase) && !apiUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-                    apiUrl += "v1/";
-                apiUrl += "chat/completions";
-            }
-        }
-
-        apiUrl = BuildOpenAiApiUrl(options);
+        var apiUrl = protocol == AiModelConfig.ProtocolAzureOpenAi
+            ? BuildAzureOpenAiApiUrl(options)
+            : BuildOpenAiApiUrl(options);
         var request = new HttpRequestMessage(HttpMethod.Post, apiUrl);
-        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeBearer, "Authorization");
+        ApplyAuthHeaders(
+            request,
+            options,
+            protocol == AiModelConfig.ProtocolAzureOpenAi ? AiModelConfig.AuthModeHeaderKey : AiModelConfig.AuthModeBearer,
+            protocol == AiModelConfig.ProtocolAzureOpenAi ? "api-key" : "Authorization");
         request.Content = new StringContent(JsonSerializer.Serialize(requestBody, _jsonOptions), Encoding.UTF8, "application/json");
         ApplyExtraHeaders(request, options.ExtraHeaders);
 
@@ -788,7 +913,7 @@ public class AiApiClient
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
 
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
         using var reader = new StreamReader(stream);
 
         var fullContent = new StringBuilder();
@@ -797,9 +922,9 @@ public class AiApiClient
         var sawSsePayload = false;
         AiTokenUsage? tokenUsage = null;
 
-        while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+        while (!reader.EndOfStream && !cts.Token.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
+            var line = await reader.ReadLineAsync(cts.Token);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
@@ -836,12 +961,13 @@ public class AiApiClient
                 }
 
                 // Extract token usage from streaming chunks (sent in last chunk when stream_options.include_usage=true)
-                if (doc.RootElement.TryGetProperty("usage", out var streamUsage))
+                if (doc.RootElement.TryGetProperty("usage", out var streamUsage) &&
+                    streamUsage.ValueKind == JsonValueKind.Object)
                 {
                     tokenUsage = new AiTokenUsage
                     {
-                        InputTokens = streamUsage.TryGetProperty("prompt_tokens", out var spt) ? spt.GetInt32() : 0,
-                        OutputTokens = streamUsage.TryGetProperty("completion_tokens", out var sct) ? sct.GetInt32() : 0
+                        InputTokens = ReadIntPropertyOrZero(streamUsage, "prompt_tokens"),
+                        OutputTokens = ReadIntPropertyOrZero(streamUsage, "completion_tokens")
                     };
                 }
             }
@@ -874,7 +1000,7 @@ public class AiApiClient
                 // Last resort: if stream returned no content chunk at all, fallback to non-stream call once.
                 try
                 {
-                    var fallback = await CallOpenAiAsync(systemPrompt, messages, options, cancellationToken);
+                    var fallback = await CallOpenAiAsync(systemPrompt, messages, options, cts.Token);
                     if (!string.IsNullOrWhiteSpace(fallback.Content))
                     {
                         fullContent.Append(fallback.Content);
@@ -895,6 +1021,158 @@ public class AiApiClient
 
         onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
         return new AiCompletionResult { Content = fullContent.ToString(), Reasoning = fullReasoning.ToString(), TokenUsage = tokenUsage };
+    }
+
+    private async Task<AiCompletionResult> CallOllamaAsync(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        AiGenerationOptions options,
+        CancellationToken cancellationToken)
+    {
+        var requestBody = BuildOllamaRequestBody(systemPrompt, messages, options, stream: false);
+        var request = new HttpRequestMessage(HttpMethod.Post, BuildOllamaChatApiUrl(options));
+        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeNone, "Authorization");
+        request.Content = new StringContent(JsonSerializer.Serialize(requestBody, _jsonOptions), Encoding.UTF8, "application/json");
+        ApplyExtraHeaders(request, options.ExtraHeaders);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
+
+        using var response = await _httpClient.SendAsync(request, cts.Token);
+        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
+
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = JsonDocument.Parse(responseJson);
+        if (!TryExtractOllamaContent(doc.RootElement, out var content) || string.IsNullOrWhiteSpace(content))
+        {
+            throw new InvalidOperationException("AI 返回了空响应");
+        }
+
+        return new AiCompletionResult { Content = content };
+    }
+
+    private async Task<AiCompletionResult> StreamOllamaAsync(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        AiGenerationOptions options,
+        Action<AiStreamChunk> onChunk,
+        CancellationToken cancellationToken)
+    {
+        var requestBody = BuildOllamaRequestBody(systemPrompt, messages, options, stream: true);
+        var request = new HttpRequestMessage(HttpMethod.Post, BuildOllamaChatApiUrl(options));
+        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeNone, "Authorization");
+        request.Content = new StringContent(JsonSerializer.Serialize(requestBody, _jsonOptions), Encoding.UTF8, "application/json");
+        ApplyExtraHeaders(request, options.ExtraHeaders);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
+
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
+
+        using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+        using var reader = new StreamReader(stream);
+        var fullContent = new StringBuilder();
+
+        while (!reader.EndOfStream && !cts.Token.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(cts.Token);
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(line);
+                if (TryExtractOllamaContent(doc.RootElement, out var chunk) && !string.IsNullOrEmpty(chunk))
+                {
+                    fullContent.Append(chunk);
+                    onChunk(new AiStreamChunk(AiStreamChunkType.Content, chunk));
+                }
+
+                if (doc.RootElement.TryGetProperty("done", out var doneEl) &&
+                    doneEl.ValueKind == JsonValueKind.True)
+                {
+                    break;
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore malformed stream lines; Ollama sends one JSON object per line.
+            }
+        }
+
+        onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
+        return new AiCompletionResult { Content = fullContent.ToString() };
+    }
+
+    private static Dictionary<string, object?> BuildOllamaRequestBody(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        AiGenerationOptions options,
+        bool stream)
+    {
+        var capabilities = ResolveCapabilities(options);
+        var body = CreateObjectMap(
+            ("model", options.Model),
+            ("messages", BuildOllamaMessages(systemPrompt, messages)),
+            ("stream", stream),
+            ("options", CreateObjectMap(("temperature", options.Temperature))));
+
+        if (capabilities.SupportsJsonMode)
+        {
+            body["format"] = "json";
+        }
+
+        MergeAdditionalBody(body, options.ExtraBody);
+        return body;
+    }
+
+    private static List<object> BuildOllamaMessages(string systemPrompt, List<ChatMessage> messages)
+    {
+        var apiMessages = new List<object>();
+        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        {
+            apiMessages.Add(new { role = "system", content = systemPrompt });
+        }
+
+        apiMessages.AddRange(messages.Select(message => new
+        {
+            role = message.Role,
+            content = ExtractChatMessageText(message)
+        }));
+        return apiMessages;
+    }
+
+    private static string ExtractChatMessageText(ChatMessage message)
+    {
+        if (!message.HasRichContent)
+            return message.Content;
+
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(message.Content))
+            parts.Add(message.Content);
+
+        if (message.Parts != null)
+        {
+            parts.AddRange(message.Parts
+                .Where(part => part.Type == ChatContentPartType.Text && !string.IsNullOrWhiteSpace(part.Text))
+                .Select(part => part.Text!));
+        }
+
+        return string.Join("\n", parts);
+    }
+
+    private static bool TryExtractOllamaContent(JsonElement root, out string content)
+    {
+        content = string.Empty;
+        if (root.TryGetProperty("message", out var message) &&
+            message.ValueKind == JsonValueKind.Object &&
+            TryExtractTextProperty(message, "content", out content))
+        {
+            return !string.IsNullOrEmpty(content);
+        }
+
+        return TryExtractTextProperty(root, "response", out content) && !string.IsNullOrEmpty(content);
     }
 
     // 保留旧方法以兼容

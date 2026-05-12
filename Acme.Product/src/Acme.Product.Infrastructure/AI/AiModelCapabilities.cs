@@ -11,6 +11,7 @@ namespace Acme.Product.Infrastructure.AI;
 public class AiModelCapabilities
 {
     public bool SupportsStreaming { get; set; } = true;
+    public bool SupportsStreamOptions { get; set; } = true;
     public bool SupportsVisionInput { get; set; } = true;
     public bool SupportsReasoningStream { get; set; }
     public bool SupportsJsonMode { get; set; } = true;
@@ -24,6 +25,7 @@ public class AiModelCapabilities
         return new AiModelCapabilities
         {
             SupportsStreaming = SupportsStreaming,
+            SupportsStreamOptions = SupportsStreamOptions,
             SupportsVisionInput = SupportsVisionInput,
             SupportsReasoningStream = SupportsReasoningStream,
             SupportsJsonMode = SupportsJsonMode,

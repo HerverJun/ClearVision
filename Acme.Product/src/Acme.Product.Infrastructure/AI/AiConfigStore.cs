@@ -534,6 +534,7 @@ public class AiConfigStore
         ExtraHeaders = CloneStringDictionary(options.ExtraHeaders),
         ExtraQuery = CloneStringDictionary(options.ExtraQuery),
         ExtraBody = CloneJsonDictionary(options.ExtraBody),
+        Capabilities = options.Capabilities?.Clone(),
         ReasoningMode = options.ReasoningMode,
         ReasoningEffort = options.ReasoningEffort
     };
