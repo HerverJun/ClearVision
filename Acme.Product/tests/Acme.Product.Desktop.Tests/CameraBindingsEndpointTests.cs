@@ -29,7 +29,20 @@ public class CameraBindingsEndpointTests
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
         {
             new() { Id = "cam-connected", DisplayName = "Connected", SerialNumber = "SN-CONNECTED", IpAddress = "10.0.0.1", IsEnabled = true, TriggerMode = "Hardware" },
-            new() { Id = "cam-online", DisplayName = "Online", SerialNumber = "SN-ONLINE", IpAddress = "10.0.0.2", IsEnabled = true },
+            new()
+            {
+                Id = "cam-online",
+                DisplayName = "Online",
+                SerialNumber = "SN-ONLINE",
+                IpAddress = "10.0.0.2",
+                IsEnabled = true,
+                TriggerMode = "Software",
+                SoftwareTriggerSource = "KeyboardEnter",
+                EnterPhotoelectricDebounceMs = 75,
+                EnterPhotoelectricTimeoutMs = 12000,
+                EnterPhotoelectricDeviceId = @"\\?\HID#VID_TEST",
+                IgnoreEnterTriggerWhileBusy = false
+            },
             new() { Id = "cam-offline", DisplayName = "Offline", SerialNumber = "SN-OFFLINE", IpAddress = "10.0.0.3", IsEnabled = true },
             new() { Id = "cam-disabled", DisplayName = "Disabled", SerialNumber = "SN-DISABLED", IpAddress = "10.0.0.4", IsEnabled = false },
             new() { Id = "cam-unbound", DisplayName = "Unbound", SerialNumber = "", IpAddress = "", IsEnabled = true }
@@ -57,6 +70,11 @@ public class CameraBindingsEndpointTests
         GetProperty(FindById(items, "cam-connected"), "IpAddress", "ipAddress").GetString().Should().Be("10.0.0.1");
         GetProperty(FindById(items, "cam-connected"), "TriggerMode", "triggerMode").GetString().Should().Be("External");
         GetProperty(FindById(items, "cam-connected"), "TargetFrameRateFps", "targetFrameRateFps").GetInt32().Should().Be(10);
+        GetProperty(FindById(items, "cam-online"), "SoftwareTriggerSource", "softwareTriggerSource").GetString().Should().Be("EnterPhotoelectric");
+        GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricDebounceMs", "enterPhotoelectricDebounceMs").GetInt32().Should().Be(75);
+        GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricTimeoutMs", "enterPhotoelectricTimeoutMs").GetInt32().Should().Be(12000);
+        GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricDeviceId", "enterPhotoelectricDeviceId").GetString().Should().Be(@"\\?\HID#VID_TEST");
+        GetProperty(FindById(items, "cam-online"), "IgnoreEnterTriggerWhileBusy", "ignoreEnterTriggerWhileBusy").GetBoolean().Should().BeFalse();
         GetProperty(FindById(items, "cam-online"), "ConnectionStatus", "connectionStatus").GetString().Should().Be("Online");
         GetProperty(FindById(items, "cam-offline"), "ConnectionStatus", "connectionStatus").GetString().Should().Be("Offline");
         GetProperty(FindById(items, "cam-disabled"), "ConnectionStatus", "connectionStatus").GetString().Should().Be("Disabled");
@@ -103,6 +121,7 @@ public class CameraBindingsEndpointTests
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton(cameraManager);
             builder.Services.AddSingleton(Substitute.For<ICameraFrameStreamCoordinator>());
+            builder.Services.AddSingleton(Substitute.For<ITriggerInputService>());
 
             var configService = Substitute.For<IConfigurationService>();
             configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));

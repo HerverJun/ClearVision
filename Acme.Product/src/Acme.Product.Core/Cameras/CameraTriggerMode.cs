@@ -9,6 +9,12 @@ public enum CameraTriggerMode
     Continuous = 2
 }
 
+public enum CameraSoftwareTriggerSource
+{
+    Manual = 0,
+    EnterPhotoelectric = 1
+}
+
 public static class CameraTriggerModeExtensions
 {
     public const int DefaultTargetFrameRateFps = 10;
@@ -66,4 +72,71 @@ public static class CameraTriggerModeExtensions
             || (!string.IsNullOrWhiteSpace(binding.SerialNumber)
                 && binding.SerialNumber.Equals(normalized, StringComparison.OrdinalIgnoreCase)));
     }
+}
+
+public static class CameraSoftwareTriggerSourceExtensions
+{
+    public const int DefaultEnterPhotoelectricDebounceMs = 200;
+    public const int MinEnterPhotoelectricDebounceMs = 0;
+    public const int MaxEnterPhotoelectricDebounceMs = 5000;
+    public const int DefaultEnterPhotoelectricTimeoutMs = 30000;
+    public const int MinEnterPhotoelectricTimeoutMs = 100;
+    public const int MaxEnterPhotoelectricTimeoutMs = 600000;
+
+    public static CameraSoftwareTriggerSource Normalize(string? rawSource)
+    {
+        if (string.IsNullOrWhiteSpace(rawSource))
+        {
+            return CameraSoftwareTriggerSource.Manual;
+        }
+
+        return rawSource.Trim().ToLowerInvariant() switch
+        {
+            "enterphotoelectric" => CameraSoftwareTriggerSource.EnterPhotoelectric,
+            "keyboardenter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
+            "usbenter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
+            "enter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
+            "photoelectricenter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
+            _ => CameraSoftwareTriggerSource.Manual
+        };
+    }
+
+    public static string ToConfigValue(this CameraSoftwareTriggerSource source) => source switch
+    {
+        CameraSoftwareTriggerSource.EnterPhotoelectric => nameof(CameraSoftwareTriggerSource.EnterPhotoelectric),
+        _ => nameof(CameraSoftwareTriggerSource.Manual)
+    };
+
+    public static int NormalizeEnterPhotoelectricDebounceMs(int debounceMs) =>
+        Math.Clamp(debounceMs, MinEnterPhotoelectricDebounceMs, MaxEnterPhotoelectricDebounceMs);
+
+    public static int NormalizeEnterPhotoelectricTimeoutMs(int timeoutMs)
+    {
+        if (timeoutMs <= 0)
+        {
+            return DefaultEnterPhotoelectricTimeoutMs;
+        }
+
+        return Math.Clamp(timeoutMs, MinEnterPhotoelectricTimeoutMs, MaxEnterPhotoelectricTimeoutMs);
+    }
+
+    public static bool UsesEnterPhotoelectricTrigger(this CameraBindingConfig? binding)
+    {
+        if (binding == null)
+        {
+            return false;
+        }
+
+        return CameraTriggerModeExtensions.Normalize(binding.TriggerMode) == CameraTriggerMode.Software &&
+               Normalize(binding.SoftwareTriggerSource) == CameraSoftwareTriggerSource.EnterPhotoelectric;
+    }
+
+    public static EnterPhotoelectricTriggerOptions ToEnterPhotoelectricTriggerOptions(this CameraBindingConfig binding) =>
+        new(
+            binding.Id,
+            binding.DisplayName,
+            binding.EnterPhotoelectricDeviceId,
+            NormalizeEnterPhotoelectricDebounceMs(binding.EnterPhotoelectricDebounceMs),
+            NormalizeEnterPhotoelectricTimeoutMs(binding.EnterPhotoelectricTimeoutMs),
+            binding.IgnoreEnterTriggerWhileBusy);
 }

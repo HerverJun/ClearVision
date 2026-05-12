@@ -13,6 +13,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     private static readonly TimeSpan DirectAcquireIdleTimeout = TimeSpan.FromSeconds(5);
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<CameraFrameStreamCoordinator> _logger;
+    private readonly ITriggerInputService _triggerInputService;
     private readonly ConcurrentDictionary<string, ProducerEntry> _producers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, PreviewSessionState> _previewSessions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -59,15 +60,25 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         double ExposureTimeUs,
         double GainDb,
         CameraTriggerMode TriggerMode,
+        EnterPhotoelectricTriggerOptions? EnterPhotoelectricTrigger,
         int TargetFrameRateFps,
         int FrameBufferCapacity);
 
     public CameraFrameStreamCoordinator(
         ICameraManager cameraManager,
         ILogger<CameraFrameStreamCoordinator> logger)
+        : this(cameraManager, logger, NoOpTriggerInputService.Instance)
+    {
+    }
+
+    public CameraFrameStreamCoordinator(
+        ICameraManager cameraManager,
+        ILogger<CameraFrameStreamCoordinator> logger,
+        ITriggerInputService triggerInputService)
     {
         _cameraManager = cameraManager;
         _logger = logger;
+        _triggerInputService = triggerInputService;
     }
 
     public async Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -347,6 +358,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 5000.0,
                 1.0,
                 CameraTriggerMode.Software,
+                null,
                 CameraTriggerModeExtensions.DefaultTargetFrameRateFps,
                 24);
         }
@@ -358,6 +370,9 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             binding.ExposureTimeUs,
             binding.GainDb,
             CameraTriggerModeExtensions.Normalize(binding.TriggerMode),
+            binding.UsesEnterPhotoelectricTrigger()
+                ? binding.ToEnterPhotoelectricTriggerOptions()
+                : null,
             CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps),
             ResolveHistoryCapacity(binding));
     }
@@ -595,6 +610,13 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         if (camera is IIndustrialCamera industrialCamera)
         {
             await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
+        }
+
+        if (binding.EnterPhotoelectricTrigger != null)
+        {
+            await _triggerInputService.WaitForEnterPhotoelectricAsync(
+                binding.EnterPhotoelectricTrigger,
+                cancellationToken);
         }
 
         var imageData = await camera.AcquireSingleFrameAsync();

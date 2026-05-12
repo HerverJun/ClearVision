@@ -198,7 +198,7 @@ static class Program
                 cameraManager.LoadBindings(config.Cameras, config.ActiveCameraId);
             }
 
-            var wwwrootPath = GetWwwRootPath();
+            var wwwrootPath = DesktopWebRootResolver.Resolve();
             if (Directory.Exists(wwwrootPath))
             {
                 var provider = new PhysicalFileProvider(wwwrootPath);
@@ -207,7 +207,18 @@ static class Program
                     FileProvider = provider,
                     DefaultFileNames = new List<string> { "index.html" }
                 });
-                app.UseStaticFiles(new StaticFileOptions { FileProvider = provider });
+
+                var staticFileOptions = new StaticFileOptions { FileProvider = provider };
+#if DEBUG
+                staticFileOptions.OnPrepareResponse = context =>
+                {
+                    context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+                    context.Context.Response.Headers.Pragma = "no-cache";
+                    context.Context.Response.Headers.Expires = "0";
+                };
+#endif
+                app.UseStaticFiles(staticFileOptions);
+                Debug.WriteLine($"静态资源目录: {wwwrootPath}");
             }
 
             app.UseCors();
@@ -316,18 +327,6 @@ static class Program
         {
             return true;
         }
-    }
-
-    static string GetWwwRootPath()
-    {
-        var basePath = AppContext.BaseDirectory;
-        var devPath = Path.Combine(basePath, "..", "..", "..", "wwwroot");
-        if (Directory.Exists(devPath))
-        {
-            return Path.GetFullPath(devPath);
-        }
-
-        return Path.GetFullPath(Path.Combine(basePath, "wwwroot"));
     }
 
     public static int GetWebPort() => _webPort;

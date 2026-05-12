@@ -38,19 +38,30 @@ public class ImageAcquisitionOperator : OperatorBase
     public override OperatorType OperatorType => OperatorType.ImageAcquisition;
     private readonly ICameraManager _cameraManager;
     private readonly ICameraFrameStreamCoordinator _streamCoordinator;
+    private readonly ITriggerInputService _triggerInputService;
 
     public ImageAcquisitionOperator(ILogger<ImageAcquisitionOperator> logger, ICameraManager cameraManager)
-        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance)
+        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance)
     {
     }
 
     public ImageAcquisitionOperator(
         ILogger<ImageAcquisitionOperator> logger,
         ICameraManager cameraManager,
-        ICameraFrameStreamCoordinator streamCoordinator) : base(logger)
+        ICameraFrameStreamCoordinator streamCoordinator)
+        : this(logger, cameraManager, streamCoordinator, NoOpTriggerInputService.Instance)
+    {
+    }
+
+    public ImageAcquisitionOperator(
+        ILogger<ImageAcquisitionOperator> logger,
+        ICameraManager cameraManager,
+        ICameraFrameStreamCoordinator streamCoordinator,
+        ITriggerInputService triggerInputService) : base(logger)
     {
         _cameraManager = cameraManager;
         _streamCoordinator = streamCoordinator;
+        _triggerInputService = triggerInputService;
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -151,6 +162,13 @@ public class ImageAcquisitionOperator : OperatorBase
                     await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
                 }
 
+                if (bindingConfig?.UsesEnterPhotoelectricTrigger() == true)
+                {
+                    await _triggerInputService.WaitForEnterPhotoelectricAsync(
+                        bindingConfig.ToEnterPhotoelectricTriggerOptions(),
+                        cancellationToken);
+                }
+
                 // 采集图像
                 var imageData = await camera.AcquireSingleFrameAsync();
 
@@ -164,7 +182,7 @@ public class ImageAcquisitionOperator : OperatorBase
                 return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
                 {
                     { "Channels", mat.Channels() },
-                    { "Source", "camera" },
+                    { "Source", bindingConfig?.UsesEnterPhotoelectricTrigger() == true ? "enter-photoelectric" : "camera" },
                     { "CameraId", cameraId }
                 }));
             }

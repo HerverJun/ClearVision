@@ -33,6 +33,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     private const int MaxCacheSize = 50;
     private readonly ICameraManager _cameraManager;
     private readonly ICameraFrameStreamCoordinator _streamCoordinator;
+    private readonly ITriggerInputService _triggerInputService;
     private readonly ILogger<ImageAcquisitionService> _logger;
     private readonly Dictionary<Guid, Mat> _imageCache = new();
     private readonly LinkedList<Guid> _cacheOrder = new();
@@ -41,7 +42,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     private bool _disposed;
 
     public ImageAcquisitionService(ICameraManager cameraManager, ILogger<ImageAcquisitionService> logger)
-        : this(cameraManager, NoOpCameraFrameStreamCoordinator.Instance, logger)
+        : this(cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance, logger)
     {
     }
 
@@ -49,9 +50,19 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         ICameraManager cameraManager,
         ICameraFrameStreamCoordinator streamCoordinator,
         ILogger<ImageAcquisitionService> logger)
+        : this(cameraManager, streamCoordinator, NoOpTriggerInputService.Instance, logger)
+    {
+    }
+
+    public ImageAcquisitionService(
+        ICameraManager cameraManager,
+        ICameraFrameStreamCoordinator streamCoordinator,
+        ITriggerInputService triggerInputService,
+        ILogger<ImageAcquisitionService> logger)
     {
         _cameraManager = cameraManager;
         _streamCoordinator = streamCoordinator;
+        _triggerInputService = triggerInputService;
         _logger = logger;
     }
 
@@ -144,6 +155,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         try
         {
             await ApplyBindingSettingsAsync(camera, binding);
+            await WaitForConfiguredSoftwareTriggerAsync(binding, cancellationToken);
             var frameData = await camera.AcquireSingleFrameAsync();
             return await CreateCameraImageDtoAsync(binding?.Id ?? cameraId, frameData, null, null, cancellationToken);
         }
@@ -695,6 +707,20 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         {
             await industrialCamera.SetTriggerModeAsync(CameraTriggerModeExtensions.Normalize(binding.TriggerMode));
         }
+    }
+
+    private async Task WaitForConfiguredSoftwareTriggerAsync(
+        CameraBindingConfig? binding,
+        CancellationToken cancellationToken)
+    {
+        if (binding?.UsesEnterPhotoelectricTrigger() != true)
+        {
+            return;
+        }
+
+        await _triggerInputService.WaitForEnterPhotoelectricAsync(
+            binding.ToEnterPhotoelectricTriggerOptions(),
+            cancellationToken);
     }
 
     private async Task<ImageDto> CreateCameraImageDtoAsync(

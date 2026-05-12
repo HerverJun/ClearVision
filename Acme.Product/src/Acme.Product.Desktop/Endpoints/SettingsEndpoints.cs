@@ -366,6 +366,11 @@ public static class SettingsEndpoints
                     binding.ExposureTimeUs,
                     binding.GainDb,
                     binding.TriggerMode,
+                    binding.SoftwareTriggerSource,
+                    binding.EnterPhotoelectricDebounceMs,
+                    binding.EnterPhotoelectricTimeoutMs,
+                    binding.IgnoreEnterTriggerWhileBusy,
+                    binding.EnterPhotoelectricDeviceId,
                     binding.TargetFrameRateFps,
                     ConnectionStatus = connectionStatus
                 };
@@ -404,7 +409,8 @@ public static class SettingsEndpoints
         app.MapPost("/api/cameras/soft-trigger-capture", async (
             CameraSoftTriggerCaptureRequest request,
             HttpContext context,
-            Acme.Product.Core.Cameras.ICameraManager cameraManager) =>
+            Acme.Product.Core.Cameras.ICameraManager cameraManager,
+            ITriggerInputService triggerInputService) =>
         {
             if (string.IsNullOrWhiteSpace(request.CameraBindingId))
             {
@@ -427,6 +433,13 @@ public static class SettingsEndpoints
                 await camera.SetExposureTimeAsync(binding.ExposureTimeUs);
                 await camera.SetGainAsync(binding.GainDb);
 
+                if (binding.UsesEnterPhotoelectricTrigger())
+                {
+                    await triggerInputService.WaitForEnterPhotoelectricAsync(
+                        binding.ToEnterPhotoelectricTriggerOptions(),
+                        context.RequestAborted);
+                }
+
                 // 软触发采图序列已内聚在 AcquireSingleFrameAsync 中
                 // （StartGrabbing → TriggerMode=On → TriggerSource=Software → ExecuteSoftwareTrigger → GetFrame）
 
@@ -440,11 +453,36 @@ public static class SettingsEndpoints
                 context.Response.Headers["X-Image-Height"] = height.ToString();
                 context.Response.Headers["X-Camera-Id"] = request.CameraBindingId;
                 context.Response.Headers["X-Trigger-Mode"] = "Software";
+                context.Response.Headers["X-Trigger-Source"] = binding.SoftwareTriggerSource;
 
                 return Results.File(
                     frameBytes,
                     contentType: "image/png",
                     fileDownloadName: null);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
+        });
+
+        app.MapGet("/api/trigger-input/diagnostics", (ITriggerInputService triggerInputService) =>
+        {
+            return Results.Ok(triggerInputService.GetDiagnostics());
+        });
+
+        app.MapPost("/api/trigger-input/learn-enter-device", async (
+            TriggerDeviceLearnRequest request,
+            ITriggerInputService triggerInputService,
+            CancellationToken cancellationToken) =>
+        {
+            var timeoutMs = Math.Clamp(request.TimeoutMs <= 0 ? 10000 : request.TimeoutMs, 1000, 60000);
+            try
+            {
+                var result = await triggerInputService.LearnEnterPhotoelectricDeviceAsync(
+                    TimeSpan.FromMilliseconds(timeoutMs),
+                    cancellationToken);
+                return Results.Ok(result);
             }
             catch (Exception ex)
             {
@@ -842,6 +880,11 @@ public class CameraContinuousPreviewStartRequest
 public class CameraContinuousPreviewStopRequest
 {
     public string SessionId { get; set; } = string.Empty;
+}
+
+public class TriggerDeviceLearnRequest
+{
+    public int TimeoutMs { get; set; } = 10000;
 }
 
 public sealed class ThemeUpdateRequest

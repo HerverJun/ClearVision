@@ -99,6 +99,61 @@ public class SoftTriggerCaptureEndpointTests
     }
 
     [Fact]
+    public async Task SoftTriggerCapture_WithEnterPhotoelectricSource_ShouldWaitForEnterSignal()
+    {
+        const string bindingId = "cam-enter-trigger";
+        var binding = new CameraBindingConfig
+        {
+            Id = bindingId,
+            DisplayName = "Enter Trigger",
+            SerialNumber = "SN-ENTER",
+            TriggerMode = "Software",
+            SoftwareTriggerSource = "EnterPhotoelectric",
+            EnterPhotoelectricDebounceMs = 250,
+            EnterPhotoelectricTimeoutMs = 15000,
+            EnterPhotoelectricDeviceId = @"\\?\HID#VID_ENTER",
+            IgnoreEnterTriggerWhileBusy = false
+        };
+
+        var camera = Substitute.For<ICamera>();
+        camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.AcquireSingleFrameAsync().Returns(Task.FromResult(ValidPngBytes));
+
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+
+        var triggerInput = Substitute.For<ITriggerInputService>();
+        triggerInput
+            .WaitForEnterPhotoelectricAsync(Arg.Any<EnterPhotoelectricTriggerOptions>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var options = call.ArgAt<EnterPhotoelectricTriggerOptions>(0);
+                return Task.FromResult(new TriggerInputEvent(
+                    "EnterPhotoelectric",
+                    options.CameraBindingId,
+                    options.DeviceId,
+                    DateTime.UtcNow));
+            });
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(cameraManager, triggerInput);
+        var response = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = bindingId });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.GetValues("X-Trigger-Source").Single().Should().Be("EnterPhotoelectric");
+        await triggerInput.Received(1).WaitForEnterPhotoelectricAsync(
+            Arg.Is<EnterPhotoelectricTriggerOptions>(options =>
+                options.CameraBindingId == bindingId &&
+                options.DeviceId == binding.EnterPhotoelectricDeviceId &&
+                options.DebounceMs == 250 &&
+                options.TimeoutMs == 15000 &&
+                options.IgnoreWhileBusy == false),
+            Arg.Any<CancellationToken>());
+        await camera.Received(1).AcquireSingleFrameAsync();
+    }
+
+    [Fact]
     public async Task SoftTriggerCapture_WithInvalidPngBytes_ShouldReturnBadRequest()
     {
         const string bindingId = "cam-bind-2";
@@ -166,7 +221,9 @@ public class SoftTriggerCaptureEndpointTests
 
         public HttpClient Client { get; }
 
-        public static async Task<SoftTriggerTestHost> CreateAsync(ICameraManager cameraManager)
+        public static async Task<SoftTriggerTestHost> CreateAsync(
+            ICameraManager cameraManager,
+            ITriggerInputService? triggerInputService = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -176,6 +233,7 @@ public class SoftTriggerCaptureEndpointTests
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton(cameraManager);
             builder.Services.AddSingleton(Substitute.For<ICameraFrameStreamCoordinator>());
+            builder.Services.AddSingleton(triggerInputService ?? Substitute.For<ITriggerInputService>());
 
             var configService = Substitute.For<IConfigurationService>();
             configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
