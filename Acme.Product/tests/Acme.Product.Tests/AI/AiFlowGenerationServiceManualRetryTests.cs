@@ -68,6 +68,178 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         session.History.Last().Payload!.ManualRetry!.Stage.Should().Be("parse");
     }
 
+    [Fact(DisplayName = "GenerateFlowAsync should extract a complete JSON object with trailing text")]
+    public async Task GenerateFlowAsync_ResponseWithTrailingText_ShouldExtractCompleteJsonObject()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson() + "\n\n说明：请现场复核 {阈值}"
+            }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "生成一个基础检测流程",
+            SessionId: "parse-trailing-text"));
+
+        result.Success.Should().BeTrue();
+        result.FailureType.Should().BeNull();
+
+        await connector.Received(1).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+        validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should prefer the later workflow JSON when old output is echoed")]
+    public async Task GenerateFlowAsync_ResponseEchoesOldFlowBeforeCorrectedFlow_ShouldUseCorrectedFlow()
+    {
+        var oldFlowJson = BuildSuccessfulFlowJson().Replace("模板策略测试流程。", "旧的错误流程。", StringComparison.Ordinal);
+        var correctedFlowJson = BuildSuccessfulFlowJson().Replace("模板策略测试流程。", "修复后的流程。", StringComparison.Ordinal);
+
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = oldFlowJson + "\n\n以上是上一轮输出，下面是修复后的完整 JSON：\n\n" + correctedFlowJson
+            }));
+
+        AiGeneratedFlowJson? validatedFlow = null;
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Do<AiGeneratedFlowJson>(flow => validatedFlow = flow))
+            .Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "修复上一轮失败的流程 JSON",
+            SessionId: "parse-prefers-later-flow"));
+
+        result.Success.Should().BeTrue();
+        validatedFlow.Should().NotBeNull();
+        validatedFlow!.Explanation.Should().Be("修复后的流程。");
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should repair manual retry without re-entering clarification")]
+    public async Task GenerateFlowAsync_ManualRetryRepairRequest_ShouldBypassClarification()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = "not json"
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var extractionCount = 0;
+        var requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
+        requirementBriefExtractor.Extract(
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<ScenarioMatchResult?>())
+            .Returns(_ =>
+            {
+                extractionCount++;
+                return extractionCount == 1
+                    ? new AiRequirementBrief
+                    {
+                        ScenarioKey = "hole-spacing-measurement",
+                        ScenarioName = "圆孔间距测量",
+                        IntentType = "measurement",
+                        Confidence = 0.9,
+                        CanGenerateDraftNow = true,
+                        DraftRiskLevel = "low",
+                        ObjectName = "圆孔/孔位",
+                        MeasurementTargets = ["孔距/圆心距离"],
+                        OutputTarget = "UI",
+                        RoiRequirement = "region",
+                        CalibrationRequirement = "pixel_to_world",
+                        KnownFacts =
+                        [
+                            "测量目标：两个圆形孔位的圆心距离",
+                            "输出目标：界面显示",
+                            "ROI：固定ROI"
+                        ]
+                    }
+                    : new AiRequirementBrief
+                    {
+                        Confidence = 0.2,
+                        CanGenerateDraftNow = false,
+                        DraftRiskLevel = "high",
+                        RequiredFields = ["scene", "object_type"],
+                        MissingFacts = ["需要确认具体场景", "需要确认检测对象"],
+                        ClarificationQuestions = [BuildQuestion("scene"), BuildQuestion("object_type")],
+                        ClarificationRequired = true
+                    };
+            });
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            requirementBriefExtractor: requirementBriefExtractor,
+            useRealOperatorFactory: true);
+
+        var first = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "测量两个圆形孔位的圆心距离，输出到界面，固定 ROI，需要像素到物理单位换算",
+            SessionId: "manual-retry-no-clarification"));
+
+        first.Success.Should().BeFalse();
+        first.ManualRetry.Should().NotBeNull();
+        first.ManualRetry!.Draft.Should().Contain("上一轮已确认的需求上下文");
+        first.ManualRetry.Draft.Should().Contain("上一轮模型原始输出");
+
+        var repairRequest = "标定：像素到物理单位换算 输出目标：界面显示 ROI：固定ROI" +
+                            Environment.NewLine +
+                            Environment.NewLine +
+                            first.ManualRetry.Draft;
+
+        var second = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            repairRequest,
+            SessionId: "manual-retry-no-clarification"));
+
+        second.Success.Should().BeTrue();
+        second.ClarificationRequired.Should().BeFalse();
+        second.RequirementBrief.Should().NotBeNull();
+        second.RequirementBrief!.ClarificationRequired.Should().BeFalse();
+        second.RequirementBrief.KnownFacts.Should().Contain("本轮是上一轮格式/结构失败后的手动修复，不重新进入需求澄清。");
+
+        await connector.Received(2).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task GenerateFlowAsync_InvalidStructure_ShouldReturnManualRetryWithoutRetryingModel()
     {
@@ -636,6 +808,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         IConversationalFlowService conversationService,
         AiRequirementBrief? requirementBrief = null,
         IReadOnlyList<ScenarioMatchResult>? scenarioMatches = null,
+        IRequirementBriefExtractor? requirementBriefExtractor = null,
         bool useRealOperatorFactory = false)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
@@ -666,17 +839,20 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(scenarioMatches ?? Array.Empty<ScenarioMatchResult>()));
 
-        var requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
-        requirementBriefExtractor.Extract(
-                Arg.Any<string?>(),
-                Arg.Any<string?>(),
-                Arg.Any<ScenarioMatchResult?>())
-            .Returns(requirementBrief ?? new AiRequirementBrief
-            {
-                Confidence = 0.9,
-                CanGenerateDraftNow = true,
-                DraftRiskLevel = "low"
-            });
+        if (requirementBriefExtractor == null)
+        {
+            requirementBriefExtractor = Substitute.For<IRequirementBriefExtractor>();
+            requirementBriefExtractor.Extract(
+                    Arg.Any<string?>(),
+                    Arg.Any<string?>(),
+                    Arg.Any<ScenarioMatchResult?>())
+                .Returns(requirementBrief ?? new AiRequirementBrief
+                {
+                    Confidence = 0.9,
+                    CanGenerateDraftNow = true,
+                    DraftRiskLevel = "low"
+                });
+        }
 
         var templateConstraintValidator = Substitute.For<ITemplateConstraintValidator>();
         templateConstraintValidator.Validate(

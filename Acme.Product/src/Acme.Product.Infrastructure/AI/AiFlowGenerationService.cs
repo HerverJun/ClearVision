@@ -8,7 +8,6 @@ using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
 using Acme.Product.Core.Entities;
 using Acme.Product.Infrastructure.AI.DryRun;
 using Acme.Product.Infrastructure.AI.Runtime;
@@ -109,8 +108,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             "conversation",
             () => _conversationalFlowService.PrepareContext(request),
             context => $"session={context.SessionId}, mode={context.Mode.ToWireValue()}");
+        var sessionSnapshot = _conversationalFlowService.GetSession(conversationContext.SessionId);
         var clarificationHistory = BuildClarificationHistoryContext(
-            _conversationalFlowService.GetSession(conversationContext.SessionId),
+            sessionSnapshot,
+            request.Description);
+        var manualRetryHistory = BuildManualRetryHistoryContext(
+            sessionSnapshot,
             request.Description);
         var answeredClarificationFields = BuildAnsweredClarificationFields(
             clarificationHistory.AnsweredFields,
@@ -119,7 +122,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var priorUserRequirementContext = BuildPriorUserRequirementContext(
             conversationContext.SessionSummary,
             request.Description,
-            clarificationHistory);
+            clarificationHistory,
+            manualRetryHistory);
         var templatePriority = await pipeline.MeasureAsync(
             "scenario_match",
             () => BuildTemplatePriorityContextAsync(request, priorUserRequirementContext, cancellationToken),
@@ -154,7 +158,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ApplyAnsweredClarificationFields(extracted, answeredClarificationFields);
                 var evaluated = _clarificationEngine.ApplyPolicy(extracted, conversationContext.Mode, request.RequirementMode);
                 evaluated = RelaxClarificationForTemplatePriority(evaluated, templatePriority);
-                return EnforceClarificationRoundLimit(evaluated, clarificationHistory.ClarificationRounds);
+                evaluated = EnforceClarificationRoundLimit(evaluated, clarificationHistory.ClarificationRounds);
+                return RelaxClarificationForManualRetry(evaluated, manualRetryHistory);
             },
             brief => string.IsNullOrWhiteSpace(brief.ScenarioName)
                 ? "requirement brief extracted without a scenario"
@@ -628,7 +633,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         summaryText: errorMessage,
                         failureSummary: failureSummary,
                         diagnostics: lastAttemptDiagnostics,
-                        progressMessages: progressMessages));
+                        progressMessages: progressMessages,
+                        requirementBrief: requirementBrief));
                 return new AiFlowGenerationResult
                 {
                     Success = false,
@@ -698,7 +704,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         summaryText: errorMessage,
                         failureSummary: failureSummary,
                         diagnostics: lastAttemptDiagnostics,
-                        progressMessages: progressMessages));
+                        progressMessages: progressMessages,
+                        requirementBrief: requirementBrief));
                 return new AiFlowGenerationResult
                 {
                     Success = false,
@@ -735,7 +742,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 summaryText: finalErrorMessage,
                 failureSummary: finalFailureSummary,
                 diagnostics: lastAttemptDiagnostics,
-                progressMessages: progressMessages));
+                progressMessages: progressMessages,
+                requirementBrief: requirementBrief));
         return new AiFlowGenerationResult
         {
             Success = false,
@@ -1355,6 +1363,27 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return brief;
     }
 
+    private static AiRequirementBrief RelaxClarificationForManualRetry(
+        AiRequirementBrief brief,
+        ManualRetryHistoryContext manualRetryHistory)
+    {
+        if (!manualRetryHistory.IsRepairRequest || !manualRetryHistory.HasPendingManualRetry)
+            return brief;
+
+        // A manual retry is a repair of a model/validator failure after the requirement gate
+        // has already been passed. Re-entering clarification here loses the original task.
+        brief.ClarificationRequired = false;
+        brief.RequirementMode = AiRequirementModes.Draft;
+        brief.CanGenerateDraftNow = true;
+        if (brief.MissingFacts.Count > 0 || brief.ClarificationQuestions.Count > 0)
+        {
+            brief.DraftRiskLevel = "high";
+        }
+
+        AddKnownFact(brief, "本轮是上一轮格式/结构失败后的手动修复，不重新进入需求澄清。");
+        return brief;
+    }
+
     private static void ApplyAnsweredClarificationFields(
         AiRequirementBrief brief,
         IReadOnlySet<string> answeredFields)
@@ -1534,6 +1563,53 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return new ClarificationHistoryContext(clarificationRounds, answeredFields, latestPendingQuestions);
     }
 
+    private static ManualRetryHistoryContext BuildManualRetryHistoryContext(
+        ConversationSession? session,
+        string? currentDescription)
+    {
+        var isRepairRequest = IsManualRetryRepairRequest(currentDescription);
+        if (!isRepairRequest || session == null || session.History.Count == 0)
+            return new ManualRetryHistoryContext(isRepairRequest, false);
+
+        var normalizedCurrent = NormalizeRequirementContextText(currentDescription);
+        foreach (var turn in session.History.OrderByDescending(item => item.TimestampUtc))
+        {
+            if (turn.Role.Equals("user", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(NormalizeRequirementContextText(turn.Message), normalizedCurrent, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!turn.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var manualRetry = turn.Payload?.ManualRetry;
+            return new ManualRetryHistoryContext(
+                isRepairRequest,
+                manualRetry?.Required == true ||
+                string.Equals(turn.Payload?.Status, AiFlowGenerationResult.FailureTypeManualRetryRequired, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return new ManualRetryHistoryContext(isRepairRequest, false);
+    }
+
+    private static bool IsManualRetryRepairRequest(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        return ContainsAny(text,
+        [
+            "请基于上一轮需求继续修正工作流 JSON",
+            "请只返回一个完整且可解析的 JSON 对象",
+            "上一轮输出摘要",
+            "上一轮模型原始输出",
+            "优先修复：",
+            "[format/invalid_json]",
+            "[validation/"
+        ]);
+    }
+
     private static bool LooksLikeAnswerForField(string message, AiClarificationQuestion question)
     {
         var text = message.Trim();
@@ -1620,12 +1696,13 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private static string BuildPriorUserRequirementContext(
         string? sessionSummary,
         string? currentDescription,
-        ClarificationHistoryContext clarificationHistory)
+        ClarificationHistoryContext clarificationHistory,
+        ManualRetryHistoryContext manualRetryHistory)
     {
         if (string.IsNullOrWhiteSpace(sessionSummary))
             return string.Empty;
 
-        if (!ShouldUsePriorRequirementContext(currentDescription, clarificationHistory))
+        if (!ShouldUsePriorRequirementContext(currentDescription, clarificationHistory, manualRetryHistory))
             return string.Empty;
 
         var current = NormalizeRequirementContextText(currentDescription);
@@ -1635,7 +1712,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             .Where(line => line.StartsWith("- user:", StringComparison.OrdinalIgnoreCase))
             .Select(line => line["- user:".Length..].Trim())
             .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Where(line => !string.Equals(NormalizeRequirementContextText(line), current, StringComparison.OrdinalIgnoreCase))
+            .Where(line => !IsSameRequirementContextLine(line, current))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .TakeLast(3)
             .ToList();
@@ -1645,15 +1722,35 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             : "历史用户需求： " + string.Join("；", userLines);
     }
 
+    private static bool IsSameRequirementContextLine(string line, string normalizedCurrent)
+    {
+        var normalizedLine = NormalizeRequirementContextText(line);
+        if (string.Equals(normalizedLine, normalizedCurrent, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (normalizedLine.EndsWith("...", StringComparison.Ordinal) && normalizedLine.Length > 3)
+        {
+            var prefix = normalizedLine[..^3].TrimEnd();
+            return prefix.Length > 0 &&
+                   normalizedCurrent.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
     private static bool ShouldUsePriorRequirementContext(
         string? currentDescription,
-        ClarificationHistoryContext clarificationHistory)
+        ClarificationHistoryContext clarificationHistory,
+        ManualRetryHistoryContext manualRetryHistory)
     {
-        if (clarificationHistory.PendingQuestions.Count == 0)
-            return false;
+        if (manualRetryHistory.IsRepairRequest && manualRetryHistory.HasPendingManualRetry)
+            return true;
 
         var current = currentDescription ?? string.Empty;
         if (IsSelfContainedNewRequirement(current))
+            return false;
+
+        if (clarificationHistory.PendingQuestions.Count == 0)
             return false;
 
         return clarificationHistory.PendingQuestions.Any(question => LooksLikeAnswerForField(current, question));
@@ -2185,6 +2282,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             new(0, new HashSet<string>(StringComparer.OrdinalIgnoreCase), Array.Empty<AiClarificationQuestion>());
     }
 
+    private sealed record ManualRetryHistoryContext(
+        bool IsRepairRequest,
+        bool HasPendingManualRetry);
+
     private string BuildRetryMessage(string originalMessage, AiValidationResult failedValidation, string? lastRawResponse)
     {
         var sb = new StringBuilder();
@@ -2370,7 +2471,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         {
             Required = true,
             Stage = stage,
-            Draft = BuildManualRetryDraft(originalMessage, validation, lastRawResponse),
+            Draft = BuildManualRetryDraft(originalMessage, validation, lastRawResponse, requirementBrief),
             Summary = diagnostics.FirstOrDefault()?.Summary ?? BuildAttemptSummary(validation),
             RepairTarget = failureSummary.RepairTarget,
             LastOutputSummary = failureSummary.LastOutputSummary,
@@ -2387,7 +2488,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 failureSummary: failureSummary,
                 diagnostics: diagnostics,
                 progressMessages: progressMessages,
-                manualRetry: manualRetry));
+                manualRetry: manualRetry,
+                requirementBrief: requirementBrief));
 
         return new AiFlowGenerationResult
         {
@@ -2419,7 +2521,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return $"AI 输出未通过{label}，请根据诊断信息修正后重试。";
     }
 
-    private static string BuildManualRetryDraft(string originalMessage, AiValidationResult validation, string? lastRawResponse)
+    private static string BuildManualRetryDraft(
+        string originalMessage,
+        AiValidationResult validation,
+        string? lastRawResponse,
+        AiRequirementBrief? requirementBrief)
     {
         var sb = new StringBuilder();
         sb.AppendLine("请基于上一轮需求继续修正工作流 JSON，不要重建无关结构。");
@@ -2427,6 +2533,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         sb.AppendLine();
         sb.AppendLine("本轮需求原话：");
         sb.AppendLine(originalMessage.Trim());
+
+        var requirementContext = BuildRequirementRepairContext(requirementBrief);
+        if (!string.IsNullOrWhiteSpace(requirementContext))
+        {
+            sb.AppendLine();
+            sb.AppendLine("上一轮已确认的需求上下文：");
+            sb.AppendLine(requirementContext);
+        }
 
         var repairTargets = BuildRepairTargets(validation);
         if (repairTargets.Count > 0)
@@ -2460,11 +2574,57 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             sb.AppendLine();
             sb.AppendLine("上一轮输出摘要：");
             sb.AppendLine(SummarizeLastOutput(lastRawResponse));
+            sb.AppendLine();
+            sb.AppendLine("上一轮模型原始输出（可能不是合法 JSON，请在此基础上修复）：");
+            sb.AppendLine("---BEGIN PREVIOUS OUTPUT---");
+            sb.AppendLine(TrimRetryOutput(lastRawResponse));
+            sb.AppendLine("---END PREVIOUS OUTPUT---");
         }
 
         sb.AppendLine();
         sb.AppendLine("请尽量保留已经正确的算子、连线和参数，仅修正本轮报错涉及的部分。");
         return sb.ToString().Trim();
+    }
+
+    private static string BuildRequirementRepairContext(AiRequirementBrief? requirementBrief)
+    {
+        if (requirementBrief == null)
+            return string.Empty;
+
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ScenarioName))
+            lines.Add($"场景：{requirementBrief.ScenarioName}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ScenarioKey))
+            lines.Add($"场景Key：{requirementBrief.ScenarioKey}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.IntentType))
+            lines.Add($"意图：{requirementBrief.IntentType}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.ObjectName))
+            lines.Add($"检测对象：{requirementBrief.ObjectName}");
+        if (requirementBrief.ObjectTypes.Count > 0)
+            lines.Add($"对象类型：{string.Join("、", requirementBrief.ObjectTypes.Take(6))}");
+        if (requirementBrief.MeasurementTargets.Count > 0)
+            lines.Add($"测量目标：{string.Join("、", requirementBrief.MeasurementTargets.Take(6))}");
+        if (requirementBrief.DefectTypes.Count > 0)
+            lines.Add($"缺陷类别：{string.Join("、", requirementBrief.DefectTypes.Take(6))}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.OutputTarget))
+            lines.Add($"输出目标：{requirementBrief.OutputTarget}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.DecisionRule))
+            lines.Add($"判定逻辑：{requirementBrief.DecisionRule}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.RoiRequirement))
+            lines.Add($"ROI：{requirementBrief.RoiRequirement}");
+        if (!string.IsNullOrWhiteSpace(requirementBrief.CalibrationRequirement))
+            lines.Add($"标定：{requirementBrief.CalibrationRequirement}");
+        foreach (var fact in requirementBrief.KnownFacts.Take(8))
+        {
+            if (!string.IsNullOrWhiteSpace(fact))
+                lines.Add(fact);
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            lines
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     private static string BuildFinalValidationErrorMessage(AiValidationResult? validation, int retryCount)
@@ -2588,13 +2748,16 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         AiFailureSummary failureSummary,
         IReadOnlyCollection<AiAttemptDiagnostic> diagnostics,
         IReadOnlyList<string> progressMessages,
-        AiManualRetryInfo? manualRetry = null)
+        AiManualRetryInfo? manualRetry = null,
+        AiRequirementBrief? requirementBrief = null)
     {
         return new ConversationTurnPayload
         {
             Kind = "assistant_failure",
             Status = status,
             Progress = progressMessages.ToList(),
+            ClarificationRequired = false,
+            RequirementBrief = requirementBrief,
             Failure = new ConversationTurnFailurePayload
             {
                 Summary = summaryText,
@@ -2681,6 +2844,13 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
     private static string NormalizeJsonEnvelope(string rawResponse)
     {
+        var json = StripJsonFences(rawResponse);
+        var candidate = EnumerateBalancedJsonObjects(json).FirstOrDefault();
+        return candidate ?? json;
+    }
+
+    private static string StripJsonFences(string rawResponse)
+    {
         var json = rawResponse.Trim();
         if (json.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
             json = json[7..];
@@ -2690,12 +2860,111 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         if (json.EndsWith("```", StringComparison.OrdinalIgnoreCase))
             json = json[..^3];
 
-        json = json.Trim();
-        if (json.StartsWith("{", StringComparison.Ordinal))
-            return json;
+        return json.Trim();
+    }
 
-        var match = Regex.Match(json, @"\{[\s\S]*\}", RegexOptions.Singleline);
-        return match.Success ? match.Value : json;
+    private static List<string> EnumerateBalancedJsonObjects(string text)
+    {
+        var objects = new List<string>();
+        if (string.IsNullOrWhiteSpace(text))
+            return objects;
+
+        var start = -1;
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
+
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (inString)
+            {
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch == '\\')
+                {
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch == '"')
+                {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (ch == '{')
+            {
+                if (depth == 0)
+                    start = i;
+                depth++;
+                continue;
+            }
+
+            if (ch == '}' && depth > 0)
+            {
+                depth--;
+                if (depth == 0 && start >= 0)
+                {
+                    objects.Add(text[start..(i + 1)]);
+                    start = -1;
+                }
+            }
+        }
+
+        return objects;
+    }
+
+    private static bool LooksLikeGeneratedFlowJson(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object &&
+                   (HasProperty(root, "operators") ||
+                    HasProperty(root, "connections") ||
+                    HasProperty(root, "parametersNeedingReview") ||
+                    HasProperty(root, "explanation"));
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasProperty(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.EnumerateObject().Any(property =>
+                   property.NameEquals(propertyName) ||
+                   string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool TryDeserializeGeneratedFlow(string json, out AiGeneratedFlowJson? flow)
+    {
+        try
+        {
+            flow = JsonSerializer.Deserialize<AiGeneratedFlowJson>(json, _jsonOptions);
+            return flow != null;
+        }
+        catch (JsonException)
+        {
+            flow = null;
+            return false;
+        }
     }
 
     private static AiValidationDiagnostic CloneDiagnostic(AiValidationDiagnostic source)
@@ -2736,29 +3005,42 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             _logger.LogDebug("AI 原始响应前 500 字符：{Preview}",
                 rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse);
 
-            // 清理可能的 Markdown 代码块包装
-            var json = NormalizeJsonEnvelope(rawResponse);
+            // 清理 Markdown 包装并从混合文本中提取完整 JSON 对象。
+            var json = StripJsonFences(rawResponse);
+            var candidates = EnumerateBalancedJsonObjects(json);
+            if (candidates.Count == 0 && json.StartsWith("{", StringComparison.Ordinal))
+                candidates.Add(json);
 
-            // 如果清理后仍不是以 { 开头，尝试从响应中提取 JSON 对象
-            // （推理模型可能在 JSON 前后附带解释文字）
-            if (!json.StartsWith("{"))
+            if (candidates.Count == 0)
             {
-                _logger.LogWarning("AI 响应不是纯 JSON，尝试提取嵌入的 JSON 对象...");
-                var match = Regex.Match(json, @"\{[\s\S]*\}", RegexOptions.Singleline);
-                if (match.Success)
+                _logger.LogError(null, "AI 响应中找不到完整 JSON 对象，响应内容前 200 字符：{Content}",
+                    json.Length > 200 ? json.Substring(0, 200) : json);
+                return null;
+            }
+
+            var orderedCandidates = candidates
+                .Select((candidate, index) => new { Candidate = candidate, Index = index })
+                .Where(item => LooksLikeGeneratedFlowJson(item.Candidate))
+                .OrderByDescending(item => item.Index)
+                .Select(item => item.Candidate)
+                .Concat(candidates.AsEnumerable().Reverse())
+                .Distinct(StringComparer.Ordinal);
+
+            foreach (var candidate in orderedCandidates)
+            {
+                if (TryDeserializeGeneratedFlow(candidate, out var flow))
                 {
-                    json = match.Value;
-                    _logger.LogInformation("Extracted JSON object from AI response. Length={Length}", json.Length);
-                }
-                else
-                {
-                    _logger.LogError(null, "AI 响应中找不到 JSON 对象，响应内容前 200 字符：{Content}",
-                        json.Length > 200 ? json.Substring(0, 200) : json);
-                    return null;
+                    if (!string.Equals(candidate, json, StringComparison.Ordinal))
+                    {
+                        _logger.LogInformation("Extracted JSON object from AI response. Length={Length}", candidate.Length);
+                    }
+
+                    return flow;
                 }
             }
 
-            return JsonSerializer.Deserialize<AiGeneratedFlowJson>(json, _jsonOptions);
+            _logger.LogWarning("AI 响应中找到 {CandidateCount} 个 JSON 对象片段，但均无法反序列化为工作流。", candidates.Count);
+            return null;
         }
         catch (JsonException ex)
         {

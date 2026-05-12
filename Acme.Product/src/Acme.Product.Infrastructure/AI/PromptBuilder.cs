@@ -666,6 +666,9 @@ public class PromptBuilder
         - operatorType must exactly match an operator_id from the catalog.
         - port and parameter names must exactly match the catalog.
         - parametersNeedingReview may be omitted only when no uncertain values remain.
+        - The first character of the response must be { and the last character must be }.
+        - Do not add Markdown code block markers, comments, or explanatory text outside the JSON object.
+        - Ensure all brackets and braces are properly paired before sending.
         """;
 
         if (!supportsJsonMode)
