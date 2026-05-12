@@ -130,7 +130,8 @@ public sealed class WebView2Host : IAsyncDisposable
     /// </summary>
     private async Task ConfigureWebView2Async()
     {
-        var core = _webView.CoreWebView2;
+        var core = _webView.CoreWebView2
+            ?? throw new InvalidOperationException("WebView2 Core 尚未初始化");
         var settings = core.Settings;
 
         // 开发工具配置（发布时应禁用）
@@ -153,7 +154,7 @@ public sealed class WebView2Host : IAsyncDisposable
             CoreWebView2HostResourceAccessKind.Allow);
 
 #if DEBUG
-        await ClearCacheAsync();
+        await ClearDiskCacheAsync(core);
         System.Diagnostics.Debug.WriteLine("[WebView2Host] DEBUG模式：已清除 WebView2 缓存");
 #endif
 
@@ -447,11 +448,14 @@ public sealed class WebView2Host : IAsyncDisposable
             throw new InvalidOperationException("WebView2 尚未初始化");
         }
 
+        await ClearDiskCacheAsync(_webView.CoreWebView2);
+    }
+
+    private static async Task ClearDiskCacheAsync(CoreWebView2 core)
+    {
         try
         {
-            var profile = _webView.CoreWebView2.Profile;
-
-            await profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.DiskCache);
+            await core.Profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.DiskCache);
 
             System.Diagnostics.Debug.WriteLine("[WebView2Host] 缓存已清除");
         }
