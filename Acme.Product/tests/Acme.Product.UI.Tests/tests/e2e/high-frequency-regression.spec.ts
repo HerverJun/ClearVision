@@ -457,7 +457,7 @@ test.describe('High Frequency Regression', () => {
         await expect(page.locator('#camera-preview-image')).toHaveCount(0);
 
         await calibButton.click();
-        await expect(page.locator('.calib-wizard-title')).toContainText('手眼标定向导');
+        await expect(page.locator('.calib-wizard-title')).toContainText('二维平面比例偏移标定向导');
         await expect(page.locator('#calib-camera-placeholder-secondary')).toContainText('刷新预览');
         await page.locator('#calib-btn-close').click();
     });

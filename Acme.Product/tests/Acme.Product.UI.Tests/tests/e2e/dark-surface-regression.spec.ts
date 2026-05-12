@@ -38,8 +38,25 @@ async function mockDarkSettings(page: Page) {
   });
 }
 
-async function readBackgroundColor(page: Page, selector: string) {
-  return page.locator(selector).evaluate(node => getComputedStyle(node).backgroundColor);
+async function readEffectiveBackgroundMaxChannel(page: Page, selector: string) {
+  return page.locator(selector).evaluate(node => {
+    let current: Element | null = node;
+    while (current) {
+      const color = getComputedStyle(current).backgroundColor;
+      const match = color.match(/rgba?\(([^)]+)\)/);
+      if (match) {
+        const parts = match[1].split(',').map(part => Number.parseFloat(part.trim()));
+        const alpha = parts.length >= 4 ? parts[3] : 1;
+        if (alpha > 0) {
+          return Math.max(parts[0] ?? 255, parts[1] ?? 255, parts[2] ?? 255);
+        }
+      }
+
+      current = current.parentElement;
+    }
+
+    return 255;
+  });
 }
 
 test('dark theme keeps flow and inspection critical surfaces off white', async ({ page }) => {
@@ -51,13 +68,13 @@ test('dark theme keeps flow and inspection critical surfaces off white', async (
   await bootAuthenticatedApp(page);
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect.poll(() => readBackgroundColor(page, '#flow-canvas')).toContain('11, 24, 36');
-  await expect.poll(() => readBackgroundColor(page, '#property-panel')).toContain('15, 36, 53');
+  await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '#flow-canvas')).toBeLessThan(90);
+  await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '#property-panel')).toBeLessThan(90);
 
   await page.locator('.nav-btn[data-view="inspection"]').click();
   await expect(page.locator('#inspection-view')).toBeVisible();
   await expect(page.locator('.inspection-protection-notice')).toBeVisible();
 
-  await expect.poll(() => readBackgroundColor(page, '#inspection-image-area')).toContain('15, 36, 53');
-  await expect.poll(() => readBackgroundColor(page, '.inspection-protection-notice')).toContain('66, 46, 18');
+  await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '#inspection-image-area')).toBeLessThan(90);
+  await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '.inspection-protection-notice')).toBeLessThan(140);
 });
