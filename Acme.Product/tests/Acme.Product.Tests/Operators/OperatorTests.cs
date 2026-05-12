@@ -52,6 +52,41 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithRuntimeImageAndNoFilePath_ShouldUseProvidedImage()
+    {
+        using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = mat.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Width"].Should().Be(13);
+        result.OutputData["Height"].Should().Be(7);
+        result.OutputData["Source"].Should().Be("provided-image");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRuntimeImageAndInvalidSourceType_ShouldReturnFailure()
+    {
+        using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Invalid"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = mat.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("SourceType must be File or Camera.");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithCameraSource_ShouldIgnoreFilePathAndAcquireCameraFrame()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"cv-image-{Guid.NewGuid():N}.png");

@@ -989,6 +989,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             // 尝试通过名称查找端口 ID，以匹配扇出度分析使用的 Key
             var port = op.OutputPorts.FirstOrDefault(p => p.Name == portName);
+            if (port == null && op.OutputPorts.Count == 1 && IsStandardImageOutputKey(portName))
+            {
+                port = op.OutputPorts[0];
+            }
+
             var portKey = port != null
                 ? $"{op.Id}:{port.Id}"
                 : $"{op.Id}:{portName}";

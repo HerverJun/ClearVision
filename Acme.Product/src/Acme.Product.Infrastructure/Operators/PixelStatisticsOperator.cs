@@ -603,31 +603,45 @@ public class PixelStatisticsOperator : OperatorBase
     private static StatisticsSummary Compute8BitStatistics(Mat analysis, Mat mask)
     {
         var hasMask = !mask.Empty();
-        var source = analysis.GetGenericIndexer<byte>();
-        var maskIndex = hasMask ? mask.GetGenericIndexer<byte>() : null;
         var histogram = new int[256];
         long sampleCount = 0;
         var nonZeroCount = 0;
         var sum = 0.0;
         var sumSquares = 0.0;
 
-        for (var y = 0; y < analysis.Rows; y++)
+        unsafe
         {
-            for (var x = 0; x < analysis.Cols; x++)
+            var sourceBase = (byte*)analysis.DataPointer;
+            var sourceStep = (int)analysis.Step();
+
+            if (!hasMask)
             {
-                if (maskIndex != null && maskIndex[y, x] == 0)
+                for (var y = 0; y < analysis.Rows; y++)
                 {
-                    continue;
+                    var sourceRow = sourceBase + y * sourceStep;
+                    for (var x = 0; x < analysis.Cols; x++)
+                    {
+                        Add8BitValue(sourceRow[x], histogram, ref sampleCount, ref sum, ref sumSquares, ref nonZeroCount);
+                    }
                 }
 
-                var value = source[y, x];
-                histogram[value]++;
-                sampleCount++;
-                sum += value;
-                sumSquares += value * value;
-                if (value != 0)
+                return Create8BitStatisticsSummary(histogram, sampleCount, sum, sumSquares, nonZeroCount);
+            }
+
+            var maskBase = (byte*)mask.DataPointer;
+            var maskStep = (int)mask.Step();
+            for (var y = 0; y < analysis.Rows; y++)
+            {
+                var sourceRow = sourceBase + y * sourceStep;
+                var maskRow = maskBase + y * maskStep;
+                for (var x = 0; x < analysis.Cols; x++)
                 {
-                    nonZeroCount++;
+                    if (maskRow[x] == 0)
+                    {
+                        continue;
+                    }
+
+                    Add8BitValue(sourceRow[x], histogram, ref sampleCount, ref sum, ref sumSquares, ref nonZeroCount);
                 }
             }
         }
