@@ -122,6 +122,7 @@ let appBootstrapPromise = null;
 let statusBarStarted = false;
 let fpsAnimationFrameId = null;
 let themeUpdateInFlight = false;
+let projectFlowSyncSuppressionDepth = 0;
 
 let projectViewModulePromise = null;
 let resultPanelModulePromise = null;
@@ -236,12 +237,16 @@ async function handleProjectChange(project) {
     inspectionController.setProject(project.id);
     inspectionPanel?.setProjectContext?.(project.id);
 
-    if (project.flow && flowCanvas) {
-        debugLogger.debug('[App] 当前工程已切换，加载流程数据:', project.flow);
-        flowCanvas.deserialize(project.flow);
-    } else if (flowCanvas) {
-        debugLogger.debug('[App] 当前工程没有流程数据，清空画布');
-        flowCanvas.clear();
+    if (flowCanvas) {
+        withProjectFlowSyncSuppressed(() => {
+            if (project.flow) {
+                debugLogger.debug('[App] 当前工程已切换，加载流程数据:', project.flow);
+                flowCanvas.deserialize(project.flow);
+            } else {
+                debugLogger.debug('[App] 当前工程没有流程数据，清空画布');
+                flowCanvas.clear();
+            }
+        });
     }
 
     resultPanel?.setProjectContext?.(project.id);
@@ -250,6 +255,45 @@ async function handleProjectChange(project) {
     setCurrentView('flow');
     syncActiveNavButton('flow');
     await switchView('flow');
+}
+
+function syncCurrentProjectFlowFromCanvas() {
+    if (projectFlowSyncSuppressionDepth > 0) {
+        return null;
+    }
+
+    const project = getCurrentProject();
+    if (!project || !flowCanvas || typeof flowCanvas.serialize !== 'function') {
+        return null;
+    }
+
+    const flow = flowCanvas.serialize();
+    projectManager.updateFlow(flow);
+    return flow;
+}
+
+function withProjectFlowSyncSuppressed(action) {
+    projectFlowSyncSuppressionDepth += 1;
+    try {
+        return action();
+    } finally {
+        projectFlowSyncSuppressionDepth = Math.max(0, projectFlowSyncSuppressionDepth - 1);
+    }
+}
+
+function initializeProjectFlowCanvasSync() {
+    if (!flowCanvas || typeof flowCanvas.subscribeStructureState !== 'function') {
+        return;
+    }
+
+    const unsubscribe = flowCanvas.subscribeStructureState((payload = {}) => {
+        if (payload.reason === 'initial') {
+            return;
+        }
+
+        syncCurrentProjectFlowFromCanvas();
+    });
+    subscriptions.push(unsubscribe);
 }
 
 /**
@@ -448,7 +492,16 @@ async function ensureAiPanel() {
     aiPanel = new AiPanel('ai-view', flowCanvasService, {
         getOperators: () => operatorLibraryPanel?.getOperators?.() || [],
         showToast,
-        onApplied: (flow) => getAiGenerationController().publishApplied(flow)
+        onApplied: (flow) => {
+            const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow;
+            getAiGenerationController().publishApplied(syncedFlow);
+        },
+        onCanvasChanged: ({ flow } = {}) => {
+            const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow || null;
+            if (syncedFlow) {
+                getAiGenerationController().publishApplied(syncedFlow);
+            }
+        }
     });
     serviceRegistry.register('aiPanel', aiPanel);
     debugLogger.debug('[App] AI 面板初始化完成');
@@ -911,6 +964,8 @@ function initializePropertyPanel() {
             const node = flowCanvas.nodes.get(operator.id);
             if (node) {
                 node.parameters = operator.parameters;
+                flowCanvas.markFlowStructureChanged?.('parameter-change');
+                syncCurrentProjectFlowFromCanvas();
             }
         }
     });
@@ -1129,6 +1184,7 @@ function initializeFlowEditor() {
     const flowCanvasAdapter = createFlowCanvasAdapter(flowCanvas, { eventBus });
     serviceRegistry.register('flowCanvas', flowCanvas);
     serviceRegistry.register('flowCanvasAdapter', flowCanvasAdapter);
+    initializeProjectFlowCanvasSync();
     inspectionController.setFlowProvider?.(() => flowCanvasAdapter.serialize());
     inspectionController.setImageSinks?.([
         (imageData) => serviceRegistry.get('inspectionImageViewer')?.loadImage?.(imageData),
@@ -1193,22 +1249,24 @@ function initializeFlowEditor() {
                 }
             }
             
-            flowCanvas.clear();
-            if (subGraphData) {
-                flowCanvas.deserialize(subGraphData);
-            }
-            
-            // 注入 CurrentItem 系统源节点（如果不存在）
-            const existingCurrentItem = Array.from(flowCanvas.nodes.values()).find(n => n.type === 'CurrentItem');
-            if (!existingCurrentItem) {
-                flowCanvas.addNode('CurrentItem', 50, 100, {
-                    title: '📦 CurrentItem',
-                    color: '#722ed1',
-                    outputs: [{ name: 'Item', type: 'Any' }, { name: 'Index', type: 'Integer' }, { name: 'Total', type: 'Integer' }],
-                    _systemNode: true  // 标记为系统节点，不可删除
-                });
-                debugLogger.debug('[App] 已注入 CurrentItem 系统源节点');
-            }
+            withProjectFlowSyncSuppressed(() => {
+                flowCanvas.clear();
+                if (subGraphData) {
+                    flowCanvas.deserialize(subGraphData);
+                }
+
+                // 注入 CurrentItem 系统源节点（如果不存在）
+                const existingCurrentItem = Array.from(flowCanvas.nodes.values()).find(n => n.type === 'CurrentItem');
+                if (!existingCurrentItem) {
+                    flowCanvas.addNode('CurrentItem', 50, 100, {
+                        title: '📦 CurrentItem',
+                        color: '#722ed1',
+                        outputs: [{ name: 'Item', type: 'Any' }, { name: 'Index', type: 'Integer' }, { name: 'Total', type: 'Integer' }],
+                        _systemNode: true  // 标记为系统节点，不可删除
+                    });
+                    debugLogger.debug('[App] 已注入 CurrentItem 系统源节点');
+                }
+            });
             
             if (breadcrumbContainer) {
                 breadcrumbContainer.classList.remove('hidden');
@@ -1251,8 +1309,14 @@ function initializeFlowEditor() {
                     console.error('[App] 保存子图失败:', e); 
                 }
 
-                flowCanvas.clear();
-                flowCanvas.deserialize(mainData);
+                withProjectFlowSyncSuppressed(() => {
+                    flowCanvas.clear();
+                    flowCanvas.deserialize(mainData);
+                });
+                flowEditorInteraction?.saveState?.();
+                if (!flowEditorInteraction) {
+                    syncCurrentProjectFlowFromCanvas();
+                }
                 
                 window._mainFlowState = null;
                 window._currentSubgraphNodeId = null;
@@ -1404,13 +1468,17 @@ async function loadProject(projectId) {
         const project = await projectManager.openProject(projectId);
         
         // 加载流程到画布
-    if (project.flow && flowCanvas) {
-            debugLogger.debug('[App] 加载流程数据:', project.flow);
-        flowCanvas.deserialize(project.flow);
-    } else if (flowCanvas) {
-            // 【修复】如果没有流程数据，清空画布
-            debugLogger.debug('[App] 工程没有流程数据，清空画布');
-        flowCanvas.clear();
+        if (flowCanvas) {
+            withProjectFlowSyncSuppressed(() => {
+                if (project.flow) {
+                    debugLogger.debug('[App] 加载流程数据:', project.flow);
+                    flowCanvas.deserialize(project.flow);
+                } else {
+                    // 【修复】如果没有流程数据，清空画布
+                    debugLogger.debug('[App] 工程没有流程数据，清空画布');
+                    flowCanvas.clear();
+                }
+            });
         }
         
         // 设置检测控制器和结果页上下文
@@ -1440,15 +1508,15 @@ async function createProject(name, description = '', preserveCanvas = false) {
         
         if (preserveCanvas) {
             // 保留画布内容，直接将当前流程保存到新工程
-    if (flowCanvas) {
-        project.flow = flowCanvas.serialize();
-                await projectManager.saveProject(project);
+            if (flowCanvas) {
+                projectManager.updateFlow(flowCanvas.serialize());
+                await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
                 debugLogger.debug('[App] 画布内容已保存到新工程:', project.name);
             }
         } else {
             // 新建空工程，清空画布
-    if (flowCanvas) {
-        flowCanvas.clear();
+            if (flowCanvas) {
+                withProjectFlowSyncSuppressed(() => flowCanvas.clear());
             }
         }
         
@@ -1933,10 +2001,10 @@ async function importProjectFromJson(file) {
         
         // 加载流程到画布
         if (flowCanvas && importData.project.flow) {
-            flowCanvas.deserialize(importData.project.flow);
+            withProjectFlowSyncSuppressed(() => flowCanvas.deserialize(importData.project.flow));
             // 将流程数据保存到后端
-            project.flow = flowCanvas.serialize();
-            await projectManager.saveProject(project);
+            projectManager.updateFlow(flowCanvas.serialize());
+            await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
         }
         
         // 设置检测控制器的工程

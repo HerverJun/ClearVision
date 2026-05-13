@@ -53,6 +53,9 @@ function installMinimalDom() {
     getElementById(id) {
       return elementsById.get(id) || null;
     },
+    querySelector() {
+      return null;
+    },
     addEventListener() {}
   };
 
@@ -133,10 +136,16 @@ test('FlowEditorInteraction syncs applied template flow into project manager', a
 
   const saved = [];
   const updates = [];
+  const serializedFlow = { operators: [{ id: 'from-template' }], connections: [] };
   const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
   interaction.canvas = {
+    nodes: new Map([['from-template', { id: 'from-template', type: 'ImageAcquisition' }]]),
+    connections: [],
     serialize() {
-      return { operators: [{ id: 'from-canvas' }], connections: [] };
+      return serializedFlow;
     }
   };
   interaction.projectManager = {
@@ -144,12 +153,57 @@ test('FlowEditorInteraction syncs applied template flow into project manager', a
       updates.push(flow);
     }
   };
-  interaction.saveState = () => saved.push(true);
+  const originalSaveState = interaction.saveState.bind(interaction);
+  interaction.saveState = () => {
+    saved.push(true);
+    originalSaveState();
+  };
 
-  const serializedFlow = { operators: [{ id: 'from-template' }], connections: [] };
   interaction.handleTemplateApplied({ serializedFlow });
 
   assert.equal(saved.length, 1);
   assert.equal(updates.length, 1);
   assert.equal(updates[0], serializedFlow);
+});
+
+test('FlowEditorInteraction undo/redo restore syncs project flow and rebuilds connection index', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  const updates = [];
+  let rebuilt = false;
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.projectManager = {
+    updateFlow(flow) {
+      updates.push(flow);
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map(),
+    connections: [],
+    _rebuildConnectionIndex() {
+      rebuilt = true;
+    },
+    render() {},
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    }
+  };
+  interaction.history = [
+    JSON.stringify({
+      nodes: [['node-1', { id: 'node-1', type: 'ImageAcquisition' }]],
+      connections: [{ id: 'conn-1', source: 'node-1', target: 'node-2' }]
+    })
+  ];
+  interaction.historyIndex = 0;
+
+  interaction.restoreState();
+
+  assert.equal(rebuilt, true);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].operators, [{ id: 'node-1' }]);
 });

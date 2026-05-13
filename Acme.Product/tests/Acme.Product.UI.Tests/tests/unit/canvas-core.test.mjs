@@ -361,6 +361,34 @@ test('FlowCanvas deserialize rebuilds connection index', async () => {
   fc.destroy();
 });
 
+test('FlowCanvas persists disabled node state through serialize and deserialize', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const node = fc.addNode('ImageAcquisition', 0, 0, {
+    inputs: [],
+    outputs: [{ id: 'out', name: 'Image', type: 'Image' }]
+  });
+
+  fc.toggleNodeDisabled(node.id);
+
+  const serialized = fc.serialize();
+  assert.equal(serialized.operators[0].isEnabled, false);
+
+  const restored = new FlowCanvas('canvas');
+  restored.deserialize(serialized);
+  assert.equal(restored.nodes.get(node.id).disabled, true);
+
+  fc.destroy();
+  restored.destroy();
+});
+
 test('FlowCanvas expands node height for multi-port operators', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

@@ -93,17 +93,14 @@ export class FlowEditorInteraction {
 
     handleTemplateApplied(payload = null) {
         this.saveState();
+    }
 
-        if (!this.projectManager?.updateFlow) {
+    syncProjectFlow() {
+        if (!this.projectManager?.updateFlow || typeof this.canvas.serialize !== 'function') {
             return;
         }
 
-        const flowData = payload?.serializedFlow
-            || (typeof this.canvas.serialize === 'function' ? this.canvas.serialize() : null);
-
-        if (flowData) {
-            this.projectManager.updateFlow(flowData);
-        }
+        this.projectManager.updateFlow(this.canvas.serialize());
     }
 
     /**
@@ -984,6 +981,8 @@ export class FlowEditorInteraction {
         } else {
             this.historyIndex++;
         }
+
+        this.syncProjectFlow();
     }
 
     /**
@@ -1019,7 +1018,9 @@ export class FlowEditorInteraction {
         const state = JSON.parse(this.history[this.historyIndex]);
         this.canvas.nodes = new Map(state.nodes);
         this.canvas.connections = state.connections;
+        this.canvas._rebuildConnectionIndex?.();
         this.canvas.render();
+        this.syncProjectFlow();
     }
 
     /**
