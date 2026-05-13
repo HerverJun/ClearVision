@@ -1265,7 +1265,7 @@ function initializeFlowEditor() {
     }
     
     // 【阶段B】初始化流程编辑器交互增强（撤销/重做/复制/粘贴/框选）
-    flowEditorInteraction = new FlowEditorInteraction(flowCanvas);
+    flowEditorInteraction = new FlowEditorInteraction(flowCanvas, { projectManager });
     serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
     debugLogger.debug('[App] 流程编辑器交互增强已启用');
     
