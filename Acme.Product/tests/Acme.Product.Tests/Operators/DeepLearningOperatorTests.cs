@@ -191,7 +191,7 @@ public class DeepLearningOperatorTests
     }
 
     [Fact]
-    public void BuildLabelContract_WithMatchingMetadataAndExternalLabels_ShouldPreferMetadataLabels()
+    public void BuildLabelContract_WithMetadataAndExternalLabels_ShouldUseMetadataOnly()
     {
         var method = typeof(DeepLearningOperator).GetMethod(
             "BuildLabelContract",
@@ -211,11 +211,13 @@ public class DeepLearningOperatorTests
         GetPropertyValue<bool>(result!, "IsValid").Should().BeTrue();
         GetPropertyValue<string[]>(result!, "ResolvedLabels").Should().Equal("Wire_Blue", "Wire_Black");
         GetPropertyValue<string>(result!, "ResolvedLabelSource").Should().Be("ModelMetadata");
-        GetPropertyValue<string>(result!, "ValidationStatus").Should().Be("MetadataValidatedWithExternalLabels");
+        GetPropertyValue<string>(result!, "ResolvedLabelPath").Should().BeEmpty();
+        GetPropertyValue<string[]>(result!, "ExternalLabels").Should().BeEmpty();
+        GetPropertyValue<string>(result!, "ValidationStatus").Should().Be("MetadataOnly");
     }
 
     [Fact]
-    public void BuildLabelContract_WithMismatchedMetadataAndExternalLabels_ShouldFailFast()
+    public void BuildLabelContract_WithMismatchedMetadataAndExternalLabels_ShouldStillUseMetadataOnly()
     {
         var method = typeof(DeepLearningOperator).GetMethod(
             "BuildLabelContract",
@@ -232,11 +234,13 @@ public class DeepLearningOperatorTests
         var result = method!.Invoke(_operator, new object?[] { "model.onnx", new[] { "Wire_Blue", "Wire_Black" }, sourceInfo });
 
         result.Should().NotBeNull();
-        GetPropertyValue<bool>(result!, "IsValid").Should().BeFalse();
-        GetPropertyValue<string>(result!, "ValidationStatus").Should().Be("Mismatch");
-        GetPropertyValue<string>(result!, "ValidationMessage").Should().Contain("Label contract mismatch");
-        GetPropertyValue<string>(result!, "ValidationMessage").Should().Contain("ModelMetadataLabels: Wire_Blue, Wire_Black");
-        GetPropertyValue<string>(result!, "ValidationMessage").Should().Contain("ExternalLabels: Wire_Black, Wire_Blue");
+        GetPropertyValue<bool>(result!, "IsValid").Should().BeTrue();
+        GetPropertyValue<string[]>(result!, "ResolvedLabels").Should().Equal("Wire_Blue", "Wire_Black");
+        GetPropertyValue<string>(result!, "ResolvedLabelSource").Should().Be("ModelMetadata");
+        GetPropertyValue<string>(result!, "ResolvedLabelPath").Should().BeEmpty();
+        GetPropertyValue<string[]>(result!, "ExternalLabels").Should().BeEmpty();
+        GetPropertyValue<string>(result!, "ValidationStatus").Should().Be("MetadataOnly");
+        GetPropertyValue<string?>(result!, "ValidationMessage").Should().BeNull();
     }
 
     [Fact]

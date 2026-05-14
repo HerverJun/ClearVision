@@ -16,11 +16,6 @@ internal static class DeepLearningLabelResolver
         string targetClassesStr,
         out string? resolvedPath)
     {
-        if (TryResolveExistingLabelPath(explicitLabelPath, modelPath, out resolvedPath))
-        {
-            return true;
-        }
-
         var requiredLabels = ParseNamedTargetClasses(targetClassesStr);
         if (TryLoadMetadataLabels(modelPath, out var metadataLabels))
         {
@@ -28,6 +23,11 @@ internal static class DeepLearningLabelResolver
             return requiredLabels.Length == 0 ||
                 requiredLabels.All(requiredLabel =>
                     metadataLabels.Any(label => string.Equals(label, requiredLabel, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (TryResolveExistingLabelPath(explicitLabelPath, modelPath, out resolvedPath))
+        {
+            return true;
         }
 
         if (requiredLabels.Length == 0)

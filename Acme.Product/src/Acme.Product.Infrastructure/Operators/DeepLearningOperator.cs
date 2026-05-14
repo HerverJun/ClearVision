@@ -78,7 +78,7 @@ public enum YoloVersion
 [OperatorParam("UseGpu", "使用GPU", "bool", DefaultValue = true)]
 [OperatorParam("GpuDeviceId", "GPU设备ID", "int", DefaultValue = 0, Min = 0, Max = 15)]
 [OperatorParam("TargetClasses", "目标类别", "string", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别", DefaultValue = "")]
-[OperatorParam("LabelsPath", "标签文件路径", "file", Description = "自定义标签文件路径（每行一个标签），为空则优先使用模型 metadata names 或自动查找模型目录下的 labels.txt；仍不可用时执行失败", DefaultValue = "")]
+[OperatorParam("LabelsPath", "标签文件路径", "file", Description = "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。", DefaultValue = "")]
 [OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。", DefaultValue = true)]
 [OperatorParam("NmsIouThreshold", "NMS IoU Threshold", "double", Description = "内部 NMS 与预览 NMS 使用的 IoU 阈值。", DefaultValue = 0.45, Min = 0.0, Max = 1.0)]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
@@ -1905,6 +1905,20 @@ public class DeepLearningOperator : OperatorBase
         string targetClassesStr)
     {
         var metadataLabels = DeepLearningLabelResolver.GetMetadataLabels(session);
+        if (metadataLabels.Length > 0)
+        {
+            return BuildLabelContract(
+                modelPath,
+                metadataLabels,
+                new LabelSourceInfo
+                {
+                    Labels = Array.Empty<string>(),
+                    Source = "IgnoredBecauseModelMetadataExists",
+                    Path = string.Empty,
+                    IsFileBacked = false
+                });
+        }
+
         var externalLabels = LoadExternalLabels(configuredLabelsPath, modelPath, targetClassesStr);
         return BuildLabelContract(modelPath, metadataLabels, externalLabels);
     }
@@ -1917,31 +1931,21 @@ public class DeepLearningOperator : OperatorBase
         if (metadataLabels.Length > 0)
         {
             Logger.LogInformation("[DeepLearning] Loaded {Count} labels from ONNX metadata.", metadataLabels.Length);
-
-            if (externalLabels.IsFileBacked && !LabelSequencesEqual(metadataLabels, externalLabels.Labels))
+            if (externalLabels.IsFileBacked)
             {
-                return new LabelContract
-                {
-                    ResolvedLabels = metadataLabels,
-                    MetadataLabels = metadataLabels,
-                    ExternalLabels = externalLabels.Labels,
-                    ResolvedLabelSource = "ModelMetadata",
-                    ResolvedLabelPath = externalLabels.Path,
-                    ValidationStatus = "Mismatch",
-                    ValidationMessage = BuildLabelContractMismatchMessage(modelPath, externalLabels, metadataLabels)
-                };
+                Logger.LogInformation(
+                    "[DeepLearning] ONNX metadata labels are authoritative; external labels file will be ignored. LabelsPath={LabelsPath}",
+                    externalLabels.Path);
             }
 
             return new LabelContract
             {
                 ResolvedLabels = metadataLabels,
                 MetadataLabels = metadataLabels,
-                ExternalLabels = externalLabels.IsFileBacked ? externalLabels.Labels : Array.Empty<string>(),
+                ExternalLabels = Array.Empty<string>(),
                 ResolvedLabelSource = "ModelMetadata",
-                ResolvedLabelPath = externalLabels.Path,
-                ValidationStatus = externalLabels.IsFileBacked
-                    ? "MetadataValidatedWithExternalLabels"
-                    : "MetadataOnly"
+                ResolvedLabelPath = string.Empty,
+                ValidationStatus = "MetadataOnly"
             };
         }
 
@@ -2029,43 +2033,6 @@ public class DeepLearningOperator : OperatorBase
         };
     }
 
-    private static bool LabelSequencesEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
-    {
-        if (left.Count != right.Count)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < left.Count; i++)
-        {
-            if (!string.Equals(left[i], right[i], StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static string BuildLabelContractMismatchMessage(
-        string modelPath,
-        LabelSourceInfo externalLabels,
-        IReadOnlyList<string> metadataLabels)
-    {
-        var externalLabelPath = string.IsNullOrWhiteSpace(externalLabels.Path)
-            ? "<not provided>"
-            : externalLabels.Path;
-
-        return string.Join(
-            Environment.NewLine,
-            "Label contract mismatch: ONNX metadata names do not match the external labels file.",
-            $"ModelPath: {modelPath}",
-            $"LabelsPath: {externalLabelPath}",
-            $"ModelMetadataLabels: {FormatLabelSequence(metadataLabels)}",
-            $"ExternalLabels: {FormatLabelSequence(externalLabels.Labels)}",
-            "Update labels.txt to match the model export order, or remove the mismatched external labels file.");
-    }
-
     private static string BuildMissingLabelContractMessage(string modelPath)
     {
         return string.Join(
@@ -2073,13 +2040,6 @@ public class DeepLearningOperator : OperatorBase
             "Label contract missing: the model does not expose ONNX metadata names and no valid labels file was found.",
             $"ModelPath: {modelPath}",
             "Provide LabelsPath, place labels.txt next to the model, or export the ONNX model with metadata names.");
-    }
-
-    private static string FormatLabelSequence(IReadOnlyList<string> labels)
-    {
-        return labels.Count == 0
-            ? "<empty>"
-            : string.Join(", ", labels);
     }
 
     private static string ResolveLabelsPath(Operator @operator)

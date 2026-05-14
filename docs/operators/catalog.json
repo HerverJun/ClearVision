@@ -1628,10 +1628,10 @@
           "options": null
         },
         {
-          "name": "LabelFile",
+          "name": "LabelsPath",
           "displayName": "标签文件路径",
           "dataType": "file",
-          "description": "自定义标签文件路径（每行一个标签），为空则使用COCO 80类或自动查找模型目录下的labels.txt",
+          "description": "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。",
           "defaultValue": "",
           "min": null,
           "max": null,

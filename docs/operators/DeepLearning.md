@@ -30,7 +30,7 @@
 | `UseGpu` | `bool` | true | - | - |
 | `GpuDeviceId` | `int` | 0 | [0, 15] | - |
 | `TargetClasses` | `string` | "" | - | 检测目标类别（逗号分隔，如 person,car），为空则检测所有类别 |
-| `LabelFile` | `file` | "" | - | 自定义标签文件路径（每行一个标签），为空则使用COCO 80类或自动查找模型目录下的labels.txt |
+| `LabelsPath` | `file` | "" | - | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
 | `DetectionMode` | `enum` | Defect | - | 缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK) |
 
 ## 输入/输出端口 / Input/Output Ports
