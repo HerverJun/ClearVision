@@ -42,6 +42,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IClarificationEngine, ClarificationEngine>();
         services.AddScoped<ITemplateConstraintValidator, TemplateConstraintValidator>();
         services.AddScoped<IAiFlowValidator, AiFlowValidator>();
+        services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();
         services.AddScoped<GenerateFlowMessageHandler>();

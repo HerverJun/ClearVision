@@ -24,7 +24,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateFlowAsync_InvalidJson_ShouldReturnManualRetryWithoutRetryingModel()
+    public async Task GenerateFlowAsync_InvalidJson_ShouldReturnManualRetryAfterAutoRepairRetries()
     {
         var connector = Substitute.For<IAiConnector>();
         connector.StreamCompleteAsync(
@@ -51,10 +51,11 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         result.ManualRetry!.Required.Should().BeTrue();
         result.ManualRetry.Stage.Should().Be("parse");
         result.ManualRetry.Draft.Should().Contain("请只返回一个完整且可解析的 JSON 对象");
-        result.LastAttemptDiagnostics.Should().ContainSingle();
-        result.LastAttemptDiagnostics[0].Stage.Should().Be("parse");
+        result.RetryCount.Should().Be(2);
+        result.LastAttemptDiagnostics.Should().HaveCount(3);
+        result.LastAttemptDiagnostics.Should().OnlyContain(item => item.Stage == "parse");
 
-        await connector.Received(1).StreamCompleteAsync(
+        await connector.Received(3).StreamCompleteAsync(
             Arg.Any<string>(),
             Arg.Any<List<ChatMessage>>(),
             Arg.Any<Action<AiStreamChunk>>(),
@@ -66,6 +67,47 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         session!.History.Last().Payload.Should().NotBeNull();
         session.History.Last().Payload!.ManualRetry.Should().NotBeNull();
         session.History.Last().Payload!.ManualRetry!.Stage.Should().Be("parse");
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should automatically repair parse failures before manual retry")]
+    public async Task GenerateFlowAsync_InvalidJsonThenValidJson_ShouldRepairAutomatically()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = "not json"
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "Generate a basic inspection flow.",
+            SessionId: "parse-auto-repair"));
+
+        result.Success.Should().BeTrue();
+        result.RetryCount.Should().Be(1);
+        result.ManualRetry.Should().BeNull();
+
+        await connector.Received(2).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+        validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
     }
 
     [Fact(DisplayName = "GenerateFlowAsync should extract a complete JSON object with trailing text")]
@@ -103,6 +145,119 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
     }
 
+    [Fact(DisplayName = "GenerateFlowAsync should unwrap a workflow envelope before validation")]
+    public async Task GenerateFlowAsync_ResponseWrappedInWorkflowEnvelope_ShouldUnwrapBeforeValidation()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = "{\"parametersNeedingReview\":{\"op_1\":[\"FilePath\"]},\"workflow\":" + BuildSuccessfulFlowJson() + "}"
+            }));
+
+        AiGeneratedFlowJson? validatedFlow = null;
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Do<AiGeneratedFlowJson>(flow => validatedFlow = flow))
+            .Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "Generate a basic inspection flow.",
+            SessionId: "parse-workflow-envelope"));
+
+        result.Success.Should().BeTrue();
+        validatedFlow.Should().NotBeNull();
+        validatedFlow!.Operators.Should().HaveCount(2);
+        validatedFlow.Connections.Should().BeEmpty();
+        validatedFlow.ParametersNeedingReview["op_1"].Should().ContainSingle("FilePath");
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should normalize common workflow field aliases before validation")]
+    public async Task GenerateFlowAsync_ResponseWithCommonAliases_ShouldNormalizeBeforeValidation()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = """
+                          {
+                            "summary": "Alias shaped response.",
+                            "nodes": [
+                              {
+                                "id": "op_1",
+                                "type": "ImageAcquisition",
+                                "name": "Camera",
+                                "params": {
+                                  "SourceType": "File",
+                                  "FilePath": "data/input.png",
+                                  "CameraId": "cam_1"
+                                }
+                              },
+                              {
+                                "id": "op_2",
+                                "operator_id": "ResultOutput",
+                                "label": "Output",
+                                "settings": {
+                                  "Format": "JSON",
+                                  "SaveToFile": false
+                                }
+                              }
+                            ],
+                            "edges": [
+                              {
+                                "from": "op_1.Image",
+                                "to": "op_2.Result"
+                              }
+                            ],
+                            "parameters_to_review": [
+                              {
+                                "operatorId": "op_1",
+                                "parameters": ["FilePath"]
+                              },
+                              "op_2.Format"
+                            ]
+                          }
+                          """
+            }));
+
+        AiGeneratedFlowJson? validatedFlow = null;
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Do<AiGeneratedFlowJson>(flow => validatedFlow = flow))
+            .Returns(new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "Generate a basic inspection flow.",
+            SessionId: "parse-common-aliases"));
+
+        result.Success.Should().BeTrue();
+        validatedFlow.Should().NotBeNull();
+        validatedFlow!.Explanation.Should().Be("Alias shaped response.");
+        validatedFlow.Operators.Should().HaveCount(2);
+        validatedFlow.Operators[0].TempId.Should().Be("op_1");
+        validatedFlow.Operators[0].OperatorType.Should().Be("ImageAcquisition");
+        validatedFlow.Operators[1].Parameters["SaveToFile"].Should().Be("false");
+        validatedFlow.Connections.Should().ContainSingle(connection =>
+            connection.SourceTempId == "op_1" &&
+            connection.SourcePortName == "Image" &&
+            connection.TargetTempId == "op_2" &&
+            connection.TargetPortName == "Result");
+        validatedFlow.ParametersNeedingReview["op_1"].Should().ContainSingle("FilePath");
+        validatedFlow.ParametersNeedingReview["op_2"].Should().ContainSingle("Format");
+    }
+
     [Fact(DisplayName = "GenerateFlowAsync should route truncated JSON to manual retry without converter exceptions")]
     public async Task GenerateFlowAsync_TruncatedJsonParameterValue_ShouldReturnManualRetry()
     {
@@ -138,8 +293,9 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeManualRetryRequired);
         result.ManualRetry.Should().NotBeNull();
         result.ManualRetry!.Stage.Should().Be("parse");
-        result.LastAttemptDiagnostics.Should().ContainSingle();
-        result.LastAttemptDiagnostics[0].Stage.Should().Be("parse");
+        result.RetryCount.Should().Be(2);
+        result.LastAttemptDiagnostics.Should().HaveCount(3);
+        result.LastAttemptDiagnostics.Should().OnlyContain(item => item.Stage == "parse");
         validator.DidNotReceive().Validate(Arg.Any<AiGeneratedFlowJson>());
     }
 
@@ -187,6 +343,14 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 Arg.Any<Action<AiStreamChunk>>(),
                 Arg.Any<CancellationToken>())
             .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = "not json"
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = "not json"
+                }),
                 Task.FromResult(new AiCompletionResult
                 {
                     Content = "not json"
@@ -273,7 +437,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         second.RequirementBrief!.ClarificationRequired.Should().BeFalse();
         second.RequirementBrief.KnownFacts.Should().Contain("本轮是上一轮格式/结构失败后的手动修复，不重新进入需求澄清。");
 
-        await connector.Received(2).StreamCompleteAsync(
+        await connector.Received(4).StreamCompleteAsync(
             Arg.Any<string>(),
             Arg.Any<List<ChatMessage>>(),
             Arg.Any<Action<AiStreamChunk>>(),
@@ -281,7 +445,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateFlowAsync_InvalidStructure_ShouldReturnManualRetryWithoutRetryingModel()
+    public async Task GenerateFlowAsync_InvalidStructure_ShouldReturnManualRetryAfterAutoRepairRetries()
     {
         var connector = Substitute.For<IAiConnector>();
         connector.StreamCompleteAsync(
@@ -316,27 +480,78 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeManualRetryRequired);
         result.ManualRetry.Should().NotBeNull();
         result.ManualRetry!.Stage.Should().Be("validation");
-        result.LastAttemptDiagnostics.Should().ContainSingle();
-        result.LastAttemptDiagnostics[0].Stage.Should().Be("validation");
-        result.LastAttemptDiagnostics[0].Issues.Should().ContainSingle();
-        result.LastAttemptDiagnostics[0].Issues[0].Code.Should().Be("missing_parameter");
-        result.ManualRetry.Diagnostics.Should().ContainSingle();
+        result.RetryCount.Should().Be(2);
+        result.LastAttemptDiagnostics.Should().HaveCount(3);
+        result.LastAttemptDiagnostics.Should().OnlyContain(item => item.Stage == "validation");
+        result.LastAttemptDiagnostics.Last().Issues.Should().ContainSingle();
+        result.LastAttemptDiagnostics.Last().Issues[0].Code.Should().Be("missing_parameter");
+        result.ManualRetry.Diagnostics.Should().HaveCount(3);
         result.ManualRetry.RepairTarget.Should().Contain("ResultOutput");
 
-        await connector.Received(1).StreamCompleteAsync(
+        await connector.Received(3).StreamCompleteAsync(
             Arg.Any<string>(),
             Arg.Any<List<ChatMessage>>(),
             Arg.Any<Action<AiStreamChunk>>(),
             Arg.Any<CancellationToken>());
-        validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
+        validator.Received(3).Validate(Arg.Any<AiGeneratedFlowJson>());
 
         var session = conversationService.GetSession("validation-manual-retry");
         session.Should().NotBeNull();
         session!.History.Last().Payload.Should().NotBeNull();
         session.History.Last().Payload!.Failure.Should().NotBeNull();
-        session.History.Last().Payload!.Failure!.Diagnostics.Should().ContainSingle();
+        session.History.Last().Payload!.Failure!.Diagnostics.Should().HaveCount(3);
         session.History.Last().Payload!.ManualRetry.Should().NotBeNull();
         session.History.Last().Payload!.ManualRetry!.Stage.Should().Be("validation");
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should automatically repair validation failures before manual retry")]
+    public async Task GenerateFlowAsync_InvalidStructureThenValidStructure_ShouldRepairAutomatically()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+
+        var validation = new AiValidationResult();
+        validation.AddError(
+            "缺少 ResultOutput 的必填输入参数",
+            code: "missing_parameter",
+            category: "validation",
+            relatedFields: ["operators[0].parameters.Result"],
+            repairHint: "请补齐 ResultOutput 的输入参数。");
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>())
+            .Returns(validation, new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "Generate a basic inspection flow.",
+            SessionId: "validation-auto-repair"));
+
+        result.Success.Should().BeTrue();
+        result.RetryCount.Should().Be(1);
+        result.ManualRetry.Should().BeNull();
+
+        await connector.Received(2).StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+        validator.Received(2).Validate(Arg.Any<AiGeneratedFlowJson>());
     }
 
     [Fact]
@@ -925,6 +1140,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             scenarioMatcher,
             requirementBriefExtractor,
             templateConstraintValidator,
+            new AiFlowResponseParser(),
             new DryRunService(flowExecutionService),
             hostEnvironment,
             promptVersionManager,

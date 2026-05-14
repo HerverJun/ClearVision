@@ -34,6 +34,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IRequirementBriefExtractor _requirementBriefExtractor;
     private readonly ClarificationEngine _clarificationEngine = new();
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
+    private readonly IAiFlowResponseParser _responseParser;
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IPromptVersionManager _promptVersionManager;
@@ -59,6 +60,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IScenarioMatcher scenarioMatcher,
         IRequirementBriefExtractor requirementBriefExtractor,
         ITemplateConstraintValidator templateConstraintValidator,
+        IAiFlowResponseParser responseParser,
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
         IPromptVersionManager promptVersionManager,
@@ -74,6 +76,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _scenarioMatcher = scenarioMatcher;
         _requirementBriefExtractor = requirementBriefExtractor;
         _templateConstraintValidator = templateConstraintValidator;
+        _responseParser = responseParser;
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
         _promptVersionManager = promptVersionManager;
@@ -416,30 +419,38 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 // 推送：解析结果
                 ReportProgress("收到 AI 响应，正在解析 JSON 数据...");
                 // 解析 AI 输出的 JSON
-                generatedFlow = pipeline.Measure(
+                var parseResult = pipeline.Measure(
                     "parse",
-                    () => ParseAiResponse(rawResponse ?? string.Empty),
-                    flow => flow == null ? "parse failed" : $"operators={flow.Operators?.Count ?? 0}, connections={flow.Connections?.Count ?? 0}");
+                    () => _responseParser.Parse(rawResponse ?? string.Empty),
+                    result => result.Success
+                        ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
+                        : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
+                generatedFlow = parseResult.Flow;
                 if (generatedFlow == null)
                 {
-                    lastValidation = new AiValidationResult();
-                    lastValidation.AddError(
-                        "AI 返回的内容不是合法的 JSON 格式",
-                        code: "invalid_json",
-                        category: "format",
-                        relatedFields: ["response.content"],
-                        repairHint: "请只返回一个完整 JSON 对象，不要附加 markdown、解释文本或多余前后缀。");
-                    lastAttemptDiagnostics = BuildAttemptDiagnostics(
+                    lastValidation = BuildParseValidationResult(parseResult);
+                    lastAttemptDiagnostics.AddRange(BuildAttemptDiagnostics(
                         attempt + 1,
                         "parse",
                         lastValidation,
-                        lastRawResponse);
+                        lastRawResponse));
+                    if (attempt < options.MaxRetries)
+                    {
+                        retryCount++;
+                        ReportProgress($"AI 输出未通过解析，正在自动修复（第 {retryCount}/{options.MaxRetries} 次）...");
+                        currentUserMessage = BuildUserChatMessage(
+                            BuildRetryMessage(request.Description, lastValidation, lastRawResponse),
+                            activeSendablePaths);
+                        continue;
+                    }
+
                     return CreateManualRetryResult(
                         stage: "parse",
                         conversationContext.SessionId,
                         request.Description,
                         lastValidation,
                         lastAttemptDiagnostics,
+                        retryCount,
                         lastRawResponse,
                         promptTrace,
                         progressMessages,
@@ -474,11 +485,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                             : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
                     MergeValidationResult(lastValidation, templateGate);
                 }
-                lastAttemptDiagnostics = BuildAttemptDiagnostics(
+                lastAttemptDiagnostics.AddRange(BuildAttemptDiagnostics(
                     attempt + 1,
                     "validation",
                     lastValidation,
-                    lastRawResponse);
+                    lastRawResponse));
                 if (lastValidation.IsValid)
                 {
                     // 校验通过，转换为 DTO 并返回
@@ -571,20 +582,31 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
                 _logger.LogWarning("AI 生成内容校验失败，错误：{Errors}",
                     string.Join("; ", lastValidation.Errors));
+                if (attempt < options.MaxRetries)
+                {
+                    retryCount++;
+                    ReportProgress($"AI 输出未通过结构校验，正在自动修复（第 {retryCount}/{options.MaxRetries} 次）...");
+                    currentUserMessage = BuildUserChatMessage(
+                        BuildRetryMessage(request.Description, lastValidation, lastRawResponse),
+                        activeSendablePaths);
+                    continue;
+                }
+
                 return CreateManualRetryResult(
                     stage: "validation",
                     conversationContext.SessionId,
                     request.Description,
                     lastValidation,
                     lastAttemptDiagnostics,
-                        lastRawResponse,
-                        promptTrace,
-                        progressMessages,
-                        requirementBrief,
-                        templatePriority.GenerationMode,
-                        templatePriority.TemplateLockLevel,
-                        BuildTemplateCandidates(templatePriority),
-                        pipeline.Timeline.ToList());
+                    retryCount,
+                    lastRawResponse,
+                    promptTrace,
+                    progressMessages,
+                    requirementBrief,
+                    templatePriority.GenerationMode,
+                    templatePriority.TemplateLockLevel,
+                    BuildTemplateCandidates(templatePriority),
+                    pipeline.Timeline.ToList());
             }
             catch (OperationCanceledException)
             {
@@ -2330,7 +2352,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         {
             sb.AppendLine();
             sb.AppendLine("Previous assistant output summary:");
-            sb.AppendLine(SummarizeLastOutput(lastRawResponse));
+            sb.AppendLine(_responseParser.Summarize(lastRawResponse));
             sb.AppendLine();
             sb.AppendLine("Previous assistant output to fix:");
             sb.AppendLine("```json");
@@ -2451,6 +2473,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         string originalMessage,
         AiValidationResult validation,
         List<AiAttemptDiagnostic> diagnostics,
+        int retryCount,
         string? lastRawResponse,
         object? promptTrace,
         IReadOnlyList<string> progressMessages,
@@ -2462,7 +2485,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         var failureSummary = BuildFailureSummary(
             validation,
-            retryCount: 0,
+            retryCount: retryCount,
             message: BuildManualRetrySummary(stage, validation),
             lastRawResponse: lastRawResponse,
             fallbackCode: stage == "parse" ? "invalid_json" : "validation_failed",
@@ -2500,6 +2523,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             FailureSummary = failureSummary,
             LastAttemptDiagnostics = diagnostics,
             ManualRetry = manualRetry,
+            RetryCount = retryCount,
             SessionId = sessionId,
             PromptTrace = promptTrace,
             RequirementBrief = requirementBrief,
@@ -2521,7 +2545,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return $"AI 输出未通过{label}，请根据诊断信息修正后重试。";
     }
 
-    private static string BuildManualRetryDraft(
+    private string BuildManualRetryDraft(
         string originalMessage,
         AiValidationResult validation,
         string? lastRawResponse,
@@ -2573,7 +2597,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         {
             sb.AppendLine();
             sb.AppendLine("上一轮输出摘要：");
-            sb.AppendLine(SummarizeLastOutput(lastRawResponse));
+            sb.AppendLine(_responseParser.Summarize(lastRawResponse));
             sb.AppendLine();
             sb.AppendLine("上一轮模型原始输出（可能不是合法 JSON，请在此基础上修复）：");
             sb.AppendLine("---BEGIN PREVIOUS OUTPUT---");
@@ -2639,7 +2663,23 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                string.Join("; ", validation?.Errors ?? new List<string>());
     }
 
-    private static List<AiAttemptDiagnostic> BuildAttemptDiagnostics(
+    private static AiValidationResult BuildParseValidationResult(AiFlowParseResult parseResult)
+    {
+        var validation = new AiValidationResult();
+        validation.AddError(
+            string.IsNullOrWhiteSpace(parseResult.Message)
+                ? "AI 返回的内容无法解析为工作流 JSON"
+                : parseResult.Message,
+            code: string.IsNullOrWhiteSpace(parseResult.Code) ? "invalid_json" : parseResult.Code,
+            category: string.IsNullOrWhiteSpace(parseResult.Category) ? "format" : parseResult.Category,
+            relatedFields: ["response.content"],
+            repairHint: string.IsNullOrWhiteSpace(parseResult.RepairHint)
+                ? "请只返回一个完整 JSON 对象，不要附加 markdown、解释文本或多余前后缀。"
+                : parseResult.RepairHint);
+        return validation;
+    }
+
+    private List<AiAttemptDiagnostic> BuildAttemptDiagnostics(
         int attemptNumber,
         string stage,
         AiValidationResult validation,
@@ -2652,7 +2692,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 AttemptNumber = attemptNumber,
                 Stage = stage,
                 Summary = BuildAttemptSummary(validation),
-                OutputSummary = SummarizeLastOutput(lastRawResponse),
+                OutputSummary = _responseParser.Summarize(lastRawResponse),
                 Issues = validation.Diagnostics.Select(CloneDiagnostic).ToList()
             }
         ];
@@ -2684,7 +2724,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return "本轮未记录结构化诊断。";
     }
 
-    private static AiFailureSummary BuildFailureSummary(
+    private AiFailureSummary BuildFailureSummary(
         AiValidationResult? validation,
         int retryCount,
         string message,
@@ -2701,7 +2741,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             RepairTarget = BuildRepairTargets(validation).FirstOrDefault()
                 ?? "根据最近一次诊断修复工作流 JSON 后重试。",
             RetryCount = retryCount,
-            LastOutputSummary = SummarizeLastOutput(lastRawResponse)
+            LastOutputSummary = _responseParser.Summarize(lastRawResponse)
         };
     }
 
@@ -2813,160 +2853,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             payload: payload);
     }
 
-    private static string SummarizeLastOutput(string? lastRawResponse)
-    {
-        if (string.IsNullOrWhiteSpace(lastRawResponse))
-            return "最近一次模型未返回可用正文。";
-
-        var normalized = NormalizeJsonEnvelope(lastRawResponse);
-        try
-        {
-            var parsed = JsonSerializer.Deserialize<AiGeneratedFlowJson>(normalized, _jsonOptions);
-            if (parsed != null)
-            {
-                return $"最近一次输出包含 {parsed.Operators?.Count ?? 0} 个算子、" +
-                       $"{parsed.Connections?.Count ?? 0} 条连线，说明文本长度 {parsed.Explanation?.Length ?? 0}。";
-            }
-        }
-        catch
-        {
-            // fallback below
-        }
-
-        var trimmed = TrimRetryOutput(lastRawResponse)
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal);
-        if (trimmed.Length > 160)
-            trimmed = trimmed[..160] + "...";
-
-        return $"最近一次输出未能解析为标准工作流 JSON，长度 {lastRawResponse.Trim().Length} 字符，片段：{trimmed}";
-    }
-
-    private static string NormalizeJsonEnvelope(string rawResponse)
-    {
-        var json = StripJsonFences(rawResponse);
-        var candidate = EnumerateBalancedJsonObjects(json).FirstOrDefault();
-        return candidate ?? string.Empty;
-    }
-
-    private static string StripJsonFences(string rawResponse)
-    {
-        var json = rawResponse.Trim();
-        if (json.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
-            json = json[7..];
-        else if (json.StartsWith("```", StringComparison.OrdinalIgnoreCase))
-            json = json[3..];
-
-        if (json.EndsWith("```", StringComparison.OrdinalIgnoreCase))
-            json = json[..^3];
-
-        return json.Trim();
-    }
-
-    private static List<string> EnumerateBalancedJsonObjects(string text)
-    {
-        var objects = new List<string>();
-        if (string.IsNullOrWhiteSpace(text))
-            return objects;
-
-        var start = -1;
-        var depth = 0;
-        var inString = false;
-        var escaped = false;
-
-        for (var i = 0; i < text.Length; i++)
-        {
-            var ch = text[i];
-            if (inString)
-            {
-                if (escaped)
-                {
-                    escaped = false;
-                    continue;
-                }
-
-                if (ch == '\\')
-                {
-                    escaped = true;
-                    continue;
-                }
-
-                if (ch == '"')
-                {
-                    inString = false;
-                }
-
-                continue;
-            }
-
-            if (ch == '"')
-            {
-                inString = true;
-                continue;
-            }
-
-            if (ch == '{')
-            {
-                if (depth == 0)
-                    start = i;
-                depth++;
-                continue;
-            }
-
-            if (ch == '}' && depth > 0)
-            {
-                depth--;
-                if (depth == 0 && start >= 0)
-                {
-                    objects.Add(text[start..(i + 1)]);
-                    start = -1;
-                }
-            }
-        }
-
-        return objects;
-    }
-
-    private static bool LooksLikeGeneratedFlowJson(string json)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            var root = document.RootElement;
-            return root.ValueKind == JsonValueKind.Object &&
-                   (HasProperty(root, "operators") ||
-                    HasProperty(root, "connections") ||
-                    HasProperty(root, "parametersNeedingReview") ||
-                    HasProperty(root, "explanation"));
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private static bool HasProperty(JsonElement element, string propertyName)
-    {
-        return element.ValueKind == JsonValueKind.Object &&
-               element.EnumerateObject().Any(property =>
-                   property.NameEquals(propertyName) ||
-                   string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool TryDeserializeGeneratedFlow(string json, out AiGeneratedFlowJson? flow)
-    {
-        try
-        {
-            flow = JsonSerializer.Deserialize<AiGeneratedFlowJson>(json, _jsonOptions);
-            return flow != null;
-        }
-        catch (JsonException)
-        {
-            flow = null;
-            return false;
-        }
-    }
-
     private static AiValidationDiagnostic CloneDiagnostic(AiValidationDiagnostic source)
     {
         return new AiValidationDiagnostic
@@ -2996,57 +2882,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             OutputSummary = source.OutputSummary,
             Issues = source.Issues?.Select(CloneDiagnostic).ToList() ?? new List<AiValidationDiagnostic>()
         };
-    }
-
-    private AiGeneratedFlowJson? ParseAiResponse(string rawResponse)
-    {
-        try
-        {
-            _logger.LogDebug("AI 原始响应前 500 字符：{Preview}",
-                rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse);
-
-            // 清理 Markdown 包装并从混合文本中提取完整 JSON 对象。
-            var json = StripJsonFences(rawResponse);
-            var candidates = EnumerateBalancedJsonObjects(json);
-
-            if (candidates.Count == 0)
-            {
-                _logger.LogError(null, "AI 响应中找不到完整 JSON 对象，响应内容前 200 字符：{Content}",
-                    json.Length > 200 ? json.Substring(0, 200) : json);
-                return null;
-            }
-
-            var orderedCandidates = candidates
-                .Select((candidate, index) => new { Candidate = candidate, Index = index })
-                .Where(item => LooksLikeGeneratedFlowJson(item.Candidate))
-                .OrderByDescending(item => item.Index)
-                .Select(item => item.Candidate)
-                .Concat(candidates.AsEnumerable().Reverse())
-                .Distinct(StringComparer.Ordinal);
-
-            foreach (var candidate in orderedCandidates)
-            {
-                if (TryDeserializeGeneratedFlow(candidate, out var flow))
-                {
-                    if (!string.Equals(candidate, json, StringComparison.Ordinal))
-                    {
-                        _logger.LogInformation("Extracted JSON object from AI response. Length={Length}", candidate.Length);
-                    }
-
-                    return flow;
-                }
-            }
-
-            _logger.LogWarning("AI 响应中找到 {CandidateCount} 个 JSON 对象片段，但均无法反序列化为工作流。", candidates.Count);
-            return null;
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogWarning("解析 AI 响应 JSON 失败：{Error}，响应内容前 300 字符：{Content}",
-                ex.Message,
-                rawResponse.Length > 300 ? rawResponse[..300] + "..." : rawResponse);
-            return null;
-        }
     }
 
     private (OperatorFlowDto Flow, Dictionary<string, string> ActualOperatorIdMap) ConvertToFlowDto(
