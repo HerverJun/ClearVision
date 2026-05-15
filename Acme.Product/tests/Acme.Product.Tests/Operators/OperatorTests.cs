@@ -214,6 +214,45 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithFrameDrivenCameraBinding_ShouldUseSharedStreamWithoutOpeningCameraDirectly()
+    {
+        using var frameMat = new Mat(5, 7, MatType.CV_8UC3, new Scalar(20, 40, 60));
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-shared",
+                SerialNumber = "SN-SHARED",
+                TriggerMode = "External"
+            }
+        });
+
+        var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+        streamCoordinator.AcquireFrameAsync("cam-shared", Arg.Any<CancellationToken>())
+            .Returns(new CameraStreamFrame("cam-shared", frameMat.ToBytes(".png"), "image/png", 7, 5, 1, DateTime.UtcNow));
+
+        var sut = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager,
+            streamCoordinator);
+
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "cam-shared"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Width"].Should().Be(7);
+        result.OutputData["Height"].Should().Be(5);
+        result.OutputData["Source"].Should().Be("external");
+        await streamCoordinator.Received(1).AcquireFrameAsync("cam-shared", Arg.Any<CancellationToken>());
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact]
     public void ValidateParameters_WithValidOperator_ShouldReturnValid()
     {
         var op = CreateTestOperator();

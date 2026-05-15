@@ -432,6 +432,8 @@ public class CameraBindingConfig
 
     public string TriggerMode { get; set; } = "Software";
 
+    public string HardwareTriggerSource { get; set; } = "Line0";
+
     public string SoftwareTriggerSource { get; set; } = "Manual";
 
     public int EnterPhotoelectricDebounceMs { get; set; } = 200;
@@ -457,6 +459,7 @@ public class CameraBindingConfig
         InterfaceType = InterfaceType?.Trim() ?? string.Empty;
         TriggerMode = Acme.Product.Core.Cameras.CameraTriggerModeExtensions.ToConfigValue(
             Acme.Product.Core.Cameras.CameraTriggerModeExtensions.Normalize(TriggerMode));
+        HardwareTriggerSource = Acme.Product.Core.Cameras.CameraHardwareTriggerSourceExtensions.Normalize(HardwareTriggerSource);
         SoftwareTriggerSource = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.ToConfigValue(
             Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.Normalize(SoftwareTriggerSource));
         EnterPhotoelectricDebounceMs = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.NormalizeEnterPhotoelectricDebounceMs(EnterPhotoelectricDebounceMs);

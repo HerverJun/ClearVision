@@ -22,6 +22,7 @@ public interface ICameraFrameStreamCoordinator : IAsyncDisposable
     bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame);
     IReadOnlyList<FrameEnvelope> GetFrameEnvelopeWindow(string cameraId, long centerSequence, int before, int after);
     RingBufferStats SnapshotFrameBufferStats(string cameraId);
+    CameraStreamUsageSnapshot SnapshotStreamUsage(string cameraId);
 }
 
 public sealed record CameraStreamFrame(
@@ -54,3 +55,12 @@ public sealed record RingBufferStats(
     long OverwrittenCount,
     long? OldestSequence,
     long? LatestSequence);
+
+public sealed record CameraStreamUsageSnapshot(
+    string CameraBindingId,
+    bool IsRunning,
+    int LeaseCount,
+    int PreviewSessionCount,
+    int PendingFrameWaiters,
+    CameraTriggerMode TriggerMode,
+    int TargetFrameRateFps);

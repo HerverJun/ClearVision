@@ -804,7 +804,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 Acme.Product.Application.DTOs.ImageDto? imageDto = null;
                 try
                 {
-                    imageDto = await imageAcquisition.AcquireFromCameraAsync(cameraId);
+                    imageDto = await imageAcquisition.AcquireFromCameraAsync(cameraId, ct);
                     if (!string.IsNullOrEmpty(imageDto.DataBase64))
                     {
                         var imageData = Convert.FromBase64String(imageDto.DataBase64);

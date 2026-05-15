@@ -281,6 +281,8 @@ public class ContinuousRuntimeTests
             _frames.Where(frame => frame.Sequence >= centerSequence - before && frame.Sequence <= centerSequence + after).ToList();
 
         public RingBufferStats SnapshotFrameBufferStats(string cameraId) => new(_frames.Count, _frames.Count, 0, _frames.First().Sequence, _frames.Last().Sequence);
+        public CameraStreamUsageSnapshot SnapshotStreamUsage(string cameraId) =>
+            new(cameraId, true, 0, 0, 0, CameraTriggerMode.Continuous, 25);
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 

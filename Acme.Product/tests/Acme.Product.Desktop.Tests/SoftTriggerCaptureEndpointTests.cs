@@ -209,6 +209,28 @@ public class SoftTriggerCaptureEndpointTests
     }
 
     [Fact]
+    public async Task SoftTriggerCapture_WithExternalTriggerBinding_ShouldReturnBadRequest()
+    {
+        const string bindingId = "cam-external";
+        var binding = new CameraBindingConfig
+        {
+            Id = bindingId,
+            SerialNumber = "SN-EXT",
+            TriggerMode = "External"
+        };
+
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(cameraManager);
+        var response = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = bindingId });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("不是 Software 触发模式");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task SoftTriggerCapture_WithInvalidPngBytes_ShouldReturnBadRequest()
     {
         const string bindingId = "cam-bind-2";

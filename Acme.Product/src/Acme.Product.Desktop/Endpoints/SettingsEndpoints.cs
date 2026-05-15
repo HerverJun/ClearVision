@@ -4,6 +4,7 @@
 
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Application.Services;
@@ -44,6 +45,10 @@ public static class SettingsEndpoints
 
             try
             {
+                var currentConfig = await configService.LoadAsync();
+                config.Cameras = NormalizeBindings(CloneBindings(currentConfig.Cameras));
+                config.ActiveCameraId = currentConfig.ActiveCameraId ?? string.Empty;
+
                 await configService.SaveAsync(config);
                 return Results.Ok(new { Message = "设置已保存" });
             }
@@ -366,6 +371,7 @@ public static class SettingsEndpoints
                     binding.ExposureTimeUs,
                     binding.GainDb,
                     binding.TriggerMode,
+                    binding.HardwareTriggerSource,
                     binding.SoftwareTriggerSource,
                     binding.EnterPhotoelectricDebounceMs,
                     binding.EnterPhotoelectricTimeoutMs,
@@ -383,12 +389,70 @@ public static class SettingsEndpoints
         app.MapPut("/api/cameras/bindings", async (
             Acme.Product.Application.DTOs.UpdateCameraBindingsRequest request,
             Acme.Product.Core.Cameras.ICameraManager cameraManager,
+            ICameraFrameStreamCoordinator streamCoordinator,
             IConfigurationService configService) =>
         {
             try
             {
                 // 1. 更新 CameraManager 内存状态
+                var existingBindings = NormalizeBindings(CloneBindings(cameraManager.GetBindings()));
                 var normalizedBindings = NormalizeBindings(request.Bindings);
+                var changedActiveConflicts = normalizedBindings
+                    .Select(binding =>
+                    {
+                        var existing = existingBindings.FirstOrDefault(item =>
+                            item.Id.Equals(binding.Id, StringComparison.OrdinalIgnoreCase));
+                        var usage = SnapshotStreamUsageOrDefault(streamCoordinator, binding.Id);
+                        return new { binding, existing, usage };
+                    })
+                    .Where(item =>
+                        item.existing != null &&
+                        item.usage.IsRunning &&
+                        HasRuntimeCameraSettingsChanged(item.existing, item.binding))
+                    .Select(item => new
+                    {
+                        CameraBindingId = item.binding.Id,
+                        item.binding.DisplayName,
+                        item.usage.LeaseCount,
+                        item.usage.PreviewSessionCount,
+                        item.usage.PendingFrameWaiters,
+                        TriggerMode = item.usage.TriggerMode.ToConfigValue()
+                    })
+                    .ToList();
+
+                var removedActiveConflicts = existingBindings
+                    .Where(existing => !normalizedBindings.Any(binding =>
+                        binding.Id.Equals(existing.Id, StringComparison.OrdinalIgnoreCase)))
+                    .Select(existing => new
+                    {
+                        binding = existing,
+                        usage = SnapshotStreamUsageOrDefault(streamCoordinator, existing.Id)
+                    })
+                    .Where(item => item.usage.IsRunning)
+                    .Select(item => new
+                    {
+                        CameraBindingId = item.binding.Id,
+                        item.binding.DisplayName,
+                        item.usage.LeaseCount,
+                        item.usage.PreviewSessionCount,
+                        item.usage.PendingFrameWaiters,
+                        TriggerMode = item.usage.TriggerMode.ToConfigValue()
+                    })
+                    .ToList();
+
+                var activeConflicts = changedActiveConflicts
+                    .Concat(removedActiveConflicts)
+                    .ToList();
+
+                if (activeConflicts.Count > 0)
+                {
+                    return Results.Conflict(new
+                    {
+                        Error = "相机流正在运行，不能直接保存会影响采集的相机参数。请先停止预览或检测，再保存。",
+                        ActiveStreams = activeConflicts
+                    });
+                }
+
                 cameraManager.UpdateBindings(normalizedBindings, request.ActiveCameraId);
 
                 // 2. 持久化到 AppConfig
@@ -429,6 +493,13 @@ public static class SettingsEndpoints
                 }
 
                 binding.Normalize();
+                if (CameraTriggerModeExtensions.Normalize(binding.TriggerMode) != CameraTriggerMode.Software)
+                {
+                    return Results.BadRequest(new
+                    {
+                        Error = "当前相机绑定不是 Software 触发模式，请使用共享帧流预览/取图接口。"
+                    });
+                }
 
                 var camera = await cameraManager.GetOrCreateByBindingAsync(request.CameraBindingId);
 
@@ -670,6 +741,102 @@ public static class SettingsEndpoints
                 return binding;
             })
             .ToList();
+    }
+
+    private static IEnumerable<CameraBindingConfig> CloneBindings(IEnumerable<CameraBindingConfig>? bindings)
+    {
+        return (bindings ?? Enumerable.Empty<CameraBindingConfig>()).Select(binding => new CameraBindingConfig
+        {
+            Id = binding.Id,
+            DisplayName = binding.DisplayName,
+            SerialNumber = binding.SerialNumber,
+            IpAddress = binding.IpAddress,
+            Manufacturer = binding.Manufacturer,
+            ModelName = binding.ModelName,
+            InterfaceType = binding.InterfaceType,
+            IsEnabled = binding.IsEnabled,
+            ExposureTimeUs = binding.ExposureTimeUs,
+            GainDb = binding.GainDb,
+            TriggerMode = binding.TriggerMode,
+            HardwareTriggerSource = binding.HardwareTriggerSource,
+            SoftwareTriggerSource = binding.SoftwareTriggerSource,
+            EnterPhotoelectricDebounceMs = binding.EnterPhotoelectricDebounceMs,
+            EnterPhotoelectricTimeoutMs = binding.EnterPhotoelectricTimeoutMs,
+            IgnoreEnterTriggerWhileBusy = binding.IgnoreEnterTriggerWhileBusy,
+            EnterPhotoelectricDeviceId = binding.EnterPhotoelectricDeviceId,
+            TargetFrameRateFps = binding.TargetFrameRateFps,
+            ContinuousInspection = CloneContinuousInspection(binding.ContinuousInspection)
+        });
+    }
+
+    private static CameraStreamUsageSnapshot SnapshotStreamUsageOrDefault(
+        ICameraFrameStreamCoordinator streamCoordinator,
+        string cameraBindingId)
+    {
+        return streamCoordinator.SnapshotStreamUsage(cameraBindingId)
+            ?? new CameraStreamUsageSnapshot(
+                cameraBindingId,
+                false,
+                0,
+                0,
+                0,
+                CameraTriggerMode.Software,
+                CameraTriggerModeExtensions.DefaultTargetFrameRateFps);
+    }
+
+    private static ContinuousInspectionConfig CloneContinuousInspection(ContinuousInspectionConfig? config)
+    {
+        config ??= new ContinuousInspectionConfig();
+        return new ContinuousInspectionConfig
+        {
+            Mode = config.Mode,
+            HardwareProfile = config.HardwareProfile,
+            TargetFps = config.TargetFps,
+            BufferCapacity = config.BufferCapacity,
+            DetectEveryNFrames = config.DetectEveryNFrames,
+            PreEventFrames = config.PreEventFrames,
+            PostEventFrames = config.PostEventFrames,
+            MinConsensusFrames = config.MinConsensusFrames,
+            ConsensusThreshold = config.ConsensusThreshold,
+            SchedulerQueueLength = config.SchedulerQueueLength,
+            MaxLatencyMs = config.MaxLatencyMs,
+            SaveReplayOnNgOnly = config.SaveReplayOnNgOnly,
+            ShadowOutputDisabled = config.ShadowOutputDisabled
+        };
+    }
+
+    private static bool HasRuntimeCameraSettingsChanged(CameraBindingConfig previous, CameraBindingConfig next)
+    {
+        previous.Normalize();
+        next.Normalize();
+        var previousMode = CameraTriggerModeExtensions.Normalize(previous.TriggerMode);
+        var nextMode = CameraTriggerModeExtensions.Normalize(next.TriggerMode);
+
+        return !string.Equals(previous.SerialNumber, next.SerialNumber, StringComparison.OrdinalIgnoreCase)
+            || Math.Abs(previous.ExposureTimeUs - next.ExposureTimeUs) > 0.001
+            || Math.Abs(previous.GainDb - next.GainDb) > 0.001
+            || previousMode != nextMode
+            || ((previousMode == CameraTriggerMode.External || nextMode == CameraTriggerMode.External) &&
+                !string.Equals(
+                    CameraHardwareTriggerSourceExtensions.Normalize(previous.HardwareTriggerSource),
+                    CameraHardwareTriggerSourceExtensions.Normalize(next.HardwareTriggerSource),
+                    StringComparison.OrdinalIgnoreCase))
+            || CameraTriggerModeExtensions.NormalizeTargetFrameRate(previous.TargetFrameRateFps)
+                != CameraTriggerModeExtensions.NormalizeTargetFrameRate(next.TargetFrameRateFps)
+            || HasContinuousStreamBufferSettingsChanged(previous.ContinuousInspection, next.ContinuousInspection);
+    }
+
+    private static bool HasContinuousStreamBufferSettingsChanged(
+        ContinuousInspectionConfig? previous,
+        ContinuousInspectionConfig? next)
+    {
+        previous ??= new ContinuousInspectionConfig();
+        next ??= new ContinuousInspectionConfig();
+        previous.Normalize();
+        next.Normalize();
+        return previous.BufferCapacity != next.BufferCapacity
+            || previous.PreEventFrames != next.PreEventFrames
+            || previous.PostEventFrames != next.PostEventFrames;
     }
 
     private static object BuildHuarayDiagnostics(int deviceCount)

@@ -326,14 +326,16 @@ class HttpClient {
     /**
      * 发送 PUT 请求
      */
-    async getForBlob(url) {
+    async getForBlob(url, options = {}) {
         let fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] GET (blob) ${fullUrl}`);
+        const signal = options?.signal;
 
         try {
             const response = await fetch(fullUrl, {
                 method: 'GET',
-                headers: this.defaultHeaders
+                headers: this.defaultHeaders,
+                signal
             });
             this.saveSuccessfulPort(fullUrl);
             return this.handleBlobResponse(response);
@@ -345,7 +347,8 @@ class HttpClient {
                     fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
                     const response = await fetch(fullUrl, {
                         method: 'GET',
-                        headers: this.defaultHeaders
+                        headers: this.defaultHeaders,
+                        signal
                     });
                     this.saveSuccessfulPort(fullUrl);
                     return this.handleBlobResponse(response);

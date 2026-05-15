@@ -137,8 +137,6 @@ public class ImageAcquisitionOperator : OperatorBase
 
             try
             {
-                // 获取并配置相机
-                var camera = await _cameraManager.GetOrCreateByBindingAsync(cameraId);
                 var bindingConfig = _cameraManager.FindBinding(cameraId);
                 bindingConfig?.Normalize();
                 var normalizedTriggerMode = CameraTriggerModeExtensions.Normalize(
@@ -161,6 +159,9 @@ public class ImageAcquisitionOperator : OperatorBase
                         { "CameraId", bindingConfig?.Id ?? cameraId }
                     }));
                 }
+
+                // 获取并配置相机
+                var camera = await _cameraManager.GetOrCreateByBindingAsync(cameraId);
 
                 // 相机参数优先来自“系统设置 -> 相机管理”，保留旧算子参数作为向后兼容 fallback。
                 var exposureTime = bindingConfig?.ExposureTimeUs

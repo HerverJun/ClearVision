@@ -74,6 +74,19 @@ public static class CameraTriggerModeExtensions
     }
 }
 
+public static class CameraHardwareTriggerSourceExtensions
+{
+    public const string DefaultHardwareTriggerSource = "Line0";
+
+    public static string Normalize(string? rawSource)
+    {
+        var source = rawSource?.Trim();
+        return string.IsNullOrWhiteSpace(source)
+            ? DefaultHardwareTriggerSource
+            : source;
+    }
+}
+
 public static class CameraSoftwareTriggerSourceExtensions
 {
     public const int DefaultEnterPhotoelectricDebounceMs = 200;
