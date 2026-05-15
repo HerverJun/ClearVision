@@ -237,6 +237,8 @@ class InspectionPanel {
     }
 
     async handleRunSingle() {
+        const wasContinuous = this.isContinuous === true;
+
         try {
             this.syncAnalysisFlowContext();
             this.updateStatus('running', '运行中...');
@@ -251,10 +253,13 @@ class InspectionPanel {
 
             await inspectionController.executeSingle();
         } catch (error) {
-            this.clearProtectionWatchdog();
             console.error('[InspectionPanel] 单次运行失败:', error);
             this.updateStatus('error', '运行失败');
-            this.setButtonsState(false);
+        } finally {
+            if (!wasContinuous && this.isContinuous !== true) {
+                this.clearProtectionWatchdog();
+                this.setButtonsState(false);
+            }
         }
     }
 
@@ -316,6 +321,16 @@ class InspectionPanel {
                 activeProjectId: this.projectId,
                 resultProjectId
             });
+
+            if (this.isContinuous) {
+                this.setButtonsState(true);
+                this.armProtectionWatchdog('等待下一次触发结果');
+            } else {
+                this.setButtonsState(false);
+                this._lastProtectionMessage = '已忽略其他工程的检测结果，当前工程显示保持不变。';
+                this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+            }
+
             return;
         }
 
