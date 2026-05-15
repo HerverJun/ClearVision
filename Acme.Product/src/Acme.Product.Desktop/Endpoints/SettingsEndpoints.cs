@@ -437,8 +437,13 @@ public static class SettingsEndpoints
 
                 if (binding.UsesEnterPhotoelectricTrigger())
                 {
+                    var triggerOptions = binding.ToEnterPhotoelectricTriggerOptions() with
+                    {
+                        AcceptPendingSignalsAfterUtc = NormalizeUtc(request.AcceptPendingEnterSignalAfterUtc)
+                    };
+
                     await triggerInputService.WaitForEnterPhotoelectricAsync(
-                        binding.ToEnterPhotoelectricTriggerOptions(),
+                        triggerOptions,
                         context.RequestAborted);
                 }
 
@@ -732,6 +737,18 @@ public static class SettingsEndpoints
         return width > 0 && height > 0;
     }
 
+    private static DateTime? NormalizeUtc(DateTime? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        return value.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+            : value.Value.ToUniversalTime();
+    }
+
     private static bool TryBuildDiskUsage(string? targetPath, out object usage, out string error)
     {
         usage = default!;
@@ -873,6 +890,8 @@ public class AiReasoningSupportRequest
 public class CameraSoftTriggerCaptureRequest
 {
     public string CameraBindingId { get; set; } = string.Empty;
+
+    public DateTime? AcceptPendingEnterSignalAfterUtc { get; set; }
 }
 
 public class CameraContinuousPreviewStartRequest

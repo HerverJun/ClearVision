@@ -470,10 +470,30 @@ function buildResultCardsFromOutputData(outputData, options = {}) {
     }));
 }
 
+function getResultStatusClass(status) {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (normalized === 'ng' || normalized === 'error') {
+        return 'ng';
+    }
+
+    if (normalized === 'ok' || normalized === 'pass' || normalized === 'passed') {
+        return 'ok';
+    }
+
+    return 'info';
+}
+
+function getResultStatusLabel(status) {
+    const normalized = String(status || '').trim();
+    return normalized.length > 0 ? normalized : 'INFO';
+}
+
 function renderResultCardHtml(card, options = {}) {
     const normalizedCard = normalizeAnalysisCard(card, options.fallbackStatus || 'OK');
-    const status = String(normalizedCard.status || options.fallbackStatus || 'OK').toLowerCase();
-    const statusClass = status === 'ng' || status === 'error' ? 'ng' : 'ok';
+    const statusClass = getResultStatusClass(normalizedCard.status || options.fallbackStatus || 'Info');
+    const statusTitle = statusClass === 'info'
+        ? '算子执行数据，仅供分析；不代表最终 OK/NG 判定'
+        : '结果状态';
     const rows = normalizedCard.fields.map(field => `
         <div class="cv-result-field cv-result-field-${escapeHtml(inferResultCategory(field))}">
             <span class="cv-result-label">${escapeHtml(field.label || field.key)}</span>
@@ -485,7 +505,7 @@ function renderResultCardHtml(card, options = {}) {
         <div class="ac-card cv-result-card ac-status-${statusClass}" data-card-type="${escapeHtml(normalizedCard.category)}">
             <div class="ac-card-header">
                 <span class="ac-card-title">${escapeHtml(normalizedCard.title)}</span>
-                <span class="cv-result-card-status ${statusClass}">${escapeHtml(normalizedCard.status || 'OK')}</span>
+                <span class="cv-result-card-status ${statusClass}" title="${escapeHtml(statusTitle)}">${escapeHtml(getResultStatusLabel(normalizedCard.status))}</span>
             </div>
             <div class="ac-card-body cv-result-card-body">
                 ${rows || '<span class="cv-result-empty">No fields</span>'}

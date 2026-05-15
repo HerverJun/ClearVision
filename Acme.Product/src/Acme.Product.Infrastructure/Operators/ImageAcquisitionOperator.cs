@@ -95,9 +95,8 @@ public class ImageAcquisitionOperator : OperatorBase
         }
 
         var hasExplicitFilePath = !string.IsNullOrWhiteSpace(filePath);
-        if (isFileSource &&
-            !hasExplicitFilePath &&
-            TryCreateOutputFromProvidedImage(inputs, out var providedImageOutput))
+        if (TryCreateOutputFromProvidedImage(inputs, out var providedImageOutput) &&
+            (isCameraSource || !hasExplicitFilePath))
         {
             return providedImageOutput;
         }

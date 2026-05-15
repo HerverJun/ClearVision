@@ -250,15 +250,17 @@ class HttpClient {
     /**
      * 发送 POST 请求
      */
-    async post(url, data = null) {
+    async post(url, data = null, options = {}) {
         let fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] POST ${fullUrl}`);
+        const signal = options?.signal;
 
         try {
             const response = await fetch(fullUrl, {
                 method: 'POST',
                 headers: this.defaultHeaders,
-                body: data ? JSON.stringify(data) : null
+                body: data ? JSON.stringify(data) : null,
+                signal
             });
             this.saveSuccessfulPort(fullUrl);
             return this.handleResponse(response);
@@ -272,7 +274,8 @@ class HttpClient {
                     const response = await fetch(fullUrl, {
                         method: 'POST',
                         headers: this.defaultHeaders,
-                        body: data ? JSON.stringify(data) : null
+                        body: data ? JSON.stringify(data) : null,
+                        signal
                     });
                     this.saveSuccessfulPort(fullUrl);
                     return this.handleResponse(response);
@@ -285,15 +288,17 @@ class HttpClient {
     /**
      * 发送 POST 请求并接收 Blob 响应
      */
-    async postForBlob(url, data = null) {
+    async postForBlob(url, data = null, options = {}) {
         let fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] POST (blob) ${fullUrl}`);
+        const signal = options?.signal;
 
         try {
             const response = await fetch(fullUrl, {
                 method: 'POST',
                 headers: this.defaultHeaders,
-                body: data ? JSON.stringify(data) : null
+                body: data ? JSON.stringify(data) : null,
+                signal
             });
             this.saveSuccessfulPort(fullUrl);
             return this.handleBlobResponse(response);
@@ -307,7 +312,8 @@ class HttpClient {
                     const response = await fetch(fullUrl, {
                         method: 'POST',
                         headers: this.defaultHeaders,
-                        body: data ? JSON.stringify(data) : null
+                        body: data ? JSON.stringify(data) : null,
+                        signal
                     });
                     this.saveSuccessfulPort(fullUrl);
                     return this.handleBlobResponse(response);

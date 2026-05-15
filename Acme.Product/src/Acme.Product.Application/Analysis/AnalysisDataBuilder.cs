@@ -25,6 +25,7 @@ public class AnalysisDataBuilder : IAnalysisDataBuilder
             new OcrRecognitionAnalysisCardMapper(),
             new CodeRecognitionAnalysisCardMapper(),
             new CommunicationAnalysisCardMapper(),
+            new DetectionSequenceJudgeAnalysisCardMapper(),
             new DetectionAnalysisCardMapper(),
             new GenericMeasurementAnalysisCardMapper(),
             new WidthMeasurementAnalysisCardMapper()

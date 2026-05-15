@@ -2010,7 +2010,7 @@ class SettingsView {
         }
     }
 
-    async captureCameraPreview(cameraBindingId = this.selectedCameraBindingId) {
+    async captureCameraPreview(cameraBindingId = this.selectedCameraBindingId, options = {}) {
         if (!cameraBindingId) {
             throw new Error('请先在相机管理中选择一台相机');
         }
@@ -2021,8 +2021,15 @@ class SettingsView {
             return await this.captureSharedFrame(cameraBindingId);
         }
 
-        const { blob, headers } = await httpClient.postForBlob('/cameras/soft-trigger-capture', {
+        const request = {
             cameraBindingId
+        };
+        if (options.acceptPendingEnterSignalAfterUtc) {
+            request.acceptPendingEnterSignalAfterUtc = options.acceptPendingEnterSignalAfterUtc;
+        }
+
+        const { blob, headers } = await httpClient.postForBlob('/cameras/soft-trigger-capture', request, {
+            signal: options.signal
         });
 
         if (!blob || blob.size === 0) {
@@ -2169,7 +2176,14 @@ class SettingsView {
             return;
         }
 
+        const isEnterPhotoelectric = this.isEnterPhotoelectricBinding(binding);
         let currentPreviewUrl = null;
+        let currentPreviewMetaText = '';
+        let previewClosed = false;
+        let previewLoading = false;
+        let previewRequestId = 0;
+        let autoRearmTimer = null;
+        let activePreviewAbortController = null;
         const content = document.createElement('div');
         content.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:16px;">
@@ -2177,9 +2191,9 @@ class SettingsView {
                     <div style="font-size:13px; color:var(--text-muted);">
                         当前相机: <strong style="color:var(--text-primary);">${binding.displayName || binding.serialNumber || binding.id}</strong>
                     </div>
-                    <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">刷新预览</button>
+                    <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">${isEnterPhotoelectric ? '重新布防' : '刷新预览'}</button>
                 </div>
-                <div style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <div id="camera-preview-surface" tabindex="-1" style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden; outline:none;">
                     <img id="camera-preview-image" alt="相机预览" style="max-width:100%; max-height:420px; display:none; object-fit:contain;">
                     <div id="camera-preview-placeholder" style="color:#94a3b8; font-size:14px; text-align:center; padding:24px;">正在加载相机预览...</div>
                 </div>
@@ -2194,50 +2208,183 @@ class SettingsView {
             }
         };
 
+        const cancelActivePreviewRequest = () => {
+            if (!activePreviewAbortController) {
+                return;
+            }
+
+            activePreviewAbortController.abort();
+            activePreviewAbortController = null;
+        };
+
         const modal = createModal({
             title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
             content,
             width: '960px',
-            onClose: cleanupPreviewUrl
+            onClose: () => {
+                previewClosed = true;
+                previewRequestId += 1;
+                cancelActivePreviewRequest();
+                if (autoRearmTimer) {
+                    clearTimeout(autoRearmTimer);
+                    autoRearmTimer = null;
+                }
+                cleanupPreviewUrl();
+            }
         });
         modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
 
         const refreshBtn = content.querySelector('#btn-refresh-camera-preview');
+        const previewSurfaceEl = content.querySelector('#camera-preview-surface');
         const imageEl = content.querySelector('#camera-preview-image');
         const placeholderEl = content.querySelector('#camera-preview-placeholder');
         const metaEl = content.querySelector('#camera-preview-meta');
-        const isEnterPhotoelectric = this.isEnterPhotoelectricBinding(binding);
 
-        const loadPreview = async () => {
+        const focusPreviewSurface = () => {
+            previewSurfaceEl?.focus({ preventScroll: true });
+        };
+
+        if (isEnterPhotoelectric) {
+            content.addEventListener('keydown', event => {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                const target = event.target;
+                if (target instanceof HTMLElement &&
+                    target.closest('input, textarea, select, [contenteditable="true"]')) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                focusPreviewSurface();
+            }, true);
+        }
+
+        const buildPreviewMetaText = (preview, waitingForNext = false) => {
+            const triggerLabel = this.normalizeSoftwareTriggerSource(preview.triggerSource) === 'EnterPhotoelectric'
+                ? '回车光电触发'
+                : preview.triggerMode;
+            const waitSuffix = waitingForNext ? ' · 等待下一次回车光电触发...' : '';
+            return `触发方式: ${triggerLabel} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${waitSuffix}`;
+        };
+
+        const showWaitingState = () => {
             refreshBtn.disabled = true;
+            refreshBtn.textContent = isEnterPhotoelectric ? '等待触发中...' : '加载中...';
+
+            if (isEnterPhotoelectric && currentPreviewUrl) {
+                placeholderEl.style.display = 'none';
+                imageEl.style.display = 'block';
+                metaEl.textContent = currentPreviewMetaText
+                    ? `${currentPreviewMetaText} · 等待下一次回车光电触发...`
+                    : '等待下一次回车光电触发...';
+                return;
+            }
+
             placeholderEl.style.display = 'block';
             placeholderEl.textContent = isEnterPhotoelectric
                 ? '等待回车光电触发...'
                 : '正在加载相机预览...';
             imageEl.style.display = 'none';
+        };
+
+        const queueAutoRearm = () => {
+            if (!isEnterPhotoelectric || previewClosed) {
+                return;
+            }
+
+            if (autoRearmTimer) {
+                clearTimeout(autoRearmTimer);
+            }
+
+            autoRearmTimer = setTimeout(() => {
+                autoRearmTimer = null;
+                void loadPreview();
+            }, 0);
+        };
+
+        const loadPreview = async () => {
+            if (previewClosed || previewLoading) {
+                return;
+            }
+
+            previewLoading = true;
+            const requestId = ++previewRequestId;
+            const acceptPendingEnterSignalAfterUtc = isEnterPhotoelectric
+                ? new Date().toISOString()
+                : null;
+            focusPreviewSurface();
+            showWaitingState();
+            let shouldAutoRearm = false;
+            const abortController = typeof AbortController !== 'undefined'
+                ? new AbortController()
+                : null;
+            activePreviewAbortController = abortController;
 
             try {
-                const preview = await this.captureCameraPreview(binding.id);
+                const preview = await this.captureCameraPreview(binding.id, {
+                    acceptPendingEnterSignalAfterUtc,
+                    signal: abortController?.signal
+                });
+                if (previewClosed || requestId !== previewRequestId) {
+                    URL.revokeObjectURL(preview.imageUrl);
+                    return;
+                }
+
                 cleanupPreviewUrl();
                 currentPreviewUrl = preview.imageUrl;
+                currentPreviewMetaText = buildPreviewMetaText(preview);
                 imageEl.src = preview.imageUrl;
                 imageEl.style.display = 'block';
                 placeholderEl.style.display = 'none';
-                const triggerLabel = this.normalizeSoftwareTriggerSource(preview.triggerSource) === 'EnterPhotoelectric'
-                    ? '回车光电触发'
-                    : preview.triggerMode;
-                metaEl.textContent = `触发方式: ${triggerLabel} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}`;
+                metaEl.textContent = currentPreviewMetaText;
+                shouldAutoRearm = isEnterPhotoelectric;
             } catch (error) {
-                placeholderEl.style.display = 'block';
-                placeholderEl.textContent = `相机预览加载失败: ${error.message}`;
-                metaEl.textContent = '';
+                if (error?.name === 'AbortError') {
+                    return;
+                }
+
+                if (previewClosed || requestId !== previewRequestId) {
+                    return;
+                }
+
+                if (currentPreviewUrl) {
+                    placeholderEl.style.display = 'none';
+                    imageEl.style.display = 'block';
+                    metaEl.textContent = `${currentPreviewMetaText} · 布防失败: ${error.message}`;
+                } else {
+                    placeholderEl.style.display = 'block';
+                    placeholderEl.textContent = `相机预览加载失败: ${error.message}`;
+                    imageEl.style.display = 'none';
+                    metaEl.textContent = '';
+                }
             } finally {
-                refreshBtn.disabled = false;
+                if (requestId === previewRequestId) {
+                    previewLoading = false;
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = isEnterPhotoelectric ? '重新布防' : '刷新预览';
+                }
+
+                if (activePreviewAbortController === abortController) {
+                    activePreviewAbortController = null;
+                }
+
+                if (shouldAutoRearm) {
+                    queueAutoRearm();
+                }
             }
         };
 
-        refreshBtn.addEventListener('click', loadPreview);
-        await loadPreview();
+        refreshBtn.addEventListener('click', event => {
+            event.preventDefault();
+            focusPreviewSurface();
+            void loadPreview();
+        });
+
+        focusPreviewSurface();
+        void loadPreview();
     }
 
     async saveSelectedCameraParameters() {

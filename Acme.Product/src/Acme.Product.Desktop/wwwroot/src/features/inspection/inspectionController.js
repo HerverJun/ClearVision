@@ -598,6 +598,7 @@ class InspectionController {
      * @param {string} options.debugSessionId - 调试会话ID（用于缓存复用）
      * @param {string} options.inputImageBase64 - 输入图像（可选）
      * @param {Object} options.parameters - 覆盖参数（可选）
+     * @param {AbortSignal} options.signal - 取消信号（可选）
      */
     async previewNode(targetNodeId, options = {}) {
         if (!this.projectId) {
@@ -620,6 +621,8 @@ class InspectionController {
                 inputImageBase64: options.inputImageBase64,
                 parameters: options.parameters,
                 imageFormat: options.imageFormat || '.png'
+            }, {
+                signal: options.signal
             });
 
             console.log('[InspectionController] 预览完成:', result);
@@ -632,6 +635,10 @@ class InspectionController {
             return result;
 
         } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw error;
+            }
+
             console.error('[InspectionController] 预览节点失败:', error);
             throw error;
         }

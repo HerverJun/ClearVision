@@ -103,6 +103,8 @@ public class AnalysisCardDto
 
     public int Priority { get; set; }
 
+    public string? Message { get; set; }
+
     public List<AnalysisFieldDto> Fields { get; set; } = new();
 
     public Dictionary<string, object?>? Meta { get; set; }
@@ -122,6 +124,8 @@ public class AnalysisFieldDto
     public string? Unit { get; set; }
 
     public string? DisplayHint { get; set; }
+
+    public string? Variant { get; set; }
 
     public string? DataType { get; set; }
 

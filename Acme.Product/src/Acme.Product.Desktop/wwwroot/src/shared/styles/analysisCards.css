@@ -36,9 +36,13 @@
 }
 
 /* 状态修饰器 */
-.ac-card.status-ok::before   { background: linear-gradient(90deg, #00685b, #1a9987); }
-.ac-card.status-ng::before   { background: linear-gradient(90deg, #ba1a1a, #e74c3c); }
-.ac-card.status-error::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+.ac-card.status-ok::before,
+.ac-card.ac-status-ok::before   { background: linear-gradient(90deg, #00685b, #1a9987); }
+.ac-card.status-ng::before,
+.ac-card.ac-status-ng::before   { background: linear-gradient(90deg, #ba1a1a, #e74c3c); }
+.ac-card.status-error::before,
+.ac-card.ac-status-error::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+.ac-card.ac-status-info::before  { background: linear-gradient(90deg, #64748b, #94a3b8); }
 
 /* ===== 卡片标题栏 ===== */
 .ac-card-header {
@@ -361,9 +365,13 @@
     background: linear-gradient(90deg, #e74c3c, #c0392b);
 }
 
-[data-theme="dark"] .ac-card.status-ok::before   { background: linear-gradient(90deg, #10b981, #34d399); }
-[data-theme="dark"] .ac-card.status-ng::before   { background: linear-gradient(90deg, #e74c3c, #f87171); }
-[data-theme="dark"] .ac-card.status-error::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+[data-theme="dark"] .ac-card.status-ok::before,
+[data-theme="dark"] .ac-card.ac-status-ok::before   { background: linear-gradient(90deg, #10b981, #34d399); }
+[data-theme="dark"] .ac-card.status-ng::before,
+[data-theme="dark"] .ac-card.ac-status-ng::before   { background: linear-gradient(90deg, #e74c3c, #f87171); }
+[data-theme="dark"] .ac-card.status-error::before,
+[data-theme="dark"] .ac-card.ac-status-error::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+[data-theme="dark"] .ac-card.ac-status-info::before  { background: linear-gradient(90deg, #94a3b8, #cbd5e1); }
 
 [data-theme="dark"] .ac-card:hover {
     border-color: rgba(231, 76, 60, 0.4);
@@ -373,6 +381,12 @@
 [data-theme="dark"] .ac-card-badge.status-ok { background: rgba(16, 185, 129, 0.15); color: #34d399; }
 [data-theme="dark"] .ac-card-badge.status-ng { background: rgba(231, 76, 60, 0.15); color: #f87171; }
 [data-theme="dark"] .ac-card-badge.status-error { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+[data-theme="dark"] .cv-result-card-status.info {
+    color: #cbd5e1;
+    background: rgba(148, 163, 184, 0.15);
+    border-color: rgba(203, 213, 225, 0.2);
+}
 
 [data-theme="dark"] .ac-diagnostic-item {
     background: rgba(255, 255, 255, 0.04);
@@ -478,6 +492,12 @@
     color: #ba1a1a;
     background: rgba(186, 26, 26, 0.1);
     border: 1px solid rgba(186, 26, 26, 0.18);
+}
+
+.cv-result-card-status.info {
+    color: #475569;
+    background: rgba(100, 116, 139, 0.11);
+    border: 1px solid rgba(100, 116, 139, 0.2);
 }
 
 .cv-result-text {

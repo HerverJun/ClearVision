@@ -60,6 +60,8 @@ public class InspectionService : IInspectionService
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
         _flowExecutionService = flowExecutionService;
+
+
         _imageAcquisitionService = imageAcquisitionService;
         _configurationService = configurationService;
         _coordinator = coordinator;
@@ -521,9 +523,10 @@ public class InspectionService : IInspectionService
 
     private async Task<InspectionResult> ExecuteSingleFromCameraCoreAsync(Guid projectId, string cameraId, OperatorFlow? flow)
     {
+        ImageDto? imageDto = null;
         try
         {
-            var imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId);
+            imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId);
 
             if (string.IsNullOrEmpty(imageDto.DataBase64))
             {
@@ -539,6 +542,20 @@ public class InspectionService : IInspectionService
             result.MarkAsError($"相机采集或检测失败: {ex.Message}");
             await _resultRepository.AddAsync(result);
             return result;
+        }
+        finally
+        {
+            if (imageDto?.Id is { } imageId && imageId != Guid.Empty)
+            {
+                try
+                {
+                    await _imageAcquisitionService.ReleaseImageAsync(imageId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[InspectionService] 释放相机采集缓存失败: {ImageId}", imageId);
+                }
+            }
         }
     }
 

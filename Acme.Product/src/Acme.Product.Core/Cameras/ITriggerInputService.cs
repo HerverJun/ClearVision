@@ -21,7 +21,10 @@ public sealed record EnterPhotoelectricTriggerOptions(
     string DeviceId,
     int DebounceMs,
     int TimeoutMs,
-    bool IgnoreWhileBusy);
+    bool IgnoreWhileBusy)
+{
+    public DateTime? AcceptPendingSignalsAfterUtc { get; init; }
+}
 
 public sealed record TriggerInputEvent(
     string Source,

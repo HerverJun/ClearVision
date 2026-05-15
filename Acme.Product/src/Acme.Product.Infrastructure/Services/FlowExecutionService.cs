@@ -219,6 +219,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         // Each ExecuteFlowAsync call owns its own FlowExecutionResult instance.
         var result = new FlowExecutionResult();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        ConcurrentDictionary<Guid, Dictionary<string, object>>? operatorOutputs = null;
 
         // 创建链接的 CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -244,7 +245,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             _executionStatuses[flow.Id] = status;
 
             // 存储每个算子的输出 - 使用 ConcurrentDictionary 支持并行执行
-            var operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
+            operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
             // 设置初始输入数据
             if (inputData != null)
@@ -324,6 +325,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 finalStatus.IsExecuting = false;
                 finalStatus.ProgressPercentage = 100;
                 finalStatus.CompletedAt ??= DateTime.UtcNow;
+            }
+
+            if (operatorOutputs != null)
+            {
+                ReleaseRemainingImageWrappers(operatorOutputs);
             }
         }
     }
@@ -947,6 +953,90 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
+    private static void ReleaseRemainingImageWrappers(
+        IEnumerable<KeyValuePair<Guid, Dictionary<string, object>>> operatorOutputs)
+    {
+        var wrappers = new HashSet<ImageWrapper>(ReferenceEqualityComparer.Instance);
+
+        foreach (var (operatorId, outputData) in operatorOutputs)
+        {
+            if (operatorId == Guid.Empty)
+            {
+                continue;
+            }
+
+            foreach (var value in outputData.Values)
+            {
+                CollectImageWrappers(value, wrappers);
+            }
+        }
+
+        foreach (var wrapper in wrappers)
+        {
+            while (wrapper.RefCount > 0)
+            {
+                try
+                {
+                    wrapper.Release();
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+                catch (InvalidOperationException)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void CollectImageWrappers(object? value, HashSet<ImageWrapper> wrappers, int depth = 0)
+    {
+        const int maxDepth = 8;
+        if (value == null || depth > maxDepth)
+        {
+            return;
+        }
+
+        if (value is ImageWrapper wrapper)
+        {
+            wrappers.Add(wrapper);
+            return;
+        }
+
+        if (value is string or byte[] or Mat)
+        {
+            return;
+        }
+
+        if (value is IDictionary<string, object> typedDict)
+        {
+            foreach (var child in typedDict.Values)
+            {
+                CollectImageWrappers(child, wrappers, depth + 1);
+            }
+            return;
+        }
+
+        if (value is IDictionary dictionary)
+        {
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                CollectImageWrappers(entry.Value, wrappers, depth + 1);
+            }
+            return;
+        }
+
+        if (value is IEnumerable enumerable)
+        {
+            foreach (var item in enumerable)
+            {
+                CollectImageWrappers(item, wrappers, depth + 1);
+            }
+        }
+    }
+
     #region Sprint 1 Task 1.1: 扇出预分析与引用计数管理
 
     /// <summary>
@@ -1244,6 +1334,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         };
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        ConcurrentDictionary<Guid, Dictionary<string, object>>? operatorOutputs = null;
 
         // 保存调试选项
         _debugOptions[options.DebugSessionId] = options;
@@ -1271,7 +1362,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             _executionStatuses[flow.Id] = status;
 
             // 存储每个算子的输出
-            var operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
+            operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
             // 设置初始输入数据
             if (inputData != null)
@@ -1497,6 +1588,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 finalStatus.IsExecuting = false;
                 finalStatus.ProgressPercentage = 100;
                 finalStatus.CompletedAt ??= DateTime.UtcNow;
+            }
+
+            if (operatorOutputs != null)
+            {
+                ReleaseRemainingImageWrappers(operatorOutputs);
             }
         }
     }

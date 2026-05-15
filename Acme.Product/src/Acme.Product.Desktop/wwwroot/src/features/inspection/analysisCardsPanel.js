@@ -250,18 +250,20 @@ function normalizeDeepLearningPreviewDiagnostics(outputData) {
 }
 
 function formatDiagnosticValue(field) {
-    const { value, variant } = field || {};
-    if ((variant === 'sequence' || variant === 'labels') && Array.isArray(value)) {
+    const value = readFirstDefined(field?.value, field?.Value);
+    const variant = readFirstDefined(field?.variant, field?.Variant);
+    const normalizedVariant = String(variant || field?.Variant || field?.displayHint || field?.DisplayHint || '').trim().toLowerCase();
+    if ((normalizedVariant === 'sequence' || normalizedVariant === 'labels') && Array.isArray(value)) {
         if (value.length === 0) {
             return '<span class="ac-diagnostic-empty">无</span>';
         }
 
-        const className = variant === 'sequence' ? 'ac-diagnostic-sequence' : 'ac-diagnostic-chip-list';
+        const className = normalizedVariant === 'sequence' ? 'ac-diagnostic-sequence' : 'ac-diagnostic-chip-list';
         const items = value.map(item => `<span class="ac-diagnostic-chip">${escapeHtml(String(item))}</span>`).join('');
         return `<div class="${className}">${items}</div>`;
     }
 
-    if (variant === 'status') {
+    if (normalizedVariant === 'status') {
         const text = String(value ?? '').trim();
         const lowerText = text.toLowerCase();
         const isNegativeStatus = text.includes('不匹配')
@@ -287,31 +289,35 @@ function formatDiagnosticValue(field) {
 
 function renderDiagnosticCardHtml(card, fallbackStatus, options = {}) {
     const compact = Boolean(options.compact);
-    const status = String(card?.status || fallbackStatus || 'OK').toUpperCase();
+    const status = String(readFirstDefined(card?.status, card?.Status, fallbackStatus, 'OK')).toUpperCase();
     const statusClass = status === 'NG' || status === 'ERROR' ? 'ng' : 'ok';
     const badgeText = status === 'ERROR' ? 'ERROR' : (status === 'OK' ? 'OK' : 'NG');
-    const icon = card?.icon || ICONS.note;
-    const fields = Array.isArray(card?.fields)
-        ? (compact ? card.fields.slice(0, 4) : card.fields)
+    const icon = readFirstDefined(card?.icon, card?.Icon, ICONS.note);
+    const sourceFields = Array.isArray(card?.fields)
+        ? card.fields
+        : (Array.isArray(card?.Fields) ? card.Fields : []);
+    const fields = Array.isArray(sourceFields)
+        ? (compact ? sourceFields.slice(0, 4) : sourceFields)
         : [];
     const rows = fields.map(field => `
         <div class="ac-diagnostic-row">
-            <span class="ac-diagnostic-label">${escapeHtml(field.label || '--')}</span>
+            <span class="ac-diagnostic-label">${escapeHtml(readFirstDefined(field.label, field.Label, '--'))}</span>
             <div class="ac-diagnostic-value">${formatDiagnosticValue(field)}</div>
         </div>
     `).join('');
-    const message = card?.message
-        ? `<div class="ac-diagnostic-message ${statusClass}">${escapeHtml(card.message)}</div>`
+    const messageText = readFirstDefined(card?.message, card?.Message, card?.meta?.Message, card?.Meta?.Message);
+    const message = messageText
+        ? `<div class="ac-diagnostic-message ${statusClass}">${escapeHtml(messageText)}</div>`
         : '';
-    const hint = compact && Array.isArray(card?.fields) && card.fields.length > fields.length
-        ? `<div class="ac-diagnostic-hint">还有 ${card.fields.length - fields.length} 项诊断字段，请在结果详情查看完整信息。</div>`
+    const hint = compact && sourceFields.length > fields.length
+        ? `<div class="ac-diagnostic-hint">还有 ${sourceFields.length - fields.length} 项诊断字段，请在结果详情查看完整信息。</div>`
         : '';
 
     return `
         <div class="ac-card ac-card-diagnostic ac-status-${statusClass}">
             <div class="ac-card-header">
                 <span class="ac-card-icon">${icon}</span>
-                <span class="ac-card-title">${escapeHtml(card?.title || '诊断卡片')}</span>
+                <span class="ac-card-title">${escapeHtml(readFirstDefined(card?.title, card?.Title, '诊断卡片'))}</span>
                 <span class="ac-diagnostic-badge ${statusClass}">${badgeText}</span>
             </div>
             <div class="ac-card-body">
@@ -515,7 +521,7 @@ class AnalysisCardsPanel {
     }
 
     _renderAnalysisCard(card, fallbackStatus) {
-        switch (String(card?.category || 'generic').toLowerCase()) {
+        switch (String(readFirstDefined(card?.category, card?.Category, 'generic')).toLowerCase()) {
             case 'measurement':
                 return this._renderStructuredMeasurementCard(card, fallbackStatus);
             case 'recognition':

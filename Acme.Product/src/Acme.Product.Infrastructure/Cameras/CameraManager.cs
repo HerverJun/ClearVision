@@ -185,10 +185,12 @@ public class CameraProviderAdapter : IIndustrialCamera
 {
     private readonly string _cameraId;
     private readonly ICameraProvider _provider;
+    private readonly SemaphoreSlim _providerGate = new(1, 1);
     private bool _isAcquiring;
     private Func<byte[], Task>? _frameCallback;
     private CancellationTokenSource? _acquisitionCts;
     private Task? _acquisitionTask;
+    private CameraTriggerMode _currentTriggerMode = CameraTriggerMode.Software;
 
     public string CameraId => _cameraId;
     public string Name => _provider.CurrentDevice?.UserDefinedName ?? _cameraId;
@@ -207,30 +209,61 @@ public class CameraProviderAdapter : IIndustrialCamera
     }
 
     public Task ConnectAsync() => Task.CompletedTask;
-    public Task DisconnectAsync() { _provider.Close(); return Task.CompletedTask; }
+
+    public async Task DisconnectAsync()
+    {
+        await StopContinuousAcquisitionAsync();
+        await _providerGate.WaitAsync();
+        try
+        {
+            _provider.Close();
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
 
     public async Task<byte[]> AcquireSingleFrameAsync()
     {
         // 严格按照华睿 SDK 正确时序调用
         // 1) StartGrabbing -> 2) TriggerMode=On,TriggerSource=Software -> 3) ExecuteSoftwareTrigger -> 4) GetFrame
 
-        // 1) 确保采集已启动
-        if (!_provider.IsGrabbing)
-            _provider.StartGrabbing();
+        CameraTriggerMode? modeToRestore = null;
+        await _providerGate.WaitAsync();
+        try
+        {
+            if (_isAcquiring)
+            {
+                modeToRestore = _currentTriggerMode;
+            }
 
-        // 2) 设置软件触发模式（TriggerMode=On, TriggerSource=Software）
-        _provider.SetTriggerMode(CameraTriggerMode.Software);
+            // 1) 确保采集已启动
+            if (!_provider.IsGrabbing)
+                _provider.StartGrabbing();
 
-        // 3) 发送软触发命令
-        _provider.ExecuteSoftwareTrigger();
+            // 2) 设置软件触发模式（TriggerMode=On, TriggerSource=Software）
+            SetProviderTriggerMode(CameraTriggerMode.Software);
 
-        // 4) 获取帧（给 SDK 足够响应时间）
-        var frame = _provider.GetFrame(3000);
-        if (frame == null)
-            throw new TimeoutException("获取图像超时");
+            // 3) 发送软触发命令
+            _provider.ExecuteSoftwareTrigger();
 
-        byte[] pngData = EncodeFrameToBytes(frame);
-        return await Task.FromResult(pngData);
+            // 4) 获取帧（给 SDK 足够响应时间）
+            var frame = _provider.GetFrame(3000);
+            if (frame == null)
+                throw new TimeoutException("获取图像超时");
+
+            return EncodeFrameToBytes(frame);
+        }
+        finally
+        {
+            if (modeToRestore.HasValue && modeToRestore.Value != CameraTriggerMode.Software && _provider.IsConnected)
+            {
+                TryRestoreTriggerMode(modeToRestore.Value);
+            }
+
+            _providerGate.Release();
+        }
     }
 
     public Task StartContinuousAcquisitionAsync(Func<byte[], Task> frameCallback)
@@ -249,16 +282,28 @@ public class CameraProviderAdapter : IIndustrialCamera
         {
             try
             {
-                if (!_provider.IsGrabbing)
-                    _provider.StartGrabbing();
-
                 while (!token.IsCancellationRequested)
                 {
-                    var frame = _provider.GetFrame(1000);
-                    if (frame == null)
-                        continue;
+                    byte[] imageData;
+                    CameraFrame frame;
+                    await _providerGate.WaitAsync(token);
+                    try
+                    {
+                        if (!_provider.IsGrabbing)
+                            _provider.StartGrabbing();
 
-                    byte[] imageData = EncodeFrameToBytes(frame, useFastEncoding: true);
+                        var grabbedFrame = _provider.GetFrame(1000);
+                        if (grabbedFrame == null)
+                            continue;
+
+                        frame = grabbedFrame;
+                        imageData = EncodeFrameToBytes(frame, useFastEncoding: true);
+                    }
+                    finally
+                    {
+                        _providerGate.Release();
+                    }
+
                     if (_frameCallback != null)
                         await _frameCallback(imageData);
 
@@ -281,6 +326,10 @@ public class CameraProviderAdapter : IIndustrialCamera
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "[CameraProviderAdapter] 连续采集异常，相机可能已断线。CameraId={CameraId}", _cameraId);
+            }
+            finally
+            {
+                _isAcquiring = false;
             }
         }, token);
 
@@ -317,13 +366,68 @@ public class CameraProviderAdapter : IIndustrialCamera
 
         _acquisitionCts?.Dispose();
         _acquisitionCts = null;
-        _provider.StopGrabbing();
+        await _providerGate.WaitAsync();
+        try
+        {
+            _provider.StopGrabbing();
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
     }
 
-    public Task SetExposureTimeAsync(double exposureTime) { _provider.SetExposure(exposureTime); return Task.CompletedTask; }
-    public Task SetGainAsync(double gain) { _provider.SetGain(gain); return Task.CompletedTask; }
-    public Task SetTriggerModeAsync(CameraTriggerMode mode) { _provider.SetTriggerMode(mode); return Task.CompletedTask; }
-    public Task ExecuteSoftwareTriggerAsync() { _provider.ExecuteSoftwareTrigger(); return Task.CompletedTask; }
+    public async Task SetExposureTimeAsync(double exposureTime)
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            _provider.SetExposure(exposureTime);
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
+
+    public async Task SetGainAsync(double gain)
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            _provider.SetGain(gain);
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
+
+    public async Task SetTriggerModeAsync(CameraTriggerMode mode)
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            SetProviderTriggerMode(mode);
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
+
+    public async Task ExecuteSoftwareTriggerAsync()
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            _provider.ExecuteSoftwareTrigger();
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
 
     public CameraParameters GetParameters() => new CameraParameters();
 
@@ -331,6 +435,27 @@ public class CameraProviderAdapter : IIndustrialCamera
     {
         StopContinuousAcquisitionAsync().GetAwaiter().GetResult();
         _provider.Dispose();
+        _providerGate.Dispose();
+    }
+
+    private void SetProviderTriggerMode(CameraTriggerMode mode)
+    {
+        if (_provider.SetTriggerMode(mode))
+        {
+            _currentTriggerMode = mode;
+        }
+    }
+
+    private void TryRestoreTriggerMode(CameraTriggerMode mode)
+    {
+        try
+        {
+            SetProviderTriggerMode(mode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[CameraProviderAdapter] 恢复连续采集触发模式失败。CameraId={CameraId}, TriggerMode={TriggerMode}", _cameraId, mode);
+        }
     }
 
     private byte[] EncodeFrameToBytes(CameraFrame frame, bool useFastEncoding = false)

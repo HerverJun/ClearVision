@@ -135,10 +135,10 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithCameraSource_ShouldIgnoreExternalImageInput()
+    public async Task ExecuteAsync_WithCameraSourceAndRuntimeImage_ShouldUseProvidedImage()
     {
-        using var staleMat = new Mat(4, 4, MatType.CV_8UC3, new Scalar(10, 20, 30));
-        var staleInput = staleMat.ToBytes(".png");
+        using var runtimeMat = new Mat(4, 9, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var runtimeInput = runtimeMat.ToBytes(".png");
         using var cameraMat = new Mat(6, 12, MatType.CV_8UC3, new Scalar(80, 90, 100));
         var cameraFrame = cameraMat.ToBytes(".png");
 
@@ -160,16 +160,16 @@ public class ImageAcquisitionOperatorTests
 
         var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
         {
-            ["Image"] = staleInput
+            ["Image"] = runtimeInput
         });
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         result.OutputData.Should().NotBeNull();
-        result.OutputData!["Width"].Should().Be(12);
-        result.OutputData["Height"].Should().Be(6);
-        result.OutputData["Source"].Should().Be("camera");
-        await cameraManager.Received(1).GetOrCreateByBindingAsync("cam-1");
-        await camera.Received(1).AcquireSingleFrameAsync();
+        result.OutputData!["Width"].Should().Be(9);
+        result.OutputData["Height"].Should().Be(4);
+        result.OutputData["Source"].Should().Be("provided-image");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync("cam-1");
+        await camera.DidNotReceive().AcquireSingleFrameAsync();
     }
 
     [Fact]

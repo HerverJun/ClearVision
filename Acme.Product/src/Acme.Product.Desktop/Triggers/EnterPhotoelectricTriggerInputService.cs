@@ -123,14 +123,15 @@ public sealed class EnterPhotoelectricTriggerInputService : ITriggerInputService
             CameraBindingId = string.IsNullOrWhiteSpace(options.CameraBindingId) ? "camera" : options.CameraBindingId.Trim(),
             DeviceId = options.DeviceId?.Trim() ?? string.Empty,
             DebounceMs = CameraSoftwareTriggerSourceExtensions.NormalizeEnterPhotoelectricDebounceMs(options.DebounceMs),
-            TimeoutMs = timeoutMs
+            TimeoutMs = timeoutMs,
+            AcceptPendingSignalsAfterUtc = NormalizeAcceptPendingSignalsAfterUtc(options.AcceptPendingSignalsAfterUtc)
         };
 
         var waiter = new TriggerWaiter(normalizedOptions);
         lock (_sync)
         {
             PrunePendingSignals(DateTime.UtcNow);
-            if (!normalizedOptions.IgnoreWhileBusy &&
+            if ((!normalizedOptions.IgnoreWhileBusy || normalizedOptions.AcceptPendingSignalsAfterUtc.HasValue) &&
                 TryTakePendingSignal(normalizedOptions, out var pendingEvent))
             {
                 return pendingEvent;
@@ -323,6 +324,13 @@ public sealed class EnterPhotoelectricTriggerInputService : ITriggerInputService
                 continue;
             }
 
+            if (options.AcceptPendingSignalsAfterUtc is { } acceptAfterUtc &&
+                pending.TimestampUtc < acceptAfterUtc)
+            {
+                index++;
+                continue;
+            }
+
             if (!TryPassDebounce(options.CameraBindingId, options.DebounceMs, pending.TimestampUtc))
             {
                 _pendingSignals.RemoveAt(index);
@@ -339,6 +347,18 @@ public sealed class EnterPhotoelectricTriggerInputService : ITriggerInputService
         }
 
         return false;
+    }
+
+    private static DateTime? NormalizeAcceptPendingSignalsAfterUtc(DateTime? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        return value.Value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+            : value.Value.ToUniversalTime();
     }
 
     private void PrunePendingSignals(DateTime nowUtc)

@@ -801,9 +801,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
             else if (!string.IsNullOrEmpty(cameraId))
             {
+                Acme.Product.Application.DTOs.ImageDto? imageDto = null;
                 try
                 {
-                    var imageDto = await imageAcquisition.AcquireFromCameraAsync(cameraId);
+                    imageDto = await imageAcquisition.AcquireFromCameraAsync(cameraId);
                     if (!string.IsNullOrEmpty(imageDto.DataBase64))
                     {
                         var imageData = Convert.FromBase64String(imageDto.DataBase64);
@@ -813,6 +814,20 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "[InspectionWorker] 预加载相机图像失败");
+                }
+                finally
+                {
+                    if (imageDto?.Id is { } imageId && imageId != Guid.Empty)
+                    {
+                        try
+                        {
+                            await imageAcquisition.ReleaseImageAsync(imageId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "[InspectionWorker] Failed to release preloaded camera image cache. ImageId={ImageId}", imageId);
+                        }
+                    }
                 }
             }
 

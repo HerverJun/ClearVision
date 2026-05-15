@@ -6,6 +6,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
 using FluentAssertions;
+using VisionDetectionResult = Acme.Product.Core.ValueObjects.DetectionResult;
 
 namespace Acme.Product.Tests.Services;
 
@@ -176,6 +177,99 @@ public class AnalysisDataBuilderTests
         fieldTypes.Should().Contain("Center", "Point");
         fieldTypes.Should().Contain("Circle", "CircleData");
         fieldTypes.Keys.Should().NotContain(new[] { "CircleDataList", "Method" });
+    }
+
+    [Fact]
+    public async Task Build_Should_Render_Sequence_Judgment_And_Mark_Detection_Cards_As_Informational()
+    {
+        var flow = new OperatorFlow("wire-sequence");
+        var boxFilter = new Operator("ROI框过滤", OperatorType.BoxFilter, 0, 0);
+        var boxNms = new Operator("候选框去重", OperatorType.BoxNms, 100, 0);
+        var judge = new Operator("顺序判定", OperatorType.DetectionSequenceJudge, 200, 0);
+
+        flow.AddOperator(boxFilter);
+        flow.AddOperator(boxNms);
+        flow.AddOperator(judge);
+
+        var rawCandidates = new DetectionList(new[]
+        {
+            new VisionDetectionResult("wire_black", 0.12f, 10, 10, 100, 40),
+            new VisionDetectionResult("wire_black", 0.35f, 12, 12, 100, 40),
+            new VisionDetectionResult("wire_blue", 0.47f, 20, 80, 100, 40)
+        });
+        var keptDetections = new DetectionList(new[]
+        {
+            new VisionDetectionResult("wire_black", 0.35f, 12, 12, 100, 40),
+            new VisionDetectionResult("wire_blue", 0.47f, 20, 80, 100, 40)
+        });
+
+        var operatorResults = new List<OperatorExecutionResult>
+        {
+            new()
+            {
+                OperatorId = boxFilter.Id,
+                OperatorName = boxFilter.Name,
+                IsSuccess = true,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["Detections"] = rawCandidates
+                }
+            },
+            new()
+            {
+                OperatorId = boxNms.Id,
+                OperatorName = boxNms.Name,
+                IsSuccess = true,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["Detections"] = keptDetections,
+                    ["SuppressedDetections"] = new DetectionList(new[]
+                    {
+                        new VisionDetectionResult("wire_black", 0.12f, 10, 10, 100, 40)
+                    })
+                }
+            },
+            new()
+            {
+                OperatorId = judge.Id,
+                OperatorName = judge.Name,
+                IsSuccess = true,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["IsMatch"] = true,
+                    ["ExpectedLabels"] = new[] { "Wire_Black", "Wire_Blue" },
+                    ["ActualOrder"] = new[] { "wire_black", "wire_blue" },
+                    ["MissingLabels"] = Array.Empty<string>(),
+                    ["DuplicateLabels"] = Array.Empty<string>(),
+                    ["ReceivedCount"] = 2,
+                    ["FilteredCount"] = 2,
+                    ["DetectionCount"] = 2,
+                    ["ExpectedCount"] = 2,
+                    ["Message"] = "Sequence matched: wire_black -> wire_blue."
+                }
+            }
+        };
+
+        var analysisData = await BuildAnalysisDataAsync(flow, operatorResults, InspectionStatus.OK);
+        var json = JsonDocument.Parse(JsonSerializer.Serialize(analysisData));
+        var cards = ReadArray(json.RootElement, "cards").EnumerateArray().ToList();
+
+        cards.Should().HaveCount(3);
+
+        var sequenceCard = cards.Single(card => ReadString(card, "sourceOperatorType") == "DetectionSequenceJudge");
+        ReadString(sequenceCard, "category").Should().Be("diagnostic");
+        ReadString(sequenceCard, "title").Should().Be("线序判定");
+        ReadString(sequenceCard, "status").Should().Be("OK");
+        ReadString(sequenceCard, "message").Should().Contain("Sequence matched");
+
+        var detectionCards = cards
+            .Where(card => ReadString(card, "category") == "detection")
+            .ToList();
+        detectionCards.Should().HaveCount(2);
+        detectionCards.Select(card => ReadString(card, "status")).Should().OnlyContain(status => status == "Info");
+        var detectionTitles = detectionCards.Select(card => ReadString(card, "title")).ToList();
+        detectionTitles.Should().Contain("BoxFilter Candidates");
+        detectionTitles.Should().Contain("BoxNms Kept Detections");
     }
 
     [Fact]
