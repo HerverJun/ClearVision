@@ -1,6 +1,6 @@
 # Measurement Operator Benchmark Report
 
-Generated (UTC): 2026-05-16T07:21:35.9237404Z
+Generated (UTC): 2026-05-16T10:23:43.3401852Z
 
 | Operator | Resolution | Iterations | Avg (ms) | P95 (ms) | P99 (ms) | Status |
 |---|---:|---:|---:|---:|---:|---|
@@ -10,14 +10,14 @@ Generated (UTC): 2026-05-16T07:21:35.9237404Z
 | PointLineDistance | 512x512 | 6 | 0.00 | 0.00 | 0.00 | OK |
 | LineLineDistance | 512x512 | 6 | 0.00 | 0.00 | 0.00 | OK |
 | GeoMeasurement | 512x512 | 6 | 0.00 | 0.00 | 0.00 | OK |
-| HistogramAnalysis | 512x512 | 6 | 0.50 | 1.00 | 1.00 | OK |
-| SharpnessEvaluation | 512x512 | 6 | 2.00 | 2.00 | 2.00 | OK |
-| ContourMeasurement | 512x512 | 6 | 4.00 | 13.00 | 13.00 | OK |
-| GapMeasurement | 512x512 | 6 | 16.00 | 28.00 | 28.00 | OK |
-| GeometricFitting | 512x512 | 6 | 41.67 | 107.00 | 107.00 | OK |
-| CaliperTool | 512x512 | 6 | 49.50 | 92.00 | 92.00 | OK |
-| LineMeasurement | 512x512 | 6 | 63.50 | 159.00 | 159.00 | OK |
-| PixelStatistics | 512x512 | 6 | 179.17 | 220.00 | 220.00 | NeedOptimize |
-| CircleMeasurement | 512x512 | 6 | 340.50 | 435.00 | 435.00 | NeedOptimize |
-| ColorMeasurement | 512x512 | 6 | 457.00 | 630.00 | 630.00 | NeedOptimize |
-| WidthMeasurement | 512x512 | 6 | 691.50 | 816.00 | 816.00 | NeedOptimize |
+| HistogramAnalysis | 512x512 | 6 | 0.50 | 2.00 | 2.00 | OK |
+| GapMeasurement | 512x512 | 6 | 2.00 | 3.00 | 3.00 | OK |
+| SharpnessEvaluation | 512x512 | 6 | 3.00 | 4.00 | 4.00 | OK |
+| CaliperTool | 512x512 | 6 | 4.33 | 7.00 | 7.00 | OK |
+| ContourMeasurement | 512x512 | 6 | 5.83 | 9.00 | 9.00 | OK |
+| PixelStatistics | 512x512 | 6 | 5.83 | 8.00 | 8.00 | OK |
+| LineMeasurement | 512x512 | 6 | 8.50 | 12.00 | 12.00 | OK |
+| GeometricFitting | 512x512 | 6 | 12.67 | 16.00 | 16.00 | OK |
+| CircleMeasurement | 512x512 | 6 | 38.33 | 60.00 | 60.00 | OK |
+| WidthMeasurement | 512x512 | 6 | 47.00 | 56.00 | 56.00 | OK |
+| ColorMeasurement | 512x512 | 6 | 56.50 | 71.00 | 71.00 | OK |
