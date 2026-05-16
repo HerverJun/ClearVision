@@ -133,12 +133,10 @@ export function createViewManager(options) {
                 break;
             }
             case 'results': {
-                containers.results?.classList.remove('hidden');
-                const panel = await ensureResultPanel();
-                if (panel) {
-                    panel.render();
-                    await loadInspectionHistory();
-                }
+                containers.stations?.classList.remove('hidden');
+                const monitorView = await ensureStationMonitorView();
+                await monitorView?.activate?.();
+                monitorView?.focusResultsWorkbench?.();
                 break;
             }
             case 'stations': {

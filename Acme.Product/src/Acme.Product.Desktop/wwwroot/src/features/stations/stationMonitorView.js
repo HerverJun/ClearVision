@@ -1,6 +1,10 @@
 import httpClient from '../../core/messaging/httpClient.js';
 import { getStoredToken } from '../auth/authStorage.js';
 import { buildSseHeaders, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
+import {
+    buildResultCardsFromOutputData,
+    renderResultCardHtml
+} from '../results/portDataTypeRenderer.mjs';
 
 class StationMonitorView {
     constructor(containerId) {
@@ -12,6 +16,16 @@ class StationMonitorView {
         this.packages = [];
         this.selectedStationId = null;
         this.selectedStationDetail = null;
+        this.monitorResults = [];
+        this.monitorTotalCount = 0;
+        this.monitorPageIndex = 0;
+        this.monitorPageSize = 12;
+        this.resultFilters = {
+            status: 'all',
+            diagnosticCode: 'all'
+        };
+        this.resultLoading = false;
+        this.resultLoadError = '';
         this.commandBusy = false;
         this.commandStatusMessage = '';
         this.commandStatusLevel = 'idle';
@@ -46,6 +60,10 @@ class StationMonitorView {
         }
     }
 
+    focusResultsWorkbench() {
+        this.resultsWorkbench?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    }
+
     renderShell() {
         if (!this.container) {
             return;
@@ -58,9 +76,13 @@ class StationMonitorView {
                         <span class="sm-kicker">工作站监控</span>
                         <h2 class="sm-title">中央监控台</h2>
                     </div>
-                    <div class="sm-status" id="sm-status" data-state="connecting">
-                        <span class="sm-pulse"></span>
-                        <span id="sm-status-text">连接中...</span>
+                    <div class="sm-header-actions">
+                        <button type="button" class="sm-scope-btn is-active" data-monitor-scope="all">全站</button>
+                        <button type="button" class="sm-scope-btn" data-monitor-refresh>刷新</button>
+                        <div class="sm-status" id="sm-status" data-state="connecting">
+                            <span class="sm-pulse"></span>
+                            <span id="sm-status-text">连接中...</span>
+                        </div>
                     </div>
                 </header>
 
@@ -71,7 +93,7 @@ class StationMonitorView {
                         <div class="sm-surface">
                             <div class="sm-surface-header">
                                 <span>工作站集群</span>
-                                <span class="sm-meta" id="sm-fleet-meta">0 个在线</span>
+                                <span class="sm-meta" id="sm-fleet-meta">0 个工作站</span>
                             </div>
                             <div class="sm-fleet" id="sm-fleet"></div>
                         </div>
@@ -81,7 +103,7 @@ class StationMonitorView {
                         <div class="sm-surface sm-detail">
                             <div class="sm-surface-header">
                                 <span>详情检查器</span>
-                                <span class="sm-meta" id="sm-detail-meta">未选择</span>
+                                <span class="sm-meta" id="sm-detail-meta">全站范围</span>
                             </div>
                             <div class="sm-detail-body" id="sm-detail"></div>
                         </div>
@@ -95,6 +117,25 @@ class StationMonitorView {
                         </div>
                     </aside>
                 </section>
+
+                <section class="sm-results-workbench" id="sm-results-workbench">
+                    <div class="sm-surface">
+                        <div class="sm-surface-header sm-results-header">
+                            <div>
+                                <span id="sm-results-title">全站结果明细</span>
+                                <small id="sm-results-subtitle">等待真实 Station 结果</small>
+                            </div>
+                            <span class="sm-meta" id="sm-results-meta">0 条记录</span>
+                        </div>
+                        <div class="sm-results-body">
+                            <div class="sm-result-overview" id="sm-result-overview"></div>
+                            <div class="sm-result-charts" id="sm-result-charts"></div>
+                            <div class="sm-result-toolbar" id="sm-result-toolbar"></div>
+                            <div class="sm-result-list" id="sm-result-list"></div>
+                            <div class="sm-result-pagination" id="sm-result-pagination"></div>
+                        </div>
+                    </div>
+                </section>
             </div>
         `;
 
@@ -107,6 +148,16 @@ class StationMonitorView {
         this.streamMeta = this.container.querySelector('#sm-feed-meta');
         this.syncText = this.container.querySelector('#sm-status-text');
         this.syncElement = this.container.querySelector('#sm-status');
+        this.scopeAllButton = this.container.querySelector('[data-monitor-scope="all"]');
+        this.resultsWorkbench = this.container.querySelector('#sm-results-workbench');
+        this.resultsTitle = this.container.querySelector('#sm-results-title');
+        this.resultsSubtitle = this.container.querySelector('#sm-results-subtitle');
+        this.resultsMeta = this.container.querySelector('#sm-results-meta');
+        this.resultOverview = this.container.querySelector('#sm-result-overview');
+        this.resultCharts = this.container.querySelector('#sm-result-charts');
+        this.resultToolbar = this.container.querySelector('#sm-result-toolbar');
+        this.resultList = this.container.querySelector('#sm-result-list');
+        this.resultPagination = this.container.querySelector('#sm-result-pagination');
     }
 
     bindEvents() {
@@ -119,6 +170,34 @@ class StationMonitorView {
                 return;
             }
 
+            const exportAction = event.target.closest('[data-result-export]');
+            if (exportAction) {
+                event.preventDefault();
+                this.exportMonitorResults(exportAction.dataset.resultExport);
+                return;
+            }
+
+            const pageAction = event.target.closest('[data-result-page]');
+            if (pageAction) {
+                event.preventDefault();
+                await this.loadResultsPage(Number(pageAction.dataset.resultPage || 0));
+                return;
+            }
+
+            const refreshAction = event.target.closest('[data-monitor-refresh]');
+            if (refreshAction) {
+                event.preventDefault();
+                await this.refreshCurrentScope();
+                return;
+            }
+
+            const allScopeAction = event.target.closest('[data-monitor-scope="all"]');
+            if (allScopeAction) {
+                event.preventDefault();
+                await this.selectAllStations();
+                return;
+            }
+
             const card = event.target.closest('[data-station-id]');
             if (!card) {
                 return;
@@ -126,7 +205,20 @@ class StationMonitorView {
 
             const stationId = card.dataset.stationId;
             if (stationId) {
-                void this.selectStation(stationId);
+                await this.selectStation(stationId);
+            }
+        });
+
+        this.container?.addEventListener('change', async (event) => {
+            if (event.target?.id === 'sm-result-status-filter') {
+                this.resultFilters.status = event.target.value || 'all';
+                await this.loadResultsPage(0);
+                return;
+            }
+
+            if (event.target?.id === 'sm-result-diagnostic-filter') {
+                this.resultFilters.diagnosticCode = event.target.value || 'all';
+                await this.loadResultsPage(0);
             }
         });
     }
@@ -149,24 +241,36 @@ class StationMonitorView {
                 this.stations.set(normalized.stationId, normalized);
             });
 
-            if (!this.selectedStationId && this.stations.size > 0) {
-                this.selectedStationId = this.getSortedStations()[0]?.stationId || null;
-            }
-
-            if (this.selectedStationId) {
-                await this.loadStationDetail(this.selectedStationId);
-            }
-
+            await this.loadResultsPage(0, { renderAfter: false });
             this.updateSyncState('实时', 'live');
         } catch (error) {
             console.error('[StationMonitorView] Failed to load initial data:', error);
+            this.resultLoadError = error?.message || '加载监控数据失败';
             this.updateSyncState('重连中', 'retrying');
         }
     }
 
+    async refreshCurrentScope() {
+        if (this.selectedStationId) {
+            await this.loadStationDetail(this.selectedStationId);
+        }
+
+        await this.loadResultsPage(this.monitorPageIndex);
+    }
+
+    async selectAllStations() {
+        this.selectedStationId = null;
+        this.selectedStationDetail = null;
+        this.scopeAllButton?.classList.add('is-active');
+        await this.loadResultsPage(0);
+        this.render();
+    }
+
     async selectStation(stationId) {
         this.selectedStationId = stationId;
+        this.scopeAllButton?.classList.remove('is-active');
         await this.loadStationDetail(stationId);
+        await this.loadResultsPage(0, { renderAfter: false });
         this.render();
     }
 
@@ -182,6 +286,49 @@ class StationMonitorView {
             this.stations.set(this.selectedStationDetail.stationId, this.selectedStationDetail);
         } catch (error) {
             console.error('[StationMonitorView] Failed to load station detail:', error);
+        }
+    }
+
+    async loadResultsPage(pageIndex = 0, { renderAfter = true } = {}) {
+        this.resultLoading = true;
+        this.resultLoadError = '';
+        this.monitorPageIndex = Math.max(0, Number(pageIndex) || 0);
+        if (renderAfter) {
+            this.renderResultsWorkbench();
+        }
+
+        try {
+            const params = {
+                pageIndex: this.monitorPageIndex,
+                pageSize: this.monitorPageSize
+            };
+
+            if (this.selectedStationId) {
+                params.stationId = this.selectedStationId;
+            }
+
+            if (this.resultFilters.status !== 'all') {
+                params.status = this.resultFilters.status;
+            }
+
+            if (this.resultFilters.diagnosticCode !== 'all') {
+                params.diagnosticCode = this.resultFilters.diagnosticCode;
+            }
+
+            const response = await httpClient.get('/stations/results', params);
+            const page = this.normalizeResultsPage(response);
+            this.monitorResults = page.items;
+            this.monitorTotalCount = page.totalCount;
+            this.monitorPageIndex = page.pageIndex;
+            this.monitorPageSize = page.pageSize;
+        } catch (error) {
+            console.error('[StationMonitorView] Failed to load station results:', error);
+            this.resultLoadError = error?.message || '结果查询失败';
+        } finally {
+            this.resultLoading = false;
+            if (renderAfter) {
+                this.render();
+            }
         }
     }
 
@@ -323,18 +470,25 @@ class StationMonitorView {
             this.stations.set(normalized.stationId, normalized);
         });
 
-        this.globalResults = recentResults.map((item) => ({
-            stationId: item?.stationId ?? item?.StationId ?? '--',
-            result: this.normalizeResult(item?.result ?? item?.Result)
-        }));
+        this.globalResults = recentResults
+            .map((item) => this.normalizeMonitorResult(item?.result ?? item?.Result, item?.station ?? item?.Station))
+            .filter(Boolean);
 
-        if (!this.selectedStationId && this.stations.size > 0) {
-            this.selectedStationId = this.getSortedStations()[0]?.stationId || null;
+        if (this.monitorResults.length === 0 && this.globalResults.length > 0) {
+            const scoped = this.globalResults
+                .filter((record) => this.resultMatchesCurrentScope(record))
+                .filter((record) => this.resultMatchesFilters(record));
+            this.monitorResults = scoped.slice(0, this.monitorPageSize);
+            this.monitorTotalCount = scoped.length;
         }
     }
 
     upsertStation(station) {
         const normalized = this.normalizeStation(station);
+        if (!normalized.stationId || normalized.stationId === '--') {
+            return;
+        }
+
         this.stations.set(normalized.stationId, normalized);
 
         if (this.selectedStationDetail?.stationId === normalized.stationId) {
@@ -346,33 +500,43 @@ class StationMonitorView {
     }
 
     applyResultEvent(payload) {
-        const station = this.normalizeStation(payload?.station);
+        const payloadStation = this.normalizeStation(payload?.station);
         const result = this.normalizeResult(payload?.result);
+        const stationId = payloadStation.stationId && payloadStation.stationId !== '--'
+            ? payloadStation.stationId
+            : result.stationId;
+        const station = this.stations.get(stationId) || payloadStation;
 
-        this.stations.set(station.stationId, station);
-        this.globalResults.unshift({
-            stationId: station.stationId,
-            stationLabel: station.lineName || station.stationId,
-            result
-        });
-        this.globalResults = this.globalResults.slice(0, 40);
+        if (payloadStation.stationId && payloadStation.stationId !== '--') {
+            this.stations.set(payloadStation.stationId, payloadStation);
+        }
 
-        if (this.selectedStationId === station.stationId) {
-            if (!this.selectedStationDetail) {
-                this.selectedStationDetail = {
-                    ...station,
-                    recentResults: []
-                };
-            }
+        const record = this.normalizeMonitorResult(result, station);
+        if (!record) {
+            return;
+        }
 
-            const recentResults = Array.isArray(this.selectedStationDetail.recentResults)
-                ? [...this.selectedStationDetail.recentResults]
-                : [];
+        this.globalResults.unshift(record);
+        this.globalResults = this.dedupeResultRecords(this.globalResults).slice(0, 80);
+
+        if (this.monitorPageIndex === 0 &&
+            this.resultMatchesCurrentScope(record) &&
+            this.resultMatchesFilters(record)) {
+            this.monitorResults = this.dedupeResultRecords([record, ...this.monitorResults]).slice(0, this.monitorPageSize);
+            this.monitorTotalCount += 1;
+        }
+
+        if (this.selectedStationId === record.stationId) {
+            const detail = this.selectedStationDetail || {
+                ...(this.stations.get(record.stationId) || { stationId: record.stationId }),
+                recentResults: []
+            };
+            const recentResults = Array.isArray(detail.recentResults) ? [...detail.recentResults] : [];
             recentResults.unshift(result);
             this.selectedStationDetail = {
-                ...this.selectedStationDetail,
+                ...detail,
                 ...station,
-                recentResults: recentResults.slice(0, 25)
+                recentResults: this.dedupeResults(recentResults).slice(0, 25)
             };
         }
     }
@@ -413,7 +577,7 @@ class StationMonitorView {
         }
 
         this.globalLogs.unshift({ stationId, log });
-        this.globalLogs = this.globalLogs.slice(0, 40);
+        this.globalLogs = this.globalLogs.slice(0, 80);
 
         if (this.selectedStationId === stationId) {
             const detail = this.selectedStationDetail || { ...station, recentLogs: [] };
@@ -615,10 +779,12 @@ class StationMonitorView {
     }
 
     render() {
+        this.scopeAllButton?.classList.toggle('is-active', !this.selectedStationId);
         this.renderSummary();
         this.renderMatrix();
         this.renderFocus();
         this.renderStream();
+        this.renderResultsWorkbench();
     }
 
     renderSummary() {
@@ -629,27 +795,27 @@ class StationMonitorView {
         const stations = this.getSortedStations();
         const onlineStations = stations.filter((station) => this.computeIsOnline(station));
         const alerts = stations.filter((station) => !this.computeIsOnline(station) || station.state === 'Faulted');
-        const recentResults = stations.flatMap((station) => Array.isArray(station.recentResults) ? station.recentResults : []);
-        const avgExecutionTime = recentResults.length > 0
-            ? recentResults.reduce((sum, result) => sum + Number(result.executionTimeMs || 0), 0) / recentResults.length
-            : stations.reduce((sum, station) => sum + Number(station.averageExecutionTimeMs || 0), 0) / Math.max(stations.length, 1);
-        const totalOk = stations.reduce((sum, station) => sum + Number(station.sessionOkCount || 0), 0);
-        const totalNg = stations.reduce((sum, station) => sum + Number(station.sessionNgCount || 0), 0);
-        const totalError = stations.reduce((sum, station) => sum + Number(station.sessionErrorCount || 0), 0);
+        const totalOk = this.summary?.totalOkCount ?? stations.reduce((sum, station) => sum + Number(station.sessionOkCount || 0), 0);
+        const totalNg = this.summary?.totalNgCount ?? stations.reduce((sum, station) => sum + Number(station.sessionNgCount || 0), 0);
+        const totalError = this.summary?.totalErrorCount ?? stations.reduce((sum, station) => sum + Number(station.sessionErrorCount || 0), 0);
+        const avgExecutionTime = this.summary?.averageExecutionTimeMs ??
+            stations.reduce((sum, station) => sum + Number(station.averageExecutionTimeMs || 0), 0) / Math.max(stations.length, 1);
+        const totalInspections = totalOk + totalNg + totalError;
+        const yieldRate = totalInspections === 0 ? '--' : `${Math.round((totalOk / totalInspections) * 1000) / 10}%`;
 
         const cards = [
             { label: '在线', value: `${onlineStations.length}/${stations.length || 0}`, meta: `${stations.length - onlineStations.length} 个离线`, tone: 'success' },
             { label: '告警', value: String(alerts.length), meta: '故障或超时', tone: alerts.length > 0 ? 'warning' : 'default' },
-            { label: '产量统计', value: `${totalOk} / ${totalNg} / ${totalError}`, meta: '良品 / 不良 / 异常', tone: 'accent' },
-            { label: '平均节拍', value: this.formatMilliseconds(avgExecutionTime), meta: `${this.offlineThresholdSeconds}秒后判定超时`, tone: 'info' }
+            { label: '良率', value: yieldRate, meta: `${totalOk} OK / ${totalNg} NG / ${totalError} ERR`, tone: 'accent' },
+            { label: '平均节拍', value: this.formatMilliseconds(avgExecutionTime), meta: `${this.offlineThresholdSeconds} 秒后判定超时`, tone: 'info' }
         ];
 
         this.summaryGrid.innerHTML = cards.map((card) => `
             <article class="sm-kpi sm-kpi--${card.tone}">
                 <div class="sm-kpi-inner">
-                    <span class="sm-kpi-label">${card.label}</span>
-                    <strong class="sm-kpi-value">${card.value}</strong>
-                    <span class="sm-kpi-meta">${card.meta}</span>
+                    <span class="sm-kpi-label">${this.escapeHtml(card.label)}</span>
+                    <strong class="sm-kpi-value">${this.escapeHtml(card.value)}</strong>
+                    <span class="sm-kpi-meta">${this.escapeHtml(card.meta)}</span>
                 </div>
             </article>
         `).join('');
@@ -661,13 +827,14 @@ class StationMonitorView {
         }
 
         const stations = this.getSortedStations();
-        this.matrixMeta.textContent = `${stations.length} 个在线`;
+        const onlineCount = stations.filter((station) => this.computeIsOnline(station)).length;
+        this.matrixMeta.textContent = `${onlineCount}/${stations.length} 在线`;
 
         if (stations.length === 0) {
             this.matrix.innerHTML = `
                 <div class="sm-empty is-center">
                     <strong>暂无工作站数据</strong>
-                    <span>请在 Studio 中启用 Station 接入，并配置 Station 同步以启动闭环。</span>
+                    <span>等待 Station 通过 /hubs/station-ingest 注册、心跳和上报结果。</span>
                 </div>
             `;
             return;
@@ -690,7 +857,7 @@ class StationMonitorView {
                     <div class="sm-station-main">
                         <div class="sm-station-head">
                             <span class="sm-station-name">${this.escapeHtml(station.stationName || station.stationId)}</span>
-                            <span class="sm-station-badge">${stateLabel}</span>
+                            <span class="sm-station-badge">${this.escapeHtml(stateLabel)}</span>
                         </div>
                         <span class="sm-station-line">${this.escapeHtml(station.lineName || station.machineName || station.stationId)}</span>
                     </div>
@@ -700,8 +867,8 @@ class StationMonitorView {
                         <span class="sm-stat"><b>${Number(station.sessionErrorCount || 0)}</b> ERR</span>
                     </div>
                     <div class="sm-station-foot">
-                        <span>${outcomeLabel}</span>
-                        <span>${this.formatRelativeTime(station.lastSeenAtUtc)}</span>
+                        <span>${this.escapeHtml(outcomeLabel)}</span>
+                        <span>${this.escapeHtml(this.formatRelativeTime(station.lastSeenAtUtc))}</span>
                     </div>
                 </button>
             `;
@@ -718,11 +885,11 @@ class StationMonitorView {
             : null;
 
         if (!selectedStation) {
-            this.focusMeta.textContent = '未选择';
+            this.focusMeta.textContent = '全站范围';
             this.focus.innerHTML = `
                 <div class="sm-empty is-center">
-                    <strong>请选择工作站</strong>
-                    <span>选择左侧某个工作站卡片，查看其包信息、计数器和近期结果。</span>
+                    <strong>当前为全站监控</strong>
+                    <span>选择左侧某个工作站后，健康、日志、命令和结果明细会联动到该 Station。</span>
                 </div>
             `;
             return;
@@ -749,7 +916,7 @@ class StationMonitorView {
                     <h3>${this.escapeHtml(detail.stationName || detail.lineName || detail.machineName || '未命名工作站')}</h3>
                     <p>${this.escapeHtml([detail.lineName, detail.areaName, detail.workcellName].filter(Boolean).join(' / ') || detail.packageName || '未加载包')}</p>
                 </div>
-                <span class="sm-detail-badge">${this.formatState(detail.state, isOnline)}</span>
+                <span class="sm-detail-badge">${this.escapeHtml(this.formatState(detail.state, isOnline))}</span>
             </div>
             <div class="sm-detail-actions">
                 <button type="button" data-station-action="ping" ${actionsDisabled}>Ping</button>
@@ -777,82 +944,65 @@ class StationMonitorView {
                 <div><dt>内存占用</dt><dd>${Number(latestHealth.workingSetMb || detail.workingSetMb || 0)} MB</dd></div>
                 <div><dt>健康状态</dt><dd>${this.escapeHtml(detail.onlineState || latestHealth.currentPackageHealth || '--')}</dd></div>
             </dl>
+            ${this.renderDetailSection('指令队列', recentCommands, (command) => `
+                <article class="sm-row">
+                    <div class="sm-row-main">
+                        <span class="sm-row-label">${this.escapeHtml(command.commandType || '--')}</span>
+                        <span class="sm-row-sublabel">${this.escapeHtml(command.commandId || '--')}</span>
+                    </div>
+                    <div class="sm-row-side">
+                        <span class="sm-row-value">${this.escapeHtml(command.status || '--')} ${Number(command.progressPercent || 0)}%</span>
+                        <span class="sm-row-time">${this.escapeHtml(command.resultMessage || command.errorCode || this.formatRelativeTime(command.createdAtUtc))}</span>
+                    </div>
+                </article>
+            `, '暂无指令记录。', 6)}
+            ${this.renderDetailSection('健康采样', recentHealth, (health) => `
+                <article class="sm-row">
+                    <div class="sm-row-main">
+                        <span class="sm-row-label">${this.escapeHtml(health.runtimeState || '--')}</span>
+                        <span class="sm-row-sublabel">${this.escapeHtml(health.currentPackageHealth || '--')}</span>
+                    </div>
+                    <div class="sm-row-side">
+                        <span class="sm-row-value">${this.formatDisk(health.diskFreeMb, health.diskTotalMb)}</span>
+                        <span class="sm-row-time">${this.escapeHtml(this.formatRelativeTime(health.createdAtUtc))}</span>
+                    </div>
+                </article>
+            `, '暂无健康采样。', 4)}
+            ${this.renderDetailSection('日志', recentLogs, (log) => `
+                <article class="sm-row sm-row--${this.escapeHtml(String(log.level || '').toLowerCase())}">
+                    <div class="sm-row-main">
+                        <span class="sm-row-label">${this.escapeHtml(log.level || '--')}</span>
+                        <span class="sm-row-sublabel">${this.escapeHtml(log.source || '--')}</span>
+                    </div>
+                    <span class="sm-row-value">${this.escapeHtml(log.renderedMessage || log.exceptionMessage || '--')}</span>
+                </article>
+            `, '暂无 WARN 或 ERROR 级别日志。', 5)}
+            ${this.renderDetailSection('近期结果', recentResults, (result) => `
+                <article class="sm-row">
+                    <div class="sm-row-main">
+                        <span class="sm-row-label">${this.escapeHtml(this.formatOutcome(result.outcome, result.inspectionStatus))}</span>
+                        <span class="sm-row-sublabel">${this.escapeHtml(result.imageId || result.runId || '--')}</span>
+                    </div>
+                    <div class="sm-row-side">
+                        <span class="sm-row-value">${this.formatMilliseconds(result.executionTimeMs)}</span>
+                        <span class="sm-row-time">${this.escapeHtml(this.formatRelativeTime(result.completedAtUtc))}</span>
+                    </div>
+                </article>
+            `, '该工作站暂无缓存结果。', 8)}
+        `;
+    }
+
+    renderDetailSection(title, items, renderItem, emptyText, take) {
+        const rows = Array.isArray(items) ? items : [];
+        return `
             <div class="sm-section">
                 <div class="sm-section-header">
-                    <span>指令队列</span>
-                    <span>${recentCommands.length}</span>
+                    <span>${this.escapeHtml(title)}</span>
+                    <span>${rows.length}</span>
                 </div>
-                ${recentCommands.length === 0
-                    ? '<div class="sm-empty compact"><span>暂无指令记录。</span></div>'
-                    : recentCommands.slice(0, 6).map((command) => `
-                        <article class="sm-row">
-                            <div class="sm-row-main">
-                                <span class="sm-row-label">${this.escapeHtml(command.commandType || '--')}</span>
-                                <span class="sm-row-sublabel">${this.escapeHtml(command.commandId || '--')}</span>
-                            </div>
-                            <div class="sm-row-side">
-                                <span class="sm-row-value">${this.escapeHtml(command.status || '--')} ${Number(command.progressPercent || 0)}%</span>
-                                <span class="sm-row-time">${this.escapeHtml(command.resultMessage || command.errorCode || this.formatRelativeTime(command.createdAtUtc))}</span>
-                            </div>
-                        </article>
-                    `).join('')}
-            </div>
-            <div class="sm-section">
-                <div class="sm-section-header">
-                    <span>健康采样</span>
-                    <span>${recentHealth.length}</span>
-                </div>
-                ${recentHealth.length === 0
-                    ? '<div class="sm-empty compact"><span>暂无健康采样。</span></div>'
-                    : recentHealth.slice(0, 4).map((health) => `
-                        <article class="sm-row">
-                            <div class="sm-row-main">
-                                <span class="sm-row-label">${this.escapeHtml(health.runtimeState || '--')}</span>
-                                <span class="sm-row-sublabel">${this.escapeHtml(health.currentPackageHealth || '--')}</span>
-                            </div>
-                            <div class="sm-row-side">
-                                <span class="sm-row-value">${this.formatDisk(health.diskFreeMb, health.diskTotalMb)}</span>
-                                <span class="sm-row-time">${this.escapeHtml(this.formatRelativeTime(health.createdAtUtc))}</span>
-                            </div>
-                        </article>
-                    `).join('')}
-            </div>
-            <div class="sm-section">
-                <div class="sm-section-header">
-                    <span>日志</span>
-                    <span>${recentLogs.length}</span>
-                </div>
-                ${recentLogs.length === 0
-                    ? '<div class="sm-empty compact"><span>暂无 WARN 或 ERROR 级别日志。</span></div>'
-                    : recentLogs.slice(0, 5).map((log) => `
-                        <article class="sm-row sm-row--${this.escapeHtml(String(log.level || '').toLowerCase())}">
-                            <div class="sm-row-main">
-                                <span class="sm-row-label">${this.escapeHtml(log.level || '--')}</span>
-                                <span class="sm-row-sublabel">${this.escapeHtml(log.source || '--')}</span>
-                            </div>
-                            <span class="sm-row-value">${this.escapeHtml(log.renderedMessage || log.exceptionMessage || '--')}</span>
-                        </article>
-                    `).join('')}
-            </div>
-            <div class="sm-section">
-                <div class="sm-section-header">
-                    <span>近期结果</span>
-                    <span>${recentResults.length}</span>
-                </div>
-                ${recentResults.length === 0
-                    ? '<div class="sm-empty compact"><span>该工作站暂无缓存结果。</span></div>'
-                    : recentResults.slice(0, 8).map((result) => `
-                        <article class="sm-row">
-                            <div class="sm-row-main">
-                                <span class="sm-row-label">${this.escapeHtml(this.formatOutcome(result.outcome, result.inspectionStatus))}</span>
-                                <span class="sm-row-sublabel">${this.escapeHtml(result.imageId || result.runId || '--')}</span>
-                            </div>
-                            <div class="sm-row-side">
-                                <span class="sm-row-value">${this.formatMilliseconds(result.executionTimeMs)}</span>
-                                <span class="sm-row-time">${this.escapeHtml(this.formatRelativeTime(result.completedAtUtc))}</span>
-                            </div>
-                        </article>
-                    `).join('')}
+                ${rows.length === 0
+                    ? `<div class="sm-empty compact"><span>${this.escapeHtml(emptyText)}</span></div>`
+                    : rows.slice(0, take).map(renderItem).join('')}
             </div>
         `;
     }
@@ -863,11 +1013,11 @@ class StationMonitorView {
         }
 
         const flow = [
-            ...this.globalResults.map((item) => ({
+            ...this.globalResults.map((record) => ({
                 type: 'result',
-                stationId: item.stationId,
-                atUtc: item.result?.completedAtUtc,
-                data: item.result
+                stationId: record.stationId,
+                atUtc: record.completedAtUtc,
+                data: record
             })),
             ...this.globalLogs.map((item) => ({
                 type: 'log',
@@ -882,7 +1032,7 @@ class StationMonitorView {
             this.stream.innerHTML = `
                 <div class="sm-empty is-center">
                     <strong>暂无事件</strong>
-                    <span>工作站开始上报后，结果和日志数据流将显示在这里。</span>
+                    <span>工作站开始上报后，结果和日志数据流会显示在这里。</span>
                 </div>
             `;
             return;
@@ -909,7 +1059,7 @@ class StationMonitorView {
                 <article class="sm-feed-item">
                     <div class="sm-feed-main">
                         <span class="sm-feed-station">${this.escapeHtml(item.stationId)}</span>
-                        <strong>${this.escapeHtml(this.formatOutcome(item.data.outcome, item.data.inspectionStatus))}</strong>
+                        <strong>${this.escapeHtml(item.data.status)}</strong>
                         <span>${this.escapeHtml(item.data.imageId || item.data.runId || '--')}</span>
                     </div>
                     <div class="sm-feed-extra">
@@ -920,6 +1070,205 @@ class StationMonitorView {
                 </article>
             `;
         }).join('');
+    }
+
+    renderResultsWorkbench() {
+        if (!this.resultOverview || !this.resultCharts || !this.resultToolbar || !this.resultList || !this.resultPagination) {
+            return;
+        }
+
+        const scopeLabel = this.getCurrentScopeLabel();
+        const stats = this.calculateResultStats(this.monitorResults);
+        const totalPages = Math.max(1, Math.ceil(this.monitorTotalCount / this.monitorPageSize));
+        this.resultsTitle.textContent = `${scopeLabel}结果明细`;
+        this.resultsSubtitle.textContent = this.selectedStationId
+            ? '已按选中 Station 过滤'
+            : '默认汇总所有已接入 Station';
+        this.resultsMeta.textContent = this.resultLoading
+            ? '加载中'
+            : `${this.monitorTotalCount} 条记录`;
+
+        this.resultOverview.innerHTML = `
+            <article class="sm-result-kpi">
+                <span>当前页</span>
+                <strong>${this.monitorResults.length}</strong>
+                <small>总计 ${this.monitorTotalCount}</small>
+            </article>
+            <article class="sm-result-kpi">
+                <span>OK / NG / ERR</span>
+                <strong>${stats.ok} / ${stats.ng} / ${stats.error}</strong>
+                <small>来自真实结果</small>
+            </article>
+            <article class="sm-result-kpi">
+                <span>良率</span>
+                <strong>${stats.total === 0 ? '--' : `${Math.round((stats.ok / stats.total) * 1000) / 10}%`}</strong>
+                <small>按当前加载结果计算</small>
+            </article>
+            <article class="sm-result-kpi">
+                <span>平均耗时</span>
+                <strong>${this.formatMilliseconds(stats.averageExecutionTimeMs)}</strong>
+                <small>executionTimeMs</small>
+            </article>
+        `;
+
+        this.resultCharts.innerHTML = `
+            ${this.renderYieldChart(stats)}
+            ${this.renderDiagnosticChart(this.monitorResults)}
+            ${this.renderTrendChart(this.monitorResults)}
+        `;
+
+        this.resultToolbar.innerHTML = `
+            <label class="sm-filter">
+                <span>状态</span>
+                <select id="sm-result-status-filter">
+                    ${this.renderOption('all', '全部', this.resultFilters.status)}
+                    ${this.renderOption('Ok', 'OK', this.resultFilters.status)}
+                    ${this.renderOption('Ng', 'NG', this.resultFilters.status)}
+                    ${this.renderOption('Error', '异常', this.resultFilters.status)}
+                    ${this.renderOption('Canceled', '已取消', this.resultFilters.status)}
+                </select>
+            </label>
+            <label class="sm-filter">
+                <span>诊断码</span>
+                <select id="sm-result-diagnostic-filter">
+                    ${this.renderOption('all', '全部', this.resultFilters.diagnosticCode)}
+                    ${this.getDiagnosticOptions().map((code) => this.renderOption(code, code, this.resultFilters.diagnosticCode)).join('')}
+                </select>
+            </label>
+            <div class="sm-result-actions">
+                <button type="button" data-monitor-refresh>刷新</button>
+                <button type="button" data-result-export="csv">CSV</button>
+                <button type="button" data-result-export="json">JSON</button>
+                <button type="button" data-result-export="excel">Excel</button>
+            </div>
+        `;
+
+        if (this.resultLoading) {
+            this.resultList.innerHTML = '<div class="sm-empty is-center"><strong>正在加载结果...</strong></div>';
+        } else if (this.resultLoadError) {
+            this.resultList.innerHTML = `
+                <div class="sm-empty is-center">
+                    <strong>结果加载失败</strong>
+                    <span>${this.escapeHtml(this.resultLoadError)}</span>
+                </div>
+            `;
+        } else if (this.monitorResults.length === 0) {
+            this.resultList.innerHTML = `
+                <div class="sm-empty is-center">
+                    <strong>暂无结果</strong>
+                    <span>没有真实 Station 结果命中当前范围和筛选条件。</span>
+                </div>
+            `;
+        } else {
+            this.resultList.innerHTML = this.monitorResults.map((record) => this.renderMonitorResultCard(record)).join('');
+        }
+
+        this.resultPagination.innerHTML = `
+            <button type="button" data-result-page="${Math.max(0, this.monitorPageIndex - 1)}" ${this.monitorPageIndex <= 0 ? 'disabled' : ''}>上一页</button>
+            <span>第 ${this.monitorPageIndex + 1} / ${totalPages} 页</span>
+            <button type="button" data-result-page="${Math.min(totalPages - 1, this.monitorPageIndex + 1)}" ${this.monitorPageIndex + 1 >= totalPages ? 'disabled' : ''}>下一页</button>
+        `;
+    }
+
+    renderYieldChart(stats) {
+        const rate = stats.total === 0 ? 0 : Math.max(0, Math.min(100, (stats.ok / stats.total) * 100));
+        return `
+            <article class="sm-chart sm-chart-yield">
+                <div class="sm-chart-head">
+                    <span>良率仪表</span>
+                    <strong>${stats.total === 0 ? '--' : `${rate.toFixed(1)}%`}</strong>
+                </div>
+                <div class="sm-yield-track">
+                    <span style="width:${rate}%"></span>
+                </div>
+                <div class="sm-chart-foot">
+                    <span>${stats.ok} OK</span>
+                    <span>${stats.ng} NG</span>
+                    <span>${stats.error} ERR</span>
+                </div>
+            </article>
+        `;
+    }
+
+    renderDiagnosticChart(records) {
+        const groups = this.groupBy(records, (record) => record.diagnosticCode || 'Unknown')
+            .slice(0, 6);
+        const max = Math.max(1, ...groups.map((item) => item.count));
+        return `
+            <article class="sm-chart">
+                <div class="sm-chart-head">
+                    <span>诊断码分布</span>
+                    <strong>${groups.length}</strong>
+                </div>
+                <div class="sm-bars">
+                    ${groups.length === 0
+                        ? '<div class="sm-empty compact"><span>暂无诊断码。</span></div>'
+                        : groups.map((item) => `
+                            <div class="sm-bar-row">
+                                <span>${this.escapeHtml(item.key)}</span>
+                                <div><i style="width:${Math.max(4, (item.count / max) * 100)}%"></i></div>
+                                <b>${item.count}</b>
+                            </div>
+                        `).join('')}
+                </div>
+            </article>
+        `;
+    }
+
+    renderTrendChart(records) {
+        const groups = this.groupBy(records, (record) => this.formatHourBucket(record.completedAtUtc))
+            .sort((left, right) => String(left.key).localeCompare(String(right.key)))
+            .slice(-8);
+        const max = Math.max(1, ...groups.map((item) => item.count));
+        return `
+            <article class="sm-chart">
+                <div class="sm-chart-head">
+                    <span>吞吐趋势</span>
+                    <strong>${records.length}</strong>
+                </div>
+                <div class="sm-trend">
+                    ${groups.length === 0
+                        ? '<div class="sm-empty compact"><span>暂无趋势数据。</span></div>'
+                        : groups.map((item) => `
+                            <div class="sm-trend-col">
+                                <span style="height:${Math.max(8, (item.count / max) * 100)}%"></span>
+                                <small>${this.escapeHtml(item.key)}</small>
+                            </div>
+                        `).join('')}
+                </div>
+            </article>
+        `;
+    }
+
+    renderMonitorResultCard(record) {
+        const outputCards = buildResultCardsFromOutputData(record.primaryOutputsPreview || {}, {
+            status: record.status
+        });
+        return `
+            <article class="sm-monitor-result sm-monitor-result--${this.toCssToken(record.status)}">
+                <header>
+                    <div>
+                        <span class="sm-result-status">${this.escapeHtml(record.status)}</span>
+                        <strong>${this.escapeHtml(record.stationLabel || record.stationId || '--')}</strong>
+                    </div>
+                    <span>${this.escapeHtml(this.formatRelativeTime(record.completedAtUtc))}</span>
+                </header>
+                <dl>
+                    <div><dt>序号</dt><dd>${Number(record.sequenceId || 0)}</dd></div>
+                    <div><dt>诊断</dt><dd>${this.escapeHtml(record.diagnosticCode || '--')}</dd></div>
+                    <div><dt>耗时</dt><dd>${this.formatMilliseconds(record.executionTimeMs)}</dd></div>
+                    <div><dt>包</dt><dd>${this.escapeHtml(record.packageName || record.packageId || '--')}</dd></div>
+                </dl>
+                ${record.diagnosticMessage
+                    ? `<p class="sm-result-message">${this.escapeHtml(record.diagnosticMessage)}</p>`
+                    : ''}
+                <div class="sm-result-output">
+                    ${outputCards.length === 0
+                        ? '<div class="sm-empty compact"><span>暂无主输出预览。</span></div>'
+                        : outputCards.map((card) => renderResultCardHtml(card, { fallbackStatus: record.status })).join('')}
+                </div>
+            </article>
+        `;
     }
 
     updateSyncState(displayText, stateKey) {
@@ -971,6 +1320,16 @@ class StationMonitorView {
         }
 
         return {
+            totalStations: Number(summary.totalStations ?? summary.TotalStations ?? 0),
+            onlineStations: Number(summary.onlineStations ?? summary.OnlineStations ?? 0),
+            offlineStations: Number(summary.offlineStations ?? summary.OfflineStations ?? 0),
+            runningStations: Number(summary.runningStations ?? summary.RunningStations ?? 0),
+            faultedStations: Number(summary.faultedStations ?? summary.FaultedStations ?? 0),
+            alertCount: Number(summary.alertCount ?? summary.AlertCount ?? 0),
+            totalOkCount: Number(summary.totalOkCount ?? summary.TotalOkCount ?? 0),
+            totalNgCount: Number(summary.totalNgCount ?? summary.TotalNgCount ?? 0),
+            totalErrorCount: Number(summary.totalErrorCount ?? summary.TotalErrorCount ?? 0),
+            averageExecutionTimeMs: Number(summary.averageExecutionTimeMs ?? summary.AverageExecutionTimeMs ?? 0),
             offlineThresholdSeconds: Number(summary.offlineThresholdSeconds ?? summary.OfflineThresholdSeconds ?? 15)
         };
     }
@@ -1043,13 +1402,47 @@ class StationMonitorView {
         return this.normalizeStation(detail);
     }
 
+    normalizeResultsPage(response) {
+        const items = Array.isArray(response)
+            ? response
+            : (response?.items ?? response?.Items ?? []);
+        return {
+            items: (Array.isArray(items) ? items : [])
+                .map((item) => this.normalizeMonitorResult(item))
+                .filter(Boolean),
+            totalCount: Number(response?.totalCount ?? response?.TotalCount ?? items.length ?? 0),
+            pageIndex: Number(response?.pageIndex ?? response?.PageIndex ?? this.monitorPageIndex),
+            pageSize: Number(response?.pageSize ?? response?.PageSize ?? this.monitorPageSize)
+        };
+    }
+
+    normalizeMonitorResult(result, station = null) {
+        const normalized = this.normalizeResult(result);
+        if (!normalized.stationId) {
+            return null;
+        }
+
+        const stationInfo = station && station.stationId && station.stationId !== '--'
+            ? station
+            : this.stations.get(normalized.stationId);
+        const status = this.normalizeResultStatus(normalized.outcome, normalized.inspectionStatus);
+        return {
+            ...normalized,
+            status,
+            stationLabel: stationInfo?.stationName || stationInfo?.lineName || stationInfo?.machineName || normalized.stationId
+        };
+    }
+
     normalizeResult(result) {
+        const preview = result?.primaryOutputsPreview ?? result?.PrimaryOutputsPreview ?? {};
         return {
             stationId: result?.stationId ?? result?.StationId ?? null,
             sequenceId: Number(result?.sequenceId ?? result?.SequenceId ?? 0),
+            messageId: result?.messageId ?? result?.MessageId ?? '',
             runId: result?.runId ?? result?.RunId ?? '--',
             packageId: result?.packageId ?? result?.PackageId ?? null,
             packageName: result?.packageName ?? result?.PackageName ?? null,
+            packageVersion: result?.packageVersion ?? result?.PackageVersion ?? null,
             flowHash: result?.flowHash ?? result?.FlowHash ?? null,
             imageId: result?.imageId ?? result?.ImageId ?? '--',
             outcome: result?.outcome ?? result?.Outcome ?? 'Error',
@@ -1057,8 +1450,10 @@ class StationMonitorView {
             executionTimeMs: Number(result?.executionTimeMs ?? result?.ExecutionTimeMs ?? 0),
             diagnosticCode: result?.diagnosticCode ?? result?.DiagnosticCode ?? null,
             diagnosticMessage: result?.diagnosticMessage ?? result?.DiagnosticMessage ?? null,
+            primaryOutputsPreview: preview && typeof preview === 'object' && !Array.isArray(preview) ? preview : {},
             startedAtUtc: result?.startedAtUtc ?? result?.StartedAtUtc ?? null,
-            completedAtUtc: result?.completedAtUtc ?? result?.CompletedAtUtc ?? null
+            completedAtUtc: result?.completedAtUtc ?? result?.CompletedAtUtc ?? null,
+            createdAtUtc: result?.createdAtUtc ?? result?.CreatedAtUtc ?? null
         };
     }
 
@@ -1116,6 +1511,186 @@ class StationMonitorView {
         };
     }
 
+    normalizeResultStatus(outcome, inspectionStatus) {
+        const normalizedOutcome = String(outcome ?? '').trim().toUpperCase();
+        if (normalizedOutcome === 'OK' || normalizedOutcome === '0') {
+            return 'OK';
+        }
+
+        if (normalizedOutcome === 'NG' || normalizedOutcome === '1') {
+            return 'NG';
+        }
+
+        if (normalizedOutcome === 'ERROR' || normalizedOutcome === '2') {
+            return 'Error';
+        }
+
+        if (normalizedOutcome === 'CANCELED' || normalizedOutcome === 'CANCELLED' || normalizedOutcome === '3') {
+            return 'Canceled';
+        }
+
+        const normalizedStatus = String(inspectionStatus ?? '').trim().toUpperCase();
+        if (normalizedStatus === 'OK' || normalizedStatus === '2') {
+            return 'OK';
+        }
+
+        if (normalizedStatus === 'NG' || normalizedStatus === '3') {
+            return 'NG';
+        }
+
+        if (normalizedStatus === 'ERROR' || normalizedStatus === '4') {
+            return 'Error';
+        }
+
+        return normalizedOutcome || 'Unknown';
+    }
+
+    calculateResultStats(records) {
+        const total = records.length;
+        const ok = records.filter((record) => record.status === 'OK').length;
+        const ng = records.filter((record) => record.status === 'NG').length;
+        const error = records.filter((record) => record.status === 'Error' || record.status === 'Canceled').length;
+        const timed = records.filter((record) => Number(record.executionTimeMs) > 0);
+        const averageExecutionTimeMs = timed.length === 0
+            ? 0
+            : timed.reduce((sum, record) => sum + Number(record.executionTimeMs || 0), 0) / timed.length;
+
+        return { total, ok, ng, error, averageExecutionTimeMs };
+    }
+
+    getCurrentScopeLabel() {
+        if (!this.selectedStationId) {
+            return '全站';
+        }
+
+        const station = this.stations.get(this.selectedStationId);
+        return station?.stationName || station?.lineName || this.selectedStationId;
+    }
+
+    resultMatchesCurrentScope(record) {
+        return !this.selectedStationId ||
+            String(record.stationId || '').toLowerCase() === String(this.selectedStationId).toLowerCase();
+    }
+
+    resultMatchesFilters(record) {
+        const statusMatches = this.resultFilters.status === 'all' ||
+            String(record.outcome || '').toLowerCase() === this.resultFilters.status.toLowerCase() ||
+            String(record.status || '').toLowerCase() === this.normalizeResultStatus(this.resultFilters.status).toLowerCase();
+        const diagnosticMatches = this.resultFilters.diagnosticCode === 'all' ||
+            String(record.diagnosticCode || '').toLowerCase() === this.resultFilters.diagnosticCode.toLowerCase();
+        return statusMatches && diagnosticMatches;
+    }
+
+    getDiagnosticOptions() {
+        const values = [
+            ...this.monitorResults.map((record) => record.diagnosticCode),
+            ...this.globalResults.map((record) => record.diagnosticCode),
+            ...this.getSortedStations().map((station) => station.lastDiagnosticCode)
+        ].filter(Boolean);
+        return [...new Set(values)].sort((left, right) => String(left).localeCompare(String(right)));
+    }
+
+    renderOption(value, label, selectedValue) {
+        return `<option value="${this.escapeHtml(value)}" ${String(value) === String(selectedValue) ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
+    }
+
+    groupBy(records, keySelector) {
+        const groups = new Map();
+        records.forEach((record) => {
+            const key = keySelector(record) || 'Unknown';
+            groups.set(key, (groups.get(key) || 0) + 1);
+        });
+        return [...groups.entries()]
+            .map(([key, count]) => ({ key, count }))
+            .sort((left, right) => right.count - left.count || String(left.key).localeCompare(String(right.key)));
+    }
+
+    dedupeResults(results) {
+        const seen = new Set();
+        return results.filter((result) => {
+            const key = `${result.stationId || ''}:${result.sequenceId || ''}:${result.messageId || ''}`;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    }
+
+    dedupeResultRecords(records) {
+        const seen = new Set();
+        return records.filter((record) => {
+            const key = `${record.stationId || ''}:${record.sequenceId || ''}:${record.messageId || ''}`;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    }
+
+    exportMonitorResults(format) {
+        const records = this.monitorResults;
+        if (records.length === 0) {
+            return;
+        }
+
+        const normalizedFormat = String(format || 'csv').toLowerCase();
+        if (normalizedFormat === 'json') {
+            this.downloadBlob(
+                JSON.stringify(records, null, 2),
+                'application/json',
+                `station-results-${Date.now()}.json`);
+            return;
+        }
+
+        const csv = this.convertResultsToCsv(records);
+        this.downloadBlob(
+            csv,
+            normalizedFormat === 'excel' ? 'application/vnd.ms-excel' : 'text/csv;charset=utf-8',
+            `station-results-${Date.now()}.${normalizedFormat === 'excel' ? 'xls' : 'csv'}`);
+    }
+
+    convertResultsToCsv(records) {
+        const headers = [
+            'StationId',
+            'Station',
+            'SequenceId',
+            'Status',
+            'DiagnosticCode',
+            'DiagnosticMessage',
+            'ExecutionTimeMs',
+            'CompletedAtUtc',
+            'PackageName'
+        ];
+        const rows = records.map((record) => [
+            record.stationId,
+            record.stationLabel,
+            record.sequenceId,
+            record.status,
+            record.diagnosticCode,
+            record.diagnosticMessage,
+            record.executionTimeMs,
+            record.completedAtUtc,
+            record.packageName
+        ]);
+        return [headers, ...rows]
+            .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','))
+            .join('\n');
+    }
+
+    downloadBlob(content, mimeType, fileName) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
     formatMilliseconds(value) {
         const numeric = Number(value || 0);
         if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -1168,21 +1743,34 @@ class StationMonitorView {
         }
 
         if (deltaSeconds < 60) {
-            return `${deltaSeconds}秒前`;
+            return `${deltaSeconds} 秒前`;
         }
 
         const minutes = Math.floor(deltaSeconds / 60);
         if (minutes < 60) {
-            return `${minutes}分钟前`;
+            return `${minutes} 分钟前`;
         }
 
         const hours = Math.floor(minutes / 60);
         if (hours < 24) {
-            return `${hours}小时前`;
+            return `${hours} 小时前`;
         }
 
         const days = Math.floor(hours / 24);
-        return `${days}天前`;
+        return `${days} 天前`;
+    }
+
+    formatHourBucket(value) {
+        if (!value) {
+            return '--';
+        }
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return '--';
+        }
+
+        return `${String(date.getHours()).padStart(2, '0')}:00`;
     }
 
     formatState(state, isOnline) {
@@ -1206,29 +1794,23 @@ class StationMonitorView {
     }
 
     formatOutcome(outcome, inspectionStatus) {
-        const normalizedOutcome = String(outcome || '').trim().toUpperCase();
-        if (normalizedOutcome === 'OK') {
-            return '良品';
+        const status = this.normalizeResultStatus(outcome, inspectionStatus);
+        switch (status) {
+            case 'OK':
+                return '良品';
+            case 'NG':
+                return '不良';
+            case 'Error':
+                return '异常';
+            case 'Canceled':
+                return '已取消';
+            default:
+                return '待定';
         }
+    }
 
-        if (normalizedOutcome === 'NG') {
-            return '不良';
-        }
-
-        if (normalizedOutcome === 'ERROR') {
-            return '异常';
-        }
-
-        if (normalizedOutcome === 'CANCELED') {
-            return '已取消';
-        }
-
-        const normalizedStatus = String(inspectionStatus || '').trim().toUpperCase();
-        if (normalizedStatus === 'OK' || normalizedStatus === 'NG' || normalizedStatus === 'ERROR') {
-            return normalizedStatus === 'ERROR' ? '异常' : (normalizedStatus === 'OK' ? '良品' : '不良');
-        }
-
-        return '待定';
+    toCssToken(value) {
+        return String(value ?? 'unknown').toLowerCase().replace(/[^a-z0-9_-]/g, '-') || 'unknown';
     }
 
     escapeHtml(value) {

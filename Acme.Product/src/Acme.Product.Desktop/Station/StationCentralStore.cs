@@ -254,6 +254,57 @@ public sealed class StationCentralStore
             .ToList();
     }
 
+    public StationResultsPageViewModel GetResultsPage(
+        string? stationId,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        string? status,
+        string? diagnosticCode,
+        int pageIndex,
+        int pageSize)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        var normalizedPageIndex = Math.Max(0, pageIndex);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, 500);
+        var query = db.StationResultSummaries.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(stationId))
+        {
+            query = query.Where(item => item.StationId == stationId);
+        }
+
+        if (fromUtc.HasValue)
+        {
+            query = query.Where(item => item.CompletedAtUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            query = query.Where(item => item.CompletedAtUtc <= toUtc.Value);
+        }
+
+        var filtered = query
+            .AsEnumerable()
+            .Where(item => MatchesStatus(item.Outcome, item.InspectionStatus, status))
+            .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
+            .OrderByDescending(item => item.CompletedAtUtc)
+            .ThenByDescending(item => item.SequenceId)
+            .ToList();
+
+        return new StationResultsPageViewModel
+        {
+            Items = filtered
+                .Skip(normalizedPageIndex * normalizedPageSize)
+                .Take(normalizedPageSize)
+                .Select(ToDto)
+                .ToList(),
+            TotalCount = filtered.Count,
+            PageIndex = normalizedPageIndex,
+            PageSize = normalizedPageSize
+        };
+    }
+
     public IReadOnlyList<StationHealthSnapshotDto> GetRecentHealth(string stationId, int take)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -1025,6 +1076,25 @@ public sealed class StationCentralStore
                value.Contains("apikey", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("apiKey", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("authorization", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesStatus(string? outcome, string? inspectionStatus, string? requestedStatus)
+    {
+        if (string.IsNullOrWhiteSpace(requestedStatus) ||
+            string.Equals(requestedStatus, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(outcome, requestedStatus, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(inspectionStatus, requestedStatus, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesText(string? value, string? requestedValue)
+    {
+        return string.IsNullOrWhiteSpace(requestedValue) ||
+               string.Equals(requestedValue, "all", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, requestedValue, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? Truncate(string? text, int maxLength)

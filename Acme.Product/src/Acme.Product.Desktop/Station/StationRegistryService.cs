@@ -509,6 +509,56 @@ public sealed class StationRegistryService
         }
     }
 
+    public StationResultsPageViewModel GetResultsPage(
+        string? stationId,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        string? status,
+        string? diagnosticCode,
+        int pageIndex,
+        int pageSize)
+    {
+        if (_centralStore != null)
+        {
+            return _centralStore.GetResultsPage(
+                stationId,
+                fromUtc,
+                toUtc,
+                status,
+                diagnosticCode,
+                pageIndex,
+                pageSize);
+        }
+
+        lock (_syncRoot)
+        {
+            var normalizedPageIndex = Math.Max(0, pageIndex);
+            var normalizedPageSize = Math.Clamp(pageSize, 1, 500);
+            var filtered = _entries.Values
+                .Where(entry => string.IsNullOrWhiteSpace(stationId) ||
+                                string.Equals(entry.StationId, stationId, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(entry => entry.RecentResults.Select(CloneResult))
+                .Where(result => !fromUtc.HasValue || result.CompletedAtUtc >= fromUtc.Value)
+                .Where(result => !toUtc.HasValue || result.CompletedAtUtc <= toUtc.Value)
+                .Where(result => MatchesStatus(result, status))
+                .Where(result => MatchesText(result.DiagnosticCode, diagnosticCode))
+                .OrderByDescending(result => result.CompletedAtUtc)
+                .ThenByDescending(result => result.SequenceId)
+                .ToList();
+
+            return new StationResultsPageViewModel
+            {
+                Items = filtered
+                    .Skip(normalizedPageIndex * normalizedPageSize)
+                    .Take(normalizedPageSize)
+                    .ToList(),
+                TotalCount = filtered.Count,
+                PageIndex = normalizedPageIndex,
+                PageSize = normalizedPageSize
+            };
+        }
+    }
+
     public IReadOnlyList<StationHealthSnapshotDto> GetRecentHealth(string stationId, int take)
     {
         lock (_syncRoot)
@@ -773,6 +823,25 @@ public sealed class StationRegistryService
         return entry.IsEnabled &&
                !string.IsNullOrWhiteSpace(entry.ConnectionId) &&
                now - entry.LastSeenAtUtc <= TimeSpan.FromSeconds(Math.Max(1, _options.OfflineThresholdSeconds));
+    }
+
+    private static bool MatchesStatus(StationResultSummaryDto result, string? requestedStatus)
+    {
+        if (string.IsNullOrWhiteSpace(requestedStatus) ||
+            string.Equals(requestedStatus, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(result.Outcome.ToString(), requestedStatus, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(result.InspectionStatus?.ToString(), requestedStatus, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesText(string? value, string? requestedValue)
+    {
+        return string.IsNullOrWhiteSpace(requestedValue) ||
+               string.Equals(requestedValue, "all", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, requestedValue, StringComparison.OrdinalIgnoreCase);
     }
 
     private StationRegistryEntry GetOrCreateEntryLocked(string stationId)

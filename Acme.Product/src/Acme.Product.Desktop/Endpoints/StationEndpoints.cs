@@ -26,6 +26,31 @@ public static class StationEndpoints
             return Results.Ok(registry.GetSummary());
         });
 
+        app.MapGet("/api/stations/results", (
+            string? stationId,
+            DateTimeOffset? from,
+            DateTimeOffset? to,
+            string? status,
+            string? diagnosticCode,
+            int? take,
+            int? pageIndex,
+            int? pageSize,
+            [FromServices] StationRegistryService registry) =>
+        {
+            var resolvedPageSize = take.HasValue
+                ? Math.Clamp(take.Value, 1, 500)
+                : Math.Clamp(pageSize.GetValueOrDefault(50), 1, 500);
+            var resolvedPageIndex = Math.Max(0, pageIndex.GetValueOrDefault(0));
+            return Results.Ok(registry.GetResultsPage(
+                stationId,
+                from,
+                to,
+                status,
+                diagnosticCode,
+                resolvedPageIndex,
+                resolvedPageSize));
+        });
+
         app.MapGet("/api/stations/{stationId}/results", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
         {
             return Results.Ok(registry.GetRecentResults(stationId, Math.Clamp(take ?? 100, 1, 500)));

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using Acme.Product.Core.Enums;
 using Acme.Product.Desktop.Endpoints;
 using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
@@ -103,6 +104,34 @@ public sealed class StationEndpointsTests
         replayChunk.Should().Contain($"id: {checkpoint + 1}");
         replayChunk.Should().Contain("\"stationId\":\"station-b\"");
         replayChunk.Should().Contain("\"diagnosticCode\":\"OK\"");
+    }
+
+    [Fact]
+    public async Task ResultsEndpoint_ShouldPageAndFilterAllStationResults()
+    {
+        await using var host = await StationEndpointTestHost.CreateAsync();
+        host.Registry.UpsertRegistration("conn-a", BuildRegistration("station-a"));
+        host.Registry.UpsertRegistration("conn-b", BuildRegistration("station-b"));
+
+        host.Registry.UpsertResultSummary("conn-a", BuildResult("station-a", 1, RuntimeRunOutcome.Ok, "OK", -3));
+        host.Registry.UpsertResultSummary("conn-b", BuildResult("station-b", 1, RuntimeRunOutcome.Error, "CAMERA_TIMEOUT", -2));
+        host.Registry.UpsertResultSummary("conn-a", BuildResult("station-a", 2, RuntimeRunOutcome.Ng, "WIRE_SWAP", -1));
+
+        var all = await host.Client.GetFromJsonAsync<StationResultsPageViewModel>("/api/stations/results?pageIndex=0&pageSize=2");
+        all.Should().NotBeNull();
+        all!.TotalCount.Should().Be(3);
+        all.Items.Should().HaveCount(2);
+        all.Items.Select(item => item.SequenceId).Should().Equal(2, 1);
+
+        var filtered = await host.Client.GetFromJsonAsync<StationResultsPageViewModel>(
+            "/api/stations/results?stationId=station-a&status=Ng&diagnosticCode=WIRE_SWAP&pageSize=10");
+
+        filtered.Should().NotBeNull();
+        filtered!.TotalCount.Should().Be(1);
+        filtered.Items.Should().ContainSingle(item =>
+            item.StationId == "station-a" &&
+            item.Outcome == RuntimeRunOutcome.Ng &&
+            item.DiagnosticCode == "WIRE_SWAP");
     }
 
     [Fact]
@@ -260,6 +289,59 @@ public sealed class StationEndpointsTests
         }
 
         return builder.ToString();
+    }
+
+    private static StationRegistrationDto BuildRegistration(string stationId)
+    {
+        return new StationRegistrationDto
+        {
+            StationId = stationId,
+            StationName = $"{stationId} name",
+            LineName = "line-1",
+            MachineName = $"{stationId}-machine",
+            ClientVersion = "test",
+            StartedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
+
+    private static StationResultSummaryDto BuildResult(
+        string stationId,
+        long sequenceId,
+        RuntimeRunOutcome outcome,
+        string diagnosticCode,
+        int completedOffsetMinutes)
+    {
+        var completedAtUtc = DateTimeOffset.UtcNow.AddMinutes(completedOffsetMinutes);
+        return new StationResultSummaryDto
+        {
+            StationId = stationId,
+            LineName = "line-1",
+            SequenceId = sequenceId,
+            MessageId = $"{stationId}-{sequenceId}",
+            RunId = $"run-{stationId}-{sequenceId}",
+            PackageId = "pkg-1",
+            PackageName = "Package 1",
+            PackageVersion = "1.0.0",
+            FlowHash = "sha256:test",
+            ImageId = $"image-{sequenceId}",
+            Outcome = outcome,
+            InspectionStatus = outcome switch
+            {
+                RuntimeRunOutcome.Ok => InspectionStatus.OK,
+                RuntimeRunOutcome.Ng => InspectionStatus.NG,
+                _ => InspectionStatus.Error
+            },
+            ExecutionTimeMs = 20 + sequenceId,
+            DiagnosticCode = diagnosticCode,
+            DiagnosticMessage = diagnosticCode,
+            PrimaryOutputsPreview = new Dictionary<string, string?>
+            {
+                ["station"] = stationId
+            },
+            StartedAtUtc = completedAtUtc.AddMilliseconds(-25),
+            CompletedAtUtc = completedAtUtc,
+            CreatedAtUtc = completedAtUtc
+        };
     }
 
     private sealed class StationEndpointTestHost : IAsyncDisposable

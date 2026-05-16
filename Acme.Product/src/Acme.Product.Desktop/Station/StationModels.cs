@@ -187,6 +187,17 @@ public sealed class StationSseSnapshotViewModel
     public IReadOnlyList<StationResultEventViewModel> RecentResults { get; set; } = Array.Empty<StationResultEventViewModel>();
 }
 
+public sealed class StationResultsPageViewModel
+{
+    public IReadOnlyList<StationResultSummaryDto> Items { get; set; } = Array.Empty<StationResultSummaryDto>();
+
+    public int TotalCount { get; set; }
+
+    public int PageIndex { get; set; }
+
+    public int PageSize { get; set; }
+}
+
 public sealed record StoredStationRegistryEvent(
     long SequenceId,
     string EventType,
