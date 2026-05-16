@@ -111,6 +111,11 @@ public sealed class AiFlowResponseParser : IAiFlowResponseParser
     public AiFlowParseResult Parse(string rawResponse)
     {
         var json = StripJsonFences(rawResponse);
+        if (TryDeserializeGeneratedFlow(json, out var directFlow) && directFlow != null)
+        {
+            return AiFlowParseResult.Parsed(directFlow, json, 1);
+        }
+
         var candidates = EnumerateBalancedJsonObjects(json);
         if (candidates.Count == 0)
         {
@@ -149,6 +154,13 @@ public sealed class AiFlowResponseParser : IAiFlowResponseParser
     {
         if (string.IsNullOrWhiteSpace(rawResponse))
             return "最近一次模型未返回可用正文。";
+
+        var rawJson = StripJsonFences(rawResponse);
+        if (TryDeserializeGeneratedFlow(rawJson, out var directParsed) && directParsed != null)
+        {
+            return $"Last output contained {directParsed.Operators?.Count ?? 0} operators, " +
+                   $"{directParsed.Connections?.Count ?? 0} connections, explanation length {directParsed.Explanation?.Length ?? 0}.";
+        }
 
         var normalized = NormalizeJsonEnvelope(rawResponse);
         if (TryDeserializeGeneratedFlow(normalized, out var parsed) && parsed != null)
@@ -434,14 +446,12 @@ public sealed class AiFlowResponseParser : IAiFlowResponseParser
         flow.TemplateLockLevel = ReadStringProperty(element, ["templateLockLevel", "template_lock_level"]) ?? flow.TemplateLockLevel;
         flow.Explanation = ReadStringProperty(element, ExplanationPropertyNames) ?? inheritedExplanation ?? flow.Explanation;
 
-        if (TryGetPropertyIgnoreCase(element, OperatorArrayPropertyNames, out var operatorsElement) &&
-            operatorsElement.ValueKind == JsonValueKind.Array)
+        if (TryGetPropertyIgnoreCase(element, OperatorArrayPropertyNames, out var operatorsElement))
         {
             flow.Operators = ParseGeneratedOperators(operatorsElement);
         }
 
-        if (TryGetPropertyIgnoreCase(element, ConnectionArrayPropertyNames, out var connectionsElement) &&
-            connectionsElement.ValueKind == JsonValueKind.Array)
+        if (TryGetPropertyIgnoreCase(element, ConnectionArrayPropertyNames, out var connectionsElement))
         {
             flow.Connections = ParseGeneratedConnections(connectionsElement);
         }
@@ -469,76 +479,154 @@ public sealed class AiFlowResponseParser : IAiFlowResponseParser
     private static List<AiGeneratedOperator> ParseGeneratedOperators(JsonElement operatorsElement)
     {
         var operators = new List<AiGeneratedOperator>();
-        foreach (var item in operatorsElement.EnumerateArray())
+
+        if (operatorsElement.ValueKind == JsonValueKind.Array)
         {
-            if (item.ValueKind != JsonValueKind.Object)
-                continue;
-
-            var operatorType = ReadStringProperty(item,
-                ["operatorType", "operator_type", "operator_id", "type", "kind"]) ?? string.Empty;
-            var tempId = ReadStringProperty(item,
-                ["tempId", "temp_id", "id", "operatorId", "operatorIdTemp", "nodeId", "node_id"]) ?? string.Empty;
-            var displayName = ReadStringProperty(item,
-                ["displayName", "display_name", "name", "label", "title"]) ?? operatorType;
-
-            var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (TryGetPropertyIgnoreCase(item, ["parameters", "params", "settings", "config"], out var parametersElement))
+            foreach (var item in operatorsElement.EnumerateArray())
             {
-                parameters = ReadStringDictionary(parametersElement);
+                if (TryParseGeneratedOperator(item, fallbackTempId: null, out var parsedOperator))
+                    operators.Add(parsedOperator);
             }
 
-            operators.Add(new AiGeneratedOperator
+            return operators;
+        }
+
+        if (operatorsElement.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in operatorsElement.EnumerateObject())
             {
-                TempId = tempId,
-                OperatorType = operatorType,
-                DisplayName = displayName,
-                Parameters = parameters
-            });
+                if (TryParseGeneratedOperator(property.Value, property.Name, out var parsedOperator))
+                    operators.Add(parsedOperator);
+            }
         }
 
         return operators;
     }
 
+    private static bool TryParseGeneratedOperator(
+        JsonElement item,
+        string? fallbackTempId,
+        out AiGeneratedOperator parsedOperator)
+    {
+        parsedOperator = new AiGeneratedOperator();
+
+        if (item.ValueKind == JsonValueKind.String)
+        {
+            var stringOperatorType = item.GetString();
+            if (string.IsNullOrWhiteSpace(stringOperatorType))
+                return false;
+
+            parsedOperator = new AiGeneratedOperator
+            {
+                TempId = fallbackTempId ?? string.Empty,
+                OperatorType = stringOperatorType,
+                DisplayName = stringOperatorType,
+                Parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            };
+            return true;
+        }
+
+        if (item.ValueKind != JsonValueKind.Object)
+            return false;
+
+        var operatorType = ReadStringProperty(item,
+            ["operatorType", "operator_type", "operator_id", "type", "kind"]) ?? string.Empty;
+        var tempId = ReadStringProperty(item,
+            ["tempId", "temp_id", "id", "operatorId", "operatorIdTemp", "nodeId", "node_id"]) ??
+            fallbackTempId ??
+            string.Empty;
+        var displayName = ReadStringProperty(item,
+            ["displayName", "display_name", "name", "label", "title"]) ?? operatorType;
+
+        var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (TryGetPropertyIgnoreCase(item, ["parameters", "params", "settings", "config"], out var parametersElement))
+        {
+            parameters = ReadStringDictionary(parametersElement);
+        }
+
+        parsedOperator = new AiGeneratedOperator
+        {
+            TempId = tempId,
+            OperatorType = operatorType,
+            DisplayName = displayName,
+            Parameters = parameters
+        };
+        return true;
+    }
+
     private static List<AiGeneratedConnection> ParseGeneratedConnections(JsonElement connectionsElement)
     {
         var connections = new List<AiGeneratedConnection>();
-        foreach (var item in connectionsElement.EnumerateArray())
+
+        if (connectionsElement.ValueKind == JsonValueKind.Array)
         {
-            if (item.ValueKind == JsonValueKind.String)
+            foreach (var item in connectionsElement.EnumerateArray())
             {
-                if (TryParseConnectionString(item.GetString(), out var stringConnection))
-                    connections.Add(stringConnection);
-                continue;
+                if (TryParseGeneratedConnection(item, out var parsedConnection))
+                    connections.Add(parsedConnection);
             }
 
-            if (item.ValueKind != JsonValueKind.Object)
-                continue;
+            return connections;
+        }
 
-            var sourceTempId = ReadStringProperty(item,
-                ["sourceTempId", "source_temp_id", "sourceOperatorId", "source_operator_id", "sourceId", "source_id", "fromTempId", "fromId", "fromOperatorId"]) ?? string.Empty;
-            var sourcePortName = ReadStringProperty(item,
-                ["sourcePortName", "source_port_name", "sourcePort", "source_port", "sourceOutput", "outputPort", "fromPort", "from_port"]) ?? string.Empty;
-            var targetTempId = ReadStringProperty(item,
-                ["targetTempId", "target_temp_id", "targetOperatorId", "target_operator_id", "targetId", "target_id", "toTempId", "toId", "toOperatorId"]) ?? string.Empty;
-            var targetPortName = ReadStringProperty(item,
-                ["targetPortName", "target_port_name", "targetPort", "target_port", "targetInput", "inputPort", "toPort", "to_port"]) ?? string.Empty;
-
-            if (TryGetPropertyIgnoreCase(item, ["source", "from"], out var sourceEndpoint))
-                MergeEndpoint(sourceEndpoint, ref sourceTempId, ref sourcePortName);
-
-            if (TryGetPropertyIgnoreCase(item, ["target", "to"], out var targetEndpoint))
-                MergeEndpoint(targetEndpoint, ref targetTempId, ref targetPortName);
-
-            connections.Add(new AiGeneratedConnection
+        if (connectionsElement.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in connectionsElement.EnumerateObject())
             {
-                SourceTempId = sourceTempId,
-                SourcePortName = sourcePortName,
-                TargetTempId = targetTempId,
-                TargetPortName = targetPortName
-            });
+                if (property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in property.Value.EnumerateArray())
+                    {
+                        if (TryParseGeneratedConnection(item, out var mappedArrayConnection))
+                            connections.Add(mappedArrayConnection);
+                    }
+
+                    continue;
+                }
+
+                if (TryParseGeneratedConnection(property.Value, out var mappedConnection))
+                    connections.Add(mappedConnection);
+            }
         }
 
         return connections;
+    }
+
+    private static bool TryParseGeneratedConnection(JsonElement item, out AiGeneratedConnection parsedConnection)
+    {
+        parsedConnection = new AiGeneratedConnection();
+
+        if (item.ValueKind == JsonValueKind.String)
+        {
+            return TryParseConnectionString(item.GetString(), out parsedConnection);
+        }
+
+        if (item.ValueKind != JsonValueKind.Object)
+            return false;
+
+        var sourceTempId = ReadStringProperty(item,
+            ["sourceTempId", "source_temp_id", "sourceOperatorId", "source_operator_id", "sourceId", "source_id", "fromTempId", "fromId", "fromOperatorId"]) ?? string.Empty;
+        var sourcePortName = ReadStringProperty(item,
+            ["sourcePortName", "source_port_name", "sourcePort", "source_port", "sourceOutput", "outputPort", "fromPort", "from_port"]) ?? string.Empty;
+        var targetTempId = ReadStringProperty(item,
+            ["targetTempId", "target_temp_id", "targetOperatorId", "target_operator_id", "targetId", "target_id", "toTempId", "toId", "toOperatorId"]) ?? string.Empty;
+        var targetPortName = ReadStringProperty(item,
+            ["targetPortName", "target_port_name", "targetPort", "target_port", "targetInput", "inputPort", "toPort", "to_port"]) ?? string.Empty;
+
+        if (TryGetPropertyIgnoreCase(item, ["source", "from"], out var sourceEndpoint))
+            MergeEndpoint(sourceEndpoint, ref sourceTempId, ref sourcePortName);
+
+        if (TryGetPropertyIgnoreCase(item, ["target", "to"], out var targetEndpoint))
+            MergeEndpoint(targetEndpoint, ref targetTempId, ref targetPortName);
+
+        parsedConnection = new AiGeneratedConnection
+        {
+            SourceTempId = sourceTempId,
+            SourcePortName = sourcePortName,
+            TargetTempId = targetTempId,
+            TargetPortName = targetPortName
+        };
+        return true;
     }
 
     private static Dictionary<string, string> ReadStringDictionary(JsonElement element)

@@ -49,6 +49,21 @@ public class PromptBuilderFewShotExamplesTests
         prompt.Should().Contain("## Section 11 - Few Shot Examples");
     }
 
+    [Fact(DisplayName = "PromptBuilder output contract should reject common invalid JSON envelopes")]
+    public void BuildSystemPrompt_OutputFormat_ShouldRejectCommonInvalidEnvelopes()
+    {
+        var factory = new OperatorFactory();
+        var builder = new PromptBuilder(factory);
+
+        var prompt = builder.BuildSystemPrompt("generate inspection workflow");
+
+        prompt.Should().Contain("operators as an array");
+        prompt.Should().Contain("connections as an array");
+        prompt.Should().Contain("Do not return an outer envelope");
+        prompt.Should().Contain("Do not return the JSON object as an escaped string value");
+        prompt.Should().Contain("Before replying, mentally validate");
+    }
+
     private static List<string> ExtractFewShotJsonObjects(string prompt)
     {
         var fewShotStart = prompt.IndexOf("# Few Shot Examples", StringComparison.Ordinal);

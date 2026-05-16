@@ -93,6 +93,9 @@ public static class AiPromptComposer
         var sb = new StringBuilder();
         sb.AppendLine("- Return one complete JSON object only.");
         sb.AppendLine("- Do not add markdown code fences or extra explanation outside the JSON.");
+        sb.AppendLine("- The response must start with { and end with }.");
+        sb.AppendLine("- Use the exact top-level shape: explanation string, operators array, connections array, optional parametersNeedingReview object.");
+        sb.AppendLine("- Do not wrap the workflow in workflow/flow/result/data/answer and do not return JSON as an escaped string.");
         sb.AppendLine("- Keep operator ids, port names, and operator types aligned with the supported catalog from the system prompt.");
 
         if (mode == GenerateFlowMode.Modify)

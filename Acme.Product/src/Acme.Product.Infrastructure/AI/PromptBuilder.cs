@@ -666,10 +666,16 @@ public class PromptBuilder
         - tempId values must be stable within the response and referenced by connections.
         - operatorType must exactly match an operator_id from the catalog.
         - port and parameter names must exactly match the catalog.
+        - The top-level JSON object must contain operators as an array and connections as an array.
+        - Do not return an outer envelope such as {"workflow": ...}, {"flow": ...}, {"result": ...}, {"data": ...}, or {"answer": ...}.
+        - Do not return the JSON object as an escaped string value.
+        - Do not use alternate top-level names such as nodes/edges/steps/modules in the final answer.
+        - Parameter values should be strings. For unknown values, omit the parameter or add it to parametersNeedingReview.
         - parametersNeedingReview may be omitted only when no uncertain values remain.
         - The first character of the response must be { and the last character must be }.
         - Do not add Markdown code block markers, comments, or explanatory text outside the JSON object.
         - Ensure all brackets and braces are properly paired before sending.
+        - Before replying, mentally validate that the response can be parsed by JSON.parse and deserialized into the exact shape above.
         """;
 
         if (!supportsJsonMode)
@@ -684,6 +690,7 @@ public class PromptBuilder
                 4. All string values must use double quotes.
                 5. Do not add comments in JSON.
                 6. Ensure all brackets and braces are properly paired.
+                7. Do not wrap the object in another object and do not return JSON as a string.
                 """;
         }
 

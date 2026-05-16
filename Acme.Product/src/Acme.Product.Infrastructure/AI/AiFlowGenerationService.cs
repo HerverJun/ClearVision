@@ -2363,6 +2363,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         sb.AppendLine();
         sb.AppendLine("Keep already valid operators, connections, and parameters unchanged where possible.");
         sb.AppendLine("Return a complete corrected JSON object only. Do not add explanations or markdown outside the JSON.");
+        sb.AppendLine("Output contract:");
+        sb.AppendLine("- The first character must be { and the last character must be }.");
+        sb.AppendLine("- Top-level shape: explanation string, operators array, connections array, optional parametersNeedingReview object.");
+        sb.AppendLine("- Do not wrap the workflow in workflow/flow/result/data/answer.");
+        sb.AppendLine("- Do not return the JSON as an escaped string.");
+        sb.AppendLine("- Do not use nodes/edges/steps/modules as final top-level aliases.");
 
         return sb.ToString();
     }
@@ -2605,6 +2611,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             sb.AppendLine("---END PREVIOUS OUTPUT---");
         }
 
+        sb.AppendLine("Output contract: return only the exact workflow JSON object; first char {, last char }; top-level operators/connections must be arrays; no workflow/flow/result/data wrapper; no escaped JSON string.");
         sb.AppendLine();
         sb.AppendLine("请尽量保留已经正确的算子、连线和参数，仅修正本轮报错涉及的部分。");
         return sb.ToString().Trim();
