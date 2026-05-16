@@ -39,8 +39,8 @@ public class AiModelEndpointsTests
 
         using var response = await host.Client.GetAsync("/api/ai/models");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
         responseJson.Should().NotContain("default-key");
         using var document = JsonDocument.Parse(responseJson);
         var models = document.RootElement;

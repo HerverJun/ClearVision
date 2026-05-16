@@ -301,12 +301,6 @@ public static class ModelCatalog
     {
         yield return Directory.GetCurrentDirectory();
         yield return AppContext.BaseDirectory;
-
-        var entryAssemblyLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
-        if (!string.IsNullOrWhiteSpace(entryAssemblyLocation))
-        {
-            yield return Path.GetDirectoryName(entryAssemblyLocation)!;
-        }
     }
 
     private static string? SearchUpwards(string startPath)

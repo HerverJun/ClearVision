@@ -389,7 +389,7 @@ public static class SettingsEndpoints
         app.MapPut("/api/cameras/bindings", async (
             Acme.Product.Application.DTOs.UpdateCameraBindingsRequest request,
             Acme.Product.Core.Cameras.ICameraManager cameraManager,
-            ICameraFrameStreamCoordinator streamCoordinator,
+            [FromServices] ICameraFrameStreamCoordinator streamCoordinator,
             IConfigurationService configService) =>
         {
             try

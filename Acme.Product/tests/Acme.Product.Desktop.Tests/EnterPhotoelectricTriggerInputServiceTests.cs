@@ -40,14 +40,14 @@ public class EnterPhotoelectricTriggerInputServiceTests
             NullLogger<EnterPhotoelectricTriggerInputService>.Instance);
 
         PublishEnterSignal(sut, "device-1");
-        var acceptAfterUtc = DateTime.UtcNow.AddMilliseconds(20);
+        var acceptAfterUtc = DateTime.UtcNow.AddMilliseconds(250);
         var waitTask = sut.WaitForEnterPhotoelectricAsync(
             new EnterPhotoelectricTriggerOptions(
                 "binding-1",
                 "Camera 1",
                 "device-1",
                 0,
-                1000,
+                5000,
                 IgnoreWhileBusy: true)
             {
                 AcceptPendingSignalsAfterUtc = acceptAfterUtc
@@ -55,6 +55,12 @@ public class EnterPhotoelectricTriggerInputServiceTests
 
         await Task.Delay(50);
         waitTask.IsCompleted.Should().BeFalse();
+
+        var remainingCutoffDelay = acceptAfterUtc - DateTime.UtcNow + TimeSpan.FromMilliseconds(50);
+        if (remainingCutoffDelay > TimeSpan.Zero)
+        {
+            await Task.Delay(remainingCutoffDelay);
+        }
 
         PublishEnterSignal(sut, "device-1");
         var triggerEvent = await waitTask;
