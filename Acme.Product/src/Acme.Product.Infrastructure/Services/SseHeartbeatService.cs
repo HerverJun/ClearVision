@@ -36,12 +36,13 @@ public class SseHeartbeatService : BackgroundService
             try
             {
                 await Task.Delay(_interval, stoppingToken);
-                
-                if (stoppingToken.IsCancellationRequested) break;
+
+                if (stoppingToken.IsCancellationRequested)
+                    break;
 
                 // 发布心跳事件
                 await _eventBus.PublishAsync(new HeartbeatEvent(), stoppingToken);
-                
+
                 _logger.LogDebug("[HeartbeatService] 心跳已发送");
             }
             catch (OperationCanceledException)

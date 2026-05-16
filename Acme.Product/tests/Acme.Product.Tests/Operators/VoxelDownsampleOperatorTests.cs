@@ -3,12 +3,12 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
-using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 using Acme.Product.Infrastructure.PointCloud;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
+using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -51,10 +51,18 @@ public sealed class VoxelDownsampleOperatorTests
 
         using var points = new OpenCvSharp.Mat(4, 3, OpenCvSharp.MatType.CV_32FC1);
         var idx = points.GetGenericIndexer<float>();
-        idx[0, 0] = 10_000.000f; idx[0, 1] = 20_000.000f; idx[0, 2] = 30_000.000f;
-        idx[1, 0] = 10_000.125f; idx[1, 1] = 20_000.125f; idx[1, 2] = 30_000.125f;
-        idx[2, 0] = 10_000.250f; idx[2, 1] = 20_000.250f; idx[2, 2] = 30_000.250f;
-        idx[3, 0] = 10_000.375f; idx[3, 1] = 20_000.375f; idx[3, 2] = 30_000.375f;
+        idx[0, 0] = 10_000.000f;
+        idx[0, 1] = 20_000.000f;
+        idx[0, 2] = 30_000.000f;
+        idx[1, 0] = 10_000.125f;
+        idx[1, 1] = 20_000.125f;
+        idx[1, 2] = 30_000.125f;
+        idx[2, 0] = 10_000.250f;
+        idx[2, 1] = 20_000.250f;
+        idx[2, 2] = 30_000.250f;
+        idx[3, 0] = 10_000.375f;
+        idx[3, 1] = 20_000.375f;
+        idx[3, 2] = 30_000.375f;
 
         using var cloud = new PointCloudModel(points.Clone());
         var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["PointCloud"] = cloud });

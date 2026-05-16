@@ -2,6 +2,7 @@
 // 图像采集算子 - 支持相机和文件采集
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -11,8 +12,6 @@ using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>

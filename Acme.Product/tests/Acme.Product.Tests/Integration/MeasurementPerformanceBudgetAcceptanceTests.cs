@@ -15,6 +15,7 @@ using Xunit;
 namespace Acme.Product.Tests.Integration;
 
 [Collection(PerformanceAcceptanceCollection.Name)]
+[Trait("Category", "PerformanceBudget")]
 public sealed class MeasurementPerformanceBudgetAcceptanceTests
 {
     private const double DefaultBudgetScale = 1.5;

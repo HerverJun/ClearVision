@@ -1,4 +1,4 @@
-﻿// OperatorEnums.cs
+// OperatorEnums.cs
 
 
 using System.Text.Json.Serialization;
@@ -176,7 +176,7 @@ public enum OperatorType
 
     Comparator = 122,
 
-        Delay = 123,
+    Delay = 123,
 
 
     CaliperTool = 130,

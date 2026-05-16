@@ -1,16 +1,15 @@
-﻿// AffineTransformOperator.cs
+// AffineTransformOperator.cs
 // 仿射变换算子
 // 执行旋转、缩放、平移等仿射变换
 // 作者：蘅芜君
 using System.Globalization;
 using System.Text.Json;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(

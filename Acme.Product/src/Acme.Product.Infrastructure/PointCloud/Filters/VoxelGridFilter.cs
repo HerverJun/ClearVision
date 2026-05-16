@@ -19,7 +19,8 @@ public sealed class VoxelGridFilter
 
     public PointCloud Downsample(PointCloud input, float leafSize)
     {
-        if (input == null) throw new ArgumentNullException(nameof(input));
+        if (input == null)
+            throw new ArgumentNullException(nameof(input));
         if (leafSize <= 0 || float.IsNaN(leafSize) || float.IsInfinity(leafSize))
         {
             throw new ArgumentOutOfRangeException(nameof(leafSize), "leafSize must be a positive finite number.");

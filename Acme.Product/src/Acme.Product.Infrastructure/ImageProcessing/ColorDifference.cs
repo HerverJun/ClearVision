@@ -77,25 +77,31 @@ public static class ColorDifference
 
     private static double Hp(double b, double ap)
     {
-        if (Math.Abs(ap) < 1e-15 && Math.Abs(b) < 1e-15) return 0.0;
+        if (Math.Abs(ap) < 1e-15 && Math.Abs(b) < 1e-15)
+            return 0.0;
 
         var h = RadToDeg(Math.Atan2(b, ap));
-        if (h < 0) h += 360.0;
+        if (h < 0)
+            h += 360.0;
         return h;
     }
 
     private static double Dhp(double h1p, double h2p, double c1p, double c2p)
     {
-        if (c1p * c2p < 1e-15) return 0.0;
+        if (c1p * c2p < 1e-15)
+            return 0.0;
         var d = h2p - h1p;
-        if (d > 180.0) d -= 360.0;
-        if (d < -180.0) d += 360.0;
+        if (d > 180.0)
+            d -= 360.0;
+        if (d < -180.0)
+            d += 360.0;
         return d;
     }
 
     private static double HBar(double h1p, double h2p, double c1p, double c2p)
     {
-        if (c1p * c2p < 1e-15) return h1p + h2p;
+        if (c1p * c2p < 1e-15)
+            return h1p + h2p;
 
         var sum = h1p + h2p;
         var diff = Math.Abs(h1p - h2p);

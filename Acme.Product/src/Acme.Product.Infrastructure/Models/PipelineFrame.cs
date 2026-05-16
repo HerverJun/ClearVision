@@ -2,8 +2,8 @@
 // 获取元数据值
 // 作者：蘅芜君
 
-using OpenCvSharp;
 using System.Diagnostics;
+using OpenCvSharp;
 
 namespace Acme.Product.Infrastructure.Models;
 
@@ -107,7 +107,7 @@ public class PipelineFrame : IDisposable
     {
         if (Metadata.TryGetValue("Width", out var w) && w is int width)
             return width;
-        
+
         // 尝试从PNG头部解析
         var dims = TryParsePngDimensions(RawImage);
         if (dims.HasValue)
@@ -128,7 +128,7 @@ public class PipelineFrame : IDisposable
     {
         if (Metadata.TryGetValue("Height", out var h) && h is int height)
             return height;
-        
+
         var dims = TryParsePngDimensions(RawImage);
         if (dims.HasValue)
         {

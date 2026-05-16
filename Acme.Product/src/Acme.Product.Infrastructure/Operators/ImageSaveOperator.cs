@@ -3,14 +3,13 @@
 // NG 图像存档，支持多种格式
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -79,7 +78,7 @@ public class ImageSaveOperator : OperatorBase
 
             // 替换文件名模板
             var actualFileName = ReplaceFileNameTemplate(fileName);
-            
+
             // 确保扩展名正确
             var extension = format.ToLower() switch
             {
@@ -108,7 +107,7 @@ public class ImageSaveOperator : OperatorBase
                 var name = Path.GetFileNameWithoutExtension(fullPath);
                 var ext = Path.GetExtension(fullPath);
                 int counter = 1;
-                
+
                 do
                 {
                     actualFileName = $"{name}_{counter:D3}{ext}";
@@ -119,7 +118,7 @@ public class ImageSaveOperator : OperatorBase
 
             // 获取 Mat 并保存
             var mat = imageWrapper.MatReadOnly;
-            
+
             var formatParams = format.ToLower() switch
             {
                 "jpg" or "jpeg" => new[] { new ImageEncodingParam(ImwriteFlags.JpegQuality, jpegQuality) },

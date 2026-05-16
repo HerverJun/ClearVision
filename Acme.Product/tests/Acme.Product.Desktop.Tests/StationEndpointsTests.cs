@@ -1,6 +1,6 @@
-using System.Text;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using Acme.Product.Desktop.Endpoints;
 using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;

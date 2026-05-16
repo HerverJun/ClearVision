@@ -1,8 +1,8 @@
 using Acme.Product.Infrastructure.DependencyInjection;
 using Acme.Product.Runtime;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
 
 namespace Acme.Product.Station;
 

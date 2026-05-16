@@ -1,4 +1,4 @@
-# 模板匹配 / TemplateMatching
+# 模板匹配 / TemplateMatch
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -6,91 +6,125 @@
 | 类名 (Class) | `TemplateMatchOperator` |
 | 枚举值 (Enum) | `OperatorType.TemplateMatching` |
 | 分类 (Category) | 匹配定位 |
+| 版本 (Version) | `1.2.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 当前版本 (Version) | `1.2.0` |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NMS。
-
-当前版本把输出分成两层语义：
-
-- `RawResponse`：OpenCV `MatchTemplate` 的原始响应值。
-- `NormalizedScore`：canonical 的高分更好分数，面向新流程消费。
-- `Score`：保留的兼容字段；当前仍等于算子用于阈值判定的分数。
-
-对 `SqDiff` / `SqDiffNormed` 的处理已修正：
-
-- `SqDiffNormed`
-  - `RawResponse = rawSqDiffNormed`
-  - `NormalizedScore = 1 - RawResponse`
-  - `Score` 兼容保留，当前与 `NormalizedScore` 相同
-- `SqDiff`
-  - `RawResponse = rawSqDiff`
-  - `NormalizedScore = inverted min-max normalization of current response map`
-  - `Score` 兼容保留，当前与 `NormalizedScore` 相同
-
-结论：
-- 原始 `SqDiff` 响应不再被伪装成可直接阈值化的 0-1 分数。
-- 新接入请优先读取 `NormalizedScore` 和 `RawResponse`。
+当前元数据描述为：Classic template matching with optional bounded rotation/scale pose search. Multi-match outputs are filtered by IoU-based NMS。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
-- 输入图和模板图统一走 `TryGetInputImage(...)`。
-- 可选做 ROI 裁剪与搜索掩膜限制。
-- `Gray / Edge / Gradient` 三种域都会先生成可匹配图，再调用 `Cv2.MatchTemplate(...)`。
-- 候选提取不再只依赖单次 `MinMaxLoc`；会从响应图中持续取峰值并做局部抑制，然后再做 IoU NMS。
-- `MaxMatches` 已实际生效，可返回多个离散匹配。
+- 先校验必填输入：`Image`、`Template`；缺失时通常返回失败结果。
+- 可选输入用于覆盖或补充参数配置：`Mask`。
+- 参数解析覆盖 20 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
+
+## 核心 API 调用链 / Core API Call Chain
+- `OperatorBase.Get*Param(...)`
+- `Cv2.Rectangle`
+- `Cv2.DrawMarker`
+- `Cv2.PutText`
+- `Cv2.CvtColor`
+- `Cv2.GaussianBlur`
+- `Cv2.Threshold`
+- `Cv2.Canny`
+- `Cv2.Sobel`
+- `Cv2.Magnitude`
+- `Cv2.Normalize`
+- `Cv2.Resize`
+- `Cv2.MatchTemplate`
+- `Cv2.MinMaxLoc`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 说明 (Description) |
-|--------|------|--------|------|
-| `Method` | `enum` | `CCoeffNormed` | 匹配方法，支持 `CCoeffNormed`、`SqDiff`、`SqDiffNormed`、`CCorr`、`CCorrNormed`、`CCoeff`。 |
-| `Domain` | `enum` | `Gray` | 匹配域，可选 `Gray`、`Edge`、`Gradient`。 |
-| `Threshold` | `double` | `0.8` | 候选阈值。对 `SqDiff` / `SqDiffNormed`，阈值比较的是修正后的高分更好分数。 |
-| `MaxMatches` | `int` | `1` | 最多保留的匹配数量。 |
-| `UseRoi` | `bool` | `false` | 是否启用 ROI 搜索。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `Method` | 匹配方法 | `enum` | CCoeffNormed | CCoeffNormed/CCoeffNormed；SqDiff/SqDiff；SqDiffNormed/SqDiffNormed；CCorr/CCorr；CCorrNormed/CCorrNormed；CCoeff/CCoeff | Yes | - |
+| `Domain` | 匹配域 | `enum` | Gray | Gray/Gray；Edge/Edge；Gradient/Gradient | Yes | - |
+| `Threshold` | 匹配分数阈值 | `double` | 0.8 | [0, 1] | Yes | - |
+| `MaxMatches` | 最大匹配数 | `int` | 1 | [1, 100] | Yes | - |
+| `UseRoi` | 使用 ROI | `bool` | false | - | Yes | - |
+| `RoiX` | ROI X | `int` | 0 | >= 0 | Yes | - |
+| `RoiY` | ROI Y | `int` | 0 | >= 0 | Yes | - |
+| `RoiWidth` | ROI Width | `int` | 0 | >= 0 | Yes | - |
+| `RoiHeight` | ROI Height | `int` | 0 | >= 0 | Yes | - |
+| `OriginMode` | Origin Mode | `enum` | Center | Center/Center；TopLeft/TopLeft；Custom/Custom | Yes | - |
+| `OriginX` | Origin X | `double` | 0 | - | Yes | - |
+| `OriginY` | Origin Y | `double` | 0 | - | Yes | - |
+| `EnablePoseSearch` | 启用姿态搜索 | `bool` | false | - | Yes | - |
+| `AngleStart` | 角度起点 | `double` | 0 | [-180, 180] | Yes | - |
+| `AngleExtent` | 角度范围 | `double` | 0 | [0, 360] | Yes | - |
+| `AngleStep` | 角度步长 | `double` | 1 | [0.1, 45] | Yes | - |
+| `ScaleMin` | 最小尺度 | `double` | 1 | [0.2, 3] | Yes | - |
+| `ScaleMax` | 最大尺度 | `double` | 1 | [0.2, 3] | Yes | - |
+| `ScaleStep` | 尺度步长 | `double` | 0.05 | [0.01, 1] | Yes | - |
+| `PyramidLevels` | 姿态搜索金字塔层数 | `int` | 1 | [1, 4] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
-| 名称 (Name) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
-|------|------|------|------|
-| `Image` | `Image` | Yes | 搜索图像。 |
-| `Template` | `Image` | Yes | 模板图像。 |
-| `Mask` | `Image` | No | 搜索掩膜；非零区域允许搜索。 |
+| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
+|------|------|------|------|------|
+| `Image` | 输入图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `Template` | 模板图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `Mask` | 搜索掩膜 | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
+|------|------|------|------|
+| `Image` | 结果图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `Position` | 匹配位置 | `Point` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Score` | 匹配分数 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `NormalizedScore` | 规范化分数 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `RawResponse` | 原始响应值 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `SubpixelOffsetX` | 亚像素峰值 X 偏移 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `SubpixelOffsetY` | 亚像素峰值 Y 偏移 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `PeakCurvature` | 响应峰曲率 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Angle` | 匹配角度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Scale` | 匹配尺度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `IsMatch` | 是否匹配 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `Matches` | 匹配列表 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `MatchCount` | 匹配数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Image` | `Image` | 结果图像。 |
-| `Position` | `Point` | 最佳匹配中心点。 |
-| `Score` | `Float` | legacy 兼容分数字段。 |
-| `NormalizedScore` | `Float` | canonical 分数，新流程优先读这个字段。 |
-| `RawResponse` | `Float` | 原始 OpenCV 响应值。 |
-| `IsMatch` | `Boolean` | 是否存在满足阈值的候选。 |
-| `Matches` | `Any` | 匹配列表，每项都包含 `Score`、`NormalizedScore`、`RawResponse`。 |
-| `MatchCount` | `Integer` | 匹配数量。 |
+| `Center` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `FailureReason` | `String` | 源码通过输出字典索引赋值写入。 |
+| `Found` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `MatchedTemplateHeight` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `MatchedTemplateWidth` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `Message` | `String` | 源码通过输出字典索引赋值写入。 |
+| `PoseSearchEnabled` | `Boolean` | 源码通过输出字典索引赋值写入。 |
+| `TemplateHeight` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `TemplateWidth` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `TopLeft` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
-## Legacy / Canonical 关系
-- legacy：
-  - `Score`
-  - 直接把 `SqDiff` 原始响应当成阈值分数的旧理解
-- canonical：
-  - `NormalizedScore`
-  - `RawResponse`
+## 性能特征 / Performance
+| 指标 (Metric) | 值 (Value) |
+|------|------|
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
 
-推荐读取方式：
-- 需要统一阈值和排序时，读 `NormalizedScore`
-- 需要和 OpenCV 原始响应对账、调参或排障时，读 `RawResponse`
-- 老流程暂时可继续读 `Score`
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
+
+## 适用场景 / Use Cases
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. `CCorr` / `CCoeff` 的 `RawResponse` 仍保留 OpenCV 原始量纲，新流程应优先依赖 `NormalizedScore` 做统一展示或诊断。
-2. 算子仍然是固定尺度模板匹配，不负责旋转/尺度搜索。
-3. 重复纹理或强周期背景下，仍需要结合 ROI、Mask 或更强约束使用。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.2.0 | 2026-04-12 | 修正 `SqDiff` / `SqDiffNormed` 评分语义，新增 `NormalizedScore` 与 `RawResponse`，同步澄清 legacy / canonical 关系 |
-| 1.0.2 | 2026-03-14 | 第二轮基于源码补充实际匹配模式、得分归一化、模板输入形态与参数限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.2.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

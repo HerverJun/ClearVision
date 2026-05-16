@@ -1,14 +1,13 @@
-﻿// ShadingCorrectionOperator.cs
+// ShadingCorrectionOperator.cs
 // 光照校正算子
 // 对不均匀光照造成的阴影进行补偿校正
 // 作者：蘅芜君
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(

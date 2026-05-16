@@ -8,8 +8,8 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
-using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.Extensions.Logging;
+using Microsoft.ML.OnnxRuntime.Tensors;
 using NSubstitute;
 
 namespace Acme.Product.Tests.Operators;

@@ -234,12 +234,12 @@ public class InspectionEventEndpointsTests
                 var authService = Substitute.For<IAuthService>();
                 authService.GetSessionAsync("test-token").Returns(
                     Task.FromResult<Acme.Product.Application.Services.UserSession?>(new Acme.Product.Application.Services.UserSession
-                {
-                    UserId = "user-1",
-                    Username = "tester",
-                    Role = "Admin",
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(30)
-                }));
+                    {
+                        UserId = "user-1",
+                        Username = "tester",
+                        Role = "Admin",
+                        ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+                    }));
                 builder.Services.AddSingleton(authService);
             }
 

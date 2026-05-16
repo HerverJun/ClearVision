@@ -25,7 +25,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _httpClient = httpClient ?? new HttpClient();
         _retryPolicy = retryPolicy ?? new ExponentialBackoffRetryPolicy(3, TimeSpan.FromSeconds(1));
-        
+
         // 配置 HttpClient
         _httpClient.BaseAddress = new Uri(EnsureTrailingSlash(_config.BaseUrl));
         _httpClient.Timeout = _config.Timeout;
@@ -54,7 +54,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync("api/generate", content, ct);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync(ct);
@@ -93,7 +93,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
     /// 流式生成响应
     /// </summary>
     public async IAsyncEnumerable<LLMStreamChunk> GenerateStreamAsync(
-        string prompt, 
+        string prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var request = new OllamaGenerateRequest
@@ -112,7 +112,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync("api/generate", content, cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -130,7 +130,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
         while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested && !isComplete)
         {
             var line = await reader.ReadLineAsync(cancellationToken);
-            
+
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
@@ -139,7 +139,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
             try
             {
                 chunk = JsonSerializer.Deserialize(
-                    line, 
+                    line,
                     OllamaJsonContext.Default.OllamaGenerateResponse
                 );
             }
@@ -196,7 +196,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
     public async Task<List<OllamaModelInfo>> GetLocalModelsAsync(CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.GetAsync("api/tags", cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             throw new LLMException($"获取模型列表失败: {response.StatusCode}");
@@ -225,7 +225,7 @@ public class OllamaConnector : ILLMConnector, IDisposable
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync("api/pull", content, cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -271,16 +271,16 @@ public class OllamaConfig
 {
     /// <summary>基础 URL (默认 http://localhost:11434)</summary>
     public string BaseUrl { get; set; } = "http://localhost:11434";
-    
+
     /// <summary>模型名称 (必需, 如 "llama2", "codellama", "mistral")</summary>
     public string Model { get; set; } = string.Empty;
-    
+
     /// <summary>温度参数 (默认 0.1)</summary>
     public float Temperature { get; set; } = 0.1f;
-    
+
     /// <summary>上下文窗口大小 (默认 4096)</summary>
     public int ContextWindow { get; set; } = 4096;
-    
+
     /// <summary>超时时间 (默认 120 秒)</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(120);
 }

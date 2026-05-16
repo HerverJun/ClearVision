@@ -131,9 +131,11 @@ public sealed class LawsTextureFilterOperator : OperatorBase
 
     private static bool IsValidKernelCombo(string s)
     {
-        if (string.IsNullOrWhiteSpace(s)) return false;
+        if (string.IsNullOrWhiteSpace(s))
+            return false;
         s = s.Trim().ToUpperInvariant();
-        if (s.Length != 4 || s[1] != '5' || s[3] != '5') return false;
+        if (s.Length != 4 || s[1] != '5' || s[3] != '5')
+            return false;
         return IsValidKernelCode(s[0]) && IsValidKernelCode(s[2]);
     }
 

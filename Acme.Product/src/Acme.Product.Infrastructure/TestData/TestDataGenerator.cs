@@ -168,8 +168,10 @@ public static class TestDataGenerator
             {
                 double noise = NextGaussian(rng, 0, sigma);
                 int value = (int)Math.Round(srcIdx[y, x] + noise);
-                if (value < 0) value = 0;
-                if (value > 255) value = 255;
+                if (value < 0)
+                    value = 0;
+                if (value > 255)
+                    value = 255;
                 dstIdx[y, x] = (byte)value;
             }
         }

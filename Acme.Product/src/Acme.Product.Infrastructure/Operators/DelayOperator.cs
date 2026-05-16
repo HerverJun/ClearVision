@@ -2,12 +2,11 @@
 // 延时算子
 // 按配置阻塞或延迟流程执行指定时间
 // 作者：蘅芜君
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(
@@ -48,7 +47,8 @@ public class DelayOperator : OperatorBase
         var elapsed = (int)(DateTime.UtcNow - start).TotalMilliseconds;
 
         object? input = null;
-        if (inputs != null && inputs.TryGetValue("Input", out var v)) input = v;
+        if (inputs != null && inputs.TryGetValue("Input", out var v))
+            input = v;
 
         return OperatorExecutionOutput.Success(new Dictionary<string, object>
         {

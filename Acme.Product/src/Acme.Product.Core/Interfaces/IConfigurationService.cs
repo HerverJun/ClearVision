@@ -15,12 +15,12 @@ public interface IConfigurationService
     /// 加载配置（若文件不存在则返回默认值）
     /// </summary>
     Task<AppConfig> LoadAsync();
-    
+
     /// <summary>
     /// 保存配置到文件
     /// </summary>
     Task SaveAsync(AppConfig config);
-    
+
     /// <summary>
     /// 获取当前内存中的配置（同步方法，用于频繁访问）
     /// </summary>

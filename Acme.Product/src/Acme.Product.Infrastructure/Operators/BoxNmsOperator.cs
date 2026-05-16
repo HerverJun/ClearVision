@@ -1,8 +1,9 @@
-﻿// BoxNmsOperator.cs
+// BoxNmsOperator.cs
 // 非极大值抑制算子
 // 对候选框执行 NMS 去重并保留最优结果
 // 作者：蘅芜君
 using System.Collections;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
@@ -11,8 +12,6 @@ using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using DetectionListValue = Acme.Product.Core.ValueObjects.DetectionList;
 using DetectionResultValue = Acme.Product.Core.ValueObjects.DetectionResult;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -126,7 +125,7 @@ public class BoxNmsOperator : OperatorBase
         var imageToUse = TryGetInputImage(inputs, "SourceImage", out var sourceImageWrapper) && sourceImageWrapper != null
             ? sourceImageWrapper
             : (TryGetInputImage(inputs, out var imageWrapper) && imageWrapper != null ? imageWrapper : null);
-        
+
         if (imageToUse != null)
         {
             var src = imageToUse.GetMat();

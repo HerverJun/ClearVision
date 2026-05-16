@@ -130,11 +130,13 @@ public class RegionDilationOperator : OperatorBase
 
     private Region DilateOnce(Region region, MorphologyKernel kernel)
     {
-        if (region.IsEmpty) return new Region();
+        if (region.IsEmpty)
+            return new Region();
 
         // 获取核的偏移量
         var offsets = kernel.GetOffsets().ToList();
-        if (offsets.Count == 0) return region;
+        if (offsets.Count == 0)
+            return region;
 
         // 对于膨胀，点在结果中当且仅当核与原区域有交集
         // 即：存在某个偏移量 (dx, dy)，使得点 (x+dx, y+dy) 在原区域中
@@ -161,7 +163,8 @@ public class RegionDilationOperator : OperatorBase
 
     private Region PointsToRuns(HashSet<(int x, int y)> points)
     {
-        if (points.Count == 0) return new Region();
+        if (points.Count == 0)
+            return new Region();
 
         // 按Y坐标分组
         var byY = points.GroupBy(p => p.y).OrderBy(g => g.Key);
@@ -197,7 +200,8 @@ public class RegionDilationOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs == null) return false;
+        if (inputs == null)
+            return false;
 
         if (inputs.TryGetValue(key, out var value) && value is Region r)
         {
@@ -216,7 +220,7 @@ public class RegionDilationOperator : OperatorBase
         using var dilatedMat = dilated.ToMat();
         var dilatedBbox = dilated.BoundingBox;
         var dilatedRoi = new Rect(dilatedBbox.X, dilatedBbox.Y, dilatedMat.Width, dilatedMat.Height);
-        
+
         if (dilatedRoi.X >= 0 && dilatedRoi.Y >= 0 && dilatedRoi.Right <= result.Width && dilatedRoi.Bottom <= result.Height)
         {
             using var colorMat = new Mat(dilatedMat.Size(), MatType.CV_8UC3, new Scalar(0, 0, 255));
@@ -228,7 +232,7 @@ public class RegionDilationOperator : OperatorBase
         using var originalMat = original.ToMat();
         var originalBbox = original.BoundingBox;
         var originalRoi = new Rect(originalBbox.X, originalBbox.Y, originalMat.Width, originalMat.Height);
-        
+
         if (originalRoi.X >= 0 && originalRoi.Y >= 0 && originalRoi.Right <= result.Width && originalRoi.Bottom <= result.Height)
         {
             using var colorMat = new Mat(originalMat.Size(), MatType.CV_8UC3, new Scalar(0, 255, 0));
@@ -255,9 +259,9 @@ public class RegionDilationOperator : OperatorBase
         // 绘制膨胀后区域轮廓（红色填充）
         using var dilatedMat = dilated.ToMat();
         var dilatedBbox = dilated.BoundingBox;
-        var dilatedRoi = new Rect(dilatedBbox.X - bbox.X + pad, dilatedBbox.Y - bbox.Y + pad, 
+        var dilatedRoi = new Rect(dilatedBbox.X - bbox.X + pad, dilatedBbox.Y - bbox.Y + pad,
             dilatedMat.Width, dilatedMat.Height);
-        
+
         if (dilatedRoi.X >= 0 && dilatedRoi.Y >= 0 && dilatedRoi.Right <= width && dilatedRoi.Bottom <= height)
         {
             using var colorMat = new Mat(dilatedMat.Size(), MatType.CV_8UC3, new Scalar(0, 0, 255));

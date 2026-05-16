@@ -239,10 +239,10 @@ public class PromptBuilder
         else
         {
             slice = _operatorKnowledgeRetriever.RetrieveAsync(new OperatorKnowledgeQuery
-                {
-                    Description = userDescription,
-                    TopN = string.IsNullOrWhiteSpace(userDescription) ? allMetadata.Count : 28
-                })
+            {
+                Description = userDescription,
+                TopN = string.IsNullOrWhiteSpace(userDescription) ? allMetadata.Count : 28
+            })
                 .GetAwaiter()
                 .GetResult();
             slice = FilterValidatedKnowledgeSlice(slice, allMetadata);

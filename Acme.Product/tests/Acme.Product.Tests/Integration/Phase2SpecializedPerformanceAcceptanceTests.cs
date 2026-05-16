@@ -19,6 +19,7 @@ using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 namespace Acme.Product.Tests.Integration;
 
 [Collection(PerformanceAcceptanceCollection.Name)]
+[Trait("Category", "PerformanceBudget")]
 public sealed class Phase2SpecializedPerformanceAcceptanceTests
 {
 #if DEBUG

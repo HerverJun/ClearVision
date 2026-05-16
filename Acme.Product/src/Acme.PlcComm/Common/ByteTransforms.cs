@@ -23,7 +23,7 @@ public class BigEndianTransform : IByteTransform
     public ulong ToUInt64(byte[] buffer, int index) => BinaryPrimitives.ReadUInt64BigEndian(buffer.AsSpan(index, 8));
     public float ToFloat(byte[] buffer, int index) => BinaryPrimitives.ReadSingleBigEndian(buffer.AsSpan(index, 4));
     public double ToDouble(byte[] buffer, int index) => BinaryPrimitives.ReadDoubleBigEndian(buffer.AsSpan(index, 8));
-    
+
     public bool ToBool(byte[] buffer, int index)
     {
         if (buffer == null || buffer.Length <= index)
@@ -101,7 +101,7 @@ public class BigEndianTransform : IByteTransform
         var bytes = encoding.GetBytes(value);
         if (bytes.Length >= length)
             return bytes[..length];
-        
+
         var result = new byte[length];
         Array.Copy(bytes, result, bytes.Length);
         return result;
@@ -123,7 +123,7 @@ public class LittleEndianTransform : IByteTransform
     public ulong ToUInt64(byte[] buffer, int index) => BinaryPrimitives.ReadUInt64LittleEndian(buffer.AsSpan(index, 8));
     public float ToFloat(byte[] buffer, int index) => BinaryPrimitives.ReadSingleLittleEndian(buffer.AsSpan(index, 4));
     public double ToDouble(byte[] buffer, int index) => BinaryPrimitives.ReadDoubleLittleEndian(buffer.AsSpan(index, 8));
-    
+
     public bool ToBool(byte[] buffer, int index)
     {
         if (buffer == null || buffer.Length <= index)
@@ -201,7 +201,7 @@ public class LittleEndianTransform : IByteTransform
         var bytes = encoding.GetBytes(value);
         if (bytes.Length >= length)
             return bytes[..length];
-        
+
         var result = new byte[length];
         Array.Copy(bytes, result, bytes.Length);
         return result;

@@ -1,12 +1,12 @@
-using Acme.Product.Core.Entities;
+using System.Reflection;
 using Acme.Product.Core.Attributes;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using OpenCvSharp;
-using System.Reflection;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -75,7 +75,7 @@ public class LocalDeformableMatchingOperatorTests
         var op = new Operator("LocalDeformableMatching", OperatorType.LocalDeformableMatching, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("MinMatchScore", 0.3)); // 闄嶄綆闃堝€间互渚挎祴璇?
         op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 2)); // 鍑忓皯灞傛暟浠ュ姞蹇祴璇?
-        
+
         using var image = CreateFeatureRichImage();
         var inputs = TestHelpers.CreateImageInputs(image);
         inputs["Template"] = image;
@@ -91,7 +91,7 @@ public class LocalDeformableMatchingOperatorTests
         var op = new Operator("LocalDeformableMatching", OperatorType.LocalDeformableMatching, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("MinMatchScore", 0.3));
         op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 2));
-        
+
         using var image = CreateFeatureRichImage();
         var inputs = TestHelpers.CreateImageInputs(image);
         inputs["Template"] = image;
@@ -376,20 +376,20 @@ public class LocalDeformableMatchingOperatorTests
     {
         // 鍒涘缓鍖呭惈涓板瘜鐗瑰緛鐨勫浘鍍?
         var mat = new Mat(400, 400, MatType.CV_8UC3, Scalar.Gray);
-        
+
         // 娣诲姞涓€浜涘嚑浣曞舰鐘朵互浜х敓鐗瑰緛
         Cv2.Rectangle(mat, new Rect(50, 50, 100, 100), Scalar.Black, -1);
         Cv2.Rectangle(mat, new Rect(200, 150, 120, 80), Scalar.White, -1);
         Cv2.Circle(mat, new Point(300, 300), 50, Scalar.Black, -1);
         Cv2.Circle(mat, new Point(150, 300), 30, Scalar.White, -1);
-        
+
         // 娣诲姞绾挎潯绾圭悊
         for (int i = 0; i < 8; i++)
         {
             Cv2.Line(mat, new Point(i * 50, 0), new Point(i * 50, 400), Scalar.DarkGray, 2);
             Cv2.Line(mat, new Point(0, i * 50), new Point(400, i * 50), Scalar.DarkGray, 2);
         }
-        
+
         return new ImageWrapper(mat);
     }
 }

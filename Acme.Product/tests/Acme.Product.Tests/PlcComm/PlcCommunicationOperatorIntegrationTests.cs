@@ -1,12 +1,12 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using Acme.PlcComm.Interfaces;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
-using Acme.PlcComm.Interfaces;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 

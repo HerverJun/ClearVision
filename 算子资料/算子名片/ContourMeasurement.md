@@ -1,92 +1,105 @@
-# 轮廓测量 / ContourMeasurement
+# Contour Measurement / ContourMeasurement
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `ContourMeasurementOperator` |
 | 枚举值 (Enum) | `OperatorType.ContourMeasurement` |
-| 分类 (Category) | 检测 |
+| 分类 (Category) | Detection |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。
-
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+当前元数据描述为：Measures contour area, perimeter, and centroid with grayscale-weighted area estimation。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 先校验输入图像与参数，再进入核心处理，避免空输入或非法格式直接进入底层 API。
-- 结果通过 `CreateImageOutput(...)` 封装，运行时通常附带 `Width` / `Height` 等基础字段。
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 参数解析覆盖 4 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(...)`
-2. `GetStringParam / GetIntParam / GetDoubleParam / GetBoolParam / GetFloatParam`
-3. `Cv2.CvtColor`
-4. `Cv2.Threshold`
-5. `Cv2.FindContours`
-6. `Cv2.ContourArea`
-7. `Cv2.ArcLength`
-8. `Cv2.BoundingRect`
-9. `Cv2.Moments`
-10. `Cv2.DrawContours`
-11. `CreateImageOutput(...)`
+- `OperatorBase.Get*Param(...)`
+- `Cv2.CvtColor`
+- `Cv2.Threshold`
+- `Cv2.FindContours`
+- `Cv2.BoundingRect`
+- `Cv2.DrawContours`
+- `Cv2.Moments`
+- `Cv2.ArcLength`
+- `Cv2.Circle`
+- `Cv2.Rectangle`
+- `Math.Abs`
+- `Math.PI`
+- `Math.Sqrt`
+- `Math.Round`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `Threshold` | `double` | `127.0` | [0.0, 255.0] | 用于判定、分割或筛选的阈值。 |
-| `MinArea` | `int` | `100` | [0, +∞] | 最小数量或下限约束。 |
-| `MaxArea` | `int` | `100000` | [0, +∞] | 最大数量或上限约束。 |
-| `SortBy` | `enum` | `"Area"` | Area/面积；Perimeter/周长 | 该参数用于在多个实现分支之间切换。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `Threshold` | Threshold | `double` | 127 | [0, 255] | Yes | - |
+| `MinArea` | Min Area | `int` | 100 | >= 0 | Yes | - |
+| `MaxArea` | Max Area | `int` | 100000 | >= 0 | Yes | - |
+| `SortBy` | Sort By | `enum` | Area | Area/Area；Perimeter/Perimeter | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 输入图像 | `Image` | Yes | 输入待处理图像。 |
+| `Image` | Input Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | 结果图像 | `Image` | 输出处理后的结果图像。 |
-| `Area` | 面积 | `Float` | 输出本算子的处理结果。 |
-| `Perimeter` | 周长 | `Float` | 输出本算子的处理结果。 |
-| `ContourCount` | 轮廓数量 | `Integer` | 输出本算子的处理结果。 |
+| `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `Area` | Area | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Perimeter` | Perimeter | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `ContourCount` | Contour Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
 ### 运行时附加输出 / Runtime Additional Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Width` | `Integer` | 输出图像宽度。 |
-| `Height` | `Integer` | 输出图像高度。 |
-| `Index` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `Area` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `Perimeter` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `CenterX` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `CenterY` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `BoundingRect` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `Circularity` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `Extent` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
+| `BoundingRect` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `CenterX` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `CenterY` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Circularity` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Confidence` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `ContourPointCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `Contours` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `EquivalentDiameter` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Extent` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `Index` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `StatusCode` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `StatusMessage` | `String` | 源码通过输出字典索引赋值写入。 |
+| `UncertaintyPx` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 通常与图像像素数线性相关，并叠加候选结构数量带来的统计成本。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 通常需要为中间图像、结果图和输出封装分配额外内存；峰值随图像尺寸和中间副本数量增长。 |
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合尺寸、角度、间距和几何位置测量。
-- 适合同时输出数值结果和可视化结果图。
-- 不适合在边缘模糊或对比度不足时直接追求高精度。
-- 不适合忽略标定比例和亚像素能力对精度的影响。
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. 当前实现通常以图像作为主要输出载体；若下游只关心数值，还需要同步读取附加字段。
-2. 源码若在内部自动转换颜色空间，下游拿到的图像语义可能与原始输入不同。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

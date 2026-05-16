@@ -220,8 +220,8 @@ public class DistanceTransformOperator : OperatorBase
             for (int x = 0; x < binary.Cols; x++)
             {
                 var isForeground = binary.At<byte>(y, x) > 0;
-                var value = isForeground 
-                    ? distForeground.At<float>(y, x) 
+                var value = isForeground
+                    ? distForeground.At<float>(y, x)
                     : -distBackground.At<float>(y, x);
                 signedDist.Set(y, x, value);
             }
@@ -259,7 +259,8 @@ public class DistanceTransformOperator : OperatorBase
             for (int i = 1; i < stats.Rows; i++) // 跳过背景
             {
                 var area = stats.At<int>(i, StatArea);
-                if (area < 100) continue; // 忽略小区域
+                if (area < 100)
+                    continue; // 忽略小区域
 
                 var x = stats.At<int>(i, StatLeft);
                 var y = stats.At<int>(i, StatTop);
@@ -269,7 +270,7 @@ public class DistanceTransformOperator : OperatorBase
                 // 提取该区域的距离值
                 using var roi = new Mat(distanceMap, new Rect(x, y, width, height));
                 using var roiMask = new Mat(labels, new Rect(x, y, width, height));
-                
+
                 // 计算该区域的距离统计
                 var maxDist = 0.0;
                 var maxDistCount = 0;
@@ -334,7 +335,7 @@ public class DistanceTransformOperator : OperatorBase
         // 基于形状几何估算最大距离
         // 圆形/椭圆：半径
         // 矩形：min(width, height) / 2
-        
+
         var minDim = Math.Min(width, height);
         var expectedRadius = minDim / 2.0;
 

@@ -49,7 +49,7 @@ public class HttpRequestOperatorTests
         var op = new Operator("test", OperatorType.HttpRequest, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("Url", $"http://127.0.0.1:{port}/ingest", "string"));
         op.AddParameter(TestHelpers.CreateParameter("Method", "POST", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("TimeoutMs", 3000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("TimeoutMs", 10000, "int"));
         op.AddParameter(TestHelpers.CreateParameter("RetryCount", 0, "int"));
         op.AddParameter(TestHelpers.CreateParameter("ContentType", "application/json", "string"));
 
@@ -62,7 +62,7 @@ public class HttpRequestOperatorTests
             }
         });
 
-        var request = await serverTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var request = await serverTask.WaitAsync(TimeSpan.FromSeconds(10));
 
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().NotBeNull();

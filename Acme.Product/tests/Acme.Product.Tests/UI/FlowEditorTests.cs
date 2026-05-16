@@ -18,10 +18,10 @@ public class FlowEditorTests : UITestBase
     {
         // Arrange
         await NavigateToAppAsync();
-        
+
         // Act
         var canvas = await Page!.QuerySelectorAsync("#flow-canvas");
-        
+
         // Assert
         canvas.Should().NotBeNull();
     }
@@ -31,11 +31,11 @@ public class FlowEditorTests : UITestBase
     {
         // Arrange
         await NavigateToAppAsync();
-        
+
         // Act - 从算子库拖拽到画布
         var operatorItem = await Page!.QuerySelectorAsync(".operator-item");
         var canvas = await Page.QuerySelectorAsync("#flow-canvas");
-        
+
         if (operatorItem != null && canvas != null)
         {
             var box = await canvas.BoundingBoxAsync();
@@ -46,7 +46,7 @@ public class FlowEditorTests : UITestBase
                 await canvas.ClickAsync();
             }
         }
-        
+
         // Assert
         var nodes = await Page.QuerySelectorAllAsync(".operator-node");
         nodes.Count.Should().BeGreaterThan(0);

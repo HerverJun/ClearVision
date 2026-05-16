@@ -113,7 +113,7 @@ public class FinsFrameBuilder
     /// <summary>
     /// 构建FINS读取请求帧
     /// </summary>
-    public byte[] BuildReadRequest(byte areaCode, ushort startAddress, byte bitAddress, ushort length, 
+    public byte[] BuildReadRequest(byte areaCode, ushort startAddress, byte bitAddress, ushort length,
         byte clientNode, byte serverNode)
     {
         // 构建FINS命令帧

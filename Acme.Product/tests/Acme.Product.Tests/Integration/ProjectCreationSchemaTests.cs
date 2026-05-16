@@ -38,7 +38,7 @@ public class ProjectCreationSchemaTests : IDisposable
     {
         // Arrange
         var project = new Project("Test Project", "Description");
-        
+
         // Ensure properties are set correctly
         project.Flow.Should().NotBeNull();
         project.Flow.Name.Should().Be("默认流程");

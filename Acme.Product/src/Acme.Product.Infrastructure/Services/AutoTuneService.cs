@@ -3,14 +3,14 @@
 // 【Phase 4】LLM 闭环验证 - 自动调参服务
 // 作者：架构修复方案 v2
 
+using System.Diagnostics;
+using System.Text.Json;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Diagnostics;
-using System.Text.Json;
 
 namespace Acme.Product.Infrastructure.Services;
 

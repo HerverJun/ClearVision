@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Text.Json;
+using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Services;
-using Acme.Product.Application.DTOs;
 
 namespace Acme.Product.Desktop.Endpoints;
 

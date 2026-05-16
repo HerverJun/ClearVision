@@ -2,13 +2,13 @@
 // 一维/图像逆 FFT 算子
 // 对标: numpy.fft.ifft / OpenCV dft
 
+using System.Numerics;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Numerics;
 
 namespace Acme.Product.Infrastructure.Operators;
 

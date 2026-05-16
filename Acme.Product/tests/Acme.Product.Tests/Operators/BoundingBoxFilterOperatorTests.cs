@@ -1,4 +1,6 @@
-﻿using Acme.Product.Core.Entities;
+using System.Collections;
+using System.Reflection;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
@@ -6,8 +8,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using OpenCvSharp;
-using System.Collections;
-using System.Reflection;
 using Xunit;
 
 namespace Acme.Product.Tests.Operators;

@@ -6,12 +6,11 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -114,7 +113,7 @@ public class HttpRequestOperator : OperatorBase
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
 
                 var result = await ExecuteRequestAsync(url, method, body, headers, linkedCts.Token);
-                
+
                 if (result.IsSuccess)
                 {
                     return OperatorExecutionOutput.Success(result.OutputData);
@@ -123,7 +122,7 @@ public class HttpRequestOperator : OperatorBase
                 // 如果不是最后一次尝试，等待后重试
                 if (attempt < maxAttempts)
                 {
-                    Logger.LogWarning("[HttpRequest] 请求失败，{Delay}ms 后重试 ({Attempt}/{RetryCount})", 
+                    Logger.LogWarning("[HttpRequest] 请求失败，{Delay}ms 后重试 ({Attempt}/{RetryCount})",
                         retryDelayMs, attempt + 1, maxAttempts);
                     await Task.Delay(retryDelayMs, cancellationToken);
                 }
@@ -137,7 +136,7 @@ public class HttpRequestOperator : OperatorBase
                 // 超时
                 if (attempt < maxAttempts)
                 {
-                    Logger.LogWarning("[HttpRequest] 请求超时，{Delay}ms 后重试 ({Attempt}/{RetryCount})", 
+                    Logger.LogWarning("[HttpRequest] 请求超时，{Delay}ms 后重试 ({Attempt}/{RetryCount})",
                         retryDelayMs, attempt + 1, maxAttempts);
                     await Task.Delay(retryDelayMs, cancellationToken);
                 }
@@ -149,7 +148,7 @@ public class HttpRequestOperator : OperatorBase
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[HttpRequest] 请求异常");
-                
+
                 if (attempt < maxAttempts)
                 {
                     await Task.Delay(retryDelayMs, cancellationToken);
@@ -176,8 +175,8 @@ public class HttpRequestOperator : OperatorBase
     }
 
     private async Task<RequestResult> ExecuteRequestAsync(
-        string url, 
-        string method, 
+        string url,
+        string method,
         string? body,
         Dictionary<string, string> headers,
         CancellationToken cancellationToken)
@@ -189,7 +188,7 @@ public class HttpRequestOperator : OperatorBase
         {
             if (key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
             {
-                request.Content = body != null 
+                request.Content = body != null
                     ? new StringContent(body, Encoding.UTF8, value)
                     : null;
             }
@@ -223,9 +222,9 @@ public class HttpRequestOperator : OperatorBase
         }
         else
         {
-            return new RequestResult 
-            { 
-                IsSuccess = false, 
+            return new RequestResult
+            {
+                IsSuccess = false,
                 ErrorMessage = $"HTTP {(int)response.StatusCode}: {responseBody}",
                 OutputData = outputData
             };

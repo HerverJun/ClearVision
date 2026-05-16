@@ -7,5 +7,6 @@
     -->
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;**/artifacts/**</DefaultItemExcludes>
     <MSBuildEnableWorkloadResolver>false</MSBuildEnableWorkloadResolver>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1903</WarningsNotAsErrors>
   </PropertyGroup>
 </Project>

@@ -1,0 +1,35 @@
+{
+  "GeneratedAtUtc": "2026-05-16T05:57:19.6809426Z",
+  "ArchivedAtUtc": "2026-05-16T05:57:19.6876607Z",
+  "GateProfile": "standard",
+  "WarmupIterations": 5,
+  "MeasuredIterations": 24,
+  "BudgetScale": 1.5,
+  "ArchiveDirectory": "C:\\Users\\A\\Desktop\\ClearVision\\Acme.Product\\test_results\\archive\\detection_performance_failures\\20260516T055719680Z_standard_s1_50",
+  "MachineName": "\u8605\u829C\u541B\u7684PC",
+  "RuntimeVersion": "8.0.22",
+  "FailedEntries": [
+    {
+      "Name": "PixelStatistics",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 22.1021375,
+      "P95Ms": 22.5656,
+      "P99Ms": 22.8927,
+      "Status": "FAIL",
+      "Notes": "p95 22.57ms exceeded allowed 15.00ms."
+    },
+    {
+      "Name": "WidthMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.5,
+      "AllowedMs": 45,
+      "MeanMs": 89.23074999999999,
+      "P95Ms": 90.0693,
+      "P99Ms": 90.1022,
+      "Status": "FAIL",
+      "Notes": "p95 90.07ms exceeded allowed 45.00ms."
+    }
+  ]
+}

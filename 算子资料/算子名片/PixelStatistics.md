@@ -6,74 +6,100 @@
 | 类名 (Class) | `PixelStatisticsOperator` |
 | 枚举值 (Enum) | `OperatorType.PixelStatistics` |
 | 分类 (Category) | 检测 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。
-
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+当前元数据描述为：Computes ROI/masked pixel-level statistics。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 先校验输入图像与参数，再进入核心处理，避免空输入或非法格式直接进入底层 API。
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 可选输入用于覆盖或补充参数配置：`Mask`。
+- 参数解析覆盖 5 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(...)`
-2. `GetStringParam / GetIntParam / GetDoubleParam / GetBoolParam / GetFloatParam`
-3. `Cv2.MeanStdDev`
-4. `Cv2.MinMaxLoc`
-5. `Cv2.BitwiseAnd`
-6. `Cv2.CountNonZero`
-7. `Cv2.CvtColor`
-8. `Cv2.Resize`
-9. `Cv2.Threshold`
-10. `Cv2.CalcHist`
+- `OperatorBase.Get*Param(...)`
+- `Cv2.ExtractChannel`
+- `Cv2.CvtColor`
+- `Cv2.Threshold`
+- `Math.Min`
+- `Math.Max`
+- `Math.Sqrt`
+- `Math.Abs`
+- `Math.Round`
+- `ImageWrapper`
+- `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `RoiX` | `int` | `0` | [0, +∞] | 限定处理区域。 |
-| `RoiY` | `int` | `0` | [0, +∞] | 限定处理区域。 |
-| `RoiW` | `int` | `0` | [0, +∞] | 限定处理区域。 |
-| `RoiH` | `int` | `0` | [0, +∞] | 限定处理区域。 |
-| `Channel` | `enum` | `"Gray"` | Gray/Gray；R/R；G/G；B/B；All/All | 该参数用于在多个实现分支之间切换。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `RoiX` | ROI X | `int` | 0 | >= 0 | Yes | - |
+| `RoiY` | ROI Y | `int` | 0 | >= 0 | Yes | - |
+| `RoiW` | ROI W | `int` | 0 | >= 0 | Yes | - |
+| `RoiH` | ROI H | `int` | 0 | >= 0 | Yes | - |
+| `Channel` | Channel | `enum` | Gray | Gray/Gray；R/R；G/G；B/B；All/All | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | Image | `Image` | Yes | 输入待处理图像。 |
-| `Mask` | Mask | `Image` | No | 输入待处理图像。 |
+| `Image` | Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `Mask` | Mask | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Mean` | Mean | `Float` | 输出流程数据结果。 |
-| `StdDev` | StdDev | `Float` | 输出流程数据结果。 |
-| `Min` | Min | `Integer` | 输出流程数据结果。 |
-| `Max` | Max | `Integer` | 输出流程数据结果。 |
-| `Median` | Median | `Integer` | 输出流程数据结果。 |
-| `NonZeroCount` | NonZero Count | `Integer` | 输出流程数据结果。 |
+| `Mean` | Mean | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `StdDev` | StdDev | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Min` | Min | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Max` | Max | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Median` | Median | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `NonZeroCount` | NonZero Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
+|------|------|------|
+| `AggregationMode` | `String` | 源码通过输出字典索引赋值写入。 |
+| `ChannelStats` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ChannelsAnalyzed` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Confidence` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `MedianAbsoluteDeviation` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Range` | `Any` | 源码输出字典初始化中可见字段。 |
+| `SampleCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `SelectedChannel` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `StatusCode` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `StatusMessage` | `String` | 源码通过输出字典索引赋值写入。 |
+| `StdError` | `Float` | 源码输出字典初始化中可见字段。 |
+| `UncertaintyPx` | `Any` | 源码通过输出字典索引赋值写入。 |
+
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 通常为 `O(1)` 或与输入集合长度线性相关。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 主要由中间结果、缓存结构和输出封装决定。 |
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合做变量整理、条件判断、结果汇总和类型转换。
-- 适合把上游复杂输出整理为下游更容易消费的结构。
-- 不适合作为图像算法替代品。
-- 不适合承载大量高频大对象搬运。
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. 源码若在内部自动转换颜色空间，下游拿到的图像语义可能与原始输入不同。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

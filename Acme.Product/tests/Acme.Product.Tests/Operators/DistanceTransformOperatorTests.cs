@@ -36,7 +36,7 @@ public class DistanceTransformOperatorTests
     {
         var op = new Operator("DistanceTransform", OperatorType.DistanceTransform, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("DistanceType", "Euclidean"));
-        
+
         using var image = CreateBinaryCircleImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 
@@ -51,12 +51,12 @@ public class DistanceTransformOperatorTests
     public async Task ExecuteAsync_WithDifferentDistanceTypes_ShouldWork()
     {
         var distanceTypes = new[] { "Euclidean", "Manhattan", "Chessboard" };
-        
+
         foreach (var distType in distanceTypes)
         {
             var op = new Operator($"DistanceTransform_{distType}", OperatorType.DistanceTransform, 0, 0);
             op.Parameters.Add(TestHelpers.CreateParameter("DistanceType", distType));
-            
+
             using var image = CreateBinaryCircleImage();
             var inputs = TestHelpers.CreateImageInputs(image);
 
@@ -70,7 +70,7 @@ public class DistanceTransformOperatorTests
     {
         var op = new Operator("DistanceTransform", OperatorType.DistanceTransform, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Signed", true));
-        
+
         using var image = CreateBinaryCircleImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 
@@ -83,13 +83,13 @@ public class DistanceTransformOperatorTests
     {
         var op = new Operator("DistanceTransform", OperatorType.DistanceTransform, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Threshold", 127.0));
-        
+
         using var image = CreateBinaryRectangleImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 
         var result = await _operator.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
-        
+
         var maxDistance = result.OutputData["MaxDistance"];
         maxDistance.Should().NotBeNull();
     }
@@ -99,7 +99,7 @@ public class DistanceTransformOperatorTests
     {
         var op = new Operator("DistanceTransform", OperatorType.DistanceTransform, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Normalize", true));
-        
+
         using var image = CreateBinaryCircleImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 

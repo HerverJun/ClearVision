@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Reflection;
 using Acme.Product.Application.Analysis;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
@@ -17,8 +19,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using System.Collections.Concurrent;
-using System.Reflection;
 
 namespace Acme.Product.Tests.Services;
 

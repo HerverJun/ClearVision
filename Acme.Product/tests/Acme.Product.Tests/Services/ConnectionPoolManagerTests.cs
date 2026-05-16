@@ -1,6 +1,6 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Diagnostics;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;

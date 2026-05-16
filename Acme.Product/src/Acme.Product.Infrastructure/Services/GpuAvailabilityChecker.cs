@@ -2,9 +2,9 @@
 // DirectML
 // 作者：蘅芜君
 
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace Acme.Product.Infrastructure.Services;
 
@@ -165,7 +165,8 @@ public static class GpuAvailabilityChecker
 
             foreach (var basePath in trtPaths)
             {
-                if (!Directory.Exists(basePath)) continue;
+                if (!Directory.Exists(basePath))
+                    continue;
 
                 // Windows
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -438,9 +439,12 @@ public class GpuInfo
             return $"GPU检测失败: {ErrorMessage}";
 
         var backends = new List<string>();
-        if (CudaAvailable) backends.Add($"CUDA {CudaVersion}");
-        if (TensorRtAvailable) backends.Add($"TensorRT {TensorRtVersion}");
-        if (DirectMlAvailable) backends.Add("DirectML");
+        if (CudaAvailable)
+            backends.Add($"CUDA {CudaVersion}");
+        if (TensorRtAvailable)
+            backends.Add($"TensorRT {TensorRtVersion}");
+        if (DirectMlAvailable)
+            backends.Add("DirectML");
 
         if (backends.Count == 0)
             return "无GPU加速后端可用";

@@ -1,4 +1,4 @@
-﻿# 深度学习 / DeepLearning
+# 深度学习 / DeepLearning
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
@@ -6,146 +6,124 @@
 | 类名 (Class) | `DeepLearningOperator` |
 | 枚举值 (Enum) | `OperatorType.DeepLearning` |
 | 分类 (Category) | AI检测 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:AI`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持：
-
-- `YOLOv5`
-- `YOLOv6`
-- `YOLOv8`
-- `YOLOv11`
-- `Auto` 自动检测版本
-
-整体流程可概括为：
-
-1. 对输入图像做保持宽高比的 letterbox 预处理；
-2. 将 BGR 图像转换为模型期望的 RGB `CHW` 张量；
-3. 调用 ONNX Runtime 执行推理；
-4. 根据输出张量形状自动判断 YOLO 版本；
-5. 走对应的后处理分支解析检测框；
-6. 仅对**同类别框**执行 NMS（IoU 阈值写死为 `0.45`）；
-7. 根据 `DetectionMode` 把检测结果解释为“缺陷列表”或“目标列表”。
-
-当前预处理中的 letterbox 细节为：
-
-- 缩放时保持原始宽高比；
-- 填充底色使用 `Scalar(114,114,114)`；
-- 输出张量形状为 `[1, 3, InputSize, InputSize]`。
-
-> English: The operator runs YOLO models via ONNX Runtime, performs aspect-ratio-preserving letterbox preprocessing, auto-detects YOLO output format when requested, then applies version-specific postprocessing and same-class NMS.
+该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺陷检测和目标分类。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
 ## 实现策略 / Implementation Strategy
-这不是“单纯加载模型然后推理”的最小实现，源码里有几项很关键的工程策略：
-
-- **模型缓存**：使用静态 `ConcurrentDictionary<string, InferenceSession>` 缓存模型会话，缓存键包含 `modelPath + gpu/cpu + deviceId`。
-- **并发安全加载**：通过 `SemaphoreSlim` 避免同一模型在并发流程下被重复加载。
-- **LRU 驱逐**：模型缓存数量上限为 `3`，超出后会按访问顺序驱逐最久未使用模型。
-- **GPU 支持**：代码里实际读取 `UseGpu` 和 `GpuDeviceId` 参数，并尝试启用 CUDA；若 GPU 初始化失败会回退到 CPU。
-- **标签加载优先级**：ONNX metadata names 优先；无 metadata 时才使用 `LabelsPath` 或模型目录下 `labels.txt`，仍不可用则执行失败。
-- **输出模式切换**：在 `DetectionMode=Object` 时输出 `Objects/ObjectCount`；默认 `Defect` 模式输出 `Defects/DefectCount`。
-
-> English: The implementation includes practical production concerns such as model caching, concurrency-safe loading, limited-size LRU eviction, optional GPU acceleration, and flexible label loading.
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 参数解析覆盖 13 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(inputs)`
-2. `GetStringParam / GetIntParam / GetFloatParam / GetBoolParam`
-3. `LoadModel(modelPath, useGpu, gpuDeviceId)`
-4. `ResolveLabelContract(session, labelsPath, modelPath, targetClassesStr)`
-   - `SessionOptions`
-   - `AppendExecutionProvider_CUDA(...)`（可用时）
-   - `InferenceSession(...)`
-5. `PreprocessImage(src, inputSize)`
-   - `Cv2.Resize(...)`
-   - letterbox 填充
-   - BGR → RGB CHW
-6. `RunInference(session, inputTensor)`
-   - `NamedOnnxValue.CreateFromTensor(...)`
-7. `DetectYoloVersion(outputTensor)`（当 `ModelVersion=Auto`）
-8. `PostprocessYoloV5V6(...)` 或 `PostprocessYoloV8V11(...)`
-9. `ApplyNMS(detections, 0.45f)`
-10. `DrawResults(src, detections)`
-11. `CreateImageOutput(outputImage, additionalData)`
+- `OperatorBase.Get*Param(...)`
+- `Cv2.Resize`
+- `Cv2.CvtColor`
+- `Cv2.MinMaxLoc`
+- `Cv2.Split`
+- `Cv2.Rectangle`
+- `Cv2.GetTextSize`
+- `Cv2.PutText`
+- `File.Exists`
+- `Path.GetDirectoryName`
+- `Path.Combine`
+- `Math.Clamp`
+- `Math.Min`
+- `Math.Max`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `ModelPath` | `file` | `""` | 文件路径 | ONNX 模型路径。为空或不存在都会直接执行失败。 |
-| `Confidence` | `double` | `0.5` | `[0.0, 1.0]` | 置信度阈值。后处理时低于该阈值的候选会被过滤。 |
-| `ModelVersion` | `enum` | `"Auto"` | `Auto` / `YOLOv5` / `YOLOv6` / `YOLOv8` / `YOLOv11` | YOLO 版本。`Auto` 时根据输出张量维度自动判断。 |
-| `InputSize` | `int` | `640` | `[320, 1280]` | 模型输入尺寸，影响预处理和推理成本。 |
-| `TargetClasses` | `string` | `""` | 逗号分隔类别字符串 | 只保留指定类别；为空表示不过滤类别。 |
-| `LabelsPath` | `file` | `""` | 文件路径 | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
-| `DetectionMode` | `enum` | `"Defect"` | `Defect` / `Object` | 输出语义模式：检出目标视为缺陷，或视为正常目标。 |
-
-### 源码隐含参数 / Runtime-Used But Undeclared Parameters
-以下参数在源码中被实际读取，但未通过 `OperatorParam` 对外声明：
-
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `UseGpu` | `bool` | `true` | `true` / `false` | 是否尝试启用 GPU 推理。 |
-| `GpuDeviceId` | `int` | `0` | `[0, 15]` | GPU 设备编号。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `ModelPath` | 模型路径 | `file` | "" | - | Yes | - |
+| `Confidence` | 置信度阈值 | `double` | 0.5 | [0, 1] | Yes | - |
+| `ModelVersion` | YOLO版本 | `enum` | Auto | Auto/自动检测；YOLOv5/YOLOv5；YOLOv6/YOLOv6；YOLOv8/YOLOv8；YOLOv11/YOLOv11 | Yes | - |
+| `InputSize` | 输入尺寸 | `int` | 640 | [320, 1280] | Yes | - |
+| `UseGpu` | 使用GPU | `bool` | true | - | Yes | - |
+| `GpuDeviceId` | GPU设备ID | `int` | 0 | [0, 15] | Yes | - |
+| `TargetClasses` | 目标类别 | `string` | "" | - | Yes | 检测目标类别（逗号分隔，如 person,car），为空则检测所有类别 |
+| `LabelsPath` | 标签文件路径 | `file` | "" | - | Yes | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
+| `EnableInternalNms` | 启用内部NMS | `bool` | true | - | Yes | 关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。 |
+| `NmsIouThreshold` | NMS IoU Threshold | `double` | 0.45 | [0, 1] | Yes | 内部 NMS 与预览 NMS 使用的 IoU 阈值。 |
+| `DetectionMode` | 检测模式 | `enum` | Defect | Defect/缺陷检测；Object/目标检测 | Yes | 缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK) |
+| `ModelId` | Model Id | `string` | "" | - | Yes | - |
+| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 输入图像 | `Image` | Yes | 待推理图像。 |
+| `Image` | 输入图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
-### 输出 / Declared Outputs
+### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | 结果图像 | `Image` | 检测结果图，会绘制框、标签和统计文字。 |
-| `Defects` | 缺陷列表 | `DetectionList` | 缺陷检测模式下使用。 |
-| `DefectCount` | 缺陷数量 | `Integer` | 缺陷检测模式下使用。 |
-| `Objects` | 目标列表 | `DetectionList` | 目标检测模式下使用。 |
-| `ObjectCount` | 目标数量 | `Integer` | 目标检测模式下使用。 |
+| `Image` | 结果图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `OriginalImage` | 原始图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `DetectionList` | 检测列表 | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
+| `Defects` | 缺陷列表 | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
+| `DefectCount` | 缺陷数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Objects` | 目标列表 | `DetectionList` | 检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。 |
+| `ObjectCount` | 目标数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `ResolvedModelPath` | Resolved Model Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelId` | Resolved Model Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelSource` | Model Source | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelProvenance` | Model Provenance | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Width` | `Integer` | 输出图像宽度。 |
-| `Height` | `Integer` | 输出图像高度。 |
-| `DetectionList` | `DetectionList` | 统一的检测结果列表字段，无论缺陷模式还是目标模式都会带出。 |
-| `Defects` | `DetectionList` | `DetectionMode=Defect` 时输出。 |
-| `DefectCount` | `Integer` | `DetectionMode=Defect` 时输出。 |
-| `Objects` | `DetectionList` | `DetectionMode=Object` 时输出。 |
-| `ObjectCount` | `Integer` | `DetectionMode=Object` 时输出。 |
+| `CandidatesByClass` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `DroppedBeforeNms` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `InternalNmsEnabled` | `Boolean` | 源码输出字典初始化中可见字段。 |
+| `LabelSource` | `String` | 源码输出字典初始化中可见字段。 |
+| `LabelValidationStatus` | `Boolean` | 源码输出字典初始化中可见字段。 |
+| `ModelMetadataLabels` | `String` | 源码输出字典初始化中可见字段。 |
+| `NmsApplied` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `NmsCandidateLimit` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `NmsIoUComparisons` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `NmsPrefilteredCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `PostprocessDiagnostics` | `Any` | 源码输出字典初始化中可见字段。 |
+| `RawCandidateCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `ResolvedLabels` | `Any` | 源码输出字典初始化中可见字段。 |
+| `VisualizationDetectionCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 主要由模型推理复杂度主导，预处理和后处理成本次之。 |
-| 典型耗时 (Typical Latency) | 与模型大小、`InputSize`、CPU/GPU 环境、标签数和检测框数量强相关；命中模型缓存时会明显快于首次加载。`DeepLearning_runtime_benchmark_baseline.md` 记录 20/20 passed，覆盖 1080p、4K、CPU fallback 和 1080p x4 batch 的预处理/YOLO 后处理路径。 |
-| 内存特征 (Memory Profile) | 除图像和输出图外，还包含输入张量、输出张量、静态模型缓存以及检测结果列表。 |
+| 时间复杂度 (Time Complexity) | 推理路径主要受模型规模、输入尺寸和硬件后端影响；后处理通常随候选数量线性或近似线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于模型大小、输入尺寸、CPU/GPU/ONNX Runtime 后端和候选数量。 |
+| 内存特征 (Memory Profile) | 需要模型会话、输入张量、输出张量和后处理集合内存；峰值随模型与输入尺寸增长。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
-- Contract baseline：`quality/evals/reports/DeepLearning_contract_baseline.md`，26/26 passed，覆盖 YOLO 输出解析、版本识别、输出张量选择、坐标 clamp、同类别 NMS、目标类别解析、标签契约、预处理和输出文本契约。
-- Dataset baseline：`quality/evals/reports/DeepLearning_detection_dataset_baseline.md`，36/36 passed，AP50=1.0000，Precision@0.50=1.0000，Recall@0.50=1.0000；这是 COCO-style 半合成检测协议桥，不代表生产模型精度。
-- Runtime baseline：`quality/evals/reports/DeepLearning_runtime_benchmark_baseline.md`，20/20 passed，记录 provider 可用性、CPU fallback、1080p/4K 预处理后处理和 batch 压力路径。
-- 失败契约包括缺失模型、标签数量不匹配、缺失标签契约、无法选择有效输出张量、非法框、低置信候选、以及 provider 不可用时的 CPU 回退行为。
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 8 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- **适合 (Suitable)**：外观复杂、规则算法难以稳定覆盖的检测、识别和缺陷筛查任务。
-- **适合 (Suitable)**：需要同一算子支持多种 YOLO 版本和标签文件切换的流程。
-- **适合 (Suitable)**：对模型切换频繁但希望复用推理会话的工程场景。
-- **不适合 (Not Suitable)**：模型文件、标签文件和版本配置不明确的流程。
-- **不适合 (Not Suitable)**：把 `DetectionMode` 只当展示选项，而不理解其会改变输出字段集合的场景。
-- **不适合 (Not Suitable)**：对严格实时性和显存可预测性要求很高，但又频繁切换大量模型的场景。
+- 适合 (Suitable)：模型、标签和阈值已完成现场校准，需要把推理结果接入视觉流程的场景。
+- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
+- 不适合 (Not Suitable)：模型未完成验证、标签映射不稳定或现场数据分布明显偏离训练数据的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. `UseGpu` 和 `GpuDeviceId` 在源码中实际生效，但未通过元数据声明；如果只看参数面板，容易误以为不支持 GPU 开关。
-2. `ModelVersion=Auto` 的版本识别基于输出张量维度启发式判断，适合常见 YOLO 导出格式，但不保证覆盖所有非标准模型。
-3. `DetectionMode` 会改变运行时实际输出字段：对象模式输出 `Objects/ObjectCount`，缺陷模式输出 `Defects/DefectCount`；集成时不能假定两组字段总是同时存在。
-4. 当前 NMS 的 IoU 阈值固定为 `0.45`，且只对同类别框抑制，没有暴露为可调参数。
-5. 文档审计勘误已确认此前关于本算子“ArrayPool 张量踩踏”和“ONNX 张量泄漏”的两个严重结论属于误报；但这不代表模型推理的性能和稳定性可脱离现场环境单独保证。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
+4. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
+5. 模型推理类路径依赖模型文件、标签、运行时库和硬件后端，算法准确率不由算子元数据单独保证。
+6. 源码包含状态缓存或实例级状态，长流程运行时需要关注状态清理、并发调用和实例复用边界。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.3 | 2026-04-28 | 回写 26/26 contract、36/36 dataset protocol bridge、20/20 runtime benchmark 和失败契约说明 |
-| 1.0.2 | 2026-03-14 | 第二轮基于源码补充 YOLO 版本判别、模型缓存/GPU 隐含参数、输出模式切换与预处理细节 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
-
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

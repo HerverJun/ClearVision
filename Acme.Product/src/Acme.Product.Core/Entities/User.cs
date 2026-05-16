@@ -54,7 +54,7 @@ public class User : Entity
     {
         if (string.IsNullOrWhiteSpace(username))
             throw new ArgumentException("用户名不能为空", nameof(username));
-        
+
         if (string.IsNullOrWhiteSpace(passwordHash))
             throw new ArgumentException("密码哈希不能为空", nameof(passwordHash));
 

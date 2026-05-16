@@ -6,82 +6,89 @@
 | 类名 (Class) | `MeasureDistanceOperator` |
 | 枚举值 (Enum) | `OperatorType.Measurement` |
 | 分类 (Category) | 检测 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。
-
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+该算子用于两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 先校验输入图像与参数，再进入核心处理，避免空输入或非法格式直接进入底层 API。
-- 结果通过 `CreateImageOutput(...)` 封装，运行时通常附带 `Width` / `Height` 等基础字段。
+- 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
+- 可选输入用于覆盖或补充参数配置：`Image`、`PointA`、`PointB`。
+- 参数解析覆盖 5 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(...)`
-2. `GetStringParam / GetIntParam / GetDoubleParam / GetBoolParam / GetFloatParam`
-3. `Cv2.Line`
-4. `Cv2.Circle`
-5. `Cv2.PutText`
-6. `CreateImageOutput(...)`
+- `OperatorBase.Get*Param(...)`
+- `Cv2.Line`
+- `Cv2.Circle`
+- `Cv2.PutText`
+- `Math.Abs`
+- `Math.Sqrt`
+- `Math.Round`
+- `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `X1` | `int` | `0` | - | 控制“X1”这一实现参数，建议结合现场样本调节。 |
-| `Y1` | `int` | `0` | - | 控制“Y1”这一实现参数，建议结合现场样本调节。 |
-| `X2` | `int` | `100` | - | 控制“X2”这一实现参数，建议结合现场样本调节。 |
-| `Y2` | `int` | `100` | - | 控制“Y2”这一实现参数，建议结合现场样本调节。 |
-| `MeasureType` | `enum` | `"PointToPoint"` | PointToPoint/点到点；Horizontal/水平；Vertical/垂直 | 操作类型或转换类型。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `X1` | 起点X | `int` | 0 | - | Yes | - |
+| `Y1` | 起点Y | `int` | 0 | - | Yes | - |
+| `X2` | 终点X | `int` | 100 | - | Yes | - |
+| `Y2` | 终点Y | `int` | 100 | - | Yes | - |
+| `MeasureType` | 测量类型 | `enum` | PointToPoint | PointToPoint/点到点；Horizontal/水平；Vertical/垂直 | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 输入图像 | `Image` | No | 输入待处理图像。 |
-| `PointA` | 起点 | `Point` | No | 提供点位输入。 |
-| `PointB` | 终点 | `Point` | No | 提供点位输入。 |
+| `Image` | 输入图像 | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `PointA` | 起点 | `Point` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
+| `PointB` | 终点 | `Point` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | 结果图像 | `Image` | 输出处理后的结果图像。 |
-| `Distance` | 测量距离 | `Float` | 输出本算子的处理结果。 |
+| `Image` | 结果图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `Distance` | 测量距离 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
 ### 运行时附加输出 / Runtime Additional Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Width` | `Integer` | 输出图像宽度。 |
-| `Height` | `Integer` | 输出图像高度。 |
-| `Distance` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `X1` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `Y1` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `X2` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `Y2` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `MeasureType` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `DeltaX` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
-| `DeltaY` | `Auto` | 当前实现中的运行时附加字段，具体语义以源码输出逻辑为准。 |
+| `Confidence` | `Float` | 源码输出字典初始化中可见字段。 |
+| `DeltaX` | `Float` | 源码输出字典初始化中可见字段。 |
+| `DeltaY` | `Float` | 源码输出字典初始化中可见字段。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `StatusCode` | `Any` | 源码输出字典初始化中可见字段。 |
+| `StatusMessage` | `String` | 源码输出字典初始化中可见字段。 |
+| `UncertaintyPx` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 多数路径近似随输入规模线性增长。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 通常需要为中间图像、结果图和输出封装分配额外内存；峰值随图像尺寸和中间副本数量增长。 |
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合尺寸、角度、间距和几何位置测量。
-- 适合同时输出数值结果和可视化结果图。
-- 不适合在边缘模糊或对比度不足时直接追求高精度。
-- 不适合忽略标定比例和亚像素能力对精度的影响。
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. 当前实现通常以图像作为主要输出载体；若下游只关心数值，还需要同步读取附加字段。
+1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+2. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

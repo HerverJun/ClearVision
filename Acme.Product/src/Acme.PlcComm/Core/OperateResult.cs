@@ -32,13 +32,13 @@ public class OperateResult
     /// <summary>
     /// 创建失败结果
     /// </summary>
-    public static OperateResult Failure(int code, string msg) => 
+    public static OperateResult Failure(int code, string msg) =>
         new() { IsSuccess = false, ErrorCode = code, Message = msg };
 
     /// <summary>
     /// 创建失败结果(使用默认错误码-1)
     /// </summary>
-    public static OperateResult Failure(string msg) => 
+    public static OperateResult Failure(string msg) =>
         new() { IsSuccess = false, ErrorCode = -1, Message = msg };
 }
 
@@ -55,18 +55,18 @@ public class OperateResult<T> : OperateResult
     /// <summary>
     /// 创建成功结果
     /// </summary>
-    public static OperateResult<T> Success(T content) => 
+    public static OperateResult<T> Success(T content) =>
         new() { IsSuccess = true, Content = content };
 
     /// <summary>
     /// 创建失败结果
     /// </summary>
-    public static new OperateResult<T> Failure(int code, string msg) => 
+    public static new OperateResult<T> Failure(int code, string msg) =>
         new() { IsSuccess = false, ErrorCode = code, Message = msg };
 
     /// <summary>
     /// 创建失败结果(使用默认错误码-1)
     /// </summary>
-    public static new OperateResult<T> Failure(string msg) => 
+    public static new OperateResult<T> Failure(string msg) =>
         new() { IsSuccess = false, ErrorCode = -1, Message = msg };
 }

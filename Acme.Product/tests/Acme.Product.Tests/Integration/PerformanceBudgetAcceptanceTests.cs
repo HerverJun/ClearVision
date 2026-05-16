@@ -16,6 +16,7 @@ using Xunit;
 namespace Acme.Product.Tests.Integration;
 
 [Collection(PerformanceAcceptanceCollection.Name)]
+[Trait("Category", "PerformanceBudget")]
 public sealed class PerformanceBudgetAcceptanceTests
 {
     // Budgets derived from docs/对标halcon的算子深化_0316/performance_requirements.md (V1.0, 2026-03-16).
@@ -445,8 +446,12 @@ public sealed class PerformanceBudgetAcceptanceTests
     private static ImageWrapper CreateSceneByWarpingTemplate(Mat template, int width, int height, double x, double y)
     {
         using var transform = new Mat(2, 3, MatType.CV_64FC1);
-        transform.Set(0, 0, 1.0); transform.Set(0, 1, 0.0); transform.Set(0, 2, x);
-        transform.Set(1, 0, 0.0); transform.Set(1, 1, 1.0); transform.Set(1, 2, y);
+        transform.Set(0, 0, 1.0);
+        transform.Set(0, 1, 0.0);
+        transform.Set(0, 2, x);
+        transform.Set(1, 0, 0.0);
+        transform.Set(1, 1, 1.0);
+        transform.Set(1, 2, y);
 
         var scene = new Mat(height, width, MatType.CV_8UC1, Scalar.Black);
         Cv2.WarpAffine(template, scene, transform, new Size(width, height), InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);

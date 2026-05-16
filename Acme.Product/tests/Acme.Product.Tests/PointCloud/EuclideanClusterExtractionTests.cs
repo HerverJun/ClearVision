@@ -4,8 +4,8 @@ using Acme.Product.Infrastructure.PointCloud.Segmentation;
 using FluentAssertions;
 using OpenCvSharp;
 using Xunit;
-using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 using MatPool = Acme.Product.Infrastructure.Memory.MatPool;
+using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 
 namespace Acme.Product.Tests.PointCloud;
 

@@ -2,13 +2,12 @@
 // 变量写入算子 - 写入值到全局变量表
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -32,7 +31,7 @@ namespace Acme.Product.Infrastructure.Operators;
 public class VariableWriteOperator : OperatorBase
 {
     private readonly IVariableContext _variableContext;
-    
+
     public override OperatorType OperatorType => OperatorType.VariableWrite;
 
     public VariableWriteOperator(

@@ -123,7 +123,8 @@ public class RegionErosionOperator : OperatorBase
         for (int i = 0; i < iterations; i++)
         {
             current = ErodeOnce(current, kernel);
-            if (current.IsEmpty) break;
+            if (current.IsEmpty)
+                break;
         }
 
         return current;
@@ -131,11 +132,13 @@ public class RegionErosionOperator : OperatorBase
 
     private Region ErodeOnce(Region region, MorphologyKernel kernel)
     {
-        if (region.IsEmpty) return new Region();
+        if (region.IsEmpty)
+            return new Region();
 
         // 获取核的偏移量
         var offsets = kernel.GetOffsets().ToList();
-        if (offsets.Count == 0) return region;
+        if (offsets.Count == 0)
+            return region;
 
         // 对于腐蚀，点在结果中当且仅当核完全包含在输入区域中
         // 即：对于每个偏移量 (dx, dy)，点 (x+dx, y+dy) 必须在原区域中
@@ -195,7 +198,8 @@ public class RegionErosionOperator : OperatorBase
                             nextInside = false;
                         }
 
-                        if (!nextInside) break;
+                        if (!nextInside)
+                            break;
                         x++;
                     }
 
@@ -212,7 +216,8 @@ public class RegionErosionOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs == null) return false;
+        if (inputs == null)
+            return false;
 
         if (inputs.TryGetValue(key, out var value) && value is Region r)
         {
@@ -231,7 +236,7 @@ public class RegionErosionOperator : OperatorBase
         using var originalMat = original.ToMat();
         var originalBbox = original.BoundingBox;
         var roi = new Rect(originalBbox.X, originalBbox.Y, originalMat.Width, originalMat.Height);
-        
+
         if (roi.X >= 0 && roi.Y >= 0 && roi.Right <= result.Width && roi.Bottom <= result.Height)
         {
             using var colorMat = new Mat(originalMat.Size(), MatType.CV_8UC3, new Scalar(255, 0, 0));
@@ -243,7 +248,7 @@ public class RegionErosionOperator : OperatorBase
         using var erodedMat = eroded.ToMat();
         var erodedBbox = eroded.BoundingBox;
         var erodedRoi = new Rect(erodedBbox.X, erodedBbox.Y, erodedMat.Width, erodedMat.Height);
-        
+
         if (erodedRoi.X >= 0 && erodedRoi.Y >= 0 && erodedRoi.Right <= result.Width && erodedRoi.Bottom <= result.Height)
         {
             using var colorMat = new Mat(erodedMat.Size(), MatType.CV_8UC3, new Scalar(0, 255, 0));
@@ -278,9 +283,9 @@ public class RegionErosionOperator : OperatorBase
         // 绘制腐蚀后区域（绿色填充）
         using var erodedMat = eroded.ToMat();
         var erodedBbox = eroded.BoundingBox;
-        var erodedRoi = new Rect(erodedBbox.X - bbox.X + pad, erodedBbox.Y - bbox.Y + pad, 
+        var erodedRoi = new Rect(erodedBbox.X - bbox.X + pad, erodedBbox.Y - bbox.Y + pad,
             erodedMat.Width, erodedMat.Height);
-        
+
         if (erodedRoi.X >= 0 && erodedRoi.Y >= 0 && erodedRoi.Right <= width && erodedRoi.Bottom <= height)
         {
             using var colorMat = new Mat(erodedMat.Size(), MatType.CV_8UC3, new Scalar(0, 255, 0));

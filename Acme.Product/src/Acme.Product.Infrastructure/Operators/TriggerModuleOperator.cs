@@ -1,13 +1,13 @@
-﻿// TriggerModuleOperator.cs
+// TriggerModuleOperator.cs
 // 触发模块算子
 // 管理软件触发、定时触发与外部触发流程
 // 作者：蘅芜君
+using System.Collections.Concurrent;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 namespace Acme.Product.Infrastructure.Operators;
 

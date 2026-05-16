@@ -77,7 +77,8 @@ public class RegionUnionOperator : OperatorBase
 
     private List<RunLength> MergeOverlappingRuns(List<RunLength> runs)
     {
-        if (runs.Count <= 1) return runs;
+        if (runs.Count <= 1)
+            return runs;
 
         var result = new List<RunLength>();
         var current = runs[0];
@@ -105,7 +106,8 @@ public class RegionUnionOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs?.TryGetValue(key, out var val) == true && val is Region r) { region = r; return true; }
+        if (inputs?.TryGetValue(key, out var val) == true && val is Region r)
+        { region = r; return true; }
         return false;
     }
 

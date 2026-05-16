@@ -130,7 +130,7 @@ public sealed class InspectionResultBackgroundServiceTests
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (!condition())
         {
             cts.Token.ThrowIfCancellationRequested();

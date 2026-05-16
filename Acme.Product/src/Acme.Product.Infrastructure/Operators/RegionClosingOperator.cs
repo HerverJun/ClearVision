@@ -54,7 +54,8 @@ public class RegionClosingOperator : OperatorBase
         if (!TryGetInputRegion(inputs, "Region", out var region) || region == null)
             return Task.FromResult(OperatorExecutionOutput.Failure("Input region required."));
 
-        if (region.IsEmpty) return Task.FromResult(CreateEmptyOutput());
+        if (region.IsEmpty)
+            return Task.FromResult(CreateEmptyOutput());
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -85,7 +86,8 @@ public class RegionClosingOperator : OperatorBase
     private Region Dilate(Region region, MorphologyKernel kernel)
     {
         var offsets = kernel.GetOffsets().ToList();
-        if (offsets.Count == 0) return region;
+        if (offsets.Count == 0)
+            return region;
 
         var expanded = new HashSet<(int x, int y)>();
         foreach (var run in region.RunLengths)
@@ -99,7 +101,8 @@ public class RegionClosingOperator : OperatorBase
     private Region Erode(Region region, MorphologyKernel kernel)
     {
         var offsets = kernel.GetOffsets().ToList();
-        if (offsets.Count == 0) return region;
+        if (offsets.Count == 0)
+            return region;
 
         var resultRuns = new List<RunLength>();
         foreach (var run in region.RunLengths)
@@ -111,7 +114,8 @@ public class RegionClosingOperator : OperatorBase
                 if (allInside)
                 {
                     int startX = x;
-                    while (x <= run.EndX && offsets.All(off => region.ContainsPoint(x + 1 + off.dx, y + off.dy))) x++;
+                    while (x <= run.EndX && offsets.All(off => region.ContainsPoint(x + 1 + off.dx, y + off.dy)))
+                        x++;
                     resultRuns.Add(new RunLength(y, startX, x));
                 }
             }
@@ -121,7 +125,8 @@ public class RegionClosingOperator : OperatorBase
 
     private Region PointsToRuns(HashSet<(int x, int y)> points)
     {
-        if (points.Count == 0) return new Region();
+        if (points.Count == 0)
+            return new Region();
         var runs = new List<RunLength>();
         foreach (var group in points.GroupBy(p => p.Item2).OrderBy(g => g.Key))
         {
@@ -129,7 +134,8 @@ public class RegionClosingOperator : OperatorBase
             int start = xs[0], prev = start;
             for (int i = 1; i < xs.Count; i++)
             {
-                if (xs[i] > prev + 1) { runs.Add(new RunLength(group.Key, start, prev)); start = xs[i]; }
+                if (xs[i] > prev + 1)
+                { runs.Add(new RunLength(group.Key, start, prev)); start = xs[i]; }
                 prev = xs[i];
             }
             runs.Add(new RunLength(group.Key, start, prev));
@@ -140,7 +146,8 @@ public class RegionClosingOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs?.TryGetValue(key, out var val) == true && val is Region r) { region = r; return true; }
+        if (inputs?.TryGetValue(key, out var val) == true && val is Region r)
+        { region = r; return true; }
         return false;
     }
 
@@ -196,8 +203,10 @@ public class RegionClosingOperator : OperatorBase
         var kw = GetIntParam(@operator, "KernelWidth", 3);
         var kh = GetIntParam(@operator, "KernelHeight", 3);
         var kernelShape = GetStringParam(@operator, "KernelShape", "Rectangle");
-        if (kw < 1 || kw > 99) return ValidationResult.Invalid("KernelWidth 1-99.");
-        if (kh < 1 || kh > 99) return ValidationResult.Invalid("KernelHeight 1-99.");
+        if (kw < 1 || kw > 99)
+            return ValidationResult.Invalid("KernelWidth 1-99.");
+        if (kh < 1 || kh > 99)
+            return ValidationResult.Invalid("KernelHeight 1-99.");
         var validShapes = new[] { "Rectangle", "Ellipse", "Cross" };
         if (!validShapes.Contains(kernelShape, StringComparer.OrdinalIgnoreCase))
             return ValidationResult.Invalid($"KernelShape must be one of: {string.Join(", ", validShapes)}");

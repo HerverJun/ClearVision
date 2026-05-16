@@ -130,7 +130,8 @@ public class GradientShapeMatchOperator : OperatorBase
 
                 foreach (var r in results)
                 {
-                    if (!r.IsValid) continue;
+                    if (!r.IsValid)
+                        continue;
                     var halfWidth = Math.Max(1, lease.Entry.TemplateWidth / 2);
                     var halfHeight = Math.Max(1, lease.Entry.TemplateHeight / 2);
                     Cv2.Rectangle(

@@ -1285,7 +1285,8 @@ public class StereoCalibrationOperator : OperatorBase
 
     private static double[][] ToJaggedMatrix(Mat mat)
     {
-        if (mat.Empty()) return Array.Empty<double[]>();
+        if (mat.Empty())
+            return Array.Empty<double[]>();
 
         var rows = mat.Rows;
         var cols = mat.Cols;
@@ -1305,7 +1306,8 @@ public class StereoCalibrationOperator : OperatorBase
 
     private static double[] FlattenMat(Mat mat)
     {
-        if (mat.Empty()) return Array.Empty<double>();
+        if (mat.Empty())
+            return Array.Empty<double>();
 
         var result = new double[mat.Rows * mat.Cols];
         var index = 0;

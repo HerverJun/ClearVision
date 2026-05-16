@@ -19,7 +19,8 @@ public sealed class NormalEstimation
     /// </summary>
     public Mat Estimate(PointCloud cloud, float radius)
     {
-        if (cloud == null) throw new ArgumentNullException(nameof(cloud));
+        if (cloud == null)
+            throw new ArgumentNullException(nameof(cloud));
         if (radius <= 0 || !float.IsFinite(radius))
         {
             throw new ArgumentOutOfRangeException(nameof(radius), "radius must be positive and finite.");
@@ -66,7 +67,9 @@ public sealed class NormalEstimation
             }
 
             var inv = 1.0 / neighbors.Count;
-            cx *= inv; cy *= inv; cz *= inv;
+            cx *= inv;
+            cy *= inv;
+            cz *= inv;
 
             // Covariance
             double xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
@@ -84,7 +87,12 @@ public sealed class NormalEstimation
                 zz += z * z;
             }
 
-            xx *= inv; xy *= inv; xz *= inv; yy *= inv; yz *= inv; zz *= inv;
+            xx *= inv;
+            xy *= inv;
+            xz *= inv;
+            yy *= inv;
+            yz *= inv;
+            zz *= inv;
 
             using var cov = new Mat(3, 3, MatType.CV_64FC1);
             cov.Set(0, 0, xx);
@@ -130,8 +138,10 @@ public sealed class NormalEstimation
 
     public static void NormalizeAndOrientConsistently(Mat points, Mat normals, float neighborRadius)
     {
-        if (points == null) throw new ArgumentNullException(nameof(points));
-        if (normals == null) throw new ArgumentNullException(nameof(normals));
+        if (points == null)
+            throw new ArgumentNullException(nameof(points));
+        if (normals == null)
+            throw new ArgumentNullException(nameof(normals));
         if (neighborRadius <= 0 || !float.IsFinite(neighborRadius))
         {
             throw new ArgumentOutOfRangeException(nameof(neighborRadius), "neighborRadius must be positive and finite.");

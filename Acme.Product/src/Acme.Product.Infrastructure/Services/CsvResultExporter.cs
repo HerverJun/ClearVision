@@ -20,10 +20,10 @@ public class CsvResultExporter : IResultExporter
         // Customize mapping if needed, or rely on AutoMap
         // For Defects list, we might want to flatten or ignore
         // csv.Context.RegisterClassMap<InspectionResultMap>();
-        
+
         await csv.WriteRecordsAsync(results);
         await writer.FlushAsync();
-        
+
         return memoryStream.ToArray();
     }
 }

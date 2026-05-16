@@ -783,7 +783,8 @@ public class GeometricFittingOperator : OperatorBase
             try
             {
                 model = Cv2.FitEllipse(samplePts);
-                if (model.Size.Width <= 0 || model.Size.Height <= 0) continue;
+                if (model.Size.Width <= 0 || model.Size.Height <= 0)
+                    continue;
             }
             catch
             {
@@ -809,7 +810,7 @@ public class GeometricFittingOperator : OperatorBase
         }
 
         var provisionalInliers = bestInlierIndices.Select(index => points[index]).ToArray();
-        
+
         try
         {
             bestModel = Cv2.FitEllipse(provisionalInliers);
@@ -873,7 +874,8 @@ public class GeometricFittingOperator : OperatorBase
         // 或者使用几何距离估算：先将点平移旋转到椭圆标准坐标系，然后计算到标准椭圆的代数距离
         var a = ellipse.Size.Width / 2.0;
         var b = ellipse.Size.Height / 2.0;
-        if (a < 1e-6 || b < 1e-6) return double.MaxValue;
+        if (a < 1e-6 || b < 1e-6)
+            return double.MaxValue;
 
         var angleRad = ellipse.Angle * Math.PI / 180.0;
         var cosA = Math.Cos(angleRad);
@@ -886,7 +888,7 @@ public class GeometricFittingOperator : OperatorBase
         var localY = (-dx * sinA) + (dy * cosA);
 
         var distSquare = Math.Pow(localX / a, 2) + Math.Pow(localY / b, 2);
-        
+
         // 粗略几何距离近似 (根据 |distSquare - 1| 缩放到像素距离)
         // 这个近似对于距离边界不远的点是足够判断 inlier 的
         var algebraicDist = Math.Abs(distSquare - 1.0);

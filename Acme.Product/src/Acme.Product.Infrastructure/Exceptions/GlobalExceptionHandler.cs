@@ -19,7 +19,7 @@ public static class GlobalExceptionHandler
     {
         var traceId = Guid.NewGuid().ToString("N")[..8];
         var contextInfo = string.IsNullOrEmpty(context) ? "" : $"[{context}] ";
-        
+
         var (category, message) = exception switch
         {
             ArgumentException _ => ("BadRequest", "请求参数无效"),
@@ -30,8 +30,8 @@ public static class GlobalExceptionHandler
             _ => ("InternalError", "服务器内部错误")
         };
 
-        logger.LogError(exception, 
-            "{Context}[TraceId: {TraceId}] [{Category}] {Message}", 
+        logger.LogError(exception,
+            "{Context}[TraceId: {TraceId}] [{Category}] {Message}",
             contextInfo, traceId, category, exception.Message);
     }
 
@@ -41,7 +41,7 @@ public static class GlobalExceptionHandler
     public static ErrorResponse CreateErrorResponse(Exception exception)
     {
         var traceId = Guid.NewGuid().ToString("N")[..8];
-        
+
         var (statusCode, message) = exception switch
         {
             ArgumentException _ => (400, "请求参数无效"),

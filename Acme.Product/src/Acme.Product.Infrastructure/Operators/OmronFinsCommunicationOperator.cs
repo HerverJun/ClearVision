@@ -2,14 +2,13 @@
 // 解析写入值：优先从上游输入获取，否则使用参数面板静态值
 // 作者：蘅芜君
 
+using Acme.PlcComm;
+using Acme.PlcComm.Interfaces;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
-using Acme.PlcComm;
-using Acme.PlcComm.Interfaces;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -57,7 +56,7 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
         var length = GetIntParam(@operator, "Length", 1, 1, 999);
         var dataType = GetStringParam(@operator, "DataType", "Word");
         var operation = GetStringParam(@operator, "Operation", "Read");
-        
+
         // 【增强】支持从上游输入动态获取写入值
         var writeValue = ResolveWriteValue(@operator, inputs);
 

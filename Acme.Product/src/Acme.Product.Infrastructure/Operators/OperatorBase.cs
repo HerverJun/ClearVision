@@ -5,8 +5,8 @@
 using System.Diagnostics;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
-using Acme.Product.Core.ValueObjects;
 using Acme.Product.Core.Operators;
+using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 

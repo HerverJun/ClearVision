@@ -375,10 +375,14 @@ public sealed class GradientShapeMatcher : IDisposable
 
             rotatedFeatures[i] = new FeaturePoint(rx, ry, newDir, f.Strength);
 
-            if (rx < minX) minX = rx;
-            if (rx > maxX) maxX = rx;
-            if (ry < minY) minY = ry;
-            if (ry > maxY) maxY = ry;
+            if (rx < minX)
+                minX = rx;
+            if (rx > maxX)
+                maxX = rx;
+            if (ry < minY)
+                minY = ry;
+            if (ry > maxY)
+                maxY = ry;
         }
 
         return new RotatedTemplate(angleDeg, rotatedFeatures, minX, maxX, minY, maxY);
@@ -426,7 +430,7 @@ public sealed class GradientShapeMatcher : IDisposable
         return (directions, magnitudes);
     }
 
-    private ShapeMatchResult FindBestMatch(byte[,] sceneDirections, ushort[,] sceneMagnitudes, 
+    private ShapeMatchResult FindBestMatch(byte[,] sceneDirections, ushort[,] sceneMagnitudes,
         Rect searchRegion, double minScore)
     {
         int sceneWidth = sceneDirections.GetLength(1);

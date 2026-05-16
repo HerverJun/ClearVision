@@ -2,14 +2,13 @@
 // ROI管理器算子 - 矩形// 功能实现圆形// 功能实现多边形区域选择
 // 作者：蘅芜君
 
+using System.Text.Json;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Text.Json;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>

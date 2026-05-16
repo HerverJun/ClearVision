@@ -36,10 +36,14 @@ public static class SimdHelper
     public static string GetCapabilities()
     {
         var caps = new List<string>();
-        if (Sse2.IsSupported) caps.Add("SSE2");
-        if (Ssse3.IsSupported) caps.Add("SSSE3");
-        if (Avx.IsSupported) caps.Add("AVX");
-        if (Avx2.IsSupported) caps.Add("AVX2");
+        if (Sse2.IsSupported)
+            caps.Add("SSE2");
+        if (Ssse3.IsSupported)
+            caps.Add("SSSE3");
+        if (Avx.IsSupported)
+            caps.Add("AVX");
+        if (Avx2.IsSupported)
+            caps.Add("AVX2");
         return string.Join(", ", caps);
     }
 

@@ -2,17 +2,17 @@
 
 ## 执行摘要
 
-基于对 ClearVision 指定仓库的核查，这个项目**不是从零起步**：它已经具备 Windows 桌面宿主（.NET 8 + WinForms + WebView2）、本地 ASP.NET Core Minimal API、155 个正式算子、较完整的 GitHub Actions 流水线、相机绑定/预览 API、基础认证、检测结果持久化、模型目录与质量门禁。真正需要优先推进的，不再是“有没有这些能力”，而是把现有能力做成**可恢复、可审计、可持续优化、可增量演进**的产品级体系：P0 应聚焦相机/预览链路的韧性层、审计与硬件在环回归；P1 应把检测结果落盘、分析 JSON、模型目录、质量脚本串成最小闭环；P2 应避免整站推翻重写，而是在保留 `httpClient.js`、`webMessageBridge.js` 与 `flowCanvas.js` 的前提下，增量迁移壳层和高变视图。fileciteturn83file0 fileciteturn84file0 fileciteturn45file0 fileciteturn44file0 fileciteturn72file0
+基于对 ClearVision 指定仓库的核查，这个项目**不是从零起步**：它已经具备 Windows 桌面宿主（.NET 8 + WinForms + WebView2）、本地 ASP.NET Core Minimal API、155 个正式算子、较完整的 GitHub Actions 流水线、相机绑定/预览 API、基础认证、检测结果持久化、模型目录与质量门禁。真正需要优先推进的，不再是“有没有这些能力”，而是把现有能力做成**可恢复、可审计、可持续优化、可增量演进**的产品级体系：P0 应聚焦相机/预览链路的韧性层、审计与硬件在环回归；P1 应把检测结果落盘、分析 JSON、模型目录、质量脚本串成最小闭环；P2 应避免整站推翻重写，而是在保留 `httpClient.js`、`webMessageBridge.js` 与 `flowCanvas.js` 的前提下，增量迁移壳层和高变视图。
 
 ## 研究范围与关键判断
 
-本次研究仅使用 `github` 连接器，代码与文档主证据来源仅为 entity["organization","GitHub","code hosting platform"] 上的 `HerverJun/ClearVision` 仓库；外部来源未使用。默认前提采用你给出的假设：目标部署环境为 Windows 桌面，技术栈以 .NET 8 + WinForms + WebView2 为主；CI/CD 与硬件形态若仓库未明确，则按 **unspecified** 处理，不做虚构补全。fileciteturn83file0 fileciteturn84file0
+本次研究仅使用 `github` 连接器，代码与文档主证据来源仅为 GitHub 上的 `HerverJun/ClearVision` 仓库；外部来源未使用。默认前提采用你给出的假设：目标部署环境为 Windows 桌面，技术栈以 .NET 8 + WinForms + WebView2 为主；CI/CD 与硬件形态若仓库未明确，则按 **unspecified** 处理，不做虚构补全。
 
-为了形成可执行计划，本次重点确认了五类信息：当前宿主/后端/前端结构，现有相机与 PLC 接入面，认证/会话/日志现状，检测结果与模型目录的闭环基础设施，以及 CI/UI 测试覆盖面。仓库证据显示：主程序会启动本地 Web 服务并注册认证、设置、PLC、AI、实时检测事件等端点；依赖注入里已注册相机管理、事件总线、检测 worker、算子工厂、模型相关服务；前端仍是原生 ES Modules，但模块已按 `core` / `features` / `shared` 分层；CI 已包含 .NET 构建测试、检测回归/性能门禁、Playwright UI 测试和发布打包。fileciteturn66file0 fileciteturn67file0 fileciteturn81file0 fileciteturn45file0
+为了形成可执行计划，本次重点确认了五类信息：当前宿主/后端/前端结构，现有相机与 PLC 接入面，认证/会话/日志现状，检测结果与模型目录的闭环基础设施，以及 CI/UI 测试覆盖面。仓库证据显示：主程序会启动本地 Web 服务并注册认证、设置、PLC、AI、实时检测事件等端点；依赖注入里已注册相机管理、事件总线、检测 worker、算子工厂、模型相关服务；前端仍是原生 ES Modules，但模块已按 `core` / `features` / `shared` 分层；CI 已包含 .NET 构建测试、检测回归/性能门禁、Playwright UI 测试和发布打包。
 
 ## P0 落地计划
 
-仓库已经有相机抽象、绑定配置、软触发抓图、连续预览、连接状态投影、认证锁定与基础日志，因此 P0 不应继续做“重复造轮子”；应聚焦三个真实缺口：**相机链路韧性**、**审计与会话治理**、**硬件在环回归**。`ICamera` / `IIndustrialCamera` / `ICameraProvider` 当前接口偏“最小可用”，暴露了连接、抓图、触发和原生 provider 操作，但没有健康探针、故障分类、退避重连、占用仲裁等契约；`SettingsEndpoints` 已直接把抓图/预览 API 暴露给前端，说明韧性层必须插在 endpoint 与 provider/manager 之间；现有单元测试覆盖了预览等待新帧与绑定状态投影，但尚未覆盖 SDK 卡死、重连抖动、断网恢复或长时 soak；认证层已有初始管理员、密码修改、失败锁定与 session timeout，但 session 与失败计数仍是进程内内存字典，用户实体也没有强制改密/密码年龄字段，因此 P0 安全侧重点应调整为“持久化审计 + 强制轮换 + 可吊销会话”。fileciteturn76file0 fileciteturn77file0 fileciteturn72file0 fileciteturn73file0 fileciteturn74file0 fileciteturn78file0 fileciteturn80file0 fileciteturn71file0
+仓库已经有相机抽象、绑定配置、软触发抓图、连续预览、连接状态投影、认证锁定与基础日志，因此 P0 不应继续做“重复造轮子”；应聚焦三个真实缺口：**相机链路韧性**、**审计与会话治理**、**硬件在环回归**。`ICamera` / `IIndustrialCamera` / `ICameraProvider` 当前接口偏“最小可用”，暴露了连接、抓图、触发和原生 provider 操作，但没有健康探针、故障分类、退避重连、占用仲裁等契约；`SettingsEndpoints` 已直接把抓图/预览 API 暴露给前端，说明韧性层必须插在 endpoint 与 provider/manager 之间；现有单元测试覆盖了预览等待新帧与绑定状态投影，但尚未覆盖 SDK 卡死、重连抖动、断网恢复或长时 soak；认证层已有初始管理员、密码修改、失败锁定与 session timeout，但 session 与失败计数仍是进程内内存字典，用户实体也没有强制改密/密码年龄字段，因此 P0 安全侧重点应调整为“持久化审计 + 强制轮换 + 可吊销会话”。
 
 ### P0 详细 TODO 清单
 
@@ -24,7 +24,7 @@
 | **P0-D 硬件在环回归包** | 把现有单元/UI 回归补到真实硬件路径 | 新增 HIL 测试标签与独立脚本；覆盖软触发抓图、连续预览、重连、触发模式切换、PLC 通信基本检查；在 CI 中保留 mock 路径，在现场 Windows runner 执行 HIL | `Acme.Product/tests/Acme.Product.Desktop.Tests/CameraBindingsEndpointTests.cs`；`.../CameraFrameStreamCoordinatorTests.cs`；`Acme.Product/tests/Acme.Product.UI.Tests/tests/e2e/high-frequency-regression.spec.ts`；`.github/workflows/ci.yml`；`scripts/run-tests-detection-regression.ps1` | 3–5 天 | QA、开发、硬件工程师、DevOps | 需要真实相机、PLC 或模拟器、现场 runner | 至少 8 个硬件场景自动通过；现场 runner 产出 HIL 报告；不影响 GitHub 云端现有 CI | HIL 用独立 workflow_dispatch，不阻塞主 PR 流 |
 | **P0-E 配置规范化** | 统一保存策略、重连策略、触发策略、日志策略的 schema | 为相机配置增加 `reconnectPolicy`、`frameTimeoutMs`、`previewBufferPolicy`；为安全配置增加 `forcePasswordRotationDays`；为日志增加 `auditEnabled` 与敏感字段脱敏配置 | `Acme.Product/src/Acme.Product.Core/Entities/AppConfig.cs`；`.../Desktop/Endpoints/SettingsEndpoints.cs`；前端设置页相关文件 | 2–3 天 | 开发、产品、QA | 依赖 P0-A/P0-C 的最终字段定义 | 配置可序列化/反序列化；旧配置可兼容升级；设置页保存和读取通过 | 采用“向后兼容默认值”，不破坏已有配置文件 |
 
-P0 任务的设计完全是沿着现有接口和测试形态展开的：服务器已在启动时加载配置并初始化相机绑定；前端已有软触发预览、连续运行与设置页回归测试；日志已接入 Serilog；因此最佳策略是**在现有抽象之上加装饰器、状态机和审计层**，而不是改 API 形态或直接重写相机模块。fileciteturn66file0 fileciteturn67file0 fileciteturn72file0 fileciteturn65file0 fileciteturn28file0
+P0 任务的设计完全是沿着现有接口和测试形态展开的：服务器已在启动时加载配置并初始化相机绑定；前端已有软触发预览、连续运行与设置页回归测试；日志已接入 Serilog；因此最佳策略是**在现有抽象之上加装饰器、状态机和审计层**，而不是改 API 形态或直接重写相机模块。
 
 ### P0 代码级实施建议
 
@@ -50,7 +50,7 @@ public sealed record CameraSessionHealth(
     string? LastErrorMessage);
 ```
 
-这样设计的原因是：现有 `ICamera`/`IIndustrialCamera` 已经被前端 API、`CameraManager`、`CameraFrameStreamCoordinator` 和测试共同使用，直接修改原接口会连带影响更大；而仓库当前接口又确实缺少健康/诊断/恢复语义。fileciteturn77file0 fileciteturn76file0 fileciteturn72file0
+这样设计的原因是：现有 `ICamera`/`IIndustrialCamera` 已经被前端 API、`CameraManager`、`CameraFrameStreamCoordinator` 和测试共同使用，直接修改原接口会连带影响更大；而仓库当前接口又确实缺少健康/诊断/恢复语义。
 
 建议退避策略分三类，而不要“一刀切”：
 
@@ -61,7 +61,7 @@ public sealed record CameraSessionHealth(
 | `SetTriggerModeAsync` / `ExecuteSoftwareTriggerAsync` | 不做长重试，只做 1 次幂等恢复 | 防止重复触发导致机械联动异常 |
 | provider `Open/Close` | 使用断路器，连续失败后 15–30 秒半开恢复 | 防止 UI 连续点击把 SDK 打崩 |
 
-建议日志与审计分离：**技术日志**继续留在 Serilog，**审计日志**单独做结构化动作表。可挂钩的位置很明确：`AuthService`、`AuthEndpoints`、`SettingsEndpoints`、`InspectionService`、以及未来的 `ResilientIndustrialCamera`。现有日志配置已经在基础设施层统一完成，但还没有专门的审计通道。fileciteturn28file0 fileciteturn78file0 fileciteturn80file0 fileciteturn72file0 fileciteturn55file0
+建议日志与审计分离：**技术日志**继续留在 Serilog，**审计日志**单独做结构化动作表。可挂钩的位置很明确：`AuthService`、`AuthEndpoints`、`SettingsEndpoints`、`InspectionService`、以及未来的 `ResilientIndustrialCamera`。现有日志配置已经在基础设施层统一完成，但还没有专门的审计通道。
 
 建议的审计事件字段：
 
@@ -85,7 +85,7 @@ public sealed record CameraSessionHealth(
 }
 ```
 
-P0 的测试建议分成三层。单元层：补 `ResilientIndustrialCameraTests`、`CameraFaultClassifierTests`、`AuditLogServiceTests`。集成层：扩充 `CameraBindingsEndpointTests` 与 `CameraFrameStreamCoordinatorTests`，覆盖重连、超时、stale frame。端到端层：沿用现有 Playwright 套件，再新增“相机预览降级提示”“权限不足不能改相机绑定”“修改密码后旧 token 失效”三类场景。当前仓库已经有高频 UI 回归与基础相机 endpoint 测试，所以这是低风险扩展。fileciteturn74file0 fileciteturn73file0 fileciteturn65file0
+P0 的测试建议分成三层。单元层：补 `ResilientIndustrialCameraTests`、`CameraFaultClassifierTests`、`AuditLogServiceTests`。集成层：扩充 `CameraBindingsEndpointTests` 与 `CameraFrameStreamCoordinatorTests`，覆盖重连、超时、stale frame。端到端层：沿用现有 Playwright 套件，再新增“相机预览降级提示”“权限不足不能改相机绑定”“修改密码后旧 token 失效”三类场景。当前仓库已经有高频 UI 回归与基础相机 endpoint 测试，所以这是低风险扩展。
 
 建议补充到配置中的最小 schema 如下，字段保持默认值兼容：
 
@@ -113,7 +113,7 @@ P0 的测试建议分成三层。单元层：补 `ResilientIndustrialCameraTests
 
 ## P1 AI 闭环最小可行工作流
 
-仓库已经具备闭环的几个关键“半成品”：检测结果实体里有 `OutputDataJson`、`AnalysisDataJson`、`FlowVersionHash`、`CalibrationBundleId` 与可缓存的 `ImageId`；`InspectionService` 会按存储策略把结果图像落盘到 `VisionData/Images` 或配置路径；分析数据由 `AnalysisDataBuilder` 按卡片方式生成；`models/model_catalog.json` 已经存在最小模型注册表；CI 里已经有检测准确率/稳定性/性能 gate。也就是说，P1 不必先造一个庞大的 MLOps 平台，完全可以先做**repo 内最小闭环**：采集 → manifest → 标注 → 训练 → 评估 → 注册 → 发布。fileciteturn52file0 fileciteturn55file0 fileciteturn58file0 fileciteturn59file0 fileciteturn45file0
+仓库已经具备闭环的几个关键“半成品”：检测结果实体里有 `OutputDataJson`、`AnalysisDataJson`、`FlowVersionHash`、`CalibrationBundleId` 与可缓存的 `ImageId`；`InspectionService` 会按存储策略把结果图像落盘到 `VisionData/Images` 或配置路径；分析数据由 `AnalysisDataBuilder` 按卡片方式生成；`models/model_catalog.json` 已经存在最小模型注册表；CI 里已经有检测准确率/稳定性/性能 gate。也就是说，P1 不必先造一个庞大的 MLOps 平台，完全可以先做**repo 内最小闭环**：采集 → manifest → 标注 → 训练 → 评估 → 注册 → 发布。
 
 ### P1 详细 TODO 清单
 
@@ -187,7 +187,7 @@ models/
 }
 ```
 
-这个设计直接复用仓库已存在的结果持久化与分析结构：`InspectionResult` 已能承载流程版本、标定包、分析 JSON；`InspectionService` 已有按状态落盘图像的逻辑；`AnalysisDataBuilder` 已能生成可读的分析卡片，因此闭环第一版完全可以围绕这些现有点扩展，而不需要先重写检测链路。fileciteturn52file0 fileciteturn55file0 fileciteturn58file0
+这个设计直接复用仓库已存在的结果持久化与分析结构：`InspectionResult` 已能承载流程版本、标定包、分析 JSON；`InspectionService` 已有按状态落盘图像的逻辑；`AnalysisDataBuilder` 已能生成可读的分析卡片，因此闭环第一版完全可以围绕这些现有点扩展，而不需要先重写检测链路。
 
 ### P1 建议 CI 步骤
 
@@ -200,11 +200,11 @@ models/
 | 注册发布 | 手动审批 | model id/version | 更新 `model_catalog.json`、发布说明 |
 | 回滚 | 手动 | previous stable version | 恢复目录指针/配置 |
 
-在模型运行时层面，`ModelCatalog` 与 `DeepLearningOperator` 已经提供了“按目录解析模型”的基础，这也是为什么建议你优先做**目录化版本管理**，而不是把模型路径硬编码到节点参数里。fileciteturn39file0 fileciteturn37file0 fileciteturn59file0
+在模型运行时层面，`ModelCatalog` 与 `DeepLearningOperator` 已经提供了“按目录解析模型”的基础，这也是为什么建议你优先做**目录化版本管理**，而不是把模型路径硬编码到节点参数里。
 
 ## P2 前端重构与迁移计划
 
-当前前端不是“杂乱无章的一坨脚本”，而是一个**已模块化但仍偏命令式**的原生 ES Modules 应用：`wwwroot/src/app.js` 是超级编排入口，动态加载 `projectView`、`resultPanel`、`inspectionPanel`、`aiPanel`；`flowCanvas.js` 是高耦合但功能完整的 Canvas 引擎；`httpClient.js` 和 `webMessageBridge.js` 是明确标记为**不要乱动**的通信层；文档还列出了大量固定 DOM ID/class 与视图切换约束。因此 P2 的正确方向不是“立刻全面 SPA 化”，而是用一个**渐进壳层**把高变页面迁到新框架，同时保留通信层与 Canvas 引擎。fileciteturn44file0 fileciteturn81file0 fileciteturn82file0 fileciteturn68file0
+当前前端不是“杂乱无章的一坨脚本”，而是一个**已模块化但仍偏命令式**的原生 ES Modules 应用：`wwwroot/src/app.js` 是超级编排入口，动态加载 `projectView`、`resultPanel`、`inspectionPanel`、`aiPanel`；`flowCanvas.js` 是高耦合但功能完整的 Canvas 引擎；`httpClient.js` 和 `webMessageBridge.js` 是明确标记为**不要乱动**的通信层；文档还列出了大量固定 DOM ID/class 与视图切换约束。因此 P2 的正确方向不是“立刻全面 SPA 化”，而是用一个**渐进壳层**把高变页面迁到新框架，同时保留通信层与 Canvas 引擎。
 
 ### 框架选择
 
@@ -212,7 +212,7 @@ models/
 
 1. Vue 更适合嵌入到现有静态 `wwwroot` 结构里，支持局部挂载和分阶段接管。
 2. 现有项目已经依赖大量 DOM ID、imperative Canvas 与 `window` 全局对象，Vue 的渐进式改造成本更低。
-3. WebView2 宿主本质上是本地静态资源 + API，Vite 很容易输出到 `wwwroot/dist`，与 `WebView2Host` 的本地资源加载方式兼容。fileciteturn44file0 fileciteturn81file0 fileciteturn68file0
+3. WebView2 宿主本质上是本地静态资源 + API，Vite 很容易输出到 `wwwroot/dist`，与 `WebView2Host` 的本地资源加载方式兼容。
 
 ### P2 详细 TODO 清单
 
@@ -250,11 +250,11 @@ models/
 5. 连续运行前后，保护规则提示始终可见，停止按钮状态正确。
 6. 结果筛选改为 `NG` 后，历史与统计都按服务端筛选刷新。
 7. 主题切换后刷新页面仍保持主题。
-8. AI 页健康检查仍然只走统一 `/api/health` 合约。现有高频回归脚本已经覆盖其中多条，所以 P2 的 UX 验收应直接在现用例基础上扩展，而不是另起一套测试体系。fileciteturn65file0
+8. AI 页健康检查仍然只走统一 `/api/health` 合约。现有高频回归脚本已经覆盖其中多条，所以 P2 的 UX 验收应直接在现用例基础上扩展，而不是另起一套测试体系。
 
 ## 12 周紧凑时间表
 
-下面的节奏不是“平均摊时间”，而是按 Vibecoding 的高反馈节奏设计：**先封装与防回退，再闭环，再迁移 UI 壳层**。因为仓库当前已经有较强的测试和质量基线，最怕的是一次性改太多造成回归，而不是“功能来不及写”。fileciteturn45file0 fileciteturn84file0
+下面的节奏不是“平均摊时间”，而是按 Vibecoding 的高反馈节奏设计：**先封装与防回退，再闭环，再迁移 UI 壳层**。因为仓库当前已经有较强的测试和质量基线，最怕的是一次性改太多造成回归，而不是“功能来不及写”。
 
 ### 12 周表格
 
@@ -317,13 +317,13 @@ gantt
 | 对 `model_catalog.json` 增加 schema 校验脚本 | 0.5–1 天 | DevOps、开发 | 防止模型目录被手改坏 |
 | 在 Playwright 中补“主题持久化”和“预览降级提示”用例 | 1–2 天 | QA、前端 | 快速兜住 P2 回归 |
 
-这些 quick wins 的共同点是：都能直接挂在现有代码入口上，比如 `SettingsEndpoints`、`AuthService`、`InspectionService`、`ci.yml` 和现有 Playwright 套件，不需要等待大型重构。fileciteturn72file0 fileciteturn78file0 fileciteturn55file0 fileciteturn45file0 fileciteturn65file0
+这些 quick wins 的共同点是：都能直接挂在现有代码入口上，比如 `SettingsEndpoints`、`AuthService`、`InspectionService`、`ci.yml` 和现有 Playwright 套件，不需要等待大型重构。
 
 ### 需要外部硬件或采购的阻塞项
 
 | 阻塞项 | 原因 | 影响任务 |
 |---|---|---|
-| 真实 entity["company","海康威视","hangzhou, zhejiang, cn"] 相机与对应 SDK DLL | 无法验证重连、触发、长时稳定性 | P0-A / P0-B / P0-D |
+| 真实 海康威视 相机与对应 SDK DLL | 无法验证重连、触发、长时稳定性 | P0-A / P0-B / P0-D |
 | PLC 实机或稳定模拟器（S7 / MC / FINS） | 无法做现场链路回归 | P0-D |
 | 工业 PC / 现场网络环境 | 无法验证 WebView2 + 本地后端 + 相机 SDK 的长时共存 | P0-D / P2 |
 | 可回灌的真实缺陷样本与标注资源 | 无法让 P1 闭环产生真实业务价值 | P1-A / P1-B / P1-C |
@@ -381,8 +381,8 @@ gantt
 
 ### 外部来源
 
-无。主证据仅使用指定 GitHub 仓库。fileciteturn83file0
+无。主证据仅使用指定 GitHub 仓库。
 
 ### Open questions / limitations
 
-当前报告有四个明确边界。第一，仓库能证明相机链路、认证、质量门禁和前端结构，但**不能替代真实硬件和现场网络环境**；因此 P0 的最终验收必须依赖外部设备。第二，仓库能证明结果落盘、分析 JSON、模型目录与质量脚本存在，但**不能证明训练框架已经内建**；因此 P1 中训练器实现细节只能按 “unspecified black-box trainer contract” 设计。第三，前端迁移建议是架构推荐，不是仓库既成事实；仓库事实是当前前端仍以原生模块为主。第四，CI/CD 发布通道的企业内审批、制品分发与签名策略在仓库中未明确，因此发布治理部分只能给出 repo 内可落地方案。fileciteturn84file0 fileciteturn45file0 fileciteturn81file0
+当前报告有四个明确边界。第一，仓库能证明相机链路、认证、质量门禁和前端结构，但**不能替代真实硬件和现场网络环境**；因此 P0 的最终验收必须依赖外部设备。第二，仓库能证明结果落盘、分析 JSON、模型目录与质量脚本存在，但**不能证明训练框架已经内建**；因此 P1 中训练器实现细节只能按 “unspecified black-box trainer contract” 设计。第三，前端迁移建议是架构推荐，不是仓库既成事实；仓库事实是当前前端仍以原生模块为主。第四，CI/CD 发布通道的企业内审批、制品分发与签名策略在仓库中未明确，因此发布治理部分只能给出 repo 内可落地方案。

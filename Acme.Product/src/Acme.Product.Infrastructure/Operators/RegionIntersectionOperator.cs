@@ -92,7 +92,8 @@ public class RegionIntersectionOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs?.TryGetValue(key, out var val) == true && val is Region r) { region = r; return true; }
+        if (inputs?.TryGetValue(key, out var val) == true && val is Region r)
+        { region = r; return true; }
         return false;
     }
 
@@ -100,7 +101,8 @@ public class RegionIntersectionOperator : OperatorBase
     {
         var bbox = r1.BoundingBox;
         bbox = bbox.Intersect(r2.BoundingBox);
-        if (inter.Area > 0) bbox = inter.BoundingBox;
+        if (inter.Area > 0)
+            bbox = inter.BoundingBox;
 
         int pad = 20, w = Math.Max(400, bbox.Width + pad * 2), h = Math.Max(300, bbox.Height + pad * 2);
         var mat = new Mat(h, w, MatType.CV_8UC3, OpenCvSharp.Scalar.Black);

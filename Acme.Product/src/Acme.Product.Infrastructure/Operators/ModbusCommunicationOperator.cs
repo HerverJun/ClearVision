@@ -380,7 +380,8 @@ public class ModbusCommunicationOperator : OperatorBase
 
         if (MasterPool.TryRemove(key, out var master))
         {
-            try { master.Dispose(); }
+            try
+            { master.Dispose(); }
             catch (Exception ex)
             {
                 Logger.LogDebug(ex, "Modbus master release failed: {Key}", key);

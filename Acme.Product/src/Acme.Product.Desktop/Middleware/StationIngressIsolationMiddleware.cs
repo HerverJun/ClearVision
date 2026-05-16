@@ -1,7 +1,7 @@
+using System.Net;
 using Acme.Product.Desktop.Station;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
-using System.Net;
 
 namespace Acme.Product.Desktop.Middleware;
 

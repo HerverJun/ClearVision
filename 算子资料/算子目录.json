@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-16T11:11:27.4197640+08:00",
-  "totalCount": 155,
+  "generatedAt": "2026-05-16T14:52:39.3310936+08:00",
+  "totalCount": 156,
   "categories": {
     "3D": {
       "count": 6,
@@ -42,10 +42,11 @@
       ]
     },
     "Communication": {
-      "count": 2,
+      "count": 3,
       "operators": [
         "MitsubishiMcCommunication",
-        "ModbusCommunication"
+        "ModbusCommunication",
+        "MqttPublish"
       ]
     },
     "Detection": {
@@ -242,10 +243,9 @@
       ]
     },
     "通信": {
-      "count": 6,
+      "count": 5,
       "operators": [
         "HttpRequest",
-        "MqttPublish",
         "OmronFinsCommunication",
         "SerialCommunication",
         "SiemensS7Communication",
@@ -262,8 +262,9 @@
       ]
     },
     "逻辑工具": {
-      "count": 5,
+      "count": 6,
       "operators": [
+        "FrameChangeTrigger",
         "PointSetTool",
         "ScriptOperator",
         "TextSave",
@@ -326,8 +327,14 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。",
+      "algorithm": "该算子用于从文件或相机采集图像。运行时从声明输入端口读取数据，按参数表解析配置，并把…",
       "inputPorts": [
+        {
+          "name": "Image",
+          "displayName": "Runtime supplied image",
+          "dataType": "Image",
+          "isRequired": false
+        },
         {
           "name": "FilePath",
           "displayName": "文件路径输入",
@@ -425,6 +432,10 @@
             {
               "value": "External",
               "label": "外部触发"
+            },
+            {
+              "value": "Continuous",
+              "label": "连续采集"
             }
           ]
         }
@@ -559,7 +570,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。",
+      "algorithm": "当前元数据描述为：Detects edges with Canny and opti…",
       "inputPorts": [
         {
           "name": "Image",
@@ -800,7 +811,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "当前元数据描述为：Global thresholding with optional…",
       "inputPorts": [
         {
           "name": "Image",
@@ -919,7 +930,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Legacy image morphology node. Use…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1027,7 +1038,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "该算子用于连通区域分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1289,7 +1300,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子在搜索图像上滑动模板并生成响应图，然后从响应图中提取多个候选并做 IoU NM…",
+      "algorithm": "当前元数据描述为：Classic template matching with op…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1686,7 +1697,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "该算子用于两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1814,7 +1825,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。",
+      "algorithm": "该算子用于一维码/二维码识别，支持 QR、Code128、DataMatrix 等多…",
       "inputPorts": [
         {
           "name": "Image",
@@ -1921,7 +1932,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前实现是一个基于 ONNX Runtime 的 YOLO 推理算子，支持：",
+      "algorithm": "该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2107,7 +2118,7 @@
           "name": "LabelsPath",
           "displayName": "标签文件路径",
           "dataType": "file",
-          "description": "自定义标签文件路径（每行一个标签），为空则优先使用模型 metadata names 或自动查找模型目录下的 labels.txt；仍不可用时执行失败",
+          "description": "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。",
           "defaultValue": "",
           "min": null,
           "max": null,
@@ -2202,7 +2213,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。",
+      "algorithm": "该算子用于汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2327,7 +2338,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "该算子用于查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用。运行时从声明输…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2554,7 +2565,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子通过局部中值替换中心像素，特别适合抑制椒盐噪声和孤立异常点。",
+      "algorithm": "该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2607,7 +2618,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子使用双边滤波同时考虑空间距离与像素差异，在保边前提下降低噪声。",
+      "algorithm": "该算子用于边缘保留的平滑滤波。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2682,7 +2693,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于调整图像尺寸。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2796,7 +2807,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于ROI区域提取。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2882,7 +2893,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于仿射模型执行旋转、缩放或平移等二维几何变换。",
+      "algorithm": "该算子用于任意角度旋转。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果…",
       "inputPorts": [
         {
           "name": "Image",
@@ -2979,7 +2990,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子利用单应性矩阵对图像做透视变换，用于视角校正或几何对齐。",
+      "algorithm": "该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3253,7 +3264,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。",
+      "algorithm": "该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3395,13 +3406,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
+        "totalScore": 90,
         "level": "A",
-        "documentationScore": 100,
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/CircleMeasurement.md"
     },
@@ -3417,7 +3428,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子从边缘图中提取直线段候选，再基于几何关系输出线结构或测量结果。",
+      "algorithm": "当前元数据描述为：Detects line features and reports…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3540,7 +3551,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "当前元数据描述为：Measures contour area, perimeter,…",
       "inputPorts": [
         {
           "name": "Image",
@@ -3653,7 +3664,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Measures angle from three points …",
       "inputPorts": [
         {
           "name": "Image",
@@ -3823,7 +3834,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Evaluates a constrained 2D GD&T s…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4010,7 +4021,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Calibrates camera intrinsics from…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4153,7 +4164,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Correct lens distortion using cal…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4200,7 +4211,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Converts pixel coordinates to phy…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4272,13 +4283,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
+        "totalScore": 90,
         "level": "A",
-        "documentationScore": 100,
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/CoordinateTransform.md"
     },
@@ -4294,7 +4305,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "当前元数据描述为：Industrial Modbus TCP communicati…",
       "inputPorts": [
         {
           "name": "Data",
@@ -4467,7 +4478,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把…",
       "inputPorts": [
         {
           "name": "Data",
@@ -4603,7 +4614,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子把输入数据持久化到数据库表中，当前正式支持 SQLite、SQLServer、…",
+      "algorithm": "该算子用于将输入数据写入 SQLite / SQL Server / MySQL 表…",
       "inputPorts": [
         {
           "name": "Data",
@@ -4703,7 +4714,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O…",
       "inputPorts": [
         {
           "name": "Value",
@@ -4805,7 +4816,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于BGR/GRAY/HSV/Lab/YUV等颜色空间转换。运行时从声明输入端…",
       "inputPorts": [
         {
           "name": "Image",
@@ -4894,7 +4905,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "自适应阈值不会对整幅图使用一个全局阈值，而是针对每个像素在其邻域窗口 W(x, y)…",
+      "algorithm": "当前元数据描述为：Local mean or Gaussian adaptive t…",
       "inputPorts": [
         {
           "name": "Image",
@@ -5009,7 +5020,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Supports global histogram equaliz…",
       "inputPorts": [
         {
           "name": "Image",
@@ -5104,7 +5115,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "当前实现的几何拟合流程并不是直接接收点集输入，而是：",
+      "algorithm": "当前元数据描述为：Fits line, circle or ellipse from…",
       "inputPorts": [
         {
           "name": "Image",
@@ -5271,7 +5282,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于矩形/圆形/多边形区域选择。运行时从声明输入端口读取数据，按参数表解析配置…",
       "inputPorts": [
         {
           "name": "Image",
@@ -5451,7 +5462,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子…",
+      "algorithm": "当前元数据描述为：Rotation-scale template matching …",
       "inputPorts": [
         {
           "name": "Image",
@@ -5664,7 +5675,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。",
+      "algorithm": "当前元数据描述为：Non-industrial reference subpixel…",
       "inputPorts": [
         {
           "name": "Image",
@@ -5783,7 +5794,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Supports compatibility color anal…",
       "inputPorts": [
         {
           "name": "Image",
@@ -6122,7 +6133,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表…",
       "inputPorts": [
         {
           "name": "Data",
@@ -6312,7 +6323,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15…",
       "inputPorts": [
         {
           "name": "Data",
@@ -6630,7 +6641,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "当前元数据描述为：Mitsubishi MC protocol PLC read/w…",
       "inputPorts": [
         {
           "name": "Data",
@@ -6893,7 +6904,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）…",
       "inputPorts": [
         {
           "name": "Data",
@@ -7156,7 +7167,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "当前元数据描述为：Generic business judgment with nu…",
       "inputPorts": [
         {
           "name": "Value",
@@ -7348,7 +7359,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Sorts detections and compares the…",
       "inputPorts": [
         {
           "name": "Detections",
@@ -7686,7 +7697,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Adaptive histogram equalization f…",
       "inputPorts": [
         {
           "name": "Image",
@@ -7821,7 +7832,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Erode, Dilate, Open, Close, Gradi…",
       "inputPorts": [
         {
           "name": "Image",
@@ -7982,7 +7993,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于基于拉普拉斯算子的边缘增强。运行时从声明输入端口读取数据，按参数表解析配置…",
       "inputPorts": [
         {
           "name": "Image",
@@ -8057,7 +8068,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于两幅图像叠加/合并。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [
         {
           "name": "Image1",
@@ -8188,7 +8199,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Computes subtraction or absolute …",
       "inputPorts": [
         {
           "name": "Image1",
@@ -8265,7 +8276,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于加权混合/透明叠加。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [
         {
           "name": "Background",
@@ -8346,7 +8357,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于从全局变量表读取值。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -8443,7 +8454,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于写入值到全局变量表。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [
         {
           "name": "Value",
@@ -8536,13 +8547,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
+        "totalScore": 80,
+        "level": "B",
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=60"
       },
       "docPath": "算子资料/算子名片/VariableWrite.md"
     },
@@ -8558,7 +8569,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于计数器自增/自减，支持重置条件。运行时从声明输入端口读取数据，按参数表解析…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -8689,7 +8700,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于Try-Catch 流程控制。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Input",
@@ -8782,7 +8793,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于获取当前循环次数和统计信息。运行时从声明输入端口读取数据，按参数表解析配置…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -9970,7 +9981,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子把深度学习结果和传统规则结果融合成最终 OK/NG 判定。它不执行视觉推理，而…",
+      "algorithm": "当前元数据描述为：Combines deep learning and tradit…",
       "inputPorts": [
         {
           "name": "DLResult",
@@ -10095,13 +10106,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
+        "totalScore": 84,
+        "level": "B",
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/DualModalVoting.md"
     },
@@ -10117,7 +10128,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置…",
       "inputPorts": [
         {
           "name": "Items",
@@ -10212,7 +10223,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "该算子用于从列表中按索引或条件提取元素。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "List",
@@ -10324,7 +10335,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "该算子用于按 JSONPath 从字符串中提取字段。运行时从声明输入端口读取数据，按…",
       "inputPorts": [
         {
           "name": "Json",
@@ -10416,7 +10427,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于支持加减乘除、取绝对值、开方等常用运算。运行时从声明输入端口读取数据，按参…",
       "inputPorts": [
         {
           "name": "ValueA",
@@ -10526,7 +10537,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)…",
       "inputPorts": [
         {
           "name": "InputA",
@@ -10610,7 +10621,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "当前元数据描述为：Converts input data across String…",
       "inputPorts": [
         {
           "name": "Input",
@@ -10721,7 +10732,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置…",
       "inputPorts": [
         {
           "name": "Body",
@@ -10855,26 +10866,29 @@
     {
       "id": "MqttPublish",
       "type": 114,
-      "displayName": "MQTT 发布",
-      "description": "向消息队列推送数据",
-      "category": "通信",
-      "version": "1.0.0",
+      "displayName": "MQTT Publish",
+      "description": "Publishes inspection data to MQTT when the optional MQTT integration is enabled.",
+      "category": "Communication",
+      "version": "0.1.0",
       "tags": [
+        "experimental",
+        "integration:mqtt",
+        "maturity:placeholder-disabled",
         "功能域:通信",
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解…",
+      "algorithm": "当前元数据描述为：Publishes inspection data to MQTT…",
       "inputPorts": [
         {
           "name": "Payload",
-          "displayName": "消息负载",
+          "displayName": "Message Payload",
           "dataType": "Any",
           "isRequired": true
         },
         {
           "name": "Message",
-          "displayName": "消息内容",
+          "displayName": "Message Text",
           "dataType": "String",
           "isRequired": false
         }
@@ -10882,7 +10896,7 @@
       "outputPorts": [
         {
           "name": "IsSuccess",
-          "displayName": "是否成功",
+          "displayName": "Is Success",
           "dataType": "Boolean",
           "isRequired": null
         }
@@ -10890,7 +10904,7 @@
       "parameters": [
         {
           "name": "Broker",
-          "displayName": "Broker地址",
+          "displayName": "Broker Address",
           "dataType": "string",
           "description": null,
           "defaultValue": "localhost",
@@ -10901,7 +10915,7 @@
         },
         {
           "name": "Port",
-          "displayName": "端口",
+          "displayName": "Port",
           "dataType": "int",
           "description": null,
           "defaultValue": "1883",
@@ -10912,7 +10926,7 @@
         },
         {
           "name": "Topic",
-          "displayName": "主题",
+          "displayName": "Topic",
           "dataType": "string",
           "description": null,
           "defaultValue": "cv/results",
@@ -10934,7 +10948,7 @@
         },
         {
           "name": "Retain",
-          "displayName": "保留消息",
+          "displayName": "Retain Message",
           "dataType": "bool",
           "description": null,
           "defaultValue": "false",
@@ -10945,7 +10959,7 @@
         },
         {
           "name": "TimeoutMs",
-          "displayName": "超时(毫秒)",
+          "displayName": "Timeout (ms)",
           "dataType": "int",
           "description": null,
           "defaultValue": "5000",
@@ -10978,7 +10992,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于按模板生成字符串。运行时从声明输入端口读取数据，按参数表解析配置，并把处理…",
       "inputPorts": [
         {
           "name": "Arg1",
@@ -11037,7 +11051,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。",
+      "algorithm": "该算子用于保存检测图像到本地硬盘。运行时从声明输入端口读取数据，按参数表解析配置，并…",
       "inputPorts": [
         {
           "name": "Image",
@@ -11118,7 +11132,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。",
+      "algorithm": "该算子用于识别图像中的文本内容。运行时从声明输入端口读取数据，按参数表解析配置，并把…",
       "inputPorts": [
         {
           "name": "Image",
@@ -11165,7 +11179,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "该算子用于分析两幅图像的差异。运行时从声明输入端口读取数据，按参数表解析配置，并把处…",
       "inputPorts": [
         {
           "name": "BaseImage",
@@ -11218,7 +11232,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "当前元数据描述为：Computes Mean/StdDev/Cpk statisti…",
       "inputPorts": [
         {
           "name": "Value",
@@ -11351,7 +11365,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子把多路输入聚合成列表，并在可解析为有限数值的输入上计算统计结果。",
+      "algorithm": "该算子用于将多路输入数据合并为列表，并提取极值与均值。运行时从声明输入端口读取数据，…",
       "inputPorts": [
         {
           "name": "Value1",
@@ -11522,7 +11536,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于比较两个数值的大小关系，输出布尔判定结果与差值。运行时从声明输入端口读取数…",
       "inputPorts": [
         {
           "name": "ValueA",
@@ -11660,7 +11674,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读…",
       "inputPorts": [
         {
           "name": "Input",
@@ -11719,7 +11733,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Detects edge pairs along a scan l…",
       "inputPorts": [
         {
           "name": "Image",
@@ -11959,7 +11973,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Measures width between parallel e…",
       "inputPorts": [
         {
           "name": "Image",
@@ -12161,7 +12175,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Computes distance from a point to…",
       "inputPorts": [
         {
           "name": "Point",
@@ -12251,7 +12265,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Computes distance and angle betwe…",
       "inputPorts": [
         {
           "name": "Line1",
@@ -12370,7 +12384,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Runs non-maximum suppression on d…",
       "inputPorts": [
         {
           "name": "Detections",
@@ -12504,7 +12518,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Filters detections by area, class…",
       "inputPorts": [
         {
           "name": "Detections",
@@ -12680,7 +12694,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Evaluates focus quality of an ima…",
       "inputPorts": [
         {
           "name": "Image",
@@ -12812,6 +12826,30 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "OutputImagePolicy",
+          "displayName": "Output Image Policy",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "FullOverlay",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "FullOverlay",
+              "label": "Full Overlay"
+            },
+            {
+              "value": "Passthrough",
+              "label": "Passthrough"
+            },
+            {
+              "value": "None",
+              "label": "None"
+            }
+          ]
         }
       ],
       "quality": {
@@ -12837,7 +12875,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": "当前元数据描述为：Pixel-space ROI offset tool. Use …",
       "inputPorts": [
         {
           "name": "ReferencePoint",
@@ -12993,7 +13031,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Builds robust affine or homograph…",
       "inputPorts": [
         {
           "name": "Image",
@@ -13202,7 +13240,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Loads CalibrationBundleV2 JSON an…",
       "inputPorts": [],
       "outputPorts": [
         {
@@ -13260,7 +13298,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕标定、坐标映射或几何重采样展开，目标是在不同空间之间建立稳定映射关系。",
+      "algorithm": "当前元数据描述为：Converts value between pixel, mm,…",
       "inputPorts": [
         {
           "name": "Value",
@@ -13392,7 +13430,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "当前元数据描述为：Measures elapsed and cycle time s…",
       "inputPorts": [
         {
           "name": "Trigger",
@@ -13505,7 +13543,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "当前元数据描述为：Runs user-defined expression or s…",
       "inputPorts": [
         {
           "name": "Input1",
@@ -13591,13 +13629,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
+        "totalScore": 90,
         "level": "A",
-        "documentationScore": 100,
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
       },
       "docPath": "算子资料/算子名片/ScriptOperator.md"
     },
@@ -13613,7 +13651,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要执行流程控制、数据整理、变量处理或类型转换，用于把上下游节点连接得更稳定。",
+      "algorithm": "当前元数据描述为：Generates software, timer, or ext…",
       "inputPorts": [
         {
           "name": "Signal",
@@ -13713,7 +13751,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Pixel-space alignment helper for …",
       "inputPorts": [
         {
           "name": "CurrentPoint",
@@ -13804,7 +13842,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Pixel-space rigid correction help…",
       "inputPorts": [
         {
           "name": "DetectedPoint",
@@ -13950,7 +13988,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Measures spacing using points or …",
       "inputPorts": [
         {
           "name": "Image",
@@ -14147,7 +14185,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子把以某个中心为参考的环形区域，从笛卡尔坐标系展开到极坐标平面。",
+      "algorithm": "当前元数据描述为：Unwraps annular image regions int…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14283,7 +14321,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于高斯卷积平滑图像，在抑制高频噪声的同时尽量保持整体结构稳定。",
+      "algorithm": "当前元数据描述为：Corrects uneven illumination by b…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14386,7 +14424,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子做的是时间域融合，不是空间域滤波。它会保留最近 N 帧图像，在时间轴上对同一像…",
+      "algorithm": "当前元数据描述为：Averages multi-frame input to red…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14465,7 +14503,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于仿射模型执行旋转、缩放或平移等二维几何变换。",
+      "algorithm": "当前元数据描述为：Applies 2D affine transform using…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14621,7 +14659,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Measures Lab delta-E or HSV stati…",
       "inputPorts": [
         {
           "name": "Image",
@@ -14831,7 +14869,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Detects surface defects using gra…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15289,7 +15327,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子检查一对边缘之间的间距是否偏离期望宽度。它可以直接使用上游传入的 Line1/…",
+      "algorithm": "当前元数据描述为：Checks edge-pair spacing deviatio…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15414,7 +15452,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子从二值结果中提取轮廓点集，并以轮廓为单位继续做几何分析或筛选。",
+      "algorithm": "当前元数据描述为：Detects rectangular/quadrilateral…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15554,7 +15592,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Fits robust 2D rigid or similarit…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15650,7 +15688,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Detects corner points using Harri…",
       "inputPorts": [
         {
           "name": "Image",
@@ -15768,7 +15806,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Computes line intersection and an…",
       "inputPorts": [
         {
           "name": "Line1",
@@ -15854,7 +15892,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子从边缘图中提取直线段候选，再基于几何关系输出线结构或测量结果。",
+      "algorithm": "当前元数据描述为：Finds best pair of near-parallel …",
       "inputPorts": [
         {
           "name": "Image",
@@ -15970,7 +16008,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子从二值结果中提取轮廓点集，并以轮廓为单位继续做几何分析或筛选。",
+      "algorithm": "当前元数据描述为：Finds quadrilateral contours with…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16086,7 +16124,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：General geometry measurement betw…",
       "inputPorts": [
         {
           "name": "Element1",
@@ -16234,7 +16272,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "当前元数据描述为：Stitches two images into a larger…",
       "inputPorts": [
         {
           "name": "Image1",
@@ -16339,7 +16377,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Splits an image into tiled region…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16446,7 +16484,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Normalizes pixel distribution for…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16554,7 +16592,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Composes multiple images by conca…",
       "inputPorts": [
         {
           "name": "Image1",
@@ -16664,7 +16702,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Pads image border using OpenCV bo…",
       "inputPorts": [
         {
           "name": "Image",
@@ -16789,7 +16827,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子负责把流程结果写入文件、数据库或外部系统，或从外围资源获取输入。",
+      "algorithm": "当前元数据描述为：Saves text or structured data to …",
       "inputPorts": [
         {
           "name": "Data",
@@ -16920,7 +16958,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Merges/sorts/filters point lists …",
       "inputPorts": [
         {
           "name": "Points1",
@@ -17086,7 +17124,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "当前元数据描述为：Classifies connected blobs by geo…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17196,7 +17234,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子围绕边缘、轮廓、点线关系或几何模型参数完成测量与定位。",
+      "algorithm": "当前元数据描述为：Computes histogram and intensity-…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17381,7 +17419,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子基于固定阈值或自动阈值策略把图像分成前景和背景两类，可用于快速分割。",
+      "algorithm": "当前元数据描述为：Computes ROI/masked pixel-level s…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17535,7 +17573,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子主要做图像预处理、增强、分割、变换或格式调整，为后续节点提供更稳定输入。",
+      "algorithm": "当前元数据描述为：Applies mean (box blur) filtering…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17738,7 +17776,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Statistical Outlier Removal (SOR)…",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -17814,7 +17852,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：RANSAC plane segmentation for poi…",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -17942,7 +17980,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Euclidean Cluster Extraction for …",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -18029,7 +18067,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Compute Point Pair Features (PPF)…",
       "inputPorts": [
         {
           "name": "PointCloud",
@@ -18116,7 +18154,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Simplified PPF-based 3D coarse su…",
       "inputPorts": [
         {
           "name": "ModelPointCloud",
@@ -18657,7 +18695,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": "该算子通过 ONNX Runtime 执行语义分割模型，将输入图像预处理为模型张量，…",
+      "algorithm": "当前元数据描述为：Runs an ONNX semantic segmentatio…",
       "inputPorts": [
         {
           "name": "Image",
@@ -19462,7 +19500,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Calibrates fisheye camera intrins…",
       "inputPorts": [
         {
           "name": "Image",
@@ -19627,7 +19665,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Correct fisheye lens distortion u…",
       "inputPorts": [
         {
           "name": "Image",
@@ -19725,7 +19763,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Calibrates stereo camera pair and…",
       "inputPorts": [
         {
           "name": "LeftImage",
@@ -19942,7 +19980,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Transforms coordinates via Calibr…",
       "inputPorts": [
         {
           "name": "Image",
@@ -21933,13 +21971,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 91,
-        "level": "A",
-        "documentationScore": 100,
+        "totalScore": 81,
+        "level": "B",
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
+        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/ArcCaliper.md"
     },
@@ -22038,7 +22076,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Performs FFT on 1D signals and em…",
       "inputPorts": [
         {
           "name": "Input",
@@ -22103,7 +22141,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Applies frequency-domain filters …",
       "inputPorts": [
         {
           "name": "Spectrum",
@@ -22158,13 +22196,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 91,
-        "level": "A",
-        "documentationScore": 100,
+        "totalScore": 81,
+        "level": "B",
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 80,
         "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
+        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/FrequencyFilter.md"
     },
@@ -22180,7 +22218,7 @@
         "成熟度:稳定",
         "算法类型:自研"
       ],
-      "algorithm": null,
+      "algorithm": "当前元数据描述为：Performs inverse FFT on 1D spectr…",
       "inputPorts": [
         {
           "name": "Spectrum",
@@ -22309,6 +22347,182 @@
         "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
       },
       "docPath": "算子资料/算子名片/PhaseClosure.md"
+    },
+    {
+      "id": "FrameChangeTrigger",
+      "type": 1620,
+      "displayName": "帧变化触发",
+      "description": "通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。",
+      "category": "逻辑工具",
+      "version": "1.0.0",
+      "tags": [
+        "功能域:检测",
+        "成熟度:稳定",
+        "算法类型:自研"
+      ],
+      "algorithm": "该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空…",
+      "inputPorts": [
+        {
+          "name": "Image",
+          "displayName": "输入图像",
+          "dataType": "Image",
+          "isRequired": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "Image",
+          "displayName": "输出图像",
+          "dataType": "Image",
+          "isRequired": null
+        },
+        {
+          "name": "Triggered",
+          "displayName": "是否触发",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "ChangeScore",
+          "displayName": "变化比例",
+          "dataType": "Float",
+          "isRequired": null
+        },
+        {
+          "name": "ChangedPixels",
+          "displayName": "变化像素数",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "Reason",
+          "displayName": "判定原因",
+          "dataType": "String",
+          "isRequired": null
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Enabled",
+          "displayName": "启用检测",
+          "dataType": "bool",
+          "description": "关闭后图像直接放行，不做帧差判断。",
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ShortCircuitWhenNotTriggered",
+          "displayName": "未触发时跳过本轮",
+          "dataType": "bool",
+          "description": "开启后，未检测到到料变化时短路当前流程，不执行后续 YOLO 和结果输出。",
+          "defaultValue": "true",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "PixelThreshold",
+          "displayName": "像素差阈值",
+          "dataType": "int",
+          "description": "单个像素灰度差超过该值才计入变化区域。现场反光/抖动多时可适当调高。",
+          "defaultValue": "30",
+          "min": "1",
+          "max": "255",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinChangeRatio",
+          "displayName": "最小变化比例",
+          "dataType": "double",
+          "description": "ROI 内变化像素占比达到该值才认为到料。误触发多时调高，漏检时调低。",
+          "defaultValue": "0.02",
+          "min": "0",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinChangePixels",
+          "displayName": "最小变化像素数",
+          "dataType": "int",
+          "description": "ROI 内变化像素数量下限，用于过滤小面积噪声。",
+          "defaultValue": "500",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CooldownMs",
+          "displayName": "冷却时间(ms)",
+          "dataType": "int",
+          "description": "触发后在该时间内抑制重复触发，防止同一端子停留期间重复判定。",
+          "defaultValue": "1200",
+          "min": "0",
+          "max": "60000",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiX",
+          "displayName": "检测区域X",
+          "dataType": "int",
+          "description": "到料检测 ROI 左上角 X。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiY",
+          "displayName": "检测区域Y",
+          "dataType": "int",
+          "description": "到料检测 ROI 左上角 Y。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiW",
+          "displayName": "检测区域宽度",
+          "dataType": "int",
+          "description": "到料检测 ROI 宽度；0 表示从 X 到图像右边界。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "RoiH",
+          "displayName": "检测区域高度",
+          "dataType": "int",
+          "description": "到料检测 ROI 高度；0 表示从 Y 到图像下边界。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        }
+      ],
+      "quality": {
+        "totalScore": 94,
+        "level": "A",
+        "documentationScore": 100,
+        "testCoverageScore": 100,
+        "parameterValidationScore": 100,
+        "errorHandlingScore": 75,
+        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+      },
+      "docPath": "算子资料/算子名片/FrameChangeTrigger.md"
     }
   ]
 }

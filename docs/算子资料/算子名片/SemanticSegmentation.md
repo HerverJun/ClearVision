@@ -6,90 +6,101 @@
 | 类名 (Class) | `SemanticSegmentationOperator` |
 | 枚举值 (Enum) | `OperatorType.SemanticSegmentation` |
 | 分类 (Category) | AI检测 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子通过 ONNX Runtime 执行语义分割模型，将输入图像预处理为模型张量，读取单个分割输出张量并按类别维度做 argmax，最终输出类别图、着色预览图和逐类别掩膜。
-
-> English: Runs an ONNX semantic segmentation model and returns a class map, colored visualization, and per-class masks.
+当前元数据描述为：Runs an ONNX semantic segmentation model and returns class map, colored visualization, and per-class masks。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
 ## 实现策略 / Implementation Strategy
-- 支持 `ModelPath` 直接加载 ONNX，也支持通过 `ModelId + ModelCatalogPath` 从 `models/model_catalog.json` 解析模型仓库。
-- 当 `InputSize`、`NumClasses`、`ClassNames` 仍为默认值时，会优先回填模型目录里的输入尺寸、类别数和类别名。
-- 预处理支持 `RGB/BGR` 通道顺序、`ScaleToUnitRange`、`Mean`、`Std`，灰度图会提升为三通道。
-- `ExecutionProvider` 支持 `cpu/cuda`；CUDA 不可用时会回退到 CPU，避免仅因运行环境缺 CUDA 而直接中断流程。
-- 输出除分割结果外，还会带出 `ResolvedModelPath`、`ResolvedModelId`、`ResolvedModelCatalogPath`、`ModelSource` 和 `ModelProvenance`，便于追踪模型来源。
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 参数解析覆盖 11 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `SemanticSegmentationOperator.ExecuteCoreAsync`
-2. `ResolveModelTarget(...)`
-3. `ModelCatalog.ResolveExplicitOrCatalogPath(...)`
-4. `GetOrCreateSessionAsync(...)`
-5. `PreprocessToTensor(...)`
-6. `InferenceSession.Run(...)`
-7. `BuildColorizedMap(...)`
-8. `BuildClassMasks(...)`
+- `OperatorBase.Get*Param(...)`
+- `Cv2.Resize`
+- `Cv2.CvtColor`
+- `Cv2.Compare`
+- `File.Exists`
+- `Path.GetFullPath`
+- `JsonSerializer.Serialize`
+- `JsonSerializer.Deserialize`
+- `Enumerable.Range`
+- `InferenceSession`
+- `ImageWrapper`
+- `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `ModelId` | `string` | `""` | - | 模型目录中的模型标识。 |
-| `ModelCatalogPath` | `file` | `""` | - | 模型目录 JSON 路径。 |
-| `ModelPath` | `file` | `""` | - | 显式 ONNX 模型路径，优先级高于目录解析。 |
-| `InputSize` | `string` | `512,512` | `width,height` | 模型输入尺寸；默认值可由模型目录回填。 |
-| `NumClasses` | `int` | `21` | `[2, 4096]` | 类别数量；默认值可由模型目录回填。 |
-| `ClassNames` | `string` | `""` | JSON array 或逗号分隔 | 类别名称；为空时生成兜底类别名。 |
-| `ExecutionProvider` | `enum` | `cpu` | `cpu/cuda` | ONNX Runtime 执行提供方。 |
-| `ScaleToUnitRange` | `bool` | `true` | - | 是否将像素归一化到 0-1。 |
-| `ChannelOrder` | `enum` | `RGB` | `RGB/BGR` | 输入给模型的通道顺序。 |
-| `Mean` | `string` | `0,0,0` | 三个数值 | 均值归一化参数。 |
-| `Std` | `string` | `1,1,1` | 三个正数 | 标准差归一化参数；任一值小于等于 0 会失败。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `ModelId` | Model Id | `string` | "" | - | Yes | - |
+| `ModelCatalogPath` | Model Catalog Path | `file` | "" | - | Yes | - |
+| `ModelPath` | Model Path | `file` | "" | - | Yes | - |
+| `InputSize` | Input Size | `string` | 512,512 | - | Yes | Width,Height |
+| `NumClasses` | Num Classes | `int` | 21 | [2, 4096] | Yes | - |
+| `ClassNames` | Class Names | `string` | "" | - | Yes | JSON array or comma-separated names |
+| `ExecutionProvider` | Execution Provider | `enum` | cpu | cpu/CPU；cuda/CUDA | Yes | - |
+| `ScaleToUnitRange` | Scale To Unit Range | `bool` | true | - | Yes | - |
+| `ChannelOrder` | Channel Order | `enum` | RGB | RGB/RGB；BGR/BGR | Yes | - |
+| `Mean` | Mean | `string` | 0,0,0 | - | Yes | - |
+| `Std` | Std | `string` | 1,1,1 | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | Image | `Image` | Yes | 待分割图像。 |
+| `Image` | Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `SegmentationMap` | Segmentation Map | `Image` | 类别索引图。 |
-| `ColoredMap` | Colored Map | `Image` | 按稳定 palette 着色的可视化图。 |
-| `ClassMasks` | Class Masks | `Any` | 每个出现类别对应的二值掩膜字典。 |
-| `ClassCount` | Class Count | `Integer` | 当前图中出现的类别数量。 |
-| `PresentClasses` | Present Classes | `Any` | 当前图中出现的类别名列表。 |
-| `ResolvedModelPath` | Resolved Model Path | `String` | 实际使用的模型路径。 |
-| `ResolvedModelId` | Resolved Model Id | `String` | 实际使用的模型 ID。 |
-| `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 实际使用的模型目录路径。 |
-| `ModelSource` | Model Source | `String` | 模型来源：显式路径或目录解析。 |
-| `ModelProvenance` | Model Provenance | `Any` | 模型来源、目录条目和解析细节。 |
+| `SegmentationMap` | Segmentation Map | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ColoredMap` | Colored Map | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ClassMasks` | Class Masks | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ClassCount` | Class Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `PresentClasses` | Present Classes | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `ResolvedModelPath` | Resolved Model Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelId` | Resolved Model Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ResolvedModelCatalogPath` | Resolved Model Catalog Path | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelSource` | Model Source | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ModelProvenance` | Model Provenance | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 预处理、类别图构建、着色和掩膜生成约为 `O(W * H * C)`；ONNX 推理成本由模型结构、输入尺寸和 provider 决定。 |
-| 典型耗时 (Typical Latency) | `SemanticSegmentation_contract_baseline.md` 记录 27/27 passed，总运行约 134 ms；`SemanticSegmentation_dataset_baseline.md` 记录 36/36 passed，总运行约 725 ms。报告里的延迟来自 repo-local identity/protocol bridge，不等同于 1920x1080 生产模型耗时。 |
-| 内存特征 (Memory Profile) | 包含输入张量、ONNX 输出张量、类别索引图、着色图、逐类 mask 和静态 session cache；内存随输入尺寸、类别数和输出掩膜数量增长。 |
+| 时间复杂度 (Time Complexity) | 推理路径主要受模型规模、输入尺寸和硬件后端影响；后处理通常随候选数量线性或近似线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于模型大小、输入尺寸、CPU/GPU/ONNX Runtime 后端和候选数量。 |
+| 内存特征 (Memory Profile) | 需要模型会话、输入张量、输出张量和后处理集合内存；峰值随模型与输入尺寸增长。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
-- Contract baseline：`quality/evals/reports/SemanticSegmentation_contract_baseline.md`，27/27 passed，覆盖 identity ONNX 模型、class map argmax、class mask、palette、模型目录解析、参数解析、预处理和失败路径。
-- Dataset baseline：`quality/evals/reports/SemanticSegmentation_dataset_baseline.md`，36/36 passed，PixelAccuracy / MeanIoU / MeanDice / MeanBoundaryIoU 均为 1.0；它是 VOC-style 半合成协议桥，不声明真实生产模型精度。
-- 失败契约包括缺失图像、缺失模型、错误 `InputSize`、错误 `Mean`、`Std <= 0`、非法 `ExecutionProvider` 和非法 class-name JSON。
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 9 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合：工件区域前景/背景分离、涂胶范围检查、语义区域裁切、后续 ROI 联动和可视化复核。
-- 适合：需要通过模型目录统一管理分割模型、类别名、输入尺寸和版本来源的流程。
-- 不适合：需要实例级目标分离、目标 ID 跟踪或复杂后处理的场景；这类需求应使用实例分割或检测模型。
+- 适合 (Suitable)：模型、标签和阈值已完成现场校准，需要把推理结果接入视觉流程的场景。
+- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
+- 不适合 (Not Suitable)：模型未完成验证、标签映射不稳定或现场数据分布明显偏离训练数据的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. 当前实现以单输出张量的常见语义分割模型为主，复杂多分支输出需要在模型侧或后续算子中对齐。
-2. CUDA 路径依赖部署环境安装对应 ONNX Runtime CUDA 运行时；仓库默认包仍以 CPU 运行时为主。
-3. 现有 dataset baseline 是协议桥证据，不代表现场材质、光照、相机和生产模型上的真实 mIoU。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
+4. 模型推理类路径依赖模型文件、标签、运行时库和硬件后端，算法准确率不由算子元数据单独保证。
+5. 源码包含状态缓存或实例级状态，长流程运行时需要关注状态清理、并发调用和实例复用边界。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-04-28 | 补充 contract/dataset evidence、性能口径、模型来源输出和失败契约说明 |
-| 1.0.0 | 2026-03-17 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

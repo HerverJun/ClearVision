@@ -5,14 +5,12 @@
 using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -86,7 +84,7 @@ public class BlobDetectionOperator : OperatorBase
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
         }
-        
+
         // 颜色预过滤
         Mat processedSrc = src;
         Mat? colorMask = null;

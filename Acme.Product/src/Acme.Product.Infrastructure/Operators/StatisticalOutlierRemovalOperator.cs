@@ -2,9 +2,9 @@ using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
-using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 using Acme.Product.Infrastructure.PointCloud.Filters;
 using Microsoft.Extensions.Logging;
+using PointCloudModel = Acme.Product.Infrastructure.PointCloud.PointCloud;
 
 namespace Acme.Product.Infrastructure.Operators;
 

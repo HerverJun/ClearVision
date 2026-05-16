@@ -48,7 +48,8 @@ public class PlcBaseClientBehaviorTests
 
         InvokeGetRetryDelay(sut, 0).Should().Be(TimeSpan.FromSeconds(2));
         InvokeGetRetryDelay(sut, 3).Should().Be(TimeSpan.FromSeconds(2));
-    }    [Fact]
+    }
+    [Fact]
     public async Task ReadAsync_WhenReadCoreThrowsIOException_ShouldNotRetryOperation()
     {
         var sut = new TestPlcClient(
@@ -235,7 +236,8 @@ public class PlcBaseClientBehaviorTests
         var method = typeof(PlcBaseClient).GetMethod("GetRetryDelay", BindingFlags.Instance | BindingFlags.NonPublic);
         method.Should().NotBeNull();
         return (TimeSpan)method!.Invoke(client, new object[] { retry })!;
-    }    private sealed class TestPlcClient : PlcBaseClient
+    }
+    private sealed class TestPlcClient : PlcBaseClient
     {
         private readonly Func<string, ushort, CancellationToken, Task<OperateResult<byte[]>>> _readCore;
         private readonly Func<string, byte[], CancellationToken, Task<OperateResult>> _writeCore;

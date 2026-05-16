@@ -1,13 +1,13 @@
 // FrequencyFilterOperator.cs
 // 频域滤波算子 - 兼容 1D 复频谱与 2D 复频谱
 
+using System.Numerics;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Numerics;
 
 namespace Acme.Product.Infrastructure.Operators;
 

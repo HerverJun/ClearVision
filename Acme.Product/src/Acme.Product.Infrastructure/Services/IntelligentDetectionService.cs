@@ -93,7 +93,7 @@ public class IntelligentDetectionService : IIntelligentDetectionService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[智能检测] 检测执行异常");
-                
+
                 if (attempt >= policy.MaxRetries)
                 {
                     return DetectionResult.Failed($"检测执行异常: {ex.Message}");
@@ -118,17 +118,17 @@ public class IntelligentDetectionService : IIntelligentDetectionService
 
             // 计算曝光调整比例
             var ratio = targetBrightness / Math.Max(imageBrightness, 1.0);
-            
+
             // 限制调整范围 (0.5x - 2.0x)
             ratio = Math.Clamp(ratio, 0.5, 2.0);
-            
+
             var newExposure = currentExposure * ratio;
-            
+
             // 限制曝光时间范围 (100us - 1000000us)
             newExposure = Math.Clamp(newExposure, 100.0, 1000000.0);
 
             await camera.SetExposureTimeAsync(newExposure);
-            
+
             return newExposure;
         }
         catch (Exception ex)
@@ -249,7 +249,7 @@ public class IntelligentDetectionService : IIntelligentDetectionService
                     break;
             }
 
-            _logger.LogInformation("[智能检测] 双模态投票结果: {IsOk}, 置信度: {Confidence:F2}, 策略: {Strategy}", 
+            _logger.LogInformation("[智能检测] 双模态投票结果: {IsOk}, 置信度: {Confidence:F2}, 策略: {Strategy}",
                 finalResult.IsOk, finalResult.Confidence, strategy);
 
             return finalResult;
@@ -310,7 +310,7 @@ public class IntelligentDetectionService : IIntelligentDetectionService
     {
         var merged = new List<DetectionItem>();
         merged.AddRange(items1);
-        
+
         // 添加不重叠的项
         foreach (var item2 in items2)
         {

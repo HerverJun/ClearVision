@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Security.Claims;
-using System.Text.Json;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;

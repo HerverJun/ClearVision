@@ -1,23 +1,23 @@
-﻿// AiFlowGenerationService.cs
+// AiFlowGenerationService.cs
 // AI 流程生成服务实现
 // 负责流程草案生成、修正与结果封装
 // 作者：蘅芜君
-using System.Text.Json;
-using Acme.Product.Application.DTOs;
-using Acme.Product.Core.DTOs;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Services;
-using Microsoft.Extensions.Logging;
-using Acme.Product.Core.Entities;
-using Acme.Product.Infrastructure.AI.DryRun;
-using Acme.Product.Infrastructure.AI.Runtime;
-using Acme.Product.Contracts.Messages;
-using OpenCvSharp;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text;
-using System.Diagnostics;
+using System.Text.Json;
+using Acme.Product.Application.DTOs;
+using Acme.Product.Contracts.Messages;
+using Acme.Product.Core.DTOs;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.Services;
+using Acme.Product.Infrastructure.AI.DryRun;
+using Acme.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using OpenCvSharp;
 
 namespace Acme.Product.Infrastructure.AI;
 
@@ -2700,7 +2700,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
     private static List<AiValidationDiagnostic>? ExtractKnowledgeDiagnostics(AiValidationResult? validation)
     {
-        if (validation == null) return null;
+        if (validation == null)
+            return null;
         var knowledge = validation.Diagnostics
             .Where(d => string.Equals(d.Category, "knowledge", StringComparison.OrdinalIgnoreCase))
             .Select(CloneDiagnostic)
@@ -3034,7 +3035,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
     private static int EstimateTokens(string? text)
     {
-        if (string.IsNullOrEmpty(text)) return 0;
+        if (string.IsNullOrEmpty(text))
+            return 0;
 
         var cjkCount = 0;
         foreach (var ch in text)

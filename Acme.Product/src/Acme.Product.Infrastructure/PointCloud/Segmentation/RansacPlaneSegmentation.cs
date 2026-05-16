@@ -38,13 +38,16 @@ public sealed class RansacPlaneSegmentation
         int maxIterations = 1000,
         int minInliers = 100)
     {
-        if (cloud == null) throw new ArgumentNullException(nameof(cloud));
+        if (cloud == null)
+            throw new ArgumentNullException(nameof(cloud));
         if (distanceThreshold <= 0 || !float.IsFinite(distanceThreshold))
         {
             throw new ArgumentOutOfRangeException(nameof(distanceThreshold), "distanceThreshold must be positive and finite.");
         }
-        if (maxIterations <= 0) throw new ArgumentOutOfRangeException(nameof(maxIterations), "maxIterations must be > 0.");
-        if (minInliers <= 0) throw new ArgumentOutOfRangeException(nameof(minInliers), "minInliers must be > 0.");
+        if (maxIterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxIterations), "maxIterations must be > 0.");
+        if (minInliers <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minInliers), "minInliers must be > 0.");
 
         var n = cloud.Count;
         if (n < 3 || minInliers > n)
@@ -260,7 +263,8 @@ public sealed class RansacPlaneSegmentation
 
     public PointCloud ExtractInlierCloud(PointCloud input, ReadOnlySpan<int> inliers)
     {
-        if (input == null) throw new ArgumentNullException(nameof(input));
+        if (input == null)
+            throw new ArgumentNullException(nameof(input));
 
         var n = inliers.Length;
         var hasColors = input.Colors != null;
@@ -352,7 +356,9 @@ public sealed class RansacPlaneSegmentation
         }
 
         var inv = 1.0 / inliers.Length;
-        cx *= inv; cy *= inv; cz *= inv;
+        cx *= inv;
+        cy *= inv;
+        cz *= inv;
 
         // Covariance
         double xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
@@ -370,7 +376,12 @@ public sealed class RansacPlaneSegmentation
             zz += z * z;
         }
 
-        xx *= inv; xy *= inv; xz *= inv; yy *= inv; yz *= inv; zz *= inv;
+        xx *= inv;
+        xy *= inv;
+        xz *= inv;
+        yy *= inv;
+        yz *= inv;
+        zz *= inv;
 
         using var cov = new Mat(3, 3, MatType.CV_64FC1);
         cov.Set(0, 0, xx);

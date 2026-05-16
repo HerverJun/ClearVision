@@ -3,10 +3,10 @@
 // 【Phase 4】LLM 闭环验证 - 提取指标和诊断
 // 作者：架构修复方案 v2
 
+using System.Runtime.InteropServices;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Runtime.InteropServices;
 
 namespace Acme.Product.Infrastructure.Services;
 
@@ -704,7 +704,8 @@ public class PreviewMetricsAnalyzer : IPreviewMetricsAnalyzer
     private double CalculateMedian(Mat image)
     {
         int length = (int)image.Total();
-        if (length == 0) return 0;
+        if (length == 0)
+            return 0;
 
         // 使用内存池优化巨量像素分配，缓解 LOH 和 GC 暂停
         var pooledData = System.Buffers.ArrayPool<byte>.Shared.Rent(length);

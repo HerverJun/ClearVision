@@ -1,10 +1,10 @@
+using System.Collections.Concurrent;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Collections.Concurrent;
 
 namespace Acme.Product.Infrastructure.Operators;
 

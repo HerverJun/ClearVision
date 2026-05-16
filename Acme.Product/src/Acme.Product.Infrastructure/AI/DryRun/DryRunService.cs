@@ -61,7 +61,7 @@ public class DryRunService
 
             result.FlowResult = flowResult;
             result.IsSuccess = flowResult.IsSuccess;
-            
+
             // 收集分支覆盖信息
             result.BranchExecutionCounts = DryRunContext.Current.BranchExecutionCounts;
             result.TotalBranches = result.BranchExecutionCounts.Count;
@@ -97,7 +97,7 @@ public class DryRunService
         {
             var result = await RunAsync(flow, testCase, stubRegistry, cancellationToken);
             results.Add(result);
-            
+
             foreach (var branch in result.BranchExecutionCounts.Keys)
             {
                 allBranches.Add(branch);

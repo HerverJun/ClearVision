@@ -1,8 +1,9 @@
-﻿// BoundingBoxFilterOperator.cs
+// BoundingBoxFilterOperator.cs
 // 边界框过滤算子
 // 按面积、类别、置信度等条件过滤检测框
 // 作者：蘅芜君
 using System.Collections;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
@@ -11,8 +12,6 @@ using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using DetectionListValue = Acme.Product.Core.ValueObjects.DetectionList;
 using DetectionResultValue = Acme.Product.Core.ValueObjects.DetectionResult;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>

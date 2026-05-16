@@ -18,11 +18,14 @@ public static class LawsTextureFilter
         int localMeanWindowSize = 15,
         BorderTypes borderType = BorderTypes.Replicate)
     {
-        if (src == null) throw new ArgumentNullException(nameof(src));
-        if (src.Empty()) throw new ArgumentException("Input image is empty.", nameof(src));
+        if (src == null)
+            throw new ArgumentNullException(nameof(src));
+        if (src.Empty())
+            throw new ArgumentException("Input image is empty.", nameof(src));
 
         var (kY, kX) = ParseKernelCombo(kernelCombo);
-        if (subtractLocalMean && localMeanWindowSize < 3) throw new ArgumentOutOfRangeException(nameof(localMeanWindowSize));
+        if (subtractLocalMean && localMeanWindowSize < 3)
+            throw new ArgumentOutOfRangeException(nameof(localMeanWindowSize));
 
         using var gray32F = ToGray32F01(src);
 
@@ -51,15 +54,18 @@ public static class LawsTextureFilter
         int windowSize = 15,
         BorderTypes borderType = BorderTypes.Replicate)
     {
-        if (filtered32F == null) throw new ArgumentNullException(nameof(filtered32F));
-        if (filtered32F.Empty()) throw new ArgumentException("Filtered image is empty.", nameof(filtered32F));
+        if (filtered32F == null)
+            throw new ArgumentNullException(nameof(filtered32F));
+        if (filtered32F.Empty())
+            throw new ArgumentException("Filtered image is empty.", nameof(filtered32F));
         if (filtered32F.Type() != MatType.CV_32FC1)
         {
             throw new ArgumentException("Filtered image must be CV_32FC1.", nameof(filtered32F));
         }
 
         var win = EnsureOdd(windowSize);
-        if (win < 3) throw new ArgumentOutOfRangeException(nameof(windowSize));
+        if (win < 3)
+            throw new ArgumentOutOfRangeException(nameof(windowSize));
 
         using var sq = new Mat();
         Cv2.Multiply(filtered32F, filtered32F, sq);
@@ -102,8 +108,10 @@ public static class LawsTextureFilter
 
     private static Mat CreateKernel5x5(float[] kY, float[] kX)
     {
-        if (kY.Length != 5) throw new ArgumentException("kY must have length 5.", nameof(kY));
-        if (kX.Length != 5) throw new ArgumentException("kX must have length 5.", nameof(kX));
+        if (kY.Length != 5)
+            throw new ArgumentException("kY must have length 5.", nameof(kY));
+        if (kX.Length != 5)
+            throw new ArgumentException("kX must have length 5.", nameof(kX));
 
         var k = new float[5, 5];
         for (var y = 0; y < 5; y++)
@@ -153,7 +161,8 @@ public static class LawsTextureFilter
 
     private static int EnsureOdd(int v)
     {
-        if (v <= 0) return v;
+        if (v <= 0)
+            return v;
         return (v % 2 == 0) ? v + 1 : v;
     }
 }

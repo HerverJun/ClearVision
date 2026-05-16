@@ -26,11 +26,11 @@ public sealed class AiFlowParseResult
         AiGeneratedFlowJson flow,
         string candidateJson,
         int candidateCount) => new()
-    {
-        Flow = flow,
-        CandidateJson = candidateJson,
-        CandidateCount = candidateCount
-    };
+        {
+            Flow = flow,
+            CandidateJson = candidateJson,
+            CandidateCount = candidateCount
+        };
 
     public static AiFlowParseResult Failed(
         string code,
@@ -38,13 +38,13 @@ public sealed class AiFlowParseResult
         string message,
         string repairHint,
         int candidateCount = 0) => new()
-    {
-        Code = code,
-        Category = category,
-        Message = message,
-        RepairHint = repairHint,
-        CandidateCount = candidateCount
-    };
+        {
+            Code = code,
+            Category = category,
+            Message = message,
+            RepairHint = repairHint,
+            CandidateCount = candidateCount
+        };
 }
 
 public sealed class AiFlowResponseParser : IAiFlowResponseParser

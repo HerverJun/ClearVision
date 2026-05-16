@@ -90,7 +90,7 @@ public class AuthMiddleware
         // 将用户信息注入 HttpContext.Items
         context.Items["CurrentUser"] = session;
 
-        _logger.LogDebug("用户 {Username} ({Role}) 已认证 - {Path}", 
+        _logger.LogDebug("用户 {Username} ({Role}) 已认证 - {Path}",
             session.Username, session.Role, path);
 
         await _next(context);
@@ -145,7 +145,7 @@ public class AuthMiddleware
     {
         // 1. 从 Authorization 头提取
         var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
-        if (!string.IsNullOrEmpty(authHeader) && 
+        if (!string.IsNullOrEmpty(authHeader) &&
             authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
             return authHeader.Substring("Bearer ".Length).Trim();
@@ -167,10 +167,10 @@ public class AuthMiddleware
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new 
-        { 
+        await context.Response.WriteAsJsonAsync(new
+        {
             Error = "Unauthorized",
-            Message = "请先登录" 
+            Message = "请先登录"
         });
     }
 }

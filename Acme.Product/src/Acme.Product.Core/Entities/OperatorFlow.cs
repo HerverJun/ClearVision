@@ -2,10 +2,10 @@
 // 算子流程实体 - 包含算子列表和连接关系
 // 作者：蘅芜君
 
+using System.Text.Json.Serialization;
 using Acme.Product.Core.Entities.Base;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
-using System.Text.Json.Serialization;
 
 namespace Acme.Product.Core.Entities;
 

@@ -1,74 +1,120 @@
-# 形状匹配 / ShapeMatching
+# 旋转尺度模板匹配 / ShapeMatching
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `ShapeMatchingOperator` |
 | 枚举值 (Enum) | `OperatorType.ShapeMatching` |
-| 分类 (Category) | Matching |
+| 分类 (Category) | 匹配定位 |
+| 版本 (Version) | `1.2.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 当前版本 (Version) | `1.2.0` |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-虽然名称叫“形状匹配”，当前实现本质上仍是灰度模板的旋转/尺度搜索，而不是轮廓描述子匹配。
+当前元数据描述为：Rotation-scale template matching with pyramid coarse-to-fine search. This is not a generic contour-descriptor matcher。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
-核心流程：
-- 把搜索图和模板图转成灰度
-- 构建金字塔做 coarse-to-fine 搜索
-- 枚举 angle/scale 变换
-- 对每个变换后的模板执行 `Cv2.MatchTemplate(..., CCoeffNormed)`
-- 从单个变换的响应图中持续提取多个峰值
-- 对变换内候选做局部抑制，再对全局候选做 IoU NMS
+## 实现策略 / Implementation Strategy
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 可选输入用于覆盖或补充参数配置：`Template`。
+- 参数解析覆盖 13 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
-## 本轮改进 / This Revision
-- `MaxMatches` 现在支持同姿态多实例；不再每个 angle/scale 只取一个 `MinMaxLoc` 峰值。
-- 单个姿态下若场景中存在多个分离目标，算子会从同一响应图中继续提取次峰值。
-- 最终输出排序增加稳定 tie-break 规则，减少多结果场景下的顺序抖动。
+## 核心 API 调用链 / Core API Call Chain
+- `OperatorBase.Get*Param(...)`
+- `Cv2.ImRead`
+- `Cv2.CvtColor`
+- `Cv2.PyrDown`
+- `Cv2.CountNonZero`
+- `Cv2.MatchTemplate`
+- `Cv2.MinMaxLoc`
+- `Cv2.Compare`
+- `Cv2.FloodFill`
+- `Cv2.GetRotationMatrix2D`
+- `Cv2.WarpAffine`
+- `Cv2.Resize`
+- `Cv2.Threshold`
+- `Cv2.Rectangle`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 说明 (Description) |
-|--------|------|--------|------|
-| `TemplatePath` | `file` | `""` | 未提供 `Template` 输入时，从文件读取模板。 |
-| `MinScore` | `double` | `0.7` | 最小匹配分数。 |
-| `MaxMatches` | `int` | `1` | 最终最多输出的匹配数量；现在会真正覆盖同姿态多实例场景。 |
-| `AngleStart` | `double` | `-30.0` | 搜索起始角度。 |
-| `AngleExtent` | `double` | `60.0` | 搜索角度跨度。 |
-| `AngleStep` | `double` | `1.0` | 基础角度步长。 |
-| `ScaleMin` | `double` | `1.0` | 最小缩放。 |
-| `ScaleMax` | `double` | `1.0` | 最大缩放。 |
-| `ScaleStep` | `double` | `0.1` | 缩放步长。 |
-| `NumLevels` | `int` | `3` | 金字塔层数。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `TemplatePath` | Template Path | `file` | "" | - | Yes | - |
+| `MinScore` | Min Score | `double` | 0.7 | [0.1, 1] | Yes | - |
+| `MaxMatches` | Max Matches | `int` | 1 | [1, 50] | Yes | - |
+| `AngleStart` | Angle Start | `double` | -30 | [-180, 180] | Yes | - |
+| `AngleExtent` | Angle Extent | `double` | 60 | [0, 360] | Yes | - |
+| `AngleStep` | Angle Step | `double` | 1 | [0.1, 10] | Yes | - |
+| `ScaleMin` | Scale Min | `double` | 1 | [0.2, 3] | Yes | - |
+| `ScaleMax` | Scale Max | `double` | 1 | [0.2, 3] | Yes | - |
+| `ScaleStep` | Scale Step | `double` | 0.1 | [0.01, 1] | Yes | - |
+| `NumLevels` | Pyramid Levels | `int` | 3 | [1, 6] | Yes | - |
+| `OriginMode` | Origin Mode | `enum` | Center | Center/Center；TopLeft/TopLeft；Custom/Custom | Yes | - |
+| `OriginX` | Origin X | `double` | 0 | - | Yes | - |
+| `OriginY` | Origin Y | `double` | 0 | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
-| 名称 (Name) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
-|------|------|------|------|
-| `Image` | `Image` | Yes | 搜索图像。 |
-| `Template` | `Image` | No | 模板图像；未提供时可改用 `TemplatePath`。 |
+| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
+|------|------|------|------|------|
+| `Image` | Search Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `Template` | Template Image | `Image` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
-|------|------|------|
-| `Image` | `Image` | 结果图，会绘制每个最终候选。 |
-| `Matches` | `Any` | 匹配结果列表；每项包含 `X`、`Y`、`XSubpixel`、`YSubpixel`、`Angle`、`Scale`、`Score`、`CenterX`、`CenterY`、`Width`、`Height`。 |
+| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
+|------|------|------|------|
+| `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `Matches` | Matches | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `IsMatch` | `Boolean` | 是否找到候选。 |
-| `Score` | `Double` | 最佳候选分数。 |
-| `MatchCount` | `Integer` | 最终输出数量。 |
-| `NumLevelsUsed` | `Integer` | 实际参与搜索的金字塔层数。 |
+| `Angle` | `Float` | 源码输出字典初始化中可见字段。 |
+| `CenterX` | `Any` | 源码输出字典初始化中可见字段。 |
+| `CenterY` | `Any` | 源码输出字典初始化中可见字段。 |
+| `FailureReason` | `String` | 源码通过输出字典索引赋值写入。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `IsMatch` | `Boolean` | 源码输出字典初始化中可见字段。 |
+| `MaskAwareTransforms` | `Any` | 源码输出字典初始化中可见字段。 |
+| `MatchCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `Method` | `Any` | 源码输出字典初始化中可见字段。 |
+| `NumLevelsUsed` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Position` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ReferenceX` | `Any` | 源码输出字典初始化中可见字段。 |
+| `ReferenceY` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Scale` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Score` | `Float` | 源码输出字典初始化中可见字段。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
+| `XSubpixel` | `Any` | 源码输出字典初始化中可见字段。 |
+| `YSubpixel` | `Any` | 源码输出字典初始化中可见字段。 |
+
+## 性能特征 / Performance
+| 指标 (Metric) | 值 (Value) |
+|------|------|
+| 时间复杂度 (Time Complexity) | 主要受外部 I/O、网络或设备响应时间影响；本地处理通常随输入规模线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于文件系统、网络、PLC/串口设备或外部服务响应。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
+
+## 适用场景 / Use Cases
+- 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
+- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. 这仍然是模板匹配路线，不适用于强遮挡、强非刚体形变或明显透视变化。
-2. 匹配核心固定使用 `CCoeffNormed`，没有暴露多种模板匹配方法。
-3. 同姿态多实例已经支持，但在强重复纹理场景仍应结合 ROI、先验角度范围或更高阈值使用。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
+4. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.2.0 | 2026-04-12 | 支持同姿态多实例提峰，补充 `MaxMatches` 的实际行为与稳定排序说明 |
-| 1.0.2 | 2026-03-14 | 第二轮基于源码补充粗到细角度搜索、金字塔规则、NMS 与实际输出结构说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.2.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

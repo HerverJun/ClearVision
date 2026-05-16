@@ -2,22 +2,22 @@
 // 设置功能 API 端点
 // 作者：蘅芜君
 
-using Acme.Product.Core.Entities;
+using System;
+using System.Buffers.Binary;
+using System.Linq;
+using System.Text.Json;
+using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Continuous;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
-using Acme.Product.Application.Services;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using System.Buffers.Binary;
-using System.Text.Json;
-using System;
-using System.Linq;
 
 namespace Acme.Product.Desktop.Endpoints;
 

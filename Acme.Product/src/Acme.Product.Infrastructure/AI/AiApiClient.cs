@@ -2,12 +2,12 @@
 // AI API 客户端
 // 负责调用外部 AI 服务并处理响应结果
 // 作者：蘅芜君
-using System.Net.Http.Headers;
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using Acme.Product.Contracts.Messages;
 
 namespace Acme.Product.Infrastructure.AI;

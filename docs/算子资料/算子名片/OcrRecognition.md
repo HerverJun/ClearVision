@@ -6,59 +6,73 @@
 | 类名 (Class) | `OcrRecognitionOperator` |
 | 枚举值 (Enum) | `OperatorType.OcrRecognition` |
 | 分类 (Category) | 识别 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子结合学习型模型或规则判定完成识别、检测或缺陷筛查。
-
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+该算子用于识别图像中的文本内容。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 先校验输入图像与参数，再进入核心处理，避免空输入或非法格式直接进入底层 API。
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 当前元数据未声明参数，执行逻辑主要由输入数据和源码默认策略决定。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(...)`
-2. `Cv2.ImEncode`
-3. `File.Exists`
-4. `Directory.Exists`
+- `Cv2.ImEncode`
+- `Directory.Exists`
+- `File.Exists`
+- `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| - | - | - | - | - | - | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | 图像 | `Image` | Yes | 输入待处理图像。 |
+| `Image` | 图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Text` | 识别文本 | `String` | 输出本算子的处理结果。 |
-| `IsSuccess` | 成功 | `Boolean` | 输出本算子的处理结果。 |
+| `Text` | 识别文本 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `IsSuccess` | 成功 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 主要由模型推理复杂度主导，预处理和后处理成本次之。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 主要由中间结果、缓存结构和输出封装决定。 |
+| 时间复杂度 (Time Complexity) | 推理路径主要受模型规模、输入尺寸和硬件后端影响；后处理通常随候选数量线性或近似线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于模型大小、输入尺寸、CPU/GPU/ONNX Runtime 后端和候选数量。 |
+| 内存特征 (Memory Profile) | 需要模型会话、输入张量、输出张量和后处理集合内存；峰值随模型与输入尺寸增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合识别、检测、分类和缺陷筛查任务。
-- 适合在规则算法不足时作为增强手段。
-- 不适合在模型和标签配置不清晰时直接上线。
-- 不适合把推理结果当作无条件真值。
+- 适合 (Suitable)：模型、标签和阈值已完成现场校准，需要把推理结果接入视觉流程的场景。
+- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
+- 不适合 (Not Suitable)：模型未完成验证、标签映射不稳定或现场数据分布明显偏离训练数据的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
+3. 模型推理类路径依赖模型文件、标签、运行时库和硬件后端，算法准确率不由算子元数据单独保证。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

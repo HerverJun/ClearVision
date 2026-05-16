@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using System.Text.Json;
+using System.Threading.Channels;
 using Acme.Product.Core.Enums;
 using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;

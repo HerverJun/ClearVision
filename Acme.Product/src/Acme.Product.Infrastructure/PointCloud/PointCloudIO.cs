@@ -51,7 +51,8 @@ public static class PointCloudIO
             }
 
             var parts = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0) continue;
+            if (parts.Length == 0)
+                continue;
 
             var key = parts[0].ToUpperInvariant();
             if (key == "FIELDS")
@@ -138,7 +139,8 @@ public static class PointCloudIO
         for (int i = dataStart; i < lines.Length && row < points; i++)
         {
             var raw = lines[i].Trim();
-            if (raw.Length == 0) continue;
+            if (raw.Length == 0)
+                continue;
 
             var values = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (values.Length < fields.Length)
@@ -318,8 +320,10 @@ public static class PointCloudIO
             }
 
             line = line.Trim();
-            if (line.Length == 0) continue;
-            if (line.StartsWith("comment", StringComparison.OrdinalIgnoreCase)) continue;
+            if (line.Length == 0)
+                continue;
+            if (line.StartsWith("comment", StringComparison.OrdinalIgnoreCase))
+                continue;
 
             if (line.StartsWith("format", StringComparison.OrdinalIgnoreCase))
             {
@@ -392,12 +396,15 @@ public static class PointCloudIO
         while (row < vertexCount)
         {
             var line = reader.ReadLine();
-            if (line == null) break;
+            if (line == null)
+                break;
             line = line.Trim();
-            if (line.Length == 0) continue;
+            if (line.Length == 0)
+                continue;
 
             var values = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (values.Length < properties.Count) continue;
+            if (values.Length < properties.Count)
+                continue;
 
             ptsIdx[row, 0] = (float)double.Parse(values[ix], culture);
             ptsIdx[row, 1] = (float)double.Parse(values[iy], culture);

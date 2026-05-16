@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;

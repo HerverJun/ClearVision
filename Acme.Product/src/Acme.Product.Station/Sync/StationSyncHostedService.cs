@@ -1,7 +1,7 @@
-using System.Threading.Channels;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Threading.Channels;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Hosting;

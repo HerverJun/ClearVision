@@ -1,8 +1,9 @@
-﻿// LocalDeformableMatchingOperator.cs
+// LocalDeformableMatchingOperator.cs
 // Local deformable matching operator (experimental MVP)
 // HALCON reference: find_local_deformable_model
 // Author: AI Assistant
 
+using System.Security.Cryptography;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -10,7 +11,6 @@ using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Security.Cryptography;
 
 namespace Acme.Product.Infrastructure.Operators;
 
@@ -745,8 +745,10 @@ public class LocalDeformableMatchingOperator : OperatorBase
                 var px = (float)(x * stepX);
                 var py = (float)(y * stepY);
                 // 杈圭晫澶勭悊
-                if (x == gridSize - 1) px = width;
-                if (y == gridSize - 1) py = height;
+                if (x == gridSize - 1)
+                    px = width;
+                if (y == gridSize - 1)
+                    py = height;
                 points.Add(new Point2f(px, py));
             }
         }
@@ -1048,7 +1050,8 @@ public class LocalDeformableMatchingOperator : OperatorBase
     private RigidFallbackResult? TryRigidFallback(Mat searchImage, PyramidLevel templateLevel,
         List<DMatch> matches, KeyPoint[] templateKpts, KeyPoint[] searchKpts)
     {
-        if (matches.Count < 4) return null;
+        if (matches.Count < 4)
+            return null;
 
         var srcPoints = matches.Select(m => templateKpts[m.QueryIdx].Pt).ToArray();
         var dstPoints = matches.Select(m => searchKpts[m.TrainIdx].Pt).ToArray();
@@ -1067,7 +1070,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             out var metrics);
 
         // Compute score.
-        #if false
+#if false
         var corners = new[]
         {
             new Point2f(0, 0),
@@ -1077,7 +1080,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
         };
 
         var transformedCorners = Cv2.PerspectiveTransform(corners, homography);
-        #endif
+#endif
 
         return new RigidFallbackResult
         {
@@ -1104,10 +1107,12 @@ public class LocalDeformableMatchingOperator : OperatorBase
             }
         }
 
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path))
+            return null;
 
         using var img = Cv2.ImRead(path, ImreadModes.Color);
-        if (img.Empty()) return null;
+        if (img.Empty())
+            return null;
 
         var template = BuildTemplatePyramid(img, pyramidLevels);
 

@@ -21,12 +21,12 @@ public class InMemoryInspectionEventBus : IInspectionEventBus, IDisposable
 {
     private readonly ILogger<InMemoryInspectionEventBus> _logger;
     private readonly IEventStore _eventStore;
-    
+
     // 精确类型订阅者存储
     private readonly ConcurrentDictionary<Type, ImmutableList<Delegate>> _handlers = new();
-    
+
     // 接口订阅者存储（使用包装器避免类型转换问题）
-    private readonly ConcurrentDictionary<Type, ImmutableList<Func<object, CancellationToken, Task>>> 
+    private readonly ConcurrentDictionary<Type, ImmutableList<Func<object, CancellationToken, Task>>>
         _interfaceHandlers = new();
 
     public InMemoryInspectionEventBus(
@@ -42,8 +42,8 @@ public class InMemoryInspectionEventBus : IInspectionEventBus, IDisposable
         var type = typeof(T);
         var exceptions = new List<Exception>();
         var sequenceId = _eventStore.Append(eventData.ProjectId, eventData);
-        
-        _logger.LogDebug("[EventBus] 发布事件: {EventType}, Project: {ProjectId}", 
+
+        _logger.LogDebug("[EventBus] 发布事件: {EventType}, Project: {ProjectId}",
             type.Name, eventData.ProjectId);
         _logger.LogTrace("[EventBus] 事件序列号: {SequenceId}", sequenceId);
 
@@ -96,7 +96,7 @@ public class InMemoryInspectionEventBus : IInspectionEventBus, IDisposable
     public IDisposable Subscribe<T>(Func<T, CancellationToken, Task> handler) where T : IInspectionEvent
     {
         var type = typeof(T);
-        
+
         _handlers.AddOrUpdate(
             type,
             _ => ImmutableList.Create<Delegate>(handler),
@@ -114,11 +114,11 @@ public class InMemoryInspectionEventBus : IInspectionEventBus, IDisposable
         });
     }
 
-    public IDisposable SubscribeInterface<TInterface>(Func<TInterface, CancellationToken, Task> handler) 
+    public IDisposable SubscribeInterface<TInterface>(Func<TInterface, CancellationToken, Task> handler)
         where TInterface : class, IInspectionEvent
     {
         var type = typeof(TInterface);
-        
+
         // 关键修正：创建包装器委托，避免运行时类型转换失败
         Func<object, CancellationToken, Task> wrapper = async (obj, ct) =>
         {
@@ -128,7 +128,7 @@ public class InMemoryInspectionEventBus : IInspectionEventBus, IDisposable
             }
             else
             {
-                _logger.LogWarning("[EventBus] 事件类型不匹配，期望 {Expected}，实际 {Actual}", 
+                _logger.LogWarning("[EventBus] 事件类型不匹配，期望 {Expected}，实际 {Actual}",
                     typeof(TInterface).Name, obj.GetType().Name);
             }
         };

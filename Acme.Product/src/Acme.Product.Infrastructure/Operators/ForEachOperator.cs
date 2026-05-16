@@ -4,23 +4,22 @@
 // 作者：蘅芜君
 
 using System.Collections.Concurrent;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
 /// ForEach 子图执行算子 - 对集合中的每个元素执行子流程
-/// 
+///
 /// 核心特性：
 /// 1. IoMode=Parallel: 纯计算子图，使用 Parallel.ForEachAsync 并行执行
 /// 2. IoMode=Sequential: 含 I/O 的串行子图，顺序执行保护硬件连接
-/// 
+///
 /// 使用场景：
 /// - 多目标检测后的逐条处理（如每个缺陷上报 MES）
 /// - 批量 HTTP 校验

@@ -1,4 +1,4 @@
-﻿// TemplateMatchOperator.cs
+// TemplateMatchOperator.cs
 // 模板匹配算子 - 在图像中查找模板位置
 // 作者：ClearVision Team
 

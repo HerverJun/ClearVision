@@ -1,4 +1,4 @@
-﻿// HikvisionCamera.cs
+// HikvisionCamera.cs
 // 海康威视工业相机实现
 // 作者：蘅芜君
 using System.Diagnostics;
@@ -174,7 +174,8 @@ public class HikvisionCamera : ICameraProvider
 
             for (int i = 0; i < _deviceList.nDeviceNum; i++)
             {
-                if (_deviceList.pDeviceInfo[i] == IntPtr.Zero) continue;
+                if (_deviceList.pDeviceInfo[i] == IntPtr.Zero)
+                    continue;
 
                 var deviceInfo = Marshal.PtrToStructure<MV_CC_DEVICE_INFO>(_deviceList.pDeviceInfo[i]);
                 string serialNumber = ExtractSerialNumber(deviceInfo);
@@ -220,14 +221,17 @@ public class HikvisionCamera : ICameraProvider
                 {
                     // GigE layout may vary across SDK versions; try both common offsets.
                     var sn = ExtractAsciiField(deviceInfo.SpecialInfo, 144, 16);
-                    if (!string.IsNullOrWhiteSpace(sn)) return sn;
+                    if (!string.IsNullOrWhiteSpace(sn))
+                        return sn;
                     sn = ExtractAsciiField(deviceInfo.SpecialInfo, 16, 16);
-                    if (!string.IsNullOrWhiteSpace(sn)) return sn;
+                    if (!string.IsNullOrWhiteSpace(sn))
+                        return sn;
                 }
                 else
                 {
                     var sn = ExtractAsciiField(deviceInfo.SpecialInfo, 64, 64);
-                    if (!string.IsNullOrWhiteSpace(sn)) return sn;
+                    if (!string.IsNullOrWhiteSpace(sn))
+                        return sn;
                 }
             }
         }
@@ -245,11 +249,13 @@ public class HikvisionCamera : ICameraProvider
                 deviceInfo.SpecialInfo.Length > 0)
             {
                 var manufacturer = ExtractAsciiField(deviceInfo.SpecialInfo, 0, 32);
-                if (!string.IsNullOrWhiteSpace(manufacturer)) return manufacturer;
+                if (!string.IsNullOrWhiteSpace(manufacturer))
+                    return manufacturer;
 
                 // Some layouts contain IP fields before manufacturer name.
                 manufacturer = ExtractAsciiField(deviceInfo.SpecialInfo, 16, 32);
-                if (!string.IsNullOrWhiteSpace(manufacturer)) return manufacturer;
+                if (!string.IsNullOrWhiteSpace(manufacturer))
+                    return manufacturer;
             }
         }
         catch (Exception ex) { Debug.WriteLine($"[HikvisionCamera] ExtractManufacturerName failed: {ex.Message}"); }
@@ -266,10 +272,12 @@ public class HikvisionCamera : ICameraProvider
                 deviceInfo.SpecialInfo.Length > 0)
             {
                 var model = ExtractAsciiField(deviceInfo.SpecialInfo, 32, 32);
-                if (!string.IsNullOrWhiteSpace(model)) return model;
+                if (!string.IsNullOrWhiteSpace(model))
+                    return model;
 
                 model = ExtractAsciiField(deviceInfo.SpecialInfo, 48, 32);
-                if (!string.IsNullOrWhiteSpace(model)) return model;
+                if (!string.IsNullOrWhiteSpace(model))
+                    return model;
             }
         }
         catch (Exception ex) { Debug.WriteLine($"[HikvisionCamera] ExtractModelName failed: {ex.Message}"); }
@@ -286,10 +294,12 @@ public class HikvisionCamera : ICameraProvider
                 deviceInfo.SpecialInfo.Length > 0)
             {
                 var userDefinedName = ExtractAsciiField(deviceInfo.SpecialInfo, 176, 16);
-                if (!string.IsNullOrWhiteSpace(userDefinedName)) return userDefinedName;
+                if (!string.IsNullOrWhiteSpace(userDefinedName))
+                    return userDefinedName;
 
                 userDefinedName = ExtractAsciiField(deviceInfo.SpecialInfo, 160, 16);
-                if (!string.IsNullOrWhiteSpace(userDefinedName)) return userDefinedName;
+                if (!string.IsNullOrWhiteSpace(userDefinedName))
+                    return userDefinedName;
             }
         }
         catch (Exception ex) { Debug.WriteLine($"[HikvisionCamera] ExtractUserDefinedName failed: {ex.Message}"); }
@@ -391,7 +401,8 @@ public class HikvisionCamera : ICameraProvider
 
     public bool Open(string serialNumber)
     {
-        if (IsConnected) Close();
+        if (IsConnected)
+            Close();
 
         try
         {
@@ -481,8 +492,10 @@ public class HikvisionCamera : ICameraProvider
 
     public bool StartGrabbing()
     {
-        if (!IsConnected) return false;
-        if (_isGrabbing) return true;
+        if (!IsConnected)
+            return false;
+        if (_isGrabbing)
+            return true;
 
         int result = MV_CC_StartGrabbing(_handle);
         _isGrabbing = result == MV_OK;
@@ -492,8 +505,10 @@ public class HikvisionCamera : ICameraProvider
 
     public bool StopGrabbing()
     {
-        if (!IsConnected) return true;
-        if (!_isGrabbing) return true;
+        if (!IsConnected)
+            return true;
+        if (!_isGrabbing)
+            return true;
 
         int result = MV_CC_StopGrabbing(_handle);
         _isGrabbing = false;
@@ -502,7 +517,8 @@ public class HikvisionCamera : ICameraProvider
 
     public CameraFrame? GetFrame(int timeoutMs = 1000)
     {
-        if (!IsConnected || !_isGrabbing || _frameBufferPtr == IntPtr.Zero || _frameBufferSize <= 0) return null;
+        if (!IsConnected || !_isGrabbing || _frameBufferPtr == IntPtr.Zero || _frameBufferSize <= 0)
+            return null;
 
         try
         {
@@ -555,19 +571,22 @@ public class HikvisionCamera : ICameraProvider
 
     public bool SetExposure(double microseconds)
     {
-        if (!IsConnected) return false;
+        if (!IsConnected)
+            return false;
         return MV_CC_SetFloatValue(_handle, "ExposureTime", (float)microseconds) == MV_OK;
     }
 
     public bool SetGain(double value)
     {
-        if (!IsConnected) return false;
+        if (!IsConnected)
+            return false;
         return MV_CC_SetFloatValue(_handle, "Gain", (float)value) == MV_OK;
     }
 
     public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null)
     {
-        if (!IsConnected) return false;
+        if (!IsConnected)
+            return false;
 
         if (mode == CameraTriggerMode.Software)
         {
@@ -589,7 +608,8 @@ public class HikvisionCamera : ICameraProvider
 
     public bool ExecuteSoftwareTrigger()
     {
-        if (!IsConnected) return false;
+        if (!IsConnected)
+            return false;
         return MV_CC_SetCommandValue(_handle, "TriggerSoftware") == MV_OK;
     }
 
@@ -601,7 +621,8 @@ public class HikvisionCamera : ICameraProvider
 
     protected virtual void Dispose(bool disposing)
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
 
         try
         {

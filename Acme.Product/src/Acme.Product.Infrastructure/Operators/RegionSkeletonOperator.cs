@@ -57,7 +57,8 @@ public class RegionSkeletonOperator : OperatorBase
         if (!TryGetInputRegion(inputs, "Region", out var region) || region == null)
             return Task.FromResult(OperatorExecutionOutput.Failure("Input region required."));
 
-        if (region.IsEmpty) return Task.FromResult(CreateEmptyOutput());
+        if (region.IsEmpty)
+            return Task.FromResult(CreateEmptyOutput());
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -120,7 +121,8 @@ public class RegionSkeletonOperator : OperatorBase
             {
                 for (int x = 1; x < src.Cols - 1; x++)
                 {
-                    if (src.At<byte>(y, x) == 0) continue;
+                    if (src.At<byte>(y, x) == 0)
+                        continue;
 
                     var p = GetNeighbors(src, x, y);
                     int A = CountTransitions(p);
@@ -138,9 +140,11 @@ public class RegionSkeletonOperator : OperatorBase
             // Delete marked points
             for (int y = 0; y < src.Rows; y++)
                 for (int x = 0; x < src.Cols; x++)
-                    if (markers[y, x]) src.Set(y, x, (byte)0);
+                    if (markers[y, x])
+                        src.Set(y, x, (byte)0);
 
-            if (!changed) break;
+            if (!changed)
+                break;
 
             // Step 2
             markers = new bool[src.Rows, src.Cols];
@@ -148,7 +152,8 @@ public class RegionSkeletonOperator : OperatorBase
             {
                 for (int x = 1; x < src.Cols - 1; x++)
                 {
-                    if (src.At<byte>(y, x) == 0) continue;
+                    if (src.At<byte>(y, x) == 0)
+                        continue;
 
                     var p = GetNeighbors(src, x, y);
                     int A = CountTransitions(p);
@@ -165,7 +170,8 @@ public class RegionSkeletonOperator : OperatorBase
 
             for (int y = 0; y < src.Rows; y++)
                 for (int x = 0; x < src.Cols; x++)
-                    if (markers[y, x]) src.Set(y, x, (byte)0);
+                    if (markers[y, x])
+                        src.Set(y, x, (byte)0);
         }
 
         src.CopyTo(dst);
@@ -209,13 +215,16 @@ public class RegionSkeletonOperator : OperatorBase
         {
             for (int x = 1; x < skeleton.Cols - 1; x++)
             {
-                if (skeleton.At<byte>(y, x) == 0) continue;
+                if (skeleton.At<byte>(y, x) == 0)
+                    continue;
 
                 var neighbors = GetNeighbors(skeleton, x, y);
                 int count = neighbors.Count(v => v == 255);
 
-                if (count == 1) endPoints.Add(new Point(x, y));
-                else if (count >= 3) branchPoints.Add(new Point(x, y));
+                if (count == 1)
+                    endPoints.Add(new Point(x, y));
+                else if (count >= 3)
+                    branchPoints.Add(new Point(x, y));
             }
         }
 
@@ -230,7 +239,8 @@ public class RegionSkeletonOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs?.TryGetValue(key, out var val) == true && val is Region r) { region = r; return true; }
+        if (inputs?.TryGetValue(key, out var val) == true && val is Region r)
+        { region = r; return true; }
         return false;
     }
 
@@ -246,8 +256,10 @@ public class RegionSkeletonOperator : OperatorBase
             Cv2.BitwiseAnd(c, c, c, skelMat);
             Cv2.AddWeighted(res[roi], 0.8, c, 0.8, 0, res[roi]);
         }
-        foreach (var p in ends) Cv2.Circle(res, p, 3, new Scalar(0, 0, 255), -1);
-        foreach (var p in branches) Cv2.Circle(res, p, 4, new Scalar(255, 0, 0), -1);
+        foreach (var p in ends)
+            Cv2.Circle(res, p, 3, new Scalar(0, 0, 255), -1);
+        foreach (var p in branches)
+            Cv2.Circle(res, p, 4, new Scalar(255, 0, 0), -1);
         Cv2.PutText(res, $"Skeleton: {skel.Area}px E:{ends.Count} B:{branches.Count}", new Point(10, 30), HersheyFonts.HersheySimplex, 0.5, new Scalar(0, 255, 255), 2);
         return res;
     }
@@ -266,8 +278,10 @@ public class RegionSkeletonOperator : OperatorBase
             Cv2.BitwiseAnd(c, c, c, skelMat);
             c.CopyTo(mat[sroi], skelMat);
         }
-        foreach (var p in ends) Cv2.Circle(mat, new Point(p.X - bbox.X + pad, p.Y - bbox.Y + pad), 3, new Scalar(0, 0, 255), -1);
-        foreach (var p in branches) Cv2.Circle(mat, new Point(p.X - bbox.X + pad, p.Y - bbox.Y + pad), 4, new Scalar(255, 0, 0), -1);
+        foreach (var p in ends)
+            Cv2.Circle(mat, new Point(p.X - bbox.X + pad, p.Y - bbox.Y + pad), 3, new Scalar(0, 0, 255), -1);
+        foreach (var p in branches)
+            Cv2.Circle(mat, new Point(p.X - bbox.X + pad, p.Y - bbox.Y + pad), 4, new Scalar(255, 0, 0), -1);
         Cv2.PutText(mat, $"Len:{skel.Area} E:{ends.Count} B:{branches.Count}", new Point(10, 30), HersheyFonts.HersheySimplex, 0.5, new Scalar(0, 255, 255), 2);
         return mat;
     }
@@ -292,7 +306,8 @@ public class RegionSkeletonOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var maxIter = GetIntParam(@operator, "MaxIterations", 100);
-        if (maxIter < 1 || maxIter > 1000) return ValidationResult.Invalid("MaxIterations 1-1000.");
+        if (maxIter < 1 || maxIter > 1000)
+            return ValidationResult.Invalid("MaxIterations 1-1000.");
         return ValidationResult.Valid();
     }
 }

@@ -240,25 +240,25 @@ public static class PlcEndpoints
         switch (protocol)
         {
             case CommunicationConfig.ProtocolS7:
+            {
+                var cpu = string.IsNullOrWhiteSpace(request.CpuType) ? "S7-1200" : request.CpuType!.Trim();
+                var rack = request.Rack ?? 0;
+                var slot = request.Slot ?? 1;
+                if (rack < 0 || rack > 15)
                 {
-                    var cpu = string.IsNullOrWhiteSpace(request.CpuType) ? "S7-1200" : request.CpuType!.Trim();
-                    var rack = request.Rack ?? 0;
-                    var slot = request.Slot ?? 1;
-                    if (rack < 0 || rack > 15)
-                    {
-                        errorMessage = "Rack 必须在 0-15 之间。";
-                        return false;
-                    }
-
-                    if (slot < 0 || slot > 15)
-                    {
-                        errorMessage = "Slot 必须在 0-15 之间。";
-                        return false;
-                    }
-
-                    connectionString = $"S7://{ipAddress}:{port}?cpu={Uri.EscapeDataString(cpu)}&rack={rack}&slot={slot}";
-                    return true;
+                    errorMessage = "Rack 必须在 0-15 之间。";
+                    return false;
                 }
+
+                if (slot < 0 || slot > 15)
+                {
+                    errorMessage = "Slot 必须在 0-15 之间。";
+                    return false;
+                }
+
+                connectionString = $"S7://{ipAddress}:{port}?cpu={Uri.EscapeDataString(cpu)}&rack={rack}&slot={slot}";
+                return true;
+            }
             case CommunicationConfig.ProtocolMc:
                 connectionString = $"MC://{ipAddress}:{port}";
                 return true;

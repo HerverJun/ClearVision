@@ -1,4 +1,4 @@
-﻿using Acme.Product.Core.DTOs;
+using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Entities;
 
 namespace Acme.Product.Infrastructure.AI;

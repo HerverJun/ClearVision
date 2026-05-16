@@ -1,5 +1,5 @@
-using System.Numerics;
 using System.Diagnostics;
+using System.Numerics;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
@@ -367,6 +367,7 @@ public class Phase42MeasurementAndSignalOperatorTests
     }
 
     [Fact]
+    [Trait("Category", "PerformanceBudget")]
     public async Task FrequencyOperators_LabBudget1024PointChain_ShouldStayWithinBudgetAndAttenuateHighFrequency()
     {
         var fft = new FFT1DOperator(Substitute.For<ILogger<FFT1DOperator>>());

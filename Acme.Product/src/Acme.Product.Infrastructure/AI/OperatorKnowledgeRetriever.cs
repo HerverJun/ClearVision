@@ -1,5 +1,5 @@
-using Acme.Product.Core.Services;
 using Acme.Product.Core.Enums;
+using Acme.Product.Core.Services;
 
 namespace Acme.Product.Infrastructure.AI;
 

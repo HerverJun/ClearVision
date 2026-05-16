@@ -4,12 +4,11 @@
 
 using System.IO.Ports;
 using System.Text;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -86,7 +85,7 @@ public class SerialCommunicationOperator : OperatorBase
         try
         {
             port.Open();
-            
+
             // 发送数据
             if (!string.IsNullOrEmpty(sendData))
             {
@@ -99,7 +98,7 @@ public class SerialCommunicationOperator : OperatorBase
                     {
                         return Task.FromResult(OperatorExecutionOutput.Failure("HEX 数据长度必须是偶数"));
                     }
-                    
+
                     bytes = new byte[hexString.Length / 2];
                     for (int i = 0; i < hexString.Length; i += 2)
                     {
@@ -117,20 +116,20 @@ public class SerialCommunicationOperator : OperatorBase
                     };
                     bytes = textEncoding.GetBytes(sendData);
                 }
-                
+
                 port.Write(bytes, 0, bytes.Length);
                 Logger.LogInformation("[SerialCommunication] 已发送 {Bytes} 字节到 {Port}", bytes.Length, portName);
             }
-            
+
             // 接收响应
             Thread.Sleep(100); // 等待设备响应
-            
+
             string response = "";
             if (port.BytesToRead > 0)
             {
                 byte[] buffer = new byte[port.BytesToRead];
                 int bytesRead = port.Read(buffer, 0, buffer.Length);
-                
+
                 if (encoding.Equals("HEX", StringComparison.OrdinalIgnoreCase))
                 {
                     response = BitConverter.ToString(buffer, 0, bytesRead).Replace("-", " ");
@@ -145,10 +144,10 @@ public class SerialCommunicationOperator : OperatorBase
                     };
                     response = textEncoding.GetString(buffer, 0, bytesRead);
                 }
-                
+
                 Logger.LogInformation("[SerialCommunication] 从 {Port} 接收 {Bytes} 字节", portName, bytesRead);
             }
-            
+
             var output = new Dictionary<string, object>
             {
                 { "Response", response },
@@ -157,7 +156,7 @@ public class SerialCommunicationOperator : OperatorBase
                 { "BaudRate", baudRate },
                 { "Success", true }
             };
-            
+
             return Task.FromResult(OperatorExecutionOutput.Success(output));
         }
         catch (UnauthorizedAccessException ex)

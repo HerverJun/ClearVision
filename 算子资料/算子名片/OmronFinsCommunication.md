@@ -6,68 +6,79 @@
 | 类名 (Class) | `OmronFinsCommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.OmronFinsCommunication` |
 | 分类 (Category) | 通信 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解析。
-
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含外部资源访问逻辑，执行结果会受文件系统、网络、PLC、串口或外部服务状态影响。
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 核心流程偏向协议适配：建立连接、发送请求、解析响应、输出状态。
+- 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
+- 可选输入用于覆盖或补充参数配置：`Data`。
+- 参数解析覆盖 13 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `GetStringParam / GetIntParam / GetDoubleParam / GetBoolParam / GetFloatParam`
+- `OperatorBase.Get*Param(...)`
+- `PlcClientFactory.CreateOmronFins`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `IpAddress` | `string` | `"192.168.250.1"` | - | 控制“IpAddress”这一实现参数，建议结合现场样本调节。 |
-| `Port` | `int` | `9600` | [1, 65535] | 通信端口。 |
-| `Address` | `string` | `"DM100"` | - | 控制“Address”这一实现参数，建议结合现场样本调节。 |
-| `Length` | `int` | `1` | [1, 999] | 控制“Length”这一实现参数，建议结合现场样本调节。 |
-| `DataType` | `enum` | `"Word"` | Bit/位 (Bool)；Word/字 (Word/UInt16)；Int16/短整型 (Int16)；DWord/双字 (DWord/UInt32)；Int32/整型 (Int32)；Float/浮点 (Float) | 操作类型或转换类型。 |
-| `Operation` | `enum` | `"Read"` | Read/读取；Write/写入 | 该参数用于在多个实现分支之间切换。 |
-| `WriteValue` | `string` | `""` | - | 控制“WriteValue”这一实现参数，建议结合现场样本调节。 |
-| `PollingMode` | `enum` | `"None"` | None/不等待；WaitForValue/等待指定值 | 读取时是否启用轮询等待 |
-| `PollingCondition` | `enum` | `"Equal"` | Equal/等于；NotEqual/不等于；GreaterThan/大于；LessThan/小于；GreaterOrEqual/大于等于；LessOrEqual/小于等于 | 等待的条件类型 |
-| `PollingValue` | `string` | `"1"` | - | 等待的目标值（如触发信号值） |
-| `PollingTimeout` | `int` | `30000` | [100, 300000] | 最长等待时间（毫秒） |
-| `PollingInterval` | `int` | `50` | [10, 5000] | 每次读取间隔（毫秒） |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `IpAddress` | IP地址 | `string` | 192.168.250.1 | - | Yes | - |
+| `Port` | 端口 | `int` | 9600 | [1, 65535] | Yes | - |
+| `UseGlobalFallback` | 允许全局回退 | `bool` | false | - | Yes | 启用后缺失的IP/Port可回退到全局通信配置 |
+| `Address` | PLC地址 | `string` | DM100 | - | Yes | - |
+| `Length` | 读取长度 | `int` | 1 | [1, 999] | Yes | - |
+| `DataType` | 数据类型 | `enum` | Word | Bit/位 (Bool)；Word/字 (Word/UInt16)；Int16/短整型 (Int16)；DWord/双字 (DWord/UInt32)；Int32/整型 (Int32)；Float/浮点 (Float)；Double/双精度 (Double) | Yes | - |
+| `Operation` | 操作 | `enum` | Read | Read/读取；Write/写入 | Yes | - |
+| `WriteValue` | 写入值 | `string` | "" | - | Yes | - |
+| `PollingMode` | 轮询模式 | `enum` | None | None/不等待；WaitForValue/等待指定值 | Yes | 读取时是否启用轮询等待 |
+| `PollingCondition` | 等待条件 | `enum` | Equal | Equal/等于；NotEqual/不等于；GreaterThan/大于；LessThan/小于；GreaterOrEqual/大于等于；LessOrEqual/小于等于 | Yes | 等待的条件类型 |
+| `PollingValue` | 等待值 | `string` | 1 | - | Yes | 等待的目标值（如触发信号值） |
+| `PollingTimeout` | 等待超时(ms) | `int` | 30000 | [100, 300000] | Yes | 最长等待时间（毫秒） |
+| `PollingInterval` | 轮询间隔(ms) | `int` | 50 | [10, 5000] | Yes | 每次读取间隔（毫秒） |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Data` | 数据 | `Any` | No | 提供通信请求所需输入。 |
+| `Data` | 数据 | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Response` | 响应 | `String` | 输出通信状态或响应结果。 |
-| `Status` | 状态 | `Boolean` | 输出通信状态或响应结果。 |
+| `Response` | 响应 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `Status` | 状态 | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | CPU 开销通常较小，整体耗时主要由设备、网络或协议往返决定。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 主要由中间结果、缓存结构和输出封装决定。 |
+| 时间复杂度 (Time Complexity) | 主要受外部 I/O、网络或设备响应时间影响；本地处理通常随输入规模线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于文件系统、网络、PLC/串口设备或外部服务响应。 |
+| 内存特征 (Memory Profile) | 主要由请求/响应缓冲、序列化数据和外部资源句柄占用决定。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：未发现同名算子测试入口，建议补充关键路径和边界输入验证。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
 
 ## 适用场景 / Use Cases
-- 适合与 PLC、串口设备、TCP 服务或 HTTP 接口联动。
-- 适合把视觉结果写入外部控制系统或读取工艺参数。
-- 不适合把通信成功直接等同于业务成功。
-- 不适合忽略网络与设备延迟。
+- 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
+- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
 
 ## 已知限制 / Known Limitations
-1. 参数 `PollingMode` 已在元数据中声明，但从源码看当前没有明显被执行逻辑实际使用。
-2. 声明输出 `Response` 与当前运行时附加字段不完全一致，集成时应以实际输出字典为准。
+1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+2. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

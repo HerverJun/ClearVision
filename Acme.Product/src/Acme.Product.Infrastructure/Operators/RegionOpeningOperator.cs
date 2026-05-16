@@ -109,7 +109,8 @@ public class RegionOpeningOperator : OperatorBase
     private Region Erode(Region region, MorphologyKernel kernel)
     {
         var offsets = kernel.GetOffsets().ToList();
-        if (offsets.Count == 0) return region;
+        if (offsets.Count == 0)
+            return region;
 
         var resultRuns = new List<RunLength>();
 
@@ -147,9 +148,11 @@ public class RegionOpeningOperator : OperatorBase
                                 }
                             }
                         }
-                        else nextInside = false;
+                        else
+                            nextInside = false;
 
-                        if (!nextInside) break;
+                        if (!nextInside)
+                            break;
                         x++;
                     }
                     resultRuns.Add(new RunLength(y, startX, x));
@@ -163,7 +166,8 @@ public class RegionOpeningOperator : OperatorBase
     private Region Dilate(Region region, MorphologyKernel kernel)
     {
         var offsets = kernel.GetOffsets().ToList();
-        if (offsets.Count == 0) return region;
+        if (offsets.Count == 0)
+            return region;
 
         var expanded = new HashSet<(int x, int y)>();
 
@@ -183,7 +187,8 @@ public class RegionOpeningOperator : OperatorBase
 
     private Region PointsToRuns(HashSet<(int x, int y)> points)
     {
-        if (points.Count == 0) return new Region();
+        if (points.Count == 0)
+            return new Region();
 
         var byY = points.GroupBy(p => p.Item2).OrderBy(g => g.Key);
         var runs = new List<RunLength>();
@@ -214,7 +219,8 @@ public class RegionOpeningOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs == null) return false;
+        if (inputs == null)
+            return false;
         if (inputs.TryGetValue(key, out var value) && value is Region r)
         {
             region = r;
@@ -280,8 +286,10 @@ public class RegionOpeningOperator : OperatorBase
         var kernelWidth = GetIntParam(@operator, "KernelWidth", 3);
         var kernelHeight = GetIntParam(@operator, "KernelHeight", 3);
         var kernelShape = GetStringParam(@operator, "KernelShape", "Rectangle");
-        if (kernelWidth < 1 || kernelWidth > 99) return ValidationResult.Invalid("KernelWidth must be 1-99.");
-        if (kernelHeight < 1 || kernelHeight > 99) return ValidationResult.Invalid("KernelHeight must be 1-99.");
+        if (kernelWidth < 1 || kernelWidth > 99)
+            return ValidationResult.Invalid("KernelWidth must be 1-99.");
+        if (kernelHeight < 1 || kernelHeight > 99)
+            return ValidationResult.Invalid("KernelHeight must be 1-99.");
         var validShapes = new[] { "Rectangle", "Ellipse", "Cross" };
         if (!validShapes.Contains(kernelShape, StringComparer.OrdinalIgnoreCase))
             return ValidationResult.Invalid($"KernelShape must be one of: {string.Join(", ", validShapes)}");

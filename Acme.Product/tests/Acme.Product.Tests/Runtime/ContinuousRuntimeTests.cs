@@ -1,7 +1,7 @@
-using Acme.Product.Core.Enums;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.Streaming;

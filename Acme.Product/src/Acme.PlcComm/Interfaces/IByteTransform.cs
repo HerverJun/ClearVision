@@ -119,17 +119,17 @@ public class PlcConnectionConfig
     public int ConnectTimeout { get; set; } = 10000;
     public int ReadTimeout { get; set; } = 5000;
     public int WriteTimeout { get; set; } = 5000;
-    
+
     // S7专用
     public int Rack { get; set; } = 0;
     public int Slot { get; set; } = 1;
     public SiemensCpuType CpuType { get; set; } = SiemensCpuType.S71200;
-    
+
     // MC专用
     public McFrameType FrameType { get; set; } = McFrameType.Frame3E;
     public byte NetworkNumber { get; set; } = 0;
     public byte PcNumber { get; set; } = 0xFF;
-    
+
     // FINS专用
     public byte LocalNode { get; set; } = 0;
     public byte RemoteNode { get; set; } = 0;

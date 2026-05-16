@@ -1,9 +1,9 @@
 using Acme.Product.Application.DTOs;
 using Acme.Product.Desktop.Endpoints;
 using FluentAssertions;
+using OperatorType = Acme.Product.Core.Enums.OperatorType;
 using PortDataType = Acme.Product.Core.Enums.PortDataType;
 using PortDirection = Acme.Product.Core.Enums.PortDirection;
-using OperatorType = Acme.Product.Core.Enums.OperatorType;
 
 namespace Acme.Product.Desktop.Tests;
 

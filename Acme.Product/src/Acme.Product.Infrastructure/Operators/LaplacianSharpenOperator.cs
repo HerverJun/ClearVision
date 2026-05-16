@@ -2,13 +2,12 @@
 // 拉普拉斯锐化算子 - 边缘增强
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -51,7 +50,8 @@ public class LaplacianSharpenOperator : OperatorBase
         var sharpenStrength = GetDoubleParam(@operator, "SharpenStrength", 1.0, min: 0, max: 5.0);
 
         // 确保核大小为奇数
-        if (kernelSize % 2 == 0) kernelSize++;
+        if (kernelSize % 2 == 0)
+            kernelSize++;
 
         var src = imageWrapper.GetMat();
         if (src.Empty())
@@ -67,17 +67,17 @@ public class LaplacianSharpenOperator : OperatorBase
         {
             using var gray = new Mat();
             Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-            
+
             // 拉普拉斯边缘检测
             Cv2.Laplacian(gray, laplacian, MatType.CV_32F, kernelSize, scale, delta);
-            
+
             // 转回8位
             Cv2.ConvertScaleAbs(laplacian, laplacian);
-            
+
             // 锐化：原图 + 边缘 * 强度
             using var laplacian3C = new Mat();
             Cv2.CvtColor(laplacian, laplacian3C, ColorConversionCodes.GRAY2BGR);
-            
+
             // 使用加权叠加：dst = src + strength * laplacian
             Cv2.AddWeighted(src, 1.0, laplacian3C, sharpenStrength, 0, dst);
         }

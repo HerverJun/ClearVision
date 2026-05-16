@@ -4,12 +4,12 @@
 
 #pragma warning disable CS0618 // Legacy compatibility coverage intentionally exercises obsolete Sprint 5 types.
 
-using Xunit;
-using FluentAssertions;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Services;
+using FluentAssertions;
+using Xunit;
 
 namespace Acme.Product.Tests.AI;
 

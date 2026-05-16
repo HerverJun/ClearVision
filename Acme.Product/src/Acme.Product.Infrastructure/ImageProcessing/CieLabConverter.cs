@@ -55,12 +55,16 @@ public static class CieLabConverter
 
     public static CieLab ComputeMeanLabBgr8U(Mat bgr8U, Rect roi)
     {
-        if (bgr8U == null) throw new ArgumentNullException(nameof(bgr8U));
-        if (bgr8U.Empty()) throw new ArgumentException("Input image is empty.", nameof(bgr8U));
-        if (bgr8U.Type() != MatType.CV_8UC3) throw new ArgumentException("Expected CV_8UC3 BGR image.", nameof(bgr8U));
+        if (bgr8U == null)
+            throw new ArgumentNullException(nameof(bgr8U));
+        if (bgr8U.Empty())
+            throw new ArgumentException("Input image is empty.", nameof(bgr8U));
+        if (bgr8U.Type() != MatType.CV_8UC3)
+            throw new ArgumentException("Expected CV_8UC3 BGR image.", nameof(bgr8U));
 
         var r = ClampRoi(roi, bgr8U.Width, bgr8U.Height);
-        if (r.Width <= 0 || r.Height <= 0) return default;
+        if (r.Width <= 0 || r.Height <= 0)
+            return default;
 
         var idx = bgr8U.GetGenericIndexer<Vec3b>();
         double sumL = 0, sumA = 0, sumB = 0;
@@ -79,7 +83,8 @@ public static class CieLabConverter
             }
         }
 
-        if (n <= 0) return default;
+        if (n <= 0)
+            return default;
         var inv = 1.0 / n;
         return new CieLab(sumL * inv, sumA * inv, sumB * inv);
     }

@@ -2,12 +2,11 @@
 // 条件分支算子 - 流程控制（True// 功能实现False分支）
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -100,7 +99,7 @@ public class ConditionalBranchOperator : OperatorBase
         // 尝试将值转换为数字进行比较
         double actualNum = 0;
         double compareNum = 0;
-        bool isNumeric = double.TryParse(actualValue?.ToString(), out actualNum) && 
+        bool isNumeric = double.TryParse(actualValue?.ToString(), out actualNum) &&
                          double.TryParse(compareValueStr, out compareNum);
 
         // 字符串值

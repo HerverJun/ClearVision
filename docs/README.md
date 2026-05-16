@@ -5,6 +5,7 @@ This directory is the primary documentation entry point. Active release and engi
 ## Core
 
 - [项目总览](./项目总览.md)
+- [文档健康检查报告](./文档健康检查报告-2026-05-16.md)
 - [当前最终整合 TODO](./进行中/当前计划/ClearVision-最终整合TODO-2026-05-03.md)
 - [Station-Studio sync SOP](./runtime/station-studio-sync.md)
 - [Desktop/Studio boundary](./runtime/Desktop-Studio-Boundary.md)

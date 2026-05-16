@@ -1,6 +1,6 @@
+using Acme.Product.Core.Services;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Services;
-using Acme.Product.Core.Services;
 using FluentAssertions;
 
 namespace Acme.Product.Tests.AI;

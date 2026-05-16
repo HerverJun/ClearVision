@@ -1,13 +1,13 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
-using Acme.Product.Core.Attributes;
 using Acme.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using OpenCvSharp;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Acme.Product.Tests.Operators;
@@ -51,8 +51,12 @@ public class RoiTransformOperatorTests
         using var moved = new Mat();
         using (var m = new Mat(2, 3, MatType.CV_64FC1))
         {
-            m.Set(0, 0, 1.0); m.Set(0, 1, 0.0); m.Set(0, 2, dx);
-            m.Set(1, 0, 0.0); m.Set(1, 1, 1.0); m.Set(1, 2, dy);
+            m.Set(0, 0, 1.0);
+            m.Set(0, 1, 0.0);
+            m.Set(0, 2, dx);
+            m.Set(1, 0, 0.0);
+            m.Set(1, 1, 1.0);
+            m.Set(1, 2, dy);
             Cv2.WarpAffine(baseImage, moved, m, new Size(width, height), InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
         }
 

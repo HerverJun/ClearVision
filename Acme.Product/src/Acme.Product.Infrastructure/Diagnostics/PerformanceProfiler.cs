@@ -17,10 +17,10 @@ public class ProfilerResult
     public double MinMs { get; set; } = double.MaxValue;
     public double MaxMs { get; set; } = double.MinValue;
     public double AverageMs => Count > 0 ? TotalMs / Count : 0;
-    
+
     // 用于计算标准差 (简单的平方和记录)
     public double SumOfSquaresMs { get; set; }
-    
+
     /// <summary>
     /// 标准差 (Standard Deviation)
     /// </summary>
@@ -28,7 +28,8 @@ public class ProfilerResult
     {
         get
         {
-            if (Count <= 1) return 0;
+            if (Count <= 1)
+                return 0;
             double variance = (SumOfSquaresMs - (TotalMs * TotalMs / Count)) / Count;
             return variance > 0 ? Math.Sqrt(variance) : 0;
         }
@@ -42,7 +43,7 @@ public class ProfilerResult
 public class PerformanceProfiler : IDisposable
 {
     private static readonly ConcurrentDictionary<string, ProfilerResult> _results = new(StringComparer.OrdinalIgnoreCase);
-    
+
     private readonly string _name;
     private readonly Stopwatch _stopwatch;
     private bool _disposed;
@@ -91,8 +92,10 @@ public class PerformanceProfiler : IDisposable
                     existing.Count++;
                     existing.TotalMs += elapsedMs;
                     existing.SumOfSquaresMs += elapsedMs * elapsedMs;
-                    if (elapsedMs < existing.MinMs) existing.MinMs = elapsedMs;
-                    if (elapsedMs > existing.MaxMs) existing.MaxMs = elapsedMs;
+                    if (elapsedMs < existing.MinMs)
+                        existing.MinMs = elapsedMs;
+                    if (elapsedMs > existing.MaxMs)
+                        existing.MaxMs = elapsedMs;
                 }
                 return existing;
             });
@@ -130,12 +133,12 @@ public class PerformanceProfiler : IDisposable
     {
         var sb = new StringBuilder();
         sb.AppendLine("OperatorName,Count,TotalMs,AverageMs,MinMs,MaxMs,StdDevMs");
-        
+
         foreach (var r in GetResults())
         {
             sb.AppendLine($"{r.Name},{r.Count},{r.TotalMs:F3},{r.AverageMs:F3},{r.MinMs:F3},{r.MaxMs:F3},{r.StdDevMs:F3}");
         }
-        
+
         return sb.ToString();
     }
 }

@@ -1,4 +1,4 @@
-﻿// CameraManager.cs
+// CameraManager.cs
 // 相机管理器实现
 // 负责相机枚举、绑定配置与逻辑 ID 映射管理
 // 作者：蘅芜君

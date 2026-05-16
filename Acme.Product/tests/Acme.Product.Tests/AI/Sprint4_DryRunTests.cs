@@ -134,7 +134,7 @@ public class Sprint4_DryRunTests
     {
         var registry = new DryRunStubRegistry();
         registry.Register("192.168.1.10:502", "40001", StubResponse.DefaultSuccess);
-        
+
         registry.Clear();
 
         Assert.False(registry.HasStub("192.168.1.10:502", "40001"));

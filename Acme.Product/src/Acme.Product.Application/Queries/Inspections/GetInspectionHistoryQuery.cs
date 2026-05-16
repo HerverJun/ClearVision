@@ -2,10 +2,10 @@
 // GetInspectionHistory查询
 // 作者：蘅芜君
 
-using MediatR;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Interfaces;
 using AutoMapper;
+using MediatR;
 
 namespace Acme.Product.Application.Queries.Inspections;
 
@@ -26,13 +26,14 @@ public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHis
     {
         // Use GetByProjectIdAsync or GetByTimeRangeAsync based on params
         // For simplicity, using GetByProjectIdAsync with limit as pageSize
-        
+
         IEnumerable<Core.Entities.InspectionResult> results;
         if (request.StartDate.HasValue && request.EndDate.HasValue)
         {
             results = await _repository.GetByTimeRangeAsync(request.ProjectId, request.StartDate.Value, request.EndDate.Value);
             // Limit manually if needed
-            if (request.Limit > 0) results = results.Take(request.Limit);
+            if (request.Limit > 0)
+                results = results.Take(request.Limit);
         }
         else
         {

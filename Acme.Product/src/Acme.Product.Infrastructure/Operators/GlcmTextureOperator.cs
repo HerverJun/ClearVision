@@ -152,10 +152,12 @@ public sealed class GlcmTextureOperator : OperatorBase
 
     private static IReadOnlyList<GlcmDirection> ParseDirections(string s)
     {
-        if (string.IsNullOrWhiteSpace(s)) return GlcmTexture.GetDefaultDirections();
+        if (string.IsNullOrWhiteSpace(s))
+            return GlcmTexture.GetDefaultDirections();
 
         var parts = s.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) return GlcmTexture.GetDefaultDirections();
+        if (parts.Length == 0)
+            return GlcmTexture.GetDefaultDirections();
 
         var list = new List<GlcmDirection>();
         foreach (var p in parts)
@@ -166,7 +168,8 @@ public sealed class GlcmTextureOperator : OperatorBase
             }
 
             deg %= 360;
-            if (deg < 0) deg += 360;
+            if (deg < 0)
+                deg += 360;
 
             // Support common 4 directions. Anything else is rejected for now.
             list.Add(deg switch
@@ -189,8 +192,10 @@ public sealed class GlcmTextureOperator : OperatorBase
         var w = GetIntParam(@operator, "RoiW", 0, min: 0, max: width);
         var h = GetIntParam(@operator, "RoiH", 0, min: 0, max: height);
 
-        if (w <= 0) w = width - x;
-        if (h <= 0) h = height - y;
+        if (w <= 0)
+            w = width - x;
+        if (h <= 0)
+            h = height - y;
 
         w = Math.Clamp(w, 0, width - x);
         h = Math.Clamp(h, 0, height - y);

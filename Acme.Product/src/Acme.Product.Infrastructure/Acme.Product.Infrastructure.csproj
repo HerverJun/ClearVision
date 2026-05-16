@@ -9,6 +9,10 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
+    <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>
+    <EnableHuaraySdk Condition="'$(EnableHuaraySdk)' == '' and Exists('$(HuaraySdkPath)MVSDK_Net.dll')">true</EnableHuaraySdk>
+    <EnableHuaraySdk Condition="'$(EnableHuaraySdk)' == ''">false</EnableHuaraySdk>
+    <DefineConstants Condition="'$(EnableHuaraySdk)' == 'true'">$(DefineConstants);HUARAY_SDK</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -76,7 +80,7 @@
   </ItemGroup>
 
   <!-- Huaray camera SDK -->
-  <ItemGroup>
+  <ItemGroup Condition="'$(EnableHuaraySdk)' == 'true'">
     <Reference Include="MVSDK_Net">
       <HintPath>..\..\lib\HuaraySDK\x64\MVSDK_Net.dll</HintPath>
       <Private>true</Private>
@@ -84,7 +88,7 @@
   </ItemGroup>
 
   <!-- Huaray SDK native runtime dependencies copied to output. -->
-  <ItemGroup>
+  <ItemGroup Condition="'$(EnableHuaraySdk)' == 'true'">
     <None Include="..\..\lib\HuaraySDK\x64\**\*.*"
           Exclude="..\..\lib\HuaraySDK\x64\MVSDK_Net.dll;..\..\lib\HuaraySDK\x64\MVSDK_Net.XML">
       <Link>%(Filename)%(Extension)</Link>

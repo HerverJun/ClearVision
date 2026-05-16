@@ -1,16 +1,15 @@
-﻿// EdgePairDefectOperator.cs
+// EdgePairDefectOperator.cs
 // 双边缘缺陷检测算子
 // 基于边缘对关系检测缺陷与异常
 // 作者：蘅芜君
 using System.Collections;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(

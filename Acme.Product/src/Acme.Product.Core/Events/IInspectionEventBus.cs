@@ -32,6 +32,6 @@ public interface IInspectionEventBus
     /// <typeparam name="TInterface">接口类型</typeparam>
     /// <param name="handler">处理器</param>
     /// <returns>订阅句柄（Dispose 取消订阅）</returns>
-    IDisposable SubscribeInterface<TInterface>(Func<TInterface, CancellationToken, Task> handler) 
+    IDisposable SubscribeInterface<TInterface>(Func<TInterface, CancellationToken, Task> handler)
         where TInterface : class, IInspectionEvent;
 }

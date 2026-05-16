@@ -24,7 +24,7 @@ public abstract class UITestBase : IAsyncLifetime
     public async Task InitializeAsync()
     {
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        
+
         Browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = true,
@@ -69,8 +69,9 @@ public abstract class UITestBase : IAsyncLifetime
     /// </summary>
     protected async Task NavigateToAppAsync(string url = "http://localhost:5000")
     {
-        if (Page == null) throw new InvalidOperationException("Page not initialized");
-        
+        if (Page == null)
+            throw new InvalidOperationException("Page not initialized");
+
         await Page.GotoAsync(url);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
@@ -80,8 +81,9 @@ public abstract class UITestBase : IAsyncLifetime
     /// </summary>
     protected async Task TakeScreenshotAsync(string name)
     {
-        if (Page == null) return;
-        
+        if (Page == null)
+            return;
+
         var path = $"screenshots/{name}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
         Directory.CreateDirectory("screenshots");
         await Page.ScreenshotAsync(new PageScreenshotOptions { Path = path });

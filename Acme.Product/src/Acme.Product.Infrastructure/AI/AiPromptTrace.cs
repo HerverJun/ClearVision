@@ -56,14 +56,16 @@ public sealed class AiPromptTrace
 
     private static string? MaskBaseUrl(string? url)
     {
-        if (string.IsNullOrWhiteSpace(url)) return url;
+        if (string.IsNullOrWhiteSpace(url))
+            return url;
         return Regex.Replace(url, @"(api[_-]?key|apikey|key|token|secret)=[^&]+",
             "$1=***", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     internal static string MaskSensitivePatterns(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return text;
+        if (string.IsNullOrWhiteSpace(text))
+            return text;
 
         // Windows local paths: C:\..., D:\...
         text = Regex.Replace(text, @"[A-Za-z]:\\[^\s""'\]\)>]+", "<local-path>");

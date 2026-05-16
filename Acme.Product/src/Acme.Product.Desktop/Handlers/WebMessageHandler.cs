@@ -1,32 +1,32 @@
-﻿// WebMessageHandler.cs
+// WebMessageHandler.cs
 // 发送事件到前端
 // 作者：蘅芜君
 
-using Acme.Product.Contracts.Messages;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Acme.Product.Application.Analysis;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
+using Acme.Product.Contracts.Messages;
+using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Interfaces;
-using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Services;
-using Acme.Product.Desktop.Inspection;
 using Acme.Product.Desktop.Extensions;
+using Acme.Product.Desktop.Inspection;
 using Acme.Product.Infrastructure.Data;
+using Acme.Product.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
-using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Acme.Product.Infrastructure.Services;
-using System.Net.Http;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Collections.Concurrent;
 
 namespace Acme.Product.Desktop.Handlers;
 
@@ -146,43 +146,44 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         _webViewControl = webViewControl;
         _webView = webViewControl.CoreWebView2;
         _webView.WebMessageReceived += OnWebMessageReceived;
-        
+
         // 【架构修复 v2】订阅事件总线
         InitializeEventSubscriptions();
     }
-    
+
     /// <summary>
     /// 【架构修复 v2】订阅事件总线
     /// </summary>
     private void InitializeEventSubscriptions()
     {
-        if (_isSubscribed) return;
-        
+        if (_isSubscribed)
+            return;
+
         try
         {
             _logger.LogInformation("[WebMessageHandler] 初始化事件订阅");
-            
+
             // 订阅状态变更事件
             _subscriptions.Add(_eventBus.Subscribe<InspectionStateChangedEvent>(async (evt, ct) =>
             {
                 PublishRealtimeMessages(evt);
                 await Task.CompletedTask;
             }));
-            
+
             // 订阅结果事件
             _subscriptions.Add(_eventBus.Subscribe<InspectionResultEvent>(async (evt, ct) =>
             {
                 PublishRealtimeMessages(evt);
                 await Task.CompletedTask;
             }));
-            
+
             // 订阅进度事件
             _subscriptions.Add(_eventBus.Subscribe<InspectionProgressEvent>(async (evt, ct) =>
             {
                 PublishRealtimeMessages(evt);
                 await Task.CompletedTask;
             }));
-            
+
             _isSubscribed = true;
             _logger.LogInformation("[WebMessageHandler] 事件订阅完成，共 {Count} 个订阅", _subscriptions.Count);
         }
@@ -857,7 +858,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
         _activeGenerateFlowRequests.Clear();
         _activeGenerateFlowRequestIdsBySessionId.Clear();
-        
+
         foreach (var subscription in _subscriptions)
         {
             try
@@ -871,9 +872,9 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         }
         _subscriptions.Clear();
         _isSubscribed = false;
-        
+
         DetachWebView();
-        
+
         _logger.LogInformation("[WebMessageHandler] 资源已释放");
     }
 

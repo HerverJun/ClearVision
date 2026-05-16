@@ -39,13 +39,18 @@ public static class GlcmTexture
         bool symmetric = true,
         bool normalize = true)
     {
-        if (src == null) throw new ArgumentNullException(nameof(src));
-        if (src.Empty()) throw new ArgumentException("Input image is empty.", nameof(src));
-        if (levels < 2 || levels > 256) throw new ArgumentOutOfRangeException(nameof(levels));
-        if (distance < 1) throw new ArgumentOutOfRangeException(nameof(distance));
+        if (src == null)
+            throw new ArgumentNullException(nameof(src));
+        if (src.Empty())
+            throw new ArgumentException("Input image is empty.", nameof(src));
+        if (levels < 2 || levels > 256)
+            throw new ArgumentOutOfRangeException(nameof(levels));
+        if (distance < 1)
+            throw new ArgumentOutOfRangeException(nameof(distance));
 
         directions ??= GetDefaultDirections();
-        if (directions.Count == 0) throw new ArgumentException("At least one direction is required.", nameof(directions));
+        if (directions.Count == 0)
+            throw new ArgumentException("At least one direction is required.", nameof(directions));
 
         using var gray8U = ToGray8U(src);
         using var quant = Quantize(gray8U, levels);
@@ -75,7 +80,8 @@ public static class GlcmTexture
             n++;
         }
 
-        if (n == 0) return default;
+        if (n == 0)
+            return default;
         var inv = 1.0 / n;
         return new GlcmFeatures(c * inv, corr * inv, e * inv, h * inv, ent * inv);
     }
@@ -100,12 +106,14 @@ public static class GlcmTexture
         for (var y = 0; y < height; y++)
         {
             var ny = y + dy;
-            if ((uint)ny >= (uint)height) continue;
+            if ((uint)ny >= (uint)height)
+                continue;
 
             for (var x = 0; x < width; x++)
             {
                 var nx = x + dx;
-                if ((uint)nx >= (uint)width) continue;
+                if ((uint)nx >= (uint)width)
+                    continue;
 
                 var i = idx[y, x];
                 var j = idx[ny, nx];
@@ -191,7 +199,8 @@ public static class GlcmTexture
             for (var j = 0; j < levels; j++)
             {
                 var p = counts[i, j];
-                if (p <= 0) continue;
+                if (p <= 0)
+                    continue;
 
                 var diff = i - j;
                 contrast += (diff * diff) * p;
@@ -262,8 +271,10 @@ public static class GlcmTexture
             {
                 var v = srcIdx[y, x];
                 var q = (int)(v / denom);
-                if (q < 0) q = 0;
-                if (q >= levels) q = levels - 1;
+                if (q < 0)
+                    q = 0;
+                if (q >= levels)
+                    q = levels - 1;
                 dstIdx[y, x] = (byte)q;
             }
         }

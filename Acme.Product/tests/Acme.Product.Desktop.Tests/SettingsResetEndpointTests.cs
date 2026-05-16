@@ -1,6 +1,6 @@
+using System.Linq;
 using System.Net;
 using System.Text.Json;
-using System.Linq;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Interfaces;

@@ -40,9 +40,9 @@ namespace Acme.Product.Infrastructure.Operators;
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]
 [OutputPort("GeometryResult", "Geometry Result", PortDataType.Any)]
-[OperatorParam("Operation", "Operation", "enum", DefaultValue = "SmallestCircle", Options = new[] { 
+[OperatorParam("Operation", "Operation", "enum", DefaultValue = "SmallestCircle", Options = new[] {
     "SmallestCircle|Smallest Enclosing Circle",
-    "MinAreaRect|Minimum Area Rectangle", 
+    "MinAreaRect|Minimum Area Rectangle",
     "MinAreaTriangle|Minimum Area Triangle",
     "ConvexHull|Convex Hull",
     "FitArc|Fit Arc (RANSAC)",
@@ -182,7 +182,7 @@ public class MinEnclosingGeometryOperator : OperatorBase
                 HersheyFonts.HersheySimplex, 0.5, new Scalar(0, 255, 0), 1);
 
             // 计算包围率（多少点被包含）
-            var enclosedCount = points.Count(p => 
+            var enclosedCount = points.Count(p =>
                 Math.Sqrt(Math.Pow(p.X - center.X, 2) + Math.Pow(p.Y - center.Y, 2)) <= radius + 1);
             var enclosureRatio = (double)enclosedCount / points.Length;
 
@@ -213,7 +213,7 @@ public class MinEnclosingGeometryOperator : OperatorBase
         {
             // 最小面积旋转矩形
             var rotatedRect = Cv2.MinAreaRect(points);
-            
+
             // 绘制矩形
             var vertices = rotatedRect.Points();
             for (int i = 0; i < 4; i++)
@@ -264,7 +264,7 @@ public class MinEnclosingGeometryOperator : OperatorBase
         {
             // 计算凸包
             var hull = Cv2.ConvexHull(points);
-            
+
             if (hull.Length < 3)
             {
                 result["Success"] = false;
@@ -316,7 +316,7 @@ public class MinEnclosingGeometryOperator : OperatorBase
         try
         {
             var hull = Cv2.ConvexHull(points);
-            
+
             // 绘制凸包
             for (int i = 0; i < hull.Length; i++)
             {
@@ -392,14 +392,14 @@ public class MinEnclosingGeometryOperator : OperatorBase
 
             // 绘制端点和中心
             Cv2.Circle(resultImage, center, 4, new Scalar(0, 0, 255), -1);
-            
+
             var startPt = new Point(
                 (int)(center.X + circle.Radius * Math.Cos(startAngle * Math.PI / 180)),
                 (int)(center.Y + circle.Radius * Math.Sin(startAngle * Math.PI / 180)));
             var endPt = new Point(
                 (int)(center.X + circle.Radius * Math.Cos(endAngle * Math.PI / 180)),
                 (int)(center.Y + circle.Radius * Math.Sin(endAngle * Math.PI / 180)));
-            
+
             Cv2.Circle(resultImage, startPt, 4, new Scalar(255, 0, 0), -1);
             Cv2.Circle(resultImage, endPt, 4, new Scalar(255, 0, 0), -1);
 
@@ -759,7 +759,8 @@ public class MinEnclosingGeometryOperator : OperatorBase
 
     private double CalculateTriangleArea(Point2f[] triangle)
     {
-        if (triangle.Length != 3) return 0;
+        if (triangle.Length != 3)
+            return 0;
         var a = triangle[0];
         var b = triangle[1];
         var c = triangle[2];
@@ -769,9 +770,10 @@ public class MinEnclosingGeometryOperator : OperatorBase
     private bool IsPointInTriangle(Point2f p, Point2f[] triangle)
     {
         var (a, b, c) = (triangle[0], triangle[1], triangle[2]);
-        
+
         var denom = (b.Y - c.Y) * (a.X - c.X) + (c.X - b.X) * (a.Y - c.Y);
-        if (Math.Abs(denom) < 1e-10) return false;
+        if (Math.Abs(denom) < 1e-10)
+            return false;
 
         var w1 = ((b.Y - c.Y) * (p.X - c.X) + (c.X - b.X) * (p.Y - c.Y)) / denom;
         var w2 = ((c.Y - a.Y) * (p.X - c.X) + (a.X - c.X) * (p.Y - c.Y)) / denom;
@@ -784,14 +786,15 @@ public class MinEnclosingGeometryOperator : OperatorBase
     {
         // OpenCV的ellipse函数绘制圆弧
         var angleStep = (endAngle - startAngle) / 36; // 每10度一个点
-        if (angleStep == 0) angleStep = 10;
+        if (angleStep == 0)
+            angleStep = 10;
 
         var prevPt = new Point(
             (int)(center.X + radius * Math.Cos(startAngle * Math.PI / 180)),
             (int)(center.Y + radius * Math.Sin(startAngle * Math.PI / 180)));
 
-        for (double angle = startAngle + Math.Abs(angleStep); 
-             (angleStep > 0 ? angle <= endAngle : angle >= endAngle); 
+        for (double angle = startAngle + Math.Abs(angleStep);
+             (angleStep > 0 ? angle <= endAngle : angle >= endAngle);
              angle += angleStep)
         {
             var pt = new Point(
@@ -810,8 +813,10 @@ public class MinEnclosingGeometryOperator : OperatorBase
 
     private (double startAngle, double endAngle, double arcAngle) CalculateArcAngle(double[] sortedAngles)
     {
-        if (sortedAngles.Length == 0) return (0, 0, 0);
-        if (sortedAngles.Length == 1) return (sortedAngles[0], sortedAngles[0], 0);
+        if (sortedAngles.Length == 0)
+            return (0, 0, 0);
+        if (sortedAngles.Length == 1)
+            return (sortedAngles[0], sortedAngles[0], 0);
 
         // 找到最大间隙
         var maxGap = 0.0;
@@ -841,8 +846,10 @@ public class MinEnclosingGeometryOperator : OperatorBase
 
     private double NormalizeAngle(double angle)
     {
-        while (angle < 0) angle += 360;
-        while (angle >= 360) angle -= 360;
+        while (angle < 0)
+            angle += 360;
+        while (angle >= 360)
+            angle -= 360;
         return angle;
     }
 
@@ -864,7 +871,8 @@ public class MinEnclosingGeometryOperator : OperatorBase
 
         var trace = sxx + syy;
         var det = sxx * syy - sxy * sxy;
-        if (det < 1e-10) return double.MaxValue;
+        if (det < 1e-10)
+            return double.MaxValue;
 
         var e1 = (trace + Math.Sqrt(trace * trace - 4 * det)) / 2;
         var e2 = (trace - Math.Sqrt(trace * trace - 4 * det)) / 2;
@@ -883,7 +891,8 @@ public class MinEnclosingGeometryOperator : OperatorBase
             var dx = points[i].X - circle.Center.X;
             var dy = points[i].Y - circle.Center.Y;
             var r = Math.Sqrt(dx * dx + dy * dy);
-            if (r < 1e-6) continue;
+            if (r < 1e-6)
+                continue;
 
             // 关于(cx, cy, r)的导数
             var dfdc = -dx / r;
@@ -910,14 +919,15 @@ public class MinEnclosingGeometryOperator : OperatorBase
         Cv2.SVDecomp(mat, w, u, vt);
         var singularValues = ReadVector(w);
 
-        if (singularValues.Length < 3 || singularValues[^1] < 1e-10) return double.MaxValue;
+        if (singularValues.Length < 3 || singularValues[^1] < 1e-10)
+            return double.MaxValue;
         return singularValues[0] / singularValues[^1];
     }
 
     private double CalculateEllipseCondition(Point2f[] points, RotatedRect ellipse)
     {
         // 简化版：基于长短轴比
-        var ratio = Math.Max(ellipse.Size.Width, ellipse.Size.Height) / 
+        var ratio = Math.Max(ellipse.Size.Width, ellipse.Size.Height) /
                     Math.Max(Math.Min(ellipse.Size.Width, ellipse.Size.Height), 1);
         return ratio * ratio; // 条件数近似
     }
@@ -946,12 +956,16 @@ public class MinEnclosingGeometryOperator : OperatorBase
     private static bool TryCreateCircleModel(Point2f p1, Point2f p2, Point2f p3, out Circle circle)
     {
         circle = default;
-        var x1 = p1.X; var y1 = p1.Y;
-        var x2 = p2.X; var y2 = p2.Y;
-        var x3 = p3.X; var y3 = p3.Y;
+        var x1 = p1.X;
+        var y1 = p1.Y;
+        var x2 = p2.X;
+        var y2 = p2.Y;
+        var x3 = p3.X;
+        var y3 = p3.Y;
 
         var a = x1 * (y2 - y3) - y1 * (x2 - x3) + x2 * y3 - x3 * y2;
-        if (Math.Abs(a) < 1e-6) return false;
+        if (Math.Abs(a) < 1e-6)
+            return false;
 
         var x1Sq = x1 * x1 + y1 * y1;
         var x2Sq = x2 * x2 + y2 * y2;
@@ -961,7 +975,8 @@ public class MinEnclosingGeometryOperator : OperatorBase
         var cy = (x1Sq * (x2 - x3) + x2Sq * (x3 - x1) + x3Sq * (x1 - x2)) / (2 * a);
         var r = Math.Sqrt((x1 - cx) * (x1 - cx) + (y1 - cy) * (y1 - cy));
 
-        if (double.IsNaN(r) || r <= 0) return false;
+        if (double.IsNaN(r) || r <= 0)
+            return false;
 
         circle = new Circle(new Point2f((float)cx, (float)cy), (float)r);
         return true;
@@ -970,7 +985,7 @@ public class MinEnclosingGeometryOperator : OperatorBase
     private static double DistancePointToCircle(Point2f point, Circle circle)
     {
         var distToCenter = Math.Sqrt(
-            Math.Pow(point.X - circle.Center.X, 2) + 
+            Math.Pow(point.X - circle.Center.X, 2) +
             Math.Pow(point.Y - circle.Center.Y, 2));
         return distToCenter - circle.Radius;
     }

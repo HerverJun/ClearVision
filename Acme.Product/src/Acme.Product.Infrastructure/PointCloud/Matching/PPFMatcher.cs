@@ -57,24 +57,37 @@ public sealed class PPFMatcher
         float inlierThreshold = 0.005f,
         int minInliers = 80)
     {
-        if (model == null) throw new ArgumentNullException(nameof(model));
-        if (scene == null) throw new ArgumentNullException(nameof(scene));
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
+        if (scene == null)
+            throw new ArgumentNullException(nameof(scene));
         if (model.Count == 0 || scene.Count == 0)
         {
             return new PPFMatchResult(false, Matrix4x4.Identity, 0, 0, double.PositiveInfinity);
         }
 
-        if (normalRadius <= 0 || !float.IsFinite(normalRadius)) throw new ArgumentOutOfRangeException(nameof(normalRadius));
-        if (featureRadius <= 0 || !float.IsFinite(featureRadius)) throw new ArgumentOutOfRangeException(nameof(featureRadius));
-        if (distanceStep <= 0 || !float.IsFinite(distanceStep)) throw new ArgumentOutOfRangeException(nameof(distanceStep));
-        if (angleStepRad <= 0 || !float.IsFinite(angleStepRad)) throw new ArgumentOutOfRangeException(nameof(angleStepRad));
-        if (numSamples <= 0) throw new ArgumentOutOfRangeException(nameof(numSamples));
-        if (modelRefStride <= 0) throw new ArgumentOutOfRangeException(nameof(modelRefStride));
-        if (maxPairsPerKey <= 0) throw new ArgumentOutOfRangeException(nameof(maxPairsPerKey));
-        if (maxCorrespondences <= 0) throw new ArgumentOutOfRangeException(nameof(maxCorrespondences));
-        if (ransacIterations <= 0) throw new ArgumentOutOfRangeException(nameof(ransacIterations));
-        if (inlierThreshold <= 0 || !float.IsFinite(inlierThreshold)) throw new ArgumentOutOfRangeException(nameof(inlierThreshold));
-        if (minInliers <= 0) throw new ArgumentOutOfRangeException(nameof(minInliers));
+        if (normalRadius <= 0 || !float.IsFinite(normalRadius))
+            throw new ArgumentOutOfRangeException(nameof(normalRadius));
+        if (featureRadius <= 0 || !float.IsFinite(featureRadius))
+            throw new ArgumentOutOfRangeException(nameof(featureRadius));
+        if (distanceStep <= 0 || !float.IsFinite(distanceStep))
+            throw new ArgumentOutOfRangeException(nameof(distanceStep));
+        if (angleStepRad <= 0 || !float.IsFinite(angleStepRad))
+            throw new ArgumentOutOfRangeException(nameof(angleStepRad));
+        if (numSamples <= 0)
+            throw new ArgumentOutOfRangeException(nameof(numSamples));
+        if (modelRefStride <= 0)
+            throw new ArgumentOutOfRangeException(nameof(modelRefStride));
+        if (maxPairsPerKey <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxPairsPerKey));
+        if (maxCorrespondences <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxCorrespondences));
+        if (ransacIterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(ransacIterations));
+        if (inlierThreshold <= 0 || !float.IsFinite(inlierThreshold))
+            throw new ArgumentOutOfRangeException(nameof(inlierThreshold));
+        if (minInliers <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minInliers));
 
         // Ensure both clouds have normals we can consume.
         using var modelWithNormals = EnsureNormals(model, normalRadius);
@@ -1660,9 +1673,15 @@ public sealed class PPFMatcher
         }
 
         using var covariance = new Mat(3, 3, MatType.CV_64FC1);
-        covariance.Set(0, 0, c00 * inv); covariance.Set(0, 1, c01 * inv); covariance.Set(0, 2, c02 * inv);
-        covariance.Set(1, 0, c01 * inv); covariance.Set(1, 1, c11 * inv); covariance.Set(1, 2, c12 * inv);
-        covariance.Set(2, 0, c02 * inv); covariance.Set(2, 1, c12 * inv); covariance.Set(2, 2, c22 * inv);
+        covariance.Set(0, 0, c00 * inv);
+        covariance.Set(0, 1, c01 * inv);
+        covariance.Set(0, 2, c02 * inv);
+        covariance.Set(1, 0, c01 * inv);
+        covariance.Set(1, 1, c11 * inv);
+        covariance.Set(1, 2, c12 * inv);
+        covariance.Set(2, 0, c02 * inv);
+        covariance.Set(2, 1, c12 * inv);
+        covariance.Set(2, 2, c22 * inv);
 
         using var eigenValues = new Mat();
         using var eigenVectors = new Mat();
@@ -2076,8 +2095,12 @@ public sealed class PPFMatcher
             }
 
             var inv = 1.0 / correspondences.Length;
-            mx *= inv; my *= inv; mz *= inv;
-            sx *= inv; sy *= inv; sz *= inv;
+            mx *= inv;
+            my *= inv;
+            mz *= inv;
+            sx *= inv;
+            sy *= inv;
+            sz *= inv;
 
             double h00 = 0, h01 = 0, h02 = 0;
             double h10 = 0, h11 = 0, h12 = 0;
@@ -2094,15 +2117,27 @@ public sealed class PPFMatcher
                 var Y = scenePoints[c.SceneIndex, 1] - sy;
                 var Z = scenePoints[c.SceneIndex, 2] - sz;
 
-                h00 += x * X; h01 += x * Y; h02 += x * Z;
-                h10 += y * X; h11 += y * Y; h12 += y * Z;
-                h20 += z * X; h21 += z * Y; h22 += z * Z;
+                h00 += x * X;
+                h01 += x * Y;
+                h02 += x * Z;
+                h10 += y * X;
+                h11 += y * Y;
+                h12 += y * Z;
+                h20 += z * X;
+                h21 += z * Y;
+                h22 += z * Z;
             }
 
             using var H = new Mat(3, 3, MatType.CV_64FC1);
-            H.Set(0, 0, h00); H.Set(0, 1, h01); H.Set(0, 2, h02);
-            H.Set(1, 0, h10); H.Set(1, 1, h11); H.Set(1, 2, h12);
-            H.Set(2, 0, h20); H.Set(2, 1, h21); H.Set(2, 2, h22);
+            H.Set(0, 0, h00);
+            H.Set(0, 1, h01);
+            H.Set(0, 2, h02);
+            H.Set(1, 0, h10);
+            H.Set(1, 1, h11);
+            H.Set(1, 2, h12);
+            H.Set(2, 0, h20);
+            H.Set(2, 1, h21);
+            H.Set(2, 2, h22);
 
             using var w = new Mat();
             using var u = new Mat();

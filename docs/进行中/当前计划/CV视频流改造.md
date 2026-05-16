@@ -6,7 +6,7 @@
 基于已优先检索的 **HerverJun/ClearVision** 与 **HerverJun/ClearFrost** 两个仓库，当前最适合的接入点是 ClearVision 现有的 `ICamera` / `IIndustrialCamera`、`CameraFrameStreamCoordinator`、`ImageAcquisitionService`、`ImageAcquisitionOperator`、`InspectionWorker` 与 `DetectionSequenceJudgeOperator`；其中连续采集骨架已存在，但缺少真正可用于“到达检测 + 去重 + 多帧一致性”的运行时模块。  
 建议采用“**保留原单帧路径 + 新增 ContinuousInspection 可选运行支路**”的方式推进：先补 `FrameEnvelope`、`RingBuffer`、`ArrivalDetector`、`LightweightTracker`、`InferenceScheduler`、`TrackConsensusJudge` 与回放 / 埋点，再用 feature flag 与 binding 配置做灰度发布。  
 整体建议排期 **6–8 周**；前 2 周打通 free-run 流与基础埋点，第 3–5 周补齐到达检测、调度、多帧投票，第 6 周开始现场 shadow 模式并行比对；如果现场硬件较弱，可在中途降级为“低帧率连续流 + 稀疏推理”的轻量配置。  
-已访问并纳入设计参考的主要外部资料来源包括：entity["company","HIKROBOT","machine vision vendor"] 官方相机触发 / 采集资料、OpenCV 视频采集与光流文档、GStreamer `queue` / `appsink` 文档、ONNX Runtime 性能调优文档。
+已访问并纳入设计参考的主要外部资料来源包括：HIKROBOT 官方相机触发 / 采集资料、OpenCV 视频采集与光流文档、GStreamer `queue` / `appsink` 文档、ONNX Runtime 性能调优文档。
 
 ## 仓库现状与接入点分析
 
@@ -654,7 +654,7 @@ flowchart TD
 
 | 来源类别 | 主要用途 |
 |---|---|
-| entity["company","HIKROBOT","machine vision vendor"] 官方相机文档 / 触发模式资料 | 用于确认 internal trigger / free-run、外部触发、设备时间戳等概念边界 |
+| HIKROBOT 官方相机文档 / 触发模式资料 | 用于确认 internal trigger / free-run、外部触发、设备时间戳等概念边界 |
 | OpenCV 官方视频采集与光流文档 | 用于设计 `ArrivalDetector`、轻量 tracker 与速度扰动场景的基础算法候选 |
 | GStreamer 官方 `queue` / `appsink` 文档 | 用于约束实时队列长度、丢帧策略与 backpressure 设计 |
 | ONNX Runtime 官方性能调优资料 | 用于指导 `InferenceScheduler` 的线程、队列、延迟与资源占用策略 |

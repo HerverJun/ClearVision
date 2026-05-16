@@ -1,4 +1,4 @@
-﻿// FeatureMatchOperatorBase.cs
+// FeatureMatchOperatorBase.cs
 // Shared feature matching infrastructure.
 // Author: ClearVision Team
 using System.Security.Cryptography;
@@ -87,8 +87,10 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         var goodMatches = new List<DMatch>();
         foreach (var match in forwardMatches)
         {
-            if (match.Length < 2) continue;
-            if (match[0].Distance >= matchRatio * match[1].Distance) continue;
+            if (match.Length < 2)
+                continue;
+            if (match[0].Distance >= matchRatio * match[1].Distance)
+                continue;
 
             if (backwardBest.TryGetValue(match[0].TrainIdx, out var reverseTemplateIdx) &&
                 reverseTemplateIdx == match[0].QueryIdx)

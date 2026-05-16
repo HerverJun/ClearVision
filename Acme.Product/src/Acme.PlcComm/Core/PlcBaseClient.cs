@@ -2,8 +2,8 @@
 // PLC客户端抽象基类
 // 作者：蘅芜君
 
-using System.Net.Sockets;
 using System.IO;
+using System.Net.Sockets;
 using System.Text;
 using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
@@ -23,7 +23,7 @@ public abstract class PlcBaseClient : IPlcClient
     // PLC协议通常为半双工，必须保证Request-Response串行
     protected readonly SemaphoreSlim _communicationLock = new(1, 1);
     protected readonly SemaphoreSlim _connectLock = new(1, 1);
-    
+
     // ─── 网络连接 ──────────────────────────────────────────
     protected TcpClient? _tcpClient;
     protected NetworkStream? _networkStream;
@@ -37,13 +37,15 @@ public abstract class PlcBaseClient : IPlcClient
     public string IpAddress { get; protected set; } = "192.168.0.1";
     public int Port { get; set; }
     public abstract int DefaultPort { get; }
-    
+
     public virtual bool IsConnected
     {
         get
         {
-            if (_disposed) return false;
-            if (_tcpClient?.Connected != true) return false;
+            if (_disposed)
+                return false;
+            if (_tcpClient?.Connected != true)
+                return false;
             // 检查最后通信时间，超过60秒认为可能断开
             if (DateTime.Now - _lastCommunicationTime > TimeSpan.FromSeconds(60))
                 return false;
@@ -72,8 +74,9 @@ public abstract class PlcBaseClient : IPlcClient
     // ─── 生命周期 ───────────────────────────────────────────
     public async Task<bool> ConnectAsync(CancellationToken ct = default)
     {
-        if (_disposed) throw new ObjectDisposedException(GetType().Name);
-        
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().Name);
+
         await _connectLock.WaitAsync(ct);
         try
         {
@@ -84,7 +87,8 @@ public abstract class PlcBaseClient : IPlcClient
             }
 
             // 自动设置默认端口
-            if (Port == 0) Port = DefaultPort;
+            if (Port == 0)
+                Port = DefaultPort;
 
             _logger.LogInformation("[{ClientType}] 正在连接 {Ip}:{Port}...", GetType().Name, IpAddress, Port);
 
@@ -111,7 +115,7 @@ public abstract class PlcBaseClient : IPlcClient
                 }
 
                 _lastCommunicationTime = DateTime.Now;
-                
+
                 // 触发事件
                 Connected?.Invoke(this, new ConnectionEventArgs
                 {
@@ -141,7 +145,8 @@ public abstract class PlcBaseClient : IPlcClient
 
     public async Task DisconnectAsync()
     {
-        if (_disposed && !HasActiveConnectionResources()) return;
+        if (_disposed && !HasActiveConnectionResources())
+            return;
 
         await _connectLock.WaitAsync();
         try
@@ -208,7 +213,7 @@ public abstract class PlcBaseClient : IPlcClient
         try
         {
             var (length, dataType) = GetTypeInfo<T>();
-            
+
             var result = await ReadAsync(address, length, ct);
             if (!result.IsSuccess)
                 return OperateResult<T>.Failure(result.ErrorCode, result.Message);
@@ -245,13 +250,13 @@ public abstract class PlcBaseClient : IPlcClient
             return OperateResult<Dictionary<string, byte[]>>.Failure("地址数组和长度数组长度不匹配");
 
         var results = new Dictionary<string, byte[]>();
-        
+
         for (int i = 0; i < addresses.Length; i++)
         {
             var result = await ReadAsync(addresses[i], lengths[i], ct);
             if (!result.IsSuccess)
                 return OperateResult<Dictionary<string, byte[]>>.Failure(result.ErrorCode, result.Message);
-            
+
             results[addresses[i]] = result.Content!;
         }
 
@@ -276,8 +281,9 @@ public abstract class PlcBaseClient : IPlcClient
 
     public async Task<bool> PingAsync(CancellationToken ct = default)
     {
-        if (!IsConnected) return false;
-        
+        if (!IsConnected)
+            return false;
+
         try
         {
             // 子类可以实现特定的心跳检测
@@ -296,7 +302,8 @@ public abstract class PlcBaseClient : IPlcClient
         if (!ReconnectPolicy.Enabled)
         {
             await _communicationLock.WaitAsync(ct);
-            try { return await operation(); }
+            try
+            { return await operation(); }
             finally { _communicationLock.Release(); }
         }
 
@@ -322,7 +329,8 @@ public abstract class PlcBaseClient : IPlcClient
             try
             {
                 await _communicationLock.WaitAsync(ct);
-                try { return await operation(); }
+                try
+                { return await operation(); }
                 finally { _communicationLock.Release(); }
             }
             catch (IOException ex)
@@ -351,7 +359,8 @@ public abstract class PlcBaseClient : IPlcClient
         if (!ReconnectPolicy.Enabled)
         {
             await _communicationLock.WaitAsync(ct);
-            try { return await operation(); }
+            try
+            { return await operation(); }
             finally { _communicationLock.Release(); }
         }
 
@@ -377,7 +386,8 @@ public abstract class PlcBaseClient : IPlcClient
             try
             {
                 await _communicationLock.WaitAsync(ct);
-                try { return await operation(); }
+                try
+                { return await operation(); }
                 finally { _communicationLock.Release(); }
             }
             catch (IOException ex)
@@ -423,8 +433,9 @@ public abstract class PlcBaseClient : IPlcClient
     // ─── 报文日志 ──────────────────────────────────────────
     protected void LogFrame(string direction, byte[] data)
     {
-        if (data == null || data.Length == 0) return;
-        
+        if (data == null || data.Length == 0)
+            return;
+
         var hexString = BitConverter.ToString(data).Replace("-", " ");
         _logger.LogDebug("[{ClientType}] [{Direction}] {Hex}", GetType().Name, direction, hexString);
     }
@@ -576,7 +587,8 @@ public abstract class PlcBaseClient : IPlcClient
     // ─── IDisposable ───────────────────────────────────────
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
 
         try
         {

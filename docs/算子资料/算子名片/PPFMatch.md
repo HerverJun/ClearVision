@@ -6,77 +6,93 @@
 | 类名 (Class) | `PPFMatchOperator` |
 | 枚举值 (Enum) | `OperatorType.PPFMatch` |
 | 分类 (Category) | 3D |
+| 版本 (Version) | `1.0.4` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-> 中文：Simplified PPF-based 3D surface matching (model -> scene pose).。
-> English: Simplified PPF-based 3D surface matching (model -> scene pose)..
+当前元数据描述为：Simplified PPF-based 3D coarse surface matching (model -> scene pose). Intended for coarse pose alignment diagnostics。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
 ## 实现策略 / Implementation Strategy
-- 中文：
-  - 先对模型点云构建量化后的 PPF 哈希表，再在场景中采样参考点生成候选对应。
-  - 候选对应进入 RANSAC 刚体变换估计，并通过内点数和 RMS 误差进行筛选。
-  - 已修正 OpenCV/SVD 到 `Matrix4x4` 的旋转矩阵约定，Week11 最终验收已收紧到 `<5mm` 平移误差。
-- English:
-  - Builds a quantized PPF hash table on the model, then samples scene reference points to generate candidate correspondences.
-  - Candidate correspondences are verified by RANSAC rigid transform estimation and inlier/RMS scoring.
-  - Rotation-matrix convention between OpenCV SVD output and `Matrix4x4` has been aligned, enabling final `<5mm` translation acceptance.
+- 先校验必填输入：`ModelPointCloud`、`ScenePointCloud`；缺失时通常返回失败结果。
+- 参数解析覆盖 10 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
-- `PPFMatchOperator.ExecuteCoreAsync`
-- `PPFMatcher.Match(...)`
-- `EnsureNormals(...)`
-- `BuildModelHash(...)`
-- `BuildSceneCorrespondences(...)`
-- `RansacRigidTransform(...) / RefineTransform(...)`
+- `OperatorBase.Get*Param(...)`
+- `Math.Max`
+- `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `NormalRadius` | `double` | 0.03 | >= 1E-06 | - |
-| `FeatureRadius` | `double` | 0.08 | >= 1E-06 | - |
-| `NumSamples` | `int` | 120 | [10, 5000] | - |
-| `ModelRefStride` | `int` | 3 | [1, 50] | - |
-| `RansacIterations` | `int` | 800 | [50, 100000] | - |
-| `InlierThreshold` | `double` | 0.005 | >= 1E-06 | - |
-| `MinInliers` | `int` | 80 | [3, 1000000] | - |
-| `DistanceStep` | `double` | 0.01 | >= 1E-06 | - |
-| `AngleStepDeg` | `double` | 5 | [0.1, 90] | - |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `NormalRadius` | Normal Radius | `double` | 0.03 | >= 1E-06 | Yes | - |
+| `FeatureRadius` | Feature Radius | `double` | 0.08 | >= 1E-06 | Yes | - |
+| `NumSamples` | Num Samples | `int` | 120 | [10, 5000] | Yes | - |
+| `ModelRefStride` | Model Ref Stride | `int` | 3 | [1, 50] | Yes | - |
+| `Seed` | Seed | `int` | 123 | [-1, 2147483647] | Yes | -1 = random sampling (non-deterministic). |
+| `RansacIterations` | RANSAC Iterations | `int` | 800 | [50, 100000] | Yes | - |
+| `InlierThreshold` | Inlier Threshold | `double` | 0.005 | >= 1E-06 | Yes | - |
+| `MinInliers` | Min Inliers | `int` | 80 | [3, 1000000] | Yes | - |
+| `DistanceStep` | Distance Step | `double` | 0.01 | >= 1E-06 | Yes | - |
+| `AngleStepDeg` | Angle Step (deg) | `double` | 5 | [0.1, 90] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `ModelPointCloud` | Model Point Cloud | `Any` | Yes | - |
-| `ScenePointCloud` | Scene Point Cloud | `Any` | Yes | - |
+| `ModelPointCloud` | Model Point Cloud | `Any` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `ScenePointCloud` | Scene Point Cloud | `Any` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `IsMatched` | Is Matched | `Boolean` | - |
-| `TransformMatrix` | Transform Matrix | `Any` | - |
-| `InlierCount` | Inlier Count | `Integer` | - |
-| `InlierRatio` | Inlier Ratio | `Float` | - |
-| `CorrespondenceCount` | Correspondence Count | `Integer` | - |
-| `RmsError` | RMS Error | `Float` | - |
+| `IsMatch` | Is Match | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `IsMatched` | Is Matched | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `Score` | Score | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `MatchCount` | Match Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Method` | Method | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `FailureReason` | Failure Reason | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `VerificationPassed` | Verification Passed | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `AmbiguityDetected` | Ambiguity Detected | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `AmbiguityScore` | Ambiguity Score | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `StabilityScore` | Stability Score | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `NormalConsistency` | Normal Consistency | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `TransformMatrix` | Transform Matrix | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `InlierCount` | Inlier Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `InlierRatio` | Inlier Ratio | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `CorrespondenceCount` | Correspondence Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `RmsError` | RMS Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 主要由模型哈希构建、场景采样和 RANSAC 迭代组成，近似随候选对应数线性增长 |
-| 典型耗时 (Typical Latency) | 阶段2专项验收（Release，4500 点模型 + 4500 点场景）`P50=1786.35ms` |
-| 内存特征 (Memory Profile) | 主要来自 PPF 哈希表、法向量估计与候选对应缓存，受 `NumSamples` / `ModelRefStride` 影响明显 |
+| 时间复杂度 (Time Complexity) | 通常随输入集合、字符串长度或字段数量线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；一般由输入数据规模和运行时调度开销决定。 |
+| 内存特征 (Memory Profile) | 主要由输出字典、集合和少量中间对象决定。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：刚体 3D 目标配准、点云姿态恢复、工件粗定位与后续精配准前置。
-- 不适合 (Not Suitable)：大面积对称体、严重遮挡或需要非刚体/可变形匹配的场景。
+- 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
+- 不适合 (Not Suitable)：上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。
 
 ## 已知限制 / Known Limitations
-1. 当前实现强调“足够工业可用的轻量 PPF”，仍未覆盖大规模遮挡、强对称体和复杂噪声场景的完整投票优化。
-1. 性能和稳定性高度依赖 `NormalRadius`、`FeatureRadius`、`NumSamples`、`ModelRefStride` 等参数组合，建议在目标工件上做一次标定式调参。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-03-17 | 自动生成文档骨架 / Generated skeleton |
+| 1.0.4 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

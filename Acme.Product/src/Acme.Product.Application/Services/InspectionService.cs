@@ -4,6 +4,8 @@
 // 生命周期：Scoped（无状态，不保存运行时状态）
 // 作者：蘅芜君 + 架构修复方案 v2
 
+using System.Collections;
+using System.Text.Json;
 using Acme.Product.Application.Analysis;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Entities;
@@ -12,8 +14,6 @@ using Acme.Product.Core.Exceptions;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
-using System.Collections;
-using System.Text.Json;
 
 // 【架构修复 v2】IInspectionWorker 从 Infrastructure 移到 Core
 

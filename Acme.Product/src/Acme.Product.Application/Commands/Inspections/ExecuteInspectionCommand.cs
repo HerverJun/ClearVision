@@ -2,13 +2,13 @@
 // ExecuteInspection命令
 // 作者：蘅芜君
 
-using MediatR;
 using Acme.Product.Application.DTOs;
-using Acme.Product.Core.Interfaces;
-using Acme.Product.Core.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
+using Acme.Product.Core.Interfaces;
+using Acme.Product.Core.Services;
 using AutoMapper;
+using MediatR;
 
 namespace Acme.Product.Application.Commands.Inspections;
 
@@ -42,12 +42,12 @@ public class ExecuteInspectionCommandHandler : IRequestHandler<ExecuteInspection
         var flowResult = await _flowExecutionService.ExecuteFlowAsync(project.Flow, request.Parameters);
 
         var inspectionResult = new InspectionResult(project.Id, null);
-        
+
         if (flowResult.IsSuccess)
         {
             inspectionResult.SetResult(
-                InspectionStatus.OK, 
-                flowResult.ExecutionTimeMs, 
+                InspectionStatus.OK,
+                flowResult.ExecutionTimeMs,
                 1.0); // Confidence placeholder
         }
         else
@@ -78,7 +78,7 @@ public class ExecuteInspectionCommandHandler : IRequestHandler<ExecuteInspection
         }
 
         await _resultRepository.AddAsync(inspectionResult);
-        
+
         return _mapper.Map<InspectionResultDto>(inspectionResult);
     }
 }

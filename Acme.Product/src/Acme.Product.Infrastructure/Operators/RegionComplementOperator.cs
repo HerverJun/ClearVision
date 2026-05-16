@@ -159,7 +159,8 @@ public class RegionComplementOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs?.TryGetValue(key, out var val) == true && val is Region r) { region = r; return true; }
+        if (inputs?.TryGetValue(key, out var val) == true && val is Region r)
+        { region = r; return true; }
         return false;
     }
 

@@ -2,15 +2,14 @@
 // 解析写入值：优先从上游输入获取，否则使用参数面板静态值
 // 作者：蘅芜君
 
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Operators;
 using Acme.PlcComm;
 using Acme.PlcComm.Interfaces;
 using Acme.PlcComm.Siemens;
-using Microsoft.Extensions.Logging;
-
 using Acme.Product.Core.Attributes;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.Operators;
+using Microsoft.Extensions.Logging;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -62,14 +61,14 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
         var address = GetStringParam(@operator, "Address", "DB1.DBW100");
         var dataType = GetStringParam(@operator, "DataType", "Word");
         var operation = GetStringParam(@operator, "Operation", "Read");
-        
+
         // 【第二优先级】轮询等待模式参数
         var pollingMode = GetStringParam(@operator, "PollingMode", "None"); // None / WaitForValue
         var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal"); // Equal / NotEqual / GreaterThan / LessThan
         var pollingValue = GetStringParam(@operator, "PollingValue", "1");
         var pollingTimeout = GetIntParam(@operator, "PollingTimeout", 30000, 100, 300000); // 100ms - 5min
         var pollingInterval = GetIntParam(@operator, "PollingInterval", 50, 10, 5000); // 10ms - 5s
-        
+
         // 【增强】支持从上游输入动态获取写入值
         var writeValue = ResolveWriteValue(@operator, inputs);
 

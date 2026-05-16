@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Acme.Product.Application.Analysis;
+using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
@@ -17,7 +18,6 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
-using Acme.Product.Application.Services;
 using Acme.Product.Infrastructure.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -49,14 +49,14 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
     // 并发控制：跟踪运行中的任务
     private readonly ConcurrentDictionary<Guid, RunningTaskEntry> _runningTasks = new();
-    
+
     // 关机控制
     private readonly SemaphoreSlim _shutdownLock = new(1, 1);
     private readonly object _shutdownTaskSync = new();
     private Task? _gracefulShutdownTask;
     private volatile bool _isShuttingDown = false;
     private int _disposeState = 0;
-    
+
     // 未处理异常记录
     private readonly ConcurrentDictionary<Guid, ExceptionRecord> _unhandledExceptions = new();
 
@@ -176,7 +176,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         var coordinatorToken = _coordinator.GetCancellationToken(projectId);
         var cts = CancellationTokenSource.CreateLinkedTokenSource(coordinatorToken);
         var exitCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        
+
         // 创建任务（使用 Task.Run 但不会立即等待）
         var task = Task.Run(async () =>
         {
@@ -211,7 +211,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         _metrics.IncrementActiveWorkers();
         _metrics.UpdateActiveSessions(_runningTasks.Count);
 
-        _logger.LogInformation("[InspectionWorker] 任务已启动: {ProjectId}, Session: {SessionId}", 
+        _logger.LogInformation("[InspectionWorker] 任务已启动: {ProjectId}, Session: {SessionId}",
             projectId, sessionId);
 
         return true;
@@ -332,7 +332,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            
+
             // 解析 Scoped 服务
             var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
             var imageAcquisition = scope.ServiceProvider.GetRequiredService<IImageAcquisitionService>();
@@ -383,7 +383,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         catch (Exception ex)
         {
             _logger.LogError(ex, "[InspectionWorker] Scope 级异常: {ProjectId}", projectId);
-            
+
             // 发布故障事件
             await _eventBus.PublishAsync(new InspectionStateChangedEvent
             {
@@ -393,7 +393,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 NewState = "Faulted",
                 ErrorMessage = ex.Message
             }, CancellationToken.None);
-            
+
             throw; // 抛到外层，由第一层保护处理
         }
     }
@@ -1400,7 +1400,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             // 3. 报告未处理异常
             if (!_unhandledExceptions.IsEmpty)
             {
-                _logger.LogError("[InspectionWorker] 关机时发现 {Count} 个未处理异常", 
+                _logger.LogError("[InspectionWorker] 关机时发现 {Count} 个未处理异常",
                     _unhandledExceptions.Count);
                 foreach (var record in _unhandledExceptions.Values)
                 {
@@ -1418,7 +1418,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     {
         var removed = _runningTasks.TryRemove(projectId, out _);
         await EnsureStoppedStateAsync(projectId, entry.SessionId);
-        
+
         try
         {
             await entry.Cts.CancelAsync();

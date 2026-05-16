@@ -1,10 +1,10 @@
+using System.Security.Cryptography;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Security.Cryptography;
 
 namespace Acme.Product.Application.Services;
 

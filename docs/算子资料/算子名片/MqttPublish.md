@@ -1,65 +1,80 @@
-# MQTT 发布 / MqttPublish
+# MQTT Publish / MqttPublish
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `MqttPublishOperator` |
 | 枚举值 (Enum) | `OperatorType.MqttPublish` |
-| 分类 (Category) | 通信 |
+| 分类 (Category) | Communication |
+| 版本 (Version) | `0.1.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `experimental`, `integration:mqtt`, `maturity:placeholder-disabled`, `功能域:通信`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子不执行图像算法，而是把流程参数映射为通信请求，与外部设备或服务完成读写和响应解析。
-
-> English: This section is completed from the current source implementation and focuses on actual runtime behavior in code.
+当前元数据描述为：Publishes inspection data to MQTT when the optional MQTT integration is enabled。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
 ## 实现策略 / Implementation Strategy
-- 实现遵循统一算子框架：参数读取、输入检查、核心处理与结果封装相互分离。
-- 核心流程偏向协议适配：建立连接、发送请求、解析响应、输出状态。
+- 先校验必填输入：`Payload`；缺失时通常返回失败结果。
+- 可选输入用于覆盖或补充参数配置：`Message`。
+- 参数解析覆盖 6 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `GetStringParam / GetIntParam / GetDoubleParam / GetBoolParam / GetFloatParam`
-2. `JsonSerializer.Serialize`
+- `OperatorBase.Get*Param(...)`
+- `JsonSerializer.Serialize`
+- `Math.Clamp`
+- `Convert.ToInt32`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `Broker` | `string` | `"localhost"` | - | 控制“Broker”这一实现参数，建议结合现场样本调节。 |
-| `Port` | `int` | `1883` | - | 通信端口。 |
-| `Topic` | `string` | `"cv/results"` | - | 控制“Topic”这一实现参数，建议结合现场样本调节。 |
-| `Qos` | `int` | `1` | - | 控制“Qos”这一实现参数，建议结合现场样本调节。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `Broker` | Broker Address | `string` | localhost | - | Yes | - |
+| `Port` | Port | `int` | 1883 | - | Yes | - |
+| `Topic` | Topic | `string` | cv/results | - | Yes | - |
+| `Qos` | QoS | `int` | 1 | - | Yes | - |
+| `Retain` | Retain Message | `bool` | false | - | Yes | - |
+| `TimeoutMs` | Timeout (ms) | `int` | 5000 | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Payload` | 消息负载 | `Any` | Yes | 提供通信请求所需输入。 |
+| `Payload` | Message Payload | `Any` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `Message` | Message Text | `String` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `IsSuccess` | 是否成功 | `Boolean` | 输出通信状态或响应结果。 |
+| `IsSuccess` | Is Success | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | CPU 开销通常较小，整体耗时主要由设备、网络或协议往返决定。 |
-| 典型耗时 (Typical Latency) | 仓库中未提供固定 benchmark；实际延迟受图像尺寸、参数规模、缓存命中率和外部依赖影响。 |
-| 内存特征 (Memory Profile) | 主要由中间结果、缓存结构和输出封装决定。 |
+| 时间复杂度 (Time Complexity) | 通常随输入集合、字符串长度或字段数量线性增长。 |
+| 典型耗时 (Typical Latency) | 未固定；一般由输入数据规模和运行时调度开销决定。 |
+| 内存特征 (Memory Profile) | 主要由输出字典、集合和少量中间对象决定。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合与 PLC、串口设备、TCP 服务或 HTTP 接口联动。
-- 适合把视觉结果写入外部控制系统或读取工艺参数。
-- 不适合把通信成功直接等同于业务成功。
-- 不适合忽略网络与设备延迟。
+- 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
+- 不适合 (Not Suitable)：上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。
 
 ## 已知限制 / Known Limitations
-1. 参数 `Qos` 已在元数据中声明，但从源码看当前没有明显被执行逻辑实际使用。
-2. 声明输出 `IsSuccess` 与当前运行时附加字段不完全一致，集成时应以实际输出字典为准。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码深化实现行为、性能与限制说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
+| 0.1.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

@@ -11,17 +11,17 @@ public class PerformanceProfilerTests
         // Arrange
         PerformanceProfiler.Reset();
         var testOperationName = "TestOp1";
-        
+
         // Act
         using (var profiler = new PerformanceProfiler(testOperationName))
         {
             Thread.Sleep(50); // Simulate work
         }
-        
+
         // Assert
         var results = PerformanceProfiler.GetResults().ToList();
         results.Should().HaveCount(1);
-        
+
         var result = results.First();
         result.Name.Should().Be(testOperationName);
         result.Count.Should().Be(1);
@@ -35,7 +35,7 @@ public class PerformanceProfilerTests
         // Arrange
         PerformanceProfiler.Reset();
         var testOperationName = "TestOp2";
-        
+
         // Act
         for (int i = 0; i < 3; i++)
         {
@@ -44,11 +44,11 @@ public class PerformanceProfilerTests
                 Thread.Sleep(20);
             }
         }
-        
+
         // Assert
         var results = PerformanceProfiler.GetResults().ToList();
         results.Should().HaveCount(1);
-        
+
         var result = results.First();
         result.Count.Should().Be(3);
         result.TotalMs.Should().BeGreaterThan(50);
@@ -67,10 +67,10 @@ public class PerformanceProfilerTests
         {
             Thread.Sleep(10);
         }
-        
+
         // Act
         var csv = PerformanceProfiler.GenerateReportCsv();
-        
+
         // Assert
         csv.Should().NotBeNullOrEmpty();
         csv.Should().Contain("OperatorName,Count,TotalMs,AverageMs,MinMs,MaxMs,StdDevMs");

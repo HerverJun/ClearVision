@@ -63,7 +63,7 @@ public static class UserEndpoints
             }
 
             var result = await userService.CreateUserAsync(request);
-            
+
             if (!result.Success)
             {
                 return Results.BadRequest(new { Error = result.ErrorMessage });
@@ -74,9 +74,9 @@ public static class UserEndpoints
 
         // 更新用户 - Admin
         app.MapPut("/api/users/{id}", async (
-            string id, 
-            UpdateUserRequest request, 
-            UserManagementService userService, 
+            string id,
+            UpdateUserRequest request,
+            UserManagementService userService,
             HttpContext context) =>
         {
             if (!await IsAdminAsync(context))
@@ -85,7 +85,7 @@ public static class UserEndpoints
             }
 
             var result = await userService.UpdateUserAsync(id, request);
-            
+
             if (!result.Success)
             {
                 if (result.ErrorMessage?.Contains("不存在") == true)
@@ -107,7 +107,7 @@ public static class UserEndpoints
             }
 
             var result = await userService.DeleteUserAsync(id);
-            
+
             if (!result.Success)
             {
                 if (result.ErrorMessage?.Contains("不存在") == true)
@@ -122,9 +122,9 @@ public static class UserEndpoints
 
         // 重置密码 - Admin
         app.MapPost("/api/users/{id}/reset-password", async (
-            string id, 
-            ResetPasswordRequest request, 
-            UserManagementService userService, 
+            string id,
+            ResetPasswordRequest request,
+            UserManagementService userService,
             HttpContext context,
             IConfigurationService configService) =>
         {
@@ -140,7 +140,7 @@ public static class UserEndpoints
             }
 
             var result = await userService.ResetPasswordAsync(id, request.NewPassword);
-            
+
             if (!result.Success)
             {
                 if (result.ErrorMessage?.Contains("不存在") == true)

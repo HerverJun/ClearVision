@@ -36,7 +36,7 @@ public class MinEnclosingGeometryOperatorTests
     {
         var op = new Operator("MinEnclosingGeometry", OperatorType.MinEnclosingGeometry, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Operation", "SmallestCircle"));
-        
+
         // 创建圆形测试图像
         using var image = CreateCircleTestImage();
         var inputs = TestHelpers.CreateImageInputs(image);
@@ -51,7 +51,7 @@ public class MinEnclosingGeometryOperatorTests
     {
         var op = new Operator("MinEnclosingGeometry", OperatorType.MinEnclosingGeometry, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Operation", "MinAreaRect"));
-        
+
         using var image = CreateRectangleTestImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 
@@ -64,7 +64,7 @@ public class MinEnclosingGeometryOperatorTests
     {
         var op = new Operator("MinEnclosingGeometry", OperatorType.MinEnclosingGeometry, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Operation", "FitCircleRobust"));
-        
+
         using var image = CreateCircleTestImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 
@@ -77,7 +77,7 @@ public class MinEnclosingGeometryOperatorTests
     {
         var op = new Operator("MinEnclosingGeometry", OperatorType.MinEnclosingGeometry, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("Operation", "ConvexHull"));
-        
+
         using var image = TestHelpers.CreateShapeTestImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 

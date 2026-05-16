@@ -940,9 +940,11 @@ public class ShapeMatchingOperator : OperatorBase
 
             for (int r = 0; r < n; r++)
             {
-                if (r == k) continue;
+                if (r == k)
+                    continue;
                 double factor = A[(r * 6) + k];
-                if (Math.Abs(factor) < 1e-18) continue;
+                if (Math.Abs(factor) < 1e-18)
+                    continue;
 
                 for (int c = k; c < n; c++)
                 {

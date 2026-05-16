@@ -1,6 +1,6 @@
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Reflection;
 using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
 using Acme.PlcComm.Interfaces;

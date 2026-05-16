@@ -185,10 +185,14 @@ public class ContourExtremaOperator : OperatorBase
         if (inputs?.TryGetValue("Contour", out var val) != true || val == null)
             return false;
 
-        if (val is IEnumerable<Point2f> pts2f) { contour = pts2f.ToList(); return true; }
-        if (val is IEnumerable<Point> pts) { contour = pts.Select(p => new Point2f(p.X, p.Y)).ToList(); return true; }
-        if (val is Point[] arr) { contour = arr.Select(p => new Point2f(p.X, p.Y)).ToList(); return true; }
-        if (val is Point2f[] arr2f) { contour = arr2f.ToList(); return true; }
+        if (val is IEnumerable<Point2f> pts2f)
+        { contour = pts2f.ToList(); return true; }
+        if (val is IEnumerable<Point> pts)
+        { contour = pts.Select(p => new Point2f(p.X, p.Y)).ToList(); return true; }
+        if (val is Point[] arr)
+        { contour = arr.Select(p => new Point2f(p.X, p.Y)).ToList(); return true; }
+        if (val is Point2f[] arr2f)
+        { contour = arr2f.ToList(); return true; }
         return false;
     }
 

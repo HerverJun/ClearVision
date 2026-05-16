@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Reflection;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -5,8 +7,6 @@ using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using System.Collections.Generic;
-using System.Reflection;
 
 namespace Acme.Product.Tests.Operators;
 

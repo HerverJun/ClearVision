@@ -2,6 +2,8 @@
 // API 端点配置
 // 作者：蘅芜君
 
+using System.Linq;
+using System.Text.Json;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
@@ -9,19 +11,17 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Data;
-using Acme.Product.Infrastructure.AI;
-using Acme.Product.Infrastructure.Services;
-using Acme.Product.Runtime;
 using Acme.Product.Desktop.Handlers;
 using Acme.Product.Desktop.Middleware;
+using Acme.Product.Infrastructure.AI;
+using Acme.Product.Infrastructure.Data;
+using Acme.Product.Infrastructure.Services;
+using Acme.Product.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using OpenCvSharp;
-using System.Linq;
-using System.Text.Json;
 
 namespace Acme.Product.Desktop.Endpoints;
 

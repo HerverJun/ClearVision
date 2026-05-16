@@ -20,6 +20,7 @@ QUALITY_RE = re.compile(r"(?P<score>\d+)\s*\((?P<level>[^)]+)\)")
 DOC_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$")
 CATEGORY_RE = re.compile(r"^###\s+(.+?)\s+\(\d+\)\s*$")
+TODO_RE = re.compile(r"(?<![A-Z0-9_])TODO(?![A-Z0-9_])", re.IGNORECASE)
 
 NON_CORE_CATEGORIES = {
     "Communication",
@@ -229,7 +230,7 @@ def todo_count(text: str) -> int:
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
-        has_todo = "TODO" in line.upper()
+        has_todo = TODO_RE.search(line) is not None
         if not has_todo:
             previous_had_todo = False
             continue

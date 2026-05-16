@@ -5,10 +5,14 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Acme.Product.Core.Cameras;
+
+#if HUARAY_SDK
 using MVSDK_Net;
+#endif
 
 namespace Acme.Product.Infrastructure.Cameras;
 
+#if HUARAY_SDK
 /// <summary>
 /// 华睿 (Huaray) 工业相机实现
 /// 注意：类名保留 MindVisionCamera 以兼容历史代码
@@ -725,3 +729,63 @@ public class MindVisionCamera : ICameraProvider
 
     ~MindVisionCamera() => Dispose(false);
 }
+#else
+/// <summary>
+/// CI-safe fallback used when the proprietary Huaray SDK is not present.
+/// </summary>
+public class MindVisionCamera : ICameraProvider
+{
+    private const uint PixelType_Gvsp_Mono8 = 0x01080001;
+    private const uint PixelType_Gvsp_RGB8 = 0x02180014;
+    private const uint PixelType_Gvsp_BGR8 = 0x02180015;
+    private const uint PixelType_Gvsp_BayerGR8 = 0x01080008;
+    private const uint PixelType_Gvsp_BayerRG8 = 0x01080009;
+    private const uint PixelType_Gvsp_BayerGB8 = 0x0108000A;
+    private const uint PixelType_Gvsp_BayerBG8 = 0x0108000B;
+
+    private const string MissingSdkMessage =
+        "MVSDK_Net.dll was not found. Install the Huaray SDK under Acme.Product/lib/HuaraySDK/x64 or build with EnableHuaraySdk=true.";
+
+    public string ProviderName => "Huaray";
+    public bool IsConnected => false;
+    public bool IsGrabbing => false;
+    public CameraDeviceInfo? CurrentDevice => null;
+
+    public static bool IsSdkLoaded => false;
+    public static string? LastSdkLoadError => MissingSdkMessage;
+    public static string? LastEnumerateError { get; private set; }
+    public static string? SdkAssemblyLocation => null;
+
+    public List<CameraDeviceInfo> EnumerateDevices()
+    {
+        LastEnumerateError = MissingSdkMessage;
+        return new List<CameraDeviceInfo>();
+    }
+
+    public bool Open(string serialNumber) => throw new InvalidOperationException(MissingSdkMessage);
+    public bool Close() => true;
+    public bool StartGrabbing() => false;
+    public bool StopGrabbing() => true;
+    public CameraFrame? GetFrame(int timeoutMs = 1000) => null;
+    public bool SetExposure(double microseconds) => false;
+    public bool SetGain(double value) => false;
+    public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null) => false;
+    public bool ExecuteSoftwareTrigger() => false;
+    public void Dispose() { }
+
+    private static CameraPixelFormat ConvertPixelFormat(uint pixelType)
+    {
+        return pixelType switch
+        {
+            PixelType_Gvsp_Mono8 => CameraPixelFormat.Mono8,
+            PixelType_Gvsp_RGB8 => CameraPixelFormat.RGB8,
+            PixelType_Gvsp_BGR8 => CameraPixelFormat.BGR8,
+            PixelType_Gvsp_BayerRG8 => CameraPixelFormat.BayerRG8,
+            PixelType_Gvsp_BayerGB8 => CameraPixelFormat.BayerGB8,
+            PixelType_Gvsp_BayerGR8 => CameraPixelFormat.BayerGR8,
+            PixelType_Gvsp_BayerBG8 => CameraPixelFormat.BayerBG8,
+            _ => CameraPixelFormat.Unknown
+        };
+    }
+}
+#endif

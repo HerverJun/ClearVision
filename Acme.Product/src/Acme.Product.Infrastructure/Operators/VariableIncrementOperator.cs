@@ -2,13 +2,12 @@
 // 变量递增算子 - 计数器自增// 功能实现自减
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -34,7 +33,7 @@ namespace Acme.Product.Infrastructure.Operators;
 public class VariableIncrementOperator : OperatorBase
 {
     private readonly IVariableContext _variableContext;
-    
+
     public override OperatorType OperatorType => OperatorType.VariableIncrement;
 
     public VariableIncrementOperator(
@@ -62,7 +61,7 @@ public class VariableIncrementOperator : OperatorBase
 
         // 先获取当前值
         var currentValue = _variableContext.GetValue<long>(variableName, 0L);
-        
+
         // 检查重置条件
         bool shouldReset = false;
         switch (resetCondition.ToLower())
@@ -83,7 +82,7 @@ public class VariableIncrementOperator : OperatorBase
         {
             newValue = resetValue + delta;
             _variableContext.SetValue(variableName, newValue);
-            Logger.LogInformation("[VariableIncrement] 变量 {VariableName} 重置为 {ResetValue} 后递增 {Delta}", 
+            Logger.LogInformation("[VariableIncrement] 变量 {VariableName} 重置为 {ResetValue} 后递增 {Delta}",
                 variableName, resetValue, delta);
         }
         else
@@ -91,7 +90,7 @@ public class VariableIncrementOperator : OperatorBase
             newValue = _variableContext.Increment(variableName, delta);
         }
 
-        Logger.LogInformation("[VariableIncrement] 变量 {VariableName}: {CurrentValue} + {Delta} = {NewValue}", 
+        Logger.LogInformation("[VariableIncrement] 变量 {VariableName}: {CurrentValue} + {Delta} = {NewValue}",
             variableName, currentValue, delta, newValue);
 
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>

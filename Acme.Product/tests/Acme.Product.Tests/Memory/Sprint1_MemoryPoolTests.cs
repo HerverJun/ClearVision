@@ -88,7 +88,7 @@ public class Sprint1_MemoryPoolTests
     /// 验证各自得到独立副本，修改一个不影响另一个
     /// </summary>
     [Fact]
-    public void ImageWriter_CoW_ConcurrentAccess_ReturnsIndependentCopies()
+    public async Task ImageWriter_CoW_ConcurrentAccess_ReturnsIndependentCopies()
     {
         var testPool = new MatPool(maxPerBucket: 8, maxTotalGb: 0.5);
 
@@ -119,7 +119,7 @@ public class Sprint1_MemoryPoolTests
         });
 
         // 等待两个线程完成
-        Task.WaitAll(task1, task2);
+        await Task.WhenAll(task1, task2);
 
         // 验证：两个线程得到的是不同的 Mat 对象
         Assert.NotNull(writable1);

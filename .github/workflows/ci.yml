@@ -99,7 +99,23 @@ jobs:
             -LogFileName product.trx `
             -MinimumTotalTests 1 `
             -MinimumPassedTests 1 `
+            -Filter "Category!=PerformanceBudget" `
             -Collect "XPlat Code Coverage"
+
+      - name: Run Product Performance Budget Tests
+        shell: pwsh
+        run: |
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:PRODUCT_TEST_PROJECT `
+            -Configuration Debug `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/product-performance `
+            -LogFileName product-performance.trx `
+            -MinimumTotalTests 1 `
+            -MinimumPassedTests 1 `
+            -Filter "Category=PerformanceBudget"
 
       - name: Run Desktop Tests with Coverage
         shell: pwsh

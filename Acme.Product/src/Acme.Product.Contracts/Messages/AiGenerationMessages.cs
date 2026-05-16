@@ -1,4 +1,4 @@
-﻿// AiGenerationMessages.cs
+// AiGenerationMessages.cs
 // AI 生成消息契约
 // 定义前后端之间 AI 流程生成相关的消息模型
 // 作者：蘅芜君

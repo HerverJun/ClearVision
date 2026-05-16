@@ -1,16 +1,15 @@
-﻿// ScriptOperator.cs
+// ScriptOperator.cs
 // 脚本算子
 // 执行内嵌脚本并输出脚本运行结果
 // 作者：蘅芜君
 using System.Data;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 [OperatorMeta(

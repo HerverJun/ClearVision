@@ -1,5 +1,5 @@
-using Acme.Product.Runtime.Abstractions;
 using Acme.Product.Core.Enums;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

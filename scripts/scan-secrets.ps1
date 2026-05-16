@@ -116,7 +116,7 @@ function Get-TextLines {
 }
 
 $findings = [System.Collections.Generic.List[object]]::new()
-$files = Get-ChildItem -LiteralPath $root -File -Recurse -Force
+$files = Get-ChildItem -LiteralPath $root -File -Recurse -Force -ErrorAction SilentlyContinue
 
 foreach ($file in $files) {
     if (Test-ExcludedFile -File $file) {

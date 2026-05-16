@@ -2,15 +2,13 @@
 // 圆测量算子 - 霍夫圆检测与测量
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -114,7 +112,7 @@ public class CircleMeasurementOperator : OperatorBase
             { "CircleDataList", circleDataList },
             { "Method", normalizedMethod }
         };
-        
+
         if (circleResults.Count > 0)
         {
             var firstCircle = circleResults.FirstOrDefault();
@@ -129,7 +127,7 @@ public class CircleMeasurementOperator : OperatorBase
                 {
                     additionalData["ResidualRmse"] = residualRmse;
                 }
-                 
+
                 // Sprint 1 Task 1.2: 添加单个 CircleData 输出
                 if (firstCircleData != null)
                 {
@@ -145,7 +143,7 @@ public class CircleMeasurementOperator : OperatorBase
         additionalData["UncertaintyPx"] = hasFeature && circleResults[0].TryGetValue("ResidualRmse", out var rmse)
             ? Convert.ToDouble(rmse)
             : (hasFeature ? 0.5 : double.NaN);
-        
+
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, additionalData)));
     }
 

@@ -89,6 +89,7 @@ public class OcrRecognitionOperatorTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", "PerformanceBudget")]
     public async Task Performance_1920x1080_InferenceTime_ShouldBe_Under_500ms()
     {
         // 1. 预热引擎，消除首次加载模型耗时

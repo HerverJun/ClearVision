@@ -1,0 +1,174 @@
+{
+  "GeneratedAtUtc": "2026-05-16T04:25:27.9030347Z",
+  "GateProfile": "standard",
+  "WarmupIterations": 5,
+  "MeasuredIterations": 24,
+  "BudgetScale": 1.5,
+  "Entries": [
+    {
+      "Name": "AngleMeasurement",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 0.12529583333333336,
+      "P95Ms": 0.1266,
+      "P99Ms": 0.1383,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "CaliperTool",
+      "BudgetMs": 50,
+      "Scale": 1.5,
+      "AllowedMs": 75,
+      "MeanMs": 6.475695833333332,
+      "P95Ms": 6.7263,
+      "P99Ms": 7.1743,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "CircleMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.5,
+      "AllowedMs": 45,
+      "MeanMs": 41.74352916666666,
+      "P95Ms": 43.726,
+      "P99Ms": 45.7063,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "ContourMeasurement",
+      "BudgetMs": 40,
+      "Scale": 1.5,
+      "AllowedMs": 60,
+      "MeanMs": 3.605825,
+      "P95Ms": 4.4373,
+      "P99Ms": 4.4972,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "GapMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.5,
+      "AllowedMs": 45,
+      "MeanMs": 4.681137500000001,
+      "P95Ms": 5.3722,
+      "P99Ms": 5.6898,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "GeoMeasurement",
+      "BudgetMs": 20,
+      "Scale": 1.5,
+      "AllowedMs": 30,
+      "MeanMs": 0.021883333333333334,
+      "P95Ms": 0.0253,
+      "P99Ms": 0.0293,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "GeometricTolerance",
+      "BudgetMs": 20,
+      "Scale": 1.5,
+      "AllowedMs": 30,
+      "MeanMs": 0.19314999999999996,
+      "P95Ms": 0.3188,
+      "P99Ms": 0.3732,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "HistogramAnalysis",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 0.7316708333333333,
+      "P95Ms": 0.9913,
+      "P99Ms": 0.9921,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "LineLineDistance",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 0.031333333333333324,
+      "P95Ms": 0.0317,
+      "P99Ms": 0.0355,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "LineMeasurement",
+      "BudgetMs": 20,
+      "Scale": 1.5,
+      "AllowedMs": 30,
+      "MeanMs": 8.781141666666667,
+      "P95Ms": 12.851,
+      "P99Ms": 13.4019,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "MeasureDistance",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 0.13162916666666666,
+      "P95Ms": 0.1588,
+      "P99Ms": 0.3215,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "PixelStatistics",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 23.542741666666668,
+      "P95Ms": 27.5472,
+      "P99Ms": 29.9666,
+      "Status": "FAIL",
+      "Notes": "p95 27.55ms exceeded allowed 15.00ms."
+    },
+    {
+      "Name": "PointLineDistance",
+      "BudgetMs": 10,
+      "Scale": 1.5,
+      "AllowedMs": 15,
+      "MeanMs": 0.03153333333333334,
+      "P95Ms": 0.0113,
+      "P99Ms": 0.5673,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "SharpnessEvaluation",
+      "BudgetMs": 15,
+      "Scale": 1.5,
+      "AllowedMs": 22.5,
+      "MeanMs": 1.7645541666666669,
+      "P95Ms": 2.1584,
+      "P99Ms": 2.2284,
+      "Status": "PASS",
+      "Notes": "Within budget."
+    },
+    {
+      "Name": "WidthMeasurement",
+      "BudgetMs": 30,
+      "Scale": 1.5,
+      "AllowedMs": 45,
+      "MeanMs": 94.40434999999998,
+      "P95Ms": 99.5955,
+      "P99Ms": 100.0012,
+      "Status": "FAIL",
+      "Notes": "p95 99.60ms exceeded allowed 45.00ms."
+    }
+  ]
+}

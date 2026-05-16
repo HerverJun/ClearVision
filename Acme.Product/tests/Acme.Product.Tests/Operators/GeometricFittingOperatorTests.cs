@@ -1,3 +1,4 @@
+using System.Reflection;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
@@ -6,7 +7,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using OpenCvSharp;
-using System.Reflection;
 
 namespace Acme.Product.Tests.Operators;
 
@@ -287,14 +287,14 @@ public class GeometricFittingOperatorTests
         ransacFit["RobustMethod"].Should().Be("Ransac");
         ransacFit.Should().ContainKey("InlierCount");
         ransacFit.Should().ContainKey("RansacModel");
-        
+
         ransacError.Should().BeLessThan(leastSquaresError);
         ransacCenter.X.Should().BeApproximately(160.0, 8.0);
         ransacCenter.Y.Should().BeApproximately(160.0, 8.0);
-        
+
         var ransacMajorAxis = Convert.ToDouble(ransacGeometry["MajorAxis"]);
         var ransacMinorAxis = Convert.ToDouble(ransacGeometry["MinorAxis"]);
-        
+
         // 确保能大概拟合出正确的轴长 (160, 80)
         Math.Max(ransacMajorAxis, ransacMinorAxis).Should().BeApproximately(160.0, 10.0);
         Math.Min(ransacMajorAxis, ransacMinorAxis).Should().BeApproximately(80.0, 10.0);

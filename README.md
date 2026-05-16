@@ -13,7 +13,7 @@ ClearVision 是一个面向工业视觉检测的 .NET 平台工程，覆盖桌�
 
 - Windows 桌面 Studio：WinForms + WebView2 前端，提供项目管理、流程编辑、算子配置、图像预览、检测执行和结果看板。
 - 本地运行时服务：桌面端内嵌 ASP.NET Core endpoints，承载项目、模板、算子预览、实时检测、Station 管理和配置接口。
-- 工业视觉算子库：覆盖图像处理、测量、标定、通信、流程控制、AI 等模块，当前公开算子目录以 155 个算子类型为核心边界。
+- 工业视觉算子库：覆盖图像处理、测量、标定、通信、流程控制、AI 等模块，当前公开算子目录以 156 个算子类型为核心边界。
 - 可打包 OperatorLibrary：`Acme.OperatorLibrary` 可独立构建为 NuGet 包，当前包版本基线为 `1.0.2`。
 - Station 现场链路：支持运行包导出、Station 同步、健康状态、结果摘要、命令下发与审计记录。
 - 质量证据体系：使用 contract、golden、dataset、field replay、benchmark 和 CI gate 区分功能成熟度与证据成熟度。

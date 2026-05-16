@@ -2,14 +2,12 @@
 // 颜色空间转换算子 - 支持BGR// 功能实现GRAY// 功能实现HSV// 功能实现Lab// 功能实现YUV等颜色空间转换
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -89,14 +87,14 @@ public class ColorConversionOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var conversionCode = GetStringParam(@operator, "ConversionCode", "BGR2GRAY").ToUpper();
-        var validCodes = new[] 
-        { 
+        var validCodes = new[]
+        {
             "BGR2GRAY", "GRAY2BGR", "BGR2HSV", "HSV2BGR",
             "BGR2Lab", "Lab2BGR", "BGR2YUV", "YUV2BGR",
             "BGR2RGB", "RGB2BGR", "BGR2RGBA", "BGR2XYZ",
             "XYZ2BGR", "BGR2HLS", "HLS2BGR"
         };
-        
+
         if (!validCodes.Contains(conversionCode))
         {
             return ValidationResult.Invalid($"不支持的颜色转换代码: {conversionCode}");

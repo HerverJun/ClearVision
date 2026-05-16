@@ -37,11 +37,11 @@ public static class SyntheticPointCloudGenerator
             float theta = (float)(Random.NextDouble() * Math.PI * 2);
             float phi = (float)(Math.Acos(2 * Random.NextDouble() - 1));
             float r = radius + RandomNoise(noise);
-            
+
             float x = r * (float)Math.Sin(phi) * (float)Math.Cos(theta);
             float y = r * (float)Math.Sin(phi) * (float)Math.Sin(theta);
             float z = r * (float)Math.Cos(phi);
-            
+
             points.Add(new Vector3(x, y, z));
         }
         return points;
@@ -58,11 +58,11 @@ public static class SyntheticPointCloudGenerator
             float theta = (float)(Random.NextDouble() * Math.PI * 2);
             float r = radius + RandomNoise(noise);
             float h = (float)(Random.NextDouble() - 0.5) * height;
-            
+
             float x = r * (float)Math.Cos(theta);
             float y = r * (float)Math.Sin(theta);
             float z = h + RandomNoise(noise);
-            
+
             points.Add(new Vector3(x, y, z));
         }
         return points;
@@ -75,10 +75,10 @@ public static class SyntheticPointCloudGenerator
     {
         var points = new List<Vector3>(count);
         float halfSize = size / 2;
-        
+
         // 在6个面上均匀采样
         int pointsPerFace = count / 6;
-        
+
         for (int face = 0; face < 6; face++)
         {
             for (int i = 0; i < pointsPerFace; i++)
@@ -86,7 +86,7 @@ public static class SyntheticPointCloudGenerator
                 float u = (float)(Random.NextDouble() - 0.5) * size;
                 float v = (float)(Random.NextDouble() - 0.5) * size;
                 float n = RandomNoise(noise);
-                
+
                 Vector3 point = face switch
                 {
                     0 => new Vector3(halfSize + n, u, v),    // +X
@@ -97,11 +97,11 @@ public static class SyntheticPointCloudGenerator
                     5 => new Vector3(u, v, -halfSize + n),   // -Z
                     _ => Vector3.Zero
                 };
-                
+
                 points.Add(point);
             }
         }
-        
+
         // 补充剩余点
         while (points.Count < count)
         {
@@ -111,7 +111,7 @@ public static class SyntheticPointCloudGenerator
                 (float)(Random.NextDouble() - 0.5) * size + RandomNoise(noise)
             ));
         }
-        
+
         return points;
     }
 
@@ -132,12 +132,12 @@ public static class SyntheticPointCloudGenerator
         sb.AppendLine("VIEWPOINT 0 0 0 1 0 0 0");
         sb.AppendLine($"POINTS {points.Count}");
         sb.AppendLine("DATA ascii");
-        
+
         foreach (var p in points)
         {
             sb.AppendLine($"{p.X:F6} {p.Y:F6} {p.Z:F6}");
         }
-        
+
         File.WriteAllText(filePath, sb.ToString());
     }
 
@@ -146,13 +146,14 @@ public static class SyntheticPointCloudGenerator
     /// </summary>
     private static float RandomNoise(float amplitude)
     {
-        if (amplitude <= 0) return 0;
-        
+        if (amplitude <= 0)
+            return 0;
+
         // Box-Muller变换生成近似高斯噪声
         double u1 = 1.0 - Random.NextDouble();
         double u2 = 1.0 - Random.NextDouble();
         double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
-        
+
         return (float)(randStdNormal * amplitude);
     }
 }

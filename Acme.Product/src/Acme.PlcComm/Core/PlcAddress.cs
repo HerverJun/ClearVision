@@ -72,12 +72,12 @@ public class PlcAddress
                 PlcDataType.DWord or PlcDataType.Int32 or PlcDataType.Float => "DBD",
                 _ => "DBW"
             };
-            
+
             if (BitOffset >= 0)
                 return $"DB{DbNumber}.{suffix}{StartAddress}.{BitOffset}";
             return $"DB{DbNumber}.{suffix}{StartAddress}";
         }
-        
+
         if (BitOffset >= 0)
             return $"{AreaType}{StartAddress}.{BitOffset}";
         return $"{AreaType}{StartAddress}";

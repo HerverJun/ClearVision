@@ -13,7 +13,7 @@ public interface IInspectionEvent
     /// 项目ID
     /// </summary>
     Guid ProjectId { get; }
-    
+
     /// <summary>
     /// 时间戳
     /// </summary>

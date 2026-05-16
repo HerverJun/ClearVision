@@ -1,133 +1,127 @@
-﻿# 几何拟合 / GeometricFitting
+# Geometric Fitting / GeometricFitting
 
 ## 基本信息 / Basic Info
 | 项目 (Field) | 值 (Value) |
 |------|------|
 | 类名 (Class) | `GeometricFittingOperator` |
 | 枚举值 (Enum) | `OperatorType.GeometricFitting` |
-| 分类 (Category) | Measurement |
+| 分类 (Category) | 检测 |
+| 版本 (Version) | `1.0.0` |
 | 成熟度 (Maturity) | 稳定 Stable |
-| 作者 (Author) | 蘅芜君 |
+| 标签 (Tags) | `功能域:测量`, `成熟度:稳定`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-当前实现的几何拟合流程并不是直接接收点集输入，而是：
-
-1. 把输入图像灰度化；
-2. 用固定阈值做二值化；
-3. 提取外轮廓；
-4. 按 `MinArea` 过滤掉过小轮廓；
-5. 将**所有有效轮廓的点合并为一个总点集**；
-6. 对这个总点集执行直线、圆或椭圆拟合。
-
-因此该算子的拟合对象是“阈值分割后所有有效轮廓点的联合点集”，而不是默认只对最大轮廓或某个 ROI 内单独轮廓拟合。
-
-拟合分支如下：
-
-- `Line`：`Cv2.FitLine(...)`
-- `Circle`：自定义最小二乘圆拟合 `FitCircleLeastSquares(...)`
-- `Ellipse`：`Cv2.FitEllipse(...)`
-
-当 `RobustMethod = Ransac` 时：
-
-- 直线和圆会先用 RANSAC 估计内点，再对内点做最终拟合；
-- 椭圆**不走 RANSAC**，仍直接调用 `FitEllipse(...)`。
-
-> English: The operator thresholds the input image, merges all valid contour points into one point set, and then fits a line, circle, or ellipse, with optional RANSAC only for line and circle fitting.
+当前元数据描述为：Fits line, circle or ellipse from contour points。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
-当前实现更偏向“从图像自动提点再拟合”的通用流程，而不是精密点集拟合器：
-
-- **固定阈值前处理**：没有自适应阈值、边缘子像素提取或 ROI 专用采样逻辑，全部基于固定二值阈值起步。
-- **多轮廓合并**：只要轮廓面积达到 `MinArea`，其点都会被并入总点集参与拟合。
-- **失败结果多数仍走成功输出**：当没有有效轮廓、点数不足或某个拟合分支失败时，算子通常返回成功执行结果，但 `FitResult.Success=false` 且附带 `Message`。
-- **输出结构因拟合类型而异**：直线、圆、椭圆各自返回不同键值，如 `LineVx/LineVy`、`Radius`、`MajorAxis/MinorAxis` 等。
-- **可视化优先**：结果图中会绘制原始轮廓和最终拟合图形，便于人工核查拟合是否合理。
-
-> English: The implementation is a practical image-to-geometry pipeline, not a pure point-set fitting API, and the returned fit payload varies by the selected geometry type.
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 参数解析覆盖 8 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
 ## 核心 API 调用链 / Core API Call Chain
-1. `TryGetInputImage(inputs, "Image")`
-2. `GetStringParam / GetIntParam / GetDoubleParam`
-3. `Cv2.CvtColor(..., BGR2GRAY)`
-4. `Cv2.Threshold(gray, binary, threshold, 255, ThresholdTypes.Binary)`
-5. `Cv2.FindContours(binary, ..., RetrievalModes.External, ApproxSimple)`
-6. 面积过滤并合并所有轮廓点
-7. 分支拟合：
-   - `Cv2.FitLine(...)`
-   - 自定义 `FitCircleLeastSquares(...)`
-   - `Cv2.FitEllipse(...)`
-8. 可选 RANSAC：
-   - `TryEstimateLineInliersRansac(...)`
-   - `TryEstimateCircleInliersRansac(...)`
-9. `Cv2.DrawContours(...)` / `Cv2.Line(...)` / `Cv2.Circle(...)` / `Cv2.Ellipse(...)`
-10. `CreateImageOutput(resultImage, additionalData)`
+- `OperatorBase.Get*Param(...)`
+- `Cv2.CvtColor`
+- `Cv2.DrawContours`
+- `Cv2.FitLine`
+- `Cv2.Line`
+- `Cv2.Circle`
+- `Cv2.FitEllipse`
+- `Cv2.Ellipse`
+- `Cv2.ContourArea`
+- `Cv2.Resize`
+- `Cv2.Threshold`
+- `Cv2.FindContours`
+- `Math.Abs`
+- `Math.Round`
 
 ## 参数说明 / Parameters
-| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
-|--------|------|--------|------|------|
-| `FitType` | `enum` | `"Circle"` | `Line` / `Circle` / `Ellipse` | 拟合类型。决定最终拟合模型及输出字段结构。 |
-| `Threshold` | `double` | `127.0` | `[0.0, 255.0]` | 固定二值阈值，用于先把图像分割成轮廓点集。 |
-| `MinArea` | `int` | `100` | `[0, +∞)` | 最小轮廓面积。面积低于此值的轮廓不会参与拟合。 |
-| `MinPoints` | `int` | `5` | `[3, 10000]` | 合并后点集的最小点数门槛。 |
-| `RobustMethod` | `enum` | `"LeastSquares"` | `LeastSquares` / `Ransac` | 鲁棒方法选择。当前只有直线和圆会真正使用 RANSAC 分支。 |
-| `RansacIterations` | `int` | `200` | `[10, 5000]` | RANSAC 迭代次数。 |
-| `RansacInlierThreshold` | `double` | `2.0` | `(0, 100]` | 点到模型距离小于该阈值时视为内点。 |
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `FitType` | Fit Type | `enum` | Circle | Line/Line；Circle/Circle；Ellipse/Ellipse | Yes | - |
+| `Threshold` | Binary Threshold | `double` | 127 | [0, 255] | Yes | - |
+| `MinArea` | Min Contour Area | `int` | 100 | >= 0 | Yes | - |
+| `MinPoints` | Min Points | `int` | 5 | [3, 10000] | Yes | - |
+| `ContourSelection` | Contour Selection | `enum` | BestResidual | LargestContour/Largest Contour；BestResidual/Best Residual | Yes | - |
+| `RobustMethod` | Robust Method | `enum` | LeastSquares | LeastSquares/LeastSquares；Ransac/Ransac | Yes | - |
+| `RansacIterations` | Ransac Iterations | `int` | 200 | [10, 5000] | Yes | - |
+| `RansacInlierThreshold` | Ransac Inlier Threshold | `double` | 2 | [0.1, 100] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
 |------|------|------|------|------|
-| `Image` | Input Image | `Image` | Yes | 输入图像。所有拟合都从图像分割轮廓点开始，而不是直接从点集输入。 |
+| `Image` | Input Image | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
 
 ### 输出 / Outputs
 | 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
 |------|------|------|------|
-| `Image` | Result Image | `Image` | 结果图，会绘制轮廓和拟合图形。 |
-| `FitResult` | Fit Result | `Any` | 拟合结果字典。不同拟合类型字段不同。 |
+| `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `FitResult` | Fit Result | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ### 运行时附加输出 / Runtime Additional Outputs
-| 名称 (Name) | 数据类型 (DataType) | 说明 (Description) |
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Width` | `Integer` | 输出图像宽度。 |
-| `Height` | `Integer` | 输出图像高度。 |
-| `FitResult` | `Dictionary` | 拟合结果主体字典。 |
-| `FitType` | `String` | 当前拟合类型。 |
-| `PointCount` | `Integer` | 参与拟合的总点数（合并后的点集大小）。 |
-| `ContourCount` | `Integer` | 参与拟合的有效轮廓数量。 |
-
-### `FitResult` 典型字段 / Typical `FitResult` Keys
-- **通用字段**：`Success`、`RobustMethod`、可选 `Message`
-- **直线拟合**：`LineVx`、`LineVy`、`LineX0`、`LineY0`、`Angle`
-- **圆拟合**：`CenterX`、`CenterY`、`Radius`
-- **椭圆拟合**：`CenterX`、`CenterY`、`MajorAxis`、`MinorAxis`、`Angle`
-- **RANSAC 辅助字段**：`InlierCount`、`InlierRatio`
+| `Angle` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `AppliedRobustMethod` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Center` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Circle` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Confidence` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `ContourCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `Geometry` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `InlierCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `InlierRatio` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `Line` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `MajorAxis` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `MaxResidual` | `Float` | 源码输出字典初始化中可见字段。 |
+| `MeanResidual` | `Float` | 源码输出字典初始化中可见字段。 |
+| `Message` | `String` | 源码通过输出字典索引赋值写入。 |
+| `MinorAxis` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `PointCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `Radius` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `RansacMaxResidual` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `RansacMeanResidual` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `RansacModel` | `String` | 源码通过输出字典索引赋值写入。 |
+| `RequestedRobustMethod` | `Any` | 源码输出字典初始化中可见字段。 |
+| `ResidualMax` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `ResidualMean` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `SelectedContourCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `SourceContourCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `Success` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Type` | `String` | 源码通过输出字典索引赋值写入。 |
+| `UncertaintyPx` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Vx` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Vy` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
+| `X0` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Y0` | `Any` | 源码输出字典初始化中可见字段。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 预处理与轮廓提取近似随像素数线性增长；RANSAC 模式额外与 `RansacIterations × PointCount` 相关。 |
-| 典型耗时 (Typical Latency) | 固定阈值和轮廓提取通常较快；开启 RANSAC 后，点集越大成本越明显。 |
-| 内存特征 (Memory Profile) | 需要分配灰度图、二值图、轮廓点集和结果图；多轮廓场景下点集内存会随轮廓总点数增长。 |
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- **适合 (Suitable)**：目标在阈值分割后轮廓清晰、需要拟合直线/圆/椭圆参数的场景。
-- **适合 (Suitable)**：希望快速从图像直接得到几何模型参数，而不是单独准备点集输入的流程。
-- **适合 (Suitable)**：存在少量异常点时，线/圆拟合可借助 RANSAC 提升鲁棒性。
-- **不适合 (Not Suitable)**：多个无关目标同时存在且会被并入同一总点集的图像。
-- **不适合 (Not Suitable)**：需要亚像素边缘采样、卡尺测量或专门测量 ROI 约束的高精度场景。
-- **不适合 (Not Suitable)**：低对比度或固定阈值难以稳定分割的复杂背景。
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. 当前实现会把**所有有效轮廓点合并后再拟合**，如果图中存在多个独立目标，可能得到混合后的错误几何模型。
-2. 预处理仅使用固定阈值 `ThresholdTypes.Binary`，没有自适应阈值、极性选择或形态学清理分支。
-3. `RobustMethod=Ransac` 当前只对直线和圆有效，椭圆拟合仍直接使用 `Cv2.FitEllipse(...)`。
-4. 没有有效轮廓或点数不足时，算子通常返回成功执行结果，并把失败状态放进 `FitResult.Success` 与 `Message`，流程编排时不能只看执行状态。
-5. `FitResult` 字段结构会随 `FitType` 改变，下游消费前应根据拟合类型判断字段是否存在。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.2 | 2026-03-14 | 第二轮基于源码补充轮廓合并逻辑、RANSAC 适用范围、FitResult 结构与执行语义说明 |
-| 1.0.1 | 2026-03-14 | 基于源码补充算法原理、调用链、参数语义、适用场景与已知限制 |
-| 1.0.0 | 2026-03-03 | 自动生成文档骨架 / Generated skeleton |
-
+| 1.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |

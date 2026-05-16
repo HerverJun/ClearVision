@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Diagnostics;
 using System.Globalization;
 using Acme.Product.Core.Cameras;
@@ -19,6 +19,7 @@ using Xunit;
 namespace Acme.Product.Tests.Integration
 {
     [Collection(PerformanceAcceptanceCollection.Name)]
+    [Trait("Category", "PerformanceBudget")]
     public class PerformanceAcceptanceTests
     {
         private readonly IFlowExecutionService _flowExecutionService;

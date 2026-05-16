@@ -5,9 +5,9 @@
 using System.Reflection;
 using System.Text.Json;
 using Acme.Product.Contracts.Messages;
+using Acme.Product.Desktop.Handlers;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
-using Acme.Product.Desktop.Handlers;
 
 namespace Acme.Product.Desktop;
 

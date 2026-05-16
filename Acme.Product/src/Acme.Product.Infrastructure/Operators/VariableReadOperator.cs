@@ -2,13 +2,12 @@
 // 变量读取算子 - 从全局变量表读取值
 // 作者：蘅芜君
 
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Microsoft.Extensions.Logging;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>
@@ -30,7 +29,7 @@ namespace Acme.Product.Infrastructure.Operators;
 public class VariableReadOperator : OperatorBase
 {
     private readonly IVariableContext _variableContext;
-    
+
     public override OperatorType OperatorType => OperatorType.VariableRead;
 
     public VariableReadOperator(
@@ -76,7 +75,7 @@ public class VariableReadOperator : OperatorBase
                 break;
         }
 
-        Logger.LogInformation("[VariableRead] 读取变量 {VariableName} = {Value} (存在: {Exists})", 
+        Logger.LogInformation("[VariableRead] 读取变量 {VariableName} = {Value} (存在: {Exists})",
             variableName, value, exists);
 
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>

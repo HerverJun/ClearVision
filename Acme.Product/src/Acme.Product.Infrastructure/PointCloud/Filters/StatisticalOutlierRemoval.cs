@@ -18,8 +18,10 @@ public sealed class StatisticalOutlierRemoval
 
     public PointCloud Filter(PointCloud input, int meanK = 50, double stddevMul = 1.0)
     {
-        if (input == null) throw new ArgumentNullException(nameof(input));
-        if (meanK <= 0) throw new ArgumentOutOfRangeException(nameof(meanK), "meanK must be a positive integer.");
+        if (input == null)
+            throw new ArgumentNullException(nameof(input));
+        if (meanK <= 0)
+            throw new ArgumentOutOfRangeException(nameof(meanK), "meanK must be a positive integer.");
         if (!double.IsFinite(stddevMul) || stddevMul < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(stddevMul), "stddevMul must be a non-negative finite number.");
@@ -214,7 +216,8 @@ public sealed class StatisticalOutlierRemoval
 
         public MaxHeap(int capacity)
         {
-            if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+            if (capacity <= 0)
+                throw new ArgumentOutOfRangeException(nameof(capacity));
             _items = new double[capacity];
         }
 

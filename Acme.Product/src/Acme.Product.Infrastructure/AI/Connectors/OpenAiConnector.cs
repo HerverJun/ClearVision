@@ -44,7 +44,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await SendAsync(HttpMethod.Post, "chat/completions", content, ct);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync(ct);
@@ -66,7 +66,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
             }
 
             var choice = result.Choices[0];
-            
+
             return new LLMResponse
             {
                 Content = choice.Message?.Content ?? string.Empty,
@@ -82,7 +82,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
     /// 流式生成响应
     /// </summary>
     public async IAsyncEnumerable<LLMStreamChunk> GenerateStreamAsync(
-        string prompt, 
+        string prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var request = CreateRequest(prompt, stream: true);
@@ -90,7 +90,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         using var response = await SendAsync(HttpMethod.Post, "chat/completions", content, cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -108,12 +108,12 @@ public class OpenAiConnector : ILLMConnector, IDisposable
         while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested && !isComplete)
         {
             var line = await reader.ReadLineAsync(cancellationToken);
-            
+
             if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                 continue;
 
             var data = line.Substring(6); // 去掉 "data: "
-            
+
             if (data == "[DONE]")
             {
                 isComplete = true;
@@ -126,7 +126,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
             try
             {
                 chunk = JsonSerializer.Deserialize(
-                    data, 
+                    data,
                     OpenAiJsonContext.Default.OpenAIChatCompletionChunk
                 );
             }
@@ -191,7 +191,7 @@ public class OpenAiConnector : ILLMConnector, IDisposable
     public async Task<List<string>> GetAvailableModelsAsync(CancellationToken cancellationToken = default)
     {
         var response = await SendAsync(HttpMethod.Get, "models", null, cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             throw new LLMException($"获取模型列表失败: {response.StatusCode}");
@@ -277,19 +277,19 @@ public class OpenAiConfig
 {
     /// <summary>API Key (必需)</summary>
     public string ApiKey { get; set; } = string.Empty;
-    
+
     /// <summary>模型名称 (默认 gpt-4)</summary>
     public string Model { get; set; } = "gpt-4";
-    
+
     /// <summary>基础 URL (默认 https://api.openai.com/v1)</summary>
     public string BaseUrl { get; set; } = "https://api.openai.com/v1";
-    
+
     /// <summary>温度参数 (默认 0.1)</summary>
     public float Temperature { get; set; } = 0.1f;
-    
+
     /// <summary>最大 Token 数 (默认 4000)</summary>
     public int MaxTokens { get; set; } = 4000;
-    
+
     /// <summary>超时时间 (默认 60 秒)</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
 }
@@ -468,7 +468,7 @@ public class LLMStreamChunk
 {
     /// <summary>内容片段</summary>
     public string Content { get; set; } = string.Empty;
-    
+
     /// <summary>是否完成</summary>
     public bool IsComplete { get; set; }
 }
@@ -481,7 +481,7 @@ public class LLMException : Exception
     public string? ErrorDetails { get; }
     public int StatusCode { get; }
 
-    public LLMException(string message, string? errorDetails = null, int statusCode = 0) 
+    public LLMException(string message, string? errorDetails = null, int statusCode = 0)
         : base(message)
     {
         ErrorDetails = errorDetails;
@@ -526,7 +526,7 @@ public class ExponentialBackoffRetryPolicy : IRetryPolicy
             {
                 lastException = ex;
                 attempt++;
-                
+
                 var delay = _initialDelay * Math.Pow(2, attempt - 1);
                 await Task.Delay(delay, cancellationToken);
             }
@@ -538,9 +538,12 @@ public class ExponentialBackoffRetryPolicy : IRetryPolicy
     private bool IsRetryable(Exception ex)
     {
         // 网络错误、超时、5xx 错误可重试
-        if (ex is HttpRequestException) return true;
-        if (ex is TaskCanceledException) return true;
-        if (ex is LLMException llmEx && llmEx.StatusCode >= 500) return true;
+        if (ex is HttpRequestException)
+            return true;
+        if (ex is TaskCanceledException)
+            return true;
+        if (ex is LLMException llmEx && llmEx.StatusCode >= 500)
+            return true;
         return false;
     }
 }

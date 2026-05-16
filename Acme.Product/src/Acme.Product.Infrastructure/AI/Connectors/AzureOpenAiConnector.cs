@@ -25,11 +25,11 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _httpClient = httpClient ?? new HttpClient();
         _retryPolicy = retryPolicy ?? new ExponentialBackoffRetryPolicy(3, TimeSpan.FromSeconds(1));
-        
+
         // 配置 HttpClient
         var baseUrl = $"{_config.Endpoint.TrimEnd('/')}/openai/deployments/{_config.DeploymentName}";
         _httpClient.BaseAddress = new Uri(EnsureTrailingSlash(baseUrl));
-        
+
         // 根据认证方式设置请求头
         if (!string.IsNullOrEmpty(_config.ApiKey))
         {
@@ -41,7 +41,7 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
             // Entra ID (AAD) 认证
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.AccessToken}");
         }
-        
+
         _httpClient.Timeout = _config.Timeout;
     }
 
@@ -58,7 +58,7 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
 
             var url = $"chat/completions?api-version={_config.ApiVersion}";
             var response = await _httpClient.PostAsync(url, content, ct);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync(ct);
@@ -80,7 +80,7 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
             }
 
             var choice = result.Choices[0];
-            
+
             return new LLMResponse
             {
                 Content = choice.Message?.Content ?? string.Empty,
@@ -96,7 +96,7 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
     /// 流式生成响应
     /// </summary>
     public async IAsyncEnumerable<LLMStreamChunk> GenerateStreamAsync(
-        string prompt, 
+        string prompt,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var request = CreateRequest(prompt, stream: true);
@@ -105,7 +105,7 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
 
         var url = $"chat/completions?api-version={_config.ApiVersion}";
         using var response = await _httpClient.PostAsync(url, content, cancellationToken);
-        
+
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -123,12 +123,12 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
         while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested && !isComplete)
         {
             var line = await reader.ReadLineAsync(cancellationToken);
-            
+
             if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                 continue;
 
             var data = line.Substring(6); // 去掉 "data: "
-            
+
             if (data == "[DONE]")
             {
                 isComplete = true;
@@ -141,7 +141,7 @@ public class AzureOpenAiConnector : ILLMConnector, IDisposable
             try
             {
                 chunk = JsonSerializer.Deserialize(
-                    data, 
+                    data,
                     AzureOpenAiJsonContext.Default.AzureChatCompletionChunk
                 );
             }
@@ -255,25 +255,25 @@ public class AzureOpenAiConfig
 {
     /// <summary>服务端点 (必需, 如 https://{resource}.openai.azure.com)</summary>
     public string Endpoint { get; set; } = string.Empty;
-    
+
     /// <summary>部署名称 (必需)</summary>
     public string DeploymentName { get; set; } = string.Empty;
-    
+
     /// <summary>API Key (与 AccessToken 二选一)</summary>
     public string ApiKey { get; set; } = string.Empty;
-    
+
     /// <summary>Entra ID 访问令牌 (与 ApiKey 二选一)</summary>
     public string AccessToken { get; set; } = string.Empty;
-    
+
     /// <summary>API 版本 (默认 2024-02-15-preview)</summary>
     public string ApiVersion { get; set; } = "2024-02-15-preview";
-    
+
     /// <summary>温度参数 (默认 0.1)</summary>
     public float Temperature { get; set; } = 0.1f;
-    
+
     /// <summary>最大 Token 数 (默认 4000)</summary>
     public int MaxTokens { get; set; } = 4000;
-    
+
     /// <summary>超时时间 (默认 60 秒)</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
 }

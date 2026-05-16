@@ -123,14 +123,14 @@ public class ResultAnalysisService : IResultAnalysisService
     public async Task<ConfidenceDistributionDto> GetConfidenceDistributionAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
-        
+
         // 按时间筛选
         var filtered = results.Where(r =>
             (!startTime.HasValue || r.InspectionTime >= startTime.Value) &&
             (!endTime.HasValue || r.InspectionTime <= endTime.Value));
 
         var allDefects = filtered.SelectMany(r => r.Defects).ToList();
-        
+
         // 分桶统计
         var buckets = new Dictionary<string, int>
         {
@@ -147,12 +147,24 @@ public class ResultAnalysisService : IResultAnalysisService
             var score = defect.ConfidenceScore * 100;
             switch (score)
             {
-                case >= 90: buckets["90-100%"]++; break;
-                case >= 80: buckets["80-90%"]++; break;
-                case >= 70: buckets["70-80%"]++; break;
-                case >= 60: buckets["60-70%"]++; break;
-                case >= 50: buckets["50-60%"]++; break;
-                default: buckets["<50%"]++; break;
+                case >= 90:
+                    buckets["90-100%"]++;
+                    break;
+                case >= 80:
+                    buckets["80-90%"]++;
+                    break;
+                case >= 70:
+                    buckets["70-80%"]++;
+                    break;
+                case >= 60:
+                    buckets["60-70%"]++;
+                    break;
+                case >= 50:
+                    buckets["50-60%"]++;
+                    break;
+                default:
+                    buckets["<50%"]++;
+                    break;
             }
         }
 
@@ -181,7 +193,7 @@ public class ResultAnalysisService : IResultAnalysisService
         var resultList = results.ToList();
 
         var dataPoints = new List<TrendDataPointDto>();
-        
+
         if (!resultList.Any())
         {
             return new TrendAnalysisDto
@@ -208,7 +220,7 @@ public class ResultAnalysisService : IResultAnalysisService
             };
 
             var periodResults = resultList.Where(r => r.InspectionTime >= current && r.InspectionTime < next).ToList();
-            
+
             dataPoints.Add(new TrendDataPointDto
             {
                 Timestamp = current,
@@ -238,7 +250,7 @@ public class ResultAnalysisService : IResultAnalysisService
     public async Task<string> ExportToCsvAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
-        
+
         var csv = new System.Text.StringBuilder();
         csv.AppendLine(ToCsvRow("检测ID", "工程ID", "检测时间", "状态", "处理时间(ms)", "置信度", "缺陷数量", "错误信息", "缺陷类型", "X", "Y", "Width", "Height", "缺陷置信度", "缺陷描述"));
 
@@ -260,7 +272,7 @@ public class ResultAnalysisService : IResultAnalysisService
                 null,
                 null,
                 null));
-            
+
             foreach (var defect in result.Defects)
             {
                 csv.AppendLine(ToCsvRow(
@@ -321,7 +333,7 @@ public class ResultAnalysisService : IResultAnalysisService
     public async Task<string> ExportToJsonAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
-        
+
         var exportData = new InspectionExportDto
         {
             ProjectId = projectId,
@@ -544,13 +556,14 @@ public class ResultAnalysisService : IResultAnalysisService
     {
         var improvements = comparisons.Count(c => c.IsPositive);
         var total = comparisons.Count;
-        
+
         return $"在{total}项指标中，有{improvements}项改善，{total - improvements}项下降";
     }
 
     private double CalculateChange(double oldValue, double newValue)
     {
-        if (oldValue == 0) return newValue > 0 ? 100 : 0;
+        if (oldValue == 0)
+            return newValue > 0 ? 100 : 0;
         return (newValue - oldValue) / oldValue * 100;
     }
 

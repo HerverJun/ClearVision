@@ -87,7 +87,7 @@ public class ResultAnalysisServiceIntegrationTests
         result.ProjectId.Should().Be(projectId);
         result.TotalDefects.Should().Be(33);
         result.Items.Should().HaveCount(4);
-        
+
         // 验证按数量降序排序
         result.Items[0].DefectType.Should().Be(DefectType.ForeignObject.ToString());
         result.Items[0].Count.Should().Be(15);
@@ -116,16 +116,16 @@ public class ResultAnalysisServiceIntegrationTests
         result.Should().NotBeNull();
         result.TotalDefects.Should().Be(7);
         result.Buckets.Should().HaveCount(6);
-        
+
         // 90-100%: 2个 (0.95, 0.92)
         result.Buckets.First(b => b.Range == "90-100%").Count.Should().Be(2);
-        
+
         // 80-90%: 1个 (0.82)
         result.Buckets.First(b => b.Range == "80-90%").Count.Should().Be(1);
-        
+
         // 70-80%: 1个 (0.75)
         result.Buckets.First(b => b.Range == "70-80%").Count.Should().Be(1);
-        
+
         // <50%: 1个 (0.45)
         result.Buckets.First(b => b.Range == "<50%").Count.Should().Be(1);
     }
@@ -260,7 +260,7 @@ public class ResultAnalysisServiceIntegrationTests
         report.DefectDistribution.Should().NotBeNull();
         report.ConfidenceDistribution.Should().NotBeNull();
         report.HourlyTrend.Should().NotBeNull();
-        
+
         // OK率低于80%，应该有建议
         report.Recommendations.Should().NotBeEmpty();
         report.Recommendations.Should().Contain(r => r.Contains("OK率较低"));
@@ -338,7 +338,7 @@ public class ResultAnalysisServiceIntegrationTests
         heatmap.GridSize.Should().Be(10);
         heatmap.Cells.Should().HaveCount(100); // 10x10 grid
         heatmap.ImageBounds.Should().NotBeNull();
-        
+
         // 至少有一些单元格应该有缺陷
         heatmap.Cells.Any(c => c.DefectCount > 0).Should().BeTrue();
     }
@@ -356,7 +356,7 @@ public class ResultAnalysisServiceIntegrationTests
     {
         var result = new InspectionResult(projectId);
         result.SetResult(InspectionStatus.NG, 150, null);
-        
+
         foreach (var score in confidenceScores)
         {
             result.AddDefect(new Defect(
@@ -366,7 +366,7 @@ public class ResultAnalysisServiceIntegrationTests
                 score,
                 "Test defect"));
         }
-        
+
         return result;
     }
 

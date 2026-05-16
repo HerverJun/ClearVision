@@ -1,6 +1,9 @@
+using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using Acme.Product.Desktop.Configuration;
 using Acme.Product.Desktop.Data;
 using Acme.Product.Desktop.Endpoints;
-using Acme.Product.Desktop.Configuration;
 using Acme.Product.Desktop.Handlers;
 using Acme.Product.Desktop.Hubs;
 using Acme.Product.Desktop.Middleware;
@@ -15,18 +18,15 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Serilog;
-using System.Diagnostics;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using Microsoft.Extensions.Configuration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using Serilog;
 
 namespace Acme.Product.Desktop;
 

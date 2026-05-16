@@ -2,9 +2,9 @@
 // 图像标注数据（JSON格式）
 // 作者：蘅芜君
 
+using System.Text.Json.Serialization;
 using Acme.Product.Core.Entities.Base;
 using Acme.Product.Core.Enums;
-using System.Text.Json.Serialization;
 
 namespace Acme.Product.Core.Entities;
 

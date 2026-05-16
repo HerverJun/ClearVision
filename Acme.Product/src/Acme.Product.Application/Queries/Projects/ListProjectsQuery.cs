@@ -2,10 +2,10 @@
 // ListProjects查询
 // 作者：蘅芜君
 
-using MediatR;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Interfaces;
 using AutoMapper;
+using MediatR;
 
 namespace Acme.Product.Application.Queries.Projects;
 
@@ -27,7 +27,7 @@ public class ListProjectsQueryHandler : IRequestHandler<ListProjectsQuery, List<
         // Assuming Repository has SearchAsync or we use ListAsync and filter.
         // IProjectRepository interface usually has SearchAsync.
         // Let's assume SearchAsync exists based on previous file reads (ProjectService uses it).
-        
+
         var projects = await _repository.SearchAsync(request.SearchTerm ?? string.Empty);
         return _mapper.Map<List<ProjectDto>>(projects);
     }

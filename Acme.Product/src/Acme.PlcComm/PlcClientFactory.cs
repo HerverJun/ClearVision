@@ -3,9 +3,9 @@
 // 作者：蘅芜君
 
 using Acme.PlcComm.Interfaces;
-using Acme.PlcComm.Siemens;
 using Acme.PlcComm.Mitsubishi;
 using Acme.PlcComm.Omron;
+using Acme.PlcComm.Siemens;
 using Microsoft.Extensions.Logging;
 
 namespace Acme.PlcComm;
@@ -93,7 +93,7 @@ public static class PlcClientFactory
     private static IPlcClient CreateS7FromUri(Uri uri, System.Collections.Specialized.NameValueCollection queryParams, ILogger? logger)
     {
         var ipAddress = uri.Host;
-        
+
         // 解析CPU类型
         var cpuTypeStr = queryParams["cpu"] ?? "S7-1200";
         var cpuType = cpuTypeStr.ToUpper() switch
@@ -120,7 +120,7 @@ public static class PlcClientFactory
         var slot = string.IsNullOrWhiteSpace(slotRaw) ? 1 : int.Parse(slotRaw);
 
         var client = new SiemensS7Client(ipAddress, cpuType, rack, slot, logger);
-        
+
         if (uri.Port > 0)
             client.Port = uri.Port;
 
@@ -131,7 +131,7 @@ public static class PlcClientFactory
     {
         var ipAddress = uri.Host;
         var client = new MitsubishiMcClient(ipAddress, logger);
-        
+
         if (uri.Port > 0)
             client.Port = uri.Port;
 
@@ -142,7 +142,7 @@ public static class PlcClientFactory
     {
         var ipAddress = uri.Host;
         var client = new OmronFinsClient(ipAddress, logger);
-        
+
         if (uri.Port > 0)
             client.Port = uri.Port;
 

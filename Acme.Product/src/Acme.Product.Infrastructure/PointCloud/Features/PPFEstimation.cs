@@ -24,7 +24,8 @@ public sealed class PPFEstimation
         float featureRadius = 0.05f,
         bool useExistingNormals = true)
     {
-        if (model == null) throw new ArgumentNullException(nameof(model));
+        if (model == null)
+            throw new ArgumentNullException(nameof(model));
         if (normalRadius <= 0 || !float.IsFinite(normalRadius))
         {
             throw new ArgumentOutOfRangeException(nameof(normalRadius), "normalRadius must be positive and finite.");
@@ -84,7 +85,8 @@ public sealed class PPFEstimation
     /// </summary>
     public PointCloud ComputePointCloudWithNormals(PointCloud input, float normalRadius = 0.03f, bool useExistingNormals = true)
     {
-        if (input == null) throw new ArgumentNullException(nameof(input));
+        if (input == null)
+            throw new ArgumentNullException(nameof(input));
         if (normalRadius <= 0 || !float.IsFinite(normalRadius))
         {
             throw new ArgumentOutOfRangeException(nameof(normalRadius), "normalRadius must be positive and finite.");

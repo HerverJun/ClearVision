@@ -1,5 +1,5 @@
-using Acme.Product.Core.Entities;
 using Acme.Product.Core.Attributes;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;

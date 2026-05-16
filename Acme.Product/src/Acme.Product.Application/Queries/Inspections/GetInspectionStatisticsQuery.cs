@@ -2,9 +2,9 @@
 // GetInspectionStatistics查询
 // 作者：蘅芜君
 
-using MediatR;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Interfaces;
+using MediatR;
 
 namespace Acme.Product.Application.Queries.Inspections;
 
@@ -41,7 +41,7 @@ public class GetInspectionStatisticsQueryHandler : IRequestHandler<GetInspection
     public async Task<InspectionStatisticsDto> Handle(GetInspectionStatisticsQuery request, CancellationToken cancellationToken)
     {
         var stats = await _repository.GetStatisticsAsync(request.ProjectId);
-        
+
         return new InspectionStatisticsDto
         {
             TotalCount = stats.TotalCount,

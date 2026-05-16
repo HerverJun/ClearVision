@@ -115,13 +115,19 @@ public sealed class PointCloud : IDisposable
             var y = idx[r, 1];
             var z = idx[r, 2];
 
-            if (x < min.X) min.X = x;
-            if (y < min.Y) min.Y = y;
-            if (z < min.Z) min.Z = z;
+            if (x < min.X)
+                min.X = x;
+            if (y < min.Y)
+                min.Y = y;
+            if (z < min.Z)
+                min.Z = z;
 
-            if (x > max.X) max.X = x;
-            if (y > max.Y) max.Y = y;
-            if (z > max.Z) max.Z = z;
+            if (x > max.X)
+                max.X = x;
+            if (y > max.Y)
+                max.Y = y;
+            if (z > max.Z)
+                max.Z = z;
         }
 
         return new AxisAlignedBoundingBox { Min = min, Max = max };
@@ -256,10 +262,14 @@ public sealed class PointCloud : IDisposable
 
     public static PointCloud FromDepthMap(Mat depth, Mat cameraMatrix, MatPool? pool = null)
     {
-        if (depth == null) throw new ArgumentNullException(nameof(depth));
-        if (cameraMatrix == null) throw new ArgumentNullException(nameof(cameraMatrix));
-        if (depth.Empty()) throw new ArgumentException("Depth is empty.", nameof(depth));
-        if (cameraMatrix.Rows != 3 || cameraMatrix.Cols != 3) throw new ArgumentException("Camera matrix must be 3x3.", nameof(cameraMatrix));
+        if (depth == null)
+            throw new ArgumentNullException(nameof(depth));
+        if (cameraMatrix == null)
+            throw new ArgumentNullException(nameof(cameraMatrix));
+        if (depth.Empty())
+            throw new ArgumentException("Depth is empty.", nameof(depth));
+        if (cameraMatrix.Rows != 3 || cameraMatrix.Cols != 3)
+            throw new ArgumentException("Camera matrix must be 3x3.", nameof(cameraMatrix));
 
         var p = pool ?? MatPool.Shared;
         int width = depth.Cols;
@@ -340,8 +350,10 @@ public sealed class PointCloud : IDisposable
         _disposed = true;
 
         ReturnMat(Points);
-        if (Colors != null) ReturnMat(Colors);
-        if (Normals != null) ReturnMat(Normals);
+        if (Colors != null)
+            ReturnMat(Colors);
+        if (Normals != null)
+            ReturnMat(Normals);
 
         GC.SuppressFinalize(this);
     }

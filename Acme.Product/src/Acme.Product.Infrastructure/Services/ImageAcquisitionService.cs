@@ -1,7 +1,9 @@
-﻿// ImageAcquisitionService.cs
+// ImageAcquisitionService.cs
 // 图像采集服务实现
 // 负责图像加载、采集缓存与连续采集任务管理
 // 作者：蘅芜君
+using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
@@ -10,11 +12,8 @@ using Acme.Product.Core.Exceptions;
 using Acme.Product.Core.Streaming;
 using Acme.Product.Infrastructure.Cameras;
 using Acme.Product.Infrastructure.Utilities;
-using OpenCvSharp;
-using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
-
 using Microsoft.Extensions.Logging;
+using OpenCvSharp;
 
 namespace Acme.Product.Infrastructure.Services;
 

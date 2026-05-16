@@ -28,7 +28,8 @@ public readonly struct RunLength : IEquatable<RunLength>
 
     public bool Overlaps(RunLength other)
     {
-        if (Y != other.Y) return false;
+        if (Y != other.Y)
+            return false;
         return StartX <= other.EndX && EndX >= other.StartX;
     }
 
@@ -115,7 +116,8 @@ public class Region : ValueObject
                 while (x < width && binaryData[y * width + x] < threshold)
                     x++;
 
-                if (x >= width) break;
+                if (x >= width)
+                    break;
 
                 int startX = x;
                 // 找到前景连续段
@@ -151,7 +153,8 @@ public class Region : ValueObject
                 while (x < width && binaryMat.At<byte>(y, x) < threshold)
                     x++;
 
-                if (x >= width) break;
+                if (x >= width)
+                    break;
 
                 int startX = x;
                 // 找到前景连续段
@@ -179,7 +182,8 @@ public class Region : ValueObject
         foreach (var run in RunLengths)
         {
             int y = run.Y - bbox.Y;
-            if (y < 0 || y >= bbox.Height) continue;
+            if (y < 0 || y >= bbox.Height)
+                continue;
 
             int startX = run.StartX - bbox.X;
             int endX = run.EndX - bbox.X;
@@ -255,13 +259,13 @@ public class Region : ValueObject
 
         // 使用 Mat 提取轮廓（简化实现）
         using var mat = ToMat();
-        using var fullMat = new OpenCvSharp.Mat(BoundingBox.Height + 2, BoundingBox.Width + 2, 
+        using var fullMat = new OpenCvSharp.Mat(BoundingBox.Height + 2, BoundingBox.Width + 2,
             OpenCvSharp.MatType.CV_8UC1, OpenCvSharp.Scalar.All(0));
-        
+
         var roi = new OpenCvSharp.Rect(1, 1, BoundingBox.Width, BoundingBox.Height);
         mat.CopyTo(fullMat[roi]);
 
-        OpenCvSharp.Cv2.FindContours(fullMat, out var contours, out _, 
+        OpenCvSharp.Cv2.FindContours(fullMat, out var contours, out _,
             OpenCvSharp.RetrievalModes.External, OpenCvSharp.ContourApproximationModes.ApproxSimple);
 
         var points = new List<OpenCvSharp.Point>();
@@ -290,11 +294,12 @@ public class Region : ValueObject
     /// </summary>
     public Region Scale(double scaleX, double scaleY)
     {
-        if (IsEmpty) return new Region();
+        if (IsEmpty)
+            return new Region();
 
         using var mat = ToMat();
         var scaledMat = new OpenCvSharp.Mat();
-        OpenCvSharp.Cv2.Resize(mat, scaledMat, new OpenCvSharp.Size(0, 0), scaleX, scaleY, 
+        OpenCvSharp.Cv2.Resize(mat, scaledMat, new OpenCvSharp.Size(0, 0), scaleX, scaleY,
             OpenCvSharp.InterpolationFlags.Nearest);
 
         var result = FromMat(scaledMat);
@@ -312,7 +317,8 @@ public class Region : ValueObject
     /// </summary>
     public Region MergeAdjacentRuns()
     {
-        if (RunLengths.Count <= 1) return this;
+        if (RunLengths.Count <= 1)
+            return this;
 
         var merged = new List<RunLength>();
         var current = RunLengths[0];
@@ -339,7 +345,8 @@ public class Region : ValueObject
 
     private RegionRect CalculateBoundingBox()
     {
-        if (IsEmpty) return new RegionRect(0, 0, 0, 0);
+        if (IsEmpty)
+            return new RegionRect(0, 0, 0, 0);
 
         int minX = RunLengths.Min(r => r.StartX);
         int maxX = RunLengths.Max(r => r.EndX);
@@ -351,7 +358,8 @@ public class Region : ValueObject
 
     private RegionPoint2f CalculateCenter()
     {
-        if (IsEmpty) return new RegionPoint2f(0, 0);
+        if (IsEmpty)
+            return new RegionPoint2f(0, 0);
 
         double sumX = 0;
         double sumY = 0;
@@ -433,13 +441,13 @@ public class MorphologyKernel : ValueObject
         Height = height;
     }
 
-    public static MorphologyKernel Rectangle(int width, int height) => 
+    public static MorphologyKernel Rectangle(int width, int height) =>
         new(MorphologyKernelShape.Rectangle, width, height);
 
-    public static MorphologyKernel Ellipse(int width, int height) => 
+    public static MorphologyKernel Ellipse(int width, int height) =>
         new(MorphologyKernelShape.Ellipse, width, height);
 
-    public static MorphologyKernel Cross(int size) => 
+    public static MorphologyKernel Cross(int size) =>
         new(MorphologyKernelShape.Cross, size, size);
 
     /// <summary>
@@ -529,7 +537,7 @@ public readonly struct RegionRect : IEquatable<RegionRect>
 
     public bool IntersectsWith(RegionRect other)
     {
-        return Left < other.Right && Right > other.Left && 
+        return Left < other.Right && Right > other.Left &&
                Top < other.Bottom && Bottom > other.Top;
     }
 

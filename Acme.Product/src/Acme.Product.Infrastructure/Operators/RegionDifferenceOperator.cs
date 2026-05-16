@@ -69,8 +69,10 @@ public class RegionDifferenceOperator : OperatorBase
 
             foreach (var run2 in runs2SameY)
             {
-                if (run2.EndX < currentStart) continue; // run2在左边，无重叠
-                if (run2.StartX > run1.EndX) break; // run2在右边，结束
+                if (run2.EndX < currentStart)
+                    continue; // run2在左边，无重叠
+                if (run2.StartX > run1.EndX)
+                    break; // run2在右边，结束
 
                 // run2与当前段有重叠
                 if (run2.StartX > currentStart)
@@ -81,7 +83,8 @@ public class RegionDifferenceOperator : OperatorBase
 
                 // 跳过重叠部分
                 currentStart = Math.Max(currentStart, run2.EndX + 1);
-                if (currentStart > run1.EndX) break;
+                if (currentStart > run1.EndX)
+                    break;
             }
 
             // 保留最后一段
@@ -111,7 +114,8 @@ public class RegionDifferenceOperator : OperatorBase
     private bool TryGetInputRegion(Dictionary<string, object>? inputs, string key, out Region? region)
     {
         region = null;
-        if (inputs?.TryGetValue(key, out var val) == true && val is Region r) { region = r; return true; }
+        if (inputs?.TryGetValue(key, out var val) == true && val is Region r)
+        { region = r; return true; }
         return false;
     }
 

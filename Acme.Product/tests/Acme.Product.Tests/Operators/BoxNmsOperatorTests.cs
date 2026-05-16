@@ -1,11 +1,11 @@
-﻿using Acme.Product.Core.Entities;
+using System.Collections;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using System.Collections;
 using Xunit;
 
 namespace Acme.Product.Tests.Operators;

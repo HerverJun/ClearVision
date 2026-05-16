@@ -1,6 +1,6 @@
-using Acme.Product.Infrastructure.DependencyInjection;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Desktop.Triggers;
+using Acme.Product.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -49,7 +49,7 @@ var candidates = typeof(OperatorBase).Assembly
     .OrderBy(x => x.OperatorType!.Value.ToString(), StringComparer.Ordinal)
     .ToList();
 
-var (generated, skipped) = GenerateOperatorDocuments(candidates, docsRoot, overwrite, onlyOperators);
+var (generated, skipped) = GenerateOperatorDocuments(candidates, docsRoot, overwrite, onlyOperators, qualityContext);
 var operators = candidates
     .Select(item => ToCatalogOperator(item, qualityContext))
     .OrderBy(item => item.Type)
@@ -86,7 +86,8 @@ static (int generated, int skipped) GenerateOperatorDocuments(
     IReadOnlyList<OperatorDocModel> candidates,
     string docsRoot,
     bool overwrite,
-    IReadOnlySet<string> onlyOperators)
+    IReadOnlySet<string> onlyOperators,
+    QualityContext qualityContext)
 {
     var generated = 0;
     var skipped = 0;
@@ -108,7 +109,7 @@ static (int generated, int skipped) GenerateOperatorDocuments(
             continue;
         }
 
-        File.WriteAllText(filePath, BuildDocument(item), new UTF8Encoding(false));
+        File.WriteAllText(filePath, BuildDocument(item, qualityContext), new UTF8Encoding(false));
         generated++;
     }
 
@@ -355,13 +356,16 @@ static OperatorType? ResolveOperatorType(Type operatorType)
     return Enum.TryParse<OperatorType>(className, out var parsed) ? parsed : null;
 }
 
-static string BuildDocument(OperatorDocModel item)
+static string BuildDocument(OperatorDocModel item, QualityContext qualityContext)
 {
     var sb = new StringBuilder();
     var className = item.ClrType.Name;
     var englishName = className.EndsWith("Operator", StringComparison.Ordinal)
         ? className[..^"Operator".Length]
         : className;
+    var category = NormalizeCategory(item.Meta.Category);
+    var facts = AnalyzeOperatorSource(item, qualityContext);
+    var tags = BuildOperatorTags(item);
 
     sb.AppendLine($"# {item.Meta.DisplayName} / {englishName}");
     sb.AppendLine();
@@ -370,44 +374,48 @@ static string BuildDocument(OperatorDocModel item)
     sb.AppendLine("|------|------|");
     sb.AppendLine($"| 类名 (Class) | `{className}` |");
     sb.AppendLine($"| 枚举值 (Enum) | `OperatorType.{item.OperatorType}` |");
-    sb.AppendLine($"| 分类 (Category) | {EscapeCell(NormalizeCategory(item.Meta.Category))} |");
+    sb.AppendLine($"| 分类 (Category) | {EscapeCell(category)} |");
+    sb.AppendLine($"| 版本 (Version) | `{NormalizeSemVersion(item.Meta.Version)}` |");
     sb.AppendLine("| 成熟度 (Maturity) | 稳定 Stable |");
-    sb.AppendLine("| 作者 (Author) | 蘅芜君 |");
+    sb.AppendLine($"| 标签 (Tags) | {EscapeCell(string.Join(", ", tags.Select(tag => $"`{tag}`")))} |");
+
     sb.AppendLine();
     sb.AppendLine("## 算法原理 / Algorithm Principle");
-    sb.AppendLine($"> 中文：{Fallback(item.Meta.Description, "TODO：补充算法原理")}。");
-    sb.AppendLine($"> English: {Fallback(item.Meta.Description, "TODO: Add algorithm principle.")}.");
+    foreach (var line in BuildAlgorithmPrinciple(item, category, facts))
+    {
+        sb.AppendLine(line);
+    }
+
     sb.AppendLine();
     sb.AppendLine("## 实现策略 / Implementation Strategy");
-    var implementationStrategy = Fallback(item.Algo?.ImplementationStrategy, "TODO：补充实现策略与方案对比");
-    sb.AppendLine($"> 中文：{implementationStrategy}。");
-    sb.AppendLine($"> English: {implementationStrategy}.");
+    foreach (var line in BuildImplementationStrategy(item, facts))
+    {
+        sb.AppendLine(line);
+    }
+
     sb.AppendLine();
     sb.AppendLine("## 核心 API 调用链 / Core API Call Chain");
-    if (!string.IsNullOrWhiteSpace(item.Algo?.CoreApi))
+    var apiCalls = BuildCoreApiCalls(item, facts);
+    foreach (var api in apiCalls)
     {
-        sb.AppendLine($"- `{item.Algo.CoreApi}`");
-    }
-    else
-    {
-        sb.AppendLine("- TODO：补充关键 API 调用链");
+        sb.AppendLine($"- `{api}`");
     }
 
     sb.AppendLine();
     sb.AppendLine("## 参数说明 / Parameters");
-    sb.AppendLine("| 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |");
-    sb.AppendLine("|--------|------|--------|------|------|");
+    sb.AppendLine("| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |");
+    sb.AppendLine("|--------|------|------|--------|------|------|------|");
     if (item.Parameters.Length == 0)
     {
-        sb.AppendLine("| - | - | - | - | - |");
+        sb.AppendLine("| - | - | - | - | - | - | - |");
     }
     else
     {
         foreach (var parameter in item.Parameters)
         {
-            var range = BuildRange(parameter.Min, parameter.Max);
+            var range = BuildParameterRangeAndOptions(parameter);
             sb.AppendLine(
-                $"| `{parameter.Name}` | `{parameter.DataType}` | {EscapeCell(FormatValue(parameter.DefaultValue))} | {EscapeCell(range)} | {EscapeCell(Fallback(parameter.Description, "-"))} |");
+                $"| `{parameter.Name}` | {EscapeCell(parameter.DisplayName)} | `{parameter.DataType}` | {EscapeCell(FormatValue(parameter.DefaultValue))} | {EscapeCell(range)} | {BoolToMark(parameter.IsRequired)} | {EscapeCell(Fallback(parameter.Description, "-"))} |");
         }
     }
 
@@ -425,7 +433,7 @@ static string BuildDocument(OperatorDocModel item)
         foreach (var input in item.Inputs)
         {
             sb.AppendLine(
-                $"| `{input.Name}` | {EscapeCell(input.DisplayName)} | `{input.DataType}` | {BoolToMark(input.IsRequired)} | - |");
+                $"| `{input.Name}` | {EscapeCell(input.DisplayName)} | `{input.DataType}` | {BoolToMark(input.IsRequired)} | {EscapeCell(BuildInputDescription(input))} |");
         }
     }
 
@@ -441,7 +449,23 @@ static string BuildDocument(OperatorDocModel item)
     {
         foreach (var output in item.Outputs)
         {
-            sb.AppendLine($"| `{output.Name}` | {EscapeCell(output.DisplayName)} | `{output.DataType}` | - |");
+            sb.AppendLine($"| `{output.Name}` | {EscapeCell(output.DisplayName)} | `{output.DataType}` | {EscapeCell(BuildOutputDescription(output))} |");
+        }
+    }
+
+    sb.AppendLine();
+    sb.AppendLine("### 运行时附加输出 / Runtime Additional Outputs");
+    if (facts.RuntimeAdditionalOutputs.Count == 0)
+    {
+        sb.AppendLine("- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。");
+    }
+    else
+    {
+        sb.AppendLine("| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |");
+        sb.AppendLine("|------|------|------|");
+        foreach (var field in facts.RuntimeAdditionalOutputs)
+        {
+            sb.AppendLine($"| `{field.Name}` | `{field.DataType}` | {EscapeCell(field.Description)} |");
         }
     }
 
@@ -449,61 +473,734 @@ static string BuildDocument(OperatorDocModel item)
     sb.AppendLine("## 性能特征 / Performance");
     sb.AppendLine("| 指标 (Metric) | 值 (Value) |");
     sb.AppendLine("|------|------|");
-    sb.AppendLine($"| 时间复杂度 (Time Complexity) | {EscapeCell(Fallback(item.Algo?.TimeComplexity, "O(?)"))} |");
-    sb.AppendLine($"| 典型耗时 (Typical Latency) | {EscapeCell(Fallback(item.Algo?.TypicalLatency, "~?ms (1920x1080)"))} |");
-    sb.AppendLine($"| 内存特征 (Memory Profile) | {EscapeCell(Fallback(item.Algo?.SpaceComplexity, "?"))} |");
+    sb.AppendLine($"| 时间复杂度 (Time Complexity) | {EscapeCell(Fallback(item.Algo?.TimeComplexity, InferTimeComplexity(item, facts)))} |");
+    sb.AppendLine($"| 典型耗时 (Typical Latency) | {EscapeCell(Fallback(item.Algo?.TypicalLatency, InferTypicalLatency(item, facts)))} |");
+    sb.AppendLine($"| 内存特征 (Memory Profile) | {EscapeCell(Fallback(item.Algo?.SpaceComplexity, InferMemoryProfile(item, facts)))} |");
+
+    sb.AppendLine();
+    sb.AppendLine("## 证据与失败契约 / Evidence & Failure Contracts");
+    foreach (var line in BuildEvidenceAndFailureContracts(item, facts, qualityContext))
+    {
+        sb.AppendLine(line);
+    }
 
     sb.AppendLine();
     sb.AppendLine("## 适用场景 / Use Cases");
-    var suitableUseCases = NonEmptyItems(item.Algo?.SuitableUseCases).ToArray();
-    if (suitableUseCases.Length == 0)
+    foreach (var useCase in BuildSuitableUseCases(item, category, facts))
     {
-        sb.AppendLine("- 适合 (Suitable)：TODO");
-    }
-    else
-    {
-        foreach (var useCase in suitableUseCases)
-        {
-            sb.AppendLine($"- 适合 (Suitable)：{useCase}");
-        }
+        sb.AppendLine($"- 适合 (Suitable)：{useCase}");
     }
 
-    var unsuitableUseCases = NonEmptyItems(item.Algo?.UnsuitableUseCases).ToArray();
-    if (unsuitableUseCases.Length == 0)
+    foreach (var useCase in BuildUnsuitableUseCases(item, category, facts))
     {
-        sb.AppendLine("- 不适合 (Not Suitable)：TODO");
-    }
-    else
-    {
-        foreach (var useCase in unsuitableUseCases)
-        {
-            sb.AppendLine($"- 不适合 (Not Suitable)：{useCase}");
-        }
+        sb.AppendLine($"- 不适合 (Not Suitable)：{useCase}");
     }
 
     sb.AppendLine();
     sb.AppendLine("## 已知限制 / Known Limitations");
-    var knownLimitations = NonEmptyItems(item.Algo?.KnownLimitations).ToArray();
-    if (knownLimitations.Length == 0)
+    var limitations = BuildKnownLimitations(item, facts).ToList();
+    for (var index = 0; index < limitations.Count; index++)
     {
-        sb.AppendLine("1. TODO");
-    }
-    else
-    {
-        for (var index = 0; index < knownLimitations.Length; index++)
-        {
-            sb.AppendLine($"{index + 1}. {knownLimitations[index]}");
-        }
+        sb.AppendLine($"{index + 1}. {limitations[index]}");
     }
 
     sb.AppendLine();
     sb.AppendLine("## 变更记录 / Changelog");
     sb.AppendLine("| 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |");
     sb.AppendLine("|------|------|----------|");
-    sb.AppendLine($"| {NormalizeSemVersion(item.Meta.Version)} | {DateTime.UtcNow:yyyy-MM-dd} | 自动生成文档骨架 / Generated skeleton |");
+    sb.AppendLine($"| {NormalizeSemVersion(item.Meta.Version)} | {DateTime.UtcNow:yyyy-MM-dd} | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |");
 
     return sb.ToString();
 }
+
+static OperatorSourceFacts AnalyzeOperatorSource(OperatorDocModel item, QualityContext qualityContext)
+{
+    qualityContext.SourceTextByTypeName.TryGetValue(item.ClrType.Name, out var sourceText);
+    sourceText ??= string.Empty;
+
+    return new OperatorSourceFacts(
+        SourceText: sourceText,
+        CoreApiCalls: ExtractCoreApiCalls(sourceText),
+        RuntimeAdditionalOutputs: ExtractRuntimeAdditionalOutputs(item, sourceText),
+        FailureCount: Regex.Matches(sourceText, @"OperatorExecutionOutput\.Failure\s*\(", RegexOptions.CultureInvariant).Count,
+        HasValidation: sourceText.Contains("ValidateParameters(", StringComparison.Ordinal),
+        HasTryCatch: sourceText.Contains("try", StringComparison.Ordinal) && sourceText.Contains("catch", StringComparison.Ordinal),
+        HasShortCircuit: sourceText.Contains("OperatorExecutionOutput.ShortCircuit", StringComparison.Ordinal),
+        UsesImageOutput: sourceText.Contains("CreateImageOutput", StringComparison.Ordinal) ||
+            sourceText.Contains("CreateSharedImageOutput", StringComparison.Ordinal),
+        UsesOpenCv: sourceText.Contains("Cv2.", StringComparison.Ordinal) ||
+            sourceText.Contains("OpenCvSharp", StringComparison.Ordinal),
+        UsesExternalIo: Regex.IsMatch(sourceText, @"\b(File|Directory|HttpClient|PlcClientFactory|Mqtt|SerialPort|TcpClient)\b", RegexOptions.CultureInvariant),
+        UsesModel: sourceText.Contains("InferenceSession", StringComparison.Ordinal) ||
+            sourceText.Contains("ModelPath", StringComparison.Ordinal) ||
+            sourceText.Contains("ONNX", StringComparison.OrdinalIgnoreCase),
+        UsesState: sourceText.Contains("ConcurrentDictionary", StringComparison.Ordinal) ||
+            sourceText.Contains("GetOrAdd", StringComparison.Ordinal) ||
+            sourceText.Contains("State", StringComparison.Ordinal));
+}
+
+static List<string> BuildAlgorithmPrinciple(OperatorDocModel item, string category, OperatorSourceFacts facts)
+{
+    var lines = new List<string>();
+    var description = Fallback(item.Meta.Description, $"{item.Meta.DisplayName} 算子执行当前声明的视觉/流程处理逻辑");
+
+    var descriptionSentence = ContainsCjk(description)
+        ? $"该算子用于{TrimSentence(description)}。"
+        : $"当前元数据描述为：{TrimSentence(description)}。";
+    lines.Add($"{descriptionSentence}运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。");
+
+    if (!string.IsNullOrWhiteSpace(item.Algo?.Name))
+    {
+        lines.Add($"算法类型以 `{item.Algo.Name}` 为主；元数据未声明更多细分时，以当前源码实现为准。");
+    }
+
+    if (facts.UsesModel)
+    {
+        lines.Add("源码中包含模型或推理资源解析逻辑，核心结果取决于模型文件、标签配置、阈值和运行时推理环境。");
+    }
+    else if (facts.UsesOpenCv)
+    {
+        lines.Add("源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。");
+    }
+    else if (facts.UsesExternalIo)
+    {
+        lines.Add("源码中包含外部资源访问逻辑，执行结果会受文件系统、网络、PLC、串口或外部服务状态影响。");
+    }
+    else if (category.Contains("流程", StringComparison.Ordinal) || category.Contains("逻辑", StringComparison.Ordinal))
+    {
+        lines.Add("该类算子主要对上游值、集合或流程状态做判断、转换、聚合或路由，不直接改写图像像素。");
+    }
+    else
+    {
+        lines.Add("处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。");
+    }
+
+    return lines;
+}
+
+static List<string> BuildImplementationStrategy(OperatorDocModel item, OperatorSourceFacts facts)
+{
+    var lines = new List<string>();
+    var requiredInputs = item.Inputs.Where(port => port.IsRequired).Select(port => $"`{port.Name}`").ToList();
+    var optionalInputs = item.Inputs.Where(port => !port.IsRequired).Select(port => $"`{port.Name}`").ToList();
+
+    if (requiredInputs.Count > 0)
+    {
+        lines.Add($"- 先校验必填输入：{string.Join("、", requiredInputs)}；缺失时通常返回失败结果。");
+    }
+    else
+    {
+        lines.Add("- 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。");
+    }
+
+    if (optionalInputs.Count > 0)
+    {
+        lines.Add($"- 可选输入用于覆盖或补充参数配置：{string.Join("、", optionalInputs)}。");
+    }
+
+    lines.Add(item.Parameters.Length > 0
+        ? $"- 参数解析覆盖 {item.Parameters.Length} 个当前元数据字段，默认值、范围和枚举项以参数表为准。"
+        : "- 当前元数据未声明参数，执行逻辑主要由输入数据和源码默认策略决定。");
+
+    if (facts.HasValidation)
+    {
+        lines.Add("- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。");
+    }
+
+    if (facts.HasTryCatch)
+    {
+        lines.Add("- 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。");
+    }
+
+    if (facts.HasShortCircuit)
+    {
+        lines.Add("- 源码包含短路输出路径，可在条件不满足时阻止后续节点继续执行。");
+    }
+
+    lines.Add(facts.UsesImageOutput
+        ? "- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。"
+        : "- 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。");
+
+    return lines;
+}
+
+static List<string> BuildCoreApiCalls(OperatorDocModel item, OperatorSourceFacts facts)
+{
+    var calls = new List<string>();
+    if (!string.IsNullOrWhiteSpace(item.Algo?.CoreApi))
+    {
+        calls.Add(item.Algo.CoreApi.Trim());
+    }
+
+    calls.AddRange(facts.CoreApiCalls);
+
+    if (calls.Count == 0)
+    {
+        calls.Add("OperatorBase.Get*Param(...)");
+        calls.Add("OperatorExecutionOutput.Success/Failure(...)");
+    }
+
+    return calls
+        .Where(call => !string.IsNullOrWhiteSpace(call))
+        .Distinct(StringComparer.Ordinal)
+        .Take(14)
+        .ToList();
+}
+
+static List<string> ExtractCoreApiCalls(string sourceText)
+{
+    if (string.IsNullOrWhiteSpace(sourceText))
+    {
+        return new List<string>();
+    }
+
+    var calls = new List<string>();
+    var patterns = new[]
+    {
+        @"\b(Cv2)\.([A-Za-z_][A-Za-z0-9_]*)",
+        @"\b(File|Directory|Path)\.([A-Za-z_][A-Za-z0-9_]*)",
+        @"\b(JsonSerializer|JsonDocument|JsonElement)\.([A-Za-z_][A-Za-z0-9_]*)",
+        @"\b(PlcClientFactory|Math|Convert|Enumerable)\.([A-Za-z_][A-Za-z0-9_]*)",
+        @"\b(HttpClient|HttpRequestMessage|InferenceSession|ImageWrapper)\b"
+    };
+
+    foreach (var pattern in patterns)
+    {
+        foreach (Match match in Regex.Matches(sourceText, pattern, RegexOptions.CultureInvariant))
+        {
+            var call = match.Groups.Count > 2 && !string.IsNullOrWhiteSpace(match.Groups[2].Value)
+                ? $"{match.Groups[1].Value}.{match.Groups[2].Value}"
+                : match.Groups[1].Value;
+
+            if (!calls.Contains(call, StringComparer.Ordinal))
+            {
+                calls.Add(call);
+            }
+        }
+    }
+
+    if (sourceText.Contains("GetStringParam", StringComparison.Ordinal) ||
+        sourceText.Contains("GetIntParam", StringComparison.Ordinal) ||
+        sourceText.Contains("GetDoubleParam", StringComparison.Ordinal) ||
+        sourceText.Contains("GetBoolParam", StringComparison.Ordinal))
+    {
+        calls.Insert(0, "OperatorBase.Get*Param(...)");
+    }
+
+    if (sourceText.Contains("OperatorExecutionOutput.Success", StringComparison.Ordinal))
+    {
+        calls.Add("OperatorExecutionOutput.Success(...)");
+    }
+
+    if (sourceText.Contains("OperatorExecutionOutput.Failure", StringComparison.Ordinal))
+    {
+        calls.Add("OperatorExecutionOutput.Failure(...)");
+    }
+
+    return calls
+        .Distinct(StringComparer.Ordinal)
+        .Take(18)
+        .ToList();
+}
+
+static List<RuntimeOutputField> ExtractRuntimeAdditionalOutputs(OperatorDocModel item, string sourceText)
+{
+    var fields = new Dictionary<string, RuntimeOutputField>(StringComparer.Ordinal);
+    var declared = item.Outputs.Select(port => port.Name).ToHashSet(StringComparer.Ordinal);
+    var inputs = item.Inputs.Select(port => port.Name).ToHashSet(StringComparer.Ordinal);
+    var parameters = item.Parameters.Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal);
+
+    void Add(string? key, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        key = key.Trim();
+        if (!IsLikelyOutputKey(key) ||
+            declared.Contains(key) ||
+            inputs.Contains(key) ||
+            parameters.Contains(key) ||
+            fields.ContainsKey(key))
+        {
+            return;
+        }
+
+        fields[key] = new RuntimeOutputField(
+            key,
+            InferRuntimeOutputType(key),
+            reason);
+    }
+
+    if (sourceText.Contains("CreateImageOutput", StringComparison.Ordinal) ||
+        sourceText.Contains("CreateSharedImageOutput", StringComparison.Ordinal))
+    {
+        Add("Width", "由图像输出封装自动附加，表示输出图像宽度。");
+        Add("Height", "由图像输出封装自动附加，表示输出图像高度。");
+    }
+
+    foreach (Match match in Regex.Matches(
+        sourceText,
+        @"CreateImageOutput\s*\([^;]*?,\s*""([^""]+)""\s*,\s*""([^""]+)""",
+        RegexOptions.Singleline | RegexOptions.CultureInvariant))
+    {
+        Add(match.Groups[1].Value, "由带自定义尺寸字段名的图像输出封装附加。");
+        Add(match.Groups[2].Value, "由带自定义尺寸字段名的图像输出封装附加。");
+    }
+
+    foreach (Match match in Regex.Matches(
+        sourceText,
+        @"\[\s*""([A-Za-z_][A-Za-z0-9_]{1,63})""\s*\]\s*=",
+        RegexOptions.CultureInvariant))
+    {
+        Add(match.Groups[1].Value, "源码通过输出字典索引赋值写入。");
+    }
+
+    foreach (var dictionaryBody in ExtractObjectDictionaryInitializerBodies(sourceText))
+    {
+        foreach (Match match in Regex.Matches(
+            dictionaryBody,
+            @"\{\s*""([A-Za-z_][A-Za-z0-9_]{1,63})""\s*,",
+            RegexOptions.CultureInvariant))
+        {
+            Add(match.Groups[1].Value, "源码输出字典初始化中可见字段。");
+        }
+    }
+
+    return fields.Values
+        .OrderBy(field => field.Name, StringComparer.Ordinal)
+        .Take(40)
+        .ToList();
+}
+
+static IEnumerable<string> ExtractObjectDictionaryInitializerBodies(string sourceText)
+{
+    const string marker = "new Dictionary<string, object";
+    var searchIndex = 0;
+
+    while (searchIndex < sourceText.Length)
+    {
+        var markerIndex = sourceText.IndexOf(marker, searchIndex, StringComparison.Ordinal);
+        if (markerIndex < 0)
+        {
+            yield break;
+        }
+
+        var braceIndex = sourceText.IndexOf('{', markerIndex);
+        if (braceIndex < 0)
+        {
+            yield break;
+        }
+
+        var depth = 0;
+        var inString = false;
+        var escape = false;
+        for (var index = braceIndex; index < sourceText.Length; index++)
+        {
+            var ch = sourceText[index];
+            if (inString)
+            {
+                if (escape)
+                {
+                    escape = false;
+                }
+                else if (ch == '\\')
+                {
+                    escape = true;
+                }
+                else if (ch == '"')
+                {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (ch == '{')
+            {
+                depth++;
+            }
+            else if (ch == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    yield return sourceText[(braceIndex + 1)..index];
+                    searchIndex = index + 1;
+                    break;
+                }
+            }
+
+            if (index == sourceText.Length - 1)
+            {
+                searchIndex = sourceText.Length;
+            }
+        }
+    }
+}
+
+static bool IsLikelyOutputKey(string key)
+{
+    if (key.Length is < 2 or > 64)
+    {
+        return false;
+    }
+
+    if (!Regex.IsMatch(key, @"^[A-Z][A-Za-z0-9_]*$", RegexOptions.CultureInvariant))
+    {
+        return false;
+    }
+
+    var excluded = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "Name",
+        "Description",
+        "Default",
+        "DefaultValue",
+        "Min",
+        "Max",
+        "Options",
+        "Value",
+        "Key"
+    };
+
+    return !excluded.Contains(key);
+}
+
+static string InferRuntimeOutputType(string key)
+{
+    if (key.EndsWith("Width", StringComparison.OrdinalIgnoreCase) ||
+        key.EndsWith("Height", StringComparison.OrdinalIgnoreCase) ||
+        key.EndsWith("Count", StringComparison.OrdinalIgnoreCase) ||
+        key.EndsWith("Limit", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Pixels", StringComparison.OrdinalIgnoreCase) ||
+        key is "Width" or "Height" or "Index")
+    {
+        return "Integer";
+    }
+
+    if (key.Contains("Image", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(key, "Mask", StringComparison.OrdinalIgnoreCase))
+    {
+        return "Image";
+    }
+
+    if (key.Contains("Detections", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Objects", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Defects", StringComparison.OrdinalIgnoreCase))
+    {
+        return "DetectionList";
+    }
+
+    if (key.StartsWith("Is", StringComparison.OrdinalIgnoreCase) ||
+        key.StartsWith("Has", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Enabled", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Passed", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Accepted", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Valid", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Triggered", StringComparison.OrdinalIgnoreCase))
+    {
+        return "Boolean";
+    }
+
+    if (key.Contains("Score", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Ratio", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Distance", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Angle", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Mean", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Min", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Max", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Std", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Delta", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Confidence", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Tolerance", StringComparison.OrdinalIgnoreCase))
+    {
+        return "Float";
+    }
+
+    if (key.Contains("Path", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Reason", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Message", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Source", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Mode", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Type", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Unit", StringComparison.OrdinalIgnoreCase) ||
+        key.Equals("Id", StringComparison.OrdinalIgnoreCase) ||
+        key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+    {
+        return "String";
+    }
+
+    return "Any";
+}
+
+static string BuildParameterRangeAndOptions(OperatorParamAttribute parameter)
+{
+    var parts = new List<string>();
+    var range = BuildRange(parameter.Min, parameter.Max);
+    if (range != "-")
+    {
+        parts.Add(range);
+    }
+
+    if (parameter.Options is { Length: > 0 })
+    {
+        parts.Add(string.Join("；", parameter.Options
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .Select(option => option.Replace("|", "/", StringComparison.Ordinal))));
+    }
+
+    return parts.Count == 0 ? "-" : string.Join("；", parts);
+}
+
+static string BuildInputDescription(InputPortAttribute input)
+{
+    return input.IsRequired
+        ? "必填输入，缺失时算子通常返回失败或无法产生有效结果。"
+        : "可选输入；提供时会参与当前算子处理或覆盖部分参数配置。";
+}
+
+static string BuildOutputDescription(OutputPortAttribute output)
+{
+    return output.DataType switch
+    {
+        PortDataType.Image => "图像输出，可供后续图像处理、显示或保存节点使用。",
+        PortDataType.Boolean => "布尔判定结果，适合连接条件分支、结果判定或通信写入。",
+        PortDataType.Integer or PortDataType.Float => "数值结果，可用于测量、阈值判定、统计或报表输出。",
+        PortDataType.String => "文本结果，可用于显示、日志、保存或外部接口传输。",
+        PortDataType.DetectionList => "检测列表结果，可连接筛选、NMS、顺序判定或结果输出节点。",
+        PortDataType.PointList => "点集结果，可连接几何测量、定位或标定相关节点。",
+        _ => "业务输出字段，具体结构以源码输出和运行时结果为准。"
+    };
+}
+
+static string InferTimeComplexity(OperatorDocModel item, OperatorSourceFacts facts)
+{
+    if (facts.UsesModel)
+    {
+        return "推理路径主要受模型规模、输入尺寸和硬件后端影响；后处理通常随候选数量线性或近似线性增长。";
+    }
+
+    if (facts.UsesExternalIo)
+    {
+        return "主要受外部 I/O、网络或设备响应时间影响；本地处理通常随输入规模线性增长。";
+    }
+
+    if (facts.UsesOpenCv || facts.UsesImageOutput || item.Inputs.Any(input => input.DataType == PortDataType.Image))
+    {
+        return "多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。";
+    }
+
+    return "通常随输入集合、字符串长度或字段数量线性增长。";
+}
+
+static string InferTypicalLatency(OperatorDocModel item, OperatorSourceFacts facts)
+{
+    if (facts.UsesModel)
+    {
+        return "未固定；取决于模型大小、输入尺寸、CPU/GPU/ONNX Runtime 后端和候选数量。";
+    }
+
+    if (facts.UsesExternalIo)
+    {
+        return "未固定；取决于文件系统、网络、PLC/串口设备或外部服务响应。";
+    }
+
+    if (facts.UsesOpenCv)
+    {
+        return "未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。";
+    }
+
+    return "未固定；一般由输入数据规模和运行时调度开销决定。";
+}
+
+static string InferMemoryProfile(OperatorDocModel item, OperatorSourceFacts facts)
+{
+    if (facts.UsesModel)
+    {
+        return "需要模型会话、输入张量、输出张量和后处理集合内存；峰值随模型与输入尺寸增长。";
+    }
+
+    if (facts.UsesImageOutput || facts.UsesOpenCv)
+    {
+        return "通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。";
+    }
+
+    if (facts.UsesExternalIo)
+    {
+        return "主要由请求/响应缓冲、序列化数据和外部资源句柄占用决定。";
+    }
+
+    return "主要由输出字典、集合和少量中间对象决定。";
+}
+
+static IEnumerable<string> BuildEvidenceAndFailureContracts(
+    OperatorDocModel item,
+    OperatorSourceFacts facts,
+    QualityContext qualityContext)
+{
+    var operatorId = item.OperatorType!.Value.ToString();
+    var hasTests =
+        qualityContext.TestIndex.Contains(item.ClrType.Name) ||
+        qualityContext.TestIndex.Contains(operatorId);
+    var hasGolden = qualityContext.GoldenEvidenceIndex.Contains(operatorId);
+
+    yield return hasTests
+        ? "- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。"
+        : "- 单元/契约测试：未发现同名算子测试入口，建议补充关键路径和边界输入验证。";
+
+    if (hasGolden)
+    {
+        yield return "- Golden/回放证据：质量报告中存在通过的 baseline 证据。";
+    }
+
+    yield return facts.HasValidation
+        ? "- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。"
+        : "- 参数失败契约：当前未发现独立 `ValidateParameters`，主要依赖执行期输入检查和参数读取默认值。";
+
+    if (facts.FailureCount > 0)
+    {
+        yield return $"- 执行失败契约：源码中发现 {facts.FailureCount} 条 `OperatorExecutionOutput.Failure(...)` 路径。";
+    }
+
+    if (facts.HasShortCircuit)
+    {
+        yield return "- 短路契约：算子可返回 `ShortCircuit`，用于阻止后续节点在当前周期继续执行。";
+    }
+}
+
+static IEnumerable<string> BuildSuitableUseCases(OperatorDocModel item, string category, OperatorSourceFacts facts)
+{
+    var declared = NonEmptyItems(item.Algo?.SuitableUseCases).ToList();
+    if (declared.Count > 0)
+    {
+        return declared;
+    }
+
+    if (facts.UsesModel)
+    {
+        return new[] { "模型、标签和阈值已完成现场校准，需要把推理结果接入视觉流程的场景。" };
+    }
+
+    if (facts.UsesExternalIo)
+    {
+        return new[] { "需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。" };
+    }
+
+    if (category.Contains("标定", StringComparison.Ordinal))
+    {
+        return new[] { "相机、坐标、像素到世界坐标或工装几何关系需要被显式建模和复用的场景。" };
+    }
+
+    if (category.Contains("通信", StringComparison.Ordinal))
+    {
+        return new[] { "检测结果需要与现场设备、上位系统或网络服务进行读写交互的场景。" };
+    }
+
+    if (category.Contains("流程", StringComparison.Ordinal) || category.Contains("逻辑", StringComparison.Ordinal))
+    {
+        return new[] { "需要对上游结果做判断、转换、聚合、计数、延时或流程路由的场景。" };
+    }
+
+    if (facts.UsesOpenCv || item.Inputs.Any(input => input.DataType == PortDataType.Image))
+    {
+        return new[] { "输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。" };
+    }
+
+    return new[] { "输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。" };
+}
+
+static IEnumerable<string> BuildUnsuitableUseCases(OperatorDocModel item, string category, OperatorSourceFacts facts)
+{
+    var declared = NonEmptyItems(item.Algo?.UnsuitableUseCases).ToList();
+    if (declared.Count > 0)
+    {
+        return declared;
+    }
+
+    var items = new List<string>();
+    if (facts.UsesExternalIo)
+    {
+        items.Add("外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。");
+    }
+
+    if (facts.UsesModel)
+    {
+        items.Add("模型未完成验证、标签映射不稳定或现场数据分布明显偏离训练数据的场景。");
+    }
+
+    if (facts.UsesOpenCv)
+    {
+        items.Add("图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。");
+    }
+
+    if (items.Count == 0)
+    {
+        items.Add("上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。");
+    }
+
+    return items;
+}
+
+static IEnumerable<string> BuildKnownLimitations(OperatorDocModel item, OperatorSourceFacts facts)
+{
+    var limitations = NonEmptyItems(item.Algo?.KnownLimitations).ToList();
+
+    if (item.Inputs.Any(input => input.IsRequired))
+    {
+        limitations.Add("必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。");
+    }
+
+    if (item.Parameters.Any(parameter => parameter.Min != null || parameter.Max != null || parameter.Options is { Length: > 0 }))
+    {
+        limitations.Add("参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。");
+    }
+
+    if (facts.RuntimeAdditionalOutputs.Count > 0)
+    {
+        limitations.Add("运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。");
+    }
+
+    if (facts.UsesExternalIo)
+    {
+        limitations.Add("外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。");
+    }
+
+    if (facts.UsesModel)
+    {
+        limitations.Add("模型推理类路径依赖模型文件、标签、运行时库和硬件后端，算法准确率不由算子元数据单独保证。");
+    }
+
+    if (facts.UsesState)
+    {
+        limitations.Add("源码包含状态缓存或实例级状态，长流程运行时需要关注状态清理、并发调用和实例复用边界。");
+    }
+
+    if (limitations.Count == 0)
+    {
+        limitations.Add("当前名片仅根据源码和元数据描述算子契约，不替代现场样本验收或专项性能基准。");
+    }
+
+    return limitations
+        .Distinct(StringComparer.Ordinal)
+        .Take(8);
+}
+
+static string TrimSentence(string text)
+{
+    var trimmed = text.Trim();
+    return trimmed.TrimEnd('。', '.', ';', '；');
+}
+
+static bool ContainsCjk(string text) =>
+    text.Any(ch => ch >= '\u4e00' && ch <= '\u9fff');
 
 static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext qualityContext)
 {
@@ -928,30 +1625,16 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
         }
     }
 
-    var historyGeneratedAt = string.IsNullOrWhiteSpace(historyDocument.GeneratedAt)
-        ? recordedAt
-        : historyDocument.GeneratedAt;
-
     var mergedHistory = new OperatorVersionHistoryDocument
     {
-        GeneratedAt = historyGeneratedAt,
+        GeneratedAt = recordedAt,
         Operators = historyById.Values
             .OrderBy(item => item.Id, StringComparer.Ordinal)
             .ToList()
     };
 
-    var changelogGeneratedAt = generatedAt;
-    if (DateTimeOffset.TryParse(
-            historyGeneratedAt,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind,
-            out var parsedGeneratedAt))
-    {
-        changelogGeneratedAt = parsedGeneratedAt;
-    }
-
     SaveVersionHistory(historyPath, mergedHistory);
-    File.WriteAllText(changelogPath, BuildVersionChangelogMarkdown(operators, mergedHistory, changelogGeneratedAt), new UTF8Encoding(false));
+    File.WriteAllText(changelogPath, BuildVersionChangelogMarkdown(operators, mergedHistory, generatedAt), new UTF8Encoding(false));
 
     return new VersionTrackingResult(violations);
 }
@@ -1418,6 +2101,25 @@ internal sealed record OperatorDocModel(
     OutputPortAttribute[] Outputs,
     OperatorParamAttribute[] Parameters,
     OperatorType? OperatorType);
+
+internal sealed record OperatorSourceFacts(
+    string SourceText,
+    List<string> CoreApiCalls,
+    List<RuntimeOutputField> RuntimeAdditionalOutputs,
+    int FailureCount,
+    bool HasValidation,
+    bool HasTryCatch,
+    bool HasShortCircuit,
+    bool UsesImageOutput,
+    bool UsesOpenCv,
+    bool UsesExternalIo,
+    bool UsesModel,
+    bool UsesState);
+
+internal sealed record RuntimeOutputField(
+    string Name,
+    string DataType,
+    string Description);
 
 internal sealed class CatalogDocument
 {

@@ -2,16 +2,15 @@
 // Mat 转 Bitmap - 使用 PNG 编解码
 // 作者：蘅芜君
 
+using System.Runtime.Versioning;
+using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Operators;
-using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using ZXing;
 using ZXing.Common;
-
-using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
 /// <summary>

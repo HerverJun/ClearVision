@@ -23,13 +23,16 @@ public sealed class EuclideanClusterExtraction
         int minClusterSize = 100,
         int maxClusterSize = 1_000_000)
     {
-        if (cloud == null) throw new ArgumentNullException(nameof(cloud));
+        if (cloud == null)
+            throw new ArgumentNullException(nameof(cloud));
         if (clusterTolerance <= 0 || !float.IsFinite(clusterTolerance))
         {
             throw new ArgumentOutOfRangeException(nameof(clusterTolerance), "clusterTolerance must be positive and finite.");
         }
-        if (minClusterSize <= 0) throw new ArgumentOutOfRangeException(nameof(minClusterSize), "minClusterSize must be > 0.");
-        if (maxClusterSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxClusterSize), "maxClusterSize must be > 0.");
+        if (minClusterSize <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minClusterSize), "minClusterSize must be > 0.");
+        if (maxClusterSize <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxClusterSize), "maxClusterSize must be > 0.");
         if (minClusterSize > maxClusterSize)
         {
             throw new ArgumentOutOfRangeException(nameof(minClusterSize), "minClusterSize must be <= maxClusterSize.");

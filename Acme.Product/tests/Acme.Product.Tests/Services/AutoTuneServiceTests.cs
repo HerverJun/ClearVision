@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Services;
@@ -7,7 +8,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using OpenCvSharp;
-using System.Text.Json;
 using DetectionResultValue = Acme.Product.Core.ValueObjects.DetectionResult;
 
 namespace Acme.Product.Tests.Services;

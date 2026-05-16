@@ -67,7 +67,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             {
                 if (existing.Status == RuntimeStatus.Running || existing.Status == RuntimeStatus.Starting)
                 {
-                    _logger.LogWarning("[Coordinator] 项目 {ProjectId} 已在运行中: {SessionId}", 
+                    _logger.LogWarning("[Coordinator] 项目 {ProjectId} 已在运行中: {SessionId}",
                         projectId, existing.SessionId);
                     return StartResult.AlreadyRunning;
                 }
@@ -89,14 +89,14 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
                 StartedAt = DateTime.UtcNow,
                 CancellationTokenSource = cts
             };
-            
+
             _sessions[projectId] = session;
-            
-            _logger.LogInformation("[Coordinator] 会话已启动: {ProjectId}, Session: {SessionId}", 
+
+            _logger.LogInformation("[Coordinator] 会话已启动: {ProjectId}, Session: {SessionId}",
                 projectId, sessionId);
-            
+
             RaiseStateChanged(projectId, sessionId, RuntimeStatus.Starting, RuntimeStatus.Stopped);
-            
+
             return StartResult.Success;
         }
         finally
@@ -123,7 +123,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
 
             if (session.Status != RuntimeStatus.Running && session.Status != RuntimeStatus.Starting)
             {
-                _logger.LogWarning("[Coordinator] 会话不在运行状态: {ProjectId}, Status: {Status}", 
+                _logger.LogWarning("[Coordinator] 会话不在运行状态: {ProjectId}, Status: {Status}",
                     projectId, session.Status);
                 return false;
             }
@@ -174,8 +174,8 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
 
     public CancellationToken GetCancellationToken(Guid projectId)
     {
-        return _ctsMap.TryGetValue(projectId, out var cts) 
-            ? cts.Token 
+        return _ctsMap.TryGetValue(projectId, out var cts)
+            ? cts.Token
             : CancellationToken.None;
     }
 
@@ -206,7 +206,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             _stateLock.Release();
         }
 
-        _logger.LogError("[Coordinator] 会话故障: {ProjectId}, Error: {Error}", 
+        _logger.LogError("[Coordinator] 会话故障: {ProjectId}, Error: {Error}",
             projectId, errorMessage);
 
         RaiseStateChanged(projectId, session!.SessionId, RuntimeStatus.Faulted, oldStatus, errorMessage);
@@ -269,7 +269,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         {
             _stateLock.Release();
         }
-        _logger.LogInformation("[Coordinator] 会话状态更新: {ProjectId}, {OldStatus} -> {NewStatus}", 
+        _logger.LogInformation("[Coordinator] 会话状态更新: {ProjectId}, {OldStatus} -> {NewStatus}",
             projectId, oldStatus, status);
 
         RaiseStateChanged(projectId, session!.SessionId, status, oldStatus);

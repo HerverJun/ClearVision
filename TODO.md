@@ -92,7 +92,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 
 - [ ] 修复 Station Monitor、PLC endpoint、runtime/log、部署 bat/README、根目录规范文档中的 mojibake。
 - [ ] 统一脚本生成文本编码；现场 bat 可保留 ASCII，面向人读的 md/txt 使用 UTF-8。
-- [ ] 增加轻量编码扫描脚本，至少检查 `�`、常见 mojibake 片段和不可读中文。
+- [ ] 增加轻量编码扫描脚本，至少检查 `U+FFFD replacement character`、常见 mojibake 片段和不可读中文。
 - 依据：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js`、`scripts/package-portable-deployment.ps1`
 
 ### P0-11 PLC 虚拟联调入口收口

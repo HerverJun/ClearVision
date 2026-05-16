@@ -3,6 +3,7 @@
 // 对标 Halcon: find_planar_uncalib_deformable_model
 // 作者：AI Assistant
 
+using System.Security.Cryptography;
 using Acme.Product.Core.Attributes;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -10,7 +11,6 @@ using Acme.Product.Core.Operators;
 using Acme.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Security.Cryptography;
 
 namespace Acme.Product.Infrastructure.Operators;
 
@@ -408,7 +408,7 @@ public class PlanarMatchingOperator : OperatorBase
         var coverageBase = Math.Max(1, Math.Min(templateFeatureCount, searchFeatureCount));
         var coverageScore = Math.Clamp(matches.Count / (double)coverageBase, 0, 1);
         return Math.Clamp((coverageScore * 0.65) + (distanceScore * 0.35), 0, 1);
-        #if false
+#if false
 
         // 综合评分：内点数、内点率、匹配率的加权组合
         var inlierCountScore = Math.Min(inlierCount / 50.0, 1.0); // 50个内点得满分
@@ -416,7 +416,7 @@ public class PlanarMatchingOperator : OperatorBase
         var matchRateScore = Math.Min(totalMatches / (double)templateFeatures, 1.0);
 
         return inlierCountScore * 0.4 + inlierRatioScore * 0.4 + matchRateScore * 0.2;
-        #endif
+#endif
     }
 
     private static double GetDescriptorDistanceNormalizer(string detectorType, Mat templateDescriptors, Mat searchDescriptors)
@@ -640,25 +640,25 @@ public class PlanarMatchingOperator : OperatorBase
                     TouchTemplateCacheEntry(cacheKey, existing);
                     return existing.Clone();
                 }
-                    // 限制缓存大小
-                    while (TemplateCache.Count >= TemplateCacheCapacity)
+                // 限制缓存大小
+                while (TemplateCache.Count >= TemplateCacheCapacity)
+                {
+                    var oldestKey = TemplateCacheOrder.First?.Value;
+                    if (oldestKey == null)
                     {
-                        var oldestKey = TemplateCacheOrder.First?.Value;
-                        if (oldestKey == null)
-                        {
-                            break;
-                        }
-
-                        if (TemplateCache.Remove(oldestKey, out var evicted))
-                        {
-                            TemplateCacheOrder.RemoveFirst();
-                            evicted.Dispose();
-                        }
+                        break;
                     }
 
-                    features.OrderNode = TemplateCacheOrder.AddLast(cacheKey);
-                    TemplateCache[cacheKey] = features;
+                    if (TemplateCache.Remove(oldestKey, out var evicted))
+                    {
+                        TemplateCacheOrder.RemoveFirst();
+                        evicted.Dispose();
+                    }
                 }
+
+                features.OrderNode = TemplateCacheOrder.AddLast(cacheKey);
+                TemplateCache[cacheKey] = features;
+            }
 
             return features.Clone();
         }

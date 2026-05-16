@@ -3,6 +3,8 @@
 // 【Phase 3】复用调试缓存机制，执行上游子图到目标节点
 // 作者：架构修复方案 v2
 
+using System.Collections;
+using System.Text.Json;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Enums;
@@ -16,8 +18,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using System.Collections;
-using System.Text.Json;
 
 namespace Acme.Product.Desktop.Endpoints;
 
@@ -54,7 +54,7 @@ public static class PreviewNodeEndpoints
 
                 // 从数据库加载流程，或直接使用前端传来的流程数据
                 Acme.Product.Core.Entities.OperatorFlow? flow;
-                
+
                 if (request.FlowData?.Operators?.Count > 0)
                 {
                     // 使用前端传来的流程数据

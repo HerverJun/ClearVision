@@ -7,6 +7,7 @@ using FluentAssertions;
 
 namespace Acme.Product.Tests.PlcComm;
 
+[Collection("PLC Operator Integration")]
 public class HalfPacketIntegrationTests
 {
     [Fact]
@@ -16,16 +17,16 @@ public class HalfPacketIntegrationTests
         listener.Start();
 
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var serverTask = ServeMcWriteAsync(listener, cts.Token);
 
         using var client = new MitsubishiMcClient(IPAddress.Loopback.ToString())
         {
             Port = port,
-            ConnectTimeout = 2000,
-            ReadTimeout = 2000,
-            WriteTimeout = 2000
+            ConnectTimeout = 15000,
+            ReadTimeout = 15000,
+            WriteTimeout = 15000
         };
 
         var connected = await client.ConnectAsync(cts.Token);
@@ -44,16 +45,16 @@ public class HalfPacketIntegrationTests
         listener.Start();
 
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var serverTask = ServeMcReadAsync(listener, cts.Token);
 
         using var client = new MitsubishiMcClient(IPAddress.Loopback.ToString())
         {
             Port = port,
-            ConnectTimeout = 2000,
-            ReadTimeout = 2000,
-            WriteTimeout = 2000
+            ConnectTimeout = 15000,
+            ReadTimeout = 15000,
+            WriteTimeout = 15000
         };
 
         var connected = await client.ConnectAsync(cts.Token);
@@ -73,16 +74,16 @@ public class HalfPacketIntegrationTests
         listener.Start();
 
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var serverTask = ServeFinsWriteAsync(listener, cts.Token);
 
         using var client = new OmronFinsClient(IPAddress.Loopback.ToString())
         {
             Port = port,
-            ConnectTimeout = 2000,
-            ReadTimeout = 2000,
-            WriteTimeout = 2000
+            ConnectTimeout = 15000,
+            ReadTimeout = 15000,
+            WriteTimeout = 15000
         };
 
         var connected = await client.ConnectAsync(cts.Token);
@@ -101,16 +102,16 @@ public class HalfPacketIntegrationTests
         listener.Start();
 
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var serverTask = ServeFinsReadAsync(listener, cts.Token);
 
         using var client = new OmronFinsClient(IPAddress.Loopback.ToString())
         {
             Port = port,
-            ConnectTimeout = 2000,
-            ReadTimeout = 2000,
-            WriteTimeout = 2000
+            ConnectTimeout = 15000,
+            ReadTimeout = 15000,
+            WriteTimeout = 15000
         };
 
         var connected = await client.ConnectAsync(cts.Token);

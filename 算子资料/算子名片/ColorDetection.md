@@ -1,74 +1,135 @@
 # 颜色检测 / ColorDetection
 
 ## 基本信息 / Basic Info
-| 项目 | 值 |
+| 项目 (Field) | 值 (Value) |
 |------|------|
-| 类名 | `ColorDetectionOperator` |
-| 枚举值 | `OperatorType.ColorDetection` |
-| 分类 | `颜色处理` |
-| 版本 | `2.0.0` |
-| 成熟度 | `Experimental` |
-| 标签 | `experimental`, `industrial-remediation`, `color-inspection` |
+| 类名 (Class) | `ColorDetectionOperator` |
+| 枚举值 (Enum) | `OperatorType.ColorDetection` |
+| 分类 (Category) | 颜色处理 |
+| 版本 (Version) | `2.0.0` |
+| 成熟度 (Maturity) | 稳定 Stable |
+| 标签 (Tags) | `color-inspection`, `experimental`, `industrial-remediation`, `功能域:检测`, `成熟度:稳定`, `算法类型:自研` |
 
-## 算法说明 / Algorithm
-该算子已从原来的“平均色/主色/范围检测”扩展为兼容型颜色检测节点，当前支持两类更适合工业场景的模式：
+## 算法原理 / Algorithm Principle
+当前元数据描述为：Supports compatibility color analysis plus HSV inspection and Lab DeltaE inspection。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
-1. `HsvInspection`
-   针对 HSV 阈值检测，支持 hue 环绕区间，例如红色的 `170 -> 10`。
-2. `LabDeltaE`
-   先计算 ROI 的平均 Lab 颜色，再基于 `CIE76` 或 `CIEDE2000` 与参考色比较，适合做颜色偏差量化。
+## 实现策略 / Implementation Strategy
+- 先校验必填输入：`Image`；缺失时通常返回失败结果。
+- 可选输入用于覆盖或补充参数配置：`ReferenceColor`。
+- 参数解析覆盖 18 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
+- 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
-同时保留 `Average`、`Dominant`、`Range` 三个旧模式，保证现有流程不被直接打断。
+## 核心 API 调用链 / Core API Call Chain
+- `OperatorBase.Get*Param(...)`
+- `Cv2.CvtColor`
+- `Cv2.Mean`
+- `Cv2.Rectangle`
+- `Cv2.PutText`
+- `Cv2.Resize`
+- `Cv2.Kmeans`
+- `Cv2.CountNonZero`
+- `Cv2.BitwiseAnd`
+- `Cv2.AddWeighted`
+- `Cv2.InRange`
+- `Cv2.BitwiseOr`
+- `Math.Max`
+- `Math.Min`
 
-## 参数 / Parameters
-| 名称 | 类型 | 默认值 | 说明 |
-|------|------|------|------|
-| `ColorSpace` | `enum` | `HSV` | 兼容模式下的颜色空间 |
-| `AnalysisMode` | `enum` | `Average` | 运行模式，支持 `Average` / `Dominant` / `Range` / `HsvInspection` / `LabDeltaE` |
-| `HueLow` | `int` | `0` | HSV 检测下限 |
-| `HueHigh` | `int` | `180` | HSV 检测上限，可与 `HueLow` 构成环绕区间 |
-| `SatLow` | `int` | `50` | 饱和度下限 |
-| `SatHigh` | `int` | `255` | 饱和度上限 |
-| `ValLow` | `int` | `50` | 明度下限 |
-| `ValHigh` | `int` | `255` | 明度上限 |
-| `DominantK` | `int` | `3` | 主色聚类数量 |
-| `DeltaEMethod` | `enum` | `CIEDE2000` | 色差算法 |
-| `RefL` | `double` | `0.0` | 参考 Lab 的 L |
-| `RefA` | `double` | `0.0` | 参考 Lab 的 a |
-| `RefB` | `double` | `0.0` | 参考 Lab 的 b |
-| `RoiX` | `int` | `0` | ROI X |
-| `RoiY` | `int` | `0` | ROI Y |
-| `RoiW` | `int` | `0` | ROI 宽度，`0` 表示使用剩余宽度 |
-| `RoiH` | `int` | `0` | ROI 高度，`0` 表示使用剩余高度 |
-| `WhiteBalanceTolerance` | `double` | `12.0` | 白平衡偏差阈值 |
+## 参数说明 / Parameters
+| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
+|--------|------|------|--------|------|------|------|
+| `ColorSpace` | 颜色空间 | `enum` | HSV | HSV/HSV；Lab/Lab | Yes | - |
+| `AnalysisMode` | 分析模式 | `enum` | Average | Average/Legacy Average；Dominant/Legacy Dominant；Range/Legacy Range；HsvInspection/HSV Inspection；LabDeltaE/Lab DeltaE | Yes | - |
+| `HueLow` | H下限 | `int` | 0 | [0, 180] | Yes | - |
+| `HueHigh` | H上限 | `int` | 180 | [0, 180] | Yes | - |
+| `SatLow` | S下限 | `int` | 50 | [0, 255] | Yes | - |
+| `SatHigh` | S上限 | `int` | 255 | [0, 255] | Yes | - |
+| `ValLow` | V下限 | `int` | 50 | [0, 255] | Yes | - |
+| `ValHigh` | V上限 | `int` | 255 | [0, 255] | Yes | - |
+| `DominantK` | 主色数量K | `int` | 3 | [1, 10] | Yes | - |
+| `DeltaEMethod` | DeltaE Method | `enum` | CIEDE2000 | CIE76/CIE76；CIEDE2000/CIEDE2000 | Yes | - |
+| `RefL` | Ref L | `double` | 0 | - | Yes | - |
+| `RefA` | Ref A | `double` | 0 | - | Yes | - |
+| `RefB` | Ref B | `double` | 0 | - | Yes | - |
+| `RoiX` | ROI X | `int` | 0 | - | Yes | - |
+| `RoiY` | ROI Y | `int` | 0 | - | Yes | - |
+| `RoiW` | ROI W | `int` | 0 | - | Yes | - |
+| `RoiH` | ROI H | `int` | 0 | - | Yes | - |
+| `WhiteBalanceTolerance` | White Balance Tolerance | `double` | 12 | [0, 255] | Yes | - |
 
-## 输入 / 输出 / Inputs & Outputs
+## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
-| 名称 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `Image` | `Image` | 是 | 输入图像 |
-| `ReferenceColor` | `Any` | 否 | 参考 Lab 颜色，可传字典或数组 |
+| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |
+|------|------|------|------|------|
+| `Image` | 输入图像 | `Image` | Yes | 必填输入，缺失时算子通常返回失败或无法产生有效结果。 |
+| `ReferenceColor` | Reference Color | `Any` | No | 可选输入；提供时会参与当前算子处理或覆盖部分参数配置。 |
 
 ### 输出 / Outputs
-| 名称 | 类型 | 说明 |
+| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |
+|------|------|------|------|
+| `Image` | 结果图像 | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
+| `ColorInfo` | 颜色信息 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `AnalysisMode` | 分析模式 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ColorSpace` | 颜色空间 | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `DeltaE` | DeltaE | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Coverage` | Coverage | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `WhiteBalanceStatus` | White Balance Status | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `MeanColor` | Mean Color | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `DominantColors` | Dominant Colors | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Diagnostics` | Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+
+### 运行时附加输出 / Runtime Additional Outputs
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Image` | `Image` | 标注后的结果图 |
-| `ColorInfo` | `Any` | 统一颜色分析结果结构 |
-| `AnalysisMode` | `String` | 实际执行模式 |
-| `ColorSpace` | `String` | 实际颜色空间 |
-| `DeltaE` | `Float` | `LabDeltaE` 模式下的色差，其他模式为 0 |
-| `Coverage` | `Float` | 颜色命中覆盖率 |
-| `WhiteBalanceStatus` | `String` | `Balanced` 或 `Suspect` |
-| `MeanColor` | `Any` | 平均颜色结果 |
-| `DominantColors` | `Any` | 主色聚类结果 |
-| `Diagnostics` | `Any` | ROI、灰世界偏差、模式等诊断信息 |
+| `Channel1` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Channel2` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Channel3` | `Any` | 源码输出字典初始化中可见字段。 |
+| `GrayWorldDeviation` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `Hex` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Hue` | `Any` | 源码输出字典初始化中可见字段。 |
+| `MatchedPixels` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `MeanB` | `Float` | 源码输出字典初始化中可见字段。 |
+| `MeanG` | `Float` | 源码输出字典初始化中可见字段。 |
+| `MeanR` | `Float` | 源码输出字典初始化中可见字段。 |
+| `Mode` | `String` | 源码输出字典初始化中可见字段。 |
+| `Percentage` | `Any` | 源码输出字典初始化中可见字段。 |
+| `PrimaryData` | `Any` | 源码输出字典初始化中可见字段。 |
+| `Rank` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ReferenceA` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ReferenceB` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ReferenceL` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `ReferenceProvided` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `Saturation` | `Float` | 源码输出字典初始化中可见字段。 |
+| `Summary` | `Any` | 源码输出字典初始化中可见字段。 |
+| `TotalPixels` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
+
+## 性能特征 / Performance
+| 指标 (Metric) | 值 (Value) |
+|------|------|
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
+| 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
+
+## 证据与失败契约 / Evidence & Failure Contracts
+- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- Golden/回放证据：质量报告中存在通过的 baseline 证据。
+- 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 颜色分选、混料检测、色差验收
-- 需要解释性较强的颜色阈值或 DeltaE 判定
-- 有明确 ROI 的局部颜色一致性检查
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
-1. `LabDeltaE` 当前仍是 ROI 平均颜色比较，不适合处理复杂纹理或多色混合表面。
-2. `WhiteBalanceStatus` 是轻量诊断，不等同于完成了完整色彩标定。
-3. 若现场成像链路没有做白平衡和颜色校正，阈值与 DeltaE 的可迁移性会明显下降。
+1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
+2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
+
+## 变更记录 / Changelog
+| 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
+|------|------|----------|
+| 2.0.0 | 2026-05-16 | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |
