@@ -146,6 +146,55 @@ async function runPreviewCoordinatorChecks() {
   assert.equal(noProjectCoordinator.getState().presenter.statusText, '等待预览');
   noProjectCoordinator.destroy();
 
+  let abortPreviewCalls = 0;
+  let abortEvents = 0;
+  const abortNode = {
+    id: 'abort-node',
+    type: 'PreviewImageNode',
+    title: 'Abort preview node',
+    parameters: [],
+    outputs: [{ name: 'Image', type: 'Image' }],
+  };
+  const abortCoordinator = new NodePreviewCoordinator({
+    getProjectId: () => 'project-1',
+    getFlowRevision: () => 1,
+    getNodeById: () => abortNode,
+    getOperatorMetadata: () => null,
+    getInputImageBase64: () => PNG_BASE64,
+    previewExecutor: async (_nodeId, options) => {
+      abortPreviewCalls += 1;
+      assert.ok(options.signal, 'preview requests should receive an abort signal');
+
+      if (abortPreviewCalls === 1) {
+        return await new Promise((_resolve, reject) => {
+          const abort = () => {
+            abortEvents += 1;
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          };
+          options.signal.addEventListener('abort', abort, { once: true });
+        });
+      }
+
+      return {
+        success: true,
+        outputImageBase64: PNG_BASE64,
+        outputData: { Score: abortPreviewCalls },
+      };
+    },
+    debounceMs: 10,
+  });
+
+  abortCoordinator.setActiveNode(abortNode);
+  await sleep(30);
+  abortCoordinator.requestActivePreview({ immediate: true, force: true });
+  await sleep(30);
+  assert.equal(abortEvents, 1, 'superseded preview should abort the previous request');
+  assert.equal(abortPreviewCalls, 2);
+  assert.equal(abortCoordinator.getState().status, 'success');
+  abortCoordinator.destroy();
+
   let previewCalls = 0;
   let node = {
     id: 'node-1',

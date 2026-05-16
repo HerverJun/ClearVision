@@ -949,6 +949,14 @@ public class Sprint7_AiEvolutionTests
             @"# 优先算子目录（根据当前需求动态裁剪）[\s\S]*?```json\s*(\[[\s\S]*?\])\s*```",
             RegexOptions.Singleline);
 
+        if (!match.Success)
+        {
+            match = Regex.Match(
+                prompt,
+                @"# Prioritized Operator Catalog[\s\S]*?```json\s*(\[[\s\S]*?\])\s*```",
+                RegexOptions.Singleline);
+        }
+
         match.Success.Should().BeTrue("Prompt should contain prioritized operator catalog JSON block.");
         var json = match.Groups[1].Value;
 

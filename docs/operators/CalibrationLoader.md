@@ -24,7 +24,6 @@
 | 参数名 (Name) | 类型 (Type) | 默认值 (Default) | 范围 (Range) | 说明 (Description) |
 |--------|------|--------|------|------|
 | `FilePath` | `file` | "" | - | - |
-| `FileFormat` | `enum` | JSON | - | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs

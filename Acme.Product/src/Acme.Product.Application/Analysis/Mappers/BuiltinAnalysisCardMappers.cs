@@ -73,6 +73,21 @@ internal static class AnalysisMapperHelpers
         return value.ToString();
     }
 
+    public static bool? TryReadBool(IReadOnlyDictionary<string, object>? outputData, string key)
+    {
+        if (!TryGetValueIgnoreCase(outputData, key, out var value) || value == null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            bool booleanValue => booleanValue,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => null
+        };
+    }
+
     public static object? TryReadObject(IReadOnlyDictionary<string, object>? outputData, string key)
     {
         return TryGetValueIgnoreCase(outputData, key, out var value) ? value : null;
@@ -202,7 +217,9 @@ internal static class AnalysisMapperHelpers
         object? value,
         string? label = null,
         string? displayHint = null,
-        string? dataType = null)
+        string? dataType = null,
+        string? variant = null,
+        string? status = null)
     {
         return new AnalysisFieldDto
         {
@@ -210,7 +227,9 @@ internal static class AnalysisMapperHelpers
             Label = label ?? key,
             Value = value,
             DisplayHint = displayHint,
-            DataType = dataType ?? InferDataType(key, value)
+            Variant = variant,
+            DataType = dataType ?? InferDataType(key, value),
+            Status = status
         };
     }
 }
@@ -392,6 +411,107 @@ public class CommunicationAnalysisCardMapper : IAnalysisCardMapper
     }
 }
 
+public class DetectionSequenceJudgeAnalysisCardMapper : IAnalysisCardMapper
+{
+    public bool CanMap(OperatorType operatorType) => operatorType == OperatorType.DetectionSequenceJudge;
+
+    public IEnumerable<AnalysisCardDto> Map(Operator @operator, OperatorExecutionResult result)
+    {
+        if (result.OutputData == null || result.OutputData.Count == 0)
+        {
+            yield break;
+        }
+
+        var isMatch = AnalysisMapperHelpers.TryReadBool(result.OutputData, "IsMatch");
+        var status = !result.IsSuccess
+            ? "Error"
+            : isMatch == true
+                ? "OK"
+                : "NG";
+        var message = AnalysisMapperHelpers.TryReadString(result.OutputData, "Message")
+            ?? (isMatch == true ? "Sequence matched." : "Sequence did not match.");
+
+        var fields = new List<AnalysisFieldDto>
+        {
+            AnalysisMapperHelpers.ToField(
+                "IsMatch",
+                isMatch == true ? "匹配" : "不匹配",
+                label: "判定结果",
+                dataType: "String",
+                variant: "status",
+                status: status),
+            AnalysisMapperHelpers.ToField(
+                "ExpectedLabels",
+                ReadSequenceValue(result.OutputData, "ExpectedLabels"),
+                label: "预期顺序",
+                dataType: "Any",
+                variant: "sequence"),
+            AnalysisMapperHelpers.ToField(
+                "ActualOrder",
+                ReadSequenceValue(result.OutputData, "ActualOrder"),
+                label: "实际顺序",
+                dataType: "Any",
+                variant: "sequence"),
+            AnalysisMapperHelpers.ToField(
+                "MissingLabels",
+                ReadSequenceValue(result.OutputData, "MissingLabels"),
+                label: "缺失标签",
+                dataType: "Any",
+                variant: "labels"),
+            AnalysisMapperHelpers.ToField(
+                "DuplicateLabels",
+                ReadSequenceValue(result.OutputData, "DuplicateLabels"),
+                label: "重复标签",
+                dataType: "Any",
+                variant: "labels")
+        };
+
+        foreach (var key in new[] { "ReceivedCount", "FilteredCount", "DetectionCount", "ExpectedCount", "RequiredMinConfidence", "RowCount" })
+        {
+            if (AnalysisMapperHelpers.TryGetValueIgnoreCase(result.OutputData, key, out var value)
+                && AnalysisMapperHelpers.IsUsefulField(key, value))
+            {
+                fields.Add(AnalysisMapperHelpers.ToField(key, value, label: ToSequenceFieldLabel(key)));
+            }
+        }
+
+        yield return new AnalysisCardDto
+        {
+            Id = $"{@operator.Id:N}-sequence-judgment",
+            Category = "diagnostic",
+            SourceOperatorId = @operator.Id,
+            SourceOperatorType = @operator.Type.ToString(),
+            Title = "线序判定",
+            Status = status,
+            Priority = status == "OK" ? 140 : 170,
+            Message = message,
+            Fields = fields,
+            Meta = AnalysisMapperHelpers.BuildMeta(
+                ("Message", message),
+                ("Source", "DetectionSequenceJudge"))
+        };
+    }
+
+    private static object ReadSequenceValue(IReadOnlyDictionary<string, object> outputData, string key)
+    {
+        return AnalysisMapperHelpers.TryReadObject(outputData, key) ?? Array.Empty<string>();
+    }
+
+    private static string ToSequenceFieldLabel(string key)
+    {
+        return key switch
+        {
+            "ReceivedCount" => "接收数量",
+            "FilteredCount" => "过滤后数量",
+            "DetectionCount" => "最终数量",
+            "ExpectedCount" => "预期数量",
+            "RequiredMinConfidence" => "最小置信度",
+            "RowCount" => "行数",
+            _ => key
+        };
+    }
+}
+
 public class DetectionAnalysisCardMapper : IAnalysisCardMapper
 {
     private static readonly HashSet<OperatorType> SupportedTypes =
@@ -424,7 +544,11 @@ public class DetectionAnalysisCardMapper : IAnalysisCardMapper
             if (AnalysisMapperHelpers.TryGetValueIgnoreCase(result.OutputData, key, out var value)
                 && AnalysisMapperHelpers.IsUsefulField(key, value))
             {
-                fields.Add(AnalysisMapperHelpers.ToField(key, value, dataType: "Integer"));
+                fields.Add(AnalysisMapperHelpers.ToField(
+                    key,
+                    value,
+                    label: ToDetectionFieldLabel(@operator.Type, key),
+                    dataType: "Integer"));
             }
         }
 
@@ -433,7 +557,11 @@ public class DetectionAnalysisCardMapper : IAnalysisCardMapper
             if (AnalysisMapperHelpers.TryGetValueIgnoreCase(result.OutputData, key, out var value)
                 && AnalysisMapperHelpers.IsUsefulField(key, value))
             {
-                fields.Add(AnalysisMapperHelpers.ToField(key, value, dataType: "DetectionList"));
+                fields.Add(AnalysisMapperHelpers.ToField(
+                    key,
+                    value,
+                    label: ToDetectionFieldLabel(@operator.Type, key),
+                    dataType: "DetectionList"));
             }
         }
 
@@ -448,11 +576,61 @@ public class DetectionAnalysisCardMapper : IAnalysisCardMapper
             Category = "detection",
             SourceOperatorId = @operator.Id,
             SourceOperatorType = @operator.Type.ToString(),
-            Title = $"{@operator.Type} Detections",
-            Status = AnalysisMapperHelpers.ResolveStatus(result),
-            Priority = 80,
+            Title = ToDetectionCardTitle(@operator.Type),
+            Status = result.IsSuccess ? "Info" : "Error",
+            Priority = ToDetectionCardPriority(@operator.Type),
             Fields = fields
         };
+    }
+
+    private static string ToDetectionCardTitle(OperatorType operatorType)
+    {
+        return operatorType switch
+        {
+            OperatorType.DeepLearning or OperatorType.OnnxInference => $"{operatorType} Raw Detections",
+            OperatorType.BoxFilter => "BoxFilter Candidates",
+            OperatorType.BoxNms => "BoxNms Kept Detections",
+            _ => $"{operatorType} Detections"
+        };
+    }
+
+    private static int ToDetectionCardPriority(OperatorType operatorType)
+    {
+        return operatorType switch
+        {
+            OperatorType.BoxNms => 90,
+            OperatorType.BoxFilter => 80,
+            OperatorType.DeepLearning or OperatorType.OnnxInference => 70,
+            _ => 75
+        };
+    }
+
+    private static string ToDetectionFieldLabel(OperatorType operatorType, string key)
+    {
+        if (operatorType == OperatorType.BoxFilter && key.Equals("Detections", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Candidates before NMS";
+        }
+
+        if (operatorType == OperatorType.BoxNms && key.Equals("Detections", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Kept detections";
+        }
+
+        if (operatorType == OperatorType.BoxNms && key.Equals("SuppressedDetections", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Suppressed detections";
+        }
+
+        if ((operatorType == OperatorType.DeepLearning || operatorType == OperatorType.OnnxInference)
+            && (key.Equals("Objects", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("Detections", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("Defects", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Raw model candidates";
+        }
+
+        return key;
     }
 }
 

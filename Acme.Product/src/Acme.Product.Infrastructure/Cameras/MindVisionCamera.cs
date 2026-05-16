@@ -35,6 +35,8 @@ public class MindVisionCamera : ICameraProvider
     private bool _hasUnreleasedFrame = false;
     private byte[]? _convertedFrameBuffer;
     private GCHandle _convertedFrameHandle;
+    private byte[]? _rawFrameBuffer;
+    private GCHandle _rawFrameHandle;
 
     // 原生 DLL 搜索路径设置
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -417,29 +419,44 @@ public class MindVisionCamera : ICameraProvider
             _lastFrame = frame;
             _hasUnreleasedFrame = true;
 
-            var width = frame.frameInfo.width;
-            var height = frame.frameInfo.height;
-            var size = frame.frameInfo.size;
-            var pixelFormat = frame.frameInfo.pixelFormat;
-            var mappedPixelFormat = ConvertPixelFormat((uint)pixelFormat);
+            try
+            {
+                var width = frame.frameInfo.width;
+                var height = frame.frameInfo.height;
+                var size = frame.frameInfo.size;
+                var pixelFormat = frame.frameInfo.pixelFormat;
+                var mappedPixelFormat = ConvertPixelFormat((uint)pixelFormat);
 
-            if (TryConvertFrameToBgr8(frame, mappedPixelFormat, out var convertedFrame))
+                if (TryConvertFrameToBgr8(frame, mappedPixelFormat, out var convertedFrame))
+                {
+                    return convertedFrame;
+                }
+
+                var frameSize = checked((int)size);
+                if (frameSize <= 0)
+                {
+                    return null;
+                }
+
+                EnsureRawFrameBuffer(frameSize);
+                Marshal.Copy(frame.pData, _rawFrameBuffer!, 0, frameSize);
+
+                return new CameraFrame
+                {
+                    DataPtr = _rawFrameHandle.AddrOfPinnedObject(),
+                    Width = (int)width,
+                    Height = (int)height,
+                    Size = frameSize,
+                    PixelFormat = mappedPixelFormat,
+                    FrameNumber = 0,
+                    Timestamp = 0,
+                    NeedsNativeRelease = false
+                };
+            }
+            finally
             {
                 ReleaseLastFrame();
-                return convertedFrame;
             }
-
-            return new CameraFrame
-            {
-                DataPtr = frame.pData,
-                Width = (int)width,
-                Height = (int)height,
-                Size = (int)size,
-                PixelFormat = mappedPixelFormat,
-                FrameNumber = 0,
-                Timestamp = 0,
-                NeedsNativeRelease = true
-            };
         }
         catch (Exception ex)
         {
@@ -527,6 +544,28 @@ public class MindVisionCamera : ICameraProvider
         _convertedFrameBuffer = null;
     }
 
+    private void EnsureRawFrameBuffer(int size)
+    {
+        if (_rawFrameBuffer != null && _rawFrameBuffer.Length >= size && _rawFrameHandle.IsAllocated)
+        {
+            return;
+        }
+
+        ReleaseRawFrameBuffer();
+        _rawFrameBuffer = new byte[size];
+        _rawFrameHandle = GCHandle.Alloc(_rawFrameBuffer, GCHandleType.Pinned);
+    }
+
+    private void ReleaseRawFrameBuffer()
+    {
+        if (_rawFrameHandle.IsAllocated)
+        {
+            _rawFrameHandle.Free();
+        }
+
+        _rawFrameBuffer = null;
+    }
+
     private static bool IsColorPixelFormat(CameraPixelFormat pixelFormat)
     {
         return pixelFormat is CameraPixelFormat.RGB8
@@ -608,7 +647,7 @@ public class MindVisionCamera : ICameraProvider
         }
     }
 
-    public bool SetTriggerMode(CameraTriggerMode mode)
+    public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null)
     {
         if (!_isConnected || _cam == null)
             return false;
@@ -617,15 +656,17 @@ public class MindVisionCamera : ICameraProvider
         {
             if (mode == CameraTriggerMode.Software)
             {
-                _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "On");
-                int res = _cam.IMV_SetEnumFeatureSymbol("TriggerSource", "Software");
-                return res == IMVDefine.IMV_OK;
+                int modeRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "On");
+                int sourceRes = _cam.IMV_SetEnumFeatureSymbol("TriggerSource", "Software");
+                return modeRes == IMVDefine.IMV_OK && sourceRes == IMVDefine.IMV_OK;
             }
 
             if (mode == CameraTriggerMode.External)
             {
-                int res = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "On");
-                return res == IMVDefine.IMV_OK;
+                var source = CameraHardwareTriggerSourceExtensions.Normalize(hardwareTriggerSource);
+                int modeRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "On");
+                int sourceRes = _cam.IMV_SetEnumFeatureSymbol("TriggerSource", source);
+                return modeRes == IMVDefine.IMV_OK && sourceRes == IMVDefine.IMV_OK;
             }
 
             int continuousRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "Off");
@@ -670,6 +711,7 @@ public class MindVisionCamera : ICameraProvider
         {
             ForceRelease();
             ReleaseConvertedFrameBuffer();
+            ReleaseRawFrameBuffer();
         }
         catch (Exception ex)
         {

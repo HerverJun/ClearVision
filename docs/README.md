@@ -5,7 +5,7 @@ This directory is the primary documentation entry point. Active release and engi
 ## Core
 
 - [项目总览](./项目总览.md)
-- [当前 debug 闭环计划](./进行中/当前计划/debug计划.md)
+- [当前最终整合 TODO](./进行中/当前计划/ClearVision-最终整合TODO-2026-05-03.md)
 - [Station-Studio sync SOP](./runtime/station-studio-sync.md)
 - [Desktop/Studio boundary](./runtime/Desktop-Studio-Boundary.md)
 
@@ -33,3 +33,5 @@ This directory is the primary documentation entry point. Active release and engi
 ## Archive
 
 Historical and closed plans live under [归档](./归档/README.md). They are retained for traceability and are not part of the default text-encoding CI scan.
+
+- [2026-05-15 当前计划闭环归档](./归档/已关闭事项/2026-05-15-当前计划闭环归档/闭环说明.md)

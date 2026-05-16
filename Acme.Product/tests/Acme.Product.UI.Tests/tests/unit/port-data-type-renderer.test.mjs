@@ -97,3 +97,26 @@ test('renders full result card html and compact summaries', () => {
 
   assert.equal(summarizeResultField(card.fields[0]), '9.877 mm');
 });
+
+test('renders informational detection cards without OK judgment badge', () => {
+  const html = renderResultCardHtml({
+    id: 'box-filter-card',
+    category: 'detection',
+    title: 'BoxFilter Candidates',
+    status: 'Info',
+    fields: [
+      {
+        key: 'Detections',
+        label: 'Candidates before NMS',
+        value: [{ label: 'wire_black', confidence: 0.04 }],
+        dataType: 'DetectionList'
+      }
+    ]
+  });
+
+  assert.match(html, /BoxFilter Candidates/);
+  assert.match(html, /Candidates before NMS/);
+  assert.match(html, /cv-result-card-status info/);
+  assert.match(html, />Info</);
+  assert.doesNotMatch(html, />OK</);
+});

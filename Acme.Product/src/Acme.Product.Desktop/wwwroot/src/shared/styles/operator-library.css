@@ -28,8 +28,14 @@
 .operator-icon {
     font-size: 20px;
     width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     flex-shrink: 0;
+    overflow: hidden;
+    line-height: 1;
 }
 
 .operator-info {
@@ -288,7 +294,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
+    overflow: hidden;
+    line-height: 1;
 }
 
 .category-icon svg {
@@ -360,6 +370,38 @@
     fill: currentColor; /* 跟随文字颜色 */
     vertical-align: middle;
     opacity: 0.9;
+    display: block;
+    flex-shrink: 0;
+}
+
+.operator-icon-img {
+    width: 18px;
+    height: 18px;
+    display: block;
+    flex-shrink: 0;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.operator-icon .operator-icon-img {
+    width: 18px;
+    height: 18px;
+    opacity: 0.9;
+}
+
+.cv-treeview-toggle-icon {
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cv-treeview-toggle-icon .operator-icon-img {
+    width: 12px;
+    height: 12px;
 }
 
 /* 详情预览头部图标 */
@@ -373,12 +415,20 @@
     border-radius: var(--radius-md);
     border: 1px solid var(--glass-border);
     color: var(--gold-accent); /* 默认高亮色 */
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
 .operator-detail .detail-icon svg {
     width: 24px;
     height: 24px;
     fill: currentColor;
+    display: block;
+}
+
+.operator-detail .detail-icon .operator-icon-img {
+    width: 24px;
+    height: 24px;
 }
 
 /* 占位符图标 */
@@ -390,12 +440,27 @@
     margin-bottom: 12px;
 }
 
+.preview-svg-icon .operator-icon-img {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+}
+
 /* 分类图标 */
 .tree-node-icon svg {
     width: 16px;
     height: 16px;
     fill: var(--gold-accent);
     opacity: 0.8;
-    margin-right: 4px;
+    margin-right: 0;
     vertical-align: sub;
+    display: block;
+}
+
+.tree-node-icon .operator-icon-img,
+.category-icon .operator-icon-img {
+    width: 16px;
+    height: 16px;
+    opacity: 0.8;
 }

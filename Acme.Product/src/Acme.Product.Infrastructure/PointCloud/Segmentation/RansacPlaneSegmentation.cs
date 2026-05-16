@@ -52,90 +52,71 @@ public sealed class RansacPlaneSegmentation
             return new RansacPlaneResult(Vector3.Zero, 0, Array.Empty<int>());
         }
 
-        var pIdx = cloud.Points.GetGenericIndexer<float>();
-        var rng = new Random(ResolveSeed(cloud, pIdx, distanceThreshold, maxIterations, minInliers));
-
-        var scratch = new int[n];
-        int bestCount = 0;
-        var bestInliers = Array.Empty<int>();
-        var bestNormal = Vector3.UnitZ;
-        float bestD = 0;
-
-        // Early stop once we have a very dominant plane.
-        var earlyStop = Math.Max(minInliers, (int)(n * 0.95));
-        var useCoarseEvaluation = n >= CoarseEvaluationThreshold && maxIterations > 16;
-        var coarseIndices = useCoarseEvaluation ? BuildCoarseSampleIndices(n) : Array.Empty<int>();
-        var candidatePlanes = useCoarseEvaluation ? new List<CandidatePlane>(MaxCandidatePlanes) : null;
-
-        for (int iter = 0; iter < maxIterations; iter++)
+        unsafe
         {
-            if (!TrySample3Distinct(rng, n, out var i1, out var i2, out var i3))
+            var points = (float*)cloud.Points.DataPointer;
+            var pointStep = (int)cloud.Points.Step() / sizeof(float);
+            var rng = new Random(ResolveSeed(cloud, points, pointStep, distanceThreshold, maxIterations, minInliers));
+
+            var scratch = new int[n];
+            int bestCount = 0;
+            var bestInliers = Array.Empty<int>();
+            var bestNormal = Vector3.UnitZ;
+            float bestD = 0;
+
+            // Early stop once we have a very dominant plane.
+            var earlyStop = Math.Max(minInliers, (int)(n * 0.95));
+            var useCoarseEvaluation = n >= CoarseEvaluationThreshold && maxIterations > 16;
+            var coarseIndices = useCoarseEvaluation ? BuildCoarseSampleIndices(n) : Array.Empty<int>();
+            var candidatePlanes = useCoarseEvaluation ? new List<CandidatePlane>(MaxCandidatePlanes) : null;
+
+            for (int iter = 0; iter < maxIterations; iter++)
             {
-                continue;
-            }
-
-            var p1 = new Vector3(pIdx[i1, 0], pIdx[i1, 1], pIdx[i1, 2]);
-            var p2 = new Vector3(pIdx[i2, 0], pIdx[i2, 1], pIdx[i2, 2]);
-            var p3 = new Vector3(pIdx[i3, 0], pIdx[i3, 1], pIdx[i3, 2]);
-
-            var v1 = p2 - p1;
-            var v2 = p3 - p1;
-            var normal = Vector3.Cross(v1, v2);
-            var len2 = normal.LengthSquared();
-            if (len2 < 1e-18f)
-            {
-                // Degenerate sample.
-                continue;
-            }
-
-            normal = Vector3.Normalize(normal);
-            var d = -Vector3.Dot(normal, p1);
-            (normal, d) = CanonicalizePlane(normal, d);
-
-            if (useCoarseEvaluation)
-            {
-                var coarseCount = CountInliers(pIdx, coarseIndices, normal, d, distanceThreshold);
-                AddCandidate(candidatePlanes!, new CandidatePlane(normal, d, coarseCount));
-
-                if (coarseCount >= coarseIndices.Length * 0.94)
+                if (!TrySample3Distinct(rng, n, out var i1, out var i2, out var i3))
                 {
-                    break;
+                    continue;
                 }
 
-                continue;
-            }
+                var p1 = ReadPoint(points, pointStep, i1);
+                var p2 = ReadPoint(points, pointStep, i2);
+                var p3 = ReadPoint(points, pointStep, i3);
 
-            var count = CollectInliers(pIdx, n, normal, d, distanceThreshold, scratch);
-
-            if (count > bestCount ||
-                (count == bestCount && IsPreferredPlane(normal, d, bestNormal, bestD)))
-            {
-                bestCount = count;
-                bestNormal = normal;
-                bestD = d;
-                bestInliers = scratch.AsSpan(0, count).ToArray();
-
-                if (bestCount >= earlyStop)
+                var v1 = p2 - p1;
+                var v2 = p3 - p1;
+                var normal = Vector3.Cross(v1, v2);
+                var len2 = normal.LengthSquared();
+                if (len2 < 1e-18f)
                 {
-                    break;
+                    // Degenerate sample.
+                    continue;
                 }
-            }
-        }
 
-        if (useCoarseEvaluation)
-        {
-            foreach (var candidate in candidatePlanes!
-                         .OrderByDescending(x => x.InlierCount)
-                         .ThenBy(x => PlaneStableScore(x.Normal, x.D))
-                         .Take(MaxCandidatePlanes))
-            {
-                var count = CountInliersAll(pIdx, n, candidate.Normal, candidate.D, distanceThreshold);
+                normal = Vector3.Normalize(normal);
+                var d = -Vector3.Dot(normal, p1);
+                (normal, d) = CanonicalizePlane(normal, d);
+
+                if (useCoarseEvaluation)
+                {
+                    var coarseCount = CountInliers(points, pointStep, coarseIndices, normal, d, distanceThreshold);
+                    AddCandidate(candidatePlanes!, new CandidatePlane(normal, d, coarseCount));
+
+                    if (coarseCount >= coarseIndices.Length * 0.94)
+                    {
+                        break;
+                    }
+
+                    continue;
+                }
+
+                var count = CollectInliers(points, pointStep, n, normal, d, distanceThreshold, scratch);
+
                 if (count > bestCount ||
-                    (count == bestCount && IsPreferredPlane(candidate.Normal, candidate.D, bestNormal, bestD)))
+                    (count == bestCount && IsPreferredPlane(normal, d, bestNormal, bestD)))
                 {
                     bestCount = count;
-                    bestNormal = candidate.Normal;
-                    bestD = candidate.D;
+                    bestNormal = normal;
+                    bestD = d;
+                    bestInliers = scratch.AsSpan(0, count).ToArray();
 
                     if (bestCount >= earlyStop)
                     {
@@ -143,34 +124,52 @@ public sealed class RansacPlaneSegmentation
                     }
                 }
             }
+
+            if (useCoarseEvaluation)
+            {
+                foreach (var candidate in candidatePlanes!
+                             .OrderByDescending(x => x.InlierCount)
+                             .ThenBy(x => PlaneStableScore(x.Normal, x.D))
+                             .Take(MaxCandidatePlanes))
+                {
+                    var count = CollectInliers(points, pointStep, n, candidate.Normal, candidate.D, distanceThreshold, scratch);
+                    if (count > bestCount ||
+                        (count == bestCount && IsPreferredPlane(candidate.Normal, candidate.D, bestNormal, bestD)))
+                    {
+                        bestCount = count;
+                        bestNormal = candidate.Normal;
+                        bestD = candidate.D;
+                        bestInliers = scratch.AsSpan(0, count).ToArray();
+
+                        if (bestCount >= earlyStop)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (bestCount < minInliers)
+            {
+                return new RansacPlaneResult(Vector3.Zero, 0, Array.Empty<int>());
+            }
+
+            // Refine using PCA on inliers (smallest eigenvector of covariance matrix).
+            (bestNormal, bestD) = RefinePlanePca(points, pointStep, bestInliers, bestNormal);
+            (bestNormal, bestD) = CanonicalizePlane(bestNormal, bestD);
+
+            // Recompute inliers with refined model (keeps behavior consistent with threshold).
+            int refinedCount = CollectInliers(points, pointStep, n, bestNormal, bestD, distanceThreshold, scratch);
+
+            var refinedInliers = scratch.AsSpan(0, refinedCount).ToArray();
+            if (refinedInliers.Length < minInliers)
+            {
+                // Fall back to original inliers if refinement makes it worse.
+                refinedInliers = bestInliers;
+            }
+
+            return new RansacPlaneResult(bestNormal, bestD, refinedInliers);
         }
-
-        if (bestCount < minInliers)
-        {
-            return new RansacPlaneResult(Vector3.Zero, 0, Array.Empty<int>());
-        }
-
-        if (useCoarseEvaluation)
-        {
-            var count = CollectInliers(pIdx, n, bestNormal, bestD, distanceThreshold, scratch);
-            bestInliers = scratch.AsSpan(0, count).ToArray();
-        }
-
-        // Refine using PCA on inliers (smallest eigenvector of covariance matrix).
-        (bestNormal, bestD) = RefinePlanePca(pIdx, bestInliers, bestNormal);
-        (bestNormal, bestD) = CanonicalizePlane(bestNormal, bestD);
-
-        // Recompute inliers with refined model (keeps behavior consistent with threshold).
-        int refinedCount = CollectInliers(pIdx, n, bestNormal, bestD, distanceThreshold, scratch);
-
-        var refinedInliers = scratch.AsSpan(0, refinedCount).ToArray();
-        if (refinedInliers.Length < minInliers)
-        {
-            // Fall back to original inliers if refinement makes it worse.
-            refinedInliers = bestInliers;
-        }
-
-        return new RansacPlaneResult(bestNormal, bestD, refinedInliers);
     }
 
     private int[] BuildCoarseSampleIndices(int totalCount)
@@ -190,7 +189,13 @@ public sealed class RansacPlaneSegmentation
         return indices;
     }
 
-    private static int CountInliers(OpenCvSharp.MatIndexer<float> points, int[] indices, Vector3 normal, float d, float distanceThreshold)
+    private static unsafe Vector3 ReadPoint(float* points, int pointStep, int index)
+    {
+        var row = points + index * pointStep;
+        return new Vector3(row[0], row[1], row[2]);
+    }
+
+    private static unsafe int CountInliers(float* points, int pointStep, int[] indices, Vector3 normal, float d, float distanceThreshold)
     {
         var nx = normal.X;
         var ny = normal.Y;
@@ -198,9 +203,9 @@ public sealed class RansacPlaneSegmentation
         int count = 0;
         for (int t = 0; t < indices.Length; t++)
         {
-            var i = indices[t];
-            var dist = MathF.Abs(nx * points[i, 0] + ny * points[i, 1] + nz * points[i, 2] + d);
-            if (dist <= distanceThreshold)
+            var row = points + indices[t] * pointStep;
+            var signedDistance = nx * row[0] + ny * row[1] + nz * row[2] + d;
+            if (signedDistance <= distanceThreshold && signedDistance >= -distanceThreshold)
             {
                 count++;
             }
@@ -209,7 +214,7 @@ public sealed class RansacPlaneSegmentation
         return count;
     }
 
-    private static int CollectInliers(OpenCvSharp.MatIndexer<float> points, int pointCount, Vector3 normal, float d, float distanceThreshold, int[] scratch)
+    private static unsafe int CollectInliers(float* points, int pointStep, int pointCount, Vector3 normal, float d, float distanceThreshold, int[] scratch)
     {
         var nx = normal.X;
         var ny = normal.Y;
@@ -217,28 +222,11 @@ public sealed class RansacPlaneSegmentation
         int count = 0;
         for (int i = 0; i < pointCount; i++)
         {
-            var dist = MathF.Abs(nx * points[i, 0] + ny * points[i, 1] + nz * points[i, 2] + d);
-            if (dist <= distanceThreshold)
+            var row = points + i * pointStep;
+            var signedDistance = nx * row[0] + ny * row[1] + nz * row[2] + d;
+            if (signedDistance <= distanceThreshold && signedDistance >= -distanceThreshold)
             {
                 scratch[count++] = i;
-            }
-        }
-
-        return count;
-    }
-
-    private static int CountInliersAll(OpenCvSharp.MatIndexer<float> points, int pointCount, Vector3 normal, float d, float distanceThreshold)
-    {
-        var nx = normal.X;
-        var ny = normal.Y;
-        var nz = normal.Z;
-        int count = 0;
-        for (int i = 0; i < pointCount; i++)
-        {
-            var dist = MathF.Abs(nx * points[i, 0] + ny * points[i, 1] + nz * points[i, 2] + d);
-            if (dist <= distanceThreshold)
-            {
-                count++;
             }
         }
 
@@ -342,8 +330,9 @@ public sealed class RansacPlaneSegmentation
         return false;
     }
 
-    private static (Vector3 Normal, float D) RefinePlanePca(
-        OpenCvSharp.MatIndexer<float> points,
+    private static unsafe (Vector3 Normal, float D) RefinePlanePca(
+        float* points,
+        int pointStep,
         int[] inliers,
         Vector3 fallbackNormal)
     {
@@ -356,10 +345,10 @@ public sealed class RansacPlaneSegmentation
         double cx = 0, cy = 0, cz = 0;
         for (int t = 0; t < inliers.Length; t++)
         {
-            var i = inliers[t];
-            cx += points[i, 0];
-            cy += points[i, 1];
-            cz += points[i, 2];
+            var row = points + inliers[t] * pointStep;
+            cx += row[0];
+            cy += row[1];
+            cz += row[2];
         }
 
         var inv = 1.0 / inliers.Length;
@@ -369,10 +358,10 @@ public sealed class RansacPlaneSegmentation
         double xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
         for (int t = 0; t < inliers.Length; t++)
         {
-            var i = inliers[t];
-            var x = points[i, 0] - cx;
-            var y = points[i, 1] - cy;
-            var z = points[i, 2] - cz;
+            var row = points + inliers[t] * pointStep;
+            var x = row[0] - cx;
+            var y = row[1] - cy;
+            var z = row[2] - cz;
             xx += x * x;
             xy += x * y;
             xz += x * z;
@@ -424,9 +413,10 @@ public sealed class RansacPlaneSegmentation
         return (normal, d);
     }
 
-    private int ResolveSeed(
+    private unsafe int ResolveSeed(
         PointCloud cloud,
-        OpenCvSharp.MatIndexer<float> points,
+        float* points,
+        int pointStep,
         float distanceThreshold,
         int maxIterations,
         int minInliers)
@@ -449,17 +439,19 @@ public sealed class RansacPlaneSegmentation
 
             for (int i = 0; i < cloud.Count; i += step)
             {
-                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(points[i, 0]));
-                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(points[i, 1]));
-                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(points[i, 2]));
+                var row = points + i * pointStep;
+                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(row[0]));
+                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(row[1]));
+                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(row[2]));
             }
 
             var last = cloud.Count - 1;
             if (last >= 0 && last % step != 0)
             {
-                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(points[last, 0]));
-                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(points[last, 1]));
-                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(points[last, 2]));
+                var row = points + last * pointStep;
+                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(row[0]));
+                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(row[1]));
+                Mix(ref hash, (uint)BitConverter.SingleToInt32Bits(row[2]));
             }
 
             var seed = (int)(hash & 0x7fffffff);

@@ -56,7 +56,7 @@ public sealed class StationEndpointsTests
             SessionErrorCount = 0
         });
 
-        var liveChunk = await ReadUntilContainsAsync(stream, "event: stationUpserted", TimeSpan.FromSeconds(2));
+        var liveChunk = await ReadUntilContainsAsync(stream, "\"state\":\"Running\"", TimeSpan.FromSeconds(2));
         liveChunk.Should().Contain("event: stationUpserted");
         liveChunk.Should().Contain("\"state\":\"Running\"");
         liveChunk.Should().Contain("\"stationId\":\"station-a\"");

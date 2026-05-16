@@ -14,6 +14,7 @@ $excludedDirectories = [System.Collections.Generic.HashSet[string]]::new([System
     ".git",
     ".tmp",
     ".vs",
+    ".venv",
     "artifacts",
     "bin",
     "coverage",
@@ -22,6 +23,7 @@ $excludedDirectories = [System.Collections.Generic.HashSet[string]]::new([System
     "obj",
     "playwright-report",
     "publish",
+    "site-packages",
     "test-results",
     "TestResults",
     "test_results"

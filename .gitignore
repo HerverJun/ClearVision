@@ -96,6 +96,7 @@ notebooks/.ipynb_checkpoints/
 docs/temp.md
 
 *.binlog
+*.csproj.lscache
 .dotnet-cli/
 
 # BenchmarkDotNet output (generated locally)

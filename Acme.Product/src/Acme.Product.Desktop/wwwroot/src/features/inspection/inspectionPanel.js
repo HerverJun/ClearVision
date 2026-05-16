@@ -237,6 +237,8 @@ class InspectionPanel {
     }
 
     async handleRunSingle() {
+        const wasContinuous = this.isContinuous === true;
+
         try {
             this.syncAnalysisFlowContext();
             this.updateStatus('running', '运行中...');
@@ -251,10 +253,13 @@ class InspectionPanel {
 
             await inspectionController.executeSingle();
         } catch (error) {
-            this.clearProtectionWatchdog();
             console.error('[InspectionPanel] 单次运行失败:', error);
             this.updateStatus('error', '运行失败');
-            this.setButtonsState(false);
+        } finally {
+            if (!wasContinuous && this.isContinuous !== true) {
+                this.clearProtectionWatchdog();
+                this.setButtonsState(false);
+            }
         }
     }
 
@@ -316,6 +321,16 @@ class InspectionPanel {
                 activeProjectId: this.projectId,
                 resultProjectId
             });
+
+            if (this.isContinuous) {
+                this.setButtonsState(true);
+                this.armProtectionWatchdog('等待下一次触发结果');
+            } else {
+                this.setButtonsState(false);
+                this._lastProtectionMessage = '已忽略其他工程的检测结果，当前工程显示保持不变。';
+                this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+            }
+
             return;
         }
 
@@ -626,6 +641,197 @@ class InspectionPanel {
         if (avgEl) avgEl.textContent = timing.avg > 0 ? `${timing.avg} ms` : '-- ms';
         if (minEl) minEl.textContent = timing.min !== Infinity ? `${timing.min} ms` : '-- ms';
         if (maxEl) maxEl.textContent = timing.max > 0 ? `${timing.max} ms` : '-- ms';
+    }
+
+    addRecentResult(result) {
+        if (!result) {
+            return;
+        }
+
+        const recentResults = getRecentResults();
+        setRecentResults([result, ...recentResults].slice(0, 12));
+        this.renderRecentResults();
+    }
+
+    renderRecentResults() {
+        const container = document.getElementById('inspection-recent-results-grid');
+        if (!container) {
+            return;
+        }
+
+        const recentResults = getRecentResults();
+        if (!Array.isArray(recentResults) || recentResults.length === 0) {
+            container.innerHTML = '<p class="empty-text">无检测记录</p>';
+            return;
+        }
+
+        container.innerHTML = recentResults.map((result) => {
+            const rawStatus = String(result?.status ?? result?.Status ?? 'NG').toUpperCase();
+            const status = rawStatus === 'OK'
+                ? 'OK'
+                : (rawStatus === 'ERROR' ? 'ERROR' : 'NG');
+            const statusClass = status === 'OK'
+                ? 'result-ok'
+                : (status === 'ERROR' ? 'result-error' : 'result-ng');
+            const timestamp = result?.timestamp ?? result?.inspectionTime ?? result?.Timestamp ?? result?.InspectionTime;
+            const timeText = timestamp
+                ? new Date(timestamp).toLocaleTimeString([], { hour12: false })
+                : new Date().toLocaleTimeString([], { hour12: false });
+            const imageBase64 = result?.outputImage
+                || result?.outputImageBase64
+                || result?.resultImageBase64
+                || result?.OutputImage
+                || result?.OutputImageBase64
+                || result?.ResultImageBase64
+                || '';
+            const imageHtml = imageBase64
+                ? `<div class="result-thumb"><img src="data:image/png;base64,${this.escapeHtml(imageBase64)}" alt="检测结果缩略图"></div>`
+                : '<div class="result-thumb"></div>';
+            const textPreview = this.extractTextPreview(
+                result?.outputData ?? result?.OutputData ?? result?.analysisData ?? result?.AnalysisData ?? result?.errorMessage
+            );
+
+            return `
+                <div class="recent-result-item ${statusClass}">
+                    ${imageHtml}
+                    <span class="result-badge">${status}</span>
+                    <span class="result-time">${this.escapeHtml(timeText)}</span>
+                    <span class="result-text-preview" title="${this.escapeHtml(textPreview)}">${this.escapeHtml(textPreview)}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    reset() {
+        this.clearProtectionWatchdog();
+        this.isContinuous = false;
+        this.consecutiveNgCount = 0;
+        this._autoRunTriggered = false;
+        this._lastProtectionMessage = '';
+        this._lastProtectionReason = '';
+        this._materialTimeoutDeadline = null;
+
+        setStats({ total: 0, ok: 0, ng: 0, error: 0, yield: 0 });
+        setTimingStats({ avg: 0, min: Infinity, max: 0, history: [] });
+        setRecentResults([]);
+
+        this.updateStatus('idle', '就绪');
+        this.updateCounters();
+        this.renderRecentResults();
+        this.analysisCardsPanel?.clear?.();
+        this.setButtonsState(false);
+        this.updateProtectionNotice();
+    }
+
+    extractTextPreview(outputData) {
+        if (outputData === null || outputData === undefined || outputData === '') {
+            return '无摘要';
+        }
+
+        if (typeof outputData === 'string') {
+            return outputData.length > 40 ? `${outputData.slice(0, 40)}...` : outputData;
+        }
+
+        if (typeof outputData !== 'object') {
+            return String(outputData);
+        }
+
+        const directText = outputData.text
+            ?? outputData.Text
+            ?? outputData.message
+            ?? outputData.Message
+            ?? outputData.label
+            ?? outputData.Label;
+        if (directText) {
+            return this.extractTextPreview(String(directText));
+        }
+
+        const count = outputData.count
+            ?? outputData.Count
+            ?? outputData.defectCount
+            ?? outputData.DefectCount
+            ?? outputData.objectCount
+            ?? outputData.ObjectCount;
+        if (Number.isFinite(Number(count))) {
+            return `数量: ${count}`;
+        }
+
+        const keys = Object.keys(outputData).slice(0, 3);
+        return keys.length > 0 ? keys.join(', ') : '结构化结果';
+    }
+
+    getAnalysisPayload(result) {
+        if (!result) {
+            return null;
+        }
+
+        const explicitAnalysis = result.analysisData ?? result.AnalysisData;
+        if (explicitAnalysis) {
+            return explicitAnalysis;
+        }
+
+        const outputData = result.outputData ?? result.OutputData;
+        if (!outputData) {
+            return null;
+        }
+
+        return buildDiagnosticsAnalysisData(outputData, result.status ?? result.Status ?? 'OK') || outputData;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text === null || text === undefined ? '' : String(text);
+        return div.innerHTML;
+    }
+
+    refresh() {
+        this.container = document.getElementById(this.panelId);
+        if (!this.container) {
+            console.warn('[InspectionPanel] refresh skipped: container not found');
+            return;
+        }
+
+        const hasRenderedPanel = !!this.container.querySelector('.inspection-panel');
+        if (!hasRenderedPanel) {
+            this.initialize();
+        }
+
+        const state = getInspectionState();
+        this.isContinuous = state.isRealtime === true;
+        this.syncAnalysisFlowContext();
+        this.updateCounters();
+        this.renderRecentResults();
+        this.setButtonsState(state.isRunning || state.isRealtime);
+
+        if (state.status === 'running' || state.isRunning || state.isRealtime) {
+            this.updateStatus('running', this.isContinuous ? this.getContinuousRunStatusText() : '运行中...');
+        } else if (state.status === 'error') {
+            this.updateStatus('error', '检测错误');
+        } else if (state.status === 'completed') {
+            this.updateStatus('ok', '最近一次检测已完成');
+        } else {
+            this.updateStatus('idle', '就绪');
+        }
+
+        this.updateProtectionNotice();
+        void this.loadRuntimeConfig();
+    }
+
+    tryAutoRunIfNeeded() {
+        if (!this.runtimeConfig?.autoRun || this._autoRunTriggered || this.isContinuous) {
+            return;
+        }
+
+        const project = getCurrentProject();
+        if (!project?.id) {
+            return;
+        }
+
+        this._autoRunTriggered = true;
+        void this.handleRunContinuous().catch((error) => {
+            this._autoRunTriggered = false;
+            console.error('[InspectionPanel] 自动连续运行启动失败:', error);
+        });
     }
     
     /**

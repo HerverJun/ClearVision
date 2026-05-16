@@ -27,7 +27,7 @@ function bindButton(documentRef, id, handler, cleanup) {
  * @property {() => any} getCurrentProject
  * @property {() => any} getFlowCanvas
  * @property {() => any} getImageViewer
- * @property {{ saveProject?: Function }} projectManager
+ * @property {{ saveProject?: Function, updateFlow?: Function, getCurrentProject?: Function }} projectManager
  * @property {{ setProject?: Function, executeSingle?: Function }} inspectionController
  * @property {(message: string, type?: string) => void} showToast
  * @property {(options?: any) => void} handleNewProject
@@ -78,10 +78,15 @@ export function bindToolbarCommands(options) {
             const flowCanvas = getFlowCanvas();
             if (project) {
                 if (flowCanvas) {
-                    project.flow = flowCanvas.serialize();
+                    const flow = flowCanvas.serialize();
+                    if (typeof projectManager?.updateFlow === 'function') {
+                        projectManager.updateFlow(flow);
+                    } else {
+                        project.flow = flow;
+                    }
                 }
 
-                await projectManager.saveProject(project);
+                await projectManager.saveProject(projectManager?.getCurrentProject?.() || project);
                 showToast('Project saved', 'success');
                 return;
             }

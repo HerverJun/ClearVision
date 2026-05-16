@@ -43,7 +43,7 @@
 - **并发安全加载**：通过 `SemaphoreSlim` 避免同一模型在并发流程下被重复加载。
 - **LRU 驱逐**：模型缓存数量上限为 `3`，超出后会按访问顺序驱逐最久未使用模型。
 - **GPU 支持**：代码里实际读取 `UseGpu` 和 `GpuDeviceId` 参数，并尝试启用 CUDA；若 GPU 初始化失败会回退到 CPU。
-- **标签加载优先级**：`LabelFile` > 模型目录下 `labels.txt` > 默认 COCO80 标签。
+- **标签加载优先级**：ONNX metadata names 优先；无 metadata 时才使用 `LabelsPath` 或模型目录下 `labels.txt`，仍不可用则执行失败。
 - **输出模式切换**：在 `DetectionMode=Object` 时输出 `Objects/ObjectCount`；默认 `Defect` 模式输出 `Defects/DefectCount`。
 
 > English: The implementation includes practical production concerns such as model caching, concurrency-safe loading, limited-size LRU eviction, optional GPU acceleration, and flexible label loading.
@@ -51,8 +51,8 @@
 ## 核心 API 调用链 / Core API Call Chain
 1. `TryGetInputImage(inputs)`
 2. `GetStringParam / GetIntParam / GetFloatParam / GetBoolParam`
-3. `LoadLabels(labelFile, modelPath)`
-4. `LoadModel(modelPath, useGpu, gpuDeviceId)`
+3. `LoadModel(modelPath, useGpu, gpuDeviceId)`
+4. `ResolveLabelContract(session, labelsPath, modelPath, targetClassesStr)`
    - `SessionOptions`
    - `AppendExecutionProvider_CUDA(...)`（可用时）
    - `InferenceSession(...)`
@@ -76,7 +76,7 @@
 | `ModelVersion` | `enum` | `"Auto"` | `Auto` / `YOLOv5` / `YOLOv6` / `YOLOv8` / `YOLOv11` | YOLO 版本。`Auto` 时根据输出张量维度自动判断。 |
 | `InputSize` | `int` | `640` | `[320, 1280]` | 模型输入尺寸，影响预处理和推理成本。 |
 | `TargetClasses` | `string` | `""` | 逗号分隔类别字符串 | 只保留指定类别；为空表示不过滤类别。 |
-| `LabelFile` | `file` | `""` | 文件路径 | 自定义标签文件路径，优先级高于自动发现和默认 COCO 标签。 |
+| `LabelsPath` | `file` | `""` | 文件路径 | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
 | `DetectionMode` | `enum` | `"Defect"` | `Defect` / `Object` | 输出语义模式：检出目标视为缺陷，或视为正常目标。 |
 
 ### 源码隐含参数 / Runtime-Used But Undeclared Parameters

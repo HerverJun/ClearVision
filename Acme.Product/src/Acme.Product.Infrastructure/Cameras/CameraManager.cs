@@ -16,8 +16,9 @@ namespace Acme.Product.Infrastructure.Cameras;
 /// </summary>
 public class CameraManager : ICameraManager, IDisposable
 {
-    private readonly ConcurrentDictionary<string, ICamera> _cameras = new();
-    private readonly ConcurrentDictionary<string, ICameraProvider> _providers = new();
+    private readonly ConcurrentDictionary<string, ICamera> _cameras = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ICameraProvider> _providers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _cameraLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<CameraManager> _logger;
     private List<CameraBindingConfig> _bindings = new();
@@ -52,23 +53,39 @@ public class CameraManager : ICameraManager, IDisposable
     /// <summary>
     /// 获取或创建相机（基于原始序列号）
     /// </summary>
-    public Task<ICamera> GetOrCreateCameraAsync(string cameraId)
+    public async Task<ICamera> GetOrCreateCameraAsync(string cameraId)
     {
-        if (_cameras.TryGetValue(cameraId, out var existingCamera))
+        ThrowIfDisposed();
+        var cameraKey = NormalizeCameraKey(cameraId);
+        if (_cameras.TryGetValue(cameraKey, out var existingCamera))
         {
-            return Task.FromResult(existingCamera);
+            return existingCamera;
         }
 
-        // AutoDetect internally opens the camera and returns a connected provider.
-        var provider = CameraProviderFactory.AutoDetect(cameraId);
-        if (provider == null)
-            throw new InvalidOperationException($"Failed to detect camera: {cameraId}. Check power, connection, and SDK installation.");
+        var cameraLock = _cameraLocks.GetOrAdd(cameraKey, _ => new SemaphoreSlim(1, 1));
+        await cameraLock.WaitAsync();
+        try
+        {
+            if (_cameras.TryGetValue(cameraKey, out existingCamera))
+            {
+                return existingCamera;
+            }
 
-        var cameraAdapter = new CameraProviderAdapter(cameraId, provider, _loggerFactory.CreateLogger<CameraProviderAdapter>());
-        _cameras[cameraId] = cameraAdapter;
-        _providers[cameraId] = provider;
+            // AutoDetect internally opens the camera and returns a connected provider.
+            var provider = CameraProviderFactory.AutoDetect(cameraKey);
+            if (provider == null)
+                throw new InvalidOperationException($"Failed to detect camera: {cameraKey}. Check power, connection, and SDK installation.");
 
-        return Task.FromResult<ICamera>(cameraAdapter);
+            var cameraAdapter = new CameraProviderAdapter(cameraKey, provider, _loggerFactory.CreateLogger<CameraProviderAdapter>());
+            _cameras[cameraKey] = cameraAdapter;
+            _providers[cameraKey] = provider;
+
+            return cameraAdapter;
+        }
+        finally
+        {
+            cameraLock.Release();
+        }
     }
 
     /// <summary>
@@ -76,11 +93,12 @@ public class CameraManager : ICameraManager, IDisposable
     /// </summary>
     public async Task<ICamera> GetOrCreateByBindingAsync(string bindingId)
     {
-        var binding = _bindings.FirstOrDefault(b => b.Id == bindingId);
+        var bindingKey = NormalizeCameraKey(bindingId);
+        var binding = _bindings.FirstOrDefault(b => b.Id.Equals(bindingKey, StringComparison.OrdinalIgnoreCase));
         if (binding == null)
         {
             // 如果找不到绑定，尝试直接作为SN处理（向下兼容）
-            return await GetOrCreateCameraAsync(bindingId);
+            return await GetOrCreateCameraAsync(bindingKey);
         }
 
         if (string.IsNullOrEmpty(binding.SerialNumber))
@@ -93,18 +111,37 @@ public class CameraManager : ICameraManager, IDisposable
 
     public Task<ICamera> OpenCameraAsync(string cameraId) => GetOrCreateCameraAsync(cameraId);
 
-    public Task CloseCameraAsync(string cameraId)
+    public async Task CloseCameraAsync(string cameraId)
     {
-        if (_cameras.TryRemove(cameraId, out var camera))
-            camera.Dispose();
-        if (_providers.TryRemove(cameraId, out var provider))
-            provider.Dispose();
-        return Task.CompletedTask;
+        var cameraKey = NormalizeCameraKey(cameraId);
+        var cameraLock = _cameraLocks.GetOrAdd(cameraKey, _ => new SemaphoreSlim(1, 1));
+        await cameraLock.WaitAsync();
+        try
+        {
+            _providers.TryRemove(cameraKey, out var provider);
+            if (_cameras.TryRemove(cameraKey, out var camera))
+            {
+                camera.Dispose();
+            }
+            else
+            {
+                provider?.Dispose();
+            }
+        }
+        finally
+        {
+            cameraLock.Release();
+        }
     }
 
     public ICamera? GetCamera(string cameraId)
     {
-        _cameras.TryGetValue(cameraId, out var camera);
+        if (string.IsNullOrWhiteSpace(cameraId))
+        {
+            return null;
+        }
+
+        _cameras.TryGetValue(cameraId.Trim(), out var camera);
         return camera;
     }
 
@@ -172,9 +209,26 @@ public class CameraManager : ICameraManager, IDisposable
         if (!_disposed)
         {
             DisconnectAllCore();
+            foreach (var cameraLock in _cameraLocks.Values)
+            {
+                cameraLock.Dispose();
+            }
+
+            _cameraLocks.Clear();
             _disposed = true;
         }
         GC.SuppressFinalize(this);
+    }
+
+    private static string NormalizeCameraKey(string cameraId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
+        return cameraId.Trim();
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 }
 
@@ -185,10 +239,13 @@ public class CameraProviderAdapter : IIndustrialCamera
 {
     private readonly string _cameraId;
     private readonly ICameraProvider _provider;
+    private readonly SemaphoreSlim _providerGate = new(1, 1);
     private bool _isAcquiring;
     private Func<byte[], Task>? _frameCallback;
     private CancellationTokenSource? _acquisitionCts;
     private Task? _acquisitionTask;
+    private CameraTriggerMode _currentTriggerMode = CameraTriggerMode.Software;
+    private string _currentHardwareTriggerSource = CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource;
 
     public string CameraId => _cameraId;
     public string Name => _provider.CurrentDevice?.UserDefinedName ?? _cameraId;
@@ -207,30 +264,64 @@ public class CameraProviderAdapter : IIndustrialCamera
     }
 
     public Task ConnectAsync() => Task.CompletedTask;
-    public Task DisconnectAsync() { _provider.Close(); return Task.CompletedTask; }
+
+    public async Task DisconnectAsync()
+    {
+        await StopContinuousAcquisitionAsync();
+        await _providerGate.WaitAsync();
+        try
+        {
+            _provider.Close();
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
 
     public async Task<byte[]> AcquireSingleFrameAsync()
     {
         // 严格按照华睿 SDK 正确时序调用
         // 1) StartGrabbing -> 2) TriggerMode=On,TriggerSource=Software -> 3) ExecuteSoftwareTrigger -> 4) GetFrame
 
-        // 1) 确保采集已启动
-        if (!_provider.IsGrabbing)
-            _provider.StartGrabbing();
+        CameraTriggerMode? modeToRestore = null;
+        string? hardwareTriggerSourceToRestore = null;
+        await _providerGate.WaitAsync();
+        try
+        {
+            if (_isAcquiring)
+            {
+                modeToRestore = _currentTriggerMode;
+                hardwareTriggerSourceToRestore = _currentHardwareTriggerSource;
+            }
 
-        // 2) 设置软件触发模式（TriggerMode=On, TriggerSource=Software）
-        _provider.SetTriggerMode(CameraTriggerMode.Software);
+            // 1) 确保采集已启动
+            if (!_provider.IsGrabbing && !_provider.StartGrabbing())
+                throw new InvalidOperationException($"Failed to start camera acquisition: {_cameraId}");
 
-        // 3) 发送软触发命令
-        _provider.ExecuteSoftwareTrigger();
+            // 2) 设置软件触发模式（TriggerMode=On, TriggerSource=Software）
+            SetProviderTriggerMode(CameraTriggerMode.Software);
 
-        // 4) 获取帧（给 SDK 足够响应时间）
-        var frame = _provider.GetFrame(3000);
-        if (frame == null)
-            throw new TimeoutException("获取图像超时");
+            // 3) 发送软触发命令
+            if (!_provider.ExecuteSoftwareTrigger())
+                throw new InvalidOperationException($"Failed to execute software trigger: {_cameraId}");
 
-        byte[] pngData = EncodeFrameToBytes(frame);
-        return await Task.FromResult(pngData);
+            // 4) 获取帧（给 SDK 足够响应时间）
+            var frame = _provider.GetFrame(3000);
+            if (frame == null)
+                throw new TimeoutException("获取图像超时");
+
+            return EncodeFrameToBytes(frame);
+        }
+        finally
+        {
+            if (modeToRestore.HasValue && modeToRestore.Value != CameraTriggerMode.Software && _provider.IsConnected)
+            {
+                TryRestoreTriggerMode(modeToRestore.Value, hardwareTriggerSourceToRestore);
+            }
+
+            _providerGate.Release();
+        }
     }
 
     public Task StartContinuousAcquisitionAsync(Func<byte[], Task> frameCallback)
@@ -249,16 +340,28 @@ public class CameraProviderAdapter : IIndustrialCamera
         {
             try
             {
-                if (!_provider.IsGrabbing)
-                    _provider.StartGrabbing();
-
                 while (!token.IsCancellationRequested)
                 {
-                    var frame = _provider.GetFrame(1000);
-                    if (frame == null)
-                        continue;
+                    byte[] imageData;
+                    CameraFrame frame;
+                    await _providerGate.WaitAsync(token);
+                    try
+                    {
+                        if (!_provider.IsGrabbing && !_provider.StartGrabbing())
+                            throw new InvalidOperationException($"Failed to start camera acquisition: {_cameraId}");
 
-                    byte[] imageData = EncodeFrameToBytes(frame, useFastEncoding: true);
+                        var grabbedFrame = _provider.GetFrame(1000);
+                        if (grabbedFrame == null)
+                            continue;
+
+                        frame = grabbedFrame;
+                        imageData = EncodeFrameToBytes(frame, useFastEncoding: true);
+                    }
+                    finally
+                    {
+                        _providerGate.Release();
+                    }
+
                     if (_frameCallback != null)
                         await _frameCallback(imageData);
 
@@ -282,6 +385,10 @@ public class CameraProviderAdapter : IIndustrialCamera
             {
                 _logger.LogWarning(ex, "[CameraProviderAdapter] 连续采集异常，相机可能已断线。CameraId={CameraId}", _cameraId);
             }
+            finally
+            {
+                _isAcquiring = false;
+            }
         }, token);
 
         return Task.CompletedTask;
@@ -300,10 +407,14 @@ public class CameraProviderAdapter : IIndustrialCamera
         {
             try
             {
-                await _acquisitionTask;
+                await _acquisitionTask.WaitAsync(TimeSpan.FromSeconds(5));
             }
             catch (OperationCanceledException)
             {
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogWarning(ex, "[CameraProviderAdapter] 停止采集等待超时，将继续释放调用方。CameraId={CameraId}", _cameraId);
             }
             catch (Exception ex)
             {
@@ -317,13 +428,85 @@ public class CameraProviderAdapter : IIndustrialCamera
 
         _acquisitionCts?.Dispose();
         _acquisitionCts = null;
-        _provider.StopGrabbing();
+        if (!await _providerGate.WaitAsync(TimeSpan.FromSeconds(2)))
+        {
+            _logger.LogWarning("[CameraProviderAdapter] 停止采集时等待 SDK 门锁超时，跳过 StopGrabbing。CameraId={CameraId}", _cameraId);
+            return;
+        }
+
+        try
+        {
+            if (_provider.IsConnected && !_provider.StopGrabbing())
+            {
+                _logger.LogWarning("[CameraProviderAdapter] 停止 SDK 采集失败。CameraId={CameraId}", _cameraId);
+            }
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
     }
 
-    public Task SetExposureTimeAsync(double exposureTime) { _provider.SetExposure(exposureTime); return Task.CompletedTask; }
-    public Task SetGainAsync(double gain) { _provider.SetGain(gain); return Task.CompletedTask; }
-    public Task SetTriggerModeAsync(CameraTriggerMode mode) { _provider.SetTriggerMode(mode); return Task.CompletedTask; }
-    public Task ExecuteSoftwareTriggerAsync() { _provider.ExecuteSoftwareTrigger(); return Task.CompletedTask; }
+    public async Task SetExposureTimeAsync(double exposureTime)
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            if (!_provider.SetExposure(exposureTime))
+            {
+                throw new InvalidOperationException($"Failed to set exposure for camera '{_cameraId}' to {exposureTime} us.");
+            }
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
+
+    public async Task SetGainAsync(double gain)
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            if (!_provider.SetGain(gain))
+            {
+                throw new InvalidOperationException($"Failed to set gain for camera '{_cameraId}' to {gain} dB.");
+            }
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
+
+    public async Task SetTriggerModeAsync(CameraTriggerMode mode, string? hardwareTriggerSource = null)
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            SetProviderTriggerMode(mode, hardwareTriggerSource);
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
+
+    public async Task ExecuteSoftwareTriggerAsync()
+    {
+        await _providerGate.WaitAsync();
+        try
+        {
+            if (!_provider.ExecuteSoftwareTrigger())
+            {
+                throw new InvalidOperationException($"Failed to execute software trigger: {_cameraId}");
+            }
+        }
+        finally
+        {
+            _providerGate.Release();
+        }
+    }
 
     public CameraParameters GetParameters() => new CameraParameters();
 
@@ -331,6 +514,41 @@ public class CameraProviderAdapter : IIndustrialCamera
     {
         StopContinuousAcquisitionAsync().GetAwaiter().GetResult();
         _provider.Dispose();
+        _providerGate.Dispose();
+    }
+
+    private void SetProviderTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null)
+    {
+        var normalizedHardwareSource = CameraHardwareTriggerSourceExtensions.Normalize(hardwareTriggerSource ?? _currentHardwareTriggerSource);
+        var providerHardwareSource = mode == CameraTriggerMode.External
+            ? normalizedHardwareSource
+            : null;
+
+        if (!_provider.SetTriggerMode(mode, providerHardwareSource))
+        {
+            throw new InvalidOperationException(
+                $"Failed to set trigger mode for camera '{_cameraId}' to {mode}"
+                + (mode == CameraTriggerMode.External ? $" ({normalizedHardwareSource})" : string.Empty)
+                + ".");
+        }
+
+        _currentTriggerMode = mode;
+        if (mode == CameraTriggerMode.External)
+        {
+            _currentHardwareTriggerSource = normalizedHardwareSource;
+        }
+    }
+
+    private void TryRestoreTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource)
+    {
+        try
+        {
+            SetProviderTriggerMode(mode, hardwareTriggerSource);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[CameraProviderAdapter] 恢复连续采集触发模式失败。CameraId={CameraId}, TriggerMode={TriggerMode}", _cameraId, mode);
+        }
     }
 
     private byte[] EncodeFrameToBytes(CameraFrame frame, bool useFastEncoding = false)

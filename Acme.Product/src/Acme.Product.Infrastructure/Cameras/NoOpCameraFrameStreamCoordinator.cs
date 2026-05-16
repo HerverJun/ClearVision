@@ -48,5 +48,8 @@ internal sealed class NoOpCameraFrameStreamCoordinator : ICameraFrameStreamCoord
     public RingBufferStats SnapshotFrameBufferStats(string cameraId) =>
         new(0, 0, 0, null, null);
 
+    public CameraStreamUsageSnapshot SnapshotStreamUsage(string cameraId) =>
+        new(cameraId, false, 0, 0, 0, CameraTriggerMode.Software, CameraTriggerModeExtensions.DefaultTargetFrameRateFps);
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

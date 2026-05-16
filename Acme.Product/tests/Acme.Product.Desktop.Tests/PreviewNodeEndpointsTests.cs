@@ -118,6 +118,55 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_ShouldPropagateRequestCancellationToFlowExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var enteredExecution = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var capturedToken = CancellationToken.None;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(callInfo =>
+                {
+                    capturedToken = callInfo.ArgAt<CancellationToken>(3);
+                    enteredExecution.TrySetResult(null);
+                    return CompleteWhenCanceledAsync(targetNodeId, capturedToken, cancellationObserved);
+                });
+        });
+
+        using var cts = new CancellationTokenSource();
+        var requestTask = host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        }, cts.Token);
+
+        await enteredExecution.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        capturedToken.CanBeCanceled.Should().BeTrue();
+
+        cts.Cancel();
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            using var _ = await requestTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // The client side is expected to observe cancellation once the request is aborted.
+        }
+    }
+
+    [Fact]
     public async Task PreviewNode_ShouldPreferStoredFlow_WhenRequestOmitsInlineFlowData()
     {
         var projectId = Guid.NewGuid();
@@ -882,6 +931,25 @@ public class PreviewNodeEndpointsTests
         image.Set(0, 0, 255);
         image.Set(1, 1, 255);
         return image.ToBytes(".png");
+    }
+
+    private static async Task<FlowDebugExecutionResult> CompleteWhenCanceledAsync(
+        Guid targetNodeId,
+        CancellationToken cancellationToken,
+        TaskCompletionSource<object?> cancellationObserved)
+    {
+        using var registration = cancellationToken.Register(() => cancellationObserved.TrySetResult(null));
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        return new FlowDebugExecutionResult
+        {
+            IsSuccess = false,
+            ErrorMessage = "Canceled",
+            IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+            {
+                [targetNodeId] = new()
+            }
+        };
     }
 
     private static UpdateFlowRequest CreateUpdateFlowRequest(params object[] items)

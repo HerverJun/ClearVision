@@ -282,7 +282,7 @@ public class OperatorService : IOperatorService
                     },
                     new() { Name = "InputSize", DisplayName = "输入尺寸", DataType = "int", DefaultValue = 640, MinValue = 320, MaxValue = 1280, IsRequired = true },
                     new() { Name = "TargetClasses", DisplayName = "目标类别", DataType = "string", DefaultValue = "", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别" },
-                    new() { Name = "LabelsPath", DisplayName = "标签文件路径", DataType = "file", DefaultValue = "", Description = "自定义标签文件路径（每行一个标签）" },
+                    new() { Name = "LabelsPath", DisplayName = "标签文件路径", DataType = "file", DefaultValue = "", Description = "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。" },
                     new() { Name = "EnableInternalNms", DisplayName = "启用内部NMS", DataType = "bool", DefaultValue = true },
                     new() { Name = "NmsIouThreshold", DisplayName = "NMS IoU阈值", DataType = "double", DefaultValue = 0.45, MinValue = 0.0, MaxValue = 1.0 }
                 }

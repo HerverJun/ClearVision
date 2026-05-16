@@ -105,6 +105,95 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task TestAiModel_ShouldMentionJsonWhenUsingOpenAiJsonObjectMode()
+    {
+        string? capturedRequestJson = null;
+        await using var host = await AiModelEndpointTestHost.CreateAsync(async (request, cancellationToken) =>
+        {
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "{\"ok\":true}"
+                      }
+                    }
+                  ]
+                }
+                """, Encoding.UTF8, "application/json")
+            };
+        });
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "deepseek-chat",
+            Name = "DeepSeek Chat",
+            Provider = "OpenAI Compatible",
+            Model = "deepseek-chat",
+            BaseUrl = "https://api.deepseek.com",
+            ApiKey = "test-key"
+        });
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models/deepseek-chat/test",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var responseDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        responseDocument.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        capturedRequestJson.Should().NotBeNullOrWhiteSpace();
+        using var requestDocument = JsonDocument.Parse(capturedRequestJson!);
+        requestDocument.RootElement.GetProperty("response_format").GetProperty("type").GetString()
+            .Should().Be("json_object");
+        var promptText = string.Join(
+            "\n",
+            requestDocument.RootElement.GetProperty("messages").EnumerateArray()
+                .Select(message => message.GetProperty("content").GetString()));
+        promptText.ToLowerInvariant().Should().Contain("json");
+    }
+
+    [Fact]
+    public async Task TestAiModel_ShouldRejectUnexpectedHealthCheckContent()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "OK"
+                      }
+                    }
+                  ]
+                }
+                """, Encoding.UTF8, "application/json")
+            }));
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "deepseek-chat",
+            Name = "DeepSeek Chat",
+            Provider = "OpenAI Compatible",
+            Model = "deepseek-chat",
+            BaseUrl = "https://api.deepseek.com",
+            ApiKey = "test-key"
+        });
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models/deepseek-chat/test",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var responseDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        responseDocument.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        responseDocument.RootElement.GetProperty("message").GetString()
+            .Should().Contain("不是预期的 JSON health-check 响应");
+    }
+
+    [Fact]
     public async Task CreateAiModel_ShouldPersistSecretAndNeverReturnApiKey()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync();
@@ -202,7 +291,8 @@ public class AiModelEndpointsTests
                 _storageDirectory);
         }
 
-        public static async Task<AiModelEndpointTestHost> CreateAsync()
+        public static async Task<AiModelEndpointTestHost> CreateAsync(
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? aiSendAsync = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -230,7 +320,10 @@ public class AiModelEndpointsTests
                 NullLogger<AiConfigStore>.Instance,
                 storageDirectory);
             builder.Services.AddSingleton(aiConfigStore);
-            builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
+            var httpClient = aiSendAsync == null
+                ? new HttpClient()
+                : new HttpClient(new CaptureHandler(aiSendAsync));
+            builder.Services.AddSingleton(new AiApiClient(httpClient, aiConfigStore));
 
             var app = builder.Build();
             app.Use(async (context, next) =>
@@ -256,6 +349,23 @@ public class AiModelEndpointsTests
             if (Directory.Exists(_storageDirectory))
             {
                 Directory.Delete(_storageDirectory, recursive: true);
+            }
+        }
+
+        private sealed class CaptureHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _sendAsync;
+
+            public CaptureHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync)
+            {
+                _sendAsync = sendAsync;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                return _sendAsync(request, cancellationToken);
             }
         }
     }

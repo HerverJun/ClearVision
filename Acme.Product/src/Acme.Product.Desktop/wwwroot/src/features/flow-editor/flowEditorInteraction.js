@@ -9,8 +9,9 @@ import debugLogger from '../../core/logging/debugLogger.js';
 import TemplateSelector from './templateSelector.js';
 
 export class FlowEditorInteraction {
-    constructor(flowCanvas) {
+    constructor(flowCanvas, options = {}) {
         this.canvas = flowCanvas;
+        this.projectManager = options.projectManager || null;
         this.isConnecting = false;
         this.connectionStart = null;
         this.connectionEnd = null;
@@ -53,7 +54,9 @@ export class FlowEditorInteraction {
      * 初始化模板选择器
      */
     initializeTemplateSelector() {
-        this.templateSelector = new TemplateSelector(this.canvas);
+        this.templateSelector = new TemplateSelector(this.canvas, {
+            onApplied: (payload) => this.handleTemplateApplied(payload)
+        });
 
         const toolbar = document.querySelector('.toolbar-right');
         if (!toolbar) return;
@@ -86,6 +89,18 @@ export class FlowEditorInteraction {
                 showToast(`打开模板选择器失败: ${error.message}`, 'error');
             }
         });
+    }
+
+    handleTemplateApplied(payload = null) {
+        this.saveState();
+    }
+
+    syncProjectFlow() {
+        if (!this.projectManager?.updateFlow || typeof this.canvas.serialize !== 'function') {
+            return;
+        }
+
+        this.projectManager.updateFlow(this.canvas.serialize());
     }
 
     /**
@@ -966,6 +981,8 @@ export class FlowEditorInteraction {
         } else {
             this.historyIndex++;
         }
+
+        this.syncProjectFlow();
     }
 
     /**
@@ -1001,7 +1018,9 @@ export class FlowEditorInteraction {
         const state = JSON.parse(this.history[this.historyIndex]);
         this.canvas.nodes = new Map(state.nodes);
         this.canvas.connections = state.connections;
+        this.canvas._rebuildConnectionIndex?.();
         this.canvas.render();
+        this.syncProjectFlow();
     }
 
     /**

@@ -1564,7 +1564,7 @@ class FlowCanvas {
                 value: p.value !== undefined ? p.value : p.defaultValue,
                 dataType: p.dataType || p.type
             })),
-            isEnabled: true
+            isEnabled: node.disabled !== true
         }));
 
         // 构建 Connections 列表 (camelCase)
@@ -1694,6 +1694,7 @@ class FlowCanvas {
                     inputs: inputs,
                     outputs: outputs,
                     parameters: op.parameters || op.Parameters || [],
+                    disabled: (op.isEnabled ?? op.IsEnabled) === false,
                     color: '#1890ff' // Default
                 };
                 node.height = Math.max(
@@ -2337,7 +2338,8 @@ class FlowCanvas {
         const node = this.nodes.get(nodeId);
         if (node) {
             node.disabled = !node.disabled;
-            this.render();
+            this.invalidate();
+            this.markFlowStructureChanged('toggleNodeDisabled');
         }
     }
 

@@ -225,6 +225,7 @@ class ProjectManager {
 
         this.currentProject.flow = flowData;
         this.unsavedChanges = true;
+        this.updateTitle();
     }
 
     /**

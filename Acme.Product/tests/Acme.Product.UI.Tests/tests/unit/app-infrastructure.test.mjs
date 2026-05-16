@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EventBus } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/app/eventBus.js';
 import { ServiceRegistry } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js';
 import { createFlowCanvasAdapter } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js';
+import { bindToolbarCommands } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/app/commandHandlers.js';
 
 test('event bus publishes and unsubscribes frontend events', () => {
   const bus = new EventBus();
@@ -73,4 +74,68 @@ test('flow canvas adapter exposes a stable canvas facade and emits flow changes'
   assert.equal(adapter.nodes.has(node.id), true);
   assert.equal(emitted.at(-1).eventName, 'flow:changed');
   assert.equal(emitted.at(-1).payload.reason, 'addNode');
+});
+
+test('toolbar save syncs serialized canvas flow into project manager before persisting', async () => {
+  let saveClick = null;
+  const saveButton = {
+    dataset: {},
+    addEventListener(eventName, listener) {
+      if (eventName === 'click') {
+        saveClick = listener;
+      }
+    },
+    removeEventListener() {}
+  };
+  const documentRef = {
+    getElementById(id) {
+      return id === 'btn-save' ? saveButton : null;
+    }
+  };
+  const project = { id: 'project-1', name: 'Project One' };
+  const serializedFlow = { operators: [{ id: 'node-1' }], connections: [] };
+  const updates = [];
+  const saves = [];
+
+  bindToolbarCommands({
+    documentRef,
+    serviceRegistry: { get() { return null; } },
+    getPropertyPanel: () => null,
+    getCurrentProject: () => project,
+    getFlowCanvas: () => ({
+      serialize() {
+        return serializedFlow;
+      }
+    }),
+    getImageViewer: () => null,
+    projectManager: {
+      updateFlow(flow) {
+        updates.push(flow);
+        project.flow = flow;
+      },
+      getCurrentProject() {
+        return project;
+      },
+      async saveProject(projectToSave) {
+        saves.push(projectToSave);
+      }
+    },
+    inspectionController: {},
+    showToast() {},
+    handleNewProject() {},
+    setCurrentView() {},
+    syncActiveNavButton() {},
+    async switchView() {},
+    async ensureInspectionPanelReady() {},
+    initializeInspectionImageViewer() {},
+    async logout() {}
+  });
+
+  saveClick({ preventDefault() {} });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0], serializedFlow);
+  assert.equal(saves.length, 1);
+  assert.equal(saves[0].flow, serializedFlow);
 });

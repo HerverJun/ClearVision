@@ -22,6 +22,13 @@ import {
     getCategoryIconPath as getSharedCategoryIconPath,
     getOperatorIconPath as getSharedOperatorIconPath
 } from '../../shared/operatorVisuals.js';
+import {
+    createCategoryIconElement,
+    createOperatorIconElement,
+    createPathIconElement,
+    normalizeOperatorIconName,
+    renderOperatorIconInto
+} from '../../shared/operatorIconRenderer.js';
 
 export class OperatorLibraryPanel {
     constructor(containerId) {
@@ -78,7 +85,7 @@ export class OperatorLibraryPanel {
                 <!-- 算子详情预览 -->
                 <div class="operator-preview" id="operator-preview">
                     <div class="preview-placeholder">
-                        <span class="preview-svg-icon">${this.getSvgIcon('M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.03 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z', '0 0 24 24')}</span>
+                        <span class="preview-svg-icon"></span>
                         <p>选择一个算子查看详情</p>
                     </div>
                 </div>
@@ -91,6 +98,12 @@ export class OperatorLibraryPanel {
                 </div>
             </div>
         `;
+
+        const placeholderIcon = this.container.querySelector('.preview-svg-icon');
+        placeholderIcon?.replaceChildren(createPathIconElement(
+            'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.03 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
+            'preview-svg-icon',
+            '#9ca3af').firstElementChild);
         
         this.bindSearchEvents();
         this.bindActionEvents();
@@ -120,20 +133,30 @@ export class OperatorLibraryPanel {
                 // 自定义渲染算子节点
                 if (node.type === 'operator') {
                     console.log('[OperatorLibrary] renderNode 渲染算子:', node.label);
-                    const operator = node.data;
-                    const icon = this.escapeHtml(node.customIcon || node.icon || '📦');
-                    const label = this.escapeHtml(node.label || '');
-                    const description = this.escapeHtml(operator?.description || '');
-                    element.innerHTML = `
-                        <div class="operator-item-content">
-                            <span class="operator-drag-handle">⋮⋮</span>
-                            <span class="operator-icon">${icon}</span>
-                            <div class="operator-info">
-                                <span class="operator-name">${label}</span>
-                                <span class="operator-desc">${description}</span>
-                            </div>
-                        </div>
-                    `;
+                    const operator = node.data || {};
+                    const content = document.createElement('div');
+                    content.className = 'operator-item-content';
+
+                    const dragHandle = document.createElement('span');
+                    dragHandle.className = 'operator-drag-handle';
+                    dragHandle.textContent = '⋮⋮';
+
+                    const icon = createOperatorIconElement(operator, 'operator-icon');
+
+                    const info = document.createElement('div');
+                    info.className = 'operator-info';
+
+                    const label = document.createElement('span');
+                    label.className = 'operator-name';
+                    label.textContent = node.label || '';
+
+                    const description = document.createElement('span');
+                    description.className = 'operator-desc';
+                    description.textContent = operator?.description || '';
+
+                    info.append(label, description);
+                    content.append(dragHandle, icon, info);
+                    element.replaceChildren(content);
                     element.draggable = true;
                     element.classList.add('operator-draggable');
                     element.classList.add('operator-with-preview');
@@ -152,46 +175,52 @@ export class OperatorLibraryPanel {
                     // 【新增】分类节点 - 自定义渲染包含展开/收起按钮
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = this.treeView.expandedNodes.has(node.id) || node.expanded;
-                    const icon = this.escapeHtml(node.customIcon || node.icon || '📁');
-                    const label = this.escapeHtml(node.label || '');
-                    const nodeId = this.escapeHtml(node.id || '');
                     const count = node.children ? node.children.length : 0;
-                    
-                    // 构建完整内容
-                    let html = '';
-                    
+
+                    element.replaceChildren();
+
                     // 展开/收起按钮
                     if (hasChildren) {
-                        const arrowIcon = isExpanded 
-                            ? '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>'
-                            : '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>';
-                        
-                        html += `
-                            <span class="cv-treeview-toggle ${isExpanded ? 'expanded' : 'collapsed'}"
-                                  data-node-id="${nodeId}">
-                                ${arrowIcon}
-                            </span>
-                        `;
+                        const toggle = document.createElement('span');
+                        toggle.className = `cv-treeview-toggle ${isExpanded ? 'expanded' : 'collapsed'}`;
+                        toggle.dataset.nodeId = node.id || '';
+                        toggle.appendChild(createPathIconElement(
+                            isExpanded
+                                ? 'M7 10l5 5 5-5z'
+                                : 'M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z',
+                            'cv-treeview-toggle-icon',
+                            '#d4a853'));
+                        element.appendChild(toggle);
                     } else {
-                        html += '<span class="cv-treeview-toggle-placeholder"></span>';
+                        const placeholder = document.createElement('span');
+                        placeholder.className = 'cv-treeview-toggle-placeholder';
+                        element.appendChild(placeholder);
                     }
-                    
+
                     // 分类内容包装器
-                    html += `
-                        <div class="category-content-wrapper">
-                            <span class="tree-node-icon category-icon">${icon}</span>
-                            <span class="tree-node-label category-label">${label}</span>
-                            ${!isExpanded && count > 0 ? `<span class="category-count">${count}</span>` : ''}
-                        </div>
-                    `;
-                    
-                    element.innerHTML = html;
-                    
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'category-content-wrapper';
+
+                    const icon = createCategoryIconElement(node.label, 'tree-node-icon category-icon');
+
+                    const label = document.createElement('span');
+                    label.className = 'tree-node-label category-label';
+                    label.textContent = node.label || '';
+
+                    wrapper.append(icon, label);
+                    if (!isExpanded && count > 0) {
+                        const countBadge = document.createElement('span');
+                        countBadge.className = 'category-count';
+                        countBadge.textContent = String(count);
+                        wrapper.appendChild(countBadge);
+                    }
+
+                    element.appendChild(wrapper);
+
                     // 绑定展开/收起事件
                     if (hasChildren) {
                         const toggle = element.querySelector('.cv-treeview-toggle');
-                        const wrapper = element.querySelector('.category-content-wrapper');
-                        
+
                         const toggleHandler = (e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -350,12 +379,14 @@ export class OperatorLibraryPanel {
         const parameters = metadata.parameters || metadata.Parameters || [];
         const inputPorts = metadata.inputPorts || metadata.InputPorts || [];
         const outputPorts = metadata.outputPorts || metadata.OutputPorts || [];
+        const iconName = normalizeOperatorIconName(metadata);
 
         return {
             ...metadata,
             type,
             category,
             displayName,
+            iconName,
             description: metadata.description || metadata.Description || '暂无描述',
             parameters,
             inputPorts,
@@ -511,26 +542,16 @@ export class OperatorLibraryPanel {
         ];
     }
 
-    /**
-     * 获取SVG图标内容
-     */
-    getSvgIcon(path, viewBox = "0 0 24 24") {
-        return `<svg viewBox="${viewBox}" width="16" height="16" fill="currentColor"><path d="${path}"/></svg>`;
+    getOperatorIconName(operator) {
+        return normalizeOperatorIconName(operator);
     }
 
     /**
      * 获取算子图标的 SVG Path 字符串
      * 按 type 匹配，未匹配则尝试 category，最后使用默认图标
      */
-    getOperatorIconPath(type, category = null) {
-        return getSharedOperatorIconPath(type, category);
-    }
-
-    /**
-     * 分类图标映射 (SVG)
-     */
-    getCategoryIcon(category) {
-        return this.getSvgIcon(getSharedCategoryIconPath(category));
+    getOperatorIconPath(type, category = null, iconName = null) {
+        return getSharedOperatorIconPath(type, category, iconName);
     }
 
     /**
@@ -541,29 +562,33 @@ export class OperatorLibraryPanel {
         const grouped = this.groupByCategory(this.filteredOperators);
         
         // 构建树形数据
-        const treeData = Object.entries(grouped).map(([category, operators]) => ({
-            id: `category_${category}`,
-            label: category,
-            type: 'category',
-            icon: null, // 禁止 TreeView 默认渲染 (会转义 SVG)
-            customIcon: this.getCategoryIcon(category),
-            expanded: true,
-            children: operators.map((op, index) => {
-                // 预先获取图标路径并注入到 operator 数据中，
-                // 这样拖拽到画布时，flowEditorInteraction.js 就能直接使用正确的图标
-                const iconPath = this.getOperatorIconPath(op.type, category);
-                op.iconPath = iconPath;
-                
-                return {
-                    id: `operator_${op.type}_${index}`,
-                    label: op.displayName || op.name,
-                    type: 'operator',
-                    icon: null, // 禁止 TreeView 默认渲染
-                    customIcon: op.icon || this.getSvgIcon(iconPath),
-                    data: op
-                };
-            })
-        }));
+        const treeData = Object.entries(grouped).map(([category, operators]) => {
+            const categoryIconPath = getSharedCategoryIconPath(category);
+            return {
+                id: `category_${category}`,
+                label: category,
+                type: 'category',
+                icon: null, // 禁止 TreeView 默认渲染 (会转义 SVG)
+                fallbackIconPath: categoryIconPath,
+                expanded: true,
+                children: operators.map((op, index) => {
+                    // 预先获取图标路径并注入到 operator 数据中，
+                    // 这样拖拽到画布时，flowEditorInteraction.js 就能直接使用正确的图标
+                    const iconName = this.getOperatorIconName(op);
+                    const iconPath = this.getOperatorIconPath(op.type, category, iconName);
+                    op.iconPath = iconPath;
+
+                    return {
+                        id: `operator_${op.type}_${index}`,
+                        label: op.displayName || op.name,
+                        type: 'operator',
+                        icon: null, // 禁止 TreeView 默认渲染
+                        fallbackIconPath: iconPath,
+                        data: op
+                    };
+                })
+            };
+        });
         
         this.treeView.setData(treeData);
 
@@ -702,9 +727,9 @@ export class OperatorLibraryPanel {
         const resolvedOperator = this.metadataByType.get(operator.type) || operator;
         const inputPorts = Array.isArray(resolvedOperator.inputPorts) ? resolvedOperator.inputPorts : [];
         const outputPorts = Array.isArray(resolvedOperator.outputPorts) ? resolvedOperator.outputPorts : [];
-        const detailIcon = resolvedOperator.icon
-            ? this.escapeHtml(resolvedOperator.icon)
-            : this.getSvgIcon(this.getOperatorIconPath(resolvedOperator.type, resolvedOperator.category));
+        const detailIconPath = resolvedOperator.iconPath ||
+            this.getOperatorIconPath(resolvedOperator.type, resolvedOperator.category, this.getOperatorIconName(resolvedOperator));
+        resolvedOperator.iconPath = detailIconPath;
         const displayName = this.escapeHtml(resolvedOperator.displayName || resolvedOperator.name || '未命名算子');
         const category = this.escapeHtml(resolvedOperator.category || '其他');
         const type = this.escapeHtml(resolvedOperator.type || '');
@@ -722,7 +747,7 @@ export class OperatorLibraryPanel {
         preview.innerHTML = `
             <div class="operator-detail">
                 <div class="detail-header">
-                    <span class="detail-icon">${detailIcon}</span>
+                    <span class="detail-icon"></span>
                     <h4>${displayName}</h4>
                 </div>
                 <div class="detail-meta">
@@ -774,6 +799,8 @@ export class OperatorLibraryPanel {
                 </div>
             </div>
         `;
+
+        renderOperatorIconInto(preview.querySelector('.detail-icon'), resolvedOperator, 'detail-icon');
 
         const autotuneButton = preview.querySelector('#btn-show-autotune-strategies');
         applyFeatureToButton(autotuneButton, 'operator.autotuneStrategies', { fallbackLabel: '查看自动调参策略' });
@@ -847,6 +874,10 @@ export class OperatorLibraryPanel {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    escapeAttribute(value) {
+        return this.escapeHtml(value);
     }
 
     /**

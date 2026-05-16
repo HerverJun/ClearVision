@@ -1,4 +1,6 @@
 using Acme.Product.Infrastructure.DependencyInjection;
+using Acme.Product.Core.Cameras;
+using Acme.Product.Desktop.Triggers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,6 +14,10 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration? configuration = null)
     {
+        services.AddSingleton<EnterPhotoelectricTriggerInputService>();
+        services.AddSingleton<ITriggerInputService>(sp =>
+            sp.GetRequiredService<EnterPhotoelectricTriggerInputService>());
+
         return services.AddVisionRuntimeServices(configuration);
     }
 

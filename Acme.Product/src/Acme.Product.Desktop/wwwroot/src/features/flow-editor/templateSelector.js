@@ -8,8 +8,11 @@ import { showToast } from '../../shared/components/uiComponents.js';
  * - 选择模板后将模板 FlowJson 转换为画布可反序列化结构
  */
 export class TemplateSelector {
-    constructor(flowCanvas) {
+    constructor(flowCanvas, options = {}) {
         this.flowCanvas = flowCanvas;
+        this.onApplied = typeof options.onApplied === 'function'
+            ? options.onApplied
+            : null;
         this.templates = [];
         this.operatorMetadata = new Map();
         this.activeTag = '';
@@ -286,6 +289,13 @@ export class TemplateSelector {
         }
 
         this.activeTemplateId = template.id || null;
+        const serializedFlow = typeof this.flowCanvas.serialize === 'function'
+            ? this.flowCanvas.serialize()
+            : flowData;
+        if (this.onApplied) {
+            await this.onApplied({ template, flowData, serializedFlow });
+        }
+
         this._updateActionButtons();
         showToast(`模板已应用：${template.name}`, 'success');
         this.close();

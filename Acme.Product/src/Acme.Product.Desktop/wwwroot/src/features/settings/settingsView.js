@@ -39,6 +39,7 @@ class SettingsView {
         this.plcSettingsLoaded = false;
         this.savedCommunicationConfig = null;
         this.activeTab = null;
+        this.lastCameraBindingSaveError = null;
 
         console.log('[SettingsView] Initialized for container:', containerId, '| isAdmin:', this.isAdmin);
     }
@@ -50,6 +51,19 @@ class SettingsView {
         return 'Software';
     }
 
+    normalizeHardwareTriggerSource(value) {
+        const normalized = String(value || '').trim();
+        return normalized || 'Line0';
+    }
+
+    normalizeSoftwareTriggerSource(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (['enterphotoelectric', 'keyboardenter', 'usbenter', 'enter', 'photoelectricenter'].includes(normalized)) {
+            return 'EnterPhotoelectric';
+        }
+        return 'Manual';
+    }
+
     normalizeCameraTargetFrameRate(value) {
         const parsed = Number.parseInt(String(value ?? ''), 10);
         if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -57,6 +71,40 @@ class SettingsView {
         }
 
         return Math.min(120, Math.max(1, parsed));
+    }
+
+    normalizeEnterDebounceMs(value) {
+        const parsed = Number.parseInt(String(value ?? ''), 10);
+        if (!Number.isFinite(parsed)) {
+            return 200;
+        }
+
+        return Math.min(5000, Math.max(0, parsed));
+    }
+
+    normalizeEnterTimeoutMs(value) {
+        const parsed = Number.parseInt(String(value ?? ''), 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            return 30000;
+        }
+
+        return Math.min(600000, Math.max(100, parsed));
+    }
+
+    isEnterPhotoelectricBinding(binding) {
+        return this.normalizeCameraTriggerMode(binding?.triggerMode) === 'Software'
+            && this.normalizeSoftwareTriggerSource(binding?.softwareTriggerSource) === 'EnterPhotoelectric';
+    }
+
+    getTriggerSourceLabel(binding) {
+        if (this.isEnterPhotoelectricBinding(binding)) {
+            return '回车光电触发';
+        }
+
+        const mode = this.normalizeCameraTriggerMode(binding?.triggerMode);
+        if (mode === 'External') return '相机 IO 外触发';
+        if (mode === 'Continuous') return '连续采集';
+        return '软件触发';
     }
 
     /**
@@ -217,6 +265,12 @@ class SettingsView {
             cameras: (Array.isArray(config?.cameras) ? config.cameras : (defaults.cameras || [])).map(binding => ({
                 ...binding,
                 triggerMode: this.normalizeCameraTriggerMode(binding?.triggerMode ?? binding?.TriggerMode),
+                hardwareTriggerSource: this.normalizeHardwareTriggerSource(binding?.hardwareTriggerSource ?? binding?.HardwareTriggerSource),
+                softwareTriggerSource: this.normalizeSoftwareTriggerSource(binding?.softwareTriggerSource ?? binding?.SoftwareTriggerSource),
+                enterPhotoelectricDebounceMs: this.normalizeEnterDebounceMs(binding?.enterPhotoelectricDebounceMs ?? binding?.EnterPhotoelectricDebounceMs),
+                enterPhotoelectricTimeoutMs: this.normalizeEnterTimeoutMs(binding?.enterPhotoelectricTimeoutMs ?? binding?.EnterPhotoelectricTimeoutMs),
+                ignoreEnterTriggerWhileBusy: (binding?.ignoreEnterTriggerWhileBusy ?? binding?.IgnoreEnterTriggerWhileBusy) !== false,
+                enterPhotoelectricDeviceId: String(binding?.enterPhotoelectricDeviceId ?? binding?.EnterPhotoelectricDeviceId ?? '').trim(),
                 targetFrameRateFps: this.normalizeCameraTargetFrameRate(binding?.targetFrameRateFps ?? binding?.TargetFrameRateFps)
             })),
             activeCameraId: config?.activeCameraId || defaults.activeCameraId || ''
@@ -1411,7 +1465,17 @@ class SettingsView {
         });
 
         const triggerModeSelect = section.querySelector('#cam-param-trigger-mode');
-        triggerModeSelect?.addEventListener('change', () => this.syncCameraFrameRateInputState());
+        triggerModeSelect?.addEventListener('change', () => {
+            this.syncCameraFrameRateInputState();
+            this.syncCameraTriggerSourceInputState();
+            this.syncCameraHardwareTriggerSourceInputState();
+        });
+
+        const triggerSourceSelect = section.querySelector('#cam-param-software-trigger-source');
+        triggerSourceSelect?.addEventListener('change', () => this.syncCameraTriggerSourceInputState());
+
+        const learnEnterDeviceBtn = section.querySelector('#btn-learn-enter-trigger-device');
+        learnEnterDeviceBtn?.addEventListener('click', () => this.learnEnterPhotoelectricDevice());
     }
 
     async loadCameraBindings() {
@@ -1426,6 +1490,12 @@ class SettingsView {
                 const exposureRaw = binding.exposureTimeUs ?? binding.ExposureTimeUs;
                 const gainRaw = binding.gainDb ?? binding.GainDb;
                 const triggerRaw = binding.triggerMode ?? binding.TriggerMode;
+                const hardwareTriggerSourceRaw = binding.hardwareTriggerSource ?? binding.HardwareTriggerSource;
+                const softwareTriggerSourceRaw = binding.softwareTriggerSource ?? binding.SoftwareTriggerSource;
+                const enterDebounceRaw = binding.enterPhotoelectricDebounceMs ?? binding.EnterPhotoelectricDebounceMs;
+                const enterTimeoutRaw = binding.enterPhotoelectricTimeoutMs ?? binding.EnterPhotoelectricTimeoutMs;
+                const ignoreBusyRaw = binding.ignoreEnterTriggerWhileBusy ?? binding.IgnoreEnterTriggerWhileBusy;
+                const enterDeviceRaw = binding.enterPhotoelectricDeviceId ?? binding.EnterPhotoelectricDeviceId ?? '';
                 const targetFrameRateRaw = binding.targetFrameRateFps ?? binding.TargetFrameRateFps;
                 const connectionStatus = binding.connectionStatus ?? binding.ConnectionStatus ?? binding.status ?? binding.Status ?? null;
                 const serialNumber = binding.serialNumber ?? binding.SerialNumber ?? binding.deviceId ?? binding.DeviceId ?? '';
@@ -1438,6 +1508,12 @@ class SettingsView {
                     exposureTimeUs: Number.isFinite(Number(exposureRaw)) ? Number(exposureRaw) : 5000,
                     gainDb: Number.isFinite(Number(gainRaw)) ? Number(gainRaw) : 1.0,
                     triggerMode: this.normalizeCameraTriggerMode(triggerRaw),
+                    hardwareTriggerSource: this.normalizeHardwareTriggerSource(hardwareTriggerSourceRaw),
+                    softwareTriggerSource: this.normalizeSoftwareTriggerSource(softwareTriggerSourceRaw),
+                    enterPhotoelectricDebounceMs: this.normalizeEnterDebounceMs(enterDebounceRaw),
+                    enterPhotoelectricTimeoutMs: this.normalizeEnterTimeoutMs(enterTimeoutRaw),
+                    ignoreEnterTriggerWhileBusy: ignoreBusyRaw !== false,
+                    enterPhotoelectricDeviceId: String(enterDeviceRaw || '').trim(),
                     targetFrameRateFps: this.normalizeCameraTargetFrameRate(targetFrameRateRaw),
                     connectionStatus: typeof connectionStatus === 'string' && connectionStatus.trim() ? connectionStatus.trim() : null
                 };
@@ -1581,6 +1657,12 @@ class SettingsView {
                     exposureTimeUs: 5000,
                     gainDb: 1.0,
                     triggerMode: 'Software',
+                    hardwareTriggerSource: 'Line0',
+                    softwareTriggerSource: 'Manual',
+                    enterPhotoelectricDebounceMs: 200,
+                    enterPhotoelectricTimeoutMs: 30000,
+                    ignoreEnterTriggerWhileBusy: true,
+                    enterPhotoelectricDeviceId: '',
                     targetFrameRateFps: 10
                 };
 
@@ -1647,6 +1729,7 @@ class SettingsView {
             const serialNumber = this.escapeHtml(b.serialNumber || '未知');
             const ipAddress = this.escapeHtml(b.ipAddress || b.IpAddress || '未知');
             const manufacturer = this.escapeHtml(b.manufacturer || '未知');
+            const triggerSourceLabel = this.escapeHtml(this.getTriggerSourceLabel(b));
 
             return `
             <tr class="camera-row" data-id="${bindingId}" style="cursor: pointer; background:${isSelected ? 'var(--panel-bg)' : 'transparent'};">
@@ -1658,6 +1741,7 @@ class SettingsView {
                         <div>
                             <div class="font-bold">${displayName}</div>
                             <div class="text-muted" style="font-size:12px;">${serialNumber}</div>
+                            <div class="text-muted" style="font-size:12px;">${triggerSourceLabel}</div>
                         </div>
                     </div>
                 </td>
@@ -1707,6 +1791,12 @@ class SettingsView {
         const exposureInput = this.container.querySelector('#cam-param-exposure');
         const gainInput = this.container.querySelector('#cam-param-gain');
         const triggerModeSelect = this.container.querySelector('#cam-param-trigger-mode');
+        const hardwareTriggerSourceSelect = this.container.querySelector('#cam-param-hardware-trigger-source');
+        const triggerSourceSelect = this.container.querySelector('#cam-param-software-trigger-source');
+        const enterDebounceInput = this.container.querySelector('#cam-param-enter-debounce');
+        const enterTimeoutInput = this.container.querySelector('#cam-param-enter-timeout');
+        const enterDeviceInput = this.container.querySelector('#cam-param-enter-device-id');
+        const ignoreBusyInput = this.container.querySelector('#cam-param-ignore-enter-busy');
         const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
 
         if (exposureInput) {
@@ -1721,10 +1811,33 @@ class SettingsView {
             triggerModeSelect.value = this.normalizeCameraTriggerMode(cam?.triggerMode);
             triggerModeSelect.disabled = !cam;
         }
+        if (hardwareTriggerSourceSelect) {
+            hardwareTriggerSourceSelect.value = this.normalizeHardwareTriggerSource(cam?.hardwareTriggerSource);
+            hardwareTriggerSourceSelect.disabled = !cam;
+        }
+        if (triggerSourceSelect) {
+            triggerSourceSelect.value = this.normalizeSoftwareTriggerSource(cam?.softwareTriggerSource);
+            triggerSourceSelect.disabled = !cam;
+        }
+        if (enterDebounceInput) {
+            enterDebounceInput.value = cam ? String(this.normalizeEnterDebounceMs(cam.enterPhotoelectricDebounceMs)) : '';
+        }
+        if (enterTimeoutInput) {
+            enterTimeoutInput.value = cam ? String(this.normalizeEnterTimeoutMs(cam.enterPhotoelectricTimeoutMs)) : '';
+        }
+        if (enterDeviceInput) {
+            enterDeviceInput.value = cam ? String(cam.enterPhotoelectricDeviceId || '') : '';
+        }
+        if (ignoreBusyInput) {
+            ignoreBusyInput.checked = cam?.ignoreEnterTriggerWhileBusy !== false;
+            ignoreBusyInput.disabled = !cam;
+        }
         if (frameRateInput) {
             frameRateInput.value = cam ? String(this.normalizeCameraTargetFrameRate(cam.targetFrameRateFps)) : '';
         }
         this.syncCameraFrameRateInputState(cam?.triggerMode, !cam);
+        this.syncCameraTriggerSourceInputState(cam, !cam);
+        this.syncCameraHardwareTriggerSourceInputState(cam, !cam);
 
         const saveBtn = this.container.querySelector('#btn-save-camera-params');
         if (saveBtn) {
@@ -1746,7 +1859,7 @@ class SettingsView {
         const selectionHint = this.container.querySelector('#camera-selection-hint');
         if (selectionHint) {
             selectionHint.textContent = cam
-                ? `当前已选中：${cam.displayName || cam.serialNumber || cam.id}。你现在可以直接预览该相机，并在此基础上启动二维平面标定。`
+                ? `当前已选中：${cam.displayName || cam.serialNumber || cam.id}。触发方式：${this.getTriggerSourceLabel(cam)}。`
                 : '请先在上方绑定列表中选择一台相机，再进行预览、二维平面标定或参数保存。';
         }
     }
@@ -1768,6 +1881,118 @@ class SettingsView {
             hintEl.textContent = disabled
                 ? '仅 Continuous 模式下可编辑；当前值会保留。'
                 : 'Continuous 模式下按该目标 fps 在应用侧节流。';
+        }
+    }
+
+    syncCameraTriggerSourceInputState(cam = null, forceDisabled = false) {
+        const triggerMode = this.normalizeCameraTriggerMode(
+            this.container?.querySelector('#cam-param-trigger-mode')?.value ?? cam?.triggerMode
+        );
+        const triggerSourceSelect = this.container?.querySelector('#cam-param-software-trigger-source');
+        const enterDebounceInput = this.container?.querySelector('#cam-param-enter-debounce');
+        const enterTimeoutInput = this.container?.querySelector('#cam-param-enter-timeout');
+        const enterDeviceInput = this.container?.querySelector('#cam-param-enter-device-id');
+        const ignoreBusyInput = this.container?.querySelector('#cam-param-ignore-enter-busy');
+        const learnBtn = this.container?.querySelector('#btn-learn-enter-trigger-device');
+        const hintEl = this.container?.querySelector('#cam-param-enter-trigger-hint');
+
+        const noCamera = forceDisabled || !this.selectedCameraBindingId;
+        const canChooseSoftwareSource = !noCamera && triggerMode === 'Software';
+        const selectedSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect?.value ?? cam?.softwareTriggerSource);
+        const enableEnterOptions = canChooseSoftwareSource && selectedSource === 'EnterPhotoelectric';
+
+        if (triggerSourceSelect) {
+            triggerSourceSelect.disabled = !canChooseSoftwareSource;
+        }
+
+        [enterDebounceInput, enterTimeoutInput, enterDeviceInput].forEach(input => {
+            if (!input) return;
+            input.disabled = !enableEnterOptions;
+            input.readOnly = !enableEnterOptions;
+            input.setAttribute('aria-disabled', enableEnterOptions ? 'false' : 'true');
+        });
+
+        if (ignoreBusyInput) {
+            ignoreBusyInput.disabled = !enableEnterOptions;
+        }
+
+        if (learnBtn) {
+            learnBtn.disabled = !enableEnterOptions;
+        }
+
+        if (hintEl) {
+            if (noCamera) {
+                hintEl.textContent = '请选择相机后配置触发来源。';
+            } else if (triggerMode !== 'Software') {
+                hintEl.textContent = '仅软件触发模式使用触发来源；相机 IO 外触发和连续采集由相机采集模式控制。';
+            } else if (selectedSource === 'EnterPhotoelectric') {
+                hintEl.textContent = '等待 USB 光电触发器发送回车键后执行一次软件采图。可学习设备以过滤普通键盘回车。';
+            } else {
+                hintEl.textContent = '普通软件触发由预览按钮、接口或流程运行请求发起。';
+            }
+        }
+    }
+
+    syncCameraHardwareTriggerSourceInputState(cam = null, forceDisabled = false) {
+        const triggerMode = this.normalizeCameraTriggerMode(
+            this.container?.querySelector('#cam-param-trigger-mode')?.value ?? cam?.triggerMode
+        );
+        const sourceSelect = this.container?.querySelector('#cam-param-hardware-trigger-source');
+        const hintEl = this.container?.querySelector('#cam-param-hardware-trigger-source-hint');
+        const noCamera = forceDisabled || !this.selectedCameraBindingId;
+        const enabled = !noCamera && triggerMode === 'External';
+
+        if (sourceSelect) {
+            sourceSelect.disabled = !enabled;
+            sourceSelect.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        }
+
+        if (hintEl) {
+            hintEl.textContent = enabled
+                ? 'External 模式下写入相机 SDK 的 TriggerSource。'
+                : '仅 External 模式下生效；当前值会保留。';
+        }
+    }
+
+    async learnEnterPhotoelectricDevice() {
+        if (!this.selectedCameraBindingId) {
+            showToast('请先选择一台相机', 'warning');
+            return;
+        }
+
+        const button = this.container?.querySelector('#btn-learn-enter-trigger-device');
+        const deviceInput = this.container?.querySelector('#cam-param-enter-device-id');
+        const previousText = button?.textContent;
+        if (button) {
+            button.disabled = true;
+            button.textContent = '等待回车...';
+        }
+
+        try {
+            showToast('请触发一次 USB 回车光电传感器', 'info');
+            const result = await httpClient.post('/trigger-input/learn-enter-device', { timeoutMs: 10000 });
+            const deviceId = result?.deviceId || result?.DeviceId || '';
+            if (!deviceId) {
+                throw new Error('未获取到设备标识');
+            }
+
+            if (deviceInput) {
+                deviceInput.value = deviceId;
+            }
+
+            const binding = this.cameraBindings.find(b => b.id === this.selectedCameraBindingId);
+            if (binding) {
+                binding.enterPhotoelectricDeviceId = deviceId;
+            }
+
+            showToast('已学习回车光电设备', 'success');
+        } catch (error) {
+            showToast('学习设备失败: ' + (error?.message || error), 'error');
+        } finally {
+            if (button) {
+                button.textContent = previousText || '学习设备';
+                this.syncCameraTriggerSourceInputState();
+            }
         }
     }
 
@@ -1794,8 +2019,10 @@ class SettingsView {
         }
     }
 
-    async fetchContinuousPreviewFrame(sessionId) {
-        const { blob, headers } = await httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}`);
+    async fetchContinuousPreviewFrame(sessionId, options = {}) {
+        const { blob, headers } = await httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}`, {
+            signal: options.signal
+        });
         if (!blob || blob.size === 0) {
             throw new Error('连续预览未返回图像数据');
         }
@@ -1816,10 +2043,12 @@ class SettingsView {
         };
     }
 
-    async captureSharedFrame(cameraBindingId) {
+    async captureSharedFrame(cameraBindingId, options = {}) {
         const session = await this.startContinuousPreviewSession(cameraBindingId);
         try {
-            const preview = await this.fetchContinuousPreviewFrame(session.sessionId || session.SessionId);
+            const preview = await this.fetchContinuousPreviewFrame(session.sessionId || session.SessionId, {
+                signal: options.signal
+            });
             return {
                 ...preview,
                 triggerMode: this.normalizeCameraTriggerMode(session.triggerMode || session.TriggerMode),
@@ -1830,19 +2059,26 @@ class SettingsView {
         }
     }
 
-    async captureCameraPreview(cameraBindingId = this.selectedCameraBindingId) {
+    async captureCameraPreview(cameraBindingId = this.selectedCameraBindingId, options = {}) {
         if (!cameraBindingId) {
             throw new Error('请先在相机管理中选择一台相机');
         }
 
         const binding = this.cameraBindings.find(item => item.id === cameraBindingId) || this.getSelectedCameraBinding();
         const triggerMode = this.normalizeCameraTriggerMode(binding?.triggerMode);
-        if (triggerMode === 'Continuous') {
-            return await this.captureSharedFrame(cameraBindingId);
+        if (triggerMode === 'Continuous' || triggerMode === 'External') {
+            return await this.captureSharedFrame(cameraBindingId, options);
         }
 
-        const { blob, headers } = await httpClient.postForBlob('/cameras/soft-trigger-capture', {
+        const request = {
             cameraBindingId
+        };
+        if (options.acceptPendingEnterSignalAfterUtc) {
+            request.acceptPendingEnterSignalAfterUtc = options.acceptPendingEnterSignalAfterUtc;
+        }
+
+        const { blob, headers } = await httpClient.postForBlob('/cameras/soft-trigger-capture', request, {
+            signal: options.signal
         });
 
         if (!blob || blob.size === 0) {
@@ -1859,6 +2095,7 @@ class SettingsView {
             imageUrl,
             cameraBindingId: headers.get('X-Camera-Id') || cameraBindingId,
             triggerMode: headers.get('X-Trigger-Mode') || 'Software',
+            triggerSource: headers.get('X-Trigger-Source') || binding?.softwareTriggerSource || 'Manual',
             width: Number.isFinite(parsedWidth) ? parsedWidth : null,
             height: Number.isFinite(parsedHeight) ? parsedHeight : null
         };
@@ -1869,6 +2106,15 @@ class SettingsView {
         let sessionId = null;
         let previewActive = false;
         let previewLoopToken = 0;
+        let activePreviewAbortController = null;
+        const triggerMode = this.normalizeCameraTriggerMode(binding?.triggerMode);
+        const triggerModeLabel = triggerMode === 'External' ? 'External' : 'Continuous';
+        const startupText = triggerMode === 'External'
+            ? '正在启动外触发预览，等待相机 IO 触发...'
+            : '正在启动连续预览...';
+        const stoppedText = triggerMode === 'External'
+            ? '外触发预览已停止'
+            : '连续预览已停止';
 
         const content = document.createElement('div');
         const bindingLabel = this.escapeHtml(binding.displayName || binding.serialNumber || binding.id);
@@ -1882,7 +2128,7 @@ class SettingsView {
                 </div>
                 <div style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <img id="camera-preview-image" alt="相机预览" style="max-width:100%; max-height:420px; display:none; object-fit:contain;">
-                    <div id="camera-preview-placeholder" style="color:#94a3b8; font-size:14px; text-align:center; padding:24px;">正在启动连续预览...</div>
+                    <div id="camera-preview-placeholder" style="color:#94a3b8; font-size:14px; text-align:center; padding:24px;">${startupText}</div>
                 </div>
                 <div id="camera-preview-meta" style="font-size:13px; color:var(--text-muted); min-height:20px;"></div>
             </div>
@@ -1895,9 +2141,19 @@ class SettingsView {
             }
         };
 
+        const cancelActivePreviewRequest = () => {
+            if (!activePreviewAbortController) {
+                return;
+            }
+
+            activePreviewAbortController.abort();
+            activePreviewAbortController = null;
+        };
+
         const stopPreview = async () => {
             previewActive = false;
             previewLoopToken += 1;
+            cancelActivePreviewRequest();
             await this.stopContinuousPreviewSession(sessionId);
             sessionId = null;
         };
@@ -1924,7 +2180,7 @@ class SettingsView {
             imageEl.src = preview.imageUrl;
             imageEl.style.display = 'block';
             placeholderEl.style.display = 'none';
-            metaEl.textContent = `触发模式: Continuous · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
+            metaEl.textContent = `触发模式: ${triggerModeLabel} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
         };
 
         const startPreview = async () => {
@@ -1933,7 +2189,7 @@ class SettingsView {
             const loopToken = ++previewLoopToken;
             toggleBtn.textContent = '停止预览';
             placeholderEl.style.display = 'block';
-            placeholderEl.textContent = '正在启动连续预览...';
+            placeholderEl.textContent = startupText;
             imageEl.style.display = 'none';
 
             try {
@@ -1941,7 +2197,16 @@ class SettingsView {
                 sessionId = session.sessionId || session.SessionId;
 
                 while (previewActive && sessionId && loopToken === previewLoopToken) {
-                    const preview = await this.fetchContinuousPreviewFrame(sessionId);
+                    const abortController = typeof AbortController !== 'undefined'
+                        ? new AbortController()
+                        : null;
+                    activePreviewAbortController = abortController;
+                    const preview = await this.fetchContinuousPreviewFrame(sessionId, {
+                        signal: abortController?.signal
+                    });
+                    if (activePreviewAbortController === abortController) {
+                        activePreviewAbortController = null;
+                    }
                     if (!previewActive || loopToken !== previewLoopToken) {
                         URL.revokeObjectURL(preview.imageUrl);
                         break;
@@ -1950,14 +2215,20 @@ class SettingsView {
                     renderFrame(preview);
                 }
             } catch (error) {
+                if (error?.name === 'AbortError') {
+                    return;
+                }
+
                 await this.stopContinuousPreviewSession(sessionId);
                 sessionId = null;
                 placeholderEl.style.display = 'block';
-                placeholderEl.textContent = `连续预览加载失败: ${error.message}`;
+                placeholderEl.textContent = `${triggerModeLabel} 预览加载失败: ${error.message}`;
                 metaEl.textContent = '';
                 imageEl.style.display = 'none';
                 previewActive = false;
                 toggleBtn.textContent = '继续预览';
+            } finally {
+                activePreviewAbortController = null;
             }
         };
 
@@ -1966,7 +2237,7 @@ class SettingsView {
                 await stopPreview();
                 toggleBtn.textContent = '继续预览';
                 placeholderEl.style.display = 'block';
-                placeholderEl.textContent = '连续预览已停止';
+                placeholderEl.textContent = stoppedText;
                 imageEl.style.display = currentPreviewUrl ? 'block' : 'none';
                 return;
             }
@@ -1984,12 +2255,20 @@ class SettingsView {
             return;
         }
 
-        if (this.normalizeCameraTriggerMode(binding.triggerMode) === 'Continuous') {
+        const triggerMode = this.normalizeCameraTriggerMode(binding.triggerMode);
+        if (triggerMode === 'Continuous' || triggerMode === 'External') {
             await this.showContinuousCameraPreview(binding);
             return;
         }
 
+        const isEnterPhotoelectric = this.isEnterPhotoelectricBinding(binding);
         let currentPreviewUrl = null;
+        let currentPreviewMetaText = '';
+        let previewClosed = false;
+        let previewLoading = false;
+        let previewRequestId = 0;
+        let autoRearmTimer = null;
+        let activePreviewAbortController = null;
         const content = document.createElement('div');
         const bindingLabel = this.escapeHtml(binding.displayName || binding.serialNumber || binding.id);
         content.innerHTML = `
@@ -1998,9 +2277,9 @@ class SettingsView {
                     <div style="font-size:13px; color:var(--text-muted);">
                         当前相机: <strong style="color:var(--text-primary);">${bindingLabel}</strong>
                     </div>
-                    <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">刷新预览</button>
+                    <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">${isEnterPhotoelectric ? '重新布防' : '刷新预览'}</button>
                 </div>
-                <div style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <div id="camera-preview-surface" tabindex="-1" style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden; outline:none;">
                     <img id="camera-preview-image" alt="相机预览" style="max-width:100%; max-height:420px; display:none; object-fit:contain;">
                     <div id="camera-preview-placeholder" style="color:#94a3b8; font-size:14px; text-align:center; padding:24px;">正在加载相机预览...</div>
                 </div>
@@ -2015,44 +2294,183 @@ class SettingsView {
             }
         };
 
+        const cancelActivePreviewRequest = () => {
+            if (!activePreviewAbortController) {
+                return;
+            }
+
+            activePreviewAbortController.abort();
+            activePreviewAbortController = null;
+        };
+
         const modal = createModal({
             title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
             content,
             width: '960px',
-            onClose: cleanupPreviewUrl
+            onClose: () => {
+                previewClosed = true;
+                previewRequestId += 1;
+                cancelActivePreviewRequest();
+                if (autoRearmTimer) {
+                    clearTimeout(autoRearmTimer);
+                    autoRearmTimer = null;
+                }
+                cleanupPreviewUrl();
+            }
         });
         modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
 
         const refreshBtn = content.querySelector('#btn-refresh-camera-preview');
+        const previewSurfaceEl = content.querySelector('#camera-preview-surface');
         const imageEl = content.querySelector('#camera-preview-image');
         const placeholderEl = content.querySelector('#camera-preview-placeholder');
         const metaEl = content.querySelector('#camera-preview-meta');
 
-        const loadPreview = async () => {
+        const focusPreviewSurface = () => {
+            previewSurfaceEl?.focus({ preventScroll: true });
+        };
+
+        if (isEnterPhotoelectric) {
+            content.addEventListener('keydown', event => {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                const target = event.target;
+                if (target instanceof HTMLElement &&
+                    target.closest('input, textarea, select, [contenteditable="true"]')) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                focusPreviewSurface();
+            }, true);
+        }
+
+        const buildPreviewMetaText = (preview, waitingForNext = false) => {
+            const triggerLabel = this.normalizeSoftwareTriggerSource(preview.triggerSource) === 'EnterPhotoelectric'
+                ? '回车光电触发'
+                : preview.triggerMode;
+            const waitSuffix = waitingForNext ? ' · 等待下一次回车光电触发...' : '';
+            return `触发方式: ${triggerLabel} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${waitSuffix}`;
+        };
+
+        const showWaitingState = () => {
             refreshBtn.disabled = true;
+            refreshBtn.textContent = isEnterPhotoelectric ? '等待触发中...' : '加载中...';
+
+            if (isEnterPhotoelectric && currentPreviewUrl) {
+                placeholderEl.style.display = 'none';
+                imageEl.style.display = 'block';
+                metaEl.textContent = currentPreviewMetaText
+                    ? `${currentPreviewMetaText} · 等待下一次回车光电触发...`
+                    : '等待下一次回车光电触发...';
+                return;
+            }
+
             placeholderEl.style.display = 'block';
-            placeholderEl.textContent = '正在加载相机预览...';
+            placeholderEl.textContent = isEnterPhotoelectric
+                ? '等待回车光电触发...'
+                : '正在加载相机预览...';
             imageEl.style.display = 'none';
+        };
+
+        const queueAutoRearm = () => {
+            if (!isEnterPhotoelectric || previewClosed) {
+                return;
+            }
+
+            if (autoRearmTimer) {
+                clearTimeout(autoRearmTimer);
+            }
+
+            autoRearmTimer = setTimeout(() => {
+                autoRearmTimer = null;
+                void loadPreview();
+            }, 0);
+        };
+
+        const loadPreview = async () => {
+            if (previewClosed || previewLoading) {
+                return;
+            }
+
+            previewLoading = true;
+            const requestId = ++previewRequestId;
+            const acceptPendingEnterSignalAfterUtc = isEnterPhotoelectric
+                ? new Date().toISOString()
+                : null;
+            focusPreviewSurface();
+            showWaitingState();
+            let shouldAutoRearm = false;
+            const abortController = typeof AbortController !== 'undefined'
+                ? new AbortController()
+                : null;
+            activePreviewAbortController = abortController;
 
             try {
-                const preview = await this.captureCameraPreview(binding.id);
+                const preview = await this.captureCameraPreview(binding.id, {
+                    acceptPendingEnterSignalAfterUtc,
+                    signal: abortController?.signal
+                });
+                if (previewClosed || requestId !== previewRequestId) {
+                    URL.revokeObjectURL(preview.imageUrl);
+                    return;
+                }
+
                 cleanupPreviewUrl();
                 currentPreviewUrl = preview.imageUrl;
+                currentPreviewMetaText = buildPreviewMetaText(preview);
                 imageEl.src = preview.imageUrl;
                 imageEl.style.display = 'block';
                 placeholderEl.style.display = 'none';
-                metaEl.textContent = `触发模式: ${preview.triggerMode} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}`;
+                metaEl.textContent = currentPreviewMetaText;
+                shouldAutoRearm = isEnterPhotoelectric;
             } catch (error) {
-                placeholderEl.style.display = 'block';
-                placeholderEl.textContent = `相机预览加载失败: ${error.message}`;
-                metaEl.textContent = '';
+                if (error?.name === 'AbortError') {
+                    return;
+                }
+
+                if (previewClosed || requestId !== previewRequestId) {
+                    return;
+                }
+
+                if (currentPreviewUrl) {
+                    placeholderEl.style.display = 'none';
+                    imageEl.style.display = 'block';
+                    metaEl.textContent = `${currentPreviewMetaText} · 布防失败: ${error.message}`;
+                } else {
+                    placeholderEl.style.display = 'block';
+                    placeholderEl.textContent = `相机预览加载失败: ${error.message}`;
+                    imageEl.style.display = 'none';
+                    metaEl.textContent = '';
+                }
             } finally {
-                refreshBtn.disabled = false;
+                if (requestId === previewRequestId) {
+                    previewLoading = false;
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = isEnterPhotoelectric ? '重新布防' : '刷新预览';
+                }
+
+                if (activePreviewAbortController === abortController) {
+                    activePreviewAbortController = null;
+                }
+
+                if (shouldAutoRearm) {
+                    queueAutoRearm();
+                }
             }
         };
 
-        refreshBtn.addEventListener('click', loadPreview);
-        await loadPreview();
+        refreshBtn.addEventListener('click', event => {
+            event.preventDefault();
+            focusPreviewSurface();
+            void loadPreview();
+        });
+
+        focusPreviewSurface();
+        void loadPreview();
     }
 
     async saveSelectedCameraParameters() {
@@ -2070,8 +2488,14 @@ class SettingsView {
         const exposureInput = this.container.querySelector('#cam-param-exposure');
         const gainInput = this.container.querySelector('#cam-param-gain');
         const triggerModeSelect = this.container.querySelector('#cam-param-trigger-mode');
+        const hardwareTriggerSourceSelect = this.container.querySelector('#cam-param-hardware-trigger-source');
+        const triggerSourceSelect = this.container.querySelector('#cam-param-software-trigger-source');
+        const enterDebounceInput = this.container.querySelector('#cam-param-enter-debounce');
+        const enterTimeoutInput = this.container.querySelector('#cam-param-enter-timeout');
+        const enterDeviceInput = this.container.querySelector('#cam-param-enter-device-id');
+        const ignoreBusyInput = this.container.querySelector('#cam-param-ignore-enter-busy');
         const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
-        if (!exposureInput || !gainInput || !triggerModeSelect || !frameRateInput) {
+        if (!exposureInput || !gainInput || !triggerModeSelect || !hardwareTriggerSourceSelect || !triggerSourceSelect || !enterDebounceInput || !enterTimeoutInput || !enterDeviceInput || !ignoreBusyInput || !frameRateInput) {
             showToast('参数面板控件缺失，请刷新后重试', 'error');
             return;
         }
@@ -2079,6 +2503,12 @@ class SettingsView {
         const exposureTimeUs = Number.parseFloat(exposureInput.value);
         const gainDb = Number.parseFloat(gainInput.value);
         const triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
+        const hardwareTriggerSource = this.normalizeHardwareTriggerSource(hardwareTriggerSourceSelect.value || 'Line0');
+        const softwareTriggerSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect.value || 'Manual');
+        const enterPhotoelectricDebounceMs = this.normalizeEnterDebounceMs(enterDebounceInput.value);
+        const enterPhotoelectricTimeoutMs = this.normalizeEnterTimeoutMs(enterTimeoutInput.value);
+        const enterPhotoelectricDeviceId = String(enterDeviceInput.value || '').trim();
+        const ignoreEnterTriggerWhileBusy = ignoreBusyInput.checked !== false;
         const targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
 
         if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
@@ -2093,6 +2523,12 @@ class SettingsView {
         binding.exposureTimeUs = exposureTimeUs;
         binding.gainDb = gainDb;
         binding.triggerMode = triggerMode;
+        binding.hardwareTriggerSource = hardwareTriggerSource;
+        binding.softwareTriggerSource = softwareTriggerSource;
+        binding.enterPhotoelectricDebounceMs = enterPhotoelectricDebounceMs;
+        binding.enterPhotoelectricTimeoutMs = enterPhotoelectricTimeoutMs;
+        binding.enterPhotoelectricDeviceId = enterPhotoelectricDeviceId;
+        binding.ignoreEnterTriggerWhileBusy = ignoreEnterTriggerWhileBusy;
         binding.targetFrameRateFps = targetFrameRateFps;
 
         const saved = await this.saveCameraBindings();
@@ -2642,6 +3078,65 @@ class SettingsView {
                             <span class="settings-field-hint">仅作用于当前所选相机</span>
                         </div>
                     </div>
+                    <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-bottom:24px;">
+                        <div class="settings-header-left" style="margin-bottom:14px;">
+                            <svg viewBox="0 0 24 24" class="settings-header-icon" style="fill:#64748b;"><path d="M7 2v11h3v9l7-12h-4l4-8H7z"/></svg>
+                            <span>触发来源 / 触发方式</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:24px;">
+                            <div class="settings-fieldset">
+                                <label>软件触发来源</label>
+                                <select class="cv-input" id="cam-param-software-trigger-source">
+                                    <option value="Manual">手动 / API 软件触发</option>
+                                    <option value="EnterPhotoelectric">回车光电触发</option>
+                                </select>
+                                <span class="settings-field-hint" id="cam-param-enter-trigger-hint">仅软件触发模式下生效。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>外触发输入线</label>
+                                <select class="cv-input" id="cam-param-hardware-trigger-source" disabled aria-disabled="true">
+                                    <option value="Line0">Line0</option>
+                                    <option value="Line1">Line1</option>
+                                    <option value="Line2">Line2</option>
+                                    <option value="Line3">Line3</option>
+                                </select>
+                                <span class="settings-field-hint" id="cam-param-hardware-trigger-source-hint">仅 External 模式下生效；当前值会保留。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>回车防抖时间</label>
+                                <div class="input-with-suffix" style="position:relative;">
+                                    <input type="number" class="cv-input" id="cam-param-enter-debounce" value="200" min="0" max="5000" style="padding-right:42px;" disabled readonly aria-disabled="true">
+                                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">ms</span>
+                                </div>
+                                <span class="settings-field-hint">过滤通断抖动或重复回车。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>触发等待超时</label>
+                                <div class="input-with-suffix" style="position:relative;">
+                                    <input type="number" class="cv-input" id="cam-param-enter-timeout" value="30000" min="100" max="600000" style="padding-right:42px;" disabled readonly aria-disabled="true">
+                                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">ms</span>
+                                </div>
+                                <span class="settings-field-hint">超过该时间未收到回车触发则报错。</span>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:24px; margin-top:16px; align-items:end;">
+                            <div class="settings-fieldset">
+                                <label>回车设备过滤</label>
+                                <div style="display:flex; gap:8px;">
+                                    <input type="text" class="cv-input" id="cam-param-enter-device-id" value="" placeholder="留空表示接受任意键盘类回车设备" disabled readonly aria-disabled="true">
+                                    <button type="button" class="cv-btn settings-btn-light" id="btn-learn-enter-trigger-device" disabled>学习设备</button>
+                                </div>
+                                <span class="settings-field-hint">学习后只接受该 USB 光电设备的回车，避免普通键盘误触。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="cam-param-ignore-enter-busy" checked style="width:16px; height:16px; accent-color:var(--cinnabar);" disabled>
+                                    忙碌时忽略新触发
+                                </label>
+                                <span class="settings-field-hint" style="margin-left:24px;">防止同一工件重复拍照。</span>
+                            </div>
+                        </div>
+                    </div>
                     <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:24px;">
                         <div class="settings-fieldset">
                             <label>采集帧率 (Frame Rate)</label>
@@ -3074,6 +3569,12 @@ class SettingsView {
         return this.cameraBindings.map(binding => ({
             ...binding,
             triggerMode: this.normalizeCameraTriggerMode(binding.triggerMode),
+            hardwareTriggerSource: this.normalizeHardwareTriggerSource(binding.hardwareTriggerSource),
+            softwareTriggerSource: this.normalizeSoftwareTriggerSource(binding.softwareTriggerSource),
+            enterPhotoelectricDebounceMs: this.normalizeEnterDebounceMs(binding.enterPhotoelectricDebounceMs),
+            enterPhotoelectricTimeoutMs: this.normalizeEnterTimeoutMs(binding.enterPhotoelectricTimeoutMs),
+            ignoreEnterTriggerWhileBusy: binding.ignoreEnterTriggerWhileBusy !== false,
+            enterPhotoelectricDeviceId: String(binding.enterPhotoelectricDeviceId || '').trim(),
             targetFrameRateFps: this.normalizeCameraTargetFrameRate(binding.targetFrameRateFps)
         }));
     }
@@ -3093,6 +3594,7 @@ class SettingsView {
     async saveCameraBindings({ silent = false } = {}) {
         const activeCameraId = this.resolveActiveCameraId();
         const bindingsPayload = this.collectCameraBindings();
+        this.lastCameraBindingSaveError = null;
 
         try {
             await httpClient.put('/cameras/bindings', {
@@ -3110,6 +3612,7 @@ class SettingsView {
             return true;
         } catch (error) {
             console.error('[SettingsView] Failed to save camera bindings:', error);
+            this.lastCameraBindingSaveError = error.message;
             if (!silent) {
                 showToast('保存相机绑定失败: ' + error.message, 'error');
             }
@@ -3224,8 +3727,14 @@ class SettingsView {
             const exposureInput = this.container?.querySelector('#cam-param-exposure');
             const gainInput = this.container?.querySelector('#cam-param-gain');
             const triggerModeSelect = this.container?.querySelector('#cam-param-trigger-mode');
+            const hardwareTriggerSourceSelect = this.container?.querySelector('#cam-param-hardware-trigger-source');
+            const triggerSourceSelect = this.container?.querySelector('#cam-param-software-trigger-source');
+            const enterDebounceInput = this.container?.querySelector('#cam-param-enter-debounce');
+            const enterTimeoutInput = this.container?.querySelector('#cam-param-enter-timeout');
+            const enterDeviceInput = this.container?.querySelector('#cam-param-enter-device-id');
+            const ignoreBusyInput = this.container?.querySelector('#cam-param-ignore-enter-busy');
             const frameRateInput = this.container?.querySelector('#cam-param-target-frame-rate');
-            if (selectedBinding && exposureInput && gainInput && triggerModeSelect && frameRateInput) {
+            if (selectedBinding && exposureInput && gainInput && triggerModeSelect && hardwareTriggerSourceSelect && triggerSourceSelect && enterDebounceInput && enterTimeoutInput && enterDeviceInput && ignoreBusyInput && frameRateInput) {
                 const exposureTimeUs = Number.parseFloat(exposureInput.value);
                 const gainDb = Number.parseFloat(gainInput.value);
                 if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
@@ -3239,6 +3748,12 @@ class SettingsView {
                 selectedBinding.exposureTimeUs = exposureTimeUs;
                 selectedBinding.gainDb = gainDb;
                 selectedBinding.triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
+                selectedBinding.hardwareTriggerSource = this.normalizeHardwareTriggerSource(hardwareTriggerSourceSelect.value || 'Line0');
+                selectedBinding.softwareTriggerSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect.value || 'Manual');
+                selectedBinding.enterPhotoelectricDebounceMs = this.normalizeEnterDebounceMs(enterDebounceInput.value);
+                selectedBinding.enterPhotoelectricTimeoutMs = this.normalizeEnterTimeoutMs(enterTimeoutInput.value);
+                selectedBinding.enterPhotoelectricDeviceId = String(enterDeviceInput.value || '').trim();
+                selectedBinding.ignoreEnterTriggerWhileBusy = ignoreBusyInput.checked !== false;
                 selectedBinding.targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
             }
         }
@@ -3281,16 +3796,16 @@ class SettingsView {
         };
         
         try {
-            // 首先保存全局配置 (AppConfig)
+            // 先保存相机绑定，避免运行中相机流拒绝参数变更时，全局配置已提前落盘。
+            const bindingsSaved = await this.saveCameraBindings({ silent: true });
+            if (!bindingsSaved) {
+                throw new Error(this.lastCameraBindingSaveError || 'Camera bindings save failed');
+            }
+
+            config.cameras = this.collectCameraBindings();
             await httpClient.put('/settings', config);
             this.config = this.normalizeAppConfig(config);
             this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
-
-            // 保存相机绑定
-            const bindingsSaved = await this.saveCameraBindings({ silent: true });
-            if (!bindingsSaved) {
-                throw new Error('Camera bindings save failed');
-            }
 
             this.syncPlcMappingsFromActiveProfile();
             this.plcSettingsLoaded = true;

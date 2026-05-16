@@ -370,6 +370,10 @@ function parsePreviewResponse(response) {
     };
 }
 
+function isAbortError(error) {
+    return error?.name === 'AbortError';
+}
+
 export class NodePreviewCoordinator {
     constructor(options = {}) {
         this.getProjectId = options.getProjectId ?? (() => null);
@@ -384,10 +388,20 @@ export class NodePreviewCoordinator {
         this.cache = new Map();
         this.state = createEmptyState();
         this.pendingTimer = null;
+        this.activeAbortController = null;
         this.requestVersion = 0;
         this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
             ? options.subscribeStructureState(() => this.handleStructureChanged())
             : null;
+    }
+
+    cancelActivePreviewRequest() {
+        if (!this.activeAbortController) {
+            return;
+        }
+
+        this.activeAbortController.abort();
+        this.activeAbortController = null;
     }
 
     destroy() {
@@ -396,6 +410,8 @@ export class NodePreviewCoordinator {
             this.pendingTimer = null;
         }
 
+        this.requestVersion += 1;
+        this.cancelActivePreviewRequest();
         this.unsubscribeStructure?.();
         this.listeners.clear();
         this.cache.clear();
@@ -438,6 +454,7 @@ export class NodePreviewCoordinator {
         }
 
         this.requestVersion += 1;
+        this.cancelActivePreviewRequest();
 
         if (!node?.id) {
             this.updateState(createEmptyState());
@@ -470,6 +487,7 @@ export class NodePreviewCoordinator {
         }
 
         const scheduledVersion = ++this.requestVersion;
+        this.cancelActivePreviewRequest();
 
         if (this.pendingTimer) {
             clearTimeout(this.pendingTimer);
@@ -554,10 +572,16 @@ export class NodePreviewCoordinator {
                 inputImageBase64: inputImageBase64 || null
             });
 
+            const abortController = typeof AbortController !== 'undefined'
+                ? new AbortController()
+                : null;
+            this.activeAbortController = abortController;
+
             try {
                 const response = await this.previewExecutor(activeNode.id, {
                     inputImageBase64,
-                    parameters: null
+                    parameters: null,
+                    signal: abortController?.signal
                 });
 
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
@@ -586,6 +610,10 @@ export class NodePreviewCoordinator {
                 this.cache.set(request.requestKey, nextState);
                 this.updateState(nextState);
             } catch (error) {
+                if (isAbortError(error)) {
+                    return;
+                }
+
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
                     return;
                 }
@@ -599,6 +627,10 @@ export class NodePreviewCoordinator {
                     outputImageBase64: null,
                     outputData: null
                 });
+            } finally {
+                if (this.activeAbortController === abortController) {
+                    this.activeAbortController = null;
+                }
             }
         };
 

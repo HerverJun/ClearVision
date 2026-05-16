@@ -12,6 +12,8 @@ namespace Acme.Product.Desktop.Endpoints;
 
 public static class StationEndpoints
 {
+    private const int SseChannelCapacity = 1024;
+
     public static IEndpointRouteBuilder MapStationEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/stations", ([FromServices] StationRegistryService registry) =>
@@ -204,10 +206,11 @@ public static class StationEndpoints
 
         var lastSequenceId = ParseLastEventId(context.Request);
         var replayWatermark = lastSequenceId;
-        var channel = Channel.CreateUnbounded<StoredStationRegistryEvent>(new UnboundedChannelOptions
+        var channel = Channel.CreateBounded<StoredStationRegistryEvent>(new BoundedChannelOptions(SseChannelCapacity)
         {
             SingleReader = true,
-            SingleWriter = false
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropOldest
         });
 
         using var subscription = registry.Subscribe(evt => channel.Writer.TryWrite(evt));

@@ -206,8 +206,9 @@ public class PromptBuilder
         - Otherwise use conservative defaults from the catalog and list the parameter in parametersNeedingReview.
 
         2. Calibration and physical units
+        - Use CalibrationBundleV2 as the runtime calibration contract.
         - If the request mentions millimeters, robot coordinates, or physical position, include CalibrationLoader or CoordinateTransform when available.
-        - Mark calibration file paths and coordinate-system choices for review.
+        - Feed calibration consumers through CalibrationData when possible, and mark calibration bundle paths and coordinate-system choices for review.
 
         3. AI models
         - For DeepLearning, include ModelPath, InputSize, Confidence, and TargetClasses when known.
@@ -666,6 +667,9 @@ public class PromptBuilder
         - operatorType must exactly match an operator_id from the catalog.
         - port and parameter names must exactly match the catalog.
         - parametersNeedingReview may be omitted only when no uncertain values remain.
+        - The first character of the response must be { and the last character must be }.
+        - Do not add Markdown code block markers, comments, or explanatory text outside the JSON object.
+        - Ensure all brackets and braces are properly paired before sending.
         """;
 
         if (!supportsJsonMode)

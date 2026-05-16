@@ -27,8 +27,8 @@ public static class AiGenerationServiceExtensions
         // 注册 HttpClient
         services.AddHttpClient<AiApiClient>(client =>
         {
-            // 给 AI 生成留出充足的响应时间（模型生成工作流较慢）
-            client.Timeout = TimeSpan.FromSeconds(120);
+            // Request-level cancellation in AiApiClient owns per-model timeouts.
+            client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
         });
 
         // 注册核心组件
@@ -42,6 +42,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IClarificationEngine, ClarificationEngine>();
         services.AddScoped<ITemplateConstraintValidator, TemplateConstraintValidator>();
         services.AddScoped<IAiFlowValidator, AiFlowValidator>();
+        services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();
         services.AddScoped<GenerateFlowMessageHandler>();
@@ -54,7 +55,7 @@ public static class AiGenerationServiceExtensions
 
         services.AddHttpClient("LLM", client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(120);
+            client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
         });
 
         services.AddSingleton<ILLMConfigurationStore, JsonLLMConfigurationStore>();

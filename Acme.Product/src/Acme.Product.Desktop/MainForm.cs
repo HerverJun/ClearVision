@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using System.Windows.Forms;
+using Acme.Product.Desktop.Triggers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -16,6 +17,7 @@ public partial class MainForm : Form
     private readonly WebView2 _webView;
     private readonly WebView2Host _webView2Host;
     private readonly Handlers.WebMessageHandler? _messageHandler;
+    private readonly EnterPhotoelectricTriggerInputService? _triggerInputService;
 
     public MainForm()
     {
@@ -30,6 +32,7 @@ public partial class MainForm : Form
 
         // 创建 WebView2 宿主
         _messageHandler = Program.ServiceProvider?.GetService<Handlers.WebMessageHandler>();
+        _triggerInputService = Program.ServiceProvider?.GetService<EnterPhotoelectricTriggerInputService>();
         _webView2Host = new WebView2Host(_webView, _messageHandler);
 
         // 窗体加载时初始化 WebView2
@@ -60,6 +63,18 @@ public partial class MainForm : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        _triggerInputService?.AttachWindow(Handle);
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        _triggerInputService?.HandleWindowMessage(m.Msg, m.LParam);
+        base.WndProc(ref m);
     }
 
     /// <summary>

@@ -66,7 +66,7 @@ public sealed class VisionDatabaseInitializerTests
                 var act = () => VisionDatabaseInitializer.InitializeAsync(dbContext);
 
                 await act.Should()
-                    .ThrowAsync<InvalidOperationException>()
+                    .ThrowAsync<OutdatedVisionDatabaseException>()
                     .WithMessage("*schema is not complete enough*");
             }
 
@@ -74,6 +74,137 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeFalse();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldDiscardOutdatedLegacySqliteSchema_WhenUserConfirms()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var decisionRequests = new List<OutdatedVisionDatabase>();
+
+        try
+        {
+            await CreateIncompleteLegacyDatabaseAsync(dbPath);
+
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+            var initializationOptions = new VisionDatabaseInitializationOptions
+            {
+                OutdatedDatabaseDecisionProvider = (database, _) =>
+                {
+                    decisionRequests.Add(database);
+                    return Task.FromResult(OutdatedVisionDatabaseDecision.Discard);
+                }
+            };
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext, initializationOptions);
+            }
+
+            decisionRequests.Should().ContainSingle();
+            decisionRequests[0].DatabasePath.Should().Be(dbPath);
+            decisionRequests[0].MissingSchemaItems.Should().NotBeEmpty();
+
+            await using var connection = new SqliteConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
+
+            (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
+            (await MigrationHistoryCountAsync(connection)).Should().Be(1);
+            (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
+            (await TableExistsAsync(connection, "StationPackageRecords")).Should().BeTrue();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldRejectPartialLegacySqliteSchema_BeforeEfMigrationCreatesTables()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        try
+        {
+            await CreatePartialLegacyDatabaseAsync(dbPath);
+
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                var act = () => VisionDatabaseInitializer.InitializeAsync(dbContext);
+
+                await act.Should()
+                    .ThrowAsync<OutdatedVisionDatabaseException>()
+                    .WithMessage("*schema is not complete enough*");
+            }
+
+            await using var connection = new SqliteConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
+
+            (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeFalse();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldDiscardMigrationConflict_WhenUserConfirms()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var decisionRequests = new List<OutdatedVisionDatabase>();
+
+        try
+        {
+            await CreateConflictingDatabaseWithMigrationHistoryAsync(dbPath);
+
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+            var initializationOptions = new VisionDatabaseInitializationOptions
+            {
+                OutdatedDatabaseDecisionProvider = (database, _) =>
+                {
+                    decisionRequests.Add(database);
+                    return Task.FromResult(OutdatedVisionDatabaseDecision.Discard);
+                }
+            };
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext, initializationOptions);
+            }
+
+            decisionRequests.Should().ContainSingle();
+            decisionRequests[0].MissingSchemaItems.Should().Contain(item => item.StartsWith("migration:", StringComparison.Ordinal));
+
+            await using var connection = new SqliteConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
+
+            (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
+            (await MigrationHistoryCountAsync(connection)).Should().Be(1);
+            (await TableExistsAsync(connection, "Projects")).Should().BeTrue();
+            (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
         }
         finally
         {
@@ -124,6 +255,44 @@ public sealed class VisionDatabaseInitializerTests
             CREATE TABLE "Users" (
                 "Id" TEXT NOT NULL CONSTRAINT "PK_Users" PRIMARY KEY,
                 "Username" TEXT NOT NULL
+            );
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task CreatePartialLegacyDatabaseAsync(string dbPath)
+    {
+        await using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE "Projects" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_Projects" PRIMARY KEY,
+                "Name" TEXT NOT NULL,
+                "Version" TEXT NOT NULL
+            );
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task CreateConflictingDatabaseWithMigrationHistoryAsync(string dbPath)
+    {
+        await using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE "__EFMigrationsHistory" (
+                "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+                "ProductVersion" TEXT NOT NULL
+            );
+            CREATE TABLE "Projects" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_Projects" PRIMARY KEY,
+                "Name" TEXT NOT NULL,
+                "Version" TEXT NOT NULL
             );
             """;
         await command.ExecuteNonQueryAsync();

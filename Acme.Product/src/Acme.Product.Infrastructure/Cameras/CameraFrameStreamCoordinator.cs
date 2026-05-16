@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Streaming;
@@ -13,6 +14,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     private static readonly TimeSpan DirectAcquireIdleTimeout = TimeSpan.FromSeconds(5);
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<CameraFrameStreamCoordinator> _logger;
+    private readonly ITriggerInputService _triggerInputService;
     private readonly ConcurrentDictionary<string, ProducerEntry> _producers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, PreviewSessionState> _previewSessions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -29,6 +31,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         public int PreviewSessionCount { get; set; }
         public bool IsRunning { get; set; }
         public string SerialNumber { get; set; } = string.Empty;
+        public string ConfigurationSignature { get; set; } = string.Empty;
         public CameraTriggerMode TriggerMode { get; set; } = CameraTriggerMode.Software;
         public int TargetFrameRateFps { get; set; } = CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
         public CameraStreamFrame? LatestFrame { get; set; }
@@ -59,15 +62,26 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         double ExposureTimeUs,
         double GainDb,
         CameraTriggerMode TriggerMode,
+        string HardwareTriggerSource,
+        EnterPhotoelectricTriggerOptions? EnterPhotoelectricTrigger,
         int TargetFrameRateFps,
         int FrameBufferCapacity);
 
     public CameraFrameStreamCoordinator(
         ICameraManager cameraManager,
         ILogger<CameraFrameStreamCoordinator> logger)
+        : this(cameraManager, logger, NoOpTriggerInputService.Instance)
+    {
+    }
+
+    public CameraFrameStreamCoordinator(
+        ICameraManager cameraManager,
+        ILogger<CameraFrameStreamCoordinator> logger,
+        ITriggerInputService triggerInputService)
     {
         _cameraManager = cameraManager;
         _logger = logger;
+        _triggerInputService = triggerInputService;
     }
 
     public async Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -283,7 +297,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     public bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame)
     {
         frame = null;
-        if (!_producers.TryGetValue(cameraId, out var entry))
+        if (!_producers.TryGetValue(ResolveProducerKey(cameraId), out var entry))
         {
             return false;
         }
@@ -293,7 +307,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
     public IReadOnlyList<FrameEnvelope> GetFrameEnvelopeWindow(string cameraId, long centerSequence, int before, int after)
     {
-        if (!_producers.TryGetValue(cameraId, out var entry))
+        if (!_producers.TryGetValue(ResolveProducerKey(cameraId), out var entry))
         {
             return Array.Empty<FrameEnvelope>();
         }
@@ -303,12 +317,37 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
     public RingBufferStats SnapshotFrameBufferStats(string cameraId)
     {
-        if (!_producers.TryGetValue(cameraId, out var entry))
+        if (!_producers.TryGetValue(ResolveProducerKey(cameraId), out var entry))
         {
             return new RingBufferStats(0, 0, 0, null, null);
         }
 
         return entry.History.SnapshotStats();
+    }
+
+    public CameraStreamUsageSnapshot SnapshotStreamUsage(string cameraId)
+    {
+        var producerKey = ResolveProducerKey(cameraId);
+        if (!_producers.TryGetValue(producerKey, out var entry))
+        {
+            return new CameraStreamUsageSnapshot(
+                producerKey,
+                false,
+                0,
+                0,
+                0,
+                CameraTriggerMode.Software,
+                CameraTriggerModeExtensions.DefaultTargetFrameRateFps);
+        }
+
+        return new CameraStreamUsageSnapshot(
+            producerKey,
+            entry.IsRunning,
+            entry.LeaseCount,
+            entry.PreviewSessionCount,
+            Volatile.Read(ref entry.PendingFrameWaiters),
+            entry.TriggerMode,
+            entry.TargetFrameRateFps);
     }
 
     public async ValueTask DisposeAsync()
@@ -347,6 +386,8 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 5000.0,
                 1.0,
                 CameraTriggerMode.Software,
+                CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource,
+                null,
                 CameraTriggerModeExtensions.DefaultTargetFrameRateFps,
                 24);
         }
@@ -358,6 +399,10 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             binding.ExposureTimeUs,
             binding.GainDb,
             CameraTriggerModeExtensions.Normalize(binding.TriggerMode),
+            CameraHardwareTriggerSourceExtensions.Normalize(binding.HardwareTriggerSource),
+            binding.UsesEnterPhotoelectricTrigger()
+                ? binding.ToEnterPhotoelectricTriggerOptions()
+                : null,
             CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps),
             ResolveHistoryCapacity(binding));
     }
@@ -368,12 +413,24 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         await entry.Gate.WaitAsync(cancellationToken);
         try
         {
+            var configurationSignature = CreateConfigurationSignature(binding);
             if (entry.IsRunning)
             {
-                return entry;
+                if (string.Equals(entry.ConfigurationSignature, configurationSignature, StringComparison.Ordinal))
+                {
+                    return entry;
+                }
+
+                if (entry.LeaseCount > 0 || entry.PreviewSessionCount > 0 || Volatile.Read(ref entry.PendingFrameWaiters) > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Camera stream '{binding.CameraBindingId}' is running with a different configuration. Stop preview/inspection before applying new camera settings.");
+                }
+
+                await StopProducerCoreAsync(entry);
             }
 
-            await StartProducerCoreAsync(entry, binding, cancellationToken);
+            await StartProducerCoreAsync(entry, binding, configurationSignature, cancellationToken);
             return entry;
         }
         finally
@@ -382,17 +439,22 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
     }
 
-    private async Task StartProducerCoreAsync(ProducerEntry entry, ResolvedBinding binding, CancellationToken cancellationToken)
+    private async Task StartProducerCoreAsync(
+        ProducerEntry entry,
+        ResolvedBinding binding,
+        string configurationSignature,
+        CancellationToken cancellationToken)
     {
         var camera = await GetConnectedCameraAsync(binding, cancellationToken);
         await ApplyCommonCameraSettingsAsync(camera, binding);
         if (camera is IIndustrialCamera industrialCamera)
         {
-            await industrialCamera.SetTriggerModeAsync(binding.TriggerMode);
+            await industrialCamera.SetTriggerModeAsync(binding.TriggerMode, binding.HardwareTriggerSource);
         }
 
         entry.IsRunning = true;
         entry.SerialNumber = binding.SerialNumber;
+        entry.ConfigurationSignature = configurationSignature;
         entry.TriggerMode = binding.TriggerMode;
         entry.TargetFrameRateFps = binding.TargetFrameRateFps;
         entry.LatestFrame = null;
@@ -480,6 +542,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     {
         if (!entry.IsRunning)
         {
+            CompleteFrameWaiters(entry, new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' is not running."));
             return;
         }
 
@@ -509,16 +572,13 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             entry.IdleStopCts = null;
             entry.IsRunning = false;
             entry.SerialNumber = string.Empty;
+            entry.ConfigurationSignature = string.Empty;
             entry.LatestFrame = null;
             entry.History = new FrameRingBuffer(24);
             entry.Sequence = 0;
             entry.LastPublishedTicks = 0;
             entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
-            entry.PendingFrameWaiters = 0;
-            lock (entry.SignalGate)
-            {
-                entry.NextFrameSignal = CreateFrameSignal();
-            }
+            CompleteFrameWaiters(entry, new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' has stopped."));
         }
     }
 
@@ -597,6 +657,13 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
         }
 
+        if (binding.EnterPhotoelectricTrigger != null)
+        {
+            await _triggerInputService.WaitForEnterPhotoelectricAsync(
+                binding.EnterPhotoelectricTrigger,
+                cancellationToken);
+        }
+
         var imageData = await camera.AcquireSingleFrameAsync();
         return CreateFrame(binding.CameraBindingId, imageData, "image/png");
     }
@@ -632,6 +699,11 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 return latestFrame;
             }
 
+            if (!entry.IsRunning)
+            {
+                throw new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' is not running.", cancellationToken);
+            }
+
             Interlocked.Increment(ref entry.PendingFrameWaiters);
             try
             {
@@ -639,6 +711,11 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 if (latestFrame != null && (!afterSequence.HasValue || latestFrame.Sequence > afterSequence.Value))
                 {
                     return latestFrame;
+                }
+
+                if (!entry.IsRunning)
+                {
+                    throw new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' is not running.", cancellationToken);
                 }
 
                 TaskCompletionSource<long> signal;
@@ -765,6 +842,42 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             Math.Max(
                 binding.ContinuousInspection.BufferCapacity,
                 binding.ContinuousInspection.PreEventFrames + binding.ContinuousInspection.PostEventFrames + 1));
+    }
+
+    private string ResolveProducerKey(string cameraId)
+    {
+        if (string.IsNullOrWhiteSpace(cameraId))
+        {
+            return string.Empty;
+        }
+
+        return _cameraManager.FindBinding(cameraId)?.Id ?? cameraId.Trim();
+    }
+
+    private static string CreateConfigurationSignature(ResolvedBinding binding)
+    {
+        return string.Join(
+            "|",
+            binding.CameraBindingId,
+            binding.SerialNumber,
+            binding.ExposureTimeUs.ToString("R", CultureInfo.InvariantCulture),
+            binding.GainDb.ToString("R", CultureInfo.InvariantCulture),
+            binding.TriggerMode.ToConfigValue(),
+            binding.HardwareTriggerSource,
+            binding.TargetFrameRateFps.ToString(CultureInfo.InvariantCulture),
+            binding.FrameBufferCapacity.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void CompleteFrameWaiters(ProducerEntry entry, Exception exception)
+    {
+        TaskCompletionSource<long> completedSignal;
+        lock (entry.SignalGate)
+        {
+            completedSignal = entry.NextFrameSignal;
+            entry.NextFrameSignal = CreateFrameSignal();
+        }
+
+        completedSignal.TrySetException(exception);
     }
 
     private static TaskCompletionSource<long> CreateFrameSignal() =>

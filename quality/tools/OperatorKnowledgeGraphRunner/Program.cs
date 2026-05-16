@@ -17,7 +17,10 @@ if (options.ParseError is not null)
 }
 
 var workspaceRoot = ResolveWorkspaceRoot();
-var storageRoot = Path.Combine(workspaceRoot, ".tmp", "operator-knowledge-graph-runner");
+var storageRoot = Path.Combine(
+    Path.GetTempPath(),
+    "clearvision-operator-knowledge-graph-runner",
+    Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(storageRoot);
 
 var operatorFactory = new OperatorFactory();
@@ -52,6 +55,15 @@ if (reportOutputPath is not null)
 Console.WriteLine(
     $"Operator knowledge graph generated: cards={graph.Cards.Count}, edges={graph.Edges.Count}, " +
     $"graph={graphOutputPath}, cards={cardsOutputPath}");
+
+try
+{
+    Directory.Delete(storageRoot, recursive: true);
+}
+catch
+{
+    // Best-effort cleanup only; generation outputs have already been written.
+}
 
 return 0;
 

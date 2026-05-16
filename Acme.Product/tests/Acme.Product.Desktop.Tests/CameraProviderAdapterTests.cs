@@ -151,6 +151,8 @@ public class CameraProviderAdapterTests
     {
         var provider = Substitute.For<ICameraProvider>();
         provider.IsGrabbing.Returns(true);
+        provider.SetTriggerMode(CameraTriggerMode.Software).Returns(true);
+        provider.ExecuteSoftwareTrigger().Returns(true);
         provider.GetFrame(3000).Returns((CameraFrame?)null);
 
         var adapter = new CameraProviderAdapter("cam-3", provider, Substitute.For<ILogger<CameraProviderAdapter>>());
@@ -163,5 +165,49 @@ public class CameraProviderAdapterTests
         provider.Received(1).SetTriggerMode(CameraTriggerMode.Software);
         provider.Received(1).ExecuteSoftwareTrigger();
         provider.Received(1).GetFrame(3000);
+    }
+
+    [Fact]
+    public async Task AcquireSingleFrameAsync_WhenSoftwareTriggerFails_ShouldThrowAndNotGetFrame()
+    {
+        var provider = Substitute.For<ICameraProvider>();
+        provider.IsGrabbing.Returns(true);
+        provider.SetTriggerMode(CameraTriggerMode.Software).Returns(true);
+        provider.ExecuteSoftwareTrigger().Returns(false);
+
+        var adapter = new CameraProviderAdapter("cam-trigger-fail", provider, Substitute.For<ILogger<CameraProviderAdapter>>());
+
+        var act = async () => await adapter.AcquireSingleFrameAsync();
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*software trigger*");
+        provider.DidNotReceive().GetFrame(Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task SetExposureTimeAsync_WhenProviderRejectsValue_ShouldThrow()
+    {
+        var provider = Substitute.For<ICameraProvider>();
+        provider.SetExposure(1234).Returns(false);
+
+        var adapter = new CameraProviderAdapter("cam-exposure-fail", provider, Substitute.For<ILogger<CameraProviderAdapter>>());
+
+        var act = async () => await adapter.SetExposureTimeAsync(1234);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*exposure*");
+    }
+
+    [Fact]
+    public async Task SetTriggerModeAsync_WithExternalMode_ShouldPassHardwareTriggerSource()
+    {
+        var provider = Substitute.For<ICameraProvider>();
+        provider.SetTriggerMode(CameraTriggerMode.External, "Line3").Returns(true);
+
+        var adapter = new CameraProviderAdapter("cam-external", provider, Substitute.For<ILogger<CameraProviderAdapter>>());
+
+        await adapter.SetTriggerModeAsync(CameraTriggerMode.External, "Line3");
+
+        provider.Received(1).SetTriggerMode(CameraTriggerMode.External, "Line3");
     }
 }

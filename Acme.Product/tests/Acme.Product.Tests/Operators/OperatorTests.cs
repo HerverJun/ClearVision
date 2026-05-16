@@ -52,6 +52,41 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithRuntimeImageAndNoFilePath_ShouldUseProvidedImage()
+    {
+        using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = mat.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Width"].Should().Be(13);
+        result.OutputData["Height"].Should().Be(7);
+        result.OutputData["Source"].Should().Be("provided-image");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRuntimeImageAndInvalidSourceType_ShouldReturnFailure()
+    {
+        using var mat = new Mat(7, 13, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Invalid"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = mat.ToBytes(".png")
+        });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("SourceType must be File or Camera.");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithCameraSource_ShouldIgnoreFilePathAndAcquireCameraFrame()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"cv-image-{Guid.NewGuid():N}.png");
@@ -100,10 +135,10 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithCameraSource_ShouldIgnoreExternalImageInput()
+    public async Task ExecuteAsync_WithCameraSourceAndRuntimeImage_ShouldUseProvidedImage()
     {
-        using var staleMat = new Mat(4, 4, MatType.CV_8UC3, new Scalar(10, 20, 30));
-        var staleInput = staleMat.ToBytes(".png");
+        using var runtimeMat = new Mat(4, 9, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        var runtimeInput = runtimeMat.ToBytes(".png");
         using var cameraMat = new Mat(6, 12, MatType.CV_8UC3, new Scalar(80, 90, 100));
         var cameraFrame = cameraMat.ToBytes(".png");
 
@@ -125,16 +160,16 @@ public class ImageAcquisitionOperatorTests
 
         var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
         {
-            ["Image"] = staleInput
+            ["Image"] = runtimeInput
         });
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         result.OutputData.Should().NotBeNull();
-        result.OutputData!["Width"].Should().Be(12);
-        result.OutputData["Height"].Should().Be(6);
-        result.OutputData["Source"].Should().Be("camera");
-        await cameraManager.Received(1).GetOrCreateByBindingAsync("cam-1");
-        await camera.Received(1).AcquireSingleFrameAsync();
+        result.OutputData!["Width"].Should().Be(9);
+        result.OutputData["Height"].Should().Be(4);
+        result.OutputData["Source"].Should().Be("provided-image");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync("cam-1");
+        await camera.DidNotReceive().AcquireSingleFrameAsync();
     }
 
     [Fact]
@@ -175,6 +210,45 @@ public class ImageAcquisitionOperatorTests
         result.OutputData["CameraId"].Should().Be("cam-envelope");
         result.OutputData["Sequence"].Should().Be(42L);
         result.OutputData["CorrelationId"].Should().Be("corr-42");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithFrameDrivenCameraBinding_ShouldUseSharedStreamWithoutOpeningCameraDirectly()
+    {
+        using var frameMat = new Mat(5, 7, MatType.CV_8UC3, new Scalar(20, 40, 60));
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-shared",
+                SerialNumber = "SN-SHARED",
+                TriggerMode = "External"
+            }
+        });
+
+        var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+        streamCoordinator.AcquireFrameAsync("cam-shared", Arg.Any<CancellationToken>())
+            .Returns(new CameraStreamFrame("cam-shared", frameMat.ToBytes(".png"), "image/png", 7, 5, 1, DateTime.UtcNow));
+
+        var sut = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager,
+            streamCoordinator);
+
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "cam-shared"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+        result.OutputData!["Width"].Should().Be(7);
+        result.OutputData["Height"].Should().Be(5);
+        result.OutputData["Source"].Should().Be("external");
+        await streamCoordinator.Received(1).AcquireFrameAsync("cam-shared", Arg.Any<CancellationToken>());
         await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
     }
 

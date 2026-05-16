@@ -1,6 +1,8 @@
 using Acme.Product.Application.Analysis;
+using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
@@ -248,6 +250,67 @@ public class InspectionWorkerTests
         InvokeIsFrameDrivenExecution(flow, null, serviceProvider).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task ExecuteCycleAsync_WithCameraPreload_ShouldPassCancellationTokenToImageAcquisition()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 1,
+                OutputData = new Dictionary<string, object>()
+            });
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var observedToken = CancellationToken.None;
+        imageAcquisition.AcquireFromCameraAsync("cam-ct", Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                observedToken = callInfo.ArgAt<CancellationToken>(1);
+                return Task.FromResult(new ImageDto
+                {
+                    Id = Guid.NewGuid(),
+                    DataBase64 = Convert.ToBase64String(new byte[] { 1, 2, 3 })
+                });
+            });
+        imageAcquisition.ReleaseImageAsync(Arg.Any<Guid>()).Returns(Task.CompletedTask);
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            Substitute.For<IInspectionResultChannelWriter>(),
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>());
+
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            new InMemoryInspectionEventBus(
+                NullLogger<InMemoryInspectionEventBus>.Instance,
+                new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance)),
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        using var cts = new CancellationTokenSource();
+        await InvokeExecuteCycleAsync(
+            worker,
+            new OperatorFlow("TokenFlow"),
+            "cam-ct",
+            flowExecution,
+            imageAcquisition,
+            cts.Token);
+
+        observedToken.Should().Be(cts.Token);
+        await imageAcquisition.Received(1).AcquireFromCameraAsync("cam-ct", cts.Token);
+    }
+
     private static async Task<FlowExecutionResult> WaitForCancellationAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -282,6 +345,36 @@ public class InspectionWorkerTests
             BindingFlags.NonPublic | BindingFlags.Static);
         method.Should().NotBeNull();
         return (bool)method!.Invoke(null, new object?[] { flow, cameraId, serviceProvider })!;
+    }
+
+    private static async Task<InspectionResult> InvokeExecuteCycleAsync(
+        InspectionWorker worker,
+        OperatorFlow flow,
+        string? cameraId,
+        IFlowExecutionService flowExecution,
+        IImageAcquisitionService imageAcquisition,
+        CancellationToken cancellationToken)
+    {
+        var method = typeof(InspectionWorker).GetMethod(
+            "ExecuteCycleAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        method.Should().NotBeNull();
+
+        var task = (Task<InspectionResult>)method!.Invoke(
+            worker,
+            new object?[]
+            {
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                flow,
+                cameraId,
+                ContinuousInspectionMode.Disabled,
+                null,
+                flowExecution,
+                imageAcquisition,
+                cancellationToken
+            })!;
+        return await task;
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)

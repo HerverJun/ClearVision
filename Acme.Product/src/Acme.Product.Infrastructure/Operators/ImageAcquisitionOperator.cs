@@ -11,7 +11,7 @@ using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-
+
 using Acme.Product.Core.Attributes;
 namespace Acme.Product.Infrastructure.Operators;
 
@@ -25,6 +25,7 @@ namespace Acme.Product.Infrastructure.Operators;
     IconName = "camera",
     Keywords = new[] { "采集", "相机", "拍照", "取图", "摄像头", "图像输入", "Acquire", "Camera", "Capture" }
 )]
+[InputPort("Image", "Runtime supplied image", PortDataType.Image, IsRequired = false)]
 [InputPort("FilePath", "文件路径输入", PortDataType.String, IsRequired = false)]
 [OutputPort("Image", "图像", PortDataType.Image)]
 [OperatorParam("SourceType", "采集源", "enum", DefaultValue = "File", Options = new[] { "File|文件", "Camera|相机" })]
@@ -38,19 +39,30 @@ public class ImageAcquisitionOperator : OperatorBase
     public override OperatorType OperatorType => OperatorType.ImageAcquisition;
     private readonly ICameraManager _cameraManager;
     private readonly ICameraFrameStreamCoordinator _streamCoordinator;
+    private readonly ITriggerInputService _triggerInputService;
 
     public ImageAcquisitionOperator(ILogger<ImageAcquisitionOperator> logger, ICameraManager cameraManager)
-        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance)
+        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance)
     {
     }
 
     public ImageAcquisitionOperator(
         ILogger<ImageAcquisitionOperator> logger,
         ICameraManager cameraManager,
-        ICameraFrameStreamCoordinator streamCoordinator) : base(logger)
+        ICameraFrameStreamCoordinator streamCoordinator)
+        : this(logger, cameraManager, streamCoordinator, NoOpTriggerInputService.Instance)
+    {
+    }
+
+    public ImageAcquisitionOperator(
+        ILogger<ImageAcquisitionOperator> logger,
+        ICameraManager cameraManager,
+        ICameraFrameStreamCoordinator streamCoordinator,
+        ITriggerInputService triggerInputService) : base(logger)
     {
         _cameraManager = cameraManager;
         _streamCoordinator = streamCoordinator;
+        _triggerInputService = triggerInputService;
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -75,9 +87,21 @@ public class ImageAcquisitionOperator : OperatorBase
             ?? TryGetStringInput(inputs, "filePath")
             ?? GetStringParam(@operator, "FilePath", GetStringParam(@operator, "filePath", string.Empty));
 
-        var hasExplicitFilePath = !string.IsNullOrWhiteSpace(filePath);
+        var isFileSource = normalizedSourceType.Equals("File", StringComparison.OrdinalIgnoreCase);
+        var isCameraSource = normalizedSourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase);
+        if (!isFileSource && !isCameraSource)
+        {
+            return OperatorExecutionOutput.Failure("SourceType must be File or Camera.");
+        }
 
-        if (normalizedSourceType.Equals("File", StringComparison.OrdinalIgnoreCase))
+        var hasExplicitFilePath = !string.IsNullOrWhiteSpace(filePath);
+        if (TryCreateOutputFromProvidedImage(inputs, out var providedImageOutput) &&
+            (isCameraSource || !hasExplicitFilePath))
+        {
+            return providedImageOutput;
+        }
+
+        if (isFileSource)
         {
             if (!hasExplicitFilePath)
             {
@@ -103,7 +127,7 @@ public class ImageAcquisitionOperator : OperatorBase
             }));
         }
 
-        if (normalizedSourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase))
+        if (isCameraSource)
         {
             var cameraId = GetStringParam(@operator, "CameraId", GetStringParam(@operator, "cameraId", string.Empty));
             if (string.IsNullOrEmpty(cameraId))
@@ -113,8 +137,6 @@ public class ImageAcquisitionOperator : OperatorBase
 
             try
             {
-                // 获取并配置相机
-                var camera = await _cameraManager.GetOrCreateByBindingAsync(cameraId);
                 var bindingConfig = _cameraManager.FindBinding(cameraId);
                 bindingConfig?.Normalize();
                 var normalizedTriggerMode = CameraTriggerModeExtensions.Normalize(
@@ -138,6 +160,9 @@ public class ImageAcquisitionOperator : OperatorBase
                     }));
                 }
 
+                // 获取并配置相机
+                var camera = await _cameraManager.GetOrCreateByBindingAsync(cameraId);
+
                 // 相机参数优先来自“系统设置 -> 相机管理”，保留旧算子参数作为向后兼容 fallback。
                 var exposureTime = bindingConfig?.ExposureTimeUs
                     ?? GetDoubleParam(@operator, "ExposureTime", GetDoubleParam(@operator, "exposureTime", 5000));
@@ -149,6 +174,13 @@ public class ImageAcquisitionOperator : OperatorBase
                 if (camera is IIndustrialCamera industrialCamera)
                 {
                     await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
+                }
+
+                if (bindingConfig?.UsesEnterPhotoelectricTrigger() == true)
+                {
+                    await _triggerInputService.WaitForEnterPhotoelectricAsync(
+                        bindingConfig.ToEnterPhotoelectricTriggerOptions(),
+                        cancellationToken);
                 }
 
                 // 采集图像
@@ -164,7 +196,7 @@ public class ImageAcquisitionOperator : OperatorBase
                 return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
                 {
                     { "Channels", mat.Channels() },
-                    { "Source", "camera" },
+                    { "Source", bindingConfig?.UsesEnterPhotoelectricTrigger() == true ? "enter-photoelectric" : "camera" },
                     { "CameraId", cameraId }
                 }));
             }
@@ -219,6 +251,83 @@ public class ImageAcquisitionOperator : OperatorBase
         }
 
         return null;
+    }
+
+    private static bool TryCreateOutputFromProvidedImage(
+        Dictionary<string, object>? inputs,
+        out OperatorExecutionOutput output)
+    {
+        output = OperatorExecutionOutput.Failure("Image input was not provided.");
+        if (inputs == null)
+        {
+            return false;
+        }
+
+        if (!inputs.TryGetValue("Image", out var value) &&
+            !inputs.TryGetValue("image", out value))
+        {
+            return false;
+        }
+
+        try
+        {
+            ImageWrapper image;
+            switch (value)
+            {
+                case ImageWrapper wrapper:
+                    var width = wrapper.Width;
+                    var height = wrapper.Height;
+                    var channels = wrapper.Channels;
+                    image = wrapper.AddRef();
+                    output = OperatorExecutionOutput.Success(new Dictionary<string, object>
+                    {
+                        ["Image"] = image,
+                        ["Width"] = width,
+                        ["Height"] = height,
+                        ["Channels"] = channels,
+                        ["Source"] = "provided-image"
+                    });
+                    return true;
+
+                case byte[] bytes:
+                    image = new ImageWrapper(bytes);
+                    output = OperatorExecutionOutput.Success(new Dictionary<string, object>
+                    {
+                        ["Image"] = image,
+                        ["Width"] = image.Width,
+                        ["Height"] = image.Height,
+                        ["Channels"] = image.Channels,
+                        ["Source"] = "provided-image"
+                    });
+                    return true;
+
+                case Mat mat:
+                    if (mat.Empty())
+                    {
+                        output = OperatorExecutionOutput.Failure("Provided Image input is empty.");
+                        return true;
+                    }
+
+                    var cloned = mat.Clone();
+                    output = OperatorExecutionOutput.Success(new Dictionary<string, object>
+                    {
+                        ["Image"] = new ImageWrapper(cloned),
+                        ["Width"] = cloned.Width,
+                        ["Height"] = cloned.Height,
+                        ["Channels"] = cloned.Channels(),
+                        ["Source"] = "provided-image"
+                    });
+                    return true;
+            }
+
+            output = OperatorExecutionOutput.Failure($"Provided Image input type is not supported: {value?.GetType().Name ?? "null"}.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            output = OperatorExecutionOutput.Failure($"Provided Image input cannot be decoded: {ex.Message}");
+            return true;
+        }
     }
 
     private static bool TryGetProvidedFrameEnvelope(Dictionary<string, object>? inputs, out FrameEnvelope? envelope)

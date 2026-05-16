@@ -40,6 +40,7 @@ public static class PreviewNodeEndpoints
         // 【Phase 3】预览工作流中指定节点的输出
         app.MapPost("/api/flows/preview-node", async (
             PreviewNodeRequest request,
+            HttpContext context,
             IFlowExecutionService flowService,
             IProjectRepository projectRepository,
             IProjectFlowStorage flowStorage,
@@ -117,7 +118,7 @@ public static class PreviewNodeEndpoints
                     flow,
                     debugOptions,
                     inputData,
-                    CancellationToken.None);
+                    context.RequestAborted);
 
                 // 获取目标节点的输出
                 if (!result.IntermediateResults.TryGetValue(request.TargetNodeId, out var nodeOutput))

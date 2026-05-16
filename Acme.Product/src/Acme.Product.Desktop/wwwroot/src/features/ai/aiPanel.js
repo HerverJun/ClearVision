@@ -5009,7 +5009,7 @@ export class AiPanel {
             this._syncPendingParameterDrafts(this.currentResult, this.currentResult?.flow, { force: true });
             this._renderFollowupChecklist(this.currentResult, this.currentResult?.flow);
             this._renderParameterDraftEditor(this.currentResult, this.currentResult?.flow);
-            this.options.onApplied?.(flow);
+            this.options.onApplied?.(this.flowCanvas.serialize?.() || flow);
             this.options.showToast?.('方案已应用到画布', 'success');
             this._setWorkbenchState(AiWorkbenchStates.APPLIED);
 
@@ -5050,6 +5050,11 @@ export class AiPanel {
             this._preApplySnapshot = null;
             this._preApplySnapshotVersion = 0;
             this._preApplyCanvasRevision = 0;
+            this.options.onCanvasChanged?.({
+                source: 'ai',
+                action: 'undo-apply',
+                flow: this.flowCanvas.serialize?.() || null
+            });
             this._setResultStatusNote('已撤销上一次应用。', 'info');
             this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
             this._addMessage('system', '已撤销应用，画布已恢复到应用前状态。');
