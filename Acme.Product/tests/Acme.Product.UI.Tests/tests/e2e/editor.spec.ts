@@ -1,9 +1,79 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { bootAuthenticatedApp } from './authHelper';
 
 const PROPERTY_SIDEBAR_SELECTOR = '[data-sidebar="property"]';
 const PROPERTY_RESIZER_SELECTOR = '[data-sidebar-resizer="property"]';
 const PROPERTY_SIDEBAR_STORAGE_KEY = 'cv_flow_property_sidebar_width';
+const OPERATOR_LIBRARY_EXPANDED_STORAGE_KEY = 'operator-library-expanded-categories-v2';
+
+async function stubGroupedOperatorLibrary(page: Page) {
+  const metadataByType: Record<string, {
+    type: string;
+    displayName: string;
+    category: string;
+    description: string;
+    parameters: unknown[];
+    inputPorts: Array<{ name: string; dataType: string }>;
+    outputPorts: Array<{ name: string; dataType: string }>;
+  }> = {
+    ImageAcquisition: {
+      type: 'ImageAcquisition',
+      displayName: '图像采集',
+      category: '输入',
+      description: '从相机或文件获取图像',
+      parameters: [],
+      inputPorts: [],
+      outputPorts: [{ name: 'Image', dataType: 'Image' }],
+    },
+    Threshold: {
+      type: 'Threshold',
+      displayName: '二值化',
+      category: '预处理',
+      description: '图像阈值分割',
+      parameters: [],
+      inputPorts: [{ name: 'Image', dataType: 'Image' }],
+      outputPorts: [{ name: 'Binary', dataType: 'Image' }],
+    },
+    GaussianBlur: {
+      type: 'GaussianBlur',
+      displayName: '高斯滤波',
+      category: '预处理',
+      description: '图像滤波降噪处理',
+      parameters: [],
+      inputPorts: [{ name: 'Image', dataType: 'Image' }],
+      outputPorts: [{ name: 'Image', dataType: 'Image' }],
+    },
+  };
+
+  await page.route('**/api/operators/types', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(Object.keys(metadataByType)),
+    });
+  });
+
+  await page.route('**/api/operators/*/metadata', async route => {
+    const url = new URL(route.request().url());
+    const pathParts = url.pathname.split('/');
+    const type = decodeURIComponent(pathParts[pathParts.length - 2] ?? '');
+    const metadata = metadataByType[type];
+
+    await route.fulfill({
+      status: metadata ? 200 : 404,
+      contentType: 'application/json',
+      body: JSON.stringify(metadata ?? { message: 'not found' }),
+    });
+  });
+
+  await page.route('**/api/operators/library', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '[]',
+    });
+  });
+}
 
 async function getSidebarWidth(page) {
   return page.locator(PROPERTY_SIDEBAR_SELECTOR).evaluate(node =>
@@ -85,6 +155,22 @@ test.describe('Flow Editor', () => {
 
   test('should have operator library', async ({ page }) => {
     await expect(page.locator('#operator-library')).toBeVisible();
+  });
+
+  test('starts operator library categories collapsed and expands on demand', async ({ page }) => {
+    await stubGroupedOperatorLibrary(page);
+    await page.evaluate(storageKey => localStorage.removeItem(storageKey), OPERATOR_LIBRARY_EXPANDED_STORAGE_KEY);
+    await page.reload();
+    await expect(page.locator('#loading-screen')).toBeHidden();
+
+    await expect(page.locator('#operator-library .category-content-wrapper')).toHaveCount(2);
+    await expect(page.locator('#operator-library .operator-draggable')).toHaveCount(0);
+    await expect(page.locator('#operator-library .category-count')).toHaveText(['1', '2']);
+
+    await page.locator('#operator-library .category-content-wrapper', { hasText: '预处理' }).click();
+    await expect(page.locator('#operator-library .operator-draggable')).toHaveCount(2);
+    await expect(page.locator('#operator-library')).toContainText('二值化');
+    await expect(page.locator('#operator-library')).toContainText('高斯滤波');
   });
 
   test('shows a property sidebar resizer and supports wider and narrower widths', async ({ page }) => {

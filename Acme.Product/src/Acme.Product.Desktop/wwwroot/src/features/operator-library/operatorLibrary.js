@@ -43,8 +43,8 @@ export class OperatorLibraryPanel {
         this.onOperatorDragStart = null;
         this.onOperatorSelected = null;
 
-        // 【新增】展开状态持久化
-        this.storageKey = 'operator-library-expanded-categories';
+        // 展开状态持久化。v2 从默认折叠开始，避免旧版全展开缓存覆盖启动默认状态。
+        this.storageKey = 'operator-library-expanded-categories-v2';
 
         this.initialize();
     }
@@ -570,7 +570,7 @@ export class OperatorLibraryPanel {
                 type: 'category',
                 icon: null, // 禁止 TreeView 默认渲染 (会转义 SVG)
                 fallbackIconPath: categoryIconPath,
-                expanded: true,
+                expanded: false,
                 children: operators.map((op, index) => {
                     // 预先获取图标路径并注入到 operator 数据中，
                     // 这样拖拽到画布时，flowEditorInteraction.js 就能直接使用正确的图标
@@ -591,17 +591,9 @@ export class OperatorLibraryPanel {
         });
         
         this.treeView.setData(treeData);
-
-        // 【关键修复】初始化 expandedNodes，确保所有设置了 expanded: true 的节点 ID 都在 Set 中
-        // 这样第一次点击就能正确切换状态
-        treeData.forEach(node => {
-            if (node.expanded) {
-                this.treeView.expandedNodes.add(node.id);
-            }
-        });
         
-        // 【新增】加载保存的展开状态（覆盖默认值）
-        this.loadExpandedState();
+        // 加载保存的展开状态；没有保存值时保持启动默认折叠。
+        this.loadExpandedState(treeData);
         
         // 【调试】打印展开状态
         console.log('[OperatorLibrary] After setData, expandedNodes:', Array.from(this.treeView.expandedNodes));
@@ -622,11 +614,13 @@ export class OperatorLibraryPanel {
     }
 
     /**
-     * 【新增】保存展开状态到 localStorage
+     * 保存展开状态到 localStorage
      */
     saveExpandedState() {
         try {
-            const expandedIds = Array.from(this.treeView.expandedNodes);
+            const categoryIds = new Set((this.treeView.root?.children || []).map(node => node.id));
+            const expandedIds = Array.from(this.treeView.expandedNodes)
+                .filter(id => categoryIds.has(id));
             localStorage.setItem(this.storageKey, JSON.stringify(expandedIds));
         } catch (e) {
             console.warn('[OperatorLibrary] Failed to save expanded state:', e);
@@ -634,22 +628,39 @@ export class OperatorLibraryPanel {
     }
 
     /**
-     * 【新增】从 localStorage 加载展开状态
+     * 从 localStorage 加载展开状态
      */
-    loadExpandedState() {
+    loadExpandedState(treeData = []) {
         try {
             const saved = localStorage.getItem(this.storageKey);
             console.log('[OperatorLibrary] Loading expanded state from localStorage:', saved);
-            if (saved) {
-                const expandedIds = JSON.parse(saved);
-                console.log('[OperatorLibrary] Parsed expandedIds:', expandedIds);
-                expandedIds.forEach(id => this.treeView.expandedNodes.add(id));
-                console.log('[OperatorLibrary] After loading, expandedNodes:', Array.from(this.treeView.expandedNodes));
-                // 加载状态后重新渲染
+            this.treeView.expandedNodes.clear();
+
+            if (!saved) {
                 this.treeView.render();
+                return;
             }
+
+            const expandedIds = JSON.parse(saved);
+            console.log('[OperatorLibrary] Parsed expandedIds:', expandedIds);
+            if (!Array.isArray(expandedIds)) {
+                localStorage.removeItem(this.storageKey);
+                this.treeView.render();
+                return;
+            }
+
+            const categoryIds = new Set(treeData.map(node => node.id));
+            expandedIds
+                .filter(id => categoryIds.has(id))
+                .forEach(id => this.treeView.expandedNodes.add(id));
+
+            console.log('[OperatorLibrary] After loading, expandedNodes:', Array.from(this.treeView.expandedNodes));
+            // 加载状态后重新渲染
+            this.treeView.render();
         } catch (e) {
             console.warn('[OperatorLibrary] Failed to load expanded state:', e);
+            this.treeView.expandedNodes.clear();
+            this.treeView.render();
         }
     }
 
@@ -706,11 +717,13 @@ export class OperatorLibraryPanel {
         // 展开全部
         this.container.querySelector('#btn-expand-all').addEventListener('click', () => {
             this.treeView.expandAll();
+            this.saveExpandedState();
         });
         
         // 折叠全部
         this.container.querySelector('#btn-collapse-all').addEventListener('click', () => {
             this.treeView.collapseAll();
+            this.saveExpandedState();
         });
         
         // 刷新列表

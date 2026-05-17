@@ -75,4 +75,60 @@ public class OperatorMetadataMigrationTests
         Assert.Equal("深度学习", metadataByType[OperatorType.DeepLearning].DisplayName);
         Assert.Equal("AI检测", metadataByType[OperatorType.DeepLearning].Category);
     }
+
+    [Fact]
+    public void MetadataCatalog_ShouldUseSupportedOperatorLibraryCategories()
+    {
+        var supportedCategories = new HashSet<string>
+        {
+            "3D",
+            "AI检测",
+            "变量",
+            "标定",
+            "采集",
+            "测量",
+            "拆分组合",
+            "定位",
+            "辅助",
+            "检测",
+            "控制",
+            "流程控制",
+            "逻辑工具",
+            "匹配定位",
+            "频域",
+            "区域处理",
+            "识别",
+            "输出",
+            "数据",
+            "数据处理",
+            "特征提取",
+            "通信",
+            "通用",
+            "图像处理",
+            "纹理",
+            "颜色处理",
+            "预处理"
+        };
+
+        var metadataByType = new OperatorFactory()
+            .GetAllMetadata()
+            .ToDictionary(m => m.Type, m => m);
+
+        var unsupported = metadataByType.Values
+            .Where(metadata => !supportedCategories.Contains(metadata.Category))
+            .Select(metadata => $"{metadata.Type}:{metadata.Category}")
+            .OrderBy(item => item)
+            .ToList();
+
+        Assert.True(
+            unsupported.Count == 0,
+            $"Unsupported operator library categories: {string.Join(", ", unsupported)}");
+
+        Assert.Equal("逻辑工具", metadataByType[OperatorType.Comparator].Category);
+        Assert.Equal("特征提取", metadataByType[OperatorType.SubpixelEdgeDetection].Category);
+        Assert.Equal("标定", metadataByType[OperatorType.HandEyeCalibration].Category);
+        Assert.Equal("手眼标定", metadataByType[OperatorType.HandEyeCalibration].DisplayName);
+        Assert.Equal("标定", metadataByType[OperatorType.HandEyeCalibrationValidator].Category);
+        Assert.Equal("手眼标定验证", metadataByType[OperatorType.HandEyeCalibrationValidator].DisplayName);
+    }
 }

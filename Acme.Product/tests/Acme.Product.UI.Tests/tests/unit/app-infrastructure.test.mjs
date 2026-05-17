@@ -4,6 +4,10 @@ import { EventBus } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/
 import { ServiceRegistry } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/app/serviceRegistry.js';
 import { createFlowCanvasAdapter } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvasAdapter.js';
 import { bindToolbarCommands } from '../../../../src/Acme.Product.Desktop/wwwroot/src/core/app/commandHandlers.js';
+import {
+  getCategoryIconPath,
+  getOperatorColor
+} from '../../../../src/Acme.Product.Desktop/wwwroot/src/shared/operatorVisuals.js';
 
 test('event bus publishes and unsubscribes frontend events', () => {
   const bus = new EventBus();
@@ -138,4 +142,14 @@ test('toolbar save syncs serialized canvas flow into project manager before pers
   assert.equal(updates[0], serializedFlow);
   assert.equal(saves.length, 1);
   assert.equal(saves[0].flow, serializedFlow);
+});
+
+test('operator visual registry supports localized category groups', () => {
+  const defaultIcon = getCategoryIconPath('__missing-category__');
+  const localizedCategories = ['频域', '区域处理', '纹理'];
+
+  for (const category of localizedCategories) {
+    assert.notEqual(getCategoryIconPath(category), defaultIcon);
+    assert.notEqual(getOperatorColor('__missing-operator__', category), '#595959');
+  }
 });
