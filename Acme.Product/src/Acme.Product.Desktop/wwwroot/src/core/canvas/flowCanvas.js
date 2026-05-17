@@ -378,6 +378,12 @@ class FlowCanvas {
      * 添加连接
      */
     addConnection(sourceId, sourcePort, targetId, targetPort) {
+        const validationError = this.getConnectionValidationError(sourceId, sourcePort, targetId, targetPort);
+        if (validationError) {
+            console.warn('[FlowCanvas] Connection rejected:', validationError, { sourceId, sourcePort, targetId, targetPort });
+            return null;
+        }
+
         const connection = {
             id: this.generateUUID(),
             source: sourceId,
@@ -391,6 +397,70 @@ class FlowCanvas {
         this.invalidate();
         this.markFlowStructureChanged('addConnection');
         return connection;
+    }
+
+    getConnectionValidationError(sourceId, sourcePort, targetId, targetPort) {
+        const sourceNode = this.nodes.get(sourceId);
+        const targetNode = this.nodes.get(targetId);
+        if (!sourceNode || !targetNode) {
+            return 'missing-node';
+        }
+
+        if (sourceId === targetId) {
+            return 'self-connection';
+        }
+
+        if (!sourceNode.outputs?.[sourcePort] || !targetNode.inputs?.[targetPort]) {
+            return 'missing-port';
+        }
+
+        const existingConn = this.connections.find(conn =>
+            conn.source === sourceId &&
+            conn.sourcePort === sourcePort &&
+            conn.target === targetId &&
+            conn.targetPort === targetPort
+        );
+        if (existingConn) {
+            return 'duplicate-connection';
+        }
+
+        if (this.getConnectionAtPort(targetId, targetPort, false)) {
+            return 'input-port-occupied';
+        }
+
+        if (this.wouldCreateCycle(sourceId, targetId)) {
+            return 'cycle';
+        }
+
+        return null;
+    }
+
+    wouldCreateCycle(sourceId, targetId) {
+        if (sourceId === targetId) {
+            return true;
+        }
+
+        const visited = new Set();
+        const stack = [targetId];
+        while (stack.length > 0) {
+            const current = stack.pop();
+            if (current === sourceId) {
+                return true;
+            }
+
+            if (!current || visited.has(current)) {
+                continue;
+            }
+
+            visited.add(current);
+            for (const conn of this.connections) {
+                if (conn.source === current && !visited.has(conn.target)) {
+                    stack.push(conn.target);
+                }
+            }
+        }
+
+        return false;
     }
 
     _indexConnection(connection) {
@@ -1051,12 +1121,23 @@ class FlowCanvas {
         }
 
         // 创建连接
+        if (this.wouldCreateCycle(this.connectingFrom.nodeId, nodeId)) {
+            console.warn('[FlowCanvas] Connection would create a cycle');
+            if (window.showToast) window.showToast('Connection would create a cycle', 'warning');
+            this.cancelConnection();
+            return;
+        }
+
         const connection = this.addConnection(
             this.connectingFrom.nodeId,
             this.connectingFrom.portIndex,
             nodeId,
             portIndex
         );
+        if (!connection) {
+            this.cancelConnection();
+            return;
+        }
 
         console.log('[FlowCanvas] 连接已创建:', connection);
 

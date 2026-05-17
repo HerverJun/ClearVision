@@ -99,6 +99,7 @@ internal static class FlowEntityMapper
             {
                 SetId(@operator, operatorData.Id);
             }
+            ApplyOperatorEnabledState(@operator, operatorData.IsEnabled);
 
             if (operatorData.InputPorts?.Count > 0)
             {
@@ -173,7 +174,7 @@ internal static class FlowEntityMapper
                 continue;
             }
 
-            flow.AddConnection(new OperatorConnection(
+            TryAddConnection(flow, new OperatorConnection(
                 sourceOperator.Id,
                 sourcePortId,
                 targetOperator.Id,
@@ -252,7 +253,7 @@ internal static class FlowEntityMapper
                 continue;
             }
 
-            flow.AddConnection(new OperatorConnection(
+            TryAddConnection(flow, new OperatorConnection(
                 sourceOperator.Id,
                 sourcePortId,
                 targetOperator.Id,
@@ -287,6 +288,7 @@ internal static class FlowEntityMapper
             {
                 SetId(@operator, operatorData.Id);
             }
+            ApplyOperatorEnabledState(@operator, operatorData.IsEnabled);
 
             if (operatorData.InputPorts?.Count > 0)
             {
@@ -387,7 +389,7 @@ internal static class FlowEntityMapper
                 continue;
             }
 
-            flow.AddConnection(new OperatorConnection(
+            TryAddConnection(flow, new OperatorConnection(
                 sourceOperator.Id,
                 sourcePortId,
                 targetOperator.Id,
@@ -838,6 +840,30 @@ internal static class FlowEntityMapper
     private static void SetId(object entity, Guid id)
     {
         entity.GetType().GetProperty("Id")?.SetValue(entity, id);
+    }
+
+    private static void ApplyOperatorEnabledState(Operator @operator, bool isEnabled)
+    {
+        if (isEnabled)
+        {
+            @operator.Enable();
+            return;
+        }
+
+        @operator.Disable();
+    }
+
+    private static bool TryAddConnection(OperatorFlow flow, OperatorConnection connection)
+    {
+        try
+        {
+            flow.AddConnection(connection);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private readonly record struct ConnectionShape(

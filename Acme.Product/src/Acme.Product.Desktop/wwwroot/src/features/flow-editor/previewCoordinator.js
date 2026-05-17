@@ -383,6 +383,10 @@ export class NodePreviewCoordinator {
         this.getInputImageBase64 = options.getInputImageBase64 ?? (() => null);
         this.previewExecutor = options.previewExecutor ?? (async () => null);
         this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+        const maxCacheEntries = Number(options.maxCacheEntries ?? 30);
+        this.maxCacheEntries = Number.isFinite(maxCacheEntries)
+            ? Math.max(0, Math.floor(maxCacheEntries))
+            : 30;
 
         this.listeners = new Set();
         this.cache = new Map();
@@ -390,6 +394,8 @@ export class NodePreviewCoordinator {
         this.pendingTimer = null;
         this.activeAbortController = null;
         this.requestVersion = 0;
+        this.debugSessionId = null;
+        this.debugSessionScopeKey = null;
         this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
             ? options.subscribeStructureState(() => this.handleStructureChanged())
             : null;
@@ -415,6 +421,8 @@ export class NodePreviewCoordinator {
         this.unsubscribeStructure?.();
         this.listeners.clear();
         this.cache.clear();
+        this.debugSessionId = null;
+        this.debugSessionScopeKey = null;
     }
 
     getState() {
@@ -455,10 +463,18 @@ export class NodePreviewCoordinator {
 
         this.requestVersion += 1;
         this.cancelActivePreviewRequest();
+        const previousNodeId = this.state.activeNodeId || null;
 
         if (!node?.id) {
+            this.debugSessionId = null;
+            this.debugSessionScopeKey = null;
             this.updateState(createEmptyState());
             return;
+        }
+
+        if (previousNodeId !== node.id) {
+            this.debugSessionId = null;
+            this.debugSessionScopeKey = null;
         }
 
         const metadata = this.getOperatorMetadata(node.type);
@@ -506,6 +522,8 @@ export class NodePreviewCoordinator {
 
             const projectId = this.getProjectId();
             if (!projectId) {
+                this.debugSessionId = null;
+                this.debugSessionScopeKey = null;
                 this.updateState({
                     status: 'idle',
                     executionTimeMs: null,
@@ -557,6 +575,8 @@ export class NodePreviewCoordinator {
 
             const cached = this.cache.get(request.requestKey);
             if (!force && cached) {
+                this.cache.delete(request.requestKey);
+                this.cache.set(request.requestKey, cached);
                 this.updateState({
                     ...cached,
                     request
@@ -579,6 +599,7 @@ export class NodePreviewCoordinator {
 
             try {
                 const response = await this.previewExecutor(activeNode.id, {
+                    debugSessionId: this.getDebugSessionId(projectId, activeNode.id),
                     inputImageBase64,
                     parameters: null,
                     signal: abortController?.signal
@@ -607,7 +628,7 @@ export class NodePreviewCoordinator {
                     outputData: parsed.outputData
                 };
 
-                this.cache.set(request.requestKey, nextState);
+                this.setCacheEntry(request.requestKey, nextState);
                 this.updateState(nextState);
             } catch (error) {
                 if (isAbortError(error)) {
@@ -660,4 +681,46 @@ export class NodePreviewCoordinator {
             immediate: false
         });
     }
+
+    getDebugSessionId(projectId, nodeId) {
+        const scopeKey = `${projectId || ''}:${nodeId || ''}`;
+        if (this.debugSessionScopeKey !== scopeKey || !this.debugSessionId) {
+            this.debugSessionScopeKey = scopeKey;
+            this.debugSessionId = generatePreviewDebugSessionId();
+        }
+
+        return this.debugSessionId;
+    }
+
+    setCacheEntry(requestKey, value) {
+        if (this.maxCacheEntries <= 0) {
+            return;
+        }
+
+        if (this.cache.has(requestKey)) {
+            this.cache.delete(requestKey);
+        }
+
+        this.cache.set(requestKey, value);
+        while (this.cache.size > this.maxCacheEntries) {
+            const oldestKey = this.cache.keys().next().value;
+            if (oldestKey === undefined) {
+                break;
+            }
+            this.cache.delete(oldestKey);
+        }
+    }
+}
+
+function generatePreviewDebugSessionId() {
+    const cryptoRef = globalThis.crypto;
+    if (cryptoRef && typeof cryptoRef.randomUUID === 'function') {
+        return cryptoRef.randomUUID();
+    }
+
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+        const value = Math.random() * 16 | 0;
+        const nibble = char === 'x' ? value : (value & 0x3 | 0x8);
+        return nibble.toString(16);
+    });
 }

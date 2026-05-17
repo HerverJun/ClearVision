@@ -127,6 +127,31 @@ public class FlowDataMappingTests
     }
 
     [Fact]
+    public void FlowDataDto_ToEntity_PreservesCanvasOperatorDisabledState()
+    {
+        var operatorId = Guid.NewGuid();
+        var dto = new FlowDataDto
+        {
+            Operators = new List<CanvasOperatorDataDto>
+            {
+                new()
+                {
+                    Id = operatorId,
+                    Name = "DisabledResize",
+                    Type = "ImageResize",
+                    IsEnabled = false
+                }
+            }
+        };
+
+        var flow = dto.ToEntity();
+
+        flow.Operators.Should().ContainSingle();
+        flow.Operators.Single().Id.Should().Be(operatorId);
+        flow.Operators.Single().IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
     public void OperatorFlowDto_ToEntity_AllowsFrontendNumberCompatibilityGroups()
     {
         var sourceOperatorId = Guid.NewGuid();
@@ -191,5 +216,31 @@ public class FlowDataMappingTests
         flow.Connections.Should().ContainSingle();
         flow.Connections.Single().SourcePortId.Should().Be(sourcePortId);
         flow.Connections.Single().TargetPortId.Should().Be(targetPortId);
+    }
+
+    [Fact]
+    public void OperatorFlowDto_ToEntity_PreservesDisabledState()
+    {
+        var operatorId = Guid.NewGuid();
+        var dto = new OperatorFlowDto
+        {
+            Name = "DisabledOperatorFlow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = operatorId,
+                    Name = "DisabledThreshold",
+                    Type = OperatorType.Thresholding,
+                    IsEnabled = false
+                }
+            ]
+        };
+
+        var flow = dto.ToEntity();
+
+        flow.Operators.Should().ContainSingle();
+        flow.Operators.Single().Id.Should().Be(operatorId);
+        flow.Operators.Single().IsEnabled.Should().BeFalse();
     }
 }

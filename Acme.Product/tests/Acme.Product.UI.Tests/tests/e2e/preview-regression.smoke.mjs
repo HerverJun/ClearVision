@@ -204,6 +204,7 @@ async function runPreviewCoordinatorChecks() {
     outputs: [{ name: 'Image', type: 'Image' }],
   };
   let flowRevision = 1;
+  const debugSessionIds = [];
 
   const coordinator = new NodePreviewCoordinator({
     getProjectId: () => 'project-1',
@@ -211,8 +212,9 @@ async function runPreviewCoordinatorChecks() {
     getNodeById: () => node,
     getOperatorMetadata: () => null,
     getInputImageBase64: () => PNG_BASE64,
-    previewExecutor: async () => {
+    previewExecutor: async (_nodeId, options) => {
       previewCalls += 1;
+      debugSessionIds.push(options.debugSessionId);
       await sleep(10);
       return {
         success: true,
@@ -246,8 +248,40 @@ async function runPreviewCoordinatorChecks() {
   coordinator.handleStructureChanged();
   await sleep(80);
   assert.equal(previewCalls, 3, 'flow revision change should invalidate preview');
+  assert.equal(
+    new Set(debugSessionIds).size,
+    1,
+    'active node previews should keep one debug session so upstream debug cache can be reused'
+  );
 
   coordinator.destroy();
+
+  const boundedCacheCoordinator = new NodePreviewCoordinator({
+    getProjectId: () => 'project-1',
+    getFlowRevision: () => 1,
+    getNodeById: id => ({
+      id,
+      type: 'PreviewImageNode',
+      title: id,
+      parameters: [{ name: 'Value', value: id }],
+      outputs: [{ name: 'Image', type: 'Image' }],
+    }),
+    getOperatorMetadata: () => null,
+    previewExecutor: async () => ({
+      success: true,
+      outputImageBase64: PNG_BASE64,
+    }),
+    debounceMs: 1,
+    maxCacheEntries: 2,
+  });
+
+  for (const id of ['cache-node-1', 'cache-node-2', 'cache-node-3']) {
+    boundedCacheCoordinator.setActiveNode({ id, type: 'PreviewImageNode', title: id, parameters: [], outputs: [{ name: 'Image', type: 'Image' }] });
+    await sleep(20);
+  }
+
+  assert.equal(boundedCacheCoordinator.cache.size, 2, 'preview cache should be bounded');
+  boundedCacheCoordinator.destroy();
 }
 
 function runSourceWiringChecks() {

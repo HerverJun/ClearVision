@@ -59,9 +59,13 @@ export class NodePreviewOverlay {
             return;
         }
 
-        const presenter = this.state.presenter;
+        const presenter = { ...this.state.presenter };
         const primaryImageSrc = presenter.outputImageSrc || presenter.inputImageSrc || null;
         const primaryImageLabel = presenter.outputImageSrc ? '输出图像' : (presenter.inputImageSrc ? '输入图像' : '');
+        const safeTitle = escapeHtml(presenter.title || 'Node Preview');
+        const safeStatusText = escapeHtml(presenter.statusText);
+        presenter.title = safeTitle;
+        presenter.statusText = safeStatusText;
         const summaryItems = presenter.summaryItems.length > 0
             ? presenter.summaryItems.map(item => `
                 <div class="node-preview-summary-item">

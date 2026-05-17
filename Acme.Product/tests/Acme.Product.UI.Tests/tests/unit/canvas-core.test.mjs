@@ -300,6 +300,48 @@ test('FlowCanvas removeNode preserves _systemNode and clears selectedConnection'
   fc.destroy();
 });
 
+test('FlowCanvas addConnection rejects occupied inputs and cycles', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+
+  const source = fc.addNode('ImageAcquisition', 0, 0, {
+    inputs: [{ id: 'source-in', name: 'in', type: 'Image' }],
+    outputs: [{ id: 'source-out', name: 'out', type: 'Image' }]
+  });
+  const target = fc.addNode('Filtering', 200, 0, {
+    inputs: [{ id: 'target-in', name: 'in', type: 'Image' }],
+    outputs: [{ id: 'target-out', name: 'out', type: 'Image' }]
+  });
+  const otherSource = fc.addNode('ImageAcquisition', 400, 0, {
+    inputs: [],
+    outputs: [{ id: 'other-out', name: 'out', type: 'Image' }]
+  });
+
+  const first = fc.addConnection(source.id, 0, target.id, 0);
+  assert.ok(first);
+
+  assert.equal(
+    fc.addConnection(otherSource.id, 0, target.id, 0),
+    null,
+    'a target input port should accept only one incoming connection'
+  );
+  assert.equal(
+    fc.addConnection(target.id, 0, source.id, 0),
+    null,
+    'adding a reverse edge should not be allowed to create a cycle'
+  );
+
+  assert.equal(fc.connections.length, 1);
+  fc.destroy();
+});
+
 test('FlowCanvas serialize does not throw when DEBUG_FLOW_CANVAS is false', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

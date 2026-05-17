@@ -366,6 +366,55 @@ public class FlowExecutionServiceTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenOperatorDisabled_ShouldSkipExecutor()
+    {
+        var flow = new OperatorFlow("DisabledOperatorFlow");
+        var op = CreateOperatorWithPorts("Disabled", OperatorType.Thresholding);
+        op.Disable();
+        flow.AddOperator(op);
+
+        var result = await _sut.ExecuteFlowAsync(flow);
+
+        result.IsSuccess.Should().BeTrue();
+        result.OperatorResults.Should().ContainSingle();
+        result.OperatorResults.Single().OperatorId.Should().Be(op.Id);
+        result.OperatorResults.Single().IsSuccess.Should().BeTrue();
+        result.OutputData.Should().BeNull();
+        await _executor.DidNotReceive().ExecuteAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteFlowDebugAsync_WhenOperatorDisabled_ShouldSkipExecutorAndExposeEmptyPreviewResult()
+    {
+        var flow = new OperatorFlow("DisabledDebugFlow");
+        var op = CreateOperatorWithPorts("DisabledPreview", OperatorType.Thresholding);
+        op.Disable();
+        flow.AddOperator(op);
+
+        var result = await _sut.ExecuteFlowDebugAsync(
+            flow,
+            new DebugOptions
+            {
+                DebugSessionId = Guid.NewGuid(),
+                EnableIntermediateCache = true,
+                BreakAtOperatorId = op.Id
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        result.DebugOperatorResults.Should().ContainSingle();
+        result.DebugOperatorResults.Single().OperatorId.Should().Be(op.Id);
+        result.IntermediateResults.Should().ContainKey(op.Id);
+        result.IntermediateResults[op.Id].Should().BeEmpty();
+        await _executor.DidNotReceive().ExecuteAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public void PrepareOperatorInputs_LargeGraph_ShouldPreserveSemantics_AndHitIndexLookups()
     {
         // Arrange: build a large graph with many unrelated nodes/connections.

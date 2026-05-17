@@ -356,6 +356,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 break;
             }
 
+            status.CurrentOperatorId = op.Id;
+            status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
+
+            if (!op.IsEnabled)
+            {
+                result.OperatorResults.Add(CreateSkippedOperatorResult(op));
+                completedCount++;
+                continue;
+            }
+
             if (!TryResolveExecutor(op.Type, out var executor))
             {
                 result.OperatorResults.Add(new OperatorExecutionResult
@@ -490,6 +500,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         if (layerCts.Token.IsCancellationRequested)
         {
             return CreateCanceledOperatorResult(op);
+        }
+
+        if (!op.IsEnabled)
+        {
+            return CreateSkippedOperatorResult(op);
         }
 
         if (!TryResolveExecutor(op.Type, out var executor))
@@ -1397,6 +1412,27 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     }
                 }
 
+                status.CurrentOperatorId = op.Id;
+                status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
+
+                if (!op.IsEnabled)
+                {
+                    var skippedDebugResult = CreateSkippedDebugOperatorResult(op, completedCount, options.Breakpoints.Contains(op.Id));
+                    result.DebugOperatorResults.Add(skippedDebugResult);
+                    result.OperatorResults.Add(skippedDebugResult);
+                    result.IntermediateResults[op.Id] = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                    completedCount++;
+
+                    if (options.BreakAtOperatorId.HasValue && op.Id == options.BreakAtOperatorId.Value)
+                    {
+                        pausedOperatorId = op.Id;
+                        result.PausedOperatorId = pausedOperatorId;
+                        break;
+                    }
+
+                    continue;
+                }
+
                 if (!TryResolveExecutor(op.Type, out var executor))
                 {
                     var debugResult = new OperatorDebugResult
@@ -1876,6 +1912,37 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             IsSuccess = false,
             ExecutionTimeMs = executionTimeMs,
             ErrorMessage = OperatorCanceledErrorMessage
+        };
+    }
+
+    private static OperatorExecutionResult CreateSkippedOperatorResult(Operator op)
+    {
+        return new OperatorExecutionResult
+        {
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            IsSuccess = true,
+            ExecutionTimeMs = 0,
+            OutputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private static OperatorDebugResult CreateSkippedDebugOperatorResult(Operator op, int executionOrder, bool isBreakpoint)
+    {
+        var now = DateTime.UtcNow;
+        return new OperatorDebugResult
+        {
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            IsSuccess = true,
+            ExecutionTimeMs = 0,
+            ExecutionOrder = executionOrder,
+            StartTime = now,
+            EndTime = now,
+            IsBreakpoint = isBreakpoint,
+            InputSnapshot = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase),
+            OutputData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase),
+            OutputSnapshot = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         };
     }
 

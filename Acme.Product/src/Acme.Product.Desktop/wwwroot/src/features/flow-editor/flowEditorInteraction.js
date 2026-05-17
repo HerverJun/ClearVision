@@ -743,14 +743,27 @@ export class FlowEditorInteraction {
             debugLogger.debug('[DEBUG endConnection] Connection exists:', exists);
             debugLogger.debug('[DEBUG endConnection] Same node check:', source.nodeId === target.nodeId);
 
-            if (!exists && source.nodeId !== target.nodeId) {
+            const validationError = typeof this.canvas.getConnectionValidationError === 'function'
+                ? this.canvas.getConnectionValidationError(source.nodeId, source.portIndex, target.nodeId, target.portIndex)
+                : (exists || source.nodeId === target.nodeId ? 'invalid' : null);
+
+            if (!validationError) {
                 debugLogger.debug(`[DEBUG endConnection] Adding connection: ${source.nodeId}:${source.portIndex} -> ${target.nodeId}:${target.portIndex}`);
-                this.canvas.addConnection(source.nodeId, source.portIndex, target.nodeId, target.portIndex);
-                this.saveState();
-                showToast('Connected', 'success');
+                const connection = this.canvas.addConnection(source.nodeId, source.portIndex, target.nodeId, target.portIndex);
+                if (connection) {
+                    this.saveState();
+                    showToast('Connected', 'success');
+                } else {
+                    showToast('Connection already exists or invalid', 'warning');
+                }
             } else {
                 debugLogger.debug('[DEBUG endConnection] Connection skipped - exists or invalid');
-                showToast('Connection already exists or invalid', 'warning');
+                const message = validationError === 'input-port-occupied'
+                    ? 'Target input port already has a connection'
+                    : (validationError === 'cycle'
+                        ? 'Connection would create a cycle'
+                        : 'Connection already exists or invalid');
+                showToast(message, 'warning');
             }
         } else {
             debugLogger.debug('[DEBUG endConnection] No valid end port found or same type port');
@@ -1019,6 +1032,7 @@ export class FlowEditorInteraction {
         this.canvas.nodes = new Map(state.nodes);
         this.canvas.connections = state.connections;
         this.canvas._rebuildConnectionIndex?.();
+        this.canvas.markFlowStructureChanged?.('history-restore');
         this.canvas.render();
         this.syncProjectFlow();
     }

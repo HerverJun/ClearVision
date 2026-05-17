@@ -186,6 +186,13 @@ public class OperatorFlow : Entity
         }
 
         // 检查是否形成循环
+        if (Connections.Any(c =>
+                c.TargetOperatorId == connection.TargetOperatorId &&
+                c.TargetPortId == connection.TargetPortId))
+        {
+            throw new InvalidOperationException($"Target port {connection.TargetPortId} already has a connection");
+        }
+
         if (WouldCreateCycle(connection))
         {
             throw new InvalidOperationException("连接会形成循环依赖");

@@ -55,7 +55,7 @@ public class OperatorDto
     /// <summary>
     /// 是否启用
     /// </summary>
-    public bool IsEnabled { get; set; }
+    public bool IsEnabled { get; set; } = true;
 
     /// <summary>
     /// 执行状态

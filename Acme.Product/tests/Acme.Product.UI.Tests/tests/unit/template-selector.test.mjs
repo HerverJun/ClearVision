@@ -173,6 +173,7 @@ test('FlowEditorInteraction undo/redo restore syncs project flow and rebuilds co
 
   const updates = [];
   let rebuilt = false;
+  const structureReasons = [];
   const interaction = Object.create(FlowEditorInteraction.prototype);
   interaction.projectManager = {
     updateFlow(flow) {
@@ -184,6 +185,9 @@ test('FlowEditorInteraction undo/redo restore syncs project flow and rebuilds co
     connections: [],
     _rebuildConnectionIndex() {
       rebuilt = true;
+    },
+    markFlowStructureChanged(reason) {
+      structureReasons.push(reason);
     },
     render() {},
     serialize() {
@@ -204,6 +208,7 @@ test('FlowEditorInteraction undo/redo restore syncs project flow and rebuilds co
   interaction.restoreState();
 
   assert.equal(rebuilt, true);
+  assert.deepEqual(structureReasons, ['history-restore']);
   assert.equal(updates.length, 1);
   assert.deepEqual(updates[0].operators, [{ id: 'node-1' }]);
 });
