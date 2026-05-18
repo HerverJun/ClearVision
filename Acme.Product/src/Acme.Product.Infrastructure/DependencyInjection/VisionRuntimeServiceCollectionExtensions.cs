@@ -254,7 +254,9 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IResultAnalysisService, ResultAnalysisService>();
 
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly));
-        services.AddAutoMapper(typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly);
+        services.AddAutoMapper(
+            _ => { },
+            typeof(Acme.Product.Application.Commands.Projects.CreateProjectCommand).Assembly);
 
         services.AddSingleton<IProjectSerializer, ProjectJsonSerializer>();
         services.AddSingleton<IResultExporter, CsvResultExporter>();

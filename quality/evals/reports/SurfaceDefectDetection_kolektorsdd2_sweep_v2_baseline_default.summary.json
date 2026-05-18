@@ -1,0 +1,377 @@
+{
+  "schemaVersion": "quality-report-summary/v1",
+  "generatedAtUtc": "2026-05-18T03:40:18.024Z",
+  "sourceReport": {
+    "originalPath": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json",
+    "originalFileName": "SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json",
+    "originalSizeBytes": 1304630,
+    "originalSizeMiB": 1.24,
+    "originalSha256": "sha256:6c8c895adb9f2fb03f9c4b70b998ae9a32b36fe635ef15cacb9f0a351c61daeb",
+    "retentionDecision": "raw-json-removed-from-git",
+    "storageStatus": "Raw bulky payload is not stored in git. Regenerate from the runner profile or retain as CI/release artifact when needed."
+  },
+  "evidenceKind": "dataset",
+  "summary": {
+    "GeneratedAtUtc": "2026-05-01T04:52:47.1444238+00:00",
+    "Dataset": "KolektorSDD2",
+    "CandidateVersion": "v2",
+    "ProfileName": "baseline_default",
+    "IndexPath": "quality/datasets/kolektorsdd2_index.json",
+    "Split": "train",
+    "MaxSide": 256,
+    "Method": "LocalContrast",
+    "ThresholdMode": "Manual",
+    "NormalizationMode": "LocalMean",
+    "Threshold": 15,
+    "MinArea": 4,
+    "MaxArea": 1000000,
+    "MorphCleanSize": 1,
+    "MorphMode": "OpenClose",
+    "BackgroundKernelSize": 31,
+    "ReferenceStatsSigma": 2.5,
+    "RobustReferenceStats": false,
+    "ResponseNormalizeMode": "RawClamp",
+    "ClaheClipLimit": 2,
+    "ClaheTileGridSize": 8,
+    "ComponentFilterMode": "AreaOnly",
+    "SmallNoiseAreaMax": 0,
+    "MinElongationForSmallComponent": 0,
+    "CompactNoiseAreaMax": 0,
+    "CompactNoiseCircularityMin": 0,
+    "CompactNoiseFillRatioMin": 0,
+    "MinLocalResponseProminence": 0,
+    "CaseCount": 480,
+    "Passed": 480,
+    "Failed": 0,
+    "DefectImageCount": 120,
+    "NormalImageCount": 360,
+    "PixelTruePositive": 13394,
+    "PixelFalsePositive": 4911,
+    "PixelFalseNegative": 51869,
+    "PixelTrueNegative": 11258082,
+    "MaskIoU": 0.190868,
+    "Dice": 0.320553,
+    "PixelF1": 0.320553,
+    "ImageAuroc": 0.795984,
+    "PixelAuroc": 0.687859,
+    "ImagePrecision": 0.642857,
+    "ImageRecall": 0.825,
+    "ImageF1": 0.722628,
+    "FalsePositivePerImage": 0.152778,
+    "RuntimeMsP95": 4.731,
+    "MinImageAuroc": 0,
+    "MinPixelF1": 0,
+    "RuntimeMs": 2064.149,
+    "MemoryAllocationBytes": 32666560
+  },
+  "operators": [
+    {
+      "Operator": "SurfaceDefectDetection",
+      "CaseCount": 480,
+      "Passed": 480,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.285,
+      "MemoryAllocationBytesAvg": 67276,
+      "HasPublicDataset": true,
+      "EvidenceKind": "dataset",
+      "Dataset": "KolektorSDD2"
+    }
+  ],
+  "imageConfusion": {
+    "TruePositive": 99,
+    "FalsePositive": 55,
+    "FalseNegative": 21,
+    "TrueNegative": 305
+  },
+  "metricFailures": {
+    "count": 0,
+    "sample": []
+  },
+  "images": {
+    "totalCount": 480,
+    "passedCount": 480,
+    "failedCount": 0,
+    "imageIncorrectCount": 76,
+    "representativeIncorrectCases": [
+      {
+        "id": "10569",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10569.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10569_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 55,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 1413,
+          "trueNegative": 21883,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.505,
+        "memoryAllocationBytes": 101408,
+        "error": null
+      },
+      {
+        "id": "10206",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10206.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10206_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 53,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 1258,
+          "trueNegative": 22294,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.327,
+        "memoryAllocationBytes": 65024,
+        "error": null
+      },
+      {
+        "id": "12008",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/12008.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/12008_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 45,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 1242,
+          "trueNegative": 22566,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.163,
+        "memoryAllocationBytes": 57904,
+        "error": null
+      },
+      {
+        "id": "10401",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10401.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10401_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 46,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 951,
+          "trueNegative": 22601,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.556,
+        "memoryAllocationBytes": 73240,
+        "error": null
+      },
+      {
+        "id": "10159",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10159.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10159_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 61,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 930,
+          "trueNegative": 22366,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.475,
+        "memoryAllocationBytes": 92168,
+        "error": null
+      },
+      {
+        "id": "10301",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10301.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10301_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 50,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 781,
+          "trueNegative": 22771,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.601,
+        "memoryAllocationBytes": 58496,
+        "error": null
+      },
+      {
+        "id": "10672",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10672.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10672_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 48,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 591,
+          "trueNegative": 23985,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.69,
+        "memoryAllocationBytes": 71352,
+        "error": null
+      },
+      {
+        "id": "11713",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/11713.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/11713_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 101,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 358,
+          "trueNegative": 23194,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 3.972,
+        "memoryAllocationBytes": 74912,
+        "error": null
+      },
+      {
+        "id": "10808",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10808.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10808_GT.png",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 119,
+        "defectCount": 0,
+        "defectArea": 0,
+        "failureTaxonomy": [
+          "low_contrast_defect_miss"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 0,
+          "falseNegative": 293,
+          "trueNegative": 23259,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.886,
+        "memoryAllocationBytes": 70704,
+        "error": null
+      },
+      {
+        "id": "10267",
+        "imagePath": "quality/public_datasets/kolektorsdd2/extracted/train/10267.png",
+        "maskPath": "quality/public_datasets/kolektorsdd2/extracted/train/10267_GT.png",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageCorrect": false,
+        "passed": true,
+        "score": 126.217604,
+        "defectCount": 1,
+        "defectArea": 211.5,
+        "failureTaxonomy": [
+          "texture_noise_false_positive"
+        ],
+        "pixelTotals": {
+          "truePositive": 0,
+          "falsePositive": 289,
+          "falseNegative": 0,
+          "trueNegative": 23263,
+          "iou": 0,
+          "dice": 0,
+          "f1": 0
+        },
+        "runtimeMs": 4.479,
+        "memoryAllocationBytes": 64632,
+        "error": null
+      }
+    ]
+  },
+  "omittedPayloads": [
+    "Images[].Components",
+    "Images[].Diagnostics",
+    "Full per-image runner payload"
+  ],
+  "notes": [
+    "This summary preserves review and audit metadata while removing bulky raw sweep payload from git.",
+    "Use sourceReport.originalSha256 to verify an externally retained raw report."
+  ]
+}

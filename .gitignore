@@ -78,6 +78,11 @@ coverage/
 artifacts/
 publish/
 
+# Local build snapshots / ad hoc verification output
+/Acme.Product/build_check/
+/Acme.Product/temp_build_out/
+/Acme.Product/temp_test_out/
+
 # Notebook checkpoints
 notebooks/.ipynb_checkpoints/
 

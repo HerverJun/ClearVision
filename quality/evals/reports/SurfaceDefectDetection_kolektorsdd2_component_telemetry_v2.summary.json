@@ -1,0 +1,2375 @@
+{
+  "schemaVersion": "quality-report-summary/v1",
+  "generatedAtUtc": "2026-05-18T06:07:53.9038568Z",
+  "sourceReport": {
+    "originalPath": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_component_telemetry_v2.csv",
+    "originalFileName": "SurfaceDefectDetection_kolektorsdd2_component_telemetry_v2.csv",
+    "originalSizeBytes": 35701324,
+    "originalSizeMiB": 34.05,
+    "originalSha256": "sha256:0a3991153940b790c9ab619c131a730058b879012721a57ea3f74da732d22da4",
+    "retentionDecision": "raw-csv-removed-from-git",
+    "storageStatus": "Raw component-level telemetry is not stored in git. Regenerate from the SurfaceDefectDetection KolektorSDD2 runner or retain as a CI/release artifact when deep component replay is needed."
+  },
+  "evidenceKind": "dataset-component-telemetry",
+  "summary": {
+    "operator": "SurfaceDefectDetection",
+    "dataset": "KolektorSDD2",
+    "rowCount": 113134,
+    "profileCount": 9,
+    "uniqueProfileCaseCount": 3338,
+    "uniqueDatasetCaseCount": 715,
+    "splits": [
+      "test",
+      "train-validation"
+    ],
+    "sourceReportCount": 10,
+    "sourceReports": [
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_local_mean.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_targeted_combined_v2.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_prominence_guard.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_shape_response_area6.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeonly_kernel3.json",
+      "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeopen_kernel3.json"
+    ],
+    "componentKinds": [
+      {
+        "value": "false_positive",
+        "count": 110983
+      },
+      {
+        "value": "true_positive",
+        "count": 1891
+      },
+      {
+        "value": "false_negative",
+        "count": 260
+      }
+    ],
+    "componentSources": [
+      {
+        "value": "predicted",
+        "count": 112874
+      },
+      {
+        "value": "ground_truth",
+        "count": 260
+      }
+    ],
+    "imageTaxonomyByComponentRows": [
+      {
+        "value": "oversegmentation_false_positive",
+        "count": 85269
+      },
+      {
+        "value": "mask_overgrowth_false_positive",
+        "count": 21593
+      },
+      {
+        "value": "(blank)",
+        "count": 3647
+      },
+      {
+        "value": "texture_noise_false_positive",
+        "count": 885
+      },
+      {
+        "value": "undersegmentation_false_negative",
+        "count": 807
+      },
+      {
+        "value": "mask_boundary_mismatch",
+        "count": 752
+      },
+      {
+        "value": "low_contrast_defect_miss",
+        "count": 134
+      },
+      {
+        "value": "small_defect_miss",
+        "count": 47
+      }
+    ],
+    "imageTaxonomyByCases": [
+      {
+        "value": "oversegmentation_false_positive",
+        "count": 1551
+      },
+      {
+        "value": "texture_noise_false_positive",
+        "count": 597
+      },
+      {
+        "value": "(blank)",
+        "count": 462
+      },
+      {
+        "value": "mask_overgrowth_false_positive",
+        "count": 302
+      },
+      {
+        "value": "undersegmentation_false_negative",
+        "count": 226
+      },
+      {
+        "value": "low_contrast_defect_miss",
+        "count": 116
+      },
+      {
+        "value": "small_defect_miss",
+        "count": 43
+      },
+      {
+        "value": "mask_boundary_mismatch",
+        "count": 41
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "profile": "baseline_default",
+      "rowCount": 699,
+      "caseCount": 410,
+      "defectCaseCount": 230,
+      "normalCaseCount": 180,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json",
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 192,
+        "falsePositive": 180,
+        "falseNegative": 38,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.516129,
+        "recall": 0.834783,
+        "f1": 0.637874,
+        "pixelF1ByCase": {
+          "count": 410,
+          "min": 0.0,
+          "avg": 0.171917,
+          "p50": 0.0,
+          "p95": 0.698795,
+          "max": 0.814815
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "true_positive",
+          "count": 377
+        },
+        {
+          "value": "false_positive",
+          "count": 272
+        },
+        {
+          "value": "false_negative",
+          "count": 50
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 649
+        },
+        {
+          "value": "ground_truth",
+          "count": 50
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "(blank)",
+          "count": 238
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 226
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 186
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 33
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 9
+        },
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 5
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 2
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "texture_noise_false_positive",
+          "count": 178
+        },
+        {
+          "value": "(blank)",
+          "count": 98
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 93
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 29
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 9
+        },
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 2
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 699,
+        "min": 0.0,
+        "avg": 59.380544,
+        "p50": 6.5,
+        "p95": 336.0,
+        "max": 1624.0
+      },
+      "pixelArea": {
+        "count": 699,
+        "min": 1.0,
+        "avg": 79.384835,
+        "p50": 16.0,
+        "p95": 401.0,
+        "max": 1709.0
+      },
+      "ringProminence": {
+        "count": 699,
+        "min": -1.75,
+        "avg": 49.373773,
+        "p50": 32.071429,
+        "p95": 150.298851,
+        "max": 183.865079
+      },
+      "falsePositivePixels": {
+        "count": 699,
+        "min": 0.0,
+        "avg": 14.881259,
+        "p50": 9.0,
+        "p95": 63.0,
+        "max": 470.0
+      },
+      "falseNegativePixels": {
+        "count": 699,
+        "min": 0.0,
+        "avg": 26.577969,
+        "p50": 0.0,
+        "p95": 103.0,
+        "max": 1709.0
+      }
+    },
+    {
+      "profile": "low_contrast_clahe_local_mean",
+      "rowCount": 27459,
+      "caseCount": 480,
+      "defectCaseCount": 120,
+      "normalCaseCount": 360,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_local_mean.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 120,
+        "falsePositive": 360,
+        "falseNegative": 0,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.25,
+        "recall": 1.0,
+        "f1": 0.4,
+        "pixelF1ByCase": {
+          "count": 480,
+          "min": 0.0,
+          "avg": 0.06011,
+          "p50": 0.0,
+          "p95": 0.407799,
+          "max": 0.767784
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 27129
+        },
+        {
+          "value": "true_positive",
+          "count": 328
+        },
+        {
+          "value": "false_negative",
+          "count": 2
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 27457
+        },
+        {
+          "value": "ground_truth",
+          "count": 2
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 21126
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 4735
+        },
+        {
+          "value": "(blank)",
+          "count": 1189
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 258
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 151
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 360
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 73
+        },
+        {
+          "value": "(blank)",
+          "count": 36
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 7
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 4
+        }
+      ],
+      "componentArea": {
+        "count": 27459,
+        "min": 0.0,
+        "avg": 9.5734,
+        "p50": 6.0,
+        "p95": 21.5,
+        "max": 2719.0
+      },
+      "pixelArea": {
+        "count": 27459,
+        "min": 1.0,
+        "avg": 24.179213,
+        "p50": 18.0,
+        "p95": 52.0,
+        "max": 3037.0
+      },
+      "ringProminence": {
+        "count": 27459,
+        "min": -4.5,
+        "avg": 30.327611,
+        "p50": 28.625,
+        "p95": 45.189189,
+        "max": 178.468966
+      },
+      "falsePositivePixels": {
+        "count": 27459,
+        "min": 0.0,
+        "avg": 23.07218,
+        "p50": 18.0,
+        "p95": 51.0,
+        "max": 710.0
+      },
+      "falseNegativePixels": {
+        "count": 27459,
+        "min": 0.0,
+        "avg": 0.003787,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 103.0
+      }
+    },
+    {
+      "profile": "low_contrast_clahe_percentile_stats",
+      "rowCount": 53049,
+      "caseCount": 480,
+      "defectCaseCount": 120,
+      "normalCaseCount": 360,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 120,
+        "falsePositive": 360,
+        "falseNegative": 0,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.25,
+        "recall": 1.0,
+        "f1": 0.4,
+        "pixelF1ByCase": {
+          "count": 480,
+          "min": 0.0,
+          "avg": 0.031128,
+          "p50": 0.0,
+          "p95": 0.209397,
+          "max": 0.548795
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 52749
+        },
+        {
+          "value": "true_positive",
+          "count": 299
+        },
+        {
+          "value": "false_negative",
+          "count": 1
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 53048
+        },
+        {
+          "value": "ground_truth",
+          "count": 1
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 40795
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 11860
+        },
+        {
+          "value": "(blank)",
+          "count": 282
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 112
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 360
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 114
+        },
+        {
+          "value": "(blank)",
+          "count": 5
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 53049,
+        "min": 0.0,
+        "avg": 25.205093,
+        "p50": 9.0,
+        "p95": 73.0,
+        "max": 15605.0
+      },
+      "pixelArea": {
+        "count": 53049,
+        "min": 1.0,
+        "avg": 53.318234,
+        "p50": 26.0,
+        "p95": 151.0,
+        "max": 17649.0
+      },
+      "ringProminence": {
+        "count": 53049,
+        "min": -6.75,
+        "avg": 39.357374,
+        "p50": 36.875,
+        "p95": 61.57732,
+        "max": 175.789116
+      },
+      "falsePositivePixels": {
+        "count": 53049,
+        "min": 0.0,
+        "avg": 52.539746,
+        "p50": 26.0,
+        "p95": 150.0,
+        "max": 17649.0
+      },
+      "falseNegativePixels": {
+        "count": 53049,
+        "min": 0.0,
+        "avg": 1.9E-05,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 1.0
+      }
+    },
+    {
+      "profile": "targeted_combined_v2",
+      "rowCount": 1914,
+      "caseCount": 444,
+      "defectCaseCount": 120,
+      "normalCaseCount": 324,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_targeted_combined_v2.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 116,
+        "falsePositive": 324,
+        "falseNegative": 4,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.263636,
+        "recall": 0.966667,
+        "f1": 0.414286,
+        "pixelF1ByCase": {
+          "count": 444,
+          "min": 0.0,
+          "avg": 0.099554,
+          "p50": 0.0,
+          "p95": 0.645455,
+          "max": 0.842912
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 1766
+        },
+        {
+          "value": "true_positive",
+          "count": 117
+        },
+        {
+          "value": "false_negative",
+          "count": 31
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 1883
+        },
+        {
+          "value": "ground_truth",
+          "count": 31
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 1216
+        },
+        {
+          "value": "(blank)",
+          "count": 260
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 153
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 150
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 68
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 61
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 4
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 2
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 228
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 96
+        },
+        {
+          "value": "(blank)",
+          "count": 66
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 19
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 19
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 12
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 3
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 1914,
+        "min": 0.0,
+        "avg": 38.50209,
+        "p50": 15.0,
+        "p95": 101.5,
+        "max": 2719.0
+      },
+      "pixelArea": {
+        "count": 1914,
+        "min": 1.0,
+        "avg": 70.671891,
+        "p50": 39.0,
+        "p95": 185.0,
+        "max": 3037.0
+      },
+      "ringProminence": {
+        "count": 1914,
+        "min": -4.5,
+        "avg": 37.692769,
+        "p50": 32.638298,
+        "p95": 69.977273,
+        "max": 178.468966
+      },
+      "falsePositivePixels": {
+        "count": 1914,
+        "min": 0.0,
+        "avg": 54.630617,
+        "p50": 36.0,
+        "p95": 143.0,
+        "max": 710.0
+      },
+      "falseNegativePixels": {
+        "count": 1914,
+        "min": 0.0,
+        "avg": 2.183386,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 823.0
+      }
+    },
+    {
+      "profile": "texture_noise_compact_circularity_area8",
+      "rowCount": 132,
+      "caseCount": 121,
+      "defectCaseCount": 120,
+      "normalCaseCount": 1,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 36,
+        "falsePositive": 1,
+        "falseNegative": 84,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.972973,
+        "recall": 0.3,
+        "f1": 0.458599,
+        "pixelF1ByCase": {
+          "count": 121,
+          "min": 0.0,
+          "avg": 0.146992,
+          "p50": 0.0,
+          "p95": 0.70675,
+          "max": 0.760976
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_negative",
+          "count": 93
+        },
+        {
+          "value": "true_positive",
+          "count": 38
+        },
+        {
+          "value": "false_positive",
+          "count": 1
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "ground_truth",
+          "count": 93
+        },
+        {
+          "value": "predicted",
+          "count": 39
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 72
+        },
+        {
+          "value": "(blank)",
+          "count": 32
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 20
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 7
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 1
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 65
+        },
+        {
+          "value": "(blank)",
+          "count": 29
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 19
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 7
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 132,
+        "min": 0.0,
+        "avg": 360.742424,
+        "p50": 162.0,
+        "p95": 1254.0,
+        "max": 6837.5
+      },
+      "pixelArea": {
+        "count": 132,
+        "min": 1.0,
+        "avg": 405.69697,
+        "p50": 202.0,
+        "p95": 1336.0,
+        "max": 7003.0
+      },
+      "ringProminence": {
+        "count": 132,
+        "min": -1.75,
+        "avg": 81.069864,
+        "p50": 65.909091,
+        "p95": 165.431034,
+        "max": 183.044643
+      },
+      "falsePositivePixels": {
+        "count": 132,
+        "min": 0.0,
+        "avg": 15.325758,
+        "p50": 0.0,
+        "p95": 93.0,
+        "max": 376.0
+      },
+      "falseNegativePixels": {
+        "count": 132,
+        "min": 0.0,
+        "avg": 330.454545,
+        "p50": 105.0,
+        "p95": 1258.0,
+        "max": 7003.0
+      }
+    },
+    {
+      "profile": "texture_noise_prominence_guard",
+      "rowCount": 27095,
+      "caseCount": 480,
+      "defectCaseCount": 120,
+      "normalCaseCount": 360,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_prominence_guard.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 120,
+        "falsePositive": 360,
+        "falseNegative": 0,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.25,
+        "recall": 1.0,
+        "f1": 0.4,
+        "pixelF1ByCase": {
+          "count": 480,
+          "min": 0.0,
+          "avg": 0.06033,
+          "p50": 0.0,
+          "p95": 0.410714,
+          "max": 0.767784
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 26767
+        },
+        {
+          "value": "true_positive",
+          "count": 326
+        },
+        {
+          "value": "false_negative",
+          "count": 2
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 27093
+        },
+        {
+          "value": "ground_truth",
+          "count": 2
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 20841
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 4682
+        },
+        {
+          "value": "(blank)",
+          "count": 1167
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 254
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 151
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 360
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 73
+        },
+        {
+          "value": "(blank)",
+          "count": 36
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 7
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 4
+        }
+      ],
+      "componentArea": {
+        "count": 27095,
+        "min": 0.0,
+        "avg": 9.611128,
+        "p50": 6.0,
+        "p95": 22.0,
+        "max": 2719.0
+      },
+      "pixelArea": {
+        "count": 27095,
+        "min": 1.0,
+        "avg": 24.335006,
+        "p50": 18.0,
+        "p95": 52.0,
+        "max": 3037.0
+      },
+      "ringProminence": {
+        "count": 27095,
+        "min": -4.5,
+        "avg": 30.359596,
+        "p50": 28.653846,
+        "p95": 45.24,
+        "max": 178.468966
+      },
+      "falsePositivePixels": {
+        "count": 27095,
+        "min": 0.0,
+        "avg": 23.213766,
+        "p50": 18.0,
+        "p95": 51.0,
+        "max": 710.0
+      },
+      "falseNegativePixels": {
+        "count": 27095,
+        "min": 0.0,
+        "avg": 0.003838,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 103.0
+      }
+    },
+    {
+      "profile": "texture_noise_shape_response_area6",
+      "rowCount": 1914,
+      "caseCount": 444,
+      "defectCaseCount": 120,
+      "normalCaseCount": 324,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_shape_response_area6.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 116,
+        "falsePositive": 324,
+        "falseNegative": 4,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.263636,
+        "recall": 0.966667,
+        "f1": 0.414286,
+        "pixelF1ByCase": {
+          "count": 444,
+          "min": 0.0,
+          "avg": 0.099554,
+          "p50": 0.0,
+          "p95": 0.645455,
+          "max": 0.842912
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 1766
+        },
+        {
+          "value": "true_positive",
+          "count": 117
+        },
+        {
+          "value": "false_negative",
+          "count": 31
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 1883
+        },
+        {
+          "value": "ground_truth",
+          "count": 31
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 1216
+        },
+        {
+          "value": "(blank)",
+          "count": 260
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 153
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 150
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 68
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 61
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 4
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 2
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 228
+        },
+        {
+          "value": "texture_noise_false_positive",
+          "count": 96
+        },
+        {
+          "value": "(blank)",
+          "count": 66
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 19
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 19
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 12
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 3
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 1914,
+        "min": 0.0,
+        "avg": 38.50209,
+        "p50": 15.0,
+        "p95": 101.5,
+        "max": 2719.0
+      },
+      "pixelArea": {
+        "count": 1914,
+        "min": 1.0,
+        "avg": 70.671891,
+        "p50": 39.0,
+        "p95": 185.0,
+        "max": 3037.0
+      },
+      "ringProminence": {
+        "count": 1914,
+        "min": -4.5,
+        "avg": 37.692769,
+        "p50": 32.638298,
+        "p95": 69.977273,
+        "max": 178.468966
+      },
+      "falsePositivePixels": {
+        "count": 1914,
+        "min": 0.0,
+        "avg": 54.630617,
+        "p50": 36.0,
+        "p95": 143.0,
+        "max": 710.0
+      },
+      "falseNegativePixels": {
+        "count": 1914,
+        "min": 0.0,
+        "avg": 2.183386,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 823.0
+      }
+    },
+    {
+      "profile": "undersegmentation_closeonly_kernel3",
+      "rowCount": 555,
+      "caseCount": 273,
+      "defectCaseCount": 120,
+      "normalCaseCount": 153,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeonly_kernel3.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 114,
+        "falsePositive": 153,
+        "falseNegative": 6,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.426966,
+        "recall": 0.95,
+        "f1": 0.589147,
+        "pixelF1ByCase": {
+          "count": 273,
+          "min": 0.0,
+          "avg": 0.190422,
+          "p50": 0.0,
+          "p95": 0.800211,
+          "max": 0.919965
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 389
+        },
+        {
+          "value": "true_positive",
+          "count": 149
+        },
+        {
+          "value": "false_negative",
+          "count": 17
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 538
+        },
+        {
+          "value": "ground_truth",
+          "count": 17
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "texture_noise_false_positive",
+          "count": 252
+        },
+        {
+          "value": "(blank)",
+          "count": 128
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 97
+        },
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 58
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 8
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 7
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 4
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 1
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "texture_noise_false_positive",
+          "count": 143
+        },
+        {
+          "value": "(blank)",
+          "count": 69
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 41
+        },
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 10
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 5
+        },
+        {
+          "value": "mask_overgrowth_false_positive",
+          "count": 3
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 1
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 555,
+        "min": 0.0,
+        "avg": 60.281982,
+        "p50": 6.0,
+        "p95": 311.0,
+        "max": 6837.5
+      },
+      "pixelArea": {
+        "count": 555,
+        "min": 1.0,
+        "avg": 76.398198,
+        "p50": 16.0,
+        "p95": 348.0,
+        "max": 7003.0
+      },
+      "ringProminence": {
+        "count": 555,
+        "min": -2.25,
+        "avg": 37.704277,
+        "p50": 24.173913,
+        "p95": 131.9,
+        "max": 175.592105
+      },
+      "falsePositivePixels": {
+        "count": 555,
+        "min": 0.0,
+        "avg": 17.563964,
+        "p50": 13.0,
+        "p95": 47.0,
+        "max": 279.0
+      },
+      "falseNegativePixels": {
+        "count": 555,
+        "min": 0.0,
+        "avg": 23.322523,
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 7003.0
+      }
+    },
+    {
+      "profile": "undersegmentation_closeopen_kernel3",
+      "rowCount": 317,
+      "caseCount": 206,
+      "defectCaseCount": 120,
+      "normalCaseCount": 86,
+      "sourceReports": [
+        "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeopen_kernel3.json"
+      ],
+      "imageConfusion": {
+        "truePositive": 97,
+        "falsePositive": 86,
+        "falseNegative": 23,
+        "trueNegative": 0
+      },
+      "imageMetrics": {
+        "precision": 0.530055,
+        "recall": 0.808333,
+        "f1": 0.640264,
+        "pixelF1ByCase": {
+          "count": 206,
+          "min": 0.0,
+          "avg": 0.210847,
+          "p50": 0.0,
+          "p95": 0.798701,
+          "max": 0.923077
+        }
+      },
+      "componentKinds": [
+        {
+          "value": "false_positive",
+          "count": 144
+        },
+        {
+          "value": "true_positive",
+          "count": 140
+        },
+        {
+          "value": "false_negative",
+          "count": 33
+        }
+      ],
+      "componentSources": [
+        {
+          "value": "predicted",
+          "count": 284
+        },
+        {
+          "value": "ground_truth",
+          "count": 33
+        }
+      ],
+      "imageTaxonomyByComponentRows": [
+        {
+          "value": "texture_noise_false_positive",
+          "count": 106
+        },
+        {
+          "value": "(blank)",
+          "count": 91
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 79
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 18
+        },
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 12
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 9
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 2
+        }
+      ],
+      "imageTaxonomyByCases": [
+        {
+          "value": "texture_noise_false_positive",
+          "count": 83
+        },
+        {
+          "value": "(blank)",
+          "count": 57
+        },
+        {
+          "value": "undersegmentation_false_negative",
+          "count": 39
+        },
+        {
+          "value": "low_contrast_defect_miss",
+          "count": 15
+        },
+        {
+          "value": "small_defect_miss",
+          "count": 8
+        },
+        {
+          "value": "oversegmentation_false_positive",
+          "count": 3
+        },
+        {
+          "value": "mask_boundary_mismatch",
+          "count": 1
+        }
+      ],
+      "componentArea": {
+        "count": 317,
+        "min": 0.0,
+        "avg": 111.801262,
+        "p50": 8.5,
+        "p95": 543.5,
+        "max": 6837.5
+      },
+      "pixelArea": {
+        "count": 317,
+        "min": 1.0,
+        "avg": 128.630915,
+        "p50": 16.0,
+        "p95": 591.0,
+        "max": 7003.0
+      },
+      "ringProminence": {
+        "count": 317,
+        "min": -2.25,
+        "avg": 43.250014,
+        "p50": 25.222222,
+        "p95": 137.229508,
+        "max": 174.947368
+      },
+      "falsePositivePixels": {
+        "count": 317,
+        "min": 0.0,
+        "avg": 14.413249,
+        "p50": 9.0,
+        "p95": 59.0,
+        "max": 246.0
+      },
+      "falseNegativePixels": {
+        "count": 317,
+        "min": 0.0,
+        "avg": 61.277603,
+        "p50": 0.0,
+        "p95": 156.0,
+        "max": 7003.0
+      }
+    }
+  ],
+  "representativeComponents": {
+    "highestFalsePositiveComponents": [
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10315",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 9,
+        "area": 15605.0,
+        "pixelArea": 17649,
+        "elongation": 2.782609,
+        "fillRatio": 0.662576,
+        "circularity": 0.007907,
+        "ringProminence": 148.757913,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 17649,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 92,
+          "height": 256
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10761",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 39,
+        "area": 8247.0,
+        "pixelArea": 10659,
+        "elongation": 2.72043,
+        "fillRatio": 0.350504,
+        "circularity": 0.00296,
+        "ringProminence": 64.437784,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 10659,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 93,
+          "height": 253
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10645",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 55,
+        "area": 7963.0,
+        "pixelArea": 9957,
+        "elongation": 2.684783,
+        "fillRatio": 0.350422,
+        "circularity": 0.004219,
+        "ringProminence": 149.701888,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 9957,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 92,
+          "height": 247
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11639",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 46,
+        "area": 6205.5,
+        "pixelArea": 8756,
+        "elongation": 2.876404,
+        "fillRatio": 0.272362,
+        "circularity": 0.002006,
+        "ringProminence": 108.600472,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 8756,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 89,
+          "height": 256
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10000",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 43,
+        "area": 5698.5,
+        "pixelArea": 7620,
+        "elongation": 2.813187,
+        "fillRatio": 0.244613,
+        "circularity": 0.003336,
+        "ringProminence": 115.456458,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 7620,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 91,
+          "height": 256
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11146",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 28,
+        "area": 5332.0,
+        "pixelArea": 6806,
+        "elongation": 1.728261,
+        "fillRatio": 0.364506,
+        "circularity": 0.005202,
+        "ringProminence": 55.632514,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 6806,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 97,
+          "width": 92,
+          "height": 159
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11488",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 51,
+        "area": 4888.5,
+        "pixelArea": 6776,
+        "elongation": 2.505376,
+        "fillRatio": 0.225599,
+        "circularity": 0.002908,
+        "ringProminence": 90.681673,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 6776,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 22,
+          "width": 93,
+          "height": 233
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10012",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 53,
+        "area": 4203.5,
+        "pixelArea": 6303,
+        "elongation": 2.217391,
+        "fillRatio": 0.223972,
+        "circularity": 0.002029,
+        "ringProminence": 118.444834,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 6303,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 92,
+          "height": 204
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10064",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 71,
+        "area": 4031.5,
+        "pixelArea": 5311,
+        "elongation": 1.781609,
+        "fillRatio": 0.298962,
+        "circularity": 0.005196,
+        "ringProminence": 107.715885,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 5311,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 6,
+          "y": 0,
+          "width": 87,
+          "height": 155
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10945",
+        "isDefect": false,
+        "predictedDefect": true,
+        "imageTaxonomy": "oversegmentation_false_positive",
+        "imagePixelF1": 0.0,
+        "source": "predicted",
+        "kind": "false_positive",
+        "componentIndex": 54,
+        "area": 3626.0,
+        "pixelArea": 4980,
+        "elongation": 2.02439,
+        "fillRatio": 0.266383,
+        "circularity": 0.004112,
+        "ringProminence": 95.650655,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 4980,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 11,
+          "y": 49,
+          "width": 82,
+          "height": 166
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      }
+    ],
+    "largestFalseNegativeComponents": [
+      {
+        "profile": "undersegmentation_closeonly_kernel3",
+        "split": "train-validation",
+        "caseId": "10309",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "undersegmentation_false_negative",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 6837.5,
+        "pixelArea": 7003,
+        "elongation": 1.101124,
+        "fillRatio": 0.783937,
+        "circularity": 0.644814,
+        "ringProminence": 42.630037,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 7003,
+        "rect": {
+          "x": 3,
+          "y": 63,
+          "width": 89,
+          "height": 98
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeonly_kernel3.json"
+      },
+      {
+        "profile": "undersegmentation_closeopen_kernel3",
+        "split": "train-validation",
+        "caseId": "10309",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "undersegmentation_false_negative",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 6837.5,
+        "pixelArea": 7003,
+        "elongation": 1.101124,
+        "fillRatio": 0.783937,
+        "circularity": 0.644814,
+        "ringProminence": 42.630037,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 7003,
+        "rect": {
+          "x": 3,
+          "y": 63,
+          "width": 89,
+          "height": 98
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeopen_kernel3.json"
+      },
+      {
+        "profile": "texture_noise_compact_circularity_area8",
+        "split": "train-validation",
+        "caseId": "10309",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 6837.5,
+        "pixelArea": 7003,
+        "elongation": 1.101124,
+        "fillRatio": 0.783937,
+        "circularity": 0.644814,
+        "ringProminence": 43.362637,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 7003,
+        "rect": {
+          "x": 3,
+          "y": 63,
+          "width": 89,
+          "height": 98
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json"
+      },
+      {
+        "profile": "texture_noise_compact_circularity_area8",
+        "split": "train-validation",
+        "caseId": "11874",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 3989.0,
+        "pixelArea": 4123,
+        "elongation": 2.347826,
+        "fillRatio": 0.802939,
+        "circularity": 0.620509,
+        "ringProminence": 35.172897,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 4123,
+        "rect": {
+          "x": 0,
+          "y": 2,
+          "width": 46,
+          "height": 108
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json"
+      },
+      {
+        "profile": "undersegmentation_closeopen_kernel3",
+        "split": "train-validation",
+        "caseId": "10306",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 2324.0,
+        "pixelArea": 2446,
+        "elongation": 2.0,
+        "fillRatio": 0.483965,
+        "circularity": 0.407577,
+        "ringProminence": 37.663755,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 2446,
+        "rect": {
+          "x": 0,
+          "y": 152,
+          "width": 49,
+          "height": 98
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeopen_kernel3.json"
+      },
+      {
+        "profile": "texture_noise_compact_circularity_area8",
+        "split": "train-validation",
+        "caseId": "10306",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 2324.0,
+        "pixelArea": 2446,
+        "elongation": 2.0,
+        "fillRatio": 0.483965,
+        "circularity": 0.407577,
+        "ringProminence": 40.419214,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 2446,
+        "rect": {
+          "x": 0,
+          "y": 152,
+          "width": 49,
+          "height": 98
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json"
+      },
+      {
+        "profile": "baseline_default",
+        "split": "test",
+        "caseId": "20671",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 1,
+        "area": 1624.0,
+        "pixelArea": 1709,
+        "elongation": 1.0,
+        "fillRatio": 0.6496,
+        "circularity": 0.632693,
+        "ringProminence": 20.635659,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 1709,
+        "rect": {
+          "x": 0,
+          "y": 72,
+          "width": 50,
+          "height": 50
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json"
+      },
+      {
+        "profile": "baseline_default",
+        "split": "test",
+        "caseId": "20439",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 1412.5,
+        "pixelArea": 1617,
+        "elongation": 1.828125,
+        "fillRatio": 0.188635,
+        "circularity": 0.081948,
+        "ringProminence": 58.017032,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 1617,
+        "rect": {
+          "x": 3,
+          "y": 16,
+          "width": 64,
+          "height": 117
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_candidate_v2.json"
+      },
+      {
+        "profile": "undersegmentation_closeopen_kernel3",
+        "split": "train-validation",
+        "caseId": "11642",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 1493.0,
+        "pixelArea": 1572,
+        "elongation": 1.282609,
+        "fillRatio": 0.550111,
+        "circularity": 0.595226,
+        "ringProminence": 48.457143,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 1572,
+        "rect": {
+          "x": 24,
+          "y": 0,
+          "width": 46,
+          "height": 59
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_undersegmentation_closeopen_kernel3.json"
+      },
+      {
+        "profile": "texture_noise_compact_circularity_area8",
+        "split": "train-validation",
+        "caseId": "11642",
+        "isDefect": true,
+        "predictedDefect": false,
+        "imageTaxonomy": "low_contrast_defect_miss",
+        "imagePixelF1": 0.0,
+        "source": "ground_truth",
+        "kind": "false_negative",
+        "componentIndex": 0,
+        "area": 1493.0,
+        "pixelArea": 1572,
+        "elongation": 1.282609,
+        "fillRatio": 0.550111,
+        "circularity": 0.595226,
+        "ringProminence": 51.242857,
+        "overlapPixels": 0,
+        "truePositivePixels": 0,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 1572,
+        "rect": {
+          "x": 24,
+          "y": 0,
+          "width": 46,
+          "height": 59
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_compact_circularity_area8.json"
+      }
+    ],
+    "lowestPixelF1TruePositiveComponents": [
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10045",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.001791,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 11,
+        "area": 12.0,
+        "pixelArea": 31,
+        "elongation": 1.25,
+        "fillRatio": 0.15,
+        "circularity": 0.076894,
+        "ringProminence": 156.692308,
+        "overlapPixels": 2,
+        "truePositivePixels": 2,
+        "falsePositivePixels": 29,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 67,
+          "y": 214,
+          "width": 10,
+          "height": 8
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "10844",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.003509,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 85,
+        "area": 323.0,
+        "pixelArea": 625,
+        "elongation": 1.375,
+        "fillRatio": 0.146818,
+        "circularity": 0.007523,
+        "ringProminence": 152.252252,
+        "overlapPixels": 12,
+        "truePositivePixels": 12,
+        "falsePositivePixels": 613,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 24,
+          "y": 50,
+          "width": 55,
+          "height": 40
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11912",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.003714,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 38,
+        "area": 50.0,
+        "pixelArea": 87,
+        "elongation": 1.076923,
+        "fillRatio": 0.274725,
+        "circularity": 0.081618,
+        "ringProminence": 136.776119,
+        "overlapPixels": 13,
+        "truePositivePixels": 13,
+        "falsePositivePixels": 74,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 80,
+          "y": 170,
+          "width": 13,
+          "height": 14
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11230",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.004552,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 70,
+        "area": 18.0,
+        "pixelArea": 44,
+        "elongation": 1.2,
+        "fillRatio": 0.15,
+        "circularity": 0.059614,
+        "ringProminence": 139.45283,
+        "overlapPixels": 8,
+        "truePositivePixels": 8,
+        "falsePositivePixels": 36,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 73,
+          "y": 101,
+          "width": 10,
+          "height": 12
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11867",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.005153,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 35,
+        "area": 760.5,
+        "pixelArea": 1227,
+        "elongation": 1.433962,
+        "fillRatio": 0.188803,
+        "circularity": 0.007319,
+        "ringProminence": 148.653132,
+        "overlapPixels": 24,
+        "truePositivePixels": 24,
+        "falsePositivePixels": 1203,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 19,
+          "y": 154,
+          "width": 53,
+          "height": 76
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "low_contrast_clahe_local_mean",
+        "split": "train-validation",
+        "caseId": "10045",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.006329,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 5,
+        "area": 5.0,
+        "pixelArea": 19,
+        "elongation": 1.6,
+        "fillRatio": 0.125,
+        "circularity": 0.065506,
+        "ringProminence": 99.0,
+        "overlapPixels": 2,
+        "truePositivePixels": 2,
+        "falsePositivePixels": 17,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 71,
+          "y": 214,
+          "width": 5,
+          "height": 8
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_local_mean.json"
+      },
+      {
+        "profile": "texture_noise_prominence_guard",
+        "split": "train-validation",
+        "caseId": "10045",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.006536,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 3,
+        "area": 5.0,
+        "pixelArea": 19,
+        "elongation": 1.6,
+        "fillRatio": 0.125,
+        "circularity": 0.065506,
+        "ringProminence": 99.0,
+        "overlapPixels": 2,
+        "truePositivePixels": 2,
+        "falsePositivePixels": 17,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 71,
+          "y": 214,
+          "width": 5,
+          "height": 8
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_texture_noise_prominence_guard.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11269",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.008826,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 84,
+        "area": 75.0,
+        "pixelArea": 152,
+        "elongation": 1.318182,
+        "fillRatio": 0.117555,
+        "circularity": 0.026538,
+        "ringProminence": 68.434211,
+        "overlapPixels": 25,
+        "truePositivePixels": 25,
+        "falsePositivePixels": 127,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 11,
+          "y": 79,
+          "width": 22,
+          "height": 29
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      },
+      {
+        "profile": "baseline_default",
+        "split": "train-validation",
+        "caseId": "10309",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "undersegmentation_false_negative",
+        "imagePixelF1": 0.009663,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 0,
+        "area": 18.5,
+        "pixelArea": 34,
+        "elongation": 2.0,
+        "fillRatio": 0.188776,
+        "circularity": 0.19663,
+        "ringProminence": 8.69697,
+        "overlapPixels": 34,
+        "truePositivePixels": 34,
+        "falsePositivePixels": 0,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 47,
+          "y": 121,
+          "width": 14,
+          "height": 7
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_baseline_default.json"
+      },
+      {
+        "profile": "low_contrast_clahe_percentile_stats",
+        "split": "train-validation",
+        "caseId": "11482",
+        "isDefect": true,
+        "predictedDefect": true,
+        "imageTaxonomy": "mask_overgrowth_false_positive",
+        "imagePixelF1": 0.009693,
+        "source": "predicted",
+        "kind": "true_positive",
+        "componentIndex": 106,
+        "area": 203.0,
+        "pixelArea": 360,
+        "elongation": 2.333333,
+        "fillRatio": 0.197279,
+        "circularity": 0.017985,
+        "ringProminence": 135.609195,
+        "overlapPixels": 39,
+        "truePositivePixels": 39,
+        "falsePositivePixels": 321,
+        "falseNegativePixels": 0,
+        "rect": {
+          "x": 74,
+          "y": 0,
+          "width": 21,
+          "height": 49
+        },
+        "sourceReport": "quality/evals/reports/SurfaceDefectDetection_kolektorsdd2_sweep_v2_low_contrast_clahe_percentile_stats.json"
+      }
+    ]
+  },
+  "omittedPayload": {
+    "rowCount": 113134,
+    "columns": [
+      "profile",
+      "split",
+      "caseId",
+      "isDefect",
+      "predictedDefect",
+      "imageTaxonomy",
+      "imagePixelF1",
+      "source",
+      "kind",
+      "componentIndex",
+      "area",
+      "pixelArea",
+      "elongation",
+      "fillRatio",
+      "circularity",
+      "componentMean",
+      "componentPeak",
+      "ringMean",
+      "ringProminence",
+      "overlapPixels",
+      "truePositivePixels",
+      "falsePositivePixels",
+      "falseNegativePixels",
+      "rectX",
+      "rectY",
+      "rectWidth",
+      "rectHeight",
+      "sourceReport"
+    ],
+    "reason": "Per-component telemetry is too large for normal repository review; this summary keeps profile-level diagnostics, distribution statistics, source provenance, and representative components."
+  }
+}

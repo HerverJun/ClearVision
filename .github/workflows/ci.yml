@@ -52,6 +52,10 @@ jobs:
         shell: pwsh
         run: '& "./scripts/check-text-encoding.ps1"'
 
+      - name: Quality Report Size Scan
+        shell: pwsh
+        run: '& "./scripts/check-quality-report-size.ps1"'
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -341,7 +345,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore Dependencies
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
 
       - name: Build
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
@@ -414,7 +418,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore Dependencies
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
 
       - name: Get Version
         id: version
@@ -506,7 +510,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore Dependencies
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
 
       - name: Build
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore
