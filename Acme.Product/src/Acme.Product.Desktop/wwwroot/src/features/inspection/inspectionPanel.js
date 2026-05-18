@@ -2,7 +2,6 @@
  * 检测控制面板组件
  * 提供检测视图的完整控制界面，包括运行控制、状态显示、统计信息等功能
  */
-console.log('[InspectionPanel] 模块已加载');
 
 import inspectionController, { getInspectionState } from './inspectionController.js';
 import httpClient from '../../core/messaging/httpClient.js';
@@ -11,6 +10,12 @@ import serviceRegistry from '../../core/app/serviceRegistry.js';
 import { getCurrentProject } from '../project/projectManager.js';
 import { AnalysisCardsPanel, buildDiagnosticsAnalysisData } from './analysisCardsPanel.js';
 import { showToast } from '../../shared/components/uiComponents.js';
+
+function debugInspectionPanelLog(...args) {
+    if (globalThis.CV_DEBUG_INSPECTION === true) {
+        console.debug(...args);
+    }
+}
 
 // 检测统计状态
 const [getStats, setStats, subscribeStats] = createSignal({
@@ -69,7 +74,7 @@ class InspectionPanel {
         this.setupSubscriptions();
         this.loadRuntimeConfig();
         
-        console.log('[InspectionPanel] 检测控制面板初始化完成');
+        debugInspectionPanelLog('[InspectionPanel] 检测控制面板初始化完成');
     }
 
     isProtectionEnabled() {
@@ -279,7 +284,7 @@ class InspectionPanel {
             }
 
             const runMode = this.selectedRunMode || 'camera';
-            console.log('[InspectionPanel] 启动连续检测，模式:', runMode);
+            debugInspectionPanelLog('[InspectionPanel] 启动连续检测，模式:', runMode);
 
             if (runMode === 'flow') {
                 await inspectionController.startRealtimeFlowMode();
@@ -528,34 +533,34 @@ class InspectionPanel {
      * 绑定事件处理
      */
     bindEvents() {
-        console.warn('[InspectionPanel] !!! 正在进行事件绑定 !!!');
-        console.log('[InspectionPanel] 正在绑定事件，容器:', this.container);
+        debugInspectionPanelLog('[InspectionPanel] 正在进行事件绑定');
+        debugInspectionPanelLog('[InspectionPanel] 正在绑定事件，容器:', this.container);
         // 单次运行按钮
         const runSingleBtn = this.container.querySelector('#btn-run-single');
-        console.log('[InspectionPanel] btn-run-single 查找结果:', runSingleBtn);
+        debugInspectionPanelLog('[InspectionPanel] btn-run-single 查找结果:', runSingleBtn);
         if (runSingleBtn) {
             runSingleBtn.addEventListener('click', (e) => {
-                console.warn('[InspectionPanel] btn-run-single 点击触发!');
+                debugInspectionPanelLog('[InspectionPanel] btn-run-single 点击触发');
                 this.handleRunSingle();
             });
         }
         
         // 连续运行按钮
         const runContinuousBtn = this.container.querySelector('#btn-run-continuous');
-        console.log('[InspectionPanel] btn-run-continuous 查找结果:', runContinuousBtn);
+        debugInspectionPanelLog('[InspectionPanel] btn-run-continuous 查找结果:', runContinuousBtn);
         if (runContinuousBtn) {
             runContinuousBtn.addEventListener('click', () => {
-                console.log('[InspectionPanel] btn-run-continuous 点击');
+                debugInspectionPanelLog('[InspectionPanel] btn-run-continuous 点击');
                 this.handleRunContinuous();
             });
         }
         
         // 停止按钮
         const stopBtn = this.container.querySelector('#btn-stop');
-        console.log('[InspectionPanel] btn-stop 查找结果:', stopBtn);
+        debugInspectionPanelLog('[InspectionPanel] btn-stop 查找结果:', stopBtn);
         if (stopBtn) {
             stopBtn.addEventListener('click', () => {
-                console.log('[InspectionPanel] btn-stop 点击');
+                debugInspectionPanelLog('[InspectionPanel] btn-stop 点击');
                 this.handleStop();
             });
         }
@@ -565,7 +570,7 @@ class InspectionPanel {
         if (runModeSelect) {
             runModeSelect.addEventListener('change', (e) => {
                 this.selectedRunMode = e.target.value;
-                console.log('[InspectionPanel] 运行模式切换为:', this.selectedRunMode);
+                debugInspectionPanelLog('[InspectionPanel] 运行模式切换为:', this.selectedRunMode);
                 
                 // 更新描述文本
                 const descEl = this.container.querySelector('#run-mode-desc');
@@ -604,7 +609,7 @@ class InspectionPanel {
      * 更新状态显示
      */
     updateStatus(status, text) {
-        console.log(`[InspectionPanel] 更新状态: ${status} - ${text}`);
+        debugInspectionPanelLog(`[InspectionPanel] 更新状态: ${status} - ${text}`);
         const statusTextEl = document.getElementById('status-text');
         if (statusTextEl) {
             statusTextEl.textContent = text;
@@ -862,7 +867,7 @@ class InspectionPanel {
      * 销毁组件，清理资源
      */
     dispose() {
-        console.log('[InspectionPanel] 正在销毁...');
+        debugInspectionPanelLog('[InspectionPanel] 正在销毁...');
         
         // 取消订阅
         if (this.unsubscribeCompleted) {

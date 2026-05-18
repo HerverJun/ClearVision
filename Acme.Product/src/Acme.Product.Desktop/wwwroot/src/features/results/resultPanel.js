@@ -15,6 +15,9 @@ import {
     summarizeResultField
 } from './portDataTypeRenderer.mjs';
 
+const LIVE_RESULT_HISTORY_REFRESH_DELAY_MS = 2000;
+const LIVE_RESULT_ANALYTICS_REFRESH_DELAY_MS = 5000;
+
 class ResultPanel {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
@@ -499,11 +502,12 @@ class ResultPanel {
     /**
      * 添加结果
      */
-    addResult(result) {
+    addResult(result, options = {}) {
         if (this.serverPaged) {
             if (this.projectId) {
-                this.queueServerHistoryRefresh();
-                this.queueServerAnalyticsRefresh();
+                const isRealtime = options?.isRealtime === true;
+                this.queueServerHistoryRefresh(isRealtime ? LIVE_RESULT_HISTORY_REFRESH_DELAY_MS : 400);
+                this.queueServerAnalyticsRefresh(isRealtime ? LIVE_RESULT_ANALYTICS_REFRESH_DELAY_MS : 800);
             }
             return;
         }
@@ -1678,6 +1682,8 @@ class ResultPanel {
                 id: payload.resultId,
                 processingTime: payload.processingTimeMs,
                 timestamp: payload.timestamp || new Date().toISOString()
+            }, {
+                isRealtime: true
             });
         }
     }

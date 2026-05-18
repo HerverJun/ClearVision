@@ -17,6 +17,7 @@ using Acme.Product.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using IConfigurationService = Acme.Product.Core.Interfaces.IConfigurationService;
 using IImageAcquisitionService = Acme.Product.Application.Services.IImageAcquisitionService;
@@ -167,6 +168,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, SemanticSegmentationOperator>();
 
         services.AddSingleton<FlowLinter>();
+        services.TryAddSingleton<ISerialPhotoelectricTriggerInputService>(NoOpSerialPhotoelectricTriggerInputService.Instance);
         services.AddSingleton<ICameraManager, CameraManager>();
         services.AddSingleton<ICameraFrameStreamCoordinator, CameraFrameStreamCoordinator>();
 

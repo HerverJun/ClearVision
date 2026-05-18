@@ -17,6 +17,9 @@ public static class DependencyInjection
         services.AddSingleton<EnterPhotoelectricTriggerInputService>();
         services.AddSingleton<ITriggerInputService>(sp =>
             sp.GetRequiredService<EnterPhotoelectricTriggerInputService>());
+        services.AddSingleton<SerialPhotoelectricTriggerInputService>();
+        services.AddSingleton<ISerialPhotoelectricTriggerInputService>(sp =>
+            sp.GetRequiredService<SerialPhotoelectricTriggerInputService>());
 
         return services.AddVisionRuntimeServices(configuration);
     }

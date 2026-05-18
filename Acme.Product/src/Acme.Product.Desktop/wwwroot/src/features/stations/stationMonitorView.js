@@ -32,6 +32,7 @@ class StationMonitorView {
         this.offlineThresholdSeconds = 15;
         this.refreshTimer = null;
         this.eventSource = null;
+        this.isActive = false;
         this.lastSseEventId = null;
         this.sseConnectionId = 0;
         this.sseReconnectAttempt = 0;
@@ -42,13 +43,19 @@ class StationMonitorView {
     }
 
     async activate() {
+        this.isActive = true;
         await this.loadInitialData();
+        if (!this.isActive) {
+            return;
+        }
+
         this.connectSse();
         this.startRefreshTimer();
         this.render();
     }
 
-    dispose() {
+    deactivate() {
+        this.isActive = false;
         if (this.refreshTimer) {
             clearInterval(this.refreshTimer);
             this.refreshTimer = null;
@@ -58,6 +65,10 @@ class StationMonitorView {
             this.eventSource.close();
             this.eventSource = null;
         }
+    }
+
+    dispose() {
+        this.deactivate();
     }
 
     focusResultsWorkbench() {
@@ -771,11 +782,15 @@ class StationMonitorView {
     }
 
     startRefreshTimer() {
-        if (this.refreshTimer) {
+        if (!this.isActive || this.refreshTimer) {
             return;
         }
 
-        this.refreshTimer = window.setInterval(() => this.render(), 1000);
+        this.refreshTimer = window.setInterval(() => {
+            if (this.isActive) {
+                this.render();
+            }
+        }, 1000);
     }
 
     render() {

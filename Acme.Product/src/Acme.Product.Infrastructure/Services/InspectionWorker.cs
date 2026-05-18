@@ -368,6 +368,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     ResolveContinuousInspectionMode(scope.ServiceProvider, cameraId, flow),
                     streamCoordinator,
                     IsFrameDrivenExecution(flow, cameraId, scope.ServiceProvider),
+                    IsBlockingSoftwareTriggerExecution(flow, cameraId, scope.ServiceProvider),
                     flowExecution,
                     imageAcquisition,
                     resultChannelWriter,
@@ -409,6 +410,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         ContinuousInspectionMode continuousInspectionMode,
         ICameraFrameStreamCoordinator? streamCoordinator,
         bool frameDrivenExecution,
+        bool blockingSoftwareTriggerExecution,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
@@ -462,6 +464,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     currentContinuousInspectionMode,
                     streamCoordinator,
                     frameDrivenExecution,
+                    blockingSoftwareTriggerExecution,
                     flowExecution,
                     imageAcquisition,
                     resultChannelWriter,
@@ -580,7 +583,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
             // 计算间隔
             var elapsedMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
-            if (frameDrivenExecution && cycleSucceeded)
+            if ((frameDrivenExecution || blockingSoftwareTriggerExecution) && cycleSucceeded)
             {
                 continue;
             }
@@ -650,6 +653,49 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         return false;
     }
 
+    private static bool IsBlockingSoftwareTriggerExecution(OperatorFlow flow, string? cameraId, IServiceProvider serviceProvider)
+    {
+        var cameraManager = serviceProvider.GetService<ICameraManager>();
+        if (cameraManager == null)
+        {
+            return false;
+        }
+
+        if (IsBlockingSoftwareTriggerBinding(cameraManager, cameraId))
+        {
+            return true;
+        }
+
+        foreach (var op in flow.Operators.Where(item => item.Type == OperatorType.ImageAcquisition))
+        {
+            var sourceType = op.Parameters
+                .FirstOrDefault(parameter => parameter.Name.Equals("SourceType", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+            sourceType = NormalizeOptionValue(sourceType);
+            var bindingId = op.Parameters
+                .FirstOrDefault(parameter => parameter.Name.Equals("CameraId", StringComparison.OrdinalIgnoreCase))
+                ?.Value?.ToString();
+            if (!string.Equals(sourceType, "Camera", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(sourceType) && !string.IsNullOrWhiteSpace(bindingId))
+                {
+                    // Continue to trigger binding check for legacy flows that only persisted CameraId.
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if (IsBlockingSoftwareTriggerBinding(cameraManager, bindingId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static string NormalizeOptionValue(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -674,6 +720,18 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
         binding.Normalize();
         return CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven();
+    }
+
+    private static bool IsBlockingSoftwareTriggerBinding(ICameraManager cameraManager, string? cameraId)
+    {
+        var binding = cameraManager.FindBinding(cameraId);
+        if (binding == null)
+        {
+            return false;
+        }
+
+        binding.Normalize();
+        return binding.UsesEnterPhotoelectricTrigger() || binding.UsesSerialPhotoelectricTrigger();
     }
 
     private static ContinuousInspectionMode ResolveContinuousInspectionMode(

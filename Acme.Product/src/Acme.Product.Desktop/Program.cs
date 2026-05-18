@@ -8,6 +8,7 @@ using Acme.Product.Desktop.Handlers;
 using Acme.Product.Desktop.Hubs;
 using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
+using Acme.Product.Desktop.Triggers;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Logging;
 using Acme.Product.Infrastructure.Metrics;
@@ -196,6 +197,8 @@ static class Program
                 var configService = services.GetRequiredService<Acme.Product.Core.Interfaces.IConfigurationService>();
                 var config = configService.LoadAsync().Result;
                 cameraManager.LoadBindings(config.Cameras, config.ActiveCameraId);
+                services.GetRequiredService<SerialPhotoelectricTriggerInputService>()
+                    .ConfigureBindings(config.Cameras);
             }
 
             var wwwrootPath = DesktopWebRootResolver.Resolve();

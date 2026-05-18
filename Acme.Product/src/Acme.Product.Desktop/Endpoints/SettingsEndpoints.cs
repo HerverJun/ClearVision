@@ -4,6 +4,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.IO.Ports;
 using System.Linq;
 using System.Text.Json;
 using Acme.Product.Application.Services;
@@ -12,12 +13,14 @@ using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Desktop.Triggers;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Cameras;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Win32;
 
 namespace Acme.Product.Desktop.Endpoints;
 
@@ -377,6 +380,11 @@ public static class SettingsEndpoints
                     binding.EnterPhotoelectricTimeoutMs,
                     binding.IgnoreEnterTriggerWhileBusy,
                     binding.EnterPhotoelectricDeviceId,
+                    binding.SerialPhotoelectricPortName,
+                    binding.SerialPhotoelectricBaudRate,
+                    binding.SerialPhotoelectricDebounceMs,
+                    binding.SerialPhotoelectricTimeoutMs,
+                    binding.IgnoreSerialPhotoelectricTriggerWhileBusy,
                     binding.TargetFrameRateFps,
                     ConnectionStatus = connectionStatus
                 };
@@ -390,6 +398,7 @@ public static class SettingsEndpoints
             Acme.Product.Application.DTOs.UpdateCameraBindingsRequest request,
             Acme.Product.Core.Cameras.ICameraManager cameraManager,
             [FromServices] ICameraFrameStreamCoordinator streamCoordinator,
+            [FromServices] ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
             IConfigurationService configService) =>
         {
             try
@@ -460,6 +469,10 @@ public static class SettingsEndpoints
                 config.Cameras = normalizedBindings;
                 config.ActiveCameraId = request.ActiveCameraId;
                 await configService.SaveAsync(config);
+                if (serialPhotoelectricTriggerInputService is SerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInput)
+                {
+                    serialPhotoelectricTriggerInput.ConfigureBindings(normalizedBindings);
+                }
 
                 return Results.Ok(new { Message = "相机配置已保存" });
             }
@@ -476,7 +489,9 @@ public static class SettingsEndpoints
             [FromServices]
             Acme.Product.Core.Cameras.ICameraManager cameraManager,
             [FromServices]
-            ITriggerInputService triggerInputService) =>
+            ITriggerInputService triggerInputService,
+            [FromServices]
+            ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService) =>
         {
             if (string.IsNullOrWhiteSpace(request.CameraBindingId))
             {
@@ -517,6 +532,17 @@ public static class SettingsEndpoints
                         triggerOptions,
                         context.RequestAborted);
                 }
+                else if (binding.UsesSerialPhotoelectricTrigger())
+                {
+                    var triggerOptions = binding.ToSerialPhotoelectricTriggerOptions() with
+                    {
+                        AcceptPendingSignalsAfterUtc = NormalizeUtc(request.AcceptPendingEnterSignalAfterUtc)
+                    };
+
+                    await serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
+                        triggerOptions,
+                        context.RequestAborted);
+                }
 
                 // 软触发采图序列已内聚在 AcquireSingleFrameAsync 中
                 // （StartGrabbing → TriggerMode=On → TriggerSource=Software → ExecuteSoftwareTrigger → GetFrame）
@@ -547,6 +573,52 @@ public static class SettingsEndpoints
         app.MapGet("/api/trigger-input/diagnostics", ([FromServices] ITriggerInputService triggerInputService) =>
         {
             return Results.Ok(triggerInputService.GetDiagnostics());
+        });
+
+        app.MapGet("/api/trigger-input/serial-photoelectric-ports", () =>
+        {
+            return Results.Ok(BuildSerialPhotoelectricPortList());
+        });
+
+        app.MapPost("/api/trigger-input/test-serial-photoelectric", async (
+            SerialPhotoelectricTestRequest request,
+            [FromServices]
+            ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
+            HttpContext context) =>
+        {
+            var timeoutMs = Math.Clamp(request.TimeoutMs <= 0 ? 10000 : request.TimeoutMs, 1000, 60000);
+            var debounceMs = CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricDebounceMs(request.DebounceMs);
+            var baudRate = CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricBaudRate(request.BaudRate);
+            var portName = (request.PortName ?? string.Empty).Trim().ToUpperInvariant();
+
+            try
+            {
+                var result = await serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
+                    new SerialPhotoelectricTriggerOptions(
+                        "settings-serial-photoelectric-test",
+                        "Settings Serial Photoelectric Test",
+                        portName,
+                        baudRate,
+                        debounceMs,
+                        timeoutMs,
+                        IgnoreWhileBusy: false)
+                    {
+                        AcceptPendingSignalsAfterUtc = DateTime.UtcNow
+                    },
+                    context.RequestAborted);
+
+                return Results.Ok(new
+                {
+                    Message = "串口光电测试成功",
+                    result.Source,
+                    PortName = result.DeviceId,
+                    result.TimestampUtc
+                });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
         });
 
         app.MapPost("/api/trigger-input/learn-enter-device", async (
@@ -764,6 +836,11 @@ public static class SettingsEndpoints
             EnterPhotoelectricTimeoutMs = binding.EnterPhotoelectricTimeoutMs,
             IgnoreEnterTriggerWhileBusy = binding.IgnoreEnterTriggerWhileBusy,
             EnterPhotoelectricDeviceId = binding.EnterPhotoelectricDeviceId,
+            SerialPhotoelectricPortName = binding.SerialPhotoelectricPortName,
+            SerialPhotoelectricBaudRate = binding.SerialPhotoelectricBaudRate,
+            SerialPhotoelectricDebounceMs = binding.SerialPhotoelectricDebounceMs,
+            SerialPhotoelectricTimeoutMs = binding.SerialPhotoelectricTimeoutMs,
+            IgnoreSerialPhotoelectricTriggerWhileBusy = binding.IgnoreSerialPhotoelectricTriggerWhileBusy,
             TargetFrameRateFps = binding.TargetFrameRateFps,
             ContinuousInspection = CloneContinuousInspection(binding.ContinuousInspection)
         });
@@ -816,6 +893,16 @@ public static class SettingsEndpoints
             || Math.Abs(previous.ExposureTimeUs - next.ExposureTimeUs) > 0.001
             || Math.Abs(previous.GainDb - next.GainDb) > 0.001
             || previousMode != nextMode
+            || !string.Equals(previous.SoftwareTriggerSource, next.SoftwareTriggerSource, StringComparison.OrdinalIgnoreCase)
+            || previous.EnterPhotoelectricDebounceMs != next.EnterPhotoelectricDebounceMs
+            || previous.EnterPhotoelectricTimeoutMs != next.EnterPhotoelectricTimeoutMs
+            || previous.IgnoreEnterTriggerWhileBusy != next.IgnoreEnterTriggerWhileBusy
+            || !string.Equals(previous.EnterPhotoelectricDeviceId, next.EnterPhotoelectricDeviceId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(previous.SerialPhotoelectricPortName, next.SerialPhotoelectricPortName, StringComparison.OrdinalIgnoreCase)
+            || previous.SerialPhotoelectricBaudRate != next.SerialPhotoelectricBaudRate
+            || previous.SerialPhotoelectricDebounceMs != next.SerialPhotoelectricDebounceMs
+            || previous.SerialPhotoelectricTimeoutMs != next.SerialPhotoelectricTimeoutMs
+            || previous.IgnoreSerialPhotoelectricTriggerWhileBusy != next.IgnoreSerialPhotoelectricTriggerWhileBusy
             || ((previousMode == CameraTriggerMode.External || nextMode == CameraTriggerMode.External) &&
                 !string.Equals(
                     CameraHardwareTriggerSourceExtensions.Normalize(previous.HardwareTriggerSource),
@@ -972,6 +1059,219 @@ public static class SettingsEndpoints
         }
     }
 
+    private static IReadOnlyList<SerialPhotoelectricPortInfo> BuildSerialPhotoelectricPortList()
+    {
+        var friendlyNames = ReadSerialPortFriendlyNamesFromRegistry();
+        var portNames = SerialPort.GetPortNames()
+            .Select(port => port.Trim().ToUpperInvariant())
+            .Where(IsComPortName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(port => ExtractComPortNumber(port))
+            .ThenBy(port => port, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var candidates = portNames
+            .Select(port =>
+            {
+                var displayName = friendlyNames.TryGetValue(port, out var friendlyName)
+                    ? friendlyName
+                    : port;
+                return new SerialPhotoelectricPortCandidate(
+                    port,
+                    displayName,
+                    ScoreSerialPhotoelectricPort(displayName));
+            })
+            .ToArray();
+
+        var recommended = candidates
+            .Where(candidate => candidate.Score > 0)
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenBy(candidate => ExtractComPortNumber(candidate.PortName))
+            .FirstOrDefault();
+
+        recommended ??= candidates.Length == 1
+            ? candidates[0]
+            : candidates
+                .Where(candidate => !LooksLikeBluetoothSerialPort(candidate.DisplayName))
+                .OrderBy(candidate => ExtractComPortNumber(candidate.PortName))
+                .FirstOrDefault();
+
+        var recommendedPortName = recommended?.PortName;
+        return candidates
+            .Select(candidate => new SerialPhotoelectricPortInfo(
+                candidate.PortName,
+                candidate.DisplayName,
+                string.Equals(candidate.PortName, recommendedPortName, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+    }
+
+    private static Dictionary<string, string> ReadSerialPortFriendlyNamesFromRegistry()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var roots = new[]
+        {
+            @"SYSTEM\CurrentControlSet\Enum\USB",
+            @"SYSTEM\CurrentControlSet\Enum\BTHENUM",
+            @"SYSTEM\CurrentControlSet\Enum\FTDIBUS",
+            @"SYSTEM\CurrentControlSet\Enum\SERENUM",
+            @"SYSTEM\CurrentControlSet\Enum\ROOT"
+        };
+
+        foreach (var rootPath in roots)
+        {
+            try
+            {
+                using var root = Registry.LocalMachine.OpenSubKey(rootPath);
+                if (root != null)
+                {
+                    ReadSerialPortFriendlyNamesFromRegistry(root, result, depth: 0);
+                }
+            }
+            catch
+            {
+                // Registry access can fail for some device classes; other roots still provide useful matches.
+            }
+        }
+
+        return result;
+    }
+
+    private static void ReadSerialPortFriendlyNamesFromRegistry(
+        RegistryKey key,
+        Dictionary<string, string> result,
+        int depth)
+    {
+        if (depth > 8)
+        {
+            return;
+        }
+
+        try
+        {
+            if (key.GetValue("FriendlyName") is string friendlyName &&
+                TryExtractComPortName(friendlyName, out var portName))
+            {
+                result[portName] = friendlyName;
+            }
+
+            foreach (var subKeyName in key.GetSubKeyNames())
+            {
+                try
+                {
+                    using var subKey = key.OpenSubKey(subKeyName);
+                    if (subKey != null)
+                    {
+                        ReadSerialPortFriendlyNamesFromRegistry(subKey, result, depth + 1);
+                    }
+                }
+                catch
+                {
+                    // Ignore individual device keys that cannot be opened.
+                }
+            }
+        }
+        catch
+        {
+            // Ignore registry branches that cannot be enumerated.
+        }
+    }
+
+    private static bool TryExtractComPortName(string friendlyName, out string portName)
+    {
+        portName = string.Empty;
+        var start = friendlyName.LastIndexOf("(COM", StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+        {
+            return false;
+        }
+
+        var end = friendlyName.IndexOf(')', start);
+        if (end <= start + 1)
+        {
+            return false;
+        }
+
+        var candidate = friendlyName.Substring(start + 1, end - start - 1).Trim().ToUpperInvariant();
+        if (!IsComPortName(candidate))
+        {
+            return false;
+        }
+
+        portName = candidate;
+        return true;
+    }
+
+    private static bool IsComPortName(string value)
+    {
+        if (value.Length <= 3 || !value.StartsWith("COM", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        for (var index = 3; index < value.Length; index++)
+        {
+            if (!char.IsDigit(value[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int ExtractComPortNumber(string portName)
+    {
+        return int.TryParse(portName.AsSpan(3), out var number) ? number : int.MaxValue;
+    }
+
+    private static int ScoreSerialPhotoelectricPort(string displayName)
+    {
+        var normalized = displayName.ToLowerInvariant();
+        if (LooksLikeBluetoothSerialPort(normalized))
+        {
+            return -100;
+        }
+
+        var score = 0;
+        if (normalized.Contains("ch340", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("ch341", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 120;
+        }
+
+        if (normalized.Contains("usb-serial", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("usb serial", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 100;
+        }
+
+        if (normalized.Contains("cp210", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("ftdi", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 90;
+        }
+
+        if (normalized.Contains("usb", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 70;
+        }
+
+        if (normalized.Contains("serial", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("串行", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 10;
+        }
+
+        return score;
+    }
+
+    private static bool LooksLikeBluetoothSerialPort(string displayName)
+    {
+        return displayName.Contains("bluetooth", StringComparison.OrdinalIgnoreCase) ||
+               displayName.Contains("蓝牙", StringComparison.OrdinalIgnoreCase) ||
+               displayName.Contains("bthenum", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static Dictionary<string, string>? CloneStringMap(Dictionary<string, string>? source)
     {
         if (source == null)
@@ -1075,6 +1375,27 @@ public class TriggerDeviceLearnRequest
 {
     public int TimeoutMs { get; set; } = 10000;
 }
+
+public class SerialPhotoelectricTestRequest
+{
+    public string? PortName { get; set; }
+
+    public int BaudRate { get; set; } = 9600;
+
+    public int DebounceMs { get; set; }
+
+    public int TimeoutMs { get; set; } = 10000;
+}
+
+public sealed record SerialPhotoelectricPortInfo(
+    string PortName,
+    string DisplayName,
+    bool IsRecommended);
+
+internal sealed record SerialPhotoelectricPortCandidate(
+    string PortName,
+    string DisplayName,
+    int Score);
 
 public sealed class ThemeUpdateRequest
 {

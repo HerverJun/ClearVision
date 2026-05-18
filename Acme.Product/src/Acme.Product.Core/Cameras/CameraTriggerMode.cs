@@ -12,7 +12,8 @@ public enum CameraTriggerMode
 public enum CameraSoftwareTriggerSource
 {
     Manual = 0,
-    EnterPhotoelectric = 1
+    EnterPhotoelectric = 1,
+    SerialPhotoelectric = 2
 }
 
 public static class CameraTriggerModeExtensions
@@ -95,6 +96,7 @@ public static class CameraSoftwareTriggerSourceExtensions
     public const int DefaultEnterPhotoelectricTimeoutMs = 30000;
     public const int MinEnterPhotoelectricTimeoutMs = 100;
     public const int MaxEnterPhotoelectricTimeoutMs = 600000;
+    public const int DefaultSerialPhotoelectricBaudRate = 9600;
 
     public static CameraSoftwareTriggerSource Normalize(string? rawSource)
     {
@@ -110,6 +112,10 @@ public static class CameraSoftwareTriggerSourceExtensions
             "usbenter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
             "enter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
             "photoelectricenter" => CameraSoftwareTriggerSource.EnterPhotoelectric,
+            "serialphotoelectric" => CameraSoftwareTriggerSource.SerialPhotoelectric,
+            "comphotoelectric" => CameraSoftwareTriggerSource.SerialPhotoelectric,
+            "serial" => CameraSoftwareTriggerSource.SerialPhotoelectric,
+            "com" => CameraSoftwareTriggerSource.SerialPhotoelectric,
             _ => CameraSoftwareTriggerSource.Manual
         };
     }
@@ -117,6 +123,7 @@ public static class CameraSoftwareTriggerSourceExtensions
     public static string ToConfigValue(this CameraSoftwareTriggerSource source) => source switch
     {
         CameraSoftwareTriggerSource.EnterPhotoelectric => nameof(CameraSoftwareTriggerSource.EnterPhotoelectric),
+        CameraSoftwareTriggerSource.SerialPhotoelectric => nameof(CameraSoftwareTriggerSource.SerialPhotoelectric),
         _ => nameof(CameraSoftwareTriggerSource.Manual)
     };
 
@@ -133,6 +140,15 @@ public static class CameraSoftwareTriggerSourceExtensions
         return Math.Clamp(timeoutMs, MinEnterPhotoelectricTimeoutMs, MaxEnterPhotoelectricTimeoutMs);
     }
 
+    public static int NormalizeSerialPhotoelectricDebounceMs(int debounceMs) =>
+        NormalizeEnterPhotoelectricDebounceMs(debounceMs);
+
+    public static int NormalizeSerialPhotoelectricTimeoutMs(int timeoutMs) =>
+        NormalizeEnterPhotoelectricTimeoutMs(timeoutMs);
+
+    public static int NormalizeSerialPhotoelectricBaudRate(int baudRate) =>
+        baudRate > 0 ? baudRate : DefaultSerialPhotoelectricBaudRate;
+
     public static bool UsesEnterPhotoelectricTrigger(this CameraBindingConfig? binding)
     {
         if (binding == null)
@@ -144,6 +160,17 @@ public static class CameraSoftwareTriggerSourceExtensions
                Normalize(binding.SoftwareTriggerSource) == CameraSoftwareTriggerSource.EnterPhotoelectric;
     }
 
+    public static bool UsesSerialPhotoelectricTrigger(this CameraBindingConfig? binding)
+    {
+        if (binding == null)
+        {
+            return false;
+        }
+
+        return CameraTriggerModeExtensions.Normalize(binding.TriggerMode) == CameraTriggerMode.Software &&
+               Normalize(binding.SoftwareTriggerSource) == CameraSoftwareTriggerSource.SerialPhotoelectric;
+    }
+
     public static EnterPhotoelectricTriggerOptions ToEnterPhotoelectricTriggerOptions(this CameraBindingConfig binding) =>
         new(
             binding.Id,
@@ -152,4 +179,14 @@ public static class CameraSoftwareTriggerSourceExtensions
             NormalizeEnterPhotoelectricDebounceMs(binding.EnterPhotoelectricDebounceMs),
             NormalizeEnterPhotoelectricTimeoutMs(binding.EnterPhotoelectricTimeoutMs),
             binding.IgnoreEnterTriggerWhileBusy);
+
+    public static SerialPhotoelectricTriggerOptions ToSerialPhotoelectricTriggerOptions(this CameraBindingConfig binding) =>
+        new(
+            binding.Id,
+            binding.DisplayName,
+            binding.SerialPhotoelectricPortName,
+            NormalizeSerialPhotoelectricBaudRate(binding.SerialPhotoelectricBaudRate),
+            NormalizeSerialPhotoelectricDebounceMs(binding.SerialPhotoelectricDebounceMs),
+            NormalizeSerialPhotoelectricTimeoutMs(binding.SerialPhotoelectricTimeoutMs),
+            binding.IgnoreSerialPhotoelectricTriggerWhileBusy);
 }

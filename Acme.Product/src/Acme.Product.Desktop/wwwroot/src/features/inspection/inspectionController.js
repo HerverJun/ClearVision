@@ -21,6 +21,12 @@ const [getInspectionState, setInspectionState, subscribeInspectionState] = creat
 
 const [getLastResult, setLastResult, subscribeLastResult] = createSignal(null);
 
+function debugInspectionLog(...args) {
+    if (globalThis.CV_DEBUG_INSPECTION === true) {
+        console.debug(...args);
+    }
+}
+
 class InspectionController {
     constructor() {
         this.projectId = null;
@@ -109,25 +115,25 @@ class InspectionController {
     initializeWebMessage() {
         // 监听算子执行事件
         webMessageBridge.on('operatorExecuted', (data) => {
-            console.log('[InspectionController] 算子执行完成:', data);
+            debugInspectionLog('[InspectionController] 算子执行完成:', data);
             this.updateProgress(data);
         });
 
         // 【架构修复 v2】监听状态变更事件
         webMessageBridge.on('stateChanged', (data) => {
-            console.log('[InspectionController] 状态变更:', data);
+            debugInspectionLog('[InspectionController] 状态变更:', data);
             this.handleStateChanged(data);
         });
 
         // 【架构修复 v2】监听检测结果事件
         webMessageBridge.on('resultProduced', (data) => {
-            console.log('[InspectionController] 检测结果:', data);
+            debugInspectionLog('[InspectionController] 检测结果:', data);
             this.handleResultEvent(data);
         });
 
         // 【架构修复 v2】监听进度事件
         webMessageBridge.on('progressChanged', (data) => {
-            console.log('[InspectionController] 进度更新:', data);
+            debugInspectionLog('[InspectionController] 进度更新:', data);
             this.updateProgress(data);
         });
 
@@ -138,7 +144,7 @@ class InspectionController {
         });
 
         webMessageBridge.on('inspectionCompleted', (data) => {
-            console.log('[InspectionController] 检测完成:', data);
+            debugInspectionLog('[InspectionController] 检测完成:', data);
             this.handleInspectionCompleted(data);
         });
 
@@ -153,7 +159,7 @@ class InspectionController {
      */
     subscribeToSseEvents(projectId) {
         if (!this.isSseSupported) {
-            console.log('[InspectionController] 浏览器不支持 SSE，使用 WebMessage');
+            debugInspectionLog('[InspectionController] 浏览器不支持 SSE，使用 WebMessage');
             return false;
         }
 
@@ -161,7 +167,7 @@ class InspectionController {
         this.unsubscribeFromSseEvents();
 
         try {
-            console.log('[InspectionController] 连接 SSE:', projectId);
+            debugInspectionLog('[InspectionController] 连接 SSE:', projectId);
             
             const token = getStoredToken();
             const eventUrl = `${httpClient.baseUrl}/inspection/realtime/${projectId}/events`;
@@ -234,7 +240,7 @@ class InspectionController {
             throw new Error(`SSE connection failed: HTTP ${response.status}`);
         }
 
-        console.log('[InspectionController] SSE 连接已建立');
+        debugInspectionLog('[InspectionController] SSE 连接已建立');
         this.useSse = true;
         this.sseReconnectAttempt = 0;
 
@@ -338,7 +344,7 @@ class InspectionController {
 
         switch (eventName) {
             case 'initialState':
-                console.log('[InspectionController] SSE 初始状态:', payload);
+                debugInspectionLog('[InspectionController] SSE 初始状态:', payload);
                 setInspectionState({
                     ...getInspectionState(),
                     isRealtime: payload.status === 'Running' || payload.status === 'Starting',
@@ -346,15 +352,15 @@ class InspectionController {
                 });
                 break;
             case 'stateChanged':
-                console.log('[InspectionController] SSE 状态变更:', payload);
+                debugInspectionLog('[InspectionController] SSE 状态变更:', payload);
                 this.handleStateChanged(payload);
                 break;
             case 'resultProduced':
-                console.log('[InspectionController] SSE 检测结果:', payload);
+                debugInspectionLog('[InspectionController] SSE 检测结果:', payload);
                 this.handleResultEvent(payload);
                 break;
             case 'progressChanged':
-                console.log('[InspectionController] SSE 进度:', payload);
+                debugInspectionLog('[InspectionController] SSE 进度:', payload);
                 this.updateProgress(payload);
                 break;
             case 'faulted':
@@ -362,10 +368,10 @@ class InspectionController {
                 this.handleInspectionError(new Error(payload.errorMessage || 'Realtime inspection faulted'));
                 break;
             case 'heartbeat':
-                console.debug('[InspectionController] SSE 心跳');
+                debugInspectionLog('[InspectionController] SSE 心跳');
                 break;
             default:
-                console.debug('[InspectionController] 未处理的 SSE 事件:', eventName);
+                debugInspectionLog('[InspectionController] 未处理的 SSE 事件:', eventName);
                 break;
         }
     }
@@ -376,7 +382,7 @@ class InspectionController {
     unsubscribeFromSseEvents() {
         this.clearSseReconnectTimer();
         if (this.eventSource) {
-            console.log('[InspectionController] 关闭 SSE 连接');
+            debugInspectionLog('[InspectionController] 关闭 SSE 连接');
             this.eventSource.close();
             this.eventSource = null;
         }
@@ -403,8 +409,10 @@ class InspectionController {
             status: statusMap[data.newState] || 'idle'
         });
 
-        if (data.newState === 'Stopped' || data.newState === 'Faulted') {
+        if (data.newState === 'Faulted') {
             console.error('[InspectionController] 检测故障:', data.errorMessage);
+        } else if (data.errorMessage) {
+            debugInspectionLog('[InspectionController] 检测状态附带消息:', data.errorMessage);
         }
     }
 
@@ -437,7 +445,7 @@ class InspectionController {
         }
 
         if (!this.markResultAsHandled(result)) {
-            console.debug('[InspectionController] 忽略重复检测结果:', this.getResultDedupeKey(result));
+            debugInspectionLog('[InspectionController] 忽略重复检测结果:', this.getResultDedupeKey(result));
             return;
         }
 
@@ -523,7 +531,7 @@ class InspectionController {
                 flowData: flowData
             });
 
-            console.log('[InspectionController] 实时检测已启动');
+            debugInspectionLog('[InspectionController] 实时检测已启动');
 
         } catch (error) {
             console.error('[InspectionController] 启动实时检测失败:', error);
@@ -558,7 +566,7 @@ class InspectionController {
                 flowData: flowData
             });
 
-            console.log('[InspectionController] 实时检测已启动 (流程驱动)');
+            debugInspectionLog('[InspectionController] 实时检测已启动 (流程驱动)');
 
         } catch (error) {
             console.error('[InspectionController] 启动失败:', error);
@@ -582,7 +590,7 @@ class InspectionController {
             // 【架构修复 v2】取消 SSE 订阅
             this.unsubscribeFromSseEvents();
 
-            console.log('[InspectionController] 实时检测已停止');
+            debugInspectionLog('[InspectionController] 实时检测已停止');
 
         } catch (error) {
             console.error('[InspectionController] 停止实时检测失败:', error);
@@ -611,7 +619,7 @@ class InspectionController {
                 throw new Error('无法获取流程数据');
             }
 
-            console.log('[InspectionController] 请求预览节点:', targetNodeId);
+            debugInspectionLog('[InspectionController] 请求预览节点:', targetNodeId);
 
             const result = await httpClient.post('/flows/preview-node', {
                 projectId: this.projectId,
@@ -625,7 +633,7 @@ class InspectionController {
                 signal: options.signal
             });
 
-            console.log('[InspectionController] 预览完成:', result);
+            debugInspectionLog('[InspectionController] 预览完成:', result);
 
             // 显示预览结果
             if (result.outputImageBase64) {
@@ -731,7 +739,7 @@ class InspectionController {
         }
 
         if (!this.markResultAsHandled(normalizedResult)) {
-            console.debug('[InspectionController] 忽略重复检测完成:', this.getResultDedupeKey(normalizedResult));
+            debugInspectionLog('[InspectionController] 忽略重复检测完成:', this.getResultDedupeKey(normalizedResult));
             return;
         }
 

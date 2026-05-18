@@ -1,6 +1,12 @@
 /**
  * WebMessage bridge for WebView2 host communication.
  */
+function debugWebMessageLog(...args) {
+    if (globalThis.CV_DEBUG_WEBMESSAGE === true || globalThis.CV_DEBUG_INSPECTION === true) {
+        console.debug(...args);
+    }
+}
+
 class WebMessageBridge {
     constructor() {
         // messageType -> Set<handler>
@@ -16,7 +22,7 @@ class WebMessageBridge {
         if (window.chrome && window.chrome.webview) {
             window.chrome.webview.addEventListener('message', this.handleMessage.bind(this));
             window.chrome.webview.addEventListener('sharedbufferreceived', this.handleSharedBuffer.bind(this));
-            console.log('[WebMessageBridge] Initialized in WebView2');
+            debugWebMessageLog('[WebMessageBridge] Initialized in WebView2');
         } else {
             console.warn('[WebMessageBridge] Not in WebView2, using mock mode');
             this.enableMockMode();
@@ -69,7 +75,7 @@ class WebMessageBridge {
             return;
         }
 
-        console.log('[WebMessageBridge] Received message:', messageType, message);
+        debugWebMessageLog('[WebMessageBridge] Received message:', messageType, message);
 
         if (message.requestId && this.pendingRequests.has(message.requestId)) {
             const { resolve, reject } = this.pendingRequests.get(message.requestId);
@@ -85,7 +91,7 @@ class WebMessageBridge {
 
         const handlers = this.messageHandlers.get(messageType);
         if (!handlers || handlers.size === 0) {
-            console.warn('[WebMessageBridge] No handler for message type:', messageType);
+            debugWebMessageLog('[WebMessageBridge] No handler for message type:', messageType);
             return;
         }
 
@@ -149,7 +155,7 @@ class WebMessageBridge {
 
     postMessage(message) {
         if (this.mockMode) {
-            console.log('[WebMessageBridge] Mock post:', message);
+            debugWebMessageLog('[WebMessageBridge] Mock post:', message);
             return;
         }
 

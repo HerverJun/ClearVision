@@ -444,6 +444,16 @@ public class CameraBindingConfig
 
     public string EnterPhotoelectricDeviceId { get; set; } = string.Empty;
 
+    public string SerialPhotoelectricPortName { get; set; } = string.Empty;
+
+    public int SerialPhotoelectricBaudRate { get; set; } = 9600;
+
+    public int SerialPhotoelectricDebounceMs { get; set; } = 200;
+
+    public int SerialPhotoelectricTimeoutMs { get; set; } = 30000;
+
+    public bool IgnoreSerialPhotoelectricTriggerWhileBusy { get; set; } = true;
+
     public int TargetFrameRateFps { get; set; } = 10;
 
     public ContinuousInspectionConfig ContinuousInspection { get; set; } = new();
@@ -465,6 +475,10 @@ public class CameraBindingConfig
         EnterPhotoelectricDebounceMs = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.NormalizeEnterPhotoelectricDebounceMs(EnterPhotoelectricDebounceMs);
         EnterPhotoelectricTimeoutMs = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.NormalizeEnterPhotoelectricTimeoutMs(EnterPhotoelectricTimeoutMs);
         EnterPhotoelectricDeviceId = EnterPhotoelectricDeviceId?.Trim() ?? string.Empty;
+        SerialPhotoelectricPortName = SerialPhotoelectricPortName?.Trim() ?? string.Empty;
+        SerialPhotoelectricBaudRate = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricBaudRate(SerialPhotoelectricBaudRate);
+        SerialPhotoelectricDebounceMs = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricDebounceMs(SerialPhotoelectricDebounceMs);
+        SerialPhotoelectricTimeoutMs = Acme.Product.Core.Cameras.CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricTimeoutMs(SerialPhotoelectricTimeoutMs);
         TargetFrameRateFps = Acme.Product.Core.Cameras.CameraTriggerModeExtensions.NormalizeTargetFrameRate(TargetFrameRateFps);
         ContinuousInspection ??= new ContinuousInspectionConfig();
         ContinuousInspection.Normalize();

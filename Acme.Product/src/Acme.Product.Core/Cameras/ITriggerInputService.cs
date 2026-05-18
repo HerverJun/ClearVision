@@ -15,10 +15,33 @@ public interface ITriggerInputService
     TriggerInputDiagnostics GetDiagnostics();
 }
 
+public interface ISerialPhotoelectricTriggerInputService
+{
+    bool IsAvailable { get; }
+
+    Task<TriggerInputEvent> WaitForSerialPhotoelectricAsync(
+        SerialPhotoelectricTriggerOptions options,
+        CancellationToken cancellationToken = default);
+
+    TriggerInputDiagnostics GetDiagnostics();
+}
+
 public sealed record EnterPhotoelectricTriggerOptions(
     string CameraBindingId,
     string DisplayName,
     string DeviceId,
+    int DebounceMs,
+    int TimeoutMs,
+    bool IgnoreWhileBusy)
+{
+    public DateTime? AcceptPendingSignalsAfterUtc { get; init; }
+}
+
+public sealed record SerialPhotoelectricTriggerOptions(
+    string CameraBindingId,
+    string DisplayName,
+    string PortName,
+    int BaudRate,
     int DebounceMs,
     int TimeoutMs,
     bool IgnoreWhileBusy)

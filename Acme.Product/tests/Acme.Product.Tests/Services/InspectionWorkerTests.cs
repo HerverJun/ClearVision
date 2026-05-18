@@ -251,6 +251,58 @@ public class InspectionWorkerTests
     }
 
     [Fact]
+    public void IsBlockingSoftwareTriggerExecution_WithSerialPhotoelectricCamera_ShouldReturnTrue()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-serial",
+                TriggerMode = "Software",
+                SoftwareTriggerSource = "SerialPhotoelectric",
+                SerialPhotoelectricPortName = "COM3"
+            }
+        });
+
+        var services = new ServiceCollection();
+        services.AddSingleton(cameraManager);
+        using var serviceProvider = services.BuildServiceProvider();
+
+        InvokeIsBlockingSoftwareTriggerExecution(new OperatorFlow("SerialTriggerFlow"), "cam-serial", serviceProvider)
+            .Should()
+            .BeTrue();
+    }
+
+    [Fact]
+    public void IsBlockingSoftwareTriggerExecution_WithFlowCameraOperator_ShouldUseBindingTriggerMode()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-flow-serial",
+                TriggerMode = "Software",
+                SoftwareTriggerSource = "SerialPhotoelectric",
+                SerialPhotoelectricPortName = "COM5"
+            }
+        });
+
+        var services = new ServiceCollection();
+        services.AddSingleton(cameraManager);
+        using var serviceProvider = services.BuildServiceProvider();
+
+        var flow = new OperatorFlow("FlowCameraSerialTrigger");
+        var acquisition = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera|相机"));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "cam-flow-serial"));
+        flow.AddOperator(acquisition);
+
+        InvokeIsBlockingSoftwareTriggerExecution(flow, null, serviceProvider).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExecuteCycleAsync_WithCameraPreload_ShouldPassCancellationTokenToImageAcquisition()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -342,6 +394,18 @@ public class InspectionWorkerTests
     {
         var method = typeof(InspectionWorker).GetMethod(
             "IsFrameDrivenExecution",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+        return (bool)method!.Invoke(null, new object?[] { flow, cameraId, serviceProvider })!;
+    }
+
+    private static bool InvokeIsBlockingSoftwareTriggerExecution(
+        OperatorFlow flow,
+        string? cameraId,
+        IServiceProvider serviceProvider)
+    {
+        var method = typeof(InspectionWorker).GetMethod(
+            "IsBlockingSoftwareTriggerExecution",
             BindingFlags.NonPublic | BindingFlags.Static);
         method.Should().NotBeNull();
         return (bool)method!.Invoke(null, new object?[] { flow, cameraId, serviceProvider })!;

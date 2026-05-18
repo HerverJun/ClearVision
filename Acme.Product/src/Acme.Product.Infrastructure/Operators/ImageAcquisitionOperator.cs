@@ -39,9 +39,10 @@ public class ImageAcquisitionOperator : OperatorBase
     private readonly ICameraManager _cameraManager;
     private readonly ICameraFrameStreamCoordinator _streamCoordinator;
     private readonly ITriggerInputService _triggerInputService;
+    private readonly ISerialPhotoelectricTriggerInputService _serialPhotoelectricTriggerInputService;
 
     public ImageAcquisitionOperator(ILogger<ImageAcquisitionOperator> logger, ICameraManager cameraManager)
-        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance)
+        : this(logger, cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance, NoOpSerialPhotoelectricTriggerInputService.Instance)
     {
     }
 
@@ -49,7 +50,7 @@ public class ImageAcquisitionOperator : OperatorBase
         ILogger<ImageAcquisitionOperator> logger,
         ICameraManager cameraManager,
         ICameraFrameStreamCoordinator streamCoordinator)
-        : this(logger, cameraManager, streamCoordinator, NoOpTriggerInputService.Instance)
+        : this(logger, cameraManager, streamCoordinator, NoOpTriggerInputService.Instance, NoOpSerialPhotoelectricTriggerInputService.Instance)
     {
     }
 
@@ -57,11 +58,13 @@ public class ImageAcquisitionOperator : OperatorBase
         ILogger<ImageAcquisitionOperator> logger,
         ICameraManager cameraManager,
         ICameraFrameStreamCoordinator streamCoordinator,
-        ITriggerInputService triggerInputService) : base(logger)
+        ITriggerInputService triggerInputService,
+        ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService) : base(logger)
     {
         _cameraManager = cameraManager;
         _streamCoordinator = streamCoordinator;
         _triggerInputService = triggerInputService;
+        _serialPhotoelectricTriggerInputService = serialPhotoelectricTriggerInputService;
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -181,6 +184,12 @@ public class ImageAcquisitionOperator : OperatorBase
                         bindingConfig.ToEnterPhotoelectricTriggerOptions(),
                         cancellationToken);
                 }
+                else if (bindingConfig?.UsesSerialPhotoelectricTrigger() == true)
+                {
+                    await _serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
+                        bindingConfig.ToSerialPhotoelectricTriggerOptions(),
+                        cancellationToken);
+                }
 
                 // 采集图像
                 var imageData = await camera.AcquireSingleFrameAsync();
@@ -195,7 +204,7 @@ public class ImageAcquisitionOperator : OperatorBase
                 return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
                 {
                     { "Channels", mat.Channels() },
-                    { "Source", bindingConfig?.UsesEnterPhotoelectricTrigger() == true ? "enter-photoelectric" : "camera" },
+                    { "Source", ResolveCameraSourceTag(bindingConfig) },
                     { "CameraId", cameraId }
                 }));
             }
@@ -374,6 +383,13 @@ public class ImageAcquisitionOperator : OperatorBase
             return OperatorExecutionOutput.Failure($"Provided frame envelope decode failed: {ex.Message}");
         }
     }
+
+    private static string ResolveCameraSourceTag(CameraBindingConfig? binding) =>
+        binding?.UsesEnterPhotoelectricTrigger() == true
+            ? "enter-photoelectric"
+            : binding?.UsesSerialPhotoelectricTrigger() == true
+                ? "serial-photoelectric"
+                : "camera";
 
     private static Mat DecodeEnvelope(FrameEnvelope envelope)
     {

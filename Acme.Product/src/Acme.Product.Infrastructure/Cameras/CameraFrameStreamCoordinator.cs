@@ -15,6 +15,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<CameraFrameStreamCoordinator> _logger;
     private readonly ITriggerInputService _triggerInputService;
+    private readonly ISerialPhotoelectricTriggerInputService _serialPhotoelectricTriggerInputService;
     private readonly ConcurrentDictionary<string, ProducerEntry> _producers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, PreviewSessionState> _previewSessions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -64,13 +65,14 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         CameraTriggerMode TriggerMode,
         string HardwareTriggerSource,
         EnterPhotoelectricTriggerOptions? EnterPhotoelectricTrigger,
+        SerialPhotoelectricTriggerOptions? SerialPhotoelectricTrigger,
         int TargetFrameRateFps,
         int FrameBufferCapacity);
 
     public CameraFrameStreamCoordinator(
         ICameraManager cameraManager,
         ILogger<CameraFrameStreamCoordinator> logger)
-        : this(cameraManager, logger, NoOpTriggerInputService.Instance)
+        : this(cameraManager, logger, NoOpTriggerInputService.Instance, NoOpSerialPhotoelectricTriggerInputService.Instance)
     {
     }
 
@@ -78,10 +80,20 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         ICameraManager cameraManager,
         ILogger<CameraFrameStreamCoordinator> logger,
         ITriggerInputService triggerInputService)
+        : this(cameraManager, logger, triggerInputService, NoOpSerialPhotoelectricTriggerInputService.Instance)
+    {
+    }
+
+    public CameraFrameStreamCoordinator(
+        ICameraManager cameraManager,
+        ILogger<CameraFrameStreamCoordinator> logger,
+        ITriggerInputService triggerInputService,
+        ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService)
     {
         _cameraManager = cameraManager;
         _logger = logger;
         _triggerInputService = triggerInputService;
+        _serialPhotoelectricTriggerInputService = serialPhotoelectricTriggerInputService;
     }
 
     public async Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -388,6 +400,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 CameraTriggerMode.Software,
                 CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource,
                 null,
+                null,
                 CameraTriggerModeExtensions.DefaultTargetFrameRateFps,
                 24);
         }
@@ -402,6 +415,9 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             CameraHardwareTriggerSourceExtensions.Normalize(binding.HardwareTriggerSource),
             binding.UsesEnterPhotoelectricTrigger()
                 ? binding.ToEnterPhotoelectricTriggerOptions()
+                : null,
+            binding.UsesSerialPhotoelectricTrigger()
+                ? binding.ToSerialPhotoelectricTriggerOptions()
                 : null,
             CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps),
             ResolveHistoryCapacity(binding));
@@ -661,6 +677,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         {
             await _triggerInputService.WaitForEnterPhotoelectricAsync(
                 binding.EnterPhotoelectricTrigger,
+                cancellationToken);
+        }
+        else if (binding.SerialPhotoelectricTrigger != null)
+        {
+            await _serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
+                binding.SerialPhotoelectricTrigger,
                 cancellationToken);
         }
 

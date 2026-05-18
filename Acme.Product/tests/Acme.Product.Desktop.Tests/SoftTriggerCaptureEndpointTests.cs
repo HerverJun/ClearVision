@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Interfaces;
@@ -154,6 +155,125 @@ public class SoftTriggerCaptureEndpointTests
     }
 
     [Fact]
+    public async Task SoftTriggerCapture_WithSerialPhotoelectricSource_ShouldWaitForSerialSignal()
+    {
+        const string bindingId = "cam-serial-trigger";
+        var binding = new CameraBindingConfig
+        {
+            Id = bindingId,
+            DisplayName = "Serial Trigger",
+            SerialNumber = "SN-SERIAL",
+            TriggerMode = "Software",
+            SoftwareTriggerSource = "SerialPhotoelectric",
+            SerialPhotoelectricPortName = "COM3",
+            SerialPhotoelectricBaudRate = 9600,
+            SerialPhotoelectricDebounceMs = 300,
+            SerialPhotoelectricTimeoutMs = 12000,
+            IgnoreSerialPhotoelectricTriggerWhileBusy = false
+        };
+
+        var camera = Substitute.For<ICamera>();
+        camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.AcquireSingleFrameAsync().Returns(Task.FromResult(ValidPngBytes));
+
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+
+        var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+        serialTriggerInput
+            .WaitForSerialPhotoelectricAsync(Arg.Any<SerialPhotoelectricTriggerOptions>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var options = call.ArgAt<SerialPhotoelectricTriggerOptions>(0);
+                return Task.FromResult(new TriggerInputEvent(
+                    "SerialPhotoelectric",
+                    options.CameraBindingId,
+                    options.PortName,
+                    DateTime.UtcNow));
+            });
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(
+            cameraManager,
+            serialPhotoelectricTriggerInputService: serialTriggerInput);
+        var response = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = bindingId });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.GetValues("X-Trigger-Source").Single().Should().Be("SerialPhotoelectric");
+        await serialTriggerInput.Received(1).WaitForSerialPhotoelectricAsync(
+            Arg.Is<SerialPhotoelectricTriggerOptions>(options =>
+                options.CameraBindingId == bindingId &&
+                options.PortName == "COM3" &&
+                options.BaudRate == 9600 &&
+                options.DebounceMs == 300 &&
+                options.TimeoutMs == 12000 &&
+                options.IgnoreWhileBusy == false),
+            Arg.Any<CancellationToken>());
+        await camera.Received(1).AcquireSingleFrameAsync();
+    }
+
+    [Fact]
+    public async Task SerialPhotoelectricTest_WithValidRequest_ShouldWaitForSerialSignalWithoutCamera()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+
+        var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+        serialTriggerInput
+            .WaitForSerialPhotoelectricAsync(Arg.Any<SerialPhotoelectricTriggerOptions>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var options = call.ArgAt<SerialPhotoelectricTriggerOptions>(0);
+                return Task.FromResult(new TriggerInputEvent(
+                    "SerialPhotoelectric",
+                    options.CameraBindingId,
+                    options.PortName,
+                    DateTime.UtcNow));
+            });
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(
+            cameraManager,
+            serialPhotoelectricTriggerInputService: serialTriggerInput);
+        var response = await host.Client.PostAsJsonAsync("/api/trigger-input/test-serial-photoelectric", new
+        {
+            portName = " com3 ",
+            baudRate = 9600,
+            debounceMs = 120,
+            timeoutMs = 5000
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("COM3");
+        await serialTriggerInput.Received(1).WaitForSerialPhotoelectricAsync(
+            Arg.Is<SerialPhotoelectricTriggerOptions>(options =>
+                options.CameraBindingId == "settings-serial-photoelectric-test" &&
+                options.PortName == "COM3" &&
+                options.BaudRate == 9600 &&
+                options.DebounceMs == 120 &&
+                options.TimeoutMs == 5000 &&
+                options.IgnoreWhileBusy == false &&
+                options.AcceptPendingSignalsAfterUtc.HasValue),
+            Arg.Any<CancellationToken>());
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task SerialPhotoelectricPorts_ShouldReturnDetectedPortPayload()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(cameraManager);
+        var response = await host.Client.GetAsync("/api/trigger-input/serial-photoelectric-ports");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
     public async Task SoftTriggerCapture_WithEnterPhotoelectricSource_ShouldPassPreviewPendingCutoff()
     {
         const string bindingId = "cam-enter-trigger-cutoff";
@@ -300,7 +420,8 @@ public class SoftTriggerCaptureEndpointTests
 
         public static async Task<SoftTriggerTestHost> CreateAsync(
             ICameraManager cameraManager,
-            ITriggerInputService? triggerInputService = null)
+            ITriggerInputService? triggerInputService = null,
+            ISerialPhotoelectricTriggerInputService? serialPhotoelectricTriggerInputService = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -311,6 +432,7 @@ public class SoftTriggerCaptureEndpointTests
             builder.Services.AddSingleton(cameraManager);
             builder.Services.AddSingleton(Substitute.For<ICameraFrameStreamCoordinator>());
             builder.Services.AddSingleton(triggerInputService ?? Substitute.For<ITriggerInputService>());
+            builder.Services.AddSingleton(serialPhotoelectricTriggerInputService ?? Substitute.For<ISerialPhotoelectricTriggerInputService>());
 
             var configService = Substitute.For<IConfigurationService>();
             configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));

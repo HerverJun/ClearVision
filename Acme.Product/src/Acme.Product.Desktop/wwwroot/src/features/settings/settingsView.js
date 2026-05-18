@@ -40,6 +40,8 @@ class SettingsView {
         this.savedCommunicationConfig = null;
         this.activeTab = null;
         this.lastCameraBindingSaveError = null;
+        this.serialPhotoelectricPorts = [];
+        this.serialPhotoelectricPortsLoaded = false;
 
         console.log('[SettingsView] Initialized for container:', containerId, '| isAdmin:', this.isAdmin);
     }
@@ -60,6 +62,9 @@ class SettingsView {
         const normalized = String(value || '').trim().toLowerCase();
         if (['enterphotoelectric', 'keyboardenter', 'usbenter', 'enter', 'photoelectricenter'].includes(normalized)) {
             return 'EnterPhotoelectric';
+        }
+        if (['serialphotoelectric', 'comphotoelectric', 'serial', 'com'].includes(normalized)) {
+            return 'SerialPhotoelectric';
         }
         return 'Manual';
     }
@@ -91,14 +96,146 @@ class SettingsView {
         return Math.min(600000, Math.max(100, parsed));
     }
 
+    normalizeSerialBaudRate(value) {
+        const parsed = Number.parseInt(String(value ?? ''), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 9600;
+    }
+
+    normalizeSerialDebounceMs(value) {
+        return this.normalizeEnterDebounceMs(value);
+    }
+
+    normalizeSerialTimeoutMs(value) {
+        return this.normalizeEnterTimeoutMs(value);
+    }
+
+    normalizeSerialPhotoelectricPortInfo(port) {
+        const portName = String(port?.portName ?? port?.PortName ?? '').trim().toUpperCase();
+        if (!portName) {
+            return null;
+        }
+
+        const displayName = String(port?.displayName ?? port?.DisplayName ?? portName).trim() || portName;
+        const isRecommended = (port?.isRecommended ?? port?.IsRecommended) === true;
+        return { portName, displayName, isRecommended };
+    }
+
+    getRecommendedSerialPhotoelectricPort() {
+        return this.serialPhotoelectricPorts.find(port => port.isRecommended)
+            || this.serialPhotoelectricPorts.find(port => !/蓝牙|bluetooth/i.test(port.displayName))
+            || this.serialPhotoelectricPorts[0]
+            || null;
+    }
+
+    updateSerialPhotoelectricPortHint() {
+        const hintEl = this.container?.querySelector('#cam-param-serial-port-hint');
+        if (!hintEl) {
+            return;
+        }
+
+        if (!this.serialPhotoelectricPortsLoaded) {
+            hintEl.textContent = '进入本页后会自动识别 USB 串口。';
+            return;
+        }
+
+        if (this.serialPhotoelectricPorts.length === 0) {
+            hintEl.textContent = '未发现串口设备；插入传感器后点“识别”。';
+            return;
+        }
+
+        const recommended = this.getRecommendedSerialPhotoelectricPort();
+        hintEl.textContent = recommended
+            ? `自动识别: ${recommended.displayName}`
+            : `已发现: ${this.serialPhotoelectricPorts.map(port => port.displayName).join('、')}`;
+    }
+
+    applySerialPhotoelectricPort(portName, { persistSelected = true } = {}) {
+        const normalizedPortName = String(portName || '').trim().toUpperCase();
+        if (!normalizedPortName) {
+            return;
+        }
+
+        const input = this.container?.querySelector('#cam-param-serial-port-name');
+        if (input) {
+            input.value = normalizedPortName;
+        }
+
+        if (persistSelected && this.selectedCameraBindingId) {
+            const binding = this.cameraBindings.find(item => item.id === this.selectedCameraBindingId);
+            if (binding) {
+                binding.serialPhotoelectricPortName = normalizedPortName;
+            }
+        }
+    }
+
+    async loadSerialPhotoelectricPorts({ silent = false, applyRecommended = false } = {}) {
+        const refreshBtn = this.container?.querySelector('#btn-refresh-serial-photoelectric-port');
+        const portInput = this.container?.querySelector('#cam-param-serial-port-name');
+        const previousText = refreshBtn?.textContent;
+
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '识别中';
+        }
+
+        try {
+            const response = await httpClient.get('/trigger-input/serial-photoelectric-ports');
+            const rawPorts = Array.isArray(response)
+                ? response
+                : (response?.ports || response?.Ports || []);
+            this.serialPhotoelectricPorts = rawPorts
+                .map(port => this.normalizeSerialPhotoelectricPortInfo(port))
+                .filter(Boolean);
+            this.serialPhotoelectricPortsLoaded = true;
+
+            const recommended = this.getRecommendedSerialPhotoelectricPort();
+            const currentPort = String(portInput?.value || '').trim();
+            const currentPortDetected = this.serialPhotoelectricPorts.some(port =>
+                port.portName.toLowerCase() === currentPort.toLowerCase());
+            if (recommended && (!currentPort || (applyRecommended && !currentPortDetected))) {
+                this.applySerialPhotoelectricPort(recommended.portName);
+            }
+
+            this.updateSerialPhotoelectricPortHint();
+
+            if (!silent) {
+                if (recommended) {
+                    showToast(`已识别串口光电: ${recommended.displayName}`, 'success');
+                } else {
+                    showToast('未发现可用串口设备', 'warning');
+                }
+            }
+        } catch (error) {
+            this.serialPhotoelectricPortsLoaded = true;
+            this.serialPhotoelectricPorts = [];
+            this.updateSerialPhotoelectricPortHint();
+            if (!silent) {
+                showToast('串口自动识别失败: ' + (error?.message || error), 'error');
+            }
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.textContent = previousText || '识别';
+                refreshBtn.disabled = false;
+            }
+        }
+    }
+
     isEnterPhotoelectricBinding(binding) {
         return this.normalizeCameraTriggerMode(binding?.triggerMode) === 'Software'
             && this.normalizeSoftwareTriggerSource(binding?.softwareTriggerSource) === 'EnterPhotoelectric';
     }
 
+    isSerialPhotoelectricBinding(binding) {
+        return this.normalizeCameraTriggerMode(binding?.triggerMode) === 'Software'
+            && this.normalizeSoftwareTriggerSource(binding?.softwareTriggerSource) === 'SerialPhotoelectric';
+    }
+
     getTriggerSourceLabel(binding) {
         if (this.isEnterPhotoelectricBinding(binding)) {
             return '回车光电触发';
+        }
+        if (this.isSerialPhotoelectricBinding(binding)) {
+            return '串口光电触发';
         }
 
         const mode = this.normalizeCameraTriggerMode(binding?.triggerMode);
@@ -271,6 +408,11 @@ class SettingsView {
                 enterPhotoelectricTimeoutMs: this.normalizeEnterTimeoutMs(binding?.enterPhotoelectricTimeoutMs ?? binding?.EnterPhotoelectricTimeoutMs),
                 ignoreEnterTriggerWhileBusy: (binding?.ignoreEnterTriggerWhileBusy ?? binding?.IgnoreEnterTriggerWhileBusy) !== false,
                 enterPhotoelectricDeviceId: String(binding?.enterPhotoelectricDeviceId ?? binding?.EnterPhotoelectricDeviceId ?? '').trim(),
+                serialPhotoelectricPortName: String(binding?.serialPhotoelectricPortName ?? binding?.SerialPhotoelectricPortName ?? '').trim(),
+                serialPhotoelectricBaudRate: this.normalizeSerialBaudRate(binding?.serialPhotoelectricBaudRate ?? binding?.SerialPhotoelectricBaudRate),
+                serialPhotoelectricDebounceMs: this.normalizeSerialDebounceMs(binding?.serialPhotoelectricDebounceMs ?? binding?.SerialPhotoelectricDebounceMs),
+                serialPhotoelectricTimeoutMs: this.normalizeSerialTimeoutMs(binding?.serialPhotoelectricTimeoutMs ?? binding?.SerialPhotoelectricTimeoutMs),
+                ignoreSerialPhotoelectricTriggerWhileBusy: (binding?.ignoreSerialPhotoelectricTriggerWhileBusy ?? binding?.IgnoreSerialPhotoelectricTriggerWhileBusy) !== false,
                 targetFrameRateFps: this.normalizeCameraTargetFrameRate(binding?.targetFrameRateFps ?? binding?.TargetFrameRateFps)
             })),
             activeCameraId: config?.activeCameraId || defaults.activeCameraId || ''
@@ -410,7 +552,9 @@ class SettingsView {
         if (tabName === 'users' && this.isAdmin) {
             this.refreshUserTable();
         } else if (tabName === 'cameras') {
-            this.loadCameraBindings();
+            this.loadCameraBindings()
+                .then(() => this.loadSerialPhotoelectricPorts({ silent: true, applyRecommended: true }))
+                .catch(error => console.warn('[SettingsView] Camera tab load failed:', error));
         } else if (tabName === 'communication') {
             this.loadPlcSettings();
         }
@@ -1472,10 +1616,22 @@ class SettingsView {
         });
 
         const triggerSourceSelect = section.querySelector('#cam-param-software-trigger-source');
-        triggerSourceSelect?.addEventListener('change', () => this.syncCameraTriggerSourceInputState());
+        triggerSourceSelect?.addEventListener('change', () => {
+            this.syncCameraTriggerSourceInputState();
+            if (this.normalizeSoftwareTriggerSource(triggerSourceSelect.value) === 'SerialPhotoelectric') {
+                this.loadSerialPhotoelectricPorts({ silent: false, applyRecommended: true });
+            }
+        });
 
         const learnEnterDeviceBtn = section.querySelector('#btn-learn-enter-trigger-device');
         learnEnterDeviceBtn?.addEventListener('click', () => this.learnEnterPhotoelectricDevice());
+
+        const testSerialPhotoelectricBtn = section.querySelector('#btn-test-serial-photoelectric');
+        testSerialPhotoelectricBtn?.addEventListener('click', () => this.testSerialPhotoelectricTrigger());
+
+        const refreshSerialPhotoelectricBtn = section.querySelector('#btn-refresh-serial-photoelectric-port');
+        refreshSerialPhotoelectricBtn?.addEventListener('click', () =>
+            this.loadSerialPhotoelectricPorts({ silent: false, applyRecommended: true }));
     }
 
     async loadCameraBindings() {
@@ -1496,6 +1652,11 @@ class SettingsView {
                 const enterTimeoutRaw = binding.enterPhotoelectricTimeoutMs ?? binding.EnterPhotoelectricTimeoutMs;
                 const ignoreBusyRaw = binding.ignoreEnterTriggerWhileBusy ?? binding.IgnoreEnterTriggerWhileBusy;
                 const enterDeviceRaw = binding.enterPhotoelectricDeviceId ?? binding.EnterPhotoelectricDeviceId ?? '';
+                const serialPortRaw = binding.serialPhotoelectricPortName ?? binding.SerialPhotoelectricPortName ?? '';
+                const serialBaudRaw = binding.serialPhotoelectricBaudRate ?? binding.SerialPhotoelectricBaudRate;
+                const serialDebounceRaw = binding.serialPhotoelectricDebounceMs ?? binding.SerialPhotoelectricDebounceMs;
+                const serialTimeoutRaw = binding.serialPhotoelectricTimeoutMs ?? binding.SerialPhotoelectricTimeoutMs;
+                const ignoreSerialBusyRaw = binding.ignoreSerialPhotoelectricTriggerWhileBusy ?? binding.IgnoreSerialPhotoelectricTriggerWhileBusy;
                 const targetFrameRateRaw = binding.targetFrameRateFps ?? binding.TargetFrameRateFps;
                 const connectionStatus = binding.connectionStatus ?? binding.ConnectionStatus ?? binding.status ?? binding.Status ?? null;
                 const serialNumber = binding.serialNumber ?? binding.SerialNumber ?? binding.deviceId ?? binding.DeviceId ?? '';
@@ -1514,6 +1675,11 @@ class SettingsView {
                     enterPhotoelectricTimeoutMs: this.normalizeEnterTimeoutMs(enterTimeoutRaw),
                     ignoreEnterTriggerWhileBusy: ignoreBusyRaw !== false,
                     enterPhotoelectricDeviceId: String(enterDeviceRaw || '').trim(),
+                    serialPhotoelectricPortName: String(serialPortRaw || '').trim(),
+                    serialPhotoelectricBaudRate: this.normalizeSerialBaudRate(serialBaudRaw),
+                    serialPhotoelectricDebounceMs: this.normalizeSerialDebounceMs(serialDebounceRaw),
+                    serialPhotoelectricTimeoutMs: this.normalizeSerialTimeoutMs(serialTimeoutRaw),
+                    ignoreSerialPhotoelectricTriggerWhileBusy: ignoreSerialBusyRaw !== false,
                     targetFrameRateFps: this.normalizeCameraTargetFrameRate(targetFrameRateRaw),
                     connectionStatus: typeof connectionStatus === 'string' && connectionStatus.trim() ? connectionStatus.trim() : null
                 };
@@ -1663,6 +1829,11 @@ class SettingsView {
                     enterPhotoelectricTimeoutMs: 30000,
                     ignoreEnterTriggerWhileBusy: true,
                     enterPhotoelectricDeviceId: '',
+                    serialPhotoelectricPortName: '',
+                    serialPhotoelectricBaudRate: 9600,
+                    serialPhotoelectricDebounceMs: 200,
+                    serialPhotoelectricTimeoutMs: 30000,
+                    ignoreSerialPhotoelectricTriggerWhileBusy: true,
                     targetFrameRateFps: 10
                 };
 
@@ -1797,6 +1968,11 @@ class SettingsView {
         const enterTimeoutInput = this.container.querySelector('#cam-param-enter-timeout');
         const enterDeviceInput = this.container.querySelector('#cam-param-enter-device-id');
         const ignoreBusyInput = this.container.querySelector('#cam-param-ignore-enter-busy');
+        const serialPortInput = this.container.querySelector('#cam-param-serial-port-name');
+        const serialBaudInput = this.container.querySelector('#cam-param-serial-baud-rate');
+        const serialDebounceInput = this.container.querySelector('#cam-param-serial-debounce');
+        const serialTimeoutInput = this.container.querySelector('#cam-param-serial-timeout');
+        const ignoreSerialBusyInput = this.container.querySelector('#cam-param-ignore-serial-busy');
         const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
 
         if (exposureInput) {
@@ -1832,9 +2008,26 @@ class SettingsView {
             ignoreBusyInput.checked = cam?.ignoreEnterTriggerWhileBusy !== false;
             ignoreBusyInput.disabled = !cam;
         }
+        if (serialPortInput) {
+            serialPortInput.value = cam ? String(cam.serialPhotoelectricPortName || '') : '';
+        }
+        if (serialBaudInput) {
+            serialBaudInput.value = cam ? String(this.normalizeSerialBaudRate(cam.serialPhotoelectricBaudRate)) : '9600';
+        }
+        if (serialDebounceInput) {
+            serialDebounceInput.value = cam ? String(this.normalizeSerialDebounceMs(cam.serialPhotoelectricDebounceMs)) : '';
+        }
+        if (serialTimeoutInput) {
+            serialTimeoutInput.value = cam ? String(this.normalizeSerialTimeoutMs(cam.serialPhotoelectricTimeoutMs)) : '';
+        }
+        if (ignoreSerialBusyInput) {
+            ignoreSerialBusyInput.checked = cam?.ignoreSerialPhotoelectricTriggerWhileBusy !== false;
+            ignoreSerialBusyInput.disabled = !cam;
+        }
         if (frameRateInput) {
             frameRateInput.value = cam ? String(this.normalizeCameraTargetFrameRate(cam.targetFrameRateFps)) : '';
         }
+        this.updateSerialPhotoelectricPortHint();
         this.syncCameraFrameRateInputState(cam?.triggerMode, !cam);
         this.syncCameraTriggerSourceInputState(cam, !cam);
         this.syncCameraHardwareTriggerSourceInputState(cam, !cam);
@@ -1893,6 +2086,11 @@ class SettingsView {
         const enterTimeoutInput = this.container?.querySelector('#cam-param-enter-timeout');
         const enterDeviceInput = this.container?.querySelector('#cam-param-enter-device-id');
         const ignoreBusyInput = this.container?.querySelector('#cam-param-ignore-enter-busy');
+        const serialPortInput = this.container?.querySelector('#cam-param-serial-port-name');
+        const serialBaudInput = this.container?.querySelector('#cam-param-serial-baud-rate');
+        const serialDebounceInput = this.container?.querySelector('#cam-param-serial-debounce');
+        const serialTimeoutInput = this.container?.querySelector('#cam-param-serial-timeout');
+        const ignoreSerialBusyInput = this.container?.querySelector('#cam-param-ignore-serial-busy');
         const learnBtn = this.container?.querySelector('#btn-learn-enter-trigger-device');
         const hintEl = this.container?.querySelector('#cam-param-enter-trigger-hint');
 
@@ -1900,6 +2098,7 @@ class SettingsView {
         const canChooseSoftwareSource = !noCamera && triggerMode === 'Software';
         const selectedSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect?.value ?? cam?.softwareTriggerSource);
         const enableEnterOptions = canChooseSoftwareSource && selectedSource === 'EnterPhotoelectric';
+        const enableSerialOptions = canChooseSoftwareSource && selectedSource === 'SerialPhotoelectric';
 
         if (triggerSourceSelect) {
             triggerSourceSelect.disabled = !canChooseSoftwareSource;
@@ -1920,13 +2119,26 @@ class SettingsView {
             learnBtn.disabled = !enableEnterOptions;
         }
 
+        [serialPortInput, serialBaudInput, serialDebounceInput, serialTimeoutInput].forEach(input => {
+            if (!input) return;
+            input.disabled = !enableSerialOptions;
+            input.readOnly = !enableSerialOptions;
+            input.setAttribute('aria-disabled', enableSerialOptions ? 'false' : 'true');
+        });
+
+        if (ignoreSerialBusyInput) {
+            ignoreSerialBusyInput.disabled = !enableSerialOptions;
+        }
+
         if (hintEl) {
             if (noCamera) {
                 hintEl.textContent = '请选择相机后配置触发来源。';
             } else if (triggerMode !== 'Software') {
                 hintEl.textContent = '仅软件触发模式使用触发来源；相机 IO 外触发和连续采集由相机采集模式控制。';
             } else if (selectedSource === 'EnterPhotoelectric') {
-                hintEl.textContent = '等待 USB 光电触发器发送回车键后执行一次软件采图。可学习设备以过滤普通键盘回车。';
+                hintEl.textContent = '等待 USB 回车光电发送回车键后执行一次软件采图。';
+            } else if (selectedSource === 'SerialPhotoelectric') {
+                hintEl.textContent = '等待串口光电遮挡帧 01 11 后执行一次软件采图。';
             } else {
                 hintEl.textContent = '普通软件触发由预览按钮、接口或流程运行请求发起。';
             }
@@ -1990,8 +2202,64 @@ class SettingsView {
             showToast('学习设备失败: ' + (error?.message || error), 'error');
         } finally {
             if (button) {
-                button.textContent = previousText || '学习设备';
+                button.textContent = previousText || '学习 USB 设备';
                 this.syncCameraTriggerSourceInputState();
+            }
+        }
+    }
+
+    async testSerialPhotoelectricTrigger() {
+        const button = this.container?.querySelector('#btn-test-serial-photoelectric');
+        const portInput = this.container?.querySelector('#cam-param-serial-port-name');
+        const baudInput = this.container?.querySelector('#cam-param-serial-baud-rate');
+        const debounceInput = this.container?.querySelector('#cam-param-serial-debounce');
+        const timeoutInput = this.container?.querySelector('#cam-param-serial-timeout');
+
+        let portName = String(portInput?.value || '').trim().toUpperCase();
+        if (!portName) {
+            await this.loadSerialPhotoelectricPorts({ silent: true, applyRecommended: true });
+            portName = String(portInput?.value || '').trim().toUpperCase();
+        }
+
+        if (!portName) {
+            const prompted = window.prompt('请输入串口光电串口号', 'COM3');
+            portName = String(prompted || '').trim().toUpperCase();
+        }
+
+        if (!/^COM\d+$/i.test(portName)) {
+            showToast('串口号格式需要类似 COM3', 'warning');
+            return;
+        }
+
+        const baudRate = this.normalizeSerialBaudRate(baudInput?.value);
+        const debounceMs = this.normalizeSerialDebounceMs(debounceInput?.value);
+        const rawTimeoutMs = Number.parseInt(String(timeoutInput?.value ?? ''), 10);
+        const timeoutMs = Number.isFinite(rawTimeoutMs) && rawTimeoutMs > 0
+            ? this.normalizeSerialTimeoutMs(rawTimeoutMs)
+            : 10000;
+        const previousText = button?.textContent;
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = '等待遮挡...';
+        }
+
+        try {
+            showToast(`正在监听 ${portName} 串口光电，请遮挡一次传感器`, 'info');
+            const result = await httpClient.post('/trigger-input/test-serial-photoelectric', {
+                portName,
+                baudRate,
+                debounceMs,
+                timeoutMs
+            });
+            const resultPort = result?.portName || result?.PortName || portName;
+            showToast(`串口光电测试成功: ${resultPort} 收到遮挡帧 01 11`, 'success');
+        } catch (error) {
+            showToast('串口光电测试失败: ' + (error?.message || error), 'error');
+        } finally {
+            if (button) {
+                button.textContent = previousText || 'Toast 测试';
+                button.disabled = false;
             }
         }
     }
@@ -2262,6 +2530,9 @@ class SettingsView {
         }
 
         const isEnterPhotoelectric = this.isEnterPhotoelectricBinding(binding);
+        const isSerialPhotoelectric = this.isSerialPhotoelectricBinding(binding);
+        const isPhotoelectricTrigger = isEnterPhotoelectric || isSerialPhotoelectric;
+        const photoelectricLabel = isSerialPhotoelectric ? '串口光电触发' : '回车光电触发';
         let currentPreviewUrl = null;
         let currentPreviewMetaText = '';
         let previewClosed = false;
@@ -2277,7 +2548,7 @@ class SettingsView {
                     <div style="font-size:13px; color:var(--text-muted);">
                         当前相机: <strong style="color:var(--text-primary);">${bindingLabel}</strong>
                     </div>
-                    <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">${isEnterPhotoelectric ? '重新布防' : '刷新预览'}</button>
+                    <button class="cv-btn cv-btn-secondary" id="btn-refresh-camera-preview" type="button">${isPhotoelectricTrigger ? '重新布防' : '刷新预览'}</button>
                 </div>
                 <div id="camera-preview-surface" tabindex="-1" style="background:#020617; border:1px solid var(--border-color); border-radius:12px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden; outline:none;">
                     <img id="camera-preview-image" alt="相机预览" style="max-width:100%; max-height:420px; display:none; object-fit:contain;">
@@ -2349,35 +2620,38 @@ class SettingsView {
         }
 
         const buildPreviewMetaText = (preview, waitingForNext = false) => {
-            const triggerLabel = this.normalizeSoftwareTriggerSource(preview.triggerSource) === 'EnterPhotoelectric'
+            const source = this.normalizeSoftwareTriggerSource(preview.triggerSource);
+            const triggerLabel = source === 'EnterPhotoelectric'
                 ? '回车光电触发'
-                : preview.triggerMode;
-            const waitSuffix = waitingForNext ? ' · 等待下一次回车光电触发...' : '';
+                : source === 'SerialPhotoelectric'
+                    ? '串口光电触发'
+                    : preview.triggerMode;
+            const waitSuffix = waitingForNext ? ` · 等待下一次${triggerLabel}...` : '';
             return `触发方式: ${triggerLabel} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${waitSuffix}`;
         };
 
         const showWaitingState = () => {
             refreshBtn.disabled = true;
-            refreshBtn.textContent = isEnterPhotoelectric ? '等待触发中...' : '加载中...';
+            refreshBtn.textContent = isPhotoelectricTrigger ? '等待触发中...' : '加载中...';
 
-            if (isEnterPhotoelectric && currentPreviewUrl) {
+            if (isPhotoelectricTrigger && currentPreviewUrl) {
                 placeholderEl.style.display = 'none';
                 imageEl.style.display = 'block';
                 metaEl.textContent = currentPreviewMetaText
-                    ? `${currentPreviewMetaText} · 等待下一次回车光电触发...`
-                    : '等待下一次回车光电触发...';
+                    ? `${currentPreviewMetaText} · 等待下一次${photoelectricLabel}...`
+                    : `等待下一次${photoelectricLabel}...`;
                 return;
             }
 
             placeholderEl.style.display = 'block';
-            placeholderEl.textContent = isEnterPhotoelectric
-                ? '等待回车光电触发...'
+            placeholderEl.textContent = isPhotoelectricTrigger
+                ? `等待${photoelectricLabel}...`
                 : '正在加载相机预览...';
             imageEl.style.display = 'none';
         };
 
         const queueAutoRearm = () => {
-            if (!isEnterPhotoelectric || previewClosed) {
+            if (!isPhotoelectricTrigger || previewClosed) {
                 return;
             }
 
@@ -2398,7 +2672,7 @@ class SettingsView {
 
             previewLoading = true;
             const requestId = ++previewRequestId;
-            const acceptPendingEnterSignalAfterUtc = isEnterPhotoelectric
+            const acceptPendingEnterSignalAfterUtc = isPhotoelectricTrigger
                 ? new Date().toISOString()
                 : null;
             focusPreviewSurface();
@@ -2426,7 +2700,7 @@ class SettingsView {
                 imageEl.style.display = 'block';
                 placeholderEl.style.display = 'none';
                 metaEl.textContent = currentPreviewMetaText;
-                shouldAutoRearm = isEnterPhotoelectric;
+                shouldAutoRearm = isPhotoelectricTrigger;
             } catch (error) {
                 if (error?.name === 'AbortError') {
                     return;
@@ -2450,7 +2724,7 @@ class SettingsView {
                 if (requestId === previewRequestId) {
                     previewLoading = false;
                     refreshBtn.disabled = false;
-                    refreshBtn.textContent = isEnterPhotoelectric ? '重新布防' : '刷新预览';
+                    refreshBtn.textContent = isPhotoelectricTrigger ? '重新布防' : '刷新预览';
                 }
 
                 if (activePreviewAbortController === abortController) {
@@ -2494,8 +2768,13 @@ class SettingsView {
         const enterTimeoutInput = this.container.querySelector('#cam-param-enter-timeout');
         const enterDeviceInput = this.container.querySelector('#cam-param-enter-device-id');
         const ignoreBusyInput = this.container.querySelector('#cam-param-ignore-enter-busy');
+        const serialPortInput = this.container.querySelector('#cam-param-serial-port-name');
+        const serialBaudInput = this.container.querySelector('#cam-param-serial-baud-rate');
+        const serialDebounceInput = this.container.querySelector('#cam-param-serial-debounce');
+        const serialTimeoutInput = this.container.querySelector('#cam-param-serial-timeout');
+        const ignoreSerialBusyInput = this.container.querySelector('#cam-param-ignore-serial-busy');
         const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
-        if (!exposureInput || !gainInput || !triggerModeSelect || !hardwareTriggerSourceSelect || !triggerSourceSelect || !enterDebounceInput || !enterTimeoutInput || !enterDeviceInput || !ignoreBusyInput || !frameRateInput) {
+        if (!exposureInput || !gainInput || !triggerModeSelect || !hardwareTriggerSourceSelect || !triggerSourceSelect || !enterDebounceInput || !enterTimeoutInput || !enterDeviceInput || !ignoreBusyInput || !serialPortInput || !serialBaudInput || !serialDebounceInput || !serialTimeoutInput || !ignoreSerialBusyInput || !frameRateInput) {
             showToast('参数面板控件缺失，请刷新后重试', 'error');
             return;
         }
@@ -2509,6 +2788,11 @@ class SettingsView {
         const enterPhotoelectricTimeoutMs = this.normalizeEnterTimeoutMs(enterTimeoutInput.value);
         const enterPhotoelectricDeviceId = String(enterDeviceInput.value || '').trim();
         const ignoreEnterTriggerWhileBusy = ignoreBusyInput.checked !== false;
+        const serialPhotoelectricPortName = String(serialPortInput.value || '').trim();
+        const serialPhotoelectricBaudRate = this.normalizeSerialBaudRate(serialBaudInput.value);
+        const serialPhotoelectricDebounceMs = this.normalizeSerialDebounceMs(serialDebounceInput.value);
+        const serialPhotoelectricTimeoutMs = this.normalizeSerialTimeoutMs(serialTimeoutInput.value);
+        const ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialBusyInput.checked !== false;
         const targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
 
         if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
@@ -2529,6 +2813,11 @@ class SettingsView {
         binding.enterPhotoelectricTimeoutMs = enterPhotoelectricTimeoutMs;
         binding.enterPhotoelectricDeviceId = enterPhotoelectricDeviceId;
         binding.ignoreEnterTriggerWhileBusy = ignoreEnterTriggerWhileBusy;
+        binding.serialPhotoelectricPortName = serialPhotoelectricPortName;
+        binding.serialPhotoelectricBaudRate = serialPhotoelectricBaudRate;
+        binding.serialPhotoelectricDebounceMs = serialPhotoelectricDebounceMs;
+        binding.serialPhotoelectricTimeoutMs = serialPhotoelectricTimeoutMs;
+        binding.ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialPhotoelectricTriggerWhileBusy;
         binding.targetFrameRateFps = targetFrameRateFps;
 
         const saved = await this.saveCameraBindings();
@@ -3088,7 +3377,8 @@ class SettingsView {
                                 <label>软件触发来源</label>
                                 <select class="cv-input" id="cam-param-software-trigger-source">
                                     <option value="Manual">手动 / API 软件触发</option>
-                                    <option value="EnterPhotoelectric">回车光电触发</option>
+                                    <option value="EnterPhotoelectric">回车光电触发（USB）</option>
+                                    <option value="SerialPhotoelectric">串口光电触发（COM）</option>
                                 </select>
                                 <span class="settings-field-hint" id="cam-param-enter-trigger-hint">仅软件触发模式下生效。</span>
                             </div>
@@ -3108,10 +3398,10 @@ class SettingsView {
                                     <input type="number" class="cv-input" id="cam-param-enter-debounce" value="200" min="0" max="5000" style="padding-right:42px;" disabled readonly aria-disabled="true">
                                     <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">ms</span>
                                 </div>
-                                <span class="settings-field-hint">过滤通断抖动或重复回车。</span>
+                                <span class="settings-field-hint">过滤 USB 回车重复触发。</span>
                             </div>
                             <div class="settings-fieldset">
-                                <label>触发等待超时</label>
+                                <label>回车等待超时</label>
                                 <div class="input-with-suffix" style="position:relative;">
                                     <input type="number" class="cv-input" id="cam-param-enter-timeout" value="30000" min="100" max="600000" style="padding-right:42px;" disabled readonly aria-disabled="true">
                                     <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">ms</span>
@@ -3124,9 +3414,9 @@ class SettingsView {
                                 <label>回车设备过滤</label>
                                 <div style="display:flex; gap:8px;">
                                     <input type="text" class="cv-input" id="cam-param-enter-device-id" value="" placeholder="留空表示接受任意键盘类回车设备" disabled readonly aria-disabled="true">
-                                    <button type="button" class="cv-btn settings-btn-light" id="btn-learn-enter-trigger-device" disabled>学习设备</button>
+                                    <button type="button" class="cv-btn settings-btn-light" id="btn-learn-enter-trigger-device" disabled>学习 USB 设备</button>
                                 </div>
-                                <span class="settings-field-hint">学习后只接受该 USB 光电设备的回车，避免普通键盘误触。</span>
+                                <span class="settings-field-hint">学习后只接受该 USB 回车光电设备，避免普通键盘误触。</span>
                             </div>
                             <div class="settings-fieldset">
                                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
@@ -3135,6 +3425,45 @@ class SettingsView {
                                 </label>
                                 <span class="settings-field-hint" style="margin-left:24px;">防止同一工件重复拍照。</span>
                             </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:24px; margin-top:16px;">
+                            <div class="settings-fieldset">
+                                <label>串口号</label>
+                                <div style="display:flex; gap:8px;">
+                                    <input type="text" class="cv-input" id="cam-param-serial-port-name" value="" placeholder="自动识别" style="min-width:0;" disabled readonly aria-disabled="true">
+                                    <button type="button" class="cv-btn settings-btn-light" id="btn-refresh-serial-photoelectric-port">识别</button>
+                                    <button type="button" class="cv-btn settings-btn-light" id="btn-test-serial-photoelectric">测试</button>
+                                </div>
+                                <span class="settings-field-hint" id="cam-param-serial-port-hint">进入本页后会自动识别 USB 串口。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>串口波特率</label>
+                                <input type="number" class="cv-input" id="cam-param-serial-baud-rate" value="9600" min="1" disabled readonly aria-disabled="true">
+                                <span class="settings-field-hint">厂家 demo 默认 9600。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>串口防抖时间</label>
+                                <div class="input-with-suffix" style="position:relative;">
+                                    <input type="number" class="cv-input" id="cam-param-serial-debounce" value="200" min="0" max="5000" style="padding-right:42px;" disabled readonly aria-disabled="true">
+                                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">ms</span>
+                                </div>
+                                <span class="settings-field-hint">过滤遮挡帧重复触发。</span>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>串口等待超时</label>
+                                <div class="input-with-suffix" style="position:relative;">
+                                    <input type="number" class="cv-input" id="cam-param-serial-timeout" value="30000" min="100" max="600000" style="padding-right:42px;" disabled readonly aria-disabled="true">
+                                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">ms</span>
+                                </div>
+                                <span class="settings-field-hint">收到遮挡帧 01 11 后触发。</span>
+                            </div>
+                        </div>
+                        <div class="settings-fieldset" style="margin-top:16px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="cam-param-ignore-serial-busy" checked style="width:16px; height:16px; accent-color:var(--cinnabar);" disabled>
+                                串口忙碌时忽略新触发
+                            </label>
+                            <span class="settings-field-hint" style="margin-left:24px;">仅串口光电触发来源下生效。</span>
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:24px;">
@@ -3575,6 +3904,11 @@ class SettingsView {
             enterPhotoelectricTimeoutMs: this.normalizeEnterTimeoutMs(binding.enterPhotoelectricTimeoutMs),
             ignoreEnterTriggerWhileBusy: binding.ignoreEnterTriggerWhileBusy !== false,
             enterPhotoelectricDeviceId: String(binding.enterPhotoelectricDeviceId || '').trim(),
+            serialPhotoelectricPortName: String(binding.serialPhotoelectricPortName || '').trim(),
+            serialPhotoelectricBaudRate: this.normalizeSerialBaudRate(binding.serialPhotoelectricBaudRate),
+            serialPhotoelectricDebounceMs: this.normalizeSerialDebounceMs(binding.serialPhotoelectricDebounceMs),
+            serialPhotoelectricTimeoutMs: this.normalizeSerialTimeoutMs(binding.serialPhotoelectricTimeoutMs),
+            ignoreSerialPhotoelectricTriggerWhileBusy: binding.ignoreSerialPhotoelectricTriggerWhileBusy !== false,
             targetFrameRateFps: this.normalizeCameraTargetFrameRate(binding.targetFrameRateFps)
         }));
     }
@@ -3733,8 +4067,13 @@ class SettingsView {
             const enterTimeoutInput = this.container?.querySelector('#cam-param-enter-timeout');
             const enterDeviceInput = this.container?.querySelector('#cam-param-enter-device-id');
             const ignoreBusyInput = this.container?.querySelector('#cam-param-ignore-enter-busy');
+            const serialPortInput = this.container?.querySelector('#cam-param-serial-port-name');
+            const serialBaudInput = this.container?.querySelector('#cam-param-serial-baud-rate');
+            const serialDebounceInput = this.container?.querySelector('#cam-param-serial-debounce');
+            const serialTimeoutInput = this.container?.querySelector('#cam-param-serial-timeout');
+            const ignoreSerialBusyInput = this.container?.querySelector('#cam-param-ignore-serial-busy');
             const frameRateInput = this.container?.querySelector('#cam-param-target-frame-rate');
-            if (selectedBinding && exposureInput && gainInput && triggerModeSelect && hardwareTriggerSourceSelect && triggerSourceSelect && enterDebounceInput && enterTimeoutInput && enterDeviceInput && ignoreBusyInput && frameRateInput) {
+            if (selectedBinding && exposureInput && gainInput && triggerModeSelect && hardwareTriggerSourceSelect && triggerSourceSelect && enterDebounceInput && enterTimeoutInput && enterDeviceInput && ignoreBusyInput && serialPortInput && serialBaudInput && serialDebounceInput && serialTimeoutInput && ignoreSerialBusyInput && frameRateInput) {
                 const exposureTimeUs = Number.parseFloat(exposureInput.value);
                 const gainDb = Number.parseFloat(gainInput.value);
                 if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
@@ -3754,6 +4093,11 @@ class SettingsView {
                 selectedBinding.enterPhotoelectricTimeoutMs = this.normalizeEnterTimeoutMs(enterTimeoutInput.value);
                 selectedBinding.enterPhotoelectricDeviceId = String(enterDeviceInput.value || '').trim();
                 selectedBinding.ignoreEnterTriggerWhileBusy = ignoreBusyInput.checked !== false;
+                selectedBinding.serialPhotoelectricPortName = String(serialPortInput.value || '').trim();
+                selectedBinding.serialPhotoelectricBaudRate = this.normalizeSerialBaudRate(serialBaudInput.value);
+                selectedBinding.serialPhotoelectricDebounceMs = this.normalizeSerialDebounceMs(serialDebounceInput.value);
+                selectedBinding.serialPhotoelectricTimeoutMs = this.normalizeSerialTimeoutMs(serialTimeoutInput.value);
+                selectedBinding.ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialBusyInput.checked !== false;
                 selectedBinding.targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
             }
         }

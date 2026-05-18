@@ -33,6 +33,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     private readonly ICameraManager _cameraManager;
     private readonly ICameraFrameStreamCoordinator _streamCoordinator;
     private readonly ITriggerInputService _triggerInputService;
+    private readonly ISerialPhotoelectricTriggerInputService _serialPhotoelectricTriggerInputService;
     private readonly ILogger<ImageAcquisitionService> _logger;
     private readonly Dictionary<Guid, Mat> _imageCache = new();
     private readonly LinkedList<Guid> _cacheOrder = new();
@@ -41,7 +42,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     private bool _disposed;
 
     public ImageAcquisitionService(ICameraManager cameraManager, ILogger<ImageAcquisitionService> logger)
-        : this(cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance, logger)
+        : this(cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance, NoOpSerialPhotoelectricTriggerInputService.Instance, logger)
     {
     }
 
@@ -49,7 +50,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         ICameraManager cameraManager,
         ICameraFrameStreamCoordinator streamCoordinator,
         ILogger<ImageAcquisitionService> logger)
-        : this(cameraManager, streamCoordinator, NoOpTriggerInputService.Instance, logger)
+        : this(cameraManager, streamCoordinator, NoOpTriggerInputService.Instance, NoOpSerialPhotoelectricTriggerInputService.Instance, logger)
     {
     }
 
@@ -57,11 +58,13 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         ICameraManager cameraManager,
         ICameraFrameStreamCoordinator streamCoordinator,
         ITriggerInputService triggerInputService,
+        ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
         ILogger<ImageAcquisitionService> logger)
     {
         _cameraManager = cameraManager;
         _streamCoordinator = streamCoordinator;
         _triggerInputService = triggerInputService;
+        _serialPhotoelectricTriggerInputService = serialPhotoelectricTriggerInputService;
         _logger = logger;
     }
 
@@ -714,14 +717,23 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         CameraBindingConfig? binding,
         CancellationToken cancellationToken)
     {
-        if (binding?.UsesEnterPhotoelectricTrigger() != true)
+        if (binding == null)
         {
             return;
         }
 
-        await _triggerInputService.WaitForEnterPhotoelectricAsync(
-            binding.ToEnterPhotoelectricTriggerOptions(),
-            cancellationToken);
+        if (binding.UsesEnterPhotoelectricTrigger())
+        {
+            await _triggerInputService.WaitForEnterPhotoelectricAsync(
+                binding.ToEnterPhotoelectricTriggerOptions(),
+                cancellationToken);
+        }
+        else if (binding.UsesSerialPhotoelectricTrigger())
+        {
+            await _serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
+                binding.ToSerialPhotoelectricTriggerOptions(),
+                cancellationToken);
+        }
     }
 
     private async Task<ImageDto> CreateCameraImageDtoAsync(

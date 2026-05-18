@@ -359,6 +359,7 @@ public class CameraBindingsEndpointTests
             builder.Services.AddSingleton(cameraManager);
             builder.Services.AddSingleton(streamCoordinator ?? Substitute.For<ICameraFrameStreamCoordinator>());
             builder.Services.AddSingleton(Substitute.For<ITriggerInputService>());
+            builder.Services.AddSingleton(Substitute.For<ISerialPhotoelectricTriggerInputService>());
 
             if (configService == null)
             {

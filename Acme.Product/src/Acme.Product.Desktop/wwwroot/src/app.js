@@ -123,11 +123,51 @@ let statusBarStarted = false;
 let fpsAnimationFrameId = null;
 let themeUpdateInFlight = false;
 let projectFlowSyncSuppressionDepth = 0;
+let studioPerformanceGuardsInitialized = false;
 
 let projectViewModulePromise = null;
 let resultPanelModulePromise = null;
 let inspectionPanelModulePromise = null;
 let stationMonitorModulePromise = null;
+let resultPanelAnalyticsRefreshTimer = null;
+let resultPanelAnalyticsRefreshProjectId = null;
+const RESULT_PANEL_ANALYTICS_REFRESH_DELAY_MS = 5000;
+
+function scheduleResultPanelAnalyticsRefresh(panel, projectId, isRealtimeResult) {
+    if (!panel || !projectId || typeof panel.loadServerAnalytics !== 'function') {
+        return;
+    }
+
+    if (isRealtimeResult) {
+        return;
+    }
+
+    resultPanelAnalyticsRefreshProjectId = projectId;
+    if (resultPanelAnalyticsRefreshTimer !== null) {
+        clearTimeout(resultPanelAnalyticsRefreshTimer);
+    }
+
+    resultPanelAnalyticsRefreshTimer = setTimeout(() => {
+        resultPanelAnalyticsRefreshTimer = null;
+        panel.loadServerAnalytics(resultPanelAnalyticsRefreshProjectId).catch(error => {
+            debugLogger.warn('[App] 刷新结果页服务端分析失败:', error);
+        });
+    }, RESULT_PANEL_ANALYTICS_REFRESH_DELAY_MS);
+}
+
+function isResultPanelVisible() {
+    const container = document.getElementById('results-list-container');
+    if (!container) {
+        return false;
+    }
+
+    return !container.closest('.hidden');
+}
+
+function isInspectionActiveForBackgroundWork() {
+    const state = inspectionController.getState?.();
+    return state?.isRealtime === true || state?.isRunning === true || state?.status === 'running';
+}
 let aiPanelModulePromise = null;
 
 // 自动保存定时器
@@ -296,6 +336,25 @@ function initializeProjectFlowCanvasSync() {
     subscriptions.push(unsubscribe);
 }
 
+function initializeStudioPerformanceGuards() {
+    if (studioPerformanceGuardsInitialized) {
+        return;
+    }
+
+    studioPerformanceGuardsInitialized = true;
+    const unsubscribe = eventBus.on('view:changed', ({ view } = {}) => {
+        if (view !== 'stations' && view !== 'results') {
+            stationMonitorView?.deactivate?.();
+        }
+
+        if (view !== 'results') {
+            resultPanel?.disconnectResultsStream?.();
+        }
+    });
+
+    subscriptions.push(unsubscribe);
+}
+
 /**
  * 初始化应用
  */
@@ -324,6 +383,7 @@ async function initializeApp() {
     initializeTheme();
     initializeToolbar();
     startStatusBarUpdates();
+    initializeStudioPerformanceGuards();
     trackedSubscribe(subscribeProject, (project) => {
         window.setTimeout(() => {
             void handleProjectChange(project).catch(error => {
@@ -826,6 +886,7 @@ function initializeInspectionController() {
         // 【关键修复】保存最新的检测结果，以便切换视图时显示
         serviceRegistry.register('lastInspectionResult', result);
         window._lastInspectionResult = result;
+        const isRealtimeResult = inspectionController.getState?.().isRealtime === true;
 
         // 如果在检测视图，立即更新检测面板和图像查看器
         if (getCurrentView() === 'inspection') {
@@ -871,27 +932,20 @@ function initializeInspectionController() {
                 outputData: normalizeOutputData(result),
                 analysisData: normalizeAnalysisData(result),
                 errorMessage: result.errorMessage
+            }, {
+                isRealtime: isRealtimeResult
             });
 
-            if (currentProjectId && typeof panel.loadServerAnalytics === 'function') {
-                setTimeout(() => {
-                    panel.loadServerAnalytics().catch(error => {
-                        debugLogger.warn('[App] 刷新结果页服务端分析失败:', error);
-                    });
-                }, 300);
+            if (!panel.serverPaged) {
+                scheduleResultPanelAnalyticsRefresh(panel, currentProjectId, isRealtimeResult);
             }
         };
 
-        if (resultPanel) {
+        if (resultPanel && isResultPanelVisible()) {
             appendResultToPanel(resultPanel);
-        } else {
-            void ensureResultPanel()
-                .then(panel => appendResultToPanel(panel))
-                .catch(error => handleFeatureLoadError('结果面板', error));
         }
 
         // 显示结果提示
-        const isRealtimeResult = inspectionController.getState?.().isRealtime === true;
         let status = 'info';
         let message = '';
 
@@ -1620,6 +1674,11 @@ function startAutoSave() {
     stopAutoSave();
     
     autoSaveInterval = setInterval(async () => {
+        if (isInspectionActiveForBackgroundWork()) {
+            debugLogger.debug('[AutoSave] 检测运行中，跳过本轮自动保存');
+            return;
+        }
+
         const project = getCurrentProject();
     if (project && flowCanvas && flowCanvas.nodes.size > 0) {
             try {
