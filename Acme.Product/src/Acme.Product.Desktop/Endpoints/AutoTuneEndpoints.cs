@@ -169,7 +169,13 @@ public static class AutoTuneEndpoints
                     request.FlowId, request.TargetNodeId);
 
                 var flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId);
-                var inputImage = DecodeBase64Image(request.InputImageBase64);
+                byte[]? inputImage = null;
+                if (!string.IsNullOrWhiteSpace(request.InputImageBase64) &&
+                    !ImagePayloadDecoder.TryDecodeBytes(request.InputImageBase64, "InputImageBase64", out inputImage, out var decodeError, out var statusCode))
+                {
+                    return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
+                }
+
                 var result = await previewService.PreviewWithMetricsAsync(
                     flow,
                     request.TargetNodeId,
@@ -205,8 +211,7 @@ public static class AutoTuneEndpoints
                     request.ScenarioKey);
 
                 var flow = FlowEntityMapper.ToEntity(request.FlowData);
-                var inputImage = DecodeBase64Image(request.InputImageBase64);
-                if (inputImage == null || inputImage.Length == 0)
+                if (string.IsNullOrWhiteSpace(request.InputImageBase64))
                 {
                     return Results.BadRequest(new ScenarioAutoTuneResponse
                     {
@@ -214,6 +219,19 @@ public static class AutoTuneEndpoints
                         ScenarioKey = request.ScenarioKey,
                         ErrorMessage = "缺少输入图像，无法执行线序场景自动调参。"
                     });
+                }
+
+                if (!ImagePayloadDecoder.TryDecodeBytes(request.InputImageBase64, "InputImageBase64", out var inputImage, out var decodeError, out var statusCode))
+                {
+                    var errorResponse = new ScenarioAutoTuneResponse
+                    {
+                        Success = false,
+                        ScenarioKey = request.ScenarioKey,
+                        ErrorMessage = decodeError
+                    };
+                    return statusCode == StatusCodes.Status413PayloadTooLarge
+                        ? Results.Json(errorResponse, statusCode: StatusCodes.Status413PayloadTooLarge)
+                        : Results.BadRequest(errorResponse);
                 }
 
                 var result = await autoTuneService.AutoTuneScenarioAsync(
@@ -448,30 +466,6 @@ public static class AutoTuneEndpoints
             Description = resource.Description,
             DiagnosticCode = resource.DiagnosticCode
         };
-    }
-
-    private static byte[]? DecodeBase64Image(string? inputImageBase64)
-    {
-        if (string.IsNullOrWhiteSpace(inputImageBase64))
-        {
-            return null;
-        }
-
-        var normalized = inputImageBase64.Trim();
-        var commaIndex = normalized.IndexOf(',');
-        if (normalized.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) && commaIndex >= 0)
-        {
-            normalized = normalized[(commaIndex + 1)..];
-        }
-
-        try
-        {
-            return Convert.FromBase64String(normalized);
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private static string? EncodeImage(byte[]? bytes)

@@ -82,11 +82,10 @@ public static class StationEndpoints
                 return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var userName = context.User?.Identity?.Name;
             var updated = registry.UpdateIdentity(
                 stationId,
                 request,
-                string.IsNullOrWhiteSpace(userName) ? request.UpdatedBy ?? "Studio" : userName,
+                GetAuthenticatedUserName(context),
                 context.Connection.RemoteIpAddress?.ToString());
             return Results.Ok(updated);
         });
@@ -117,12 +116,11 @@ public static class StationEndpoints
                 return Results.BadRequest(new { error = payloadError });
             }
 
-            var issuedBy = context.User?.Identity?.Name;
             var command = store.CreateCommand(
                 stationId,
                 request.CommandType,
                 payloadJson,
-                string.IsNullOrWhiteSpace(issuedBy) ? request.IssuedBy ?? "Studio" : issuedBy,
+                GetAuthenticatedUserName(context),
                 TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)));
             return Results.Ok(command);
         });
@@ -167,7 +165,7 @@ public static class StationEndpoints
                 stationId,
                 Acme.Product.Runtime.Abstractions.StationCommandType.DeployPackage,
                 payload,
-                context.User?.Identity?.Name ?? request.IssuedBy ?? "Studio",
+                GetAuthenticatedUserName(context),
                 TimeSpan.FromMinutes(30));
             return Results.Ok(command);
         });
@@ -379,6 +377,27 @@ public static class StationEndpoints
         };
 
         return string.Equals(role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+    }
+
+    private static string GetAuthenticatedUserName(HttpContext context)
+    {
+        if (context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            var userName = userObj switch
+            {
+                Acme.Product.Application.Services.UserSession user => user.Username,
+                UserSession user => user.Username,
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(userName))
+            {
+                return userName.Trim();
+            }
+        }
+
+        var principalName = context.User?.Identity?.Name;
+        return string.IsNullOrWhiteSpace(principalName) ? "Studio" : principalName.Trim();
     }
 }
 

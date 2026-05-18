@@ -8,6 +8,7 @@ using Acme.Product.Desktop.Station;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace Acme.Product.Desktop.Middleware;
 
@@ -87,8 +88,14 @@ public class AuthMiddleware
             return;
         }
 
-        // 将用户信息注入 HttpContext.Items
+        // 将用户信息注入 HttpContext.Items 和标准 ClaimsPrincipal
         context.Items["CurrentUser"] = session;
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.NameIdentifier, session.UserId),
+            new Claim(ClaimTypes.Name, session.Username),
+            new Claim(ClaimTypes.Role, session.Role)
+        ], "ClearVisionToken"));
 
         _logger.LogDebug("用户 {Username} ({Role}) 已认证 - {Path}",
             session.Username, session.Role, path);

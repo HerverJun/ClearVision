@@ -30,10 +30,6 @@ namespace Acme.Product.Desktop.Endpoints;
 /// </summary>
 public static class ApiEndpoints
 {
-    private const int MaxImageUploadBytes = 25 * 1024 * 1024;
-    private const int MaxImageUploadBase64Chars = ((MaxImageUploadBytes + 2) / 3) * 4;
-    private const int MaxImageUploadPayloadChars = MaxImageUploadBase64Chars + 1024 * 1024;
-
     public static IEndpointRouteBuilder MapVisionApiEndpoints(this IEndpointRouteBuilder app)
     {
         // 健康检查
@@ -243,7 +239,11 @@ public static class ApiEndpoints
             {
                 if (!string.IsNullOrEmpty(request.ImageBase64))
                 {
-                    var imageData = Convert.FromBase64String(request.ImageBase64);
+                    if (!ImagePayloadDecoder.TryDecodeBytes(request.ImageBase64, "ImageBase64", out var imageData, out var decodeError, out var statusCode))
+                    {
+                        return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
+                    }
+
                     var result = await service.ExecuteSingleAsync(request.ProjectId, imageData, request.FlowData?.ToEntity());
                     return Results.Ok(result);
                 }
@@ -494,9 +494,9 @@ public static class ApiEndpoints
             OperatorParameterRecommendationRequest request,
             ParameterRecommender recommender) =>
         {
-            if (!TryDecodeImage(request.ImageBase64, out var image, out var decodeError))
+            if (!TryDecodeImage(request.ImageBase64, out var image, out var decodeError, out var statusCode))
             {
-                return Results.BadRequest(new { Error = decodeError });
+                return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
             }
 
             using (image)
@@ -517,9 +517,9 @@ public static class ApiEndpoints
             OperatorPreviewService previewService,
             CancellationToken cancellationToken) =>
         {
-            if (!TryDecodeImage(request.ImageBase64, out var image, out var decodeError))
+            if (!TryDecodeImage(request.ImageBase64, out var image, out var decodeError, out var statusCode))
             {
-                return Results.BadRequest(new { Error = decodeError });
+                return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
             }
 
             using (image)
@@ -530,48 +530,9 @@ public static class ApiEndpoints
         });
     }
 
-    private static bool TryDecodeImage(string? imageBase64, out Mat image, out string? errorMessage)
+    private static bool TryDecodeImage(string? imageBase64, out Mat image, out string errorMessage, out int statusCode)
     {
-        image = new Mat();
-        errorMessage = null;
-
-        if (string.IsNullOrWhiteSpace(imageBase64))
-        {
-            errorMessage = "ImageBase64 is required.";
-            return false;
-        }
-
-        var payload = imageBase64.Trim();
-        var markerIndex = payload.IndexOf(',');
-        if (payload.StartsWith("data:", StringComparison.OrdinalIgnoreCase) && markerIndex >= 0)
-        {
-            payload = payload[(markerIndex + 1)..];
-        }
-
-        try
-        {
-            var bytes = Convert.FromBase64String(payload);
-            image = Cv2.ImDecode(bytes, ImreadModes.Color);
-
-            if (image.Empty())
-            {
-                image.Dispose();
-                errorMessage = "Image decoding failed.";
-                return false;
-            }
-
-            return true;
-        }
-        catch (FormatException)
-        {
-            errorMessage = "ImageBase64 format is invalid.";
-            return false;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
-            return false;
-        }
+        return ImagePayloadDecoder.TryDecodeImage(imageBase64, out image, out errorMessage, out statusCode);
     }
 
     private static string? ResolveFlowJson(TemplateUpsertRequest request)
@@ -594,9 +555,7 @@ public static class ApiEndpoints
             {
                 if (!TryDecodeImageUpload(request.DataBase64, out var imageData, out var decodeError, out var statusCode))
                 {
-                    return statusCode == StatusCodes.Status413PayloadTooLarge
-                        ? Results.Json(new { Error = decodeError }, statusCode: StatusCodes.Status413PayloadTooLarge)
-                        : Results.BadRequest(new { Error = decodeError });
+                    return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
                 }
 
                 var imageId = await cache.AddAsync(imageData, "png");
@@ -648,92 +607,6 @@ public static class ApiEndpoints
         out string errorMessage,
         out int statusCode)
     {
-        imageData = [];
-        errorMessage = string.Empty;
-        statusCode = StatusCodes.Status400BadRequest;
-
-        if (string.IsNullOrWhiteSpace(dataBase64))
-        {
-            errorMessage = "DataBase64 is required.";
-            return false;
-        }
-
-        var payload = dataBase64.Trim();
-        if (payload.Length > MaxImageUploadPayloadChars)
-        {
-            statusCode = StatusCodes.Status413PayloadTooLarge;
-            errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
-            return false;
-        }
-
-        if (payload.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-        {
-            var commaIndex = payload.IndexOf(',');
-            if (commaIndex < 0 || commaIndex == payload.Length - 1)
-            {
-                errorMessage = "DataBase64 data URL is invalid.";
-                return false;
-            }
-
-            payload = payload[(commaIndex + 1)..];
-        }
-
-        var base64CharCount = 0;
-        var paddingCount = 0;
-        foreach (var ch in payload)
-        {
-            if (char.IsWhiteSpace(ch))
-            {
-                continue;
-            }
-
-            base64CharCount++;
-            if (ch == '=')
-            {
-                paddingCount++;
-            }
-
-            if (base64CharCount > MaxImageUploadBase64Chars)
-            {
-                statusCode = StatusCodes.Status413PayloadTooLarge;
-                errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
-                return false;
-            }
-        }
-
-        if (base64CharCount == 0)
-        {
-            errorMessage = "DataBase64 is required.";
-            return false;
-        }
-
-        var estimatedBytes = (base64CharCount / 4 * 3) - Math.Min(paddingCount, 2);
-        if (estimatedBytes > MaxImageUploadBytes)
-        {
-            statusCode = StatusCodes.Status413PayloadTooLarge;
-            errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
-            return false;
-        }
-
-        var compactPayload = new string(payload.Where(ch => !char.IsWhiteSpace(ch)).ToArray());
-        try
-        {
-            imageData = Convert.FromBase64String(compactPayload);
-        }
-        catch (FormatException)
-        {
-            errorMessage = "DataBase64 format is invalid.";
-            return false;
-        }
-
-        if (imageData.Length > MaxImageUploadBytes)
-        {
-            statusCode = StatusCodes.Status413PayloadTooLarge;
-            errorMessage = $"Image upload exceeds the {MaxImageUploadBytes} byte limit.";
-            imageData = [];
-            return false;
-        }
-
-        return true;
+        return ImagePayloadDecoder.TryDecodeBytes(dataBase64, "DataBase64", out imageData, out errorMessage, out statusCode);
     }
 }
