@@ -357,6 +357,17 @@ public sealed class StationRegistryService
         PublishEvents([new StoredStationRegistryEvent(Interlocked.Increment(ref _nextEventSequenceId), "stationCommandUpdated", payload, DateTimeOffset.UtcNow)]);
     }
 
+    public bool TryGetRegisteredStationId(string connectionId, out string? stationId)
+    {
+        lock (_syncRoot)
+        {
+            var entry = _entries.Values.FirstOrDefault(item =>
+                string.Equals(item.ConnectionId, connectionId, StringComparison.Ordinal));
+            stationId = entry?.StationId;
+            return !string.IsNullOrWhiteSpace(stationId);
+        }
+    }
+
     public StationStatusViewModel UpdateIdentity(
         string stationId,
         StationIdentityUpdateRequest request,

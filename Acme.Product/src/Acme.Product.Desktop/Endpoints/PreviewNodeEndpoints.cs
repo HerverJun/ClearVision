@@ -104,9 +104,13 @@ public static class PreviewNodeEndpoints
                 var externalInputImageBase64 = ShouldUseExternalInputImage(flow, request.TargetNodeId)
                     ? request.InputImageBase64
                     : null;
-                if (!string.IsNullOrEmpty(externalInputImageBase64))
+                if (!string.IsNullOrWhiteSpace(externalInputImageBase64))
                 {
-                    var imageData = Convert.FromBase64String(externalInputImageBase64);
+                    if (!ImagePayloadDecoder.TryDecodeBytes(externalInputImageBase64, "InputImageBase64", out var imageData, out var decodeError, out var statusCode))
+                    {
+                        return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
+                    }
+
                     inputData = new Dictionary<string, object>
                     {
                         ["Image"] = imageData
@@ -286,19 +290,9 @@ public static class PreviewNodeEndpoints
 
     private static byte[]? TryDecodeBase64(string? base64)
     {
-        if (string.IsNullOrWhiteSpace(base64))
-        {
-            return null;
-        }
-
-        try
-        {
-            return Convert.FromBase64String(base64);
-        }
-        catch
-        {
-            return null;
-        }
+        return ImagePayloadDecoder.TryDecodeBytes(base64, "ImageBase64", out var imageData, out _, out _)
+            ? imageData
+            : null;
     }
 
     private static bool HasUpstreamOperatorType(

@@ -25,13 +25,13 @@ public sealed class StationHub : Hub
 
     public Task<StationReplayCursorDto> RegisterStationAsync(StationRegistrationDto registration)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForRegistration(registration);
         return Task.FromResult(_registryService.UpsertRegistration(Context.ConnectionId, registration));
     }
 
     public Task<StationRegisterAckDto> RegisterStation(StationRegistrationDto registration)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForRegistration(registration);
         var cursor = _registryService.UpsertRegistration(Context.ConnectionId, registration);
         return Task.FromResult(new StationRegisterAckDto
         {
@@ -46,13 +46,13 @@ public sealed class StationHub : Hub
 
     public Task<StationReplayCursorDto> PushHeartbeatAsync(StationHeartbeatDto heartbeat)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(heartbeat.StationId);
         return Task.FromResult(_registryService.UpsertHeartbeat(Context.ConnectionId, heartbeat));
     }
 
     public Task<StationAckDto> Heartbeat(StationHeartbeatDto heartbeat)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(heartbeat.StationId);
         var cursor = _registryService.UpsertHeartbeat(Context.ConnectionId, heartbeat);
         return Task.FromResult(new StationAckDto
         {
@@ -66,25 +66,25 @@ public sealed class StationHub : Hub
 
     public Task<StationReplayCursorDto> PushSnapshotAsync(StationSnapshotDto snapshot)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(snapshot.StationId);
         return Task.FromResult(_registryService.UpsertSnapshot(Context.ConnectionId, snapshot));
     }
 
     public Task<StationAckDto> PushHealth(StationHealthSnapshotDto snapshot)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(snapshot.StationId);
         return Task.FromResult(_registryService.UpsertHealthSnapshot(Context.ConnectionId, snapshot));
     }
 
     public Task<StationReplayCursorDto> PushResultSummaryAsync(StationResultSummaryDto result)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(result.StationId);
         return Task.FromResult(_registryService.UpsertResultSummary(Context.ConnectionId, result));
     }
 
     public Task<StationAckDto> PushResult(StationResultSummaryDto result)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(result.StationId);
         var cursor = _registryService.UpsertResultSummary(Context.ConnectionId, result);
         return Task.FromResult(new StationAckDto
         {
@@ -98,25 +98,25 @@ public sealed class StationHub : Hub
 
     public Task<StationAckDto> PushLog(StationLogSummaryDto log)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(log.StationId);
         return Task.FromResult(_registryService.UpsertLogSummary(Context.ConnectionId, log));
     }
 
     public Task<StationReplayCursorDto> GetReplayCursor(string stationId)
     {
-        EnsureAuthorized();
+        stationId = EnsureAuthorizedForStation(stationId);
         return Task.FromResult(_registryService.GetReplayCursor(stationId));
     }
 
     public Task<StationCommandDto?> PollCommand(string stationId)
     {
-        EnsureAuthorized();
+        stationId = EnsureAuthorizedForStation(stationId);
         return Task.FromResult(_registryService.PollCommand(stationId));
     }
 
     public Task ReportCommandResult(StationCommandResultDto result)
     {
-        EnsureAuthorized();
+        EnsureAuthorizedForStation(result.StationId);
         _registryService.ReportCommandResult(result);
         return Task.CompletedTask;
     }
@@ -130,5 +130,45 @@ public sealed class StationHub : Hub
         }
 
         throw new HubException(failureReason);
+    }
+
+    private void EnsureAuthorizedForRegistration(StationRegistrationDto registration)
+    {
+        EnsureAuthorized();
+        var stationId = RequireStationId(registration.StationId);
+        if (_registryService.TryGetRegisteredStationId(Context.ConnectionId, out var registeredStationId) &&
+            !string.Equals(registeredStationId, stationId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new HubException($"Station connection is already registered for station '{registeredStationId}'.");
+        }
+
+        registration.StationId = stationId;
+    }
+
+    private string EnsureAuthorizedForStation(string? stationId)
+    {
+        EnsureAuthorized();
+        var normalizedStationId = RequireStationId(stationId);
+        if (!_registryService.TryGetRegisteredStationId(Context.ConnectionId, out var registeredStationId))
+        {
+            throw new HubException("Station connection is not registered.");
+        }
+
+        if (!string.Equals(registeredStationId, normalizedStationId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new HubException($"Station connection is not authorized for station '{normalizedStationId}'.");
+        }
+
+        return normalizedStationId;
+    }
+
+    private static string RequireStationId(string? stationId)
+    {
+        if (string.IsNullOrWhiteSpace(stationId))
+        {
+            throw new HubException("StationId is required.");
+        }
+
+        return stationId.Trim();
     }
 }
