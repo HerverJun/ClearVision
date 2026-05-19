@@ -363,6 +363,141 @@ public class InspectionWorkerTests
         await imageAcquisition.Received(1).AcquireFromCameraAsync("cam-ct", cts.Token);
     }
 
+    [Fact]
+    public async Task ExecuteCycleAsync_WithFileSourceFlow_ShouldSkipCameraPreload()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        Dictionary<string, object>? executedInputs = null;
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                executedInputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 1,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var flow = new OperatorFlow("FileSourceFlow");
+        var acquisition = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", @"C:\images\latest.png"));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", "stale-camera"));
+        flow.AddOperator(acquisition);
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            Substitute.For<IInspectionResultChannelWriter>(),
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>());
+
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            new InMemoryInspectionEventBus(
+                NullLogger<InMemoryInspectionEventBus>.Instance,
+                new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance)),
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        await InvokeExecuteCycleAsync(
+            worker,
+            flow,
+            "cam-stale",
+            flowExecution,
+            imageAcquisition,
+            CancellationToken.None);
+
+        executedInputs.Should().NotBeNull();
+        executedInputs!.Should().NotContainKey("Image");
+        _ = imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunRealtimeLoopAsync_WithDefaultRuntimeProtection_DoesNotStopAfterSixConsecutiveNg()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 1,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["Result"] = "NG"
+                }
+            }));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        configurationService.GetCurrent().Returns(new AppConfig
+        {
+            Runtime = new RuntimeConfig
+            {
+                ApplyProtectionRules = true,
+                StopOnConsecutiveNg = 0
+            }
+        });
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>(),
+            configurationService);
+
+        var eventBus = new InMemoryInspectionEventBus(
+            NullLogger<InMemoryInspectionEventBus>.Instance,
+            new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance));
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            eventBus,
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        var resultCount = 0;
+        using var subscription = eventBus.Subscribe<InspectionResultEvent>((_, _) =>
+        {
+            if (Interlocked.Increment(ref resultCount) >= 6)
+            {
+                cts.Cancel();
+            }
+
+            return Task.CompletedTask;
+        });
+
+        await InvokeRunRealtimeLoopAsync(
+            worker,
+            new OperatorFlow("ConsecutiveNg"),
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            configurationService,
+            cts.Token).WaitAsync(TimeSpan.FromSeconds(5));
+
+        resultCount.Should().BeGreaterThanOrEqualTo(6);
+    }
+
     private static async Task<FlowExecutionResult> WaitForCancellationAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -374,7 +509,8 @@ public class InspectionWorkerTests
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
         IInspectionResultRepository resultRepository,
-        IProjectRepository projectRepository)
+        IProjectRepository projectRepository,
+        IConfigurationService? configurationService = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -383,6 +519,10 @@ public class InspectionWorkerTests
         services.AddScoped(_ => resultChannelWriter);
         services.AddScoped(_ => resultRepository);
         services.AddScoped(_ => projectRepository);
+        if (configurationService != null)
+        {
+            services.AddScoped(_ => configurationService);
+        }
 
         return services.BuildServiceProvider();
     }
@@ -437,8 +577,42 @@ public class InspectionWorkerTests
                 flowExecution,
                 imageAcquisition,
                 cancellationToken
-            })!;
+        })!;
         return await task;
+    }
+
+    private static Task InvokeRunRealtimeLoopAsync(
+        InspectionWorker worker,
+        OperatorFlow flow,
+        IFlowExecutionService flowExecution,
+        IImageAcquisitionService imageAcquisition,
+        IInspectionResultChannelWriter resultChannelWriter,
+        IConfigurationService configurationService,
+        CancellationToken cancellationToken)
+    {
+        var method = typeof(InspectionWorker).GetMethod(
+            "RunRealtimeLoopAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        method.Should().NotBeNull();
+
+        return (Task)method!.Invoke(
+            worker,
+            new object?[]
+            {
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                flow,
+                null,
+                ContinuousInspectionMode.Disabled,
+                null,
+                true,
+                false,
+                flowExecution,
+                imageAcquisition,
+                resultChannelWriter,
+                configurationService,
+                cancellationToken
+            })!;
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)

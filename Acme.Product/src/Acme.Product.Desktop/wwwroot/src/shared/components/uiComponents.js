@@ -221,6 +221,8 @@ export function createCheckbox(options = {}) {
 
 // 延迟初始化 toast 容器，确保 DOM 已就绪
 let toastContainer = null;
+const activeToasts = new Map();
+const maxVisibleToasts = 4;
 
 function getToastContainer() {
     if (!toastContainer) {
@@ -257,9 +259,28 @@ export function showToast(message, type = 'info', duration = 3000) {
         setTimeout(() => showToast(message, type, duration), 100);
         return null;
     }
+
+    const normalizedMessage = String(message ?? '');
+    const normalizedType = String(type || 'info');
+    const toastKey = `${normalizedType}:${normalizedMessage}`;
+    const existingToast = activeToasts.get(toastKey);
+    if (existingToast?.parentNode && existingToast.__cvToastRemoving !== true) {
+        globalThis.clearTimeout(existingToast.__cvToastTimer);
+        existingToast.__cvToastTimer = globalThis.setTimeout(() => {
+            removeToast(existingToast);
+        }, duration);
+        return existingToast;
+    }
     
     const toast = document.createElement('div');
-    toast.className = `cv-toast cv-toast-${type}`;
+    toast.className = `cv-toast cv-toast-${normalizedType}`;
+    if (toast.dataset) {
+        toast.dataset.toastKey = toastKey;
+    } else if (typeof toast.setAttribute === 'function') {
+        toast.setAttribute('data-toast-key', toastKey);
+    } else {
+        toast.__cvToastKey = toastKey;
+    }
 
     const icons = {
         success: '✓',
@@ -269,12 +290,12 @@ export function showToast(message, type = 'info', duration = 3000) {
     };
 
     toast.innerHTML = `
-        <span class="cv-toast-icon">${icons[type]}</span>
+        <span class="cv-toast-icon">${icons[normalizedType] || icons.info}</span>
         <span class="cv-toast-message"></span>
         <button class="cv-toast-close">×</button>
     `;
 
-    toast.querySelector('.cv-toast-message').textContent = String(message ?? '');
+    toast.querySelector('.cv-toast-message').textContent = normalizedMessage;
 
     // 关闭按钮
     toast.querySelector('.cv-toast-close').addEventListener('click', () => {
@@ -282,9 +303,17 @@ export function showToast(message, type = 'info', duration = 3000) {
     });
 
     container.appendChild(toast);
+    activeToasts.set(toastKey, toast);
+
+    const overflowCount = container.children.length - maxVisibleToasts;
+    if (overflowCount > 0) {
+        Array.from(container.children)
+            .slice(0, overflowCount)
+            .forEach(removeToast);
+    }
 
     // 自动移除
-    setTimeout(() => {
+    toast.__cvToastTimer = setTimeout(() => {
         removeToast(toast);
     }, duration);
 
@@ -292,10 +321,40 @@ export function showToast(message, type = 'info', duration = 3000) {
 }
 
 function removeToast(toast) {
-    toast.classList.add('cv-toast-hiding');
+    if (!toast) {
+        return;
+    }
+
+    if (toast.__cvToastRemoving) {
+        return;
+    }
+    toast.__cvToastRemoving = true;
+
+    if (toast.__cvToastTimer) {
+        globalThis.clearTimeout(toast.__cvToastTimer);
+        toast.__cvToastTimer = null;
+    }
+
+    const toastKey = toast.dataset?.toastKey
+        || (typeof toast.getAttribute === 'function' ? toast.getAttribute('data-toast-key') : null)
+        || toast.__cvToastKey;
+    if (toastKey) {
+        activeToasts.delete(toastKey);
+    }
+
+    if (toast.classList?.add) {
+        toast.classList.add('cv-toast-hiding');
+    } else if (typeof toast.className === 'string' && !toast.className.includes('cv-toast-hiding')) {
+        toast.className = `${toast.className} cv-toast-hiding`;
+    }
+
     setTimeout(() => {
         if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
+            if (typeof toast.parentNode.removeChild === 'function') {
+                toast.parentNode.removeChild(toast);
+            } else if (typeof toast.remove === 'function') {
+                toast.remove();
+            }
         }
     }, 300);
 }

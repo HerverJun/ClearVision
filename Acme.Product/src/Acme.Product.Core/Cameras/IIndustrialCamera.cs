@@ -10,6 +10,11 @@ namespace Acme.Product.Core.Cameras;
 public interface IIndustrialCamera : ICamera
 {
     /// <summary>
+    /// 设置像素格式
+    /// </summary>
+    Task SetPixelFormatAsync(CameraPixelFormat pixelFormat);
+
+    /// <summary>
     /// 设置触发模式
     /// </summary>
     Task SetTriggerModeAsync(CameraTriggerMode mode, string? hardwareTriggerSource = null);
@@ -125,6 +130,11 @@ public interface ICameraProvider : IDisposable
     bool SetGain(double value);
 
     /// <summary>
+    /// 设置像素格式
+    /// </summary>
+    bool SetPixelFormat(CameraPixelFormat pixelFormat);
+
+    /// <summary>
     /// 设置触发模式
     /// </summary>
     bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null);
@@ -230,4 +240,45 @@ public enum CameraPixelFormat
     BayerGB8,
     BayerGR8,
     BayerBG8
+}
+
+public static class CameraPixelFormatExtensions
+{
+    public const string DefaultPixelFormat = nameof(CameraPixelFormat.Mono8);
+
+    public static CameraPixelFormat Normalize(string? rawPixelFormat)
+    {
+        var normalized = (rawPixelFormat ?? string.Empty)
+            .Trim()
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .ToLowerInvariant();
+
+        return normalized switch
+        {
+            "mono" or "mono8" or "monochrome" or "gray" or "gray8" or "grey" or "grey8" or "moon" => CameraPixelFormat.Mono8,
+            "rgb" or "rgb8" => CameraPixelFormat.RGB8,
+            "bgr" or "bgr8" => CameraPixelFormat.BGR8,
+            "bayerrg" or "bayerrg8" => CameraPixelFormat.BayerRG8,
+            "bayergb" or "bayergb8" => CameraPixelFormat.BayerGB8,
+            "bayergr" or "bayergr8" => CameraPixelFormat.BayerGR8,
+            "bayerbg" or "bayerbg8" => CameraPixelFormat.BayerBG8,
+            _ => CameraPixelFormat.Mono8
+        };
+    }
+
+    public static string ToConfigValue(this CameraPixelFormat pixelFormat)
+    {
+        return pixelFormat switch
+        {
+            CameraPixelFormat.RGB8 => nameof(CameraPixelFormat.RGB8),
+            CameraPixelFormat.BGR8 => nameof(CameraPixelFormat.BGR8),
+            CameraPixelFormat.BayerRG8 => nameof(CameraPixelFormat.BayerRG8),
+            CameraPixelFormat.BayerGB8 => nameof(CameraPixelFormat.BayerGB8),
+            CameraPixelFormat.BayerGR8 => nameof(CameraPixelFormat.BayerGR8),
+            CameraPixelFormat.BayerBG8 => nameof(CameraPixelFormat.BayerBG8),
+            _ => nameof(CameraPixelFormat.Mono8)
+        };
+    }
 }

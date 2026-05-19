@@ -1,9 +1,9 @@
 {
   "name": "Terminal Wire Sequence Video Stream Template",
-  "description": "Continuous camera acquisition with frame-change arrival trigger before DeepLearning, for conveyor lines without photoelectric or PLC trigger signals.",
+  "description": "Continuous camera acquisition with frame-change arrival trigger before ONNX-integrated wire sequence detection.",
   "scenarioKey": "wire-sequence-terminal-video-stream",
   "baseScenarioKey": "wire-sequence-terminal",
-  "templateVersion": "1.5.0",
+  "templateVersion": "1.6.0",
   "expectedSequence": [
     "Wire_Black",
     "Wire_Blue"
@@ -21,8 +21,7 @@
     "FrameChangeTrigger.RoiY",
     "FrameChangeTrigger.RoiW",
     "FrameChangeTrigger.RoiH",
-    "BoxNms.ScoreThreshold",
-    "BoxNms.IouThreshold"
+    "DeepLearning.Confidence"
   ],
   "operators": [
     {
@@ -62,35 +61,12 @@
         "InputSize": "640",
         "TargetClasses": "Wire_Black,Wire_Blue",
         "EnableInternalNms": "false",
+        "OutputFormat": "EndToEndNms",
         "DetectionMode": "Object"
       }
     },
     {
       "id": "op_4",
-      "type": "BoxFilter",
-      "name": "RoiDetectionFilter",
-      "params": {
-        "FilterMode": "Region",
-        "RegionX": "0",
-        "RegionY": "0",
-        "RegionW": "999999",
-        "RegionH": "999999",
-        "MinScore": "0.0"
-      }
-    },
-    {
-      "id": "op_5",
-      "type": "BoxNms",
-      "name": "DetectionNms",
-      "params": {
-        "IouThreshold": "0.45",
-        "ScoreThreshold": "0.25",
-        "MaxDetections": "10",
-        "ShowSuppressed": "false"
-      }
-    },
-    {
-      "id": "op_6",
       "type": "DetectionSequenceJudge",
       "name": "SequenceJudge",
       "params": {
@@ -102,7 +78,7 @@
       }
     },
     {
-      "id": "op_7",
+      "id": "op_5",
       "type": "ResultOutput",
       "name": "Output",
       "params": {
@@ -131,51 +107,27 @@
       "targetPort": "Detections"
     },
     {
-      "source": "op_2",
-      "sourcePort": "Image",
-      "target": "op_4",
-      "targetPort": "Image"
-    },
-    {
-      "source": "op_4",
-      "sourcePort": "Detections",
-      "target": "op_5",
-      "targetPort": "Detections"
-    },
-    {
-      "source": "op_2",
+      "source": "op_3",
       "sourcePort": "Image",
       "target": "op_5",
       "targetPort": "Image"
     },
     {
-      "source": "op_5",
-      "sourcePort": "Detections",
-      "target": "op_6",
-      "targetPort": "Detections"
-    },
-    {
-      "source": "op_5",
-      "sourcePort": "Image",
-      "target": "op_7",
-      "targetPort": "Image"
-    },
-    {
-      "source": "op_5",
-      "sourcePort": "Diagnostics",
-      "target": "op_7",
+      "source": "op_3",
+      "sourcePort": "PostprocessDiagnostics",
+      "target": "op_5",
       "targetPort": "Data"
     },
     {
-      "source": "op_6",
+      "source": "op_4",
       "sourcePort": "Diagnostics",
-      "target": "op_7",
+      "target": "op_5",
       "targetPort": "Result"
     },
     {
-      "source": "op_6",
+      "source": "op_4",
       "sourcePort": "Message",
-      "target": "op_7",
+      "target": "op_5",
       "targetPort": "Text"
     }
   ],
@@ -195,26 +147,18 @@
       "CooldownMs"
     ],
     "op_3": [
-      "ModelPath"
+      "ModelPath",
+      "OutputFormat",
+      "Confidence"
     ],
     "op_4": [
-      "RegionX",
-      "RegionY",
-      "RegionW",
-      "RegionH"
-    ],
-    "op_5": [
-      "ScoreThreshold",
-      "IouThreshold"
-    ],
-    "op_6": [
       "ExpectedLabels",
       "ExpectedCount"
     ]
   },
   "runtimeNotes": [
     "Set the camera binding triggerMode to Continuous and start with targetFrameRateFps between 5 and 10.",
-    "Tune FrameChangeTrigger ROI first so belt vibration and glare occupy as little ROI area as possible.",
+    "Tune FrameChangeTrigger ROI only for arrival detection; detection ROI filtering is not part of this template.",
     "When FrameChangeTrigger is not triggered, the flow cycle is short-circuited and does not publish OK/NG."
   ]
 }

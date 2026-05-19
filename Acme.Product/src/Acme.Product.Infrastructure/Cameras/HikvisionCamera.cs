@@ -583,6 +583,15 @@ public class HikvisionCamera : ICameraProvider
         return MV_CC_SetFloatValue(_handle, "Gain", (float)value) == MV_OK;
     }
 
+    public bool SetPixelFormat(CameraPixelFormat pixelFormat)
+    {
+        if (!IsConnected)
+            return false;
+
+        var symbol = CameraPixelFormatExtensions.Normalize(pixelFormat.ToConfigValue()).ToConfigValue();
+        return MV_CC_SetEnumValueByString(_handle, "PixelFormat", symbol) == MV_OK;
+    }
+
     public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null)
     {
         if (!IsConnected)

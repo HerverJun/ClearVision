@@ -412,15 +412,16 @@ public class Sprint7_AiEvolutionTests
             var templates = await service.GetTemplatesAsync();
             var upgraded = templates.Single(item => item.ScenarioKey == "wire-sequence-terminal");
 
-            upgraded.TemplateVersion.Should().Be("1.4.2");
+            upgraded.TemplateVersion.Should().Be("1.6.0");
             upgraded.ScenarioPackage.Should().NotBeNull();
-            upgraded.ScenarioPackage!.PackageVersion.Should().Be("1.4.0");
+            upgraded.ScenarioPackage!.PackageVersion.Should().Be("1.6.0");
 
             using var document = JsonDocument.Parse(upgraded.FlowJson);
             var deepLearningParams = document.RootElement.GetProperty("operators").EnumerateArray()
                 .Single(item => item.GetProperty("tempId").GetString() == "op_2")
                 .GetProperty("parameters");
             deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+            deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
             deepLearningParams.GetProperty("Confidence").GetString().Should().Be("0.05");
         }
         finally
@@ -673,7 +674,7 @@ public class Sprint7_AiEvolutionTests
         }
     }
 
-    [Fact(DisplayName = "FlowTemplateService - 端子线序模板应对齐固定 ROI + BoxNms 主链")]
+    [Fact(DisplayName = "FlowTemplateService - 端子线序模板应使用 ONNX NMS 短链路")]
     public async Task FlowTemplateService_WireSequenceTemplate_ShouldUseAlignedSkeleton()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
@@ -684,13 +685,13 @@ public class Sprint7_AiEvolutionTests
             var template = (await service.GetTemplatesAsync())
                 .Single(item => item.Name == "端子线序检测");
 
-            template.TemplateVersion.Should().Be("1.4.2");
+            template.TemplateVersion.Should().Be("1.6.0");
             template.ScenarioPackage.Should().NotBeNull();
-            template.ScenarioPackage!.PackageVersion.Should().Be("1.4.0");
+            template.ScenarioPackage!.PackageVersion.Should().Be("1.6.0");
             template.ScenarioPackage.RequiredResources.Should().Equal("DeepLearning.ModelPath");
-            template.ScenarioPackage.AssetVersionIds.Should().Contain("template:terminal-wire-sequence-template@1.4.0");
-            template.ScenarioPackage.AssetVersionIds.Should().Contain("model:wire-seq-yolo@1.2.0");
-            template.ScenarioPackage.AssetVersionIds.Should().Contain("rule:wire-sequence-rule@1.4.0");
+            template.ScenarioPackage.AssetVersionIds.Should().Contain("template:terminal-wire-sequence-template@1.6.0");
+            template.ScenarioPackage.AssetVersionIds.Should().Contain("model:wire-seq-yolo-nms@1.3.0");
+            template.ScenarioPackage.AssetVersionIds.Should().Contain("rule:wire-sequence-rule@1.6.0");
 
             using var document = JsonDocument.Parse(template.FlowJson);
             var root = document.RootElement;
@@ -699,7 +700,7 @@ public class Sprint7_AiEvolutionTests
             root.GetProperty("requiredResources").EnumerateArray().Select(item => item.GetString())
                 .Should().Equal("DeepLearning.ModelPath");
             root.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
-                .Should().Equal("BoxNms.ScoreThreshold", "BoxNms.IouThreshold");
+                .Should().Equal("DeepLearning.Confidence");
 
             var operatorTypes = root.GetProperty("operators").EnumerateArray()
                 .Select(item => item.GetProperty("operatorType").GetString())
@@ -707,8 +708,6 @@ public class Sprint7_AiEvolutionTests
             operatorTypes.Should().Equal(
                 "ImageAcquisition",
                 "DeepLearning",
-                "BoxFilter",
-                "BoxNms",
                 "DetectionSequenceJudge",
                 "ResultOutput");
             operatorTypes.Should().NotContain("ConditionalBranch");
@@ -721,45 +720,23 @@ public class Sprint7_AiEvolutionTests
                 item.GetProperty("targetTempId").GetString() == "op_3" &&
                 item.GetProperty("targetPortName").GetString() == "Detections");
             connections.Should().Contain(item =>
-                item.GetProperty("sourceTempId").GetString() == "op_3" &&
-                item.GetProperty("sourcePortName").GetString() == "Detections" &&
-                item.GetProperty("targetTempId").GetString() == "op_4" &&
-                item.GetProperty("targetPortName").GetString() == "Detections");
-            connections.Should().Contain(item =>
                 item.GetProperty("sourceTempId").GetString() == "op_2" &&
-                item.GetProperty("sourcePortName").GetString() == "OriginalImage" &&
+                item.GetProperty("sourcePortName").GetString() == "PostprocessDiagnostics" &&
                 item.GetProperty("targetTempId").GetString() == "op_4" &&
-                item.GetProperty("targetPortName").GetString() == "SourceImage");
-            connections.Should().Contain(item =>
-                item.GetProperty("sourceTempId").GetString() == "op_4" &&
-                item.GetProperty("sourcePortName").GetString() == "Diagnostics" &&
-                item.GetProperty("targetTempId").GetString() == "op_6" &&
                 item.GetProperty("targetPortName").GetString() == "Data");
             connections.Should().Contain(item =>
-                item.GetProperty("sourceTempId").GetString() == "op_5" &&
+                item.GetProperty("sourceTempId").GetString() == "op_3" &&
                 item.GetProperty("sourcePortName").GetString() == "Diagnostics" &&
-                item.GetProperty("targetTempId").GetString() == "op_6" &&
+                item.GetProperty("targetTempId").GetString() == "op_4" &&
                 item.GetProperty("targetPortName").GetString() == "Result");
             connections.Should().Contain(item =>
-                item.GetProperty("sourceTempId").GetString() == "op_5" &&
+                item.GetProperty("sourceTempId").GetString() == "op_3" &&
                 item.GetProperty("sourcePortName").GetString() == "Message" &&
-                item.GetProperty("targetTempId").GetString() == "op_6" &&
+                item.GetProperty("targetTempId").GetString() == "op_4" &&
                 item.GetProperty("targetPortName").GetString() == "Text");
 
-            var boxFilterParams = root.GetProperty("operators").EnumerateArray()
-                .Single(item => item.GetProperty("tempId").GetString() == "op_3")
-                .GetProperty("parameters");
-            boxFilterParams.GetProperty("FilterMode").GetString().Should().Be("Region");
-            boxFilterParams.GetProperty("RegionW").GetString().Should().Be("999999");
-            boxFilterParams.GetProperty("RegionH").GetString().Should().Be("999999");
-
-            var boxNmsParams = root.GetProperty("operators").EnumerateArray()
-                .Single(item => item.GetProperty("tempId").GetString() == "op_4")
-                .GetProperty("parameters");
-            boxNmsParams.GetProperty("ShowSuppressed").GetString().Should().Be("false");
-
             var judgeParams = root.GetProperty("operators").EnumerateArray()
-                .Single(item => item.GetProperty("tempId").GetString() == "op_5")
+                .Single(item => item.GetProperty("tempId").GetString() == "op_3")
                 .GetProperty("parameters");
             judgeParams.GetProperty("ExpectedLabels").GetString().Should().Be("Wire_Black,Wire_Blue");
             judgeParams.GetProperty("SortBy").GetString().Should().Be("CenterY");
@@ -769,6 +746,7 @@ public class Sprint7_AiEvolutionTests
                 .Single(item => item.GetProperty("tempId").GetString() == "op_2")
                 .GetProperty("parameters");
             deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+            deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
             deepLearningParams.GetProperty("Confidence").GetString().Should().Be("0.05");
             deepLearningParams.GetProperty("LabelsPath").GetString().Should().BeEmpty();
 
@@ -792,12 +770,12 @@ public class Sprint7_AiEvolutionTests
             var template = (await service.GetTemplatesAsync())
                 .Single(item => item.Name == "端子线序检测-视频流版");
 
-            template.TemplateVersion.Should().Be("1.5.0");
+            template.TemplateVersion.Should().Be("1.6.0");
             template.ScenarioKey.Should().Be("wire-sequence-terminal-video-stream");
             template.ScenarioPackage.Should().NotBeNull();
-            template.ScenarioPackage!.PackageVersion.Should().Be("1.5.0");
+            template.ScenarioPackage!.PackageVersion.Should().Be("1.6.0");
             template.ScenarioPackage.AssetVersionIds.Should()
-                .Contain("template:terminal-wire-sequence-video-stream-template@1.5.0");
+                .Contain("template:terminal-wire-sequence-video-stream-template@1.6.0");
 
             using var document = JsonDocument.Parse(template.FlowJson);
             var root = document.RootElement;
@@ -809,8 +787,6 @@ public class Sprint7_AiEvolutionTests
                 "ImageAcquisition",
                 "FrameChangeTrigger",
                 "DeepLearning",
-                "BoxFilter",
-                "BoxNms",
                 "DetectionSequenceJudge",
                 "ResultOutput");
 
@@ -826,6 +802,44 @@ public class Sprint7_AiEvolutionTests
 
             root.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
                 .Should().Contain("FrameChangeTrigger.MinChangeRatio");
+            root.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
+                .Should().Contain("DeepLearning.Confidence");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 端子线序精简模板端口应通过校验器")]
+    public async Task FlowTemplateService_WireSequenceTemplates_ShouldUseValidOperatorPorts()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+            var templates = await service.GetTemplatesAsync();
+            var validator = new AiFlowValidator(new OperatorFactory());
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            jsonOptions.Converters.Add(new FlexibleStringDictionaryJsonConverter());
+
+            foreach (var templateName in new[] { "端子线序检测", "端子线序检测-视频流版" })
+            {
+                var template = templates.Single(item => item.Name == templateName);
+                var flow = JsonSerializer.Deserialize<AiGeneratedFlowJson>(template.FlowJson, jsonOptions);
+                flow.Should().NotBeNull();
+
+                var result = validator.Validate(flow!);
+
+                result.IsValid.Should().BeTrue(string.Join(Environment.NewLine, result.Errors));
+                result.Diagnostics
+                    .Where(IsPortContractDiagnostic)
+                    .Should().BeEmpty($"{templateName} should only use declared operator ports and compatible port types");
+            }
         }
         finally
         {
@@ -968,5 +982,15 @@ public class Sprint7_AiEvolutionTests
             .ToList();
 
         return ids;
+    }
+
+    private static bool IsPortContractDiagnostic(AiValidationDiagnostic diagnostic)
+    {
+        return diagnostic.Code is
+            "missing_source_operator" or
+            "missing_target_operator" or
+            "missing_output_port" or
+            "missing_input_port" or
+            "incompatible_port_type";
     }
 }

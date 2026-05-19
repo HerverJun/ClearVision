@@ -50,6 +50,13 @@ public enum YoloVersion
     YOLOv11 = 11
 }
 
+public enum DetectionOutputFormat
+{
+    Auto = 0,
+    RawYolo = 1,
+    EndToEndNms = 2
+}
+
 /// <summary>
 /// 深度学习算子 - 使用 ONNX 模型进行 AI 缺陷检测
 /// 支持 YOLOv5, YOLOv6, YOLOv8, YOLOv11 等多种模型格式
@@ -79,12 +86,15 @@ public enum YoloVersion
 [OperatorParam("LabelsPath", "标签文件路径", "file", Description = "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。", DefaultValue = "")]
 [OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。", DefaultValue = true)]
 [OperatorParam("NmsIouThreshold", "NMS IoU Threshold", "double", Description = "内部 NMS 与预览 NMS 使用的 IoU 阈值。", DefaultValue = 0.45, Min = 0.0, Max = 1.0)]
+[OperatorParam("OutputFormat", "输出格式", "enum", Description = "Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。", DefaultValue = "Auto", Options = new[] { "Auto|自动识别", "RawYolo|原始 YOLO", "EndToEndNms|端到端 NMS" })]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
 [OutputPort("ResolvedModelPath", "Resolved Model Path", PortDataType.String)]
 [OutputPort("ResolvedModelId", "Resolved Model Id", PortDataType.String)]
 [OutputPort("ResolvedModelCatalogPath", "Resolved Model Catalog Path", PortDataType.String)]
 [OutputPort("ModelSource", "Model Source", PortDataType.String)]
 [OutputPort("ModelProvenance", "Model Provenance", PortDataType.Any)]
+[OutputPort("PostprocessDiagnostics", "Postprocess Diagnostics", PortDataType.Any)]
+[OutputPort("OutputFormat", "Output Format", PortDataType.String)]
 [OperatorParam("ModelId", "Model Id", "string", DefaultValue = "")]
 [OperatorParam("ModelCatalogPath", "Model Catalog Path", "file", DefaultValue = "")]
 public class DeepLearningOperator : OperatorBase
@@ -312,6 +322,7 @@ public class DeepLearningOperator : OperatorBase
         var labelsPath = ResolveLabelsPath(@operator);
         var enableInternalNms = GetBoolParam(@operator, "EnableInternalNms", true);
         var nmsIouThreshold = GetFloatParam(@operator, "NmsIouThreshold", 0.45f, 0.0f, 1.0f);
+        var outputFormat = ParseDetectionOutputFormat(GetStringParam(@operator, "OutputFormat", "Auto"));
 
         // 2.1 加载自定义标签
         var labels = Array.Empty<string>();
@@ -412,7 +423,7 @@ public class DeepLearningOperator : OperatorBase
         Logger.LogInformation("[DeepLearning] 最终使用YOLO版本: {YoloVersion}, 置信度阈值: {Confidence}", yoloVersion, confidenceThreshold);
 
         // 9. 后处理
-        var postprocessResult = PostprocessResultsWithDiagnostics(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, targetClasses, enableInternalNms, nmsIouThreshold);
+        var postprocessResult = PostprocessResultsWithDiagnostics(outputTensor, confidenceThreshold, originalWidth, originalHeight, inputSize, yoloVersion, outputFormat, labels.Length, targetClasses, enableInternalNms, nmsIouThreshold);
         var detections = postprocessResult.Detections;
         Logger.LogInformation("[DeepLearning] 检测到目标数量: {DetectionCount}", detections.Count);
 
@@ -448,6 +459,7 @@ public class DeepLearningOperator : OperatorBase
             { "DetectionMode", detectionMode },
             { "InternalNmsEnabled", enableInternalNms },
             { "NmsIouThreshold", nmsIouThreshold },
+            { "OutputFormat", postprocessResult.ResolvedOutputFormat.ToString() },
             { "RawCandidateCount", postprocessResult.Diagnostics.RawCandidateCount },
             { "PostprocessDiagnostics", postprocessResult.Diagnostics.ToPayload() },
             { "VisualizationDetectionCount", visualizationDetections.Count },
@@ -1237,20 +1249,39 @@ public class DeepLearningOperator : OperatorBase
         int originalHeight,
         int inputSize,
         YoloVersion yoloVersion,
+        DetectionOutputFormat outputFormat,
+        int knownLabelCount,
         HashSet<int>? targetClasses,
         bool enableInternalNms,
         float nmsIouThreshold)
     {
-        var detections = PostprocessResults(
-            outputTensor,
-            confidenceThreshold,
-            originalWidth,
-            originalHeight,
-            inputSize,
-            yoloVersion,
-            targetClasses,
-            enableInternalNms,
-            nmsIouThreshold);
+        var resolvedOutputFormat = DetectionOutputFormat.RawYolo;
+        List<DetectionResult> detections;
+
+        if (ShouldUseEndToEndNmsOutput(outputTensor, outputFormat, knownLabelCount))
+        {
+            detections = PostprocessEndToEndNmsOutput(
+                outputTensor,
+                confidenceThreshold,
+                originalWidth,
+                originalHeight,
+                inputSize);
+            detections = ApplyTargetClassFilter(detections, targetClasses);
+            resolvedOutputFormat = DetectionOutputFormat.EndToEndNms;
+        }
+        else
+        {
+            detections = PostprocessResults(
+                outputTensor,
+                confidenceThreshold,
+                originalWidth,
+                originalHeight,
+                inputSize,
+                yoloVersion,
+                targetClasses,
+                enableInternalNms,
+                nmsIouThreshold);
+        }
 
         return new PostprocessResult(
             detections,
@@ -1258,8 +1289,315 @@ public class DeepLearningOperator : OperatorBase
                 detections,
                 DefaultNmsCandidateLimit,
                 droppedBeforeNms: 0,
-                nmsApplied: enableInternalNms,
-                iouComparisons: 0));
+                nmsApplied: resolvedOutputFormat == DetectionOutputFormat.RawYolo && enableInternalNms,
+                iouComparisons: 0,
+                outputFormat: resolvedOutputFormat.ToString()),
+            resolvedOutputFormat);
+    }
+
+    private List<DetectionResult> ApplyTargetClassFilter(
+        List<DetectionResult> detections,
+        HashSet<int>? targetClasses)
+    {
+        if (targetClasses == null || targetClasses.Count == 0)
+        {
+            return detections;
+        }
+
+        var beforeFilter = detections.Count;
+        var filteredDetections = new List<DetectionResult>(detections.Count);
+        foreach (var detection in detections)
+        {
+            if (targetClasses.Contains(detection.ClassId))
+            {
+                filteredDetections.Add(detection);
+            }
+        }
+
+        Logger.LogDebug("[DeepLearning] 类别过滤: {BeforeFilter} -> {AfterFilter} (目标类别: {TargetClasses})",
+            beforeFilter, filteredDetections.Count, string.Join(",", targetClasses));
+        return filteredDetections;
+    }
+
+    private bool ShouldUseEndToEndNmsOutput(
+        DenseTensor<float> outputTensor,
+        DetectionOutputFormat outputFormat,
+        int knownLabelCount)
+    {
+        if (outputFormat == DetectionOutputFormat.RawYolo)
+        {
+            return false;
+        }
+
+        var shape = outputTensor.Dimensions.ToArray();
+        if (outputFormat == DetectionOutputFormat.EndToEndNms)
+        {
+            if (!TryGetEndToEndNmsLayout(shape, out var forcedLayout))
+            {
+                throw new InvalidOperationException(
+                    $"DeepLearning OutputFormat=EndToEndNms requires a 2D/3D tensor with 6 or 7 features per detection. Actual shape: {FormatTensorShape(shape)}.");
+            }
+
+            if (forcedLayout.DetectionCount > 1000)
+            {
+                throw new InvalidOperationException(
+                    $"DeepLearning OutputFormat=EndToEndNms received {FormatTensorShape(shape)}, which looks like raw YOLO anchor output. Set OutputFormat=RawYolo/Auto or export an ONNX model with NMS.");
+            }
+
+            if (!HasPlausibleEndToEndRows(outputTensor, forcedLayout, knownLabelCount, allowEmpty: true))
+            {
+                throw new InvalidOperationException(
+                    $"DeepLearning OutputFormat=EndToEndNms received {FormatTensorShape(shape)}, but sampled rows do not match [x1,y1,x2,y2,score,class]. Verify the model export or set OutputFormat=RawYolo/Auto.");
+            }
+
+            return true;
+        }
+
+        return IsLikelyEndToEndNmsOutput(outputTensor, knownLabelCount);
+    }
+
+    private static string FormatTensorShape(IReadOnlyList<int> shape)
+    {
+        return shape.Count == 0
+            ? "[]"
+            : "[" + string.Join(",", shape) + "]";
+    }
+
+    private bool IsLikelyEndToEndNmsOutput(DenseTensor<float> outputTensor, int knownLabelCount)
+    {
+        if (!TryGetEndToEndNmsLayout(outputTensor.Dimensions.ToArray(), out var layout))
+        {
+            return false;
+        }
+
+        if (layout.DetectionCount > 1000)
+        {
+            return false;
+        }
+
+        return HasPlausibleEndToEndRows(outputTensor, layout, knownLabelCount, allowEmpty: false);
+    }
+
+    private bool HasPlausibleEndToEndRows(
+        DenseTensor<float> outputTensor,
+        EndToEndNmsLayout layout,
+        int knownLabelCount,
+        bool allowEmpty)
+    {
+        var sampleCount = Math.Min(layout.DetectionCount, 24);
+        var positiveScoreRows = 0;
+        var validRows = 0;
+        for (var i = 0; i < sampleCount; i++)
+        {
+            var score = ReadEndToEndFeature(outputTensor, layout, i, layout.ScoreIndex);
+            if (score <= 0f)
+            {
+                continue;
+            }
+
+            positiveScoreRows++;
+            if (score > 1.0f)
+            {
+                continue;
+            }
+
+            var classValue = ReadEndToEndFeature(outputTensor, layout, i, layout.ClassIndex);
+            if (!IsPlausibleClassValue(classValue, knownLabelCount))
+            {
+                continue;
+            }
+
+            var x1 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset);
+            var y1 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset + 1);
+            var x2 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset + 2);
+            var y2 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset + 3);
+            if (x2 > x1 && y2 > y1)
+            {
+                validRows++;
+            }
+        }
+
+        return validRows > 0 || (allowEmpty && positiveScoreRows == 0);
+    }
+
+    private List<DetectionResult> PostprocessEndToEndNmsOutput(
+        DenseTensor<float> outputTensor,
+        float confidenceThreshold,
+        int originalWidth,
+        int originalHeight,
+        int inputSize)
+    {
+        var detections = new List<DetectionResult>();
+        if (!TryGetEndToEndNmsLayout(outputTensor.Dimensions.ToArray(), out var layout))
+        {
+            return detections;
+        }
+
+        var scale = Math.Min((float)inputSize / originalWidth, (float)inputSize / originalHeight);
+        var xPad = (inputSize - originalWidth * scale) / 2;
+        var yPad = (inputSize - originalHeight * scale) / 2;
+
+        for (var i = 0; i < layout.DetectionCount; i++)
+        {
+            var score = ReadEndToEndFeature(outputTensor, layout, i, layout.ScoreIndex);
+            if (score < confidenceThreshold || score <= 0f)
+            {
+                continue;
+            }
+
+            var classValue = ReadEndToEndFeature(outputTensor, layout, i, layout.ClassIndex);
+            var classId = (int)MathF.Round(classValue);
+            if (classId < 0)
+            {
+                continue;
+            }
+
+            var x1 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset);
+            var y1 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset + 1);
+            var x2 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset + 2);
+            var y2 = ReadEndToEndFeature(outputTensor, layout, i, layout.BoxOffset + 3);
+
+            if (x2 <= x1 || y2 <= y1)
+            {
+                continue;
+            }
+
+            (x1, y1, x2, y2) = ProjectEndToEndBox(
+                x1,
+                y1,
+                x2,
+                y2,
+                originalWidth,
+                originalHeight,
+                scale,
+                xPad,
+                yPad);
+
+            var width = x2 - x1;
+            var height = y2 - y1;
+            if (width <= 0f || height <= 0f)
+            {
+                continue;
+            }
+
+            detections.Add(new DetectionResult
+            {
+                X = x1,
+                Y = y1,
+                Width = width,
+                Height = height,
+                Confidence = score,
+                ClassId = classId
+            });
+        }
+
+        Logger.LogDebug("[DeepLearning] EndToEndNms后处理: 输出检测数={DetectionCount}", detections.Count);
+        return detections;
+    }
+
+    private static (float X1, float Y1, float X2, float Y2) ProjectEndToEndBox(
+        float x1,
+        float y1,
+        float x2,
+        float y2,
+        int originalWidth,
+        int originalHeight,
+        float scale,
+        float xPad,
+        float yPad)
+    {
+        var maxCoordinate = MathF.Max(MathF.Max(MathF.Abs(x1), MathF.Abs(y1)), MathF.Max(MathF.Abs(x2), MathF.Abs(y2)));
+        if (maxCoordinate <= 1.5f)
+        {
+            x1 *= originalWidth;
+            x2 *= originalWidth;
+            y1 *= originalHeight;
+            y2 *= originalHeight;
+        }
+        else
+        {
+            x1 = (x1 - xPad) / scale;
+            x2 = (x2 - xPad) / scale;
+            y1 = (y1 - yPad) / scale;
+            y2 = (y2 - yPad) / scale;
+        }
+
+        x1 = Math.Clamp(x1, 0, originalWidth);
+        x2 = Math.Clamp(x2, 0, originalWidth);
+        y1 = Math.Clamp(y1, 0, originalHeight);
+        y2 = Math.Clamp(y2, 0, originalHeight);
+        return (x1, y1, x2, y2);
+    }
+
+    private static bool IsPlausibleClassValue(float classValue, int knownLabelCount)
+    {
+        if (float.IsNaN(classValue) || float.IsInfinity(classValue))
+        {
+            return false;
+        }
+
+        var rounded = MathF.Round(classValue);
+        if (MathF.Abs(classValue - rounded) > 0.001f)
+        {
+            return false;
+        }
+
+        return knownLabelCount <= 0
+            ? rounded >= 0f && rounded <= 1000f
+            : rounded >= 0f && rounded < knownLabelCount;
+    }
+
+    private static bool TryGetEndToEndNmsLayout(int[] shape, out EndToEndNmsLayout layout)
+    {
+        layout = default;
+
+        if (shape.Length == 3 && shape[0] == 1)
+        {
+            if (IsEndToEndFeatureCount(shape[2]) && shape[1] > 0)
+            {
+                layout = new EndToEndNmsLayout(3, shape[1], shape[2], false);
+                return true;
+            }
+
+            if (IsEndToEndFeatureCount(shape[1]) && shape[2] > 0)
+            {
+                layout = new EndToEndNmsLayout(3, shape[2], shape[1], true);
+                return true;
+            }
+        }
+
+        if (shape.Length == 2)
+        {
+            if (IsEndToEndFeatureCount(shape[1]) && shape[0] > 0)
+            {
+                layout = new EndToEndNmsLayout(2, shape[0], shape[1], false);
+                return true;
+            }
+
+            if (IsEndToEndFeatureCount(shape[0]) && shape[1] > 0)
+            {
+                layout = new EndToEndNmsLayout(2, shape[1], shape[0], true);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsEndToEndFeatureCount(int value)
+    {
+        return value == 6 || value == 7;
+    }
+
+    private static float ReadEndToEndFeature(DenseTensor<float> tensor, EndToEndNmsLayout layout, int detectionIndex, int featureIndex)
+    {
+        return layout.Rank switch
+        {
+            2 when layout.Transposed => tensor[featureIndex, detectionIndex],
+            2 => tensor[detectionIndex, featureIndex],
+            3 when layout.Transposed => tensor[0, featureIndex, detectionIndex],
+            _ => tensor[0, detectionIndex, featureIndex]
+        };
     }
 
 
@@ -1576,6 +1914,16 @@ public class DeepLearningOperator : OperatorBase
         };
     }
 
+    private DetectionOutputFormat ParseDetectionOutputFormat(string format)
+    {
+        return format?.Trim().ToLowerInvariant() switch
+        {
+            "raw" or "rawyolo" or "yolo" => DetectionOutputFormat.RawYolo,
+            "endtoend" or "endtoendnms" or "nms" or "onnxnms" => DetectionOutputFormat.EndToEndNms,
+            _ => DetectionOutputFormat.Auto
+        };
+    }
+
     /// <summary>
     /// 非极大值抑制 (NMS)
     /// </summary>
@@ -1687,7 +2035,10 @@ public class DeepLearningOperator : OperatorBase
         return (keep, iouComparisons);
     }
 
-    private sealed record PostprocessResult(List<DetectionResult> Detections, PostprocessDiagnostics Diagnostics);
+    private sealed record PostprocessResult(
+        List<DetectionResult> Detections,
+        PostprocessDiagnostics Diagnostics,
+        DetectionOutputFormat ResolvedOutputFormat);
 
     private sealed record PostprocessDiagnostics(
         int RawCandidateCount,
@@ -1696,6 +2047,7 @@ public class DeepLearningOperator : OperatorBase
         int DroppedBeforeNms,
         bool NmsApplied,
         long NmsIoUComparisons,
+        string OutputFormat,
         Dictionary<int, int> CandidatesByClass)
     {
         public static PostprocessDiagnostics FromRawCandidates(
@@ -1703,7 +2055,8 @@ public class DeepLearningOperator : OperatorBase
             int candidateLimit,
             int droppedBeforeNms,
             bool nmsApplied,
-            long iouComparisons)
+            long iouComparisons,
+            string outputFormat)
         {
             var byClass = new Dictionary<int, int>();
             for (var i = 0; i < detections.Count; i++)
@@ -1719,6 +2072,7 @@ public class DeepLearningOperator : OperatorBase
                 droppedBeforeNms,
                 nmsApplied,
                 iouComparisons,
+                outputFormat,
                 byClass);
         }
 
@@ -1730,8 +2084,16 @@ public class DeepLearningOperator : OperatorBase
             ["DroppedBeforeNms"] = DroppedBeforeNms,
             ["NmsApplied"] = NmsApplied,
             ["NmsIoUComparisons"] = NmsIoUComparisons,
+            ["OutputFormat"] = OutputFormat,
             ["CandidatesByClass"] = CandidatesByClass
         };
+    }
+
+    private readonly record struct EndToEndNmsLayout(int Rank, int DetectionCount, int FeatureCount, bool Transposed)
+    {
+        public int BoxOffset => FeatureCount == 7 ? 1 : 0;
+        public int ScoreIndex => BoxOffset + 4;
+        public int ClassIndex => BoxOffset + 5;
     }
 
     private readonly struct NmsBox

@@ -302,10 +302,13 @@ public class InspectionService : IInspectionService
         Action<InspectionResult>? onResultReady = null)
     {
         var sessionId = Guid.NewGuid();
+        var effectiveCameraId = ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
+            ? null
+            : cameraId;
 
         _logger.LogInformation(
             "[InspectionService] 请求启动实时检测: ProjectId={ProjectId}, SessionId={SessionId}, CameraId={CameraId}",
-            projectId, sessionId, cameraId ?? "(流程内)");
+            projectId, sessionId, effectiveCameraId ?? "(流程内)");
 
         // 步骤 1：注册会话（Coordinator 保证原子性）
         var startResult = await _coordinator.TryStartAsync(projectId, sessionId, cancellationToken);
@@ -322,7 +325,7 @@ public class InspectionService : IInspectionService
         }
 
         // 步骤 2：启动 Worker（不等待完成，Fire-and-forget）
-        var workerStarted = await _worker.TryStartRunAsync(projectId, sessionId, flow, cameraId);
+        var workerStarted = await _worker.TryStartRunAsync(projectId, sessionId, flow, effectiveCameraId);
 
         if (!workerStarted)
         {
@@ -526,6 +529,16 @@ public class InspectionService : IInspectionService
         ImageDto? imageDto = null;
         try
         {
+            var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
+            if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(actualFlow))
+            {
+                _logger.LogInformation(
+                    "[InspectionService] 图像采集算子使用本地文件输入，跳过相机预采集: ProjectId={ProjectId}, CameraId={CameraId}",
+                    projectId,
+                    cameraId);
+                return await ExecuteSingleCoreAsync(projectId, imageData: null, actualFlow);
+            }
+
             imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId);
 
             if (string.IsNullOrEmpty(imageDto.DataBase64))
@@ -534,7 +547,7 @@ public class InspectionService : IInspectionService
             }
 
             var imageData = Convert.FromBase64String(imageDto.DataBase64);
-            return await ExecuteSingleCoreAsync(projectId, imageData, flow);
+            return await ExecuteSingleCoreAsync(projectId, imageData, actualFlow);
         }
         catch (Exception ex)
         {

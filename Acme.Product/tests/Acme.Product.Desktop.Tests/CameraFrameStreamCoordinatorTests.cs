@@ -18,6 +18,7 @@ public class CameraFrameStreamCoordinatorTests
         camera.IsConnected.Returns(true);
         camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetPixelFormatAsync(Arg.Any<CameraPixelFormat>()).Returns(Task.CompletedTask);
         camera.SetTriggerModeAsync(Arg.Any<CameraTriggerMode>(), Arg.Any<string?>()).Returns(Task.CompletedTask);
         camera.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()).Returns(Task.CompletedTask);
         camera.StopContinuousAcquisitionAsync().Returns(Task.CompletedTask);
@@ -159,6 +160,7 @@ public class CameraFrameStreamCoordinatorTests
         camera.IsConnected.Returns(true);
         camera.SetExposureTimeAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
+        camera.SetPixelFormatAsync(Arg.Any<CameraPixelFormat>()).Returns(Task.CompletedTask);
         camera.SetTriggerModeAsync(Arg.Any<CameraTriggerMode>(), Arg.Any<string?>()).Returns(Task.CompletedTask);
         camera.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()).Returns(Task.CompletedTask);
         camera.StopContinuousAcquisitionAsync().Returns(Task.CompletedTask);

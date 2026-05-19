@@ -1,6 +1,6 @@
 {
   "ruleName": "wire-sequence-rule",
-  "ruleVersion": "1.4.0",
+  "ruleVersion": "1.6.0",
   "scenarioKey": "wire-sequence-terminal",
   "expectedSequence": [
     "Wire_Black",
@@ -11,17 +11,16 @@
     "DeepLearning.ModelPath"
   ],
   "tunableParameters": [
-    "BoxNms.ScoreThreshold",
-    "BoxNms.IouThreshold"
+    "DeepLearning.Confidence"
   ],
   "allowMissing": false,
   "allowDuplicate": false,
   "minConfidence": 0.0,
   "sortBy": "CenterY",
   "direction": "TopToBottom",
-  "thresholdOwner": "BoxNms",
+  "thresholdOwner": "DeepLearning",
   "diagnosticOutputs": [
-    "BoxNms.Diagnostics",
+    "DeepLearning.PostprocessDiagnostics",
     "DetectionSequenceJudge.Diagnostics",
     "DetectionSequenceJudge.Message"
   ],

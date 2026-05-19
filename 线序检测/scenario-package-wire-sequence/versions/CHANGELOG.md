@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Switched the active wire-sequence templates to `DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput`.
+- Removed detection ROI filtering and platform-side `BoxNms` from the active wire-sequence flow because candidate suppression now lives in the exported ONNX model.
+- Moved the remaining platform-side tuning surface to `DeepLearning.Confidence`.
+- Bumped the active model artifact contract to `wire-seq-yolo-nms-v1.3.onnx` so it no longer resolves the legacy raw YOLO model.
 - Added `terminal-wire-sequence-video-stream` v1.5.0 template for conveyor lines without photoelectric or PLC trigger signals.
 - Added a continuous-acquisition front end with `FrameChangeTrigger` before YOLO; no-material frames are short-circuited and do not publish OK / NG results.
 - Fixed the wire label-set ordering to match the exported ONNX class order: `Wire_Blue`, `Wire_Black`.

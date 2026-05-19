@@ -20,6 +20,7 @@ export class ImageViewerComponent {
         this.canvas = null;
         this.imageCanvas = null;
         this.currentImage = null;
+        this.currentImageSource = null;
         this.defects = [];
         
         // 生成唯一 ID，避免多个实例冲突
@@ -154,18 +155,28 @@ export class ImageViewerComponent {
     /**
      * 从文件加载图像
      */
-    loadFromFile(file) {
+    loadFromFile(file, options = {}) {
+        const silent = options.silent === true;
         if (!file.type.startsWith('image/')) {
-            showToast('请选择有效的图像文件', 'error');
+            if (!silent) {
+                showToast('请选择有效的图像文件', 'error');
+            }
             return Promise.reject(new Error('Invalid file type'));
         }
 
-        showToast(`正在加载: ${file.name}`, 'info');
+        if (!silent) {
+            showToast(`正在加载: ${file.name}`, 'info');
+        }
         
         return this.imageCanvas.loadImage(file).then(() => {
-            showToast('图像加载成功', 'success');
+            this.currentImageSource = null;
+            if (!silent) {
+                showToast('图像加载成功', 'success');
+            }
         }).catch((err) => {
-            showToast('图像加载失败: ' + err.message, 'error');
+            if (!silent) {
+                showToast('图像加载失败: ' + err.message, 'error');
+            }
             throw err;
         });
     }
@@ -173,13 +184,21 @@ export class ImageViewerComponent {
     /**
      * 从URL加载图像
      */
-    loadFromUrl(url) {
-        showToast('正在加载图像...', 'info');
+    loadFromUrl(url, options = {}) {
+        const silent = options.silent === true;
+        if (!silent) {
+            showToast('正在加载图像...', 'info');
+        }
         
         return this.imageCanvas.loadImage(url).then(() => {
-            showToast('图像加载成功', 'success');
+            this.currentImageSource = url;
+            if (!silent) {
+                showToast('图像加载成功', 'success');
+            }
         }).catch((err) => {
-            showToast('图像加载失败', 'error');
+            if (!silent) {
+                showToast('图像加载失败', 'error');
+            }
             throw err;
         });
     }
@@ -187,9 +206,9 @@ export class ImageViewerComponent {
     /**
      * 从Base64加载图像
      */
-    loadFromBase64(base64String, format = 'png') {
+    loadFromBase64(base64String, format = 'png', options = {}) {
         const url = `data:image/${format};base64,${base64String}`;
-        return this.loadFromUrl(url);
+        return this.loadFromUrl(url, options);
     }
 
     /**
@@ -203,19 +222,40 @@ export class ImageViewerComponent {
      * 通用图像加载方法 - 支持 data URL 和 raw base64
      * @param {string} source - data URL (如 "data:image/png;base64,...") 或者 raw base64 字符串
      */
-    loadImage(source) {
+    loadImage(source, options = {}) {
         if (!source) {
             console.warn('[ImageViewer] loadImage: source is empty');
             return Promise.reject(new Error('Image source is empty'));
         }
 
+        if (typeof source === 'string' && this.currentImage && this.currentImageSource === source) {
+            this.imageCanvas?.resize?.();
+            this.imageCanvas?.render?.();
+            return Promise.resolve(this.currentImage);
+        }
+
         // 如果是 data URL，直接当作 URL 加载
-        if (source.startsWith('data:')) {
-            return this.loadFromUrl(source);
+        if (typeof source === 'string' && source.startsWith('data:')) {
+            return this.loadFromUrl(source, options);
         }
         
         // 如果是 raw base64，使用 loadFromBase64
-        return this.loadFromBase64(source);
+        if (typeof source === 'string') {
+            return this.loadFromBase64(source, 'png', options);
+        }
+
+        if (source instanceof Blob || source instanceof ArrayBuffer || source instanceof Uint8Array) {
+            return this.imageCanvas.loadImage(source).then(() => {
+                this.currentImageSource = null;
+            }).catch((err) => {
+                if (options.silent !== true) {
+                    showToast('图像加载失败: ' + err.message, 'error');
+                }
+                throw err;
+            });
+        }
+
+        return this.loadFromFile(source, options);
     }
 
     /**

@@ -1,4 +1,8 @@
 using System.Text.Json;
+using Acme.Product.Core.DTOs;
+using Acme.Product.Core.Services;
+using Acme.Product.Infrastructure.AI;
+using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
 
 namespace Acme.Product.Tests.AI;
@@ -18,7 +22,7 @@ public class WireSequenceScenarioPackageTests
         using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
         using var rule = JsonDocument.Parse(File.ReadAllText(rulePath));
 
-        manifest.RootElement.GetProperty("Version").GetString().Should().Be("1.5.0");
+        manifest.RootElement.GetProperty("Version").GetString().Should().Be("1.6.0");
         manifest.RootElement.GetProperty("Constraints").GetProperty("RequiredResources")
             .EnumerateArray().Select(item => item.GetString())
             .Should().Equal("DeepLearning.ModelPath");
@@ -28,14 +32,19 @@ public class WireSequenceScenarioPackageTests
             .ToDictionary(
                 item => item.GetProperty("ArtifactType").GetString()!,
                 item => item.GetProperty("ArtifactVersion").GetString()!);
-        assetVersions["Template"].Should().Be("1.4.0");
-        assetVersions["Model"].Should().Be("1.2.0");
-        assetVersions["Rule"].Should().Be("1.4.0");
+        assetVersions["Template"].Should().Be("1.6.0");
+        assetVersions["Model"].Should().Be("1.3.0");
+        assetVersions["Rule"].Should().Be("1.6.0");
+        var modelAsset = manifest.RootElement.GetProperty("Assets").EnumerateArray()
+            .Single(item => item.GetProperty("ArtifactType").GetString() == "Model");
+        modelAsset.GetProperty("ArtifactName").GetString().Should().Be("wire-seq-yolo-nms");
+        modelAsset.GetProperty("RelativePath").GetString().Should().Be("models/wire-seq-yolo-nms-v1.3.onnx");
+        modelAsset.GetProperty("Metadata").GetProperty("outputFormat").GetString().Should().Be("EndToEndNms");
 
         template.RootElement.GetProperty("requiredResources").EnumerateArray().Select(item => item.GetString())
             .Should().Equal("DeepLearning.ModelPath");
         template.RootElement.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
-            .Should().Equal("BoxNms.ScoreThreshold", "BoxNms.IouThreshold");
+            .Should().Equal("DeepLearning.Confidence");
 
         var operatorTypes = template.RootElement.GetProperty("operators").EnumerateArray()
             .Select(item => item.GetProperty("type").GetString())
@@ -43,8 +52,6 @@ public class WireSequenceScenarioPackageTests
         operatorTypes.Should().Equal(
             "ImageAcquisition",
             "DeepLearning",
-            "BoxFilter",
-            "BoxNms",
             "DetectionSequenceJudge",
             "ResultOutput");
 
@@ -55,46 +62,30 @@ public class WireSequenceScenarioPackageTests
             item.GetProperty("target").GetString() == "op_3" &&
             item.GetProperty("targetPort").GetString() == "Detections");
         connections.Should().Contain(item =>
-            item.GetProperty("source").GetString() == "op_3" &&
-            item.GetProperty("sourcePort").GetString() == "Detections" &&
+            item.GetProperty("source").GetString() == "op_2" &&
+            item.GetProperty("sourcePort").GetString() == "PostprocessDiagnostics" &&
             item.GetProperty("target").GetString() == "op_4" &&
-            item.GetProperty("targetPort").GetString() == "Detections");
-        connections.Should().Contain(item =>
-            item.GetProperty("source").GetString() == "op_4" &&
-            item.GetProperty("sourcePort").GetString() == "Diagnostics" &&
-            item.GetProperty("target").GetString() == "op_6" &&
             item.GetProperty("targetPort").GetString() == "Data");
         connections.Should().Contain(item =>
-            item.GetProperty("source").GetString() == "op_5" &&
+            item.GetProperty("source").GetString() == "op_3" &&
             item.GetProperty("sourcePort").GetString() == "Diagnostics" &&
-            item.GetProperty("target").GetString() == "op_6" &&
+            item.GetProperty("target").GetString() == "op_4" &&
             item.GetProperty("targetPort").GetString() == "Result");
         connections.Should().Contain(item =>
-            item.GetProperty("source").GetString() == "op_5" &&
+            item.GetProperty("source").GetString() == "op_3" &&
             item.GetProperty("sourcePort").GetString() == "Message" &&
-            item.GetProperty("target").GetString() == "op_6" &&
+            item.GetProperty("target").GetString() == "op_4" &&
             item.GetProperty("targetPort").GetString() == "Text");
 
         var deepLearningParams = template.RootElement.GetProperty("operators").EnumerateArray()
             .Single(item => item.GetProperty("id").GetString() == "op_2")
             .GetProperty("params");
         deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+        deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
         deepLearningParams.GetProperty("Confidence").GetString().Should().Be("0.05");
 
-        var boxFilterParams = template.RootElement.GetProperty("operators").EnumerateArray()
-            .Single(item => item.GetProperty("id").GetString() == "op_3")
-            .GetProperty("params");
-        boxFilterParams.GetProperty("FilterMode").GetString().Should().Be("Region");
-        boxFilterParams.GetProperty("RegionW").GetString().Should().Be("999999");
-        boxFilterParams.GetProperty("RegionH").GetString().Should().Be("999999");
-
-        var boxNmsParams = template.RootElement.GetProperty("operators").EnumerateArray()
-            .Single(item => item.GetProperty("id").GetString() == "op_4")
-            .GetProperty("params");
-        boxNmsParams.GetProperty("ShowSuppressed").GetString().Should().Be("false");
-
         var judgeParams = template.RootElement.GetProperty("operators").EnumerateArray()
-            .Single(item => item.GetProperty("id").GetString() == "op_5")
+            .Single(item => item.GetProperty("id").GetString() == "op_3")
             .GetProperty("params");
         judgeParams.GetProperty("MinConfidence").GetString().Should().Be("0.0");
 
@@ -110,7 +101,7 @@ public class WireSequenceScenarioPackageTests
         ruleSequence.Should().Equal(templateSequence);
         rule.RootElement.GetProperty("requiredResources").EnumerateArray().Select(item => item.GetString())
             .Should().Equal("DeepLearning.ModelPath");
-        rule.RootElement.GetProperty("thresholdOwner").GetString().Should().Be("BoxNms");
+        rule.RootElement.GetProperty("thresholdOwner").GetString().Should().Be("DeepLearning");
         rule.RootElement.GetProperty("minConfidence").GetDouble().Should().Be(0.0);
         rule.RootElement.GetProperty("sortBy").GetString().Should().Be("CenterY");
         rule.RootElement.GetProperty("direction").GetString().Should().Be("TopToBottom");
@@ -133,13 +124,13 @@ public class WireSequenceScenarioPackageTests
 
         var videoAsset = manifest.RootElement.GetProperty("Assets").EnumerateArray()
             .Single(item => item.GetProperty("ArtifactName").GetString() == "terminal-wire-sequence-video-stream-template");
-        videoAsset.GetProperty("ArtifactVersion").GetString().Should().Be("1.5.0");
+        videoAsset.GetProperty("ArtifactVersion").GetString().Should().Be("1.6.0");
         videoAsset.GetProperty("RelativePath").GetString()
             .Should().Be("template/terminal-wire-sequence-video-stream.flow.template.json");
 
         template.RootElement.GetProperty("scenarioKey").GetString()
             .Should().Be("wire-sequence-terminal-video-stream");
-        template.RootElement.GetProperty("templateVersion").GetString().Should().Be("1.5.0");
+        template.RootElement.GetProperty("templateVersion").GetString().Should().Be("1.6.0");
 
         template.RootElement.GetProperty("operators").EnumerateArray()
             .Select(item => item.GetProperty("type").GetString())
@@ -147,8 +138,6 @@ public class WireSequenceScenarioPackageTests
                 "ImageAcquisition",
                 "FrameChangeTrigger",
                 "DeepLearning",
-                "BoxFilter",
-                "BoxNms",
                 "DetectionSequenceJudge",
                 "ResultOutput");
 
@@ -159,6 +148,34 @@ public class WireSequenceScenarioPackageTests
 
         template.RootElement.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
             .Should().Contain("FrameChangeTrigger.MinChangeRatio");
+        template.RootElement.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
+            .Should().Contain("DeepLearning.Confidence");
+    }
+
+    [Fact]
+    public void ScenarioPackage_ActiveTemplates_ShouldUseDeclaredOperatorPorts()
+    {
+        var repoRoot = ResolveRepoRoot();
+        var packageRoot = ResolveScenarioPackageRoot(repoRoot);
+        var templatePaths = new[]
+        {
+            Path.Combine(packageRoot, "template", "terminal-wire-sequence.flow.template.json"),
+            Path.Combine(packageRoot, "template", "terminal-wire-sequence-video-stream.flow.template.json")
+        };
+        var validator = new AiFlowValidator(new OperatorFactory());
+
+        foreach (var templatePath in templatePaths)
+        {
+            using var template = JsonDocument.Parse(File.ReadAllText(templatePath));
+            var flow = ConvertScenarioPackageTemplate(template.RootElement);
+
+            var result = validator.Validate(flow);
+
+            result.IsValid.Should().BeTrue(string.Join(Environment.NewLine, result.Errors));
+            result.Diagnostics
+                .Where(IsPortContractDiagnostic)
+                .Should().BeEmpty($"{Path.GetFileName(templatePath)} should only use declared operator ports and compatible port types");
+        }
     }
 
     [Fact]
@@ -261,6 +278,59 @@ public class WireSequenceScenarioPackageTests
         }
 
         throw new DirectoryNotFoundException("Failed to resolve repository root for wire-sequence scenario package tests.");
+    }
+
+    private static AiGeneratedFlowJson ConvertScenarioPackageTemplate(JsonElement root)
+    {
+        var flow = new AiGeneratedFlowJson
+        {
+            Explanation = root.GetProperty("description").GetString() ?? string.Empty
+        };
+
+        foreach (var op in root.GetProperty("operators").EnumerateArray())
+        {
+            var generated = new AiGeneratedOperator
+            {
+                TempId = op.GetProperty("id").GetString() ?? string.Empty,
+                OperatorType = op.GetProperty("type").GetString() ?? string.Empty,
+                DisplayName = op.GetProperty("name").GetString() ?? string.Empty
+            };
+
+            if (op.TryGetProperty("params", out var parameters))
+            {
+                foreach (var parameter in parameters.EnumerateObject())
+                {
+                    generated.Parameters[parameter.Name] = parameter.Value.ValueKind == JsonValueKind.String
+                        ? parameter.Value.GetString() ?? string.Empty
+                        : parameter.Value.GetRawText();
+                }
+            }
+
+            flow.Operators.Add(generated);
+        }
+
+        foreach (var connection in root.GetProperty("connections").EnumerateArray())
+        {
+            flow.Connections.Add(new AiGeneratedConnection
+            {
+                SourceTempId = connection.GetProperty("source").GetString() ?? string.Empty,
+                SourcePortName = connection.GetProperty("sourcePort").GetString() ?? string.Empty,
+                TargetTempId = connection.GetProperty("target").GetString() ?? string.Empty,
+                TargetPortName = connection.GetProperty("targetPort").GetString() ?? string.Empty
+            });
+        }
+
+        return flow;
+    }
+
+    private static bool IsPortContractDiagnostic(AiValidationDiagnostic diagnostic)
+    {
+        return diagnostic.Code is
+            "missing_source_operator" or
+            "missing_target_operator" or
+            "missing_output_port" or
+            "missing_input_port" or
+            "incompatible_port_type";
     }
 
     private static IEnumerable<string> EnumerateDirectoriesSafe(string root, string searchPattern)

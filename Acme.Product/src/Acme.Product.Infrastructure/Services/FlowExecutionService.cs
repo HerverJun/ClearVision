@@ -283,10 +283,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             // 记录流程执行完成日志
             _logger.LogFlowExecution(flow.Id, executionOrder.Count, stopwatch.ElapsedMilliseconds, result.IsSuccess);
 
-            var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
-            if (flowOutputOperator != null)
+            if (result.IsSuccess)
             {
-                result.OutputData = ConvertImageWrappersToBytes(operatorOutputs[flowOutputOperator.Id]);
+                var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
+                if (flowOutputOperator != null)
+                {
+                    result.OutputData = ConvertImageWrappersToBytes(operatorOutputs[flowOutputOperator.Id]);
+                }
             }
 
             status.IsExecuting = false;
@@ -1583,10 +1586,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
 
-            var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
-            if (flowOutputOperator != null)
+            if (result.IsSuccess)
             {
-                result.OutputData = ConvertImageWrappersToBytes(operatorOutputs[flowOutputOperator.Id]);
+                var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
+                if (flowOutputOperator != null)
+                {
+                    result.OutputData = ConvertImageWrappersToBytes(operatorOutputs[flowOutputOperator.Id]);
+                }
             }
 
             status.IsExecuting = false;

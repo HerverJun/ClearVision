@@ -340,7 +340,8 @@ a, button, input, select, textarea,
    ========================================================================== */
 
 .cv-toast {
-    backdrop-filter: blur(32px) saturate(160%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 /* ==========================================================================

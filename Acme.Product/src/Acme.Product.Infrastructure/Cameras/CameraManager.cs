@@ -246,6 +246,7 @@ public class CameraProviderAdapter : IIndustrialCamera
     private Task? _acquisitionTask;
     private CameraTriggerMode _currentTriggerMode = CameraTriggerMode.Software;
     private string _currentHardwareTriggerSource = CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource;
+    private bool _providerTriggerModeKnown;
 
     public string CameraId => _cameraId;
     public string Name => _provider.CurrentDevice?.UserDefinedName ?? _cameraId;
@@ -281,35 +282,53 @@ public class CameraProviderAdapter : IIndustrialCamera
 
     public async Task<byte[]> AcquireSingleFrameAsync()
     {
-        // 严格按照华睿 SDK 正确时序调用
-        // 1) StartGrabbing -> 2) TriggerMode=On,TriggerSource=Software -> 3) ExecuteSoftwareTrigger -> 4) GetFrame
-
         CameraTriggerMode? modeToRestore = null;
         string? hardwareTriggerSourceToRestore = null;
+        bool wasGrabbing = false;
+        bool stoppedForTriggerModeChange = false;
         await _providerGate.WaitAsync();
         try
         {
+            wasGrabbing = _provider.IsGrabbing;
             if (_isAcquiring)
             {
                 modeToRestore = _currentTriggerMode;
                 hardwareTriggerSourceToRestore = _currentHardwareTriggerSource;
             }
 
-            // 1) 确保采集已启动
+            if (!_providerTriggerModeKnown || _currentTriggerMode != CameraTriggerMode.Software)
+            {
+                try
+                {
+                    SetProviderTriggerMode(CameraTriggerMode.Software);
+                }
+                catch when (_provider.IsGrabbing)
+                {
+                    if (!_provider.StopGrabbing())
+                    {
+                        throw new InvalidOperationException($"Failed to stop camera acquisition before software trigger: {_cameraId}");
+                    }
+
+                    stoppedForTriggerModeChange = true;
+                    SetProviderTriggerMode(CameraTriggerMode.Software);
+                }
+            }
+
             if (!_provider.IsGrabbing && !_provider.StartGrabbing())
+            {
                 throw new InvalidOperationException($"Failed to start camera acquisition: {_cameraId}");
+            }
 
-            // 2) 设置软件触发模式（TriggerMode=On, TriggerSource=Software）
-            SetProviderTriggerMode(CameraTriggerMode.Software);
-
-            // 3) 发送软触发命令
             if (!_provider.ExecuteSoftwareTrigger())
+            {
                 throw new InvalidOperationException($"Failed to execute software trigger: {_cameraId}");
+            }
 
-            // 4) 获取帧（给 SDK 足够响应时间）
             var frame = _provider.GetFrame(3000);
             if (frame == null)
+            {
                 throw new TimeoutException("获取图像超时");
+            }
 
             return EncodeFrameToBytes(frame);
         }
@@ -317,7 +336,16 @@ public class CameraProviderAdapter : IIndustrialCamera
         {
             if (modeToRestore.HasValue && modeToRestore.Value != CameraTriggerMode.Software && _provider.IsConnected)
             {
+                if ((stoppedForTriggerModeChange || _provider.IsGrabbing) && !_provider.StopGrabbing())
+                {
+                    _logger.LogWarning("[CameraProviderAdapter] 切回原触发模式前停止 SDK 采集失败。CameraId={CameraId}", _cameraId);
+                }
+
                 TryRestoreTriggerMode(modeToRestore.Value, hardwareTriggerSourceToRestore);
+                if (wasGrabbing && !_provider.IsGrabbing && !_provider.StartGrabbing())
+                {
+                    _logger.LogWarning("[CameraProviderAdapter] 软件触发后恢复 SDK 采集失败。CameraId={CameraId}", _cameraId);
+                }
             }
 
             _providerGate.Release();
@@ -479,6 +507,48 @@ public class CameraProviderAdapter : IIndustrialCamera
         }
     }
 
+    public async Task SetPixelFormatAsync(CameraPixelFormat pixelFormat)
+    {
+        await _providerGate.WaitAsync();
+        var restartRequired = false;
+        try
+        {
+            if (_provider.IsGrabbing)
+            {
+                if (!_provider.StopGrabbing())
+                {
+                    throw new InvalidOperationException($"Failed to stop acquisition before setting pixel format for camera '{_cameraId}'.");
+                }
+
+                restartRequired = true;
+            }
+
+            var normalizedPixelFormat = CameraPixelFormatExtensions.Normalize(pixelFormat.ToConfigValue());
+            if (!_provider.SetPixelFormat(normalizedPixelFormat))
+            {
+                throw new InvalidOperationException($"Failed to set pixel format for camera '{_cameraId}' to {normalizedPixelFormat.ToConfigValue()}.");
+            }
+
+            if (restartRequired)
+            {
+                restartRequired = false;
+                if (!_provider.StartGrabbing())
+                {
+                    throw new InvalidOperationException($"Failed to restart acquisition after setting pixel format for camera '{_cameraId}'.");
+                }
+            }
+        }
+        finally
+        {
+            if (restartRequired && _provider.IsConnected && !_provider.IsGrabbing && !_provider.StartGrabbing())
+            {
+                _logger.LogWarning("[CameraProviderAdapter] 设置像素格式后恢复 SDK 采集失败。CameraId={CameraId}", _cameraId);
+            }
+
+            _providerGate.Release();
+        }
+    }
+
     public async Task SetTriggerModeAsync(CameraTriggerMode mode, string? hardwareTriggerSource = null)
     {
         await _providerGate.WaitAsync();
@@ -533,6 +603,7 @@ public class CameraProviderAdapter : IIndustrialCamera
         }
 
         _currentTriggerMode = mode;
+        _providerTriggerModeKnown = true;
         if (mode == CameraTriggerMode.External)
         {
             _currentHardwareTriggerSource = normalizedHardwareSource;

@@ -7,7 +7,7 @@ This scenario package now targets a two-wire terminal sequence contract:
 
 The recommended external model artifact name is:
 
-- `wire-seq-yolo-v1.2.onnx`
+- `wire-seq-yolo-nms-v1.3.onnx`
 
 The repository does not commit the actual ONNX binary. This folder keeps only the
 contract for package metadata and local deployment paths.
@@ -16,9 +16,13 @@ contract for package metadata and local deployment paths.
 
 Place the trained model at:
 
-- `线序检测/scenario-package-wire-sequence/models/wire-seq-yolo-v1.2.onnx`
+- `线序检测/scenario-package-wire-sequence/models/wire-seq-yolo-nms-v1.3.onnx`
 
 Or point `DeepLearning.ModelPath` to any valid external ONNX file.
+
+The active 1.6 template sets `DeepLearning.OutputFormat=EndToEndNms`, so the
+model must emit compact `[x1,y1,x2,y2,score,class]` detections rather than raw
+YOLO anchor tensors.
 
 ## Label alignment
 

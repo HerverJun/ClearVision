@@ -6,6 +6,7 @@ using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
+using Acme.Product.Core.ValueObjects;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -474,10 +475,73 @@ public class InspectionServiceSingleRunTests
             item.ErrorMessage.Contains("camera offline", StringComparison.Ordinal)));
     }
 
+    [Fact]
+    public async Task ExecuteSingleAsync_WithCameraIdAndFileSourceFlow_ShouldSkipCameraPreAcquire()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var explicitFlow = CreateImageAcquisitionFlow("File", @"C:\images\latest.png", "stale-camera");
+        Dictionary<string, object>? executedInputs = null;
+
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                executedInputs = callInfo.ArgAt<Dictionary<string, object>?>(1);
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 11,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var result = await service.ExecuteSingleAsync(projectId, "camera-1", explicitFlow);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        executedInputs.Should().NotBeNull();
+        executedInputs!.Should().NotContainKey("Image");
+        _ = imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     private static OperatorFlow CreateFlow(string operatorName)
     {
         var flow = new OperatorFlow("test-flow");
         flow.AddOperator(new Operator(Guid.NewGuid(), operatorName, OperatorType.ResultOutput, 0, 0));
+        return flow;
+    }
+
+    private static OperatorFlow CreateImageAcquisitionFlow(string sourceType, string filePath, string cameraId)
+    {
+        var flow = new OperatorFlow("file-source-flow");
+        var acquisition = new Operator(Guid.NewGuid(), "Acquire", OperatorType.ImageAcquisition, 0, 0);
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", sourceType));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", filePath));
+        acquisition.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", cameraId));
+        flow.AddOperator(acquisition);
         return flow;
     }
 

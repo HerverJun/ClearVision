@@ -62,6 +62,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         string SerialNumber,
         double ExposureTimeUs,
         double GainDb,
+        CameraPixelFormat PixelFormat,
         CameraTriggerMode TriggerMode,
         string HardwareTriggerSource,
         EnterPhotoelectricTriggerOptions? EnterPhotoelectricTrigger,
@@ -397,6 +398,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 cameraId.Trim(),
                 5000.0,
                 1.0,
+                CameraPixelFormat.Mono8,
                 CameraTriggerMode.Software,
                 CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource,
                 null,
@@ -411,6 +413,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             binding.SerialNumber,
             binding.ExposureTimeUs,
             binding.GainDb,
+            CameraPixelFormatExtensions.Normalize(binding.PixelFormat),
             CameraTriggerModeExtensions.Normalize(binding.TriggerMode),
             CameraHardwareTriggerSourceExtensions.Normalize(binding.HardwareTriggerSource),
             binding.UsesEnterPhotoelectricTrigger()
@@ -706,6 +709,10 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     {
         await camera.SetExposureTimeAsync(binding.ExposureTimeUs);
         await camera.SetGainAsync(binding.GainDb);
+        if (camera is IIndustrialCamera industrialCamera)
+        {
+            await industrialCamera.SetPixelFormatAsync(binding.PixelFormat);
+        }
     }
 
     private async Task<CameraStreamFrame> WaitForFrameCoreAsync(
@@ -884,6 +891,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             binding.SerialNumber,
             binding.ExposureTimeUs.ToString("R", CultureInfo.InvariantCulture),
             binding.GainDb.ToString("R", CultureInfo.InvariantCulture),
+            binding.PixelFormat.ToConfigValue(),
             binding.TriggerMode.ToConfigValue(),
             binding.HardwareTriggerSource,
             binding.TargetFrameRateFps.ToString(CultureInfo.InvariantCulture),

@@ -175,6 +175,11 @@ public class ImageAcquisitionOperator : OperatorBase
 
                 if (camera is IIndustrialCamera industrialCamera)
                 {
+                    if (bindingConfig != null)
+                    {
+                        await industrialCamera.SetPixelFormatAsync(CameraPixelFormatExtensions.Normalize(bindingConfig.PixelFormat));
+                    }
+
                     await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
                 }
 

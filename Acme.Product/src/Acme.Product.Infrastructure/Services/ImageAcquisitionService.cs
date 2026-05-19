@@ -707,6 +707,7 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         await camera.SetGainAsync(binding.GainDb);
         if (camera is IIndustrialCamera industrialCamera)
         {
+            await industrialCamera.SetPixelFormatAsync(CameraPixelFormatExtensions.Normalize(binding.PixelFormat));
             await industrialCamera.SetTriggerModeAsync(
                 CameraTriggerModeExtensions.Normalize(binding.TriggerMode),
                 binding.HardwareTriggerSource);

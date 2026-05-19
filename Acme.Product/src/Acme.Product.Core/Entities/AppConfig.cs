@@ -430,6 +430,8 @@ public class CameraBindingConfig
 
     public double GainDb { get; set; } = 1.0;
 
+    public string PixelFormat { get; set; } = Acme.Product.Core.Cameras.CameraPixelFormatExtensions.DefaultPixelFormat;
+
     public string TriggerMode { get; set; } = "Software";
 
     public string HardwareTriggerSource { get; set; } = "Line0";
@@ -467,6 +469,8 @@ public class CameraBindingConfig
         Manufacturer = string.IsNullOrWhiteSpace(Manufacturer) ? "Huaray" : Manufacturer.Trim();
         ModelName = ModelName?.Trim() ?? string.Empty;
         InterfaceType = InterfaceType?.Trim() ?? string.Empty;
+        PixelFormat = Acme.Product.Core.Cameras.CameraPixelFormatExtensions.ToConfigValue(
+            Acme.Product.Core.Cameras.CameraPixelFormatExtensions.Normalize(PixelFormat));
         TriggerMode = Acme.Product.Core.Cameras.CameraTriggerModeExtensions.ToConfigValue(
             Acme.Product.Core.Cameras.CameraTriggerModeExtensions.Normalize(TriggerMode));
         HardwareTriggerSource = Acme.Product.Core.Cameras.CameraHardwareTriggerSourceExtensions.Normalize(HardwareTriggerSource);

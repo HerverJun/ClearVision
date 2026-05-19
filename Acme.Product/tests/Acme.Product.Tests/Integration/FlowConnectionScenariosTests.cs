@@ -146,6 +146,40 @@ public class FlowConnectionScenariosTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenImageConsumerFails_ShouldKeepOriginalFailureMessage()
+    {
+        var sourceExecutor = new TestImageSourceOperator(NullLogger<TestImageSourceOperator>.Instance);
+        var consumerExecutor = new TestFailingImageConsumerOperator(NullLogger<TestFailingImageConsumerOperator>.Instance);
+        var service = CreateFlowService(sourceExecutor, consumerExecutor);
+
+        var flow = new OperatorFlow();
+        var source = CreateOperator("source", OperatorType.ImageAcquisition, outputPorts: [("Image", PortDataType.Image)]);
+        var consumer = CreateOperator(
+            "consumer",
+            OperatorType.ImageDiff,
+            inputPorts: [("Image", PortDataType.Image)],
+            outputPorts: [("Output", PortDataType.Any)]);
+
+        flow.AddOperator(source);
+        flow.AddOperator(consumer);
+        flow.AddConnection(CreateConnection(source, "Image", consumer, "Image"));
+
+        var output = await service.ExecuteFlowAsync(flow);
+
+        output.IsSuccess.Should().BeFalse();
+        output.ErrorMessage.Should().Contain("synthetic image consumer failure");
+        output.ErrorMessage.Should().NotContain("disposed", because: "flow output normalization must not mask the operator failure");
+        sourceExecutor.LastOutputImage.Should().NotBeNull();
+        sourceExecutor.LastOutputImage!.RefCount.Should().Be(0);
+
+        var debugOutput = await service.ExecuteFlowDebugAsync(flow, new DebugOptions { EnableIntermediateCache = false });
+
+        debugOutput.IsSuccess.Should().BeFalse();
+        debugOutput.ErrorMessage.Should().Contain("synthetic image consumer failure");
+        debugOutput.ErrorMessage.Should().NotContain("disposed", because: "preview/debug output normalization must not mask the operator failure");
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_NonImageConnections_ShouldNotImplicitlyForwardImageWrapper()
     {
         var sourceExecutor = new TestYoloLikeSourceOperator(NullLogger<TestYoloLikeSourceOperator>.Instance);
@@ -298,6 +332,33 @@ public class FlowConnectionScenariosTests
             {
                 { "SameRef", ReferenceEquals(inputA, inputB) }
             }));
+        }
+
+        public override ValidationResult ValidateParameters(Operator @operator)
+        {
+            return ValidationResult.Valid();
+        }
+    }
+
+    private sealed class TestFailingImageConsumerOperator : OperatorBase
+    {
+        public override OperatorType OperatorType => OperatorType.ImageDiff;
+
+        public TestFailingImageConsumerOperator(ILogger<TestFailingImageConsumerOperator> logger) : base(logger)
+        {
+        }
+
+        protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs,
+            CancellationToken cancellationToken)
+        {
+            if (!TryGetInputImage(inputs, "Image", out _))
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure("missing image"));
+            }
+
+            return Task.FromResult(OperatorExecutionOutput.Failure("synthetic image consumer failure"));
         }
 
         public override ValidationResult ValidateParameters(Operator @operator)

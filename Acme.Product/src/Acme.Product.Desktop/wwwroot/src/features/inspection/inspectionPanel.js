@@ -63,6 +63,11 @@ class InspectionPanel {
         this._materialTimeoutDeadline = null;
         this._lastProtectionReason = '';
         this._lastProtectionMessage = '';
+        this._runtimeConfigLoadedAt = 0;
+        this._runtimeConfigLoadPromise = null;
+        this._pendingAnalysisUpdate = null;
+        this._recentResultsDirty = false;
+        this._countersDirty = false;
         this.projectId = getCurrentProject()?.id || null;
 
         // 初始化 UI 和分析卡片面板
@@ -72,7 +77,7 @@ class InspectionPanel {
         
         // 设置订阅
         this.setupSubscriptions();
-        this.loadRuntimeConfig();
+        this.loadRuntimeConfig({ force: true });
         
         debugInspectionPanelLog('[InspectionPanel] 检测控制面板初始化完成');
     }
@@ -143,11 +148,24 @@ class InspectionPanel {
     }
 
     syncAnalysisFlowContext() {
-        if (!this.analysisCardsPanel) {
+        if (!this.analysisCardsPanel || this.analysisCardsPanel.usesFlowContext !== true) {
             return;
         }
 
         this.analysisCardsPanel.setFlowContext(this.getActiveFlowDefinition());
+    }
+
+    isPanelVisible() {
+        if (!this.container || typeof this.container.closest !== 'function') {
+            return true;
+        }
+
+        const viewContainer = this.container.closest('.inspection-view-container');
+        if (viewContainer?.classList?.contains('hidden')) {
+            return false;
+        }
+
+        return true;
     }
 
     setProjectContext(projectId) {
@@ -192,7 +210,9 @@ class InspectionPanel {
         this._materialTimeoutDeadline = Date.now() + timeoutMs;
         const timeoutSeconds = Math.round(timeoutMs / 1000);
         this._lastProtectionMessage = `${reason}，运行保护监控中；若 ${timeoutSeconds} 秒内没有新结果，将自动停止连续运行。`;
-        this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+        if (this.isPanelVisible()) {
+            this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+        }
         this._materialTimeoutHandle = window.setTimeout(() => {
             this.handleProtectionTimeout(reason);
         }, timeoutMs);
@@ -319,6 +339,7 @@ class InspectionPanel {
 
     handleInspectionResult(result) {
         this.clearProtectionWatchdog();
+        const shouldRender = this.isPanelVisible();
 
         const resultProjectId = result?.projectId || result?.ProjectId || null;
         if (this.projectId && resultProjectId && this.projectId !== resultProjectId) {
@@ -328,12 +349,16 @@ class InspectionPanel {
             });
 
             if (this.isContinuous) {
-                this.setButtonsState(true);
+                if (shouldRender) {
+                    this.setButtonsState(true);
+                }
                 this.armProtectionWatchdog('等待下一次触发结果');
             } else {
-                this.setButtonsState(false);
                 this._lastProtectionMessage = '已忽略其他工程的检测结果，当前工程显示保持不变。';
-                this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+                if (shouldRender) {
+                    this.setButtonsState(false);
+                    this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+                }
             }
 
             return;
@@ -341,17 +366,23 @@ class InspectionPanel {
 
         const analysisPayload = this.getAnalysisPayload(result);
         if (this.analysisCardsPanel) {
-            this.syncAnalysisFlowContext();
-            if (analysisPayload) {
-                this.analysisCardsPanel.updateCards(analysisPayload, result.status, result.processingTimeMs);
-            } else {
-                this.analysisCardsPanel.clear();
+            this._pendingAnalysisUpdate = {
+                analysisPayload,
+                status: result.status,
+                processingTimeMs: result.processingTimeMs
+            };
+
+            if (shouldRender) {
+                this.renderPendingAnalysisUpdate();
+                this._pendingAnalysisUpdate = null;
             }
         }
 
         const status = result.status === 'OK' ? 'ok' : result.status === 'Error' ? 'error' : 'ng';
         const statusText = result.status === 'OK' ? '通过' : result.status === 'Error' ? '错误' : '不通过';
-        this.updateStatus(status, statusText);
+        if (shouldRender) {
+            this.updateStatus(status, statusText);
+        }
 
         const stats = getStats();
         const newStats = {
@@ -375,8 +406,12 @@ class InspectionPanel {
             });
         }
 
-        this.updateCounters();
-        this.setButtonsState(this.isContinuous);
+        if (shouldRender) {
+            this.updateCounters();
+            this.setButtonsState(this.isContinuous);
+        } else {
+            this._countersDirty = true;
+        }
 
         if (result.status === 'NG') {
             this.consecutiveNgCount += 1;
@@ -388,44 +423,80 @@ class InspectionPanel {
         if (this.isContinuous && stopThreshold > 0 && this.consecutiveNgCount >= stopThreshold) {
             const thresholdMessage = `连续 NG 达到阈值 (${stopThreshold})，系统已按运行保护规则自动停止连续运行。请检查工件质量、阈值配置或上游触发条件。`;
             this._lastProtectionMessage = thresholdMessage;
-            this.updateProtectionNotice(thresholdMessage, 'warning');
+            if (shouldRender) {
+                this.updateProtectionNotice(thresholdMessage, 'warning');
+            }
             showToast(`连续 NG 达到阈值 (${stopThreshold})，已自动停止`, 'warning');
             this.handleStop();
             return;
         }
 
-        this.addRecentResult(result);
+        this.addRecentResult(result, { render: shouldRender });
 
         if (this.isContinuous) {
             this.armProtectionWatchdog('等待下一次触发结果');
         } else {
             this._lastProtectionMessage = '最近一次检测已完成，当前未在连续运行。';
-            this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+            if (shouldRender) {
+                this.updateProtectionNotice(this._lastProtectionMessage, 'info');
+            }
         }
     }
 
-    async loadRuntimeConfig() {
-        try {
-            const settings = await httpClient.get('/settings');
-            const runtime = settings?.runtime || {};
-            this.runtimeConfig = {
-                autoRun: !!runtime.autoRun,
-                stopOnConsecutiveNg: Math.max(0, Number(runtime.stopOnConsecutiveNg || 0)),
-                missingMaterialTimeoutSeconds: Math.max(0, Number(runtime.missingMaterialTimeoutSeconds || 0)),
-                applyProtectionRules: runtime.applyProtectionRules !== false
-            };
-        } catch (error) {
-            console.warn('[InspectionPanel] 加载运行时配置失败:', error);
-            this.runtimeConfig = {
-                autoRun: false,
-                stopOnConsecutiveNg: 0,
-                missingMaterialTimeoutSeconds: 30,
-                applyProtectionRules: true
-            };
+    renderPendingAnalysisUpdate() {
+        if (!this.analysisCardsPanel || !this._pendingAnalysisUpdate) {
+            return;
         }
 
-        this.updateProtectionNotice();
-        this.tryAutoRunIfNeeded();
+        const { analysisPayload, status, processingTimeMs } = this._pendingAnalysisUpdate;
+        if (analysisPayload) {
+            this.analysisCardsPanel.updateCards(analysisPayload, status, processingTimeMs);
+        } else {
+            this.analysisCardsPanel.clear();
+        }
+    }
+
+    async loadRuntimeConfig(options = {}) {
+        const force = options.force === true;
+        const now = Date.now();
+        if (!force && this._runtimeConfigLoadedAt > 0 && now - this._runtimeConfigLoadedAt < 10000) {
+            return this.runtimeConfig;
+        }
+
+        if (this._runtimeConfigLoadPromise) {
+            return this._runtimeConfigLoadPromise;
+        }
+
+        this._runtimeConfigLoadPromise = (async () => {
+            try {
+                const settings = await httpClient.get('/settings');
+                const runtime = settings?.runtime || {};
+                this.runtimeConfig = {
+                    autoRun: !!runtime.autoRun,
+                    stopOnConsecutiveNg: Math.max(0, Number(runtime.stopOnConsecutiveNg || 0)),
+                    missingMaterialTimeoutSeconds: Math.max(0, Number(runtime.missingMaterialTimeoutSeconds || 0)),
+                    applyProtectionRules: runtime.applyProtectionRules !== false
+                };
+                this._runtimeConfigLoadedAt = Date.now();
+            } catch (error) {
+                console.warn('[InspectionPanel] 加载运行时配置失败:', error);
+                this.runtimeConfig = {
+                    autoRun: false,
+                    stopOnConsecutiveNg: 0,
+                    missingMaterialTimeoutSeconds: 30,
+                    applyProtectionRules: true
+                };
+                this._runtimeConfigLoadedAt = Date.now();
+            } finally {
+                this._runtimeConfigLoadPromise = null;
+            }
+
+            this.updateProtectionNotice();
+            this.tryAutoRunIfNeeded();
+            return this.runtimeConfig;
+        })();
+
+        return this._runtimeConfigLoadPromise;
     }
 
     /**
@@ -648,14 +719,20 @@ class InspectionPanel {
         if (maxEl) maxEl.textContent = timing.max > 0 ? `${timing.max} ms` : '-- ms';
     }
 
-    addRecentResult(result) {
+    addRecentResult(result, options = {}) {
         if (!result) {
             return;
         }
 
         const recentResults = getRecentResults();
-        setRecentResults([result, ...recentResults].slice(0, 12));
+        setRecentResults([result, ...recentResults].slice(0, 8));
+        if (options.render === false) {
+            this._recentResultsDirty = true;
+            return;
+        }
+
         this.renderRecentResults();
+        this._recentResultsDirty = false;
     }
 
     renderRecentResults() {
@@ -682,23 +759,12 @@ class InspectionPanel {
             const timeText = timestamp
                 ? new Date(timestamp).toLocaleTimeString([], { hour12: false })
                 : new Date().toLocaleTimeString([], { hour12: false });
-            const imageBase64 = result?.outputImage
-                || result?.outputImageBase64
-                || result?.resultImageBase64
-                || result?.OutputImage
-                || result?.OutputImageBase64
-                || result?.ResultImageBase64
-                || '';
-            const imageHtml = imageBase64
-                ? `<div class="result-thumb"><img src="data:image/png;base64,${this.escapeHtml(imageBase64)}" alt="检测结果缩略图"></div>`
-                : '<div class="result-thumb"></div>';
             const textPreview = this.extractTextPreview(
                 result?.outputData ?? result?.OutputData ?? result?.analysisData ?? result?.AnalysisData ?? result?.errorMessage
             );
 
             return `
                 <div class="recent-result-item ${statusClass}">
-                    ${imageHtml}
                     <span class="result-badge">${status}</span>
                     <span class="result-time">${this.escapeHtml(timeText)}</span>
                     <span class="result-text-preview" title="${this.escapeHtml(textPreview)}">${this.escapeHtml(textPreview)}</span>
@@ -715,6 +781,9 @@ class InspectionPanel {
         this._lastProtectionMessage = '';
         this._lastProtectionReason = '';
         this._materialTimeoutDeadline = null;
+        this._pendingAnalysisUpdate = null;
+        this._recentResultsDirty = false;
+        this._countersDirty = false;
 
         setStats({ total: 0, ok: 0, ng: 0, error: 0, yield: 0 });
         setTimingStats({ avg: 0, min: Infinity, max: 0, history: [] });
@@ -804,8 +873,14 @@ class InspectionPanel {
         const state = getInspectionState();
         this.isContinuous = state.isRealtime === true;
         this.syncAnalysisFlowContext();
+        if (this._pendingAnalysisUpdate) {
+            this.renderPendingAnalysisUpdate();
+            this._pendingAnalysisUpdate = null;
+        }
         this.updateCounters();
+        this._countersDirty = false;
         this.renderRecentResults();
+        this._recentResultsDirty = false;
         this.setButtonsState(state.isRunning || state.isRealtime);
 
         if (state.status === 'running' || state.isRunning || state.isRealtime) {
@@ -819,7 +894,7 @@ class InspectionPanel {
         }
 
         this.updateProtectionNotice();
-        void this.loadRuntimeConfig();
+        void this.loadRuntimeConfig({ force: false });
     }
 
     tryAutoRunIfNeeded() {

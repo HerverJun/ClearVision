@@ -30,7 +30,7 @@ public class CameraBindingsEndpointTests
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
         {
-            new() { Id = "cam-connected", DisplayName = "Connected", SerialNumber = "SN-CONNECTED", IpAddress = "10.0.0.1", IsEnabled = true, TriggerMode = "Hardware", HardwareTriggerSource = "Line2" },
+            new() { Id = "cam-connected", DisplayName = "Connected", SerialNumber = "SN-CONNECTED", IpAddress = "10.0.0.1", IsEnabled = true, PixelFormat = "RGB8", TriggerMode = "Hardware", HardwareTriggerSource = "Line2" },
             new()
             {
                 Id = "cam-online",
@@ -72,6 +72,7 @@ public class CameraBindingsEndpointTests
         GetProperty(FindById(items, "cam-connected"), "IpAddress", "ipAddress").GetString().Should().Be("10.0.0.1");
         GetProperty(FindById(items, "cam-connected"), "TriggerMode", "triggerMode").GetString().Should().Be("External");
         GetProperty(FindById(items, "cam-connected"), "HardwareTriggerSource", "hardwareTriggerSource").GetString().Should().Be("Line2");
+        GetProperty(FindById(items, "cam-connected"), "PixelFormat", "pixelFormat").GetString().Should().Be("RGB8");
         GetProperty(FindById(items, "cam-connected"), "TargetFrameRateFps", "targetFrameRateFps").GetInt32().Should().Be(10);
         GetProperty(FindById(items, "cam-online"), "SoftwareTriggerSource", "softwareTriggerSource").GetString().Should().Be("EnterPhotoelectric");
         GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricDebounceMs", "enterPhotoelectricDebounceMs").GetInt32().Should().Be(75);

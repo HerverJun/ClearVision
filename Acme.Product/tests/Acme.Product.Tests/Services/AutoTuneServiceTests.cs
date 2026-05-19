@@ -289,6 +289,103 @@ public class AutoTuneServiceTests
         seenThresholds[1].Should().Be((0.2d, 0.4d));
     }
 
+    [Fact]
+    public async Task AutoTuneScenarioAsync_ShouldTuneDeepLearningConfidenceWhenBoxNmsIsAbsent()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var metricsAnalyzer = Substitute.For<IPreviewMetricsAnalyzer>();
+        var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
+        var service = new AutoTuneService(
+            NullLogger<AutoTuneService>.Instance,
+            flowExecution,
+            metricsAnalyzer,
+            flowNodePreviewService);
+
+        var flow = new OperatorFlow("WireSequenceFlow");
+        var deepLearning = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
+        deepLearning.AddParameter(new Parameter(Guid.NewGuid(), "Confidence", "Confidence", string.Empty, "double", 0.05d));
+        var judge = new Operator("Judge", OperatorType.DetectionSequenceJudge, 0, 0);
+
+        flow.AddOperator(deepLearning);
+        flow.AddOperator(judge);
+        flow.Connections.Add(new OperatorConnection(deepLearning.Id, Guid.NewGuid(), judge.Id, Guid.NewGuid()));
+
+        var seenConfidence = new List<double>();
+        var previewCall = 0;
+        flowNodePreviewService.PreviewWithMetricsAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Guid>(),
+                Arg.Any<byte[]?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                previewCall++;
+                var callFlow = callInfo.ArgAt<OperatorFlow>(0);
+                var callDeepLearning = callFlow.Operators.Single(item => item.Type == OperatorType.DeepLearning);
+                seenConfidence.Add(ReadDoubleParam(callDeepLearning, "Confidence"));
+
+                return Task.FromResult(previewCall == 1
+                    ? new FlowNodePreviewWithMetricsResult
+                    {
+                        Success = true,
+                        TargetNodeId = judge.Id,
+                        Outputs = new Dictionary<string, object>
+                        {
+                            ["DetectionList"] = new DetectionList(new[]
+                            {
+                                new DetectionResultValue("Wire_Brown", 0.52f, 10f, 10f, 8f, 8f)
+                            }),
+                            ["ExpectedLabels"] = new[] { "Wire_Brown", "Wire_Black" },
+                            ["ExpectedCount"] = 2,
+                            ["RequiredMinConfidence"] = 0.6d,
+                            ["IsMatch"] = false
+                        },
+                        Metrics = new PreviewMetrics { OverallScore = 0.25 },
+                        DiagnosticCodes =
+                        [
+                            "missing_expected_class",
+                            "detection_count_mismatch",
+                            "low_detection_confidence"
+                        ]
+                    }
+                    : new FlowNodePreviewWithMetricsResult
+                    {
+                        Success = true,
+                        TargetNodeId = judge.Id,
+                        Outputs = new Dictionary<string, object>
+                        {
+                            ["DetectionList"] = new DetectionList(new[]
+                            {
+                                new DetectionResultValue("Wire_Brown", 0.92f, 10f, 10f, 8f, 8f),
+                                new DetectionResultValue("Wire_Black", 0.90f, 20f, 10f, 8f, 8f)
+                            }),
+                            ["ExpectedLabels"] = new[] { "Wire_Brown", "Wire_Black" },
+                            ["ExpectedCount"] = 2,
+                            ["RequiredMinConfidence"] = 0.6d,
+                            ["ActualOrder"] = new[] { "Wire_Brown", "Wire_Black" },
+                            ["IsMatch"] = true
+                        },
+                        Metrics = new PreviewMetrics { OverallScore = 0.92 },
+                        DiagnosticCodes = new List<string>()
+                    });
+            });
+
+        var result = await service.AutoTuneScenarioAsync(
+            "wire-sequence-terminal",
+            flow,
+            CreateInputImage(),
+            new AutoTuneGoal(),
+            maxIterations: 5,
+            ct: CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.IsGoalAchieved.Should().BeTrue();
+        result.TotalIterations.Should().Be(2);
+        result.FinalParameters.Keys.Should().BeEquivalentTo("DeepLearning.Confidence");
+        Convert.ToDouble(result.FinalParameters["DeepLearning.Confidence"]).Should().BeApproximately(0.0d, 0.0001d);
+        seenConfidence.Should().Equal(0.05d, 0.0d);
+    }
+
     private static double ReadDoubleParam(Operator @operator, string name)
     {
         return @operator.Parameters.Single(item => item.Name == name).GetValue() switch

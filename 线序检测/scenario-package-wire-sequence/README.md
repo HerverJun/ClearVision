@@ -1,6 +1,6 @@
 # Wire Sequence Scenario Package
 
-This package is the baseline reusable package for full-image terminal wire-sequence inspection with ROI-based detection filtering.
+This package is the baseline reusable package for full-image terminal wire-sequence inspection with ONNX-integrated candidate suppression.
 
 ## Directory Contract
 
@@ -17,42 +17,41 @@ This package is the baseline reusable package for full-image terminal wire-seque
 
 Current golden flow skeleton:
 
-`ImageAcquisition -> DeepLearning -> BoxFilter(FilterMode=Region) -> BoxNms -> DetectionSequenceJudge -> ResultOutput`
+`ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput`
 
 ## Video Stream Flow
 
 For on-site conveyor lines without photoelectric or PLC trigger signals, use:
 
-`ImageAcquisition(TriggerMode=Continuous) -> FrameChangeTrigger -> DeepLearning -> BoxFilter(FilterMode=Region) -> BoxNms -> DetectionSequenceJudge -> ResultOutput`
+`ImageAcquisition(TriggerMode=Continuous) -> FrameChangeTrigger -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput`
 
-The video-stream template is `template/terminal-wire-sequence-video-stream.flow.template.json`. It keeps the same detection, NMS and sequence-judgment contract as the baseline template, but adds a frame-change arrival gate before YOLO. Frames that do not meet the arrival-change threshold are short-circuited as no-material frames, so they do not publish OK / NG inspection results.
+The video-stream template is `template/terminal-wire-sequence-video-stream.flow.template.json`. It keeps the same detection and sequence-judgment contract as the baseline template, but adds a frame-change arrival gate before YOLO. Frames that do not meet the arrival-change threshold are short-circuited as no-material frames, so they do not publish OK / NG inspection results.
 
 Tune `FrameChangeTrigger.RoiX/Y/W/H` first to cover the terminal arrival area and avoid belt-edge vibration or glare. Then tune `PixelThreshold`, `MinChangeRatio`, `MinChangePixels`, and `CooldownMs` according to belt speed and terminal dwell time.
 
 Current diagnostics contract:
 
-- `DeepLearning` runs on the full image, keeps a low confidence floor, and disables internal NMS for this scenario template.
-- `BoxFilter(FilterMode=Region)` is the ROI gate and removes detections whose center falls outside the configured region.
-- `BoxNms` is the single owner of runtime score / IoU filtering.
-- `ResultOutput` should receive `BoxNms.Diagnostics`, `DetectionSequenceJudge.Diagnostics`, and `DetectionSequenceJudge.Message` together with the preview image.
+- `DeepLearning` runs on the full image, expects ONNX-integrated NMS output, and disables platform-side internal NMS for this scenario template.
+- Detection ROI filtering and platform-side `BoxNms` are not part of the active wire-sequence flow.
+- `ResultOutput` should receive `DeepLearning.PostprocessDiagnostics`, `DetectionSequenceJudge.Diagnostics`, and `DetectionSequenceJudge.Message` together with the preview image.
 
 Current tuning contract:
 
 - `wire-sequence-terminal` v1 only allows automatic tuning for:
-  - `BoxNms.ScoreThreshold`
-  - `BoxNms.IouThreshold`
-- `DeepLearning.Confidence` remains a low confidence floor and is not the primary现场调参项.
+  - `DeepLearning.Confidence`
+- `DeepLearning.Confidence` is only the final platform-side score floor; NMS thresholds are owned by the exported ONNX model.
 - `DetectionSequenceJudge.MinConfidence` stays fixed at `0.0`.
 - `ExpectedLabels`, `ExpectedCount`, and `DeepLearning.ModelPath` require manual review and must not be auto-rewritten.
 - `DeepLearning.LabelsPath` is now an optional compatibility field and should only be configured when the model does not expose usable metadata names.
 
 ## Asset Delivery
 
-- The package manifest currently points to `models/wire-seq-yolo-v1.2.onnx`.
+- The package manifest currently points to `models/wire-seq-yolo-nms-v1.3.onnx`.
 - The repository does not commit the private model binary by default.
 - Local or on-site delivery must provide one of the following:
-  - the model file at `models/wire-seq-yolo-v1.2.onnx`, or
+  - the model file at `models/wire-seq-yolo-nms-v1.3.onnx`, or
   - an explicit `DeepLearning.ModelPath` pointing to a real external file.
+- The active template requires an ONNX export that emits compact `EndToEndNms` detections.
 - `labels/labels.txt` stores the model export class order and must match the ONNX metadata `names` order when metadata is present.
 - `expectedSequence` and `DetectionSequenceJudge.ExpectedLabels` remain the business inspection order and are intentionally independent from model class order.
 

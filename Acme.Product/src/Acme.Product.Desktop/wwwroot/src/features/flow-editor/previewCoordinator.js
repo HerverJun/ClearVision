@@ -277,6 +277,15 @@ function shouldUseExternalInputImage(node) {
     return node?.type !== 'ImageAcquisition';
 }
 
+function isLiveCameraAcquisitionNode(node) {
+    if (node?.type !== 'ImageAcquisition') {
+        return false;
+    }
+
+    const sourceTypeRaw = getParameterValue(node.parameters, 'SourceType', 'sourceType');
+    return normalizeAcquisitionSourceType(sourceTypeRaw) === 'camera';
+}
+
 function validatePreviewPrerequisites(node, inputImageBase64) {
     if (!node) {
         return '未选中算子';
@@ -573,8 +582,9 @@ export class NodePreviewCoordinator {
                 inputImageBase64
             });
 
+            const bypassCache = isLiveCameraAcquisitionNode(activeNode);
             const cached = this.cache.get(request.requestKey);
-            if (!force && cached) {
+            if (!force && !bypassCache && cached) {
                 this.cache.delete(request.requestKey);
                 this.cache.set(request.requestKey, cached);
                 this.updateState({
@@ -628,7 +638,10 @@ export class NodePreviewCoordinator {
                     outputData: parsed.outputData
                 };
 
-                this.setCacheEntry(request.requestKey, nextState);
+                if (!bypassCache) {
+                    this.setCacheEntry(request.requestKey, nextState);
+                }
+
                 this.updateState(nextState);
             } catch (error) {
                 if (isAbortError(error)) {

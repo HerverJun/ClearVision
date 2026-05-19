@@ -1,8 +1,8 @@
 {
   "name": "Terminal Wire Sequence Template",
-  "description": "Full-image DeepLearning + ROI box filtering + BoxNms + DetectionSequenceJudge baseline.",
+  "description": "Full-image DeepLearning with ONNX-integrated NMS + DetectionSequenceJudge baseline.",
   "scenarioKey": "wire-sequence-terminal",
-  "templateVersion": "1.4.0",
+  "templateVersion": "1.6.0",
   "expectedSequence": [
     "Wire_Black",
     "Wire_Blue"
@@ -12,8 +12,7 @@
     "DeepLearning.ModelPath"
   ],
   "tunableParameters": [
-    "BoxNms.ScoreThreshold",
-    "BoxNms.IouThreshold"
+    "DeepLearning.Confidence"
   ],
   "operators": [
     {
@@ -32,35 +31,12 @@
         "InputSize": "640",
         "TargetClasses": "Wire_Black,Wire_Blue",
         "EnableInternalNms": "false",
+        "OutputFormat": "EndToEndNms",
         "DetectionMode": "Object"
       }
     },
     {
       "id": "op_3",
-      "type": "BoxFilter",
-      "name": "RoiDetectionFilter",
-      "params": {
-        "FilterMode": "Region",
-        "RegionX": "0",
-        "RegionY": "0",
-        "RegionW": "999999",
-        "RegionH": "999999",
-        "MinScore": "0.0"
-      }
-    },
-    {
-      "id": "op_4",
-      "type": "BoxNms",
-      "name": "DetectionNms",
-      "params": {
-        "IouThreshold": "0.45",
-        "ScoreThreshold": "0.25",
-        "MaxDetections": "10",
-        "ShowSuppressed": "false"
-      }
-    },
-    {
-      "id": "op_5",
       "type": "DetectionSequenceJudge",
       "name": "SequenceJudge",
       "params": {
@@ -72,7 +48,7 @@
       }
     },
     {
-      "id": "op_6",
+      "id": "op_4",
       "type": "ResultOutput",
       "name": "Output",
       "params": {
@@ -95,69 +71,37 @@
       "targetPort": "Detections"
     },
     {
-      "source": "op_1",
-      "sourcePort": "Image",
-      "target": "op_3",
-      "targetPort": "Image"
-    },
-    {
-      "source": "op_3",
-      "sourcePort": "Detections",
-      "target": "op_4",
-      "targetPort": "Detections"
-    },
-    {
-      "source": "op_1",
+      "source": "op_2",
       "sourcePort": "Image",
       "target": "op_4",
       "targetPort": "Image"
     },
     {
-      "source": "op_4",
-      "sourcePort": "Detections",
-      "target": "op_5",
-      "targetPort": "Detections"
-    },
-    {
-      "source": "op_4",
-      "sourcePort": "Image",
-      "target": "op_6",
-      "targetPort": "Image"
-    },
-    {
-      "source": "op_4",
-      "sourcePort": "Diagnostics",
-      "target": "op_6",
+      "source": "op_2",
+      "sourcePort": "PostprocessDiagnostics",
+      "target": "op_4",
       "targetPort": "Data"
     },
     {
-      "source": "op_5",
+      "source": "op_3",
       "sourcePort": "Diagnostics",
-      "target": "op_6",
+      "target": "op_4",
       "targetPort": "Result"
     },
     {
-      "source": "op_5",
+      "source": "op_3",
       "sourcePort": "Message",
-      "target": "op_6",
+      "target": "op_4",
       "targetPort": "Text"
     }
   ],
   "parametersNeedingReview": {
     "op_2": [
-      "ModelPath"
+      "ModelPath",
+      "OutputFormat",
+      "Confidence"
     ],
     "op_3": [
-      "RegionX",
-      "RegionY",
-      "RegionW",
-      "RegionH"
-    ],
-    "op_4": [
-      "ScoreThreshold",
-      "IouThreshold"
-    ],
-    "op_5": [
       "ExpectedLabels",
       "ExpectedCount"
     ]

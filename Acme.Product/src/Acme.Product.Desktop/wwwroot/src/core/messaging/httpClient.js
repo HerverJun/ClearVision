@@ -335,6 +335,7 @@ class HttpClient {
             const response = await fetch(fullUrl, {
                 method: 'GET',
                 headers: this.defaultHeaders,
+                cache: options?.cache || 'no-store',
                 signal
             });
             this.saveSuccessfulPort(fullUrl);
@@ -348,6 +349,7 @@ class HttpClient {
                     const response = await fetch(fullUrl, {
                         method: 'GET',
                         headers: this.defaultHeaders,
+                        cache: options?.cache || 'no-store',
                         signal
                     });
                     this.saveSuccessfulPort(fullUrl);

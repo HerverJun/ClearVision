@@ -28,6 +28,22 @@ function hideAllViews(containers) {
     Object.values(containers).forEach(container => container?.classList.add('hidden'));
 }
 
+function getInlineResultImageBase64(result) {
+    if (!result || typeof result !== 'object') {
+        return null;
+    }
+
+    return result.imageData
+        || result.ImageData
+        || result.outputImage
+        || result.OutputImage
+        || result.outputImageBase64
+        || result.OutputImageBase64
+        || result.resultImageBase64
+        || result.ResultImageBase64
+        || null;
+}
+
 /**
  * @typedef {Object} ViewManagerOptions
  * @property {Document} documentRef
@@ -124,8 +140,9 @@ export function createViewManager(options) {
                     inspectionImageViewer?.imageCanvas?.resize?.();
 
                     const lastInspectionResult = serviceRegistry?.get?.('lastInspectionResult');
-                    if (lastInspectionResult?.outputImage && inspectionImageViewer) {
-                        inspectionImageViewer.loadImage(`data:image/png;base64,${lastInspectionResult.outputImage}`);
+                    const lastInspectionImage = getInlineResultImageBase64(lastInspectionResult);
+                    if (lastInspectionImage && inspectionImageViewer) {
+                        inspectionImageViewer.loadImage(`data:image/png;base64,${lastInspectionImage}`, { silent: true });
                     }
 
                     panel?.refresh?.();

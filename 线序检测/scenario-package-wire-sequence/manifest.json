@@ -2,35 +2,35 @@
   "SchemaVersion": "1.0",
   "ScenarioKey": "wire-sequence-terminal",
   "ScenarioName": "Terminal Wire Sequence",
-  "Version": "1.5.0",
-  "Description": "Reusable package for fixed-ROI wire-sequence inspection with detection, NMS, order judgment and optional continuous video-stream arrival triggering.",
+  "Version": "1.6.0",
+  "Description": "Reusable package for full-image wire-sequence inspection with ONNX-integrated candidate suppression, order judgment and optional continuous video-stream arrival triggering.",
   "CreatedAtUtc": "2026-03-23T00:00:00Z",
   "CreatedBy": "clearvision-team",
   "Assets": [
     {
       "ArtifactType": "Template",
       "ArtifactName": "terminal-wire-sequence-template",
-      "ArtifactVersion": "1.4.0",
+      "ArtifactVersion": "1.6.0",
       "RelativePath": "template/terminal-wire-sequence.flow.template.json",
       "Required": true,
-      "ChecksumSha256": "fe3316368b7d462b1d219fc0d72ecb3fbaa701acfc620e83bf7d2920bff09ca2",
+      "ChecksumSha256": "2afc8b750a25d5b754734120f2dd12ece9e0e2f1197ee5e19f1f0d34aef850b8",
       "Metadata": {
         "entryPoint": "true",
         "expectedSequence": "Wire_Black,Wire_Blue",
         "expectedDetectionCount": "2",
         "judgeOperatorType": "DetectionSequenceJudge",
         "requiredResources": "DeepLearning.ModelPath",
-        "thresholdOwner": "BoxNms",
-        "diagnosticOutputs": "BoxNms.Diagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
+        "thresholdOwner": "DeepLearning",
+        "diagnosticOutputs": "DeepLearning.PostprocessDiagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
       }
     },
     {
       "ArtifactType": "Template",
       "ArtifactName": "terminal-wire-sequence-video-stream-template",
-      "ArtifactVersion": "1.5.0",
+      "ArtifactVersion": "1.6.0",
       "RelativePath": "template/terminal-wire-sequence-video-stream.flow.template.json",
       "Required": false,
-      "ChecksumSha256": "74ebc131a83fc6c4a002dc9c1c877bf5bc56deeb72228b246d96255ad4b64a4d",
+      "ChecksumSha256": "b236134944b511f202c3d57515a88525548339dcbc0c2f71341910e77eef8e2a",
       "Metadata": {
         "entryPoint": "true",
         "variant": "videoStream",
@@ -42,15 +42,15 @@
         "requiredResources": "DeepLearning.ModelPath",
         "parametersNeedingReview": "FrameChangeTrigger.RoiX,FrameChangeTrigger.RoiY,FrameChangeTrigger.RoiWidth,FrameChangeTrigger.RoiHeight,DeepLearning.ModelPath",
         "publishBlockers": "Reject ROI 0,0,0,0 and missing model release gate fields before field package export.",
-        "thresholdOwner": "FrameChangeTrigger,BoxNms",
-        "diagnosticOutputs": "FrameChangeTrigger.Triggered,FrameChangeTrigger.ChangeScore,FrameChangeTrigger.ChangedPixels,FrameChangeTrigger.Reason,BoxNms.Diagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
+        "thresholdOwner": "FrameChangeTrigger,DeepLearning",
+        "diagnosticOutputs": "FrameChangeTrigger.Triggered,FrameChangeTrigger.ChangeScore,FrameChangeTrigger.ChangedPixels,FrameChangeTrigger.Reason,DeepLearning.PostprocessDiagnostics,DetectionSequenceJudge.Diagnostics,DetectionSequenceJudge.Message"
       }
     },
     {
       "ArtifactType": "Model",
-      "ArtifactName": "wire-seq-yolo",
-      "ArtifactVersion": "1.2.0",
-      "RelativePath": "models/wire-seq-yolo-v1.2.onnx",
+      "ArtifactName": "wire-seq-yolo-nms",
+      "ArtifactVersion": "1.3.0",
+      "RelativePath": "models/wire-seq-yolo-nms-v1.3.onnx",
       "Required": false,
       "ChecksumSha256": null,
       "Metadata": {
@@ -58,6 +58,7 @@
         "modelSha256": "REQUIRED_AT_DEPLOYMENT",
         "license": "REQUIRED_AT_DEPLOYMENT",
         "labelsContract": "labels/labels.txt sha256:b156ec31207dcd782c1501d8119037d1827b7c3384db55bec5291dcf22e0ef44",
+        "outputFormat": "EndToEndNms",
         "providerFallback": "OnnxRuntime CPU fallback required; GPU provider optional and must be recorded in release evidence.",
         "datasetVersion": "REQUIRED_AT_DEPLOYMENT",
         "hardwareProfile": "REQUIRED_AT_DEPLOYMENT",
@@ -69,10 +70,10 @@
     {
       "ArtifactType": "Rule",
       "ArtifactName": "wire-sequence-rule",
-      "ArtifactVersion": "1.4.0",
+      "ArtifactVersion": "1.6.0",
       "RelativePath": "rules/sequence-rule.v1.json",
       "Required": true,
-      "ChecksumSha256": "704f987ebb7679305c99bda7edf8312b6c173622f164af8c2769b1ab56f22452",
+      "ChecksumSha256": "a8c566f85d65c73baf3e0d18254409088e1cb814a72a9d5ee038fd09a04e4d1e",
       "Metadata": {
         "judgeOperatorType": "DetectionSequenceJudge",
         "expectedSequence": "Wire_Black,Wire_Blue",
@@ -105,7 +106,7 @@
       "ArtifactVersion": "1.0.0",
       "RelativePath": "faq/README.md",
       "Required": false,
-      "ChecksumSha256": "4ed97a5d40082d6668524c79589ce0f3d665c849ada86cea950b6a21fb10bb80",
+      "ChecksumSha256": "e5cd8537e2acf2cf9e45495f74a6458b361a00842dd0dfd677282ecf04916a31",
       "Metadata": {
         "optional": "true"
       }

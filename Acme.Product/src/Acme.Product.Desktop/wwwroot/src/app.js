@@ -499,7 +499,6 @@ async function ensureInspectionPanelReady() {
     }
 
     if (inspectionPanel) {
-        inspectionPanel.refresh();
         inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
         return inspectionPanel;
     }
@@ -587,9 +586,6 @@ function initializeInspectionImageViewer() {
     if (existingInspectionImageViewer) {
         requestAnimationFrame(() => {
             existingInspectionImageViewer.imageCanvas?.resize();
-            if (existingInspectionImageViewer.imageCanvas?.image) {
-                existingInspectionImageViewer.imageCanvas.resetView();
-            }
         });
         return;
     }
@@ -669,6 +665,23 @@ function getInlineResultImageBase64(result) {
         || result.resultImageBase64
         || result.ResultImageBase64
         || null;
+}
+
+function loadViewerImageSilently(viewer, imageData) {
+    if (!viewer || !imageData) {
+        return;
+    }
+
+    try {
+        const maybePromise = viewer.loadImage?.(imageData, { silent: true });
+        if (maybePromise && typeof maybePromise.catch === 'function') {
+            maybePromise.catch(error => {
+                debugLogger.warn('[App] 静默加载检测图像失败:', error);
+            });
+        }
+    } catch (error) {
+        debugLogger.warn('[App] 静默加载检测图像失败:', error);
+    }
 }
 
 function buildResultDefects(result) {
@@ -895,7 +908,7 @@ function initializeInspectionController() {
             const inspectionImageViewerService = serviceRegistry.get('inspectionImageViewer');
             if (outputImage && inspectionImageViewerService) {
                 const imageData = `data:image/png;base64,${outputImage}`;
-                inspectionImageViewerService.loadImage(imageData);
+                loadViewerImageSilently(inspectionImageViewerService, imageData);
             }
 
 
@@ -1241,8 +1254,20 @@ function initializeFlowEditor() {
     initializeProjectFlowCanvasSync();
     inspectionController.setFlowProvider?.(() => flowCanvasAdapter.serialize());
     inspectionController.setImageSinks?.([
-        (imageData) => serviceRegistry.get('inspectionImageViewer')?.loadImage?.(imageData),
-        (imageData) => serviceRegistry.get('imageViewer')?.loadImage?.(imageData)
+        (imageData) => {
+            if (getCurrentView() !== 'inspection') {
+                return;
+            }
+
+            loadViewerImageSilently(serviceRegistry.get('inspectionImageViewer'), imageData);
+        },
+        (imageData) => {
+            if (getCurrentView() !== 'image') {
+                return;
+            }
+
+            loadViewerImageSilently(serviceRegistry.get('imageViewer'), imageData);
+        }
     ]);
     initializeNodePreviewExperience();
     

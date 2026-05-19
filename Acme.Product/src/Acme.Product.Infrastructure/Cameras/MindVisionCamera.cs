@@ -625,7 +625,28 @@ public class MindVisionCamera : ICameraProvider
         try
         {
             int res = _cam.IMV_SetDoubleFeatureValue("ExposureTime", microseconds);
-            return res == IMVDefine.IMV_OK;
+            if (res == IMVDefine.IMV_OK)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Set ExposureTime failed: {DescribeSdkResult(res)}. Preparing manual exposure state and retrying.");
+            PrepareManualExposureWrite();
+
+            res = _cam.IMV_SetDoubleFeatureValue("ExposureTime", microseconds);
+            if (res == IMVDefine.IMV_OK)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Retry Set ExposureTime failed: {DescribeSdkResult(res)}.");
+            if (TrySetRawExposure(microseconds, out var rawRes))
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Set ExposureTimeRaw failed: {DescribeSdkResult(rawRes)}.");
+            return false;
         }
         catch (Exception ex)
         {
@@ -641,12 +662,43 @@ public class MindVisionCamera : ICameraProvider
 
         try
         {
+            TrySetEnumFeatureIfWriteable("GainSelector", "All");
+
             int res = _cam.IMV_SetDoubleFeatureValue("GainRaw", value);
+            if (res == IMVDefine.IMV_OK)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Set GainRaw failed: {DescribeSdkResult(res)}. Trying Gain.");
+            res = _cam.IMV_SetDoubleFeatureValue("Gain", value);
+            if (res != IMVDefine.IMV_OK)
+            {
+                Debug.WriteLine($"[MindVisionCamera] Set Gain failed: {DescribeSdkResult(res)}.");
+            }
+
             return res == IMVDefine.IMV_OK;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[MindVisionCamera] SetGain failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool SetPixelFormat(CameraPixelFormat pixelFormat)
+    {
+        if (!_isConnected || _cam == null)
+            return false;
+
+        try
+        {
+            var symbol = CameraPixelFormatExtensions.Normalize(pixelFormat.ToConfigValue()).ToConfigValue();
+            return TrySetEnumFeatureIfWriteable("PixelFormat", symbol);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetPixelFormat failed: {ex.Message}");
             return false;
         }
     }
@@ -683,6 +735,81 @@ public class MindVisionCamera : ICameraProvider
         }
     }
 
+    private void PrepareManualExposureWrite()
+    {
+        if (_cam == null)
+        {
+            return;
+        }
+
+        TrySetEnumFeatureIfWriteable("ExposureAuto", "Off");
+        TrySetEnumFeatureIfWriteable("ExposureMode", "Timed");
+        TrySetEnumFeatureIfWriteable("AcquisitionMode", "Continuous");
+
+        // Some Huaray GigE models report ExposureTime as read-only until trigger mode
+        // is normalized after a third-party viewer has touched the camera.
+        if (!_isGrabbing)
+        {
+            TrySetEnumFeatureIfWriteable("TriggerMode", "Off");
+        }
+    }
+
+    private bool TrySetRawExposure(double microseconds, out int result)
+    {
+        result = IMVDefine.IMV_ERROR;
+        if (_cam == null ||
+            !_cam.IMV_FeatureIsValid("ExposureTimeRaw") ||
+            !_cam.IMV_FeatureIsAvailable("ExposureTimeRaw"))
+        {
+            return false;
+        }
+
+        var rawValue = checked((long)Math.Round(microseconds * 10.0, MidpointRounding.AwayFromZero));
+        result = _cam.IMV_SetIntFeatureValue("ExposureTimeRaw", rawValue);
+        return result == IMVDefine.IMV_OK;
+    }
+
+    private bool TrySetEnumFeatureIfWriteable(string featureName, string symbol)
+    {
+        if (_cam == null ||
+            !_cam.IMV_FeatureIsValid(featureName) ||
+            !_cam.IMV_FeatureIsAvailable(featureName) ||
+            !_cam.IMV_FeatureIsWriteable(featureName))
+        {
+            return false;
+        }
+
+        var result = _cam.IMV_SetEnumFeatureSymbol(featureName, symbol);
+        if (result != IMVDefine.IMV_OK)
+        {
+            Debug.WriteLine($"[MindVisionCamera] Set {featureName}={symbol} failed: {DescribeSdkResult(result)}.");
+        }
+
+        return result == IMVDefine.IMV_OK;
+    }
+
+    private static string DescribeSdkResult(int result)
+    {
+        return result switch
+        {
+            IMVDefine.IMV_OK => "0 (OK)",
+            IMVDefine.IMV_ERROR => "-101 (Error)",
+            IMVDefine.IMV_INVALID_HANDLE => "-102 (Invalid handle)",
+            IMVDefine.IMV_INVALID_PARAM => "-103 (Invalid parameter)",
+            IMVDefine.IMV_INVALID_FRAME_HANDLE => "-104 (Invalid frame handle)",
+            IMVDefine.IMV_INVALID_FRAME => "-105 (Invalid frame)",
+            IMVDefine.IMV_INVALID_RESOURCE => "-106 (Invalid resource)",
+            IMVDefine.IMV_INVALID_IP => "-107 (Invalid IP)",
+            IMVDefine.IMV_NO_MEMORY => "-108 (No memory)",
+            IMVDefine.IMV_INSUFFICIENT_MEMORY => "-109 (Insufficient memory)",
+            IMVDefine.IMV_ERROR_PROPERTY_TYPE => "-110 (Invalid feature type)",
+            IMVDefine.IMV_INVALID_ACCESS => "-111 (Invalid access)",
+            IMVDefine.IMV_INVALID_RANGE => "-112 (Invalid range)",
+            IMVDefine.IMV_NOT_SUPPORT => "-113 (Not supported)",
+            _ => result.ToString()
+        };
+    }
+
     public bool ExecuteSoftwareTrigger()
     {
         if (!_isConnected || _cam == null)
@@ -690,7 +817,21 @@ public class MindVisionCamera : ICameraProvider
 
         try
         {
+            if (_isGrabbing)
+            {
+                var clearRes = _cam.IMV_ClearFrameBuffer();
+                if (clearRes != IMVDefine.IMV_OK)
+                {
+                    Debug.WriteLine($"[MindVisionCamera] ClearFrameBuffer before software trigger failed: {DescribeSdkResult(clearRes)}.");
+                }
+            }
+
             int res = _cam.IMV_ExecuteCommandFeature("TriggerSoftware");
+            if (res != IMVDefine.IMV_OK)
+            {
+                Debug.WriteLine($"[MindVisionCamera] Execute TriggerSoftware failed: {DescribeSdkResult(res)}.");
+            }
+
             return res == IMVDefine.IMV_OK;
         }
         catch (Exception ex)
@@ -769,6 +910,7 @@ public class MindVisionCamera : ICameraProvider
     public CameraFrame? GetFrame(int timeoutMs = 1000) => null;
     public bool SetExposure(double microseconds) => false;
     public bool SetGain(double value) => false;
+    public bool SetPixelFormat(CameraPixelFormat pixelFormat) => false;
     public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null) => false;
     public bool ExecuteSoftwareTrigger() => false;
     public void Dispose() { }

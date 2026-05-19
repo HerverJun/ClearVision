@@ -71,6 +71,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
+    private sealed record RuntimeProtectionOptions(bool ApplyProtectionRules, int StopOnConsecutiveNg);
+
     private class ExceptionRecord
     {
         public required Exception Exception { get; init; }
@@ -340,6 +342,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var projectRepository = scope.ServiceProvider.GetRequiredService<IProjectRepository>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<InspectionWorker>>();
             var streamCoordinator = scope.ServiceProvider.GetService<ICameraFrameStreamCoordinator>();
+            var configurationService = scope.ServiceProvider.GetService<IConfigurationService>();
 
             // 创建日志上下文
             // Create the logging / correlation scope for this run.
@@ -372,6 +375,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     flowExecution,
                     imageAcquisition,
                     resultChannelWriter,
+                    configurationService,
                     ct);
 
                 logger.LogInformation("[InspectionWorker] 检测循环结束");
@@ -414,6 +418,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
+        IConfigurationService? configurationService,
         CancellationToken ct)
     {
         if (continuousInspectionMode == ContinuousInspectionMode.Primary)
@@ -468,6 +473,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     flowExecution,
                     imageAcquisition,
                     resultChannelWriter,
+                    configurationService,
                     ct);
                 return;
             }
@@ -547,10 +553,15 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 if (result.Status == InspectionStatus.NG)
                 {
                     consecutiveNgCount++;
-                    // TODO: 从配置读取阈值
-                    if (consecutiveNgCount >= 5)
+                    var protectionOptions = ResolveRuntimeProtectionOptions(configurationService);
+                    if (protectionOptions.ApplyProtectionRules &&
+                        protectionOptions.StopOnConsecutiveNg > 0 &&
+                        consecutiveNgCount >= protectionOptions.StopOnConsecutiveNg)
                     {
-                        _logger.LogWarning("连续 NG 达到阈值，停止检测: {ProjectId}", projectId);
+                        _logger.LogWarning(
+                            "连续 NG 达到运行保护阈值，停止检测: {ProjectId}, Threshold={Threshold}",
+                            projectId,
+                            protectionOptions.StopOnConsecutiveNg);
                         break;
                     }
                 }
@@ -603,11 +614,29 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         _logger.LogInformation("[InspectionWorker] 检测循环结束，共执行 {CycleCount} 轮", cycleCount);
     }
 
+    private static RuntimeProtectionOptions ResolveRuntimeProtectionOptions(IConfigurationService? configurationService)
+    {
+        var runtime = configurationService?.GetCurrent()?.Runtime;
+        if (runtime?.ApplyProtectionRules != true)
+        {
+            return new RuntimeProtectionOptions(false, 0);
+        }
+
+        return new RuntimeProtectionOptions(
+            true,
+            Math.Max(0, runtime.StopOnConsecutiveNg));
+    }
+
     /// <summary>
     /// 执行单轮检测
     /// </summary>
     private static bool IsFrameDrivenExecution(OperatorFlow flow, string? cameraId, IServiceProvider serviceProvider)
     {
+        if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow))
+        {
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(cameraId) && flow.Operators.All(item => item.Type != OperatorType.ImageAcquisition))
         {
             return false;
@@ -655,6 +684,11 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
     private static bool IsBlockingSoftwareTriggerExecution(OperatorFlow flow, string? cameraId, IServiceProvider serviceProvider)
     {
+        if (ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow))
+        {
+            return false;
+        }
+
         var cameraManager = serviceProvider.GetService<ICameraManager>();
         if (cameraManager == null)
         {
@@ -801,26 +835,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
     private static bool TryResolveCycleCameraId(OperatorFlow flow, string? cameraId, out string resolvedCameraId)
     {
-        resolvedCameraId = string.Empty;
-        if (!string.IsNullOrWhiteSpace(cameraId))
-        {
-            resolvedCameraId = cameraId.Trim();
-            return true;
-        }
-
-        foreach (var op in flow.Operators.Where(item => item.Type == OperatorType.ImageAcquisition))
-        {
-            var bindingId = op.Parameters
-                .FirstOrDefault(parameter => parameter.Name.Equals("CameraId", StringComparison.OrdinalIgnoreCase))
-                ?.Value?.ToString();
-            if (!string.IsNullOrWhiteSpace(bindingId))
-            {
-                resolvedCameraId = bindingId.Trim();
-                return true;
-            }
-        }
-
-        return false;
+        return ImageAcquisitionFlowAnalyzer.TryResolveCameraId(flow, cameraId, out resolvedCameraId);
     }
 
     private async Task<InspectionResult> ExecuteCycleAsync(
@@ -843,7 +858,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var inputData = new Dictionary<string, object>();
 
             // 如果指定了相机，预加载图像
-            if (continuousInspectionMode == ContinuousInspectionMode.Primary &&
+            var shouldUseExternalCameraInput = !ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow);
+            if (shouldUseExternalCameraInput &&
+                continuousInspectionMode == ContinuousInspectionMode.Primary &&
                 streamCoordinator != null &&
                 TryResolveCycleCameraId(flow, cameraId, out var envelopeCameraId))
             {
@@ -857,7 +874,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     _logger.LogWarning(ex, "[InspectionWorker] Failed to acquire continuous frame envelope.");
                 }
             }
-            else if (!string.IsNullOrEmpty(cameraId))
+            else if (shouldUseExternalCameraInput && !string.IsNullOrEmpty(cameraId))
             {
                 Acme.Product.Application.DTOs.ImageDto? imageDto = null;
                 try

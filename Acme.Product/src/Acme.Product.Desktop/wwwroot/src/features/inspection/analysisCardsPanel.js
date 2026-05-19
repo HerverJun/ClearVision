@@ -221,8 +221,23 @@ function normalizeDeepLearningPreviewDiagnostics(outputData) {
         return null;
     }
 
+    const postprocessDiagnostics = readFirstDefined(
+        outputData.PostprocessDiagnostics,
+        outputData.postprocessDiagnostics,
+        isPlainObject(outputData.Data) ? outputData.Data : null,
+        isPlainObject(outputData.data) ? outputData.data : null
+    );
+    const outputFormat = String(readFirstDefined(
+        outputData.OutputFormat,
+        outputData.outputFormat,
+        postprocessDiagnostics?.OutputFormat,
+        postprocessDiagnostics?.outputFormat,
+        'RawYolo'
+    ));
+    const outputFormatLower = outputFormat.toLowerCase();
+    const isEndToEndNms = outputFormatLower === 'endtoendnms';
     const internalNmsEnabled = readFirstDefined(outputData.InternalNmsEnabled, outputData.internalNmsEnabled);
-    if (internalNmsEnabled !== false) {
+    if (internalNmsEnabled !== false && !isEndToEndNms) {
         return null;
     }
 
@@ -242,10 +257,11 @@ function normalizeDeepLearningPreviewDiagnostics(outputData) {
     return {
         detectionMode,
         internalNmsEnabled: false,
+        outputFormat,
         rawCandidateCount: rawCandidates,
         visualizedCount,
-        visualOwner: 'Preview-NMS',
-        businessOwner: 'BoxNms'
+        visualOwner: isEndToEndNms ? 'ONNX output' : 'Preview-NMS',
+        businessOwner: isEndToEndNms ? 'ONNX NMS' : 'BoxNms'
     };
 }
 
@@ -340,16 +356,20 @@ export function buildDiagnosticsAnalysisData(outputData, fallbackStatus = 'OK') 
     const deepLearningPreview = normalizeDeepLearningPreviewDiagnostics(outputData);
 
     if (deepLearningPreview) {
+        const isEndToEndNms = String(deepLearningPreview.outputFormat || '').toLowerCase() === 'endtoendnms';
         cards.push({
             category: 'diagnostic',
-            type: 'preview-nms',
-            title: '预览去重说明',
+            type: isEndToEndNms ? 'onnx-nms' : 'preview-nms',
+            title: isEndToEndNms ? '模型内置去重说明' : '预览去重说明',
             status: 'OK',
             icon: ICONS.note,
-            message: '当前预览图使用 Preview-NMS 收敛重叠框，仅用于可视化；真正业务去重仍由下游 BoxNms 执行。',
+            message: isEndToEndNms
+                ? '当前检测结果来自 ONNX 模型内置候选框抑制，平台侧不再串接检测 ROI 过滤或 BoxNms。'
+                : '当前预览图使用 Preview-NMS 收敛重叠框，仅用于可视化；真正业务去重仍由下游 BoxNms 执行。',
             priority: 130,
             fields: [
                 { label: '检测模式', value: deepLearningPreview.detectionMode },
+                { label: '输出格式', value: deepLearningPreview.outputFormat },
                 { label: '原始候选框', value: deepLearningPreview.rawCandidateCount },
                 { label: '预览图显示框', value: deepLearningPreview.visualizedCount },
                 { label: '预览去重层', value: deepLearningPreview.visualOwner },
@@ -437,6 +457,7 @@ export function renderDiagnosticsCardsHtml(outputData, fallbackStatus = 'OK', op
 class AnalysisCardsPanel {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
+        this.usesFlowContext = false;
 
         if (!this.container) {
             console.warn('[AnalysisCardsPanel] 找不到容器:', containerId);

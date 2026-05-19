@@ -1155,7 +1155,7 @@ class PropertyPanel {
         if (result?.missingResources?.length > 0) {
             this.showToast('自动调参已停止：缺少模型或标签资源。', 'warning');
         } else if (result?.success) {
-            this.showToast('线序自动调参已完成，并已回写 BoxNms 参数。', 'success');
+            this.showToast('线序自动调参已完成，并已回写检测参数。', 'success');
         } else {
             this.showToast(result?.errorMessage || '线序自动调参未收敛，请查看诊断。', 'warning');
         }

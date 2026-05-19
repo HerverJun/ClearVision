@@ -69,27 +69,41 @@ export function createWireSequenceParameterPatch(flowData, targetNodeId, finalPa
     const boxNms = getOperators(flowData).find(operator =>
         relevantIds.has(String(readOperatorId(operator) || '')) &&
         readOperatorType(operator) === 'BoxNms');
+    const deepLearning = getOperators(flowData).find(operator =>
+        relevantIds.has(String(readOperatorId(operator) || '')) &&
+        readOperatorType(operator) === 'DeepLearning');
 
-    if (!boxNms) {
-        return null;
-    }
-
-    const parameters = {};
     if (Object.prototype.hasOwnProperty.call(finalParameters, 'BoxNms.ScoreThreshold')) {
+        if (!boxNms) {
+            return null;
+        }
+
+        const parameters = {};
         parameters.ScoreThreshold = finalParameters['BoxNms.ScoreThreshold'];
-    }
-    if (Object.prototype.hasOwnProperty.call(finalParameters, 'BoxNms.IouThreshold')) {
-        parameters.IouThreshold = finalParameters['BoxNms.IouThreshold'];
+        if (Object.prototype.hasOwnProperty.call(finalParameters, 'BoxNms.IouThreshold')) {
+            parameters.IouThreshold = finalParameters['BoxNms.IouThreshold'];
+        }
+
+        return {
+            operatorId: readOperatorId(boxNms),
+            parameters
+        };
     }
 
-    if (Object.keys(parameters).length === 0) {
-        return null;
+    if (Object.prototype.hasOwnProperty.call(finalParameters, 'DeepLearning.Confidence')) {
+        if (!deepLearning) {
+            return null;
+        }
+
+        return {
+            operatorId: readOperatorId(deepLearning),
+            parameters: {
+                Confidence: finalParameters['DeepLearning.Confidence']
+            }
+        };
     }
 
-    return {
-        operatorId: readOperatorId(boxNms),
-        parameters
-    };
+    return null;
 }
 
 export function buildWireSequenceFollowupHint({
@@ -115,7 +129,9 @@ export function buildWireSequenceFollowupHint({
     }
 
     const parameterEntries = Object.entries(finalParameters || {}).filter(([key]) =>
-        key === 'BoxNms.ScoreThreshold' || key === 'BoxNms.IouThreshold');
+        key === 'BoxNms.ScoreThreshold' ||
+        key === 'BoxNms.IouThreshold' ||
+        key === 'DeepLearning.Confidence');
     if (parameterEntries.length > 0) {
         lines.push('建议直接修改以下参数：');
         parameterEntries.forEach(([key, value]) => {

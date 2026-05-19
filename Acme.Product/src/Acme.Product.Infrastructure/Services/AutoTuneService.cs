@@ -375,18 +375,25 @@ public class AutoTuneService : IAutoTuneService
         }
 
         var boxNmsOperator = FindClosestUpstreamOperator(flow, judgeOperator.Id, OperatorType.BoxNms);
-        if (boxNmsOperator == null)
+        var modelOperator = boxNmsOperator == null
+            ? FindClosestUpstreamOperator(flow, judgeOperator.Id, OperatorType.DeepLearning)
+            : null;
+        var tuningOperator = boxNmsOperator ?? modelOperator;
+        if (tuningOperator == null)
         {
             return new ScenarioAutoTuneResult
             {
                 Success = false,
                 ScenarioKey = normalizedScenarioKey,
-                ErrorMessage = "线序场景缺少 BoxNms 节点。"
+                ErrorMessage = "线序场景缺少可调的 DeepLearning 或 BoxNms 节点。"
             };
         }
 
         maxIterations = Math.Clamp(maxIterations, 1, 5);
-        var currentParameters = CaptureWireSequenceParameters(boxNmsOperator);
+        var useModelConfidenceTuning = boxNmsOperator == null;
+        var currentParameters = useModelConfidenceTuning
+            ? CaptureWireSequenceModelParameters(tuningOperator)
+            : CaptureWireSequenceParameters(tuningOperator);
         var bestParameters = new Dictionary<string, object>(currentParameters);
         FlowNodePreviewWithMetricsResult? bestPreview = null;
         double bestScore = double.MinValue;
@@ -396,7 +403,14 @@ public class AutoTuneService : IAutoTuneService
             ct.ThrowIfCancellationRequested();
             var iterationStopwatch = Stopwatch.StartNew();
 
-            ApplyWireSequenceParameters(boxNmsOperator, currentParameters);
+            if (useModelConfidenceTuning)
+            {
+                ApplyWireSequenceModelParameters(tuningOperator, currentParameters);
+            }
+            else
+            {
+                ApplyWireSequenceParameters(tuningOperator, currentParameters);
+            }
 
             var preview = await _flowNodePreviewService.PreviewWithMetricsAsync(
                 flow,
@@ -1146,6 +1160,14 @@ public class AutoTuneService : IAutoTuneService
         };
     }
 
+    private static Dictionary<string, object> CaptureWireSequenceModelParameters(Operator deepLearningOperator)
+    {
+        return new Dictionary<string, object>
+        {
+            ["DeepLearning.Confidence"] = GetOperatorParameterValue(deepLearningOperator, "Confidence", 0.05d)
+        };
+    }
+
     private static void ApplyWireSequenceParameters(Operator boxNmsOperator, Dictionary<string, object> parameters)
     {
         if (parameters.TryGetValue("BoxNms.ScoreThreshold", out var scoreThreshold))
@@ -1159,10 +1181,23 @@ public class AutoTuneService : IAutoTuneService
         }
     }
 
+    private static void ApplyWireSequenceModelParameters(Operator deepLearningOperator, Dictionary<string, object> parameters)
+    {
+        if (parameters.TryGetValue("DeepLearning.Confidence", out var confidence))
+        {
+            SetOperatorParameterValue(deepLearningOperator, "Confidence", confidence);
+        }
+    }
+
     private static Dictionary<string, object>? AdjustWireSequenceParameters(
         Dictionary<string, object> currentParameters,
         FlowNodePreviewWithMetricsResult preview)
     {
+        if (currentParameters.ContainsKey("DeepLearning.Confidence"))
+        {
+            return AdjustWireSequenceModelParameters(currentParameters, preview);
+        }
+
         var diagnostics = new HashSet<string>(preview.DiagnosticCodes, StringComparer.OrdinalIgnoreCase);
         var nextParameters = new Dictionary<string, object>(currentParameters);
         var changed = false;
@@ -1200,6 +1235,41 @@ public class AutoTuneService : IAutoTuneService
         }
 
         return changed ? nextParameters : null;
+    }
+
+    private static Dictionary<string, object>? AdjustWireSequenceModelParameters(
+        Dictionary<string, object> currentParameters,
+        FlowNodePreviewWithMetricsResult preview)
+    {
+        var diagnostics = new HashSet<string>(preview.DiagnosticCodes, StringComparer.OrdinalIgnoreCase);
+        var summary = DetectionOutputInspector.Inspect(preview.Outputs);
+        var currentConfidence = ReadDoubleValue(currentParameters, "DeepLearning.Confidence", 0.05d);
+        var expectedCount = summary.ExpectedCount ?? summary.ExpectedLabels.Count;
+        var actualCount = summary.DetectionCount > 0 ? summary.DetectionCount : (summary.DeclaredCount ?? 0);
+
+        double? nextConfidence = null;
+        if (diagnostics.Contains("missing_expected_class") ||
+            diagnostics.Contains("low_detection_confidence") ||
+            (expectedCount > 0 && actualCount < expectedCount))
+        {
+            nextConfidence = Math.Max(0.0d, Math.Round(currentConfidence - 0.05d, 3));
+        }
+        else if (diagnostics.Contains("duplicate_detected_class") ||
+                 (expectedCount > 0 && actualCount > expectedCount))
+        {
+            nextConfidence = Math.Min(0.80d, Math.Round(currentConfidence + 0.05d, 3));
+        }
+
+        if (!nextConfidence.HasValue || Math.Abs(nextConfidence.Value - currentConfidence) <= 0.0001d)
+        {
+            return null;
+        }
+
+        var nextParameters = new Dictionary<string, object>(currentParameters)
+        {
+            ["DeepLearning.Confidence"] = nextConfidence.Value
+        };
+        return nextParameters;
     }
 
     private static bool IsWireSequenceGoalAchieved(FlowNodePreviewWithMetricsResult preview)

@@ -308,19 +308,14 @@ public static class ApiEndpoints
             {
                 // 根据运行模式选择启动方式
                 var runMode = request.RunMode?.ToLower() ?? "camera";
+                var requestFlow = request.FlowData?.ToEntity();
 
-                if (runMode == "flow" && request.FlowData != null)
+                if (runMode == "flow" && requestFlow != null)
                 {
                     // 流程驱动模式
-                    var flow = request.FlowData.ToEntity();
-                    if (flow == null)
-                    {
-                        return Results.BadRequest(new { Error = "无效的流程数据" });
-                    }
-
                     await service.StartRealtimeInspectionFlowAsync(
                         request.ProjectId,
-                        flow,
+                        requestFlow,
                         request.CameraId,
                         cancellationToken,
                         result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
@@ -330,6 +325,24 @@ public static class ApiEndpoints
                         Message = "实时检测已启动 (流程驱动模式)",
                         ProjectId = request.ProjectId,
                         RunMode = "flow",
+                        CameraId = request.CameraId
+                    });
+                }
+                else if (requestFlow?.Operators?.Count > 0)
+                {
+                    // 相机驱动模式也必须使用前端当前流程，避免画布参数更新后仍执行持久化旧流程。
+                    await service.StartRealtimeInspectionFlowAsync(
+                        request.ProjectId,
+                        requestFlow,
+                        request.CameraId,
+                        cancellationToken,
+                        result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
+
+                    return Results.Ok(new
+                    {
+                        Message = "实时检测已启动 (相机驱动模式)",
+                        ProjectId = request.ProjectId,
+                        RunMode = "camera",
                         CameraId = request.CameraId
                     });
                 }

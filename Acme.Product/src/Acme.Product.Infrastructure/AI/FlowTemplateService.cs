@@ -46,7 +46,6 @@ public class FlowTemplateService : IFlowTemplateService
     private const string WireSequenceTemplateName = "端子线序检测";
     private const string WireSequenceVideoStreamTemplateName = "端子线序检测-视频流版";
     private const string WireSequenceIndustry = "线束装配";
-    private const string WireSequenceDefaultRegionExtent = "999999";
     private static readonly IReadOnlyDictionary<string, string> _deprecatedBuiltInTemplates =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -399,20 +398,20 @@ public class FlowTemplateService : IFlowTemplateService
             {
                 Id = Guid.NewGuid(),
                 Name = WireSequenceTemplateName,
-                Description = "端子线序检测模板，先做全图 YOLO 检测，再按 ROI 区域过滤框，最后做 NMS 与顺序判定。",
+                Description = "端子线序检测模板，ONNX 模型内置候选框抑制后直接输出线根检测框，再做顺序判定。",
                 Industry = WireSequenceIndustry,
-                Tags = ["线序", "YOLO", "端子", "ROI"],
-                TemplateVersion = "1.4.2",
+                Tags = ["线序", "YOLO", "端子", "ONNX-NMS"],
+                TemplateVersion = "1.6.0",
                 ScenarioKey = WireSequenceScenarioKey,
                 ScenarioPackage = new ScenarioPackageBinding
                 {
                     PackageKey = WireSequenceScenarioKey,
-                    PackageVersion = "1.4.0",
+                    PackageVersion = "1.6.0",
                     AssetVersionIds =
                     [
-                        "template:terminal-wire-sequence-template@1.4.0",
-                        "model:wire-seq-yolo@1.2.0",
-                        "rule:wire-sequence-rule@1.4.0",
+                        "template:terminal-wire-sequence-template@1.6.0",
+                        "model:wire-seq-yolo-nms@1.3.0",
+                        "rule:wire-sequence-rule@1.6.0",
                         "label:wire-label-set@1.1.0"
                     ],
                     RequiredResources =
@@ -422,14 +421,13 @@ public class FlowTemplateService : IFlowTemplateService
                 },
                 FlowJson = JsonSerializer.Serialize(new
                 {
-                    explanation = "适用于线束装配工位的端子线序判定，先做全图 YOLO 检测，再用 ROI 区域过滤框，最后做 NMS 去重和顺序判定。",
+                    explanation = "适用于线束装配工位的端子线序判定。ONNX 模型已内置候选框抑制，平台侧只保留图像采集、深度学习检测、线序判定和结果输出。",
                     expectedSequence = new[] { "Wire_Black", "Wire_Blue" },
                     expectedDetectionCount = 2,
                     requiredResources = new[] { "DeepLearning.ModelPath" },
                     tunableParameters = new[]
                     {
-                        "BoxNms.ScoreThreshold",
-                        "BoxNms.IouThreshold"
+                        "DeepLearning.Confidence"
                     },
                     operators = new object[]
                     {
@@ -442,25 +440,10 @@ public class FlowTemplateService : IFlowTemplateService
                             ["InputSize"] = "640",
                             ["TargetClasses"] = "Wire_Black,Wire_Blue",
                             ["EnableInternalNms"] = "false",
+                            ["OutputFormat"] = "EndToEndNms",
                             ["DetectionMode"] = "Object"
                         }),
-                        Node("op_3", "BoxFilter", "ROI框过滤", new Dictionary<string, string>
-                        {
-                            ["FilterMode"] = "Region",
-                            ["RegionX"] = "0",
-                            ["RegionY"] = "0",
-                            ["RegionW"] = TemplateDefaultRegionExtent,
-                            ["RegionH"] = TemplateDefaultRegionExtent,
-                            ["MinScore"] = "0.0"
-                        }),
-                        Node("op_4", "BoxNms", "候选框去重", new Dictionary<string, string>
-                        {
-                            ["IouThreshold"] = "0.45",
-                            ["ScoreThreshold"] = "0.25",
-                            ["MaxDetections"] = "10",
-                            ["ShowSuppressed"] = "false"
-                        }),
-                        Node("op_5", "DetectionSequenceJudge", "顺序判定", new Dictionary<string, string>
+                        Node("op_3", "DetectionSequenceJudge", "顺序判定", new Dictionary<string, string>
                         {
                             ["ExpectedLabels"] = "Wire_Black,Wire_Blue",
                             ["SortBy"] = "CenterY",
@@ -468,7 +451,7 @@ public class FlowTemplateService : IFlowTemplateService
                             ["ExpectedCount"] = "2",
                             ["MinConfidence"] = "0.0"
                         }),
-                        Node("op_6", "ResultOutput", "结果输出", new Dictionary<string, string>
+                        Node("op_4", "ResultOutput", "结果输出", new Dictionary<string, string>
                         {
                             ["Format"] = "JSON",
                             ["SaveToFile"] = "true"
@@ -478,22 +461,15 @@ public class FlowTemplateService : IFlowTemplateService
                     {
                         Link("op_1", "Image", "op_2", "Image"),
                         Link("op_2", "Objects", "op_3", "Detections"),
-                        Link("op_1", "Image", "op_3", "Image"),
-                        Link("op_3", "Detections", "op_4", "Detections"),
-                        Link("op_1", "Image", "op_4", "Image"),
-                        Link("op_2", "OriginalImage", "op_4", "SourceImage"),  // 使用原始图像重新绘制，避免图像叠加污染
-                        Link("op_4", "Detections", "op_5", "Detections"),
-                        Link("op_4", "Image", "op_6", "Image"),
-                        Link("op_4", "Diagnostics", "op_6", "Data"),
-                        Link("op_5", "Diagnostics", "op_6", "Result"),
-                        Link("op_5", "Message", "op_6", "Text")
+                        Link("op_2", "Image", "op_4", "Image"),
+                        Link("op_2", "PostprocessDiagnostics", "op_4", "Data"),
+                        Link("op_3", "Diagnostics", "op_4", "Result"),
+                        Link("op_3", "Message", "op_4", "Text")
                     },
                     parametersNeedingReview = new Dictionary<string, List<string>>
                     {
-                        ["op_2"] = ["ModelPath"],
-                        ["op_3"] = ["RegionX", "RegionY", "RegionW", "RegionH"],
-                        ["op_4"] = ["ScoreThreshold", "IouThreshold"],
-                        ["op_5"] = ["ExpectedLabels", "ExpectedCount"]
+                        ["op_2"] = ["ModelPath", "OutputFormat", "Confidence"],
+                        ["op_3"] = ["ExpectedLabels", "ExpectedCount"]
                     }
                 }, _jsonOptions),
                 CreatedAt = DateTime.UtcNow
@@ -502,20 +478,20 @@ public class FlowTemplateService : IFlowTemplateService
             {
                 Id = Guid.NewGuid(),
                 Name = WireSequenceVideoStreamTemplateName,
-                Description = "端子线序检测视频流模板，连续采集后先用帧变化触发判断到料，未到料时跳过本轮，触发后再执行 YOLO、ROI、NMS 与顺序判定。",
+                Description = "端子线序检测视频流模板，连续采集后先用帧变化触发判断到料，触发后进入内置 NMS 的 ONNX 检测和顺序判定。",
                 Industry = WireSequenceIndustry,
-                Tags = ["线序", "视频流", "连续采集", "帧变化触发", "端子", "YOLO"],
-                TemplateVersion = "1.5.0",
+                Tags = ["线序", "视频流", "连续采集", "帧变化触发", "端子", "ONNX-NMS"],
+                TemplateVersion = "1.6.0",
                 ScenarioKey = WireSequenceVideoStreamScenarioKey,
                 ScenarioPackage = new ScenarioPackageBinding
                 {
                     PackageKey = WireSequenceScenarioKey,
-                    PackageVersion = "1.5.0",
+                    PackageVersion = "1.6.0",
                     AssetVersionIds =
                     [
-                        "template:terminal-wire-sequence-video-stream-template@1.5.0",
-                        "model:wire-seq-yolo@1.2.0",
-                        "rule:wire-sequence-rule@1.4.0",
+                        "template:terminal-wire-sequence-video-stream-template@1.6.0",
+                        "model:wire-seq-yolo-nms@1.3.0",
+                        "rule:wire-sequence-rule@1.6.0",
                         "label:wire-label-set@1.1.0"
                     ],
                     RequiredResources =
@@ -525,7 +501,7 @@ public class FlowTemplateService : IFlowTemplateService
                 },
                 FlowJson = JsonSerializer.Serialize(new
                 {
-                    explanation = "适用于没有光电或 PLC 触发信号的皮带线端子线序检测。相机连续采集，帧变化触发算子在到料 ROI 内检测变化；未到料帧短路本轮流程，触发后才进入 YOLO、ROI 框过滤、NMS 和线序判定。",
+                    explanation = "适用于没有光电或 PLC 触发信号的皮带线端子线序检测。相机连续采集，帧变化触发算子只负责到料判断；触发后进入内置 NMS 的 ONNX 检测和线序判定。",
                     expectedSequence = new[] { "Wire_Black", "Wire_Blue" },
                     expectedDetectionCount = 2,
                     requiredResources = new[] { "DeepLearning.ModelPath" },
@@ -539,8 +515,7 @@ public class FlowTemplateService : IFlowTemplateService
                         "FrameChangeTrigger.RoiY",
                         "FrameChangeTrigger.RoiW",
                         "FrameChangeTrigger.RoiH",
-                        "BoxNms.ScoreThreshold",
-                        "BoxNms.IouThreshold"
+                        "DeepLearning.Confidence"
                     },
                     operators = new object[]
                     {
@@ -570,25 +545,10 @@ public class FlowTemplateService : IFlowTemplateService
                             ["InputSize"] = "640",
                             ["TargetClasses"] = "Wire_Black,Wire_Blue",
                             ["EnableInternalNms"] = "false",
+                            ["OutputFormat"] = "EndToEndNms",
                             ["DetectionMode"] = "Object"
                         }),
-                        Node("op_4", "BoxFilter", "ROI框过滤", new Dictionary<string, string>
-                        {
-                            ["FilterMode"] = "Region",
-                            ["RegionX"] = "0",
-                            ["RegionY"] = "0",
-                            ["RegionW"] = WireSequenceDefaultRegionExtent,
-                            ["RegionH"] = WireSequenceDefaultRegionExtent,
-                            ["MinScore"] = "0.0"
-                        }),
-                        Node("op_5", "BoxNms", "候选框去重", new Dictionary<string, string>
-                        {
-                            ["IouThreshold"] = "0.45",
-                            ["ScoreThreshold"] = "0.25",
-                            ["MaxDetections"] = "10",
-                            ["ShowSuppressed"] = "false"
-                        }),
-                        Node("op_6", "DetectionSequenceJudge", "顺序判定", new Dictionary<string, string>
+                        Node("op_4", "DetectionSequenceJudge", "顺序判定", new Dictionary<string, string>
                         {
                             ["ExpectedLabels"] = "Wire_Black,Wire_Blue",
                             ["SortBy"] = "CenterY",
@@ -596,7 +556,7 @@ public class FlowTemplateService : IFlowTemplateService
                             ["ExpectedCount"] = "2",
                             ["MinConfidence"] = "0.0"
                         }),
-                        Node("op_7", "ResultOutput", "结果输出", new Dictionary<string, string>
+                        Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
                         {
                             ["Format"] = "JSON",
                             ["SaveToFile"] = "true"
@@ -607,23 +567,17 @@ public class FlowTemplateService : IFlowTemplateService
                         Link("op_1", "Image", "op_2", "Image"),
                         Link("op_2", "Image", "op_3", "Image"),
                         Link("op_3", "Objects", "op_4", "Detections"),
-                        Link("op_2", "Image", "op_4", "Image"),
-                        Link("op_4", "Detections", "op_5", "Detections"),
-                        Link("op_2", "Image", "op_5", "Image"),
-                        Link("op_5", "Detections", "op_6", "Detections"),
-                        Link("op_5", "Image", "op_7", "Image"),
-                        Link("op_5", "Diagnostics", "op_7", "Data"),
-                        Link("op_6", "Diagnostics", "op_7", "Result"),
-                        Link("op_6", "Message", "op_7", "Text")
+                        Link("op_3", "Image", "op_5", "Image"),
+                        Link("op_3", "PostprocessDiagnostics", "op_5", "Data"),
+                        Link("op_4", "Diagnostics", "op_5", "Result"),
+                        Link("op_4", "Message", "op_5", "Text")
                     },
                     parametersNeedingReview = new Dictionary<string, List<string>>
                     {
                         ["op_1"] = ["CameraId", "TriggerMode"],
                         ["op_2"] = ["RoiX", "RoiY", "RoiW", "RoiH", "PixelThreshold", "MinChangeRatio", "MinChangePixels", "CooldownMs"],
-                        ["op_3"] = ["ModelPath"],
-                        ["op_4"] = ["RegionX", "RegionY", "RegionW", "RegionH"],
-                        ["op_5"] = ["ScoreThreshold", "IouThreshold"],
-                        ["op_6"] = ["ExpectedLabels", "ExpectedCount"]
+                        ["op_3"] = ["ModelPath", "OutputFormat", "Confidence"],
+                        ["op_4"] = ["ExpectedLabels", "ExpectedCount"]
                     }
                 }, _jsonOptions),
                 CreatedAt = DateTime.UtcNow

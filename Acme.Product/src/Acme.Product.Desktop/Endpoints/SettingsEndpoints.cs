@@ -373,6 +373,7 @@ public static class SettingsEndpoints
                     binding.IsEnabled,
                     binding.ExposureTimeUs,
                     binding.GainDb,
+                    binding.PixelFormat,
                     binding.TriggerMode,
                     binding.HardwareTriggerSource,
                     binding.SoftwareTriggerSource,
@@ -520,6 +521,10 @@ public static class SettingsEndpoints
 
                 await camera.SetExposureTimeAsync(binding.ExposureTimeUs);
                 await camera.SetGainAsync(binding.GainDb);
+                if (camera is IIndustrialCamera industrialCamera)
+                {
+                    await industrialCamera.SetPixelFormatAsync(CameraPixelFormatExtensions.Normalize(binding.PixelFormat));
+                }
 
                 if (binding.UsesEnterPhotoelectricTrigger())
                 {
@@ -545,7 +550,7 @@ public static class SettingsEndpoints
                 }
 
                 // 软触发采图序列已内聚在 AcquireSingleFrameAsync 中
-                // （StartGrabbing → TriggerMode=On → TriggerSource=Software → ExecuteSoftwareTrigger → GetFrame）
+                // （切到软件触发 → 复用或启动采集流 → ExecuteSoftwareTrigger → GetFrame；仅在 SDK 不允许热切模式时兜底停启）
 
                 var frameBytes = await camera.AcquireSingleFrameAsync();
                 if (!TryReadPngDimensions(frameBytes, out var width, out var height))
@@ -683,6 +688,9 @@ public static class SettingsEndpoints
             try
             {
                 var frame = await streamCoordinator.WaitForPreviewFrameAsync(sessionId, cancellationToken);
+                context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                context.Response.Headers.Pragma = "no-cache";
+                context.Response.Headers.Expires = "0";
                 context.Response.Headers["X-Image-Width"] = frame.Width.ToString();
                 context.Response.Headers["X-Image-Height"] = frame.Height.ToString();
                 context.Response.Headers["X-Camera-Id"] = frame.CameraBindingId;
@@ -829,6 +837,7 @@ public static class SettingsEndpoints
             IsEnabled = binding.IsEnabled,
             ExposureTimeUs = binding.ExposureTimeUs,
             GainDb = binding.GainDb,
+            PixelFormat = binding.PixelFormat,
             TriggerMode = binding.TriggerMode,
             HardwareTriggerSource = binding.HardwareTriggerSource,
             SoftwareTriggerSource = binding.SoftwareTriggerSource,
@@ -892,6 +901,7 @@ public static class SettingsEndpoints
         return !string.Equals(previous.SerialNumber, next.SerialNumber, StringComparison.OrdinalIgnoreCase)
             || Math.Abs(previous.ExposureTimeUs - next.ExposureTimeUs) > 0.001
             || Math.Abs(previous.GainDb - next.GainDb) > 0.001
+            || !string.Equals(previous.PixelFormat, next.PixelFormat, StringComparison.OrdinalIgnoreCase)
             || previousMode != nextMode
             || !string.Equals(previous.SoftwareTriggerSource, next.SoftwareTriggerSource, StringComparison.OrdinalIgnoreCase)
             || previous.EnterPhotoelectricDebounceMs != next.EnterPhotoelectricDebounceMs

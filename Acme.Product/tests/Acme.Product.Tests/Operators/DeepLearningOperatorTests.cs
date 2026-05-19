@@ -309,6 +309,76 @@ public class DeepLearningOperatorTests
     }
 
     [Fact]
+    public void PostprocessEndToEndNmsOutput_ShouldParseXyxyScoreClassRows()
+    {
+        var method = typeof(DeepLearningOperator).GetMethod(
+            "PostprocessEndToEndNmsOutput",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        method.Should().NotBeNull();
+
+        var tensor = new DenseTensor<float>(new float[1 * 2 * 6], new[] { 1, 2, 6 });
+        tensor[0, 0, 0] = 10f;
+        tensor[0, 0, 1] = 20f;
+        tensor[0, 0, 2] = 50f;
+        tensor[0, 0, 3] = 80f;
+        tensor[0, 0, 4] = 0.92f;
+        tensor[0, 0, 5] = 1f;
+        tensor[0, 1, 0] = 100f;
+        tensor[0, 1, 1] = 100f;
+        tensor[0, 1, 2] = 120f;
+        tensor[0, 1, 3] = 120f;
+        tensor[0, 1, 4] = 0.01f;
+        tensor[0, 1, 5] = 0f;
+
+        var result = method!.Invoke(_operator, new object?[] { tensor, 0.05f, 640, 640, 640 });
+
+        result.Should().BeAssignableTo<System.Collections.IEnumerable>();
+        var detections = result.As<System.Collections.IEnumerable>().Cast<object>().ToList();
+        detections.Should().HaveCount(1);
+        GetPropertyValue<float>(detections[0], "X").Should().Be(10f);
+        GetPropertyValue<float>(detections[0], "Y").Should().Be(20f);
+        GetPropertyValue<float>(detections[0], "Width").Should().Be(40f);
+        GetPropertyValue<float>(detections[0], "Height").Should().Be(60f);
+        GetPropertyValue<float>(detections[0], "Confidence").Should().BeApproximately(0.92f, 0.0001f);
+        GetPropertyValue<int>(detections[0], "ClassId").Should().Be(1);
+    }
+
+    [Fact]
+    public void ShouldUseEndToEndNmsOutput_WhenForcedWithRawYoloAnchorShape_ShouldFailFast()
+    {
+        var method = typeof(DeepLearningOperator).GetMethod(
+            "ShouldUseEndToEndNmsOutput",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        method.Should().NotBeNull();
+
+        var tensor = new DenseTensor<float>(new float[1 * 6 * 8400], new[] { 1, 6, 8400 });
+
+        var action = () => method!.Invoke(_operator, new object?[] { tensor, DetectionOutputFormat.EndToEndNms, 2 });
+
+        var exception = action.Should().Throw<TargetInvocationException>().Which;
+        exception.InnerException.Should().BeOfType<InvalidOperationException>();
+        exception.InnerException!.Message.Should().Contain("raw YOLO");
+    }
+
+    [Fact]
+    public void ShouldUseEndToEndNmsOutput_WhenForcedWithEmptyCompactNmsShape_ShouldAccept()
+    {
+        var method = typeof(DeepLearningOperator).GetMethod(
+            "ShouldUseEndToEndNmsOutput",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        method.Should().NotBeNull();
+
+        var tensor = new DenseTensor<float>(new float[1 * 100 * 6], new[] { 1, 100, 6 });
+
+        var result = method!.Invoke(_operator, new object?[] { tensor, DetectionOutputFormat.EndToEndNms, 2 });
+
+        result.Should().Be(true);
+    }
+
+    [Fact]
     public void ApplyNmsWithStats_WithHeavyOverlap_ShouldKeepTopCandidateAndAvoidQuadraticComparisons()
     {
         var detections = Enumerable.Range(0, 800)

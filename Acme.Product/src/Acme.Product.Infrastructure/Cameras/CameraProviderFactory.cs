@@ -285,6 +285,7 @@ public class MockCameraProvider : ICameraProvider
     private byte[]? _dummyBuffer;
     private GCHandle _bufferHandle;
     private CameraDeviceInfo? _currentDevice;
+    private CameraPixelFormat _pixelFormat = CameraPixelFormat.Mono8;
 
     public string ProviderName => "Mock";
     public bool IsConnected => _isConnected && !_disposed;
@@ -311,13 +312,7 @@ public class MockCameraProvider : ICameraProvider
         if (_disposed)
             return false;
 
-        int w = 1280, h = 1024;
-        _dummyBuffer = new byte[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                _dummyBuffer[y * w + x] = (byte)((x + y) % 255);
-
-        _bufferHandle = GCHandle.Alloc(_dummyBuffer, GCHandleType.Pinned);
+        ResetDummyBuffer();
         _isConnected = true;
         _currentDevice = new CameraDeviceInfo
         {
@@ -366,7 +361,7 @@ public class MockCameraProvider : ICameraProvider
             Width = 1280,
             Height = 1024,
             Size = _dummyBuffer.Length,
-            PixelFormat = CameraPixelFormat.Mono8,
+            PixelFormat = _pixelFormat,
             FrameNumber = (ulong)DateTime.Now.Ticks,
             Timestamp = (ulong)DateTime.Now.Ticks,
             NeedsNativeRelease = false
@@ -375,6 +370,17 @@ public class MockCameraProvider : ICameraProvider
 
     public bool SetExposure(double microseconds) => true;
     public bool SetGain(double value) => true;
+    public bool SetPixelFormat(CameraPixelFormat pixelFormat)
+    {
+        _pixelFormat = CameraPixelFormatExtensions.Normalize(pixelFormat.ToConfigValue());
+        if (_isConnected)
+        {
+            ResetDummyBuffer();
+        }
+
+        return true;
+    }
+
     public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null) => true;
     public bool ExecuteSoftwareTrigger() => true;
 
@@ -384,5 +390,34 @@ public class MockCameraProvider : ICameraProvider
             return;
         Close();
         _disposed = true;
+    }
+
+    private void ResetDummyBuffer()
+    {
+        if (_bufferHandle.IsAllocated)
+        {
+            _bufferHandle.Free();
+        }
+
+        const int w = 1280;
+        const int h = 1024;
+        var channels = _pixelFormat is CameraPixelFormat.RGB8 or CameraPixelFormat.BGR8 ? 3 : 1;
+        _dummyBuffer = new byte[w * h * channels];
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                var index = (y * w + x) * channels;
+                var value = (byte)((x + y) % 255);
+                _dummyBuffer[index] = value;
+                if (channels == 3)
+                {
+                    _dummyBuffer[index + 1] = (byte)((x * 2 + y) % 255);
+                    _dummyBuffer[index + 2] = (byte)((x + y * 2) % 255);
+                }
+            }
+        }
+
+        _bufferHandle = GCHandle.Alloc(_dummyBuffer, GCHandleType.Pinned);
     }
 }

@@ -56,8 +56,8 @@ public class CameraProviderAdapterTests
 
             Received.InOrder(() =>
             {
-                provider.StartGrabbing();
                 provider.SetTriggerMode(CameraTriggerMode.Software);
+                provider.StartGrabbing();
                 provider.ExecuteSoftwareTrigger();
                 provider.GetFrame(3000);
             });
@@ -69,7 +69,7 @@ public class CameraProviderAdapterTests
     }
 
     [Fact]
-    public async Task AcquireSingleFrameAsync_WhenAlreadyGrabbing_ShouldNotCallStartGrabbing()
+    public async Task AcquireSingleFrameAsync_WhenAlreadyGrabbing_ShouldReuseActiveSoftwareTriggerStream()
     {
         var provider = Substitute.For<ICameraProvider>();
         provider.IsGrabbing.Returns(true);
@@ -94,10 +94,14 @@ public class CameraProviderAdapterTests
             var pngBytes = await adapter.AcquireSingleFrameAsync();
 
             pngBytes.Should().NotBeNullOrEmpty();
+            Received.InOrder(() =>
+            {
+                provider.SetTriggerMode(CameraTriggerMode.Software);
+                provider.ExecuteSoftwareTrigger();
+                provider.GetFrame(3000);
+            });
+            provider.DidNotReceive().StopGrabbing();
             provider.DidNotReceive().StartGrabbing();
-            provider.Received(1).SetTriggerMode(CameraTriggerMode.Software);
-            provider.Received(1).ExecuteSoftwareTrigger();
-            provider.Received(1).GetFrame(3000);
         }
         finally
         {
@@ -209,5 +213,18 @@ public class CameraProviderAdapterTests
         await adapter.SetTriggerModeAsync(CameraTriggerMode.External, "Line3");
 
         provider.Received(1).SetTriggerMode(CameraTriggerMode.External, "Line3");
+    }
+
+    [Fact]
+    public async Task SetPixelFormatAsync_ShouldPassSelectedFormatToProvider()
+    {
+        var provider = Substitute.For<ICameraProvider>();
+        provider.SetPixelFormat(CameraPixelFormat.RGB8).Returns(true);
+
+        var adapter = new CameraProviderAdapter("cam-format", provider, Substitute.For<ILogger<CameraProviderAdapter>>());
+
+        await adapter.SetPixelFormatAsync(CameraPixelFormat.RGB8);
+
+        provider.Received(1).SetPixelFormat(CameraPixelFormat.RGB8);
     }
 }

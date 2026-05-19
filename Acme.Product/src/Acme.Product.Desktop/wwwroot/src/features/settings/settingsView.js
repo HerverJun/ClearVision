@@ -78,6 +78,35 @@ class SettingsView {
         return Math.min(120, Math.max(1, parsed));
     }
 
+    normalizeCameraPixelFormat(value) {
+        const normalized = String(value || '')
+            .trim()
+            .replace(/[-_\s]/g, '')
+            .toLowerCase();
+        if (['rgb', 'rgb8'].includes(normalized)) return 'RGB8';
+        if (['bgr', 'bgr8'].includes(normalized)) return 'BGR8';
+        if (['bayerrg', 'bayerrg8'].includes(normalized)) return 'BayerRG8';
+        if (['bayergb', 'bayergb8'].includes(normalized)) return 'BayerGB8';
+        if (['bayergr', 'bayergr8'].includes(normalized)) return 'BayerGR8';
+        if (['bayerbg', 'bayerbg8'].includes(normalized)) return 'BayerBG8';
+        if (['mono', 'mono8', 'monochrome', 'gray', 'gray8', 'grey', 'grey8', 'moon'].includes(normalized)) return 'Mono8';
+        return 'Mono8';
+    }
+
+    getCameraPixelFormatLabel(value) {
+        const format = this.normalizeCameraPixelFormat(value);
+        const labels = {
+            Mono8: 'Mono8',
+            RGB8: 'RGB8',
+            BGR8: 'BGR8',
+            BayerRG8: 'Bayer RG8',
+            BayerGB8: 'Bayer GB8',
+            BayerGR8: 'Bayer GR8',
+            BayerBG8: 'Bayer BG8'
+        };
+        return labels[format] || 'Mono8';
+    }
+
     normalizeEnterDebounceMs(value) {
         const parsed = Number.parseInt(String(value ?? ''), 10);
         if (!Number.isFinite(parsed)) {
@@ -401,6 +430,7 @@ class SettingsView {
             security: { ...defaults.security, ...(config?.security || {}) },
             cameras: (Array.isArray(config?.cameras) ? config.cameras : (defaults.cameras || [])).map(binding => ({
                 ...binding,
+                pixelFormat: this.normalizeCameraPixelFormat(binding?.pixelFormat ?? binding?.PixelFormat),
                 triggerMode: this.normalizeCameraTriggerMode(binding?.triggerMode ?? binding?.TriggerMode),
                 hardwareTriggerSource: this.normalizeHardwareTriggerSource(binding?.hardwareTriggerSource ?? binding?.HardwareTriggerSource),
                 softwareTriggerSource: this.normalizeSoftwareTriggerSource(binding?.softwareTriggerSource ?? binding?.SoftwareTriggerSource),
@@ -733,6 +763,12 @@ class SettingsView {
         savedCommunication.heartbeatIntervalMs = workingCommunication.heartbeatIntervalMs;
         savedCommunication[profileKey] = this.cloneCommunicationConfig(workingCommunication[profileKey]);
         return savedCommunication;
+    }
+
+    areCommunicationConfigsEqual(left, right) {
+        const normalizedLeft = this.normalizeCommunicationConfig(left);
+        const normalizedRight = this.normalizeCommunicationConfig(right);
+        return JSON.stringify(normalizedLeft) === JSON.stringify(normalizedRight);
     }
 
     async loadPlcSettings({ force = false } = {}) {
@@ -1637,7 +1673,7 @@ class SettingsView {
     async loadCameraBindings() {
         const tbody = this.container.querySelector('#camera-bindings-table tbody');
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 24px;"><div class="cv-spinner" style="margin-right:8px; display:inline-block;"></div>正在加载相机配置...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px;"><div class="cv-spinner" style="margin-right:8px; display:inline-block;"></div>正在加载相机配置...</td></tr>`;
         }
 
         try {
@@ -1645,6 +1681,7 @@ class SettingsView {
             this.cameraBindings = (bindings || []).map(binding => {
                 const exposureRaw = binding.exposureTimeUs ?? binding.ExposureTimeUs;
                 const gainRaw = binding.gainDb ?? binding.GainDb;
+                const pixelFormatRaw = binding.pixelFormat ?? binding.PixelFormat;
                 const triggerRaw = binding.triggerMode ?? binding.TriggerMode;
                 const hardwareTriggerSourceRaw = binding.hardwareTriggerSource ?? binding.HardwareTriggerSource;
                 const softwareTriggerSourceRaw = binding.softwareTriggerSource ?? binding.SoftwareTriggerSource;
@@ -1668,6 +1705,7 @@ class SettingsView {
                     ipAddress: typeof ipAddress === 'string' ? ipAddress.trim() : '',
                     exposureTimeUs: Number.isFinite(Number(exposureRaw)) ? Number(exposureRaw) : 5000,
                     gainDb: Number.isFinite(Number(gainRaw)) ? Number(gainRaw) : 1.0,
+                    pixelFormat: this.normalizeCameraPixelFormat(pixelFormatRaw),
                     triggerMode: this.normalizeCameraTriggerMode(triggerRaw),
                     hardwareTriggerSource: this.normalizeHardwareTriggerSource(hardwareTriggerSourceRaw),
                     softwareTriggerSource: this.normalizeSoftwareTriggerSource(softwareTriggerSourceRaw),
@@ -1693,7 +1731,7 @@ class SettingsView {
         } catch (error) {
             console.error('Failed to load camera bindings:', error);
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color:var(--accent);">加载配置失败: ${this.escapeHtml(error.message)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 20px; color:var(--accent);">加载配置失败: ${this.escapeHtml(error.message)}</td></tr>`;
             }
             this.updateCameraParameterPanel(null);
         }
@@ -1822,6 +1860,7 @@ class SettingsView {
                     isEnabled: true,
                     exposureTimeUs: 5000,
                     gainDb: 1.0,
+                    pixelFormat: 'Mono8',
                     triggerMode: 'Software',
                     hardwareTriggerSource: 'Line0',
                     softwareTriggerSource: 'Manual',
@@ -1874,7 +1913,7 @@ class SettingsView {
         if (!this.cameraBindings || this.cameraBindings.length === 0) {
             this.selectedCameraBindingId = null;
             this.updateCameraParameterPanel(null);
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:24px;">暂无绑定配置，请点击“华睿搜索”或“海康搜索”发现设备</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">暂无绑定配置，请点击“华睿搜索”或“海康搜索”发现设备</td></tr>';
             return;
         }
 
@@ -1900,6 +1939,7 @@ class SettingsView {
             const serialNumber = this.escapeHtml(b.serialNumber || '未知');
             const ipAddress = this.escapeHtml(b.ipAddress || b.IpAddress || '未知');
             const manufacturer = this.escapeHtml(b.manufacturer || '未知');
+            const pixelFormat = this.escapeHtml(this.getCameraPixelFormatLabel(b.pixelFormat ?? b.PixelFormat));
             const triggerSourceLabel = this.escapeHtml(this.getTriggerSourceLabel(b));
 
             return `
@@ -1918,6 +1958,7 @@ class SettingsView {
                 </td>
                 <td><span class="font-mono">${ipAddress}</span></td>
                 <td>${manufacturer}</td>
+                <td><span class="font-mono">${pixelFormat}</span></td>
                 <td><span class="settings-status-badge ${statusClass}"><span class="${statusDotClass}"></span> ${statusText}</span></td>
                 <td><button class="action-icon-btn" title="删除" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
             </tr>
@@ -1961,6 +2002,7 @@ class SettingsView {
 
         const exposureInput = this.container.querySelector('#cam-param-exposure');
         const gainInput = this.container.querySelector('#cam-param-gain');
+        const pixelFormatSelect = this.container.querySelector('#cam-param-pixel-format');
         const triggerModeSelect = this.container.querySelector('#cam-param-trigger-mode');
         const hardwareTriggerSourceSelect = this.container.querySelector('#cam-param-hardware-trigger-source');
         const triggerSourceSelect = this.container.querySelector('#cam-param-software-trigger-source');
@@ -1982,6 +2024,10 @@ class SettingsView {
         if (gainInput) {
             gainInput.value = cam ? String(cam.gainDb ?? 1.0) : '';
             gainInput.disabled = !cam;
+        }
+        if (pixelFormatSelect) {
+            pixelFormatSelect.value = this.normalizeCameraPixelFormat(cam?.pixelFormat ?? cam?.PixelFormat);
+            pixelFormatSelect.disabled = !cam;
         }
         if (triggerModeSelect) {
             triggerModeSelect.value = this.normalizeCameraTriggerMode(cam?.triggerMode);
@@ -2052,7 +2098,7 @@ class SettingsView {
         const selectionHint = this.container.querySelector('#camera-selection-hint');
         if (selectionHint) {
             selectionHint.textContent = cam
-                ? `当前已选中：${cam.displayName || cam.serialNumber || cam.id}。触发方式：${this.getTriggerSourceLabel(cam)}。`
+                ? `当前已选中：${cam.displayName || cam.serialNumber || cam.id}。像素格式：${this.getCameraPixelFormatLabel(cam.pixelFormat ?? cam.PixelFormat)}。触发方式：${this.getTriggerSourceLabel(cam)}。`
                 : '请先在上方绑定列表中选择一台相机，再进行预览、二维平面标定或参数保存。';
         }
     }
@@ -2288,7 +2334,8 @@ class SettingsView {
     }
 
     async fetchContinuousPreviewFrame(sessionId, options = {}) {
-        const { blob, headers } = await httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}`, {
+        const cacheKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const { blob, headers } = await httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}?_=${cacheKey}`, {
             signal: options.signal
         });
         if (!blob || blob.size === 0) {
@@ -2517,12 +2564,22 @@ class SettingsView {
     }
 
     async showSelectedCameraPreview() {
-        const binding = this.getSelectedCameraBinding();
+        let binding = this.getSelectedCameraBinding();
         if (!binding) {
             showToast('请先在相机管理中选择一台相机，再打开相机预览', 'warning');
             return;
         }
 
+        const saved = await this.saveSelectedCameraParameters({ silent: true });
+        if (!saved) {
+            if (this.lastCameraBindingSaveError) {
+                showToast('保存相机参数失败: ' + this.lastCameraBindingSaveError, 'error');
+            }
+
+            return;
+        }
+
+        binding = this.getSelectedCameraBinding() || binding;
         const triggerMode = this.normalizeCameraTriggerMode(binding.triggerMode);
         if (triggerMode === 'Continuous' || triggerMode === 'External') {
             await this.showContinuousCameraPreview(binding);
@@ -2747,20 +2804,21 @@ class SettingsView {
         void loadPreview();
     }
 
-    async saveSelectedCameraParameters() {
+    async saveSelectedCameraParameters({ silent = false } = {}) {
         if (!this.selectedCameraBindingId) {
             showToast('请先在上方绑定列表中选择一台相机', 'warning');
-            return;
+            return false;
         }
 
         const binding = this.cameraBindings.find(b => b.id === this.selectedCameraBindingId);
         if (!binding) {
             showToast('未找到选中的相机绑定', 'error');
-            return;
+            return false;
         }
 
         const exposureInput = this.container.querySelector('#cam-param-exposure');
         const gainInput = this.container.querySelector('#cam-param-gain');
+        const pixelFormatSelect = this.container.querySelector('#cam-param-pixel-format');
         const triggerModeSelect = this.container.querySelector('#cam-param-trigger-mode');
         const hardwareTriggerSourceSelect = this.container.querySelector('#cam-param-hardware-trigger-source');
         const triggerSourceSelect = this.container.querySelector('#cam-param-software-trigger-source');
@@ -2774,13 +2832,14 @@ class SettingsView {
         const serialTimeoutInput = this.container.querySelector('#cam-param-serial-timeout');
         const ignoreSerialBusyInput = this.container.querySelector('#cam-param-ignore-serial-busy');
         const frameRateInput = this.container.querySelector('#cam-param-target-frame-rate');
-        if (!exposureInput || !gainInput || !triggerModeSelect || !hardwareTriggerSourceSelect || !triggerSourceSelect || !enterDebounceInput || !enterTimeoutInput || !enterDeviceInput || !ignoreBusyInput || !serialPortInput || !serialBaudInput || !serialDebounceInput || !serialTimeoutInput || !ignoreSerialBusyInput || !frameRateInput) {
+        if (!exposureInput || !gainInput || !pixelFormatSelect || !triggerModeSelect || !hardwareTriggerSourceSelect || !triggerSourceSelect || !enterDebounceInput || !enterTimeoutInput || !enterDeviceInput || !ignoreBusyInput || !serialPortInput || !serialBaudInput || !serialDebounceInput || !serialTimeoutInput || !ignoreSerialBusyInput || !frameRateInput) {
             showToast('参数面板控件缺失，请刷新后重试', 'error');
-            return;
+            return false;
         }
 
         const exposureTimeUs = Number.parseFloat(exposureInput.value);
         const gainDb = Number.parseFloat(gainInput.value);
+        const pixelFormat = this.normalizeCameraPixelFormat(pixelFormatSelect.value || 'Mono8');
         const triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
         const hardwareTriggerSource = this.normalizeHardwareTriggerSource(hardwareTriggerSourceSelect.value || 'Line0');
         const softwareTriggerSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect.value || 'Manual');
@@ -2797,15 +2856,16 @@ class SettingsView {
 
         if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
             showToast('曝光时间需在 10 - 1000000 µs 范围内', 'warning');
-            return;
+            return false;
         }
         if (!Number.isFinite(gainDb) || gainDb < 0 || gainDb > 24) {
             showToast('增益需在 0.0 - 24.0 dB 范围内', 'warning');
-            return;
+            return false;
         }
 
         binding.exposureTimeUs = exposureTimeUs;
         binding.gainDb = gainDb;
+        binding.pixelFormat = pixelFormat;
         binding.triggerMode = triggerMode;
         binding.hardwareTriggerSource = hardwareTriggerSource;
         binding.softwareTriggerSource = softwareTriggerSource;
@@ -2820,9 +2880,9 @@ class SettingsView {
         binding.ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialPhotoelectricTriggerWhileBusy;
         binding.targetFrameRateFps = targetFrameRateFps;
 
-        const saved = await this.saveCameraBindings();
+        const saved = await this.saveCameraBindings({ silent });
         if (!saved) {
-            return;
+            return false;
         }
 
         this.refreshCameraTable();
@@ -2830,7 +2890,11 @@ class SettingsView {
         if (selectedRow) {
             this.selectCameraRow(selectedRow);
         }
-        showToast(`已保存相机参数: ${binding.displayName || binding.serialNumber}`, 'success');
+        if (!silent) {
+            showToast(`已保存相机参数: ${binding.displayName || binding.serialNumber}`, 'success');
+        }
+
+        return true;
     }
 
     // （演示用空壳。需要配合 Modal使用，这里只挂载入口）
@@ -3316,13 +3380,14 @@ class SettingsView {
                                 <th>名称</th>
                                 <th>IP地址/序列号</th>
                                 <th>驱动类型</th>
+                                <th>像素格式</th>
                                 <th>状态</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             <!-- 加载后端数据 -->
-                            <tr><td colspan="5" style="text-align:center; padding: 24px;"><div class="cv-spinner" style="margin-right:8px; display:inline-block;"></div>正在加载相机配置...</td></tr>
+                            <tr><td colspan="6" style="text-align:center; padding: 24px;"><div class="cv-spinner" style="margin-right:8px; display:inline-block;"></div>正在加载相机配置...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -3340,7 +3405,7 @@ class SettingsView {
                     <div id="camera-selection-hint" class="settings-field-hint" style="display:block; margin-bottom:16px;">
                         请先在上方绑定列表中选择一台相机，再进行预览、二维平面标定或参数保存。
                     </div>
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:24px; margin-bottom: 24px;">
+                    <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:24px; margin-bottom: 24px;">
                         <div class="settings-fieldset">
                             <label>曝光时间 (Exposure Time)</label>
                             <div class="input-with-suffix" style="position:relative;">
@@ -3356,6 +3421,19 @@ class SettingsView {
                                 <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">dB</span>
                             </div>
                             <span class="settings-field-hint">范围: 0.0 - 24.0 dB</span>
+                        </div>
+                        <div class="settings-fieldset">
+                            <label>像素格式 (Pixel Format)</label>
+                            <select class="cv-input" id="cam-param-pixel-format">
+                                <option value="Mono8">Mono8 / 黑白</option>
+                                <option value="RGB8">RGB8 / 彩色 RGB</option>
+                                <option value="BGR8">BGR8 / 彩色 BGR</option>
+                                <option value="BayerRG8">BayerRG8</option>
+                                <option value="BayerGB8">BayerGB8</option>
+                                <option value="BayerGR8">BayerGR8</option>
+                                <option value="BayerBG8">BayerBG8</option>
+                            </select>
+                            <span class="settings-field-hint">保存后写入相机 SDK 的 PixelFormat。</span>
                         </div>
                         <div class="settings-fieldset">
                             <label>触发模式 (Trigger Mode)</label>
@@ -3897,6 +3975,7 @@ class SettingsView {
     collectCameraBindings() {
         return this.cameraBindings.map(binding => ({
             ...binding,
+            pixelFormat: this.normalizeCameraPixelFormat(binding.pixelFormat ?? binding.PixelFormat),
             triggerMode: this.normalizeCameraTriggerMode(binding.triggerMode),
             hardwareTriggerSource: this.normalizeHardwareTriggerSource(binding.hardwareTriggerSource),
             softwareTriggerSource: this.normalizeSoftwareTriggerSource(binding.softwareTriggerSource),
@@ -4060,6 +4139,7 @@ class SettingsView {
             const selectedBinding = this.cameraBindings.find(b => b.id === this.selectedCameraBindingId);
             const exposureInput = this.container?.querySelector('#cam-param-exposure');
             const gainInput = this.container?.querySelector('#cam-param-gain');
+            const pixelFormatSelect = this.container?.querySelector('#cam-param-pixel-format');
             const triggerModeSelect = this.container?.querySelector('#cam-param-trigger-mode');
             const hardwareTriggerSourceSelect = this.container?.querySelector('#cam-param-hardware-trigger-source');
             const triggerSourceSelect = this.container?.querySelector('#cam-param-software-trigger-source');
@@ -4073,7 +4153,7 @@ class SettingsView {
             const serialTimeoutInput = this.container?.querySelector('#cam-param-serial-timeout');
             const ignoreSerialBusyInput = this.container?.querySelector('#cam-param-ignore-serial-busy');
             const frameRateInput = this.container?.querySelector('#cam-param-target-frame-rate');
-            if (selectedBinding && exposureInput && gainInput && triggerModeSelect && hardwareTriggerSourceSelect && triggerSourceSelect && enterDebounceInput && enterTimeoutInput && enterDeviceInput && ignoreBusyInput && serialPortInput && serialBaudInput && serialDebounceInput && serialTimeoutInput && ignoreSerialBusyInput && frameRateInput) {
+            if (selectedBinding && exposureInput && gainInput && pixelFormatSelect && triggerModeSelect && hardwareTriggerSourceSelect && triggerSourceSelect && enterDebounceInput && enterTimeoutInput && enterDeviceInput && ignoreBusyInput && serialPortInput && serialBaudInput && serialDebounceInput && serialTimeoutInput && ignoreSerialBusyInput && frameRateInput) {
                 const exposureTimeUs = Number.parseFloat(exposureInput.value);
                 const gainDb = Number.parseFloat(gainInput.value);
                 if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
@@ -4086,6 +4166,7 @@ class SettingsView {
                 }
                 selectedBinding.exposureTimeUs = exposureTimeUs;
                 selectedBinding.gainDb = gainDb;
+                selectedBinding.pixelFormat = this.normalizeCameraPixelFormat(pixelFormatSelect.value || 'Mono8');
                 selectedBinding.triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
                 selectedBinding.hardwareTriggerSource = this.normalizeHardwareTriggerSource(hardwareTriggerSourceSelect.value || 'Line0');
                 selectedBinding.softwareTriggerSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect.value || 'Manual');
@@ -4102,10 +4183,26 @@ class SettingsView {
             }
         }
         
-        const plcSaveResult = await this.savePlcSettings({ silent: true, persistAllProfiles: true });
-        if (!plcSaveResult?.success) {
-            showToast('PLC 配置校验未通过，请先修正当前协议配置。', 'error');
-            return;
+        const plcSettingsDraft = this.normalizeCommunicationConfig(
+            this.buildPlcSettingsPayload({ persistAllProfiles: true })
+        );
+        const hasPendingPlcChanges = !this.areCommunicationConfigsEqual(
+            plcSettingsDraft,
+            this.savedCommunicationConfig || this.config?.communication
+        );
+        let communicationForSave = plcSettingsDraft;
+
+        if (hasPendingPlcChanges) {
+            const plcSaveResult = await this.savePlcSettings({ silent: true, persistAllProfiles: true });
+            if (!plcSaveResult?.success) {
+                showToast('PLC 配置校验未通过，请先修正当前协议配置。', 'error');
+                return;
+            }
+
+            communicationForSave = this.normalizeCommunicationConfig(plcSaveResult.settings || plcSettingsDraft);
+        } else {
+            this.config.communication = this.cloneCommunicationConfig(plcSettingsDraft);
+            this.syncPlcMappingsFromActiveProfile();
         }
 
         const config = {
@@ -4115,7 +4212,7 @@ class SettingsView {
                 autoStart: this.container?.querySelector('#cfg-autoStart')?.checked || false
             },
             communication: {
-                ...this.normalizeCommunicationConfig(plcSaveResult.settings || this.config?.communication),
+                ...this.normalizeCommunicationConfig(communicationForSave),
                 heartbeatIntervalMs
             },
             storage: {

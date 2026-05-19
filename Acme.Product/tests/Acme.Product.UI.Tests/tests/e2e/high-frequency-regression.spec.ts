@@ -105,6 +105,7 @@ async function mockSettingsApis(
     options: {
         onPlcSettingsPut?: (payload: any) => void;
         onSettingsPut?: (payload: any) => void;
+        onCameraBindingsPut?: (payload: any) => void;
     } = {}) {
     const settingsPayload = buildSettingsPayload();
 
@@ -172,6 +173,15 @@ async function mockSettingsApis(
             return;
         }
 
+        const payload = JSON.parse(route.request().postData() || '{}');
+        options.onCameraBindingsPut?.(payload);
+        if (Array.isArray(payload?.bindings)) {
+            settingsPayload.cameras = payload.bindings;
+        }
+        if (typeof payload?.activeCameraId === 'string') {
+            settingsPayload.activeCameraId = payload.activeCameraId;
+        }
+
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -223,6 +233,58 @@ async function mockSettingsApis(
 }
 
 async function mockResultsApis(page: Page) {
+    const stationId = 'station-regression-001';
+    const completedAtUtc = '2026-03-20T10:10:00Z';
+    const buildStationResultsPage = (status: string | null) => {
+        const items = status === 'Ng'
+            ? [
+                {
+                    stationId,
+                    sequenceId: 1,
+                    runId: 'run-ng-001',
+                    imageId: 'img-ng-001',
+                    outcome: 'NG',
+                    executionTimeMs: 28,
+                    diagnosticCode: 'Scratch',
+                    diagnosticMessage: 'Scratch',
+                    completedAtUtc,
+                    primaryOutputsPreview: { station: 'S1' },
+                }
+            ]
+            : [
+                {
+                    stationId,
+                    sequenceId: 1,
+                    runId: 'run-ng-001',
+                    imageId: 'img-ng-001',
+                    outcome: 'NG',
+                    executionTimeMs: 28,
+                    diagnosticCode: 'Scratch',
+                    diagnosticMessage: 'Scratch',
+                    completedAtUtc,
+                    primaryOutputsPreview: { station: 'S1' },
+                },
+                {
+                    stationId,
+                    sequenceId: 2,
+                    runId: 'run-ok-001',
+                    imageId: 'img-ok-001',
+                    outcome: 'OK',
+                    executionTimeMs: 22,
+                    diagnosticCode: 'Passed',
+                    completedAtUtc: '2026-03-20T10:11:00Z',
+                    primaryOutputsPreview: { station: 'S1' },
+                }
+            ];
+
+        return {
+            items,
+            totalCount: status === 'Ng' ? 1 : 10,
+            pageIndex: 0,
+            pageSize: 12,
+        };
+    };
+
     await page.route(`**/api/inspection/history/${PROJECT_ID}**`, async route => {
         const url = new URL(route.request().url());
         const status = url.searchParams.get('status');
@@ -339,6 +401,76 @@ async function mockResultsApis(page: Page) {
                     },
                 ],
             }),
+        });
+    });
+
+    await page.route('**/api/stations/summary', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                totalStations: 1,
+                onlineStations: 1,
+                offlineStations: 0,
+                runningStations: 1,
+                faultedStations: 0,
+                alertCount: 0,
+                totalOkCount: 7,
+                totalNgCount: 3,
+                totalErrorCount: 0,
+                averageExecutionTimeMs: 25,
+                offlineThresholdSeconds: 15,
+            }),
+        });
+    });
+
+    await page.route('**/api/stations', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([
+                {
+                    stationId,
+                    stationName: 'Regression Station',
+                    lineName: 'Line A',
+                    isEnabled: true,
+                    isOnline: true,
+                    onlineState: 'Online',
+                    state: 'Running',
+                    lastSeenAtUtc: new Date().toISOString(),
+                    sessionOkCount: 7,
+                    sessionNgCount: 3,
+                    sessionErrorCount: 0,
+                    averageExecutionTimeMs: 25,
+                    lastOutcome: 'NG',
+                    lastDiagnosticCode: 'Scratch',
+                }
+            ]),
+        });
+    });
+
+    await page.route('**/api/station-packages', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([]),
+        });
+    });
+
+    await page.route('**/api/stations/results**', async route => {
+        const url = new URL(route.request().url());
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(buildStationResultsPage(url.searchParams.get('status'))),
+        });
+    });
+
+    await page.route('**/api/stations/events', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'text/event-stream',
+            body: 'event: heartbeat\ndata: {}\n\n',
         });
     });
 }
@@ -462,6 +594,37 @@ test.describe('High Frequency Regression', () => {
         await page.locator('#calib-btn-close').click();
     });
 
+    test('settings camera regression: save all skips PLC validation when PLC config is unchanged', async ({ page }) => {
+        const plcSettingsPuts: any[] = [];
+        const cameraBindingPuts: any[] = [];
+        const settingsPuts: any[] = [];
+
+        await mockProjectApis(page);
+        await mockSettingsApis(page, {
+            onPlcSettingsPut: payload => plcSettingsPuts.push(payload),
+            onCameraBindingsPut: payload => cameraBindingPuts.push(payload),
+            onSettingsPut: payload => settingsPuts.push(payload),
+        });
+        await bootRegressionApp(page);
+
+        await page.locator('.nav-btn[data-view="settings"]').click();
+        await expect(page.locator('.settings-menu-item[data-tab="cameras"]')).toBeVisible();
+        await page.locator('.settings-menu-item[data-tab="cameras"]').click();
+        await expect(page.locator('#camera-bindings-table tbody tr.camera-row')).toBeVisible();
+
+        await page.locator('#camera-bindings-table tbody tr.camera-row').first().click();
+        await expect(page.locator('#cam-param-exposure')).toHaveValue('12000');
+        await page.locator('#cam-param-exposure').fill('16000');
+        await page.locator('#btn-save-settings').click();
+
+        await expect.poll(() => cameraBindingPuts.length).toBe(1);
+        expect(cameraBindingPuts[0].bindings[0].exposureTimeUs).toBe(16000);
+
+        await expect.poll(() => settingsPuts.length).toBe(1);
+        expect(settingsPuts[0].cameras[0].exposureTimeUs).toBe(16000);
+        expect(plcSettingsPuts).toHaveLength(0);
+    });
+
     test('settings plc regression: save all preserves drafts across protocols', async ({ page }) => {
         const plcSettingsPuts: any[] = [];
         const settingsPuts: any[] = [];
@@ -524,19 +687,25 @@ test.describe('High Frequency Regression', () => {
         await expect(page.locator('#btn-run-continuous')).toBeEnabled();
     });
 
-    test('result filter regression: server-paged filters refresh server-backed history and analytics', async ({ page }) => {
+    test('station result filter regression: server-paged filters refresh monitor results', async ({ page }) => {
         await mockProjectApis(page);
         await mockResultsApis(page);
         await bootRegressionApp(page);
 
         await openProject(page);
 
-        await page.locator('.nav-btn[data-view="results"]').click();
-        await expect(page.locator('#results-count-info')).toContainText('当前页 2 条 / 共 10 条记录');
+        await page.locator('.nav-btn[data-view="stations"]').click();
+        await expect(page.locator('#sm-results-workbench')).toBeVisible();
+        await expect(page.locator('#sm-results-meta')).toHaveText('10 条记录');
+        await expect(page.locator('#sm-result-overview')).toContainText('总计 10');
+        await expect(page.locator('#sm-result-list')).toContainText('NG');
+        await expect(page.locator('#sm-result-list')).toContainText('OK');
 
-        await page.locator('#filter-status').selectOption('ng');
+        await page.locator('#sm-result-status-filter').selectOption('Ng');
 
-        await expect(page.locator('#results-count-info')).toContainText('当前页 1 条 / 共 1 条记录');
-        await expect(page.locator('#results-grid')).toContainText('NG');
+        await expect(page.locator('#sm-results-meta')).toHaveText('1 条记录');
+        await expect(page.locator('#sm-result-overview')).toContainText('总计 1');
+        await expect(page.locator('#sm-result-list')).toContainText('NG');
+        await expect(page.locator('#sm-result-list')).not.toContainText('OK');
     });
 });
