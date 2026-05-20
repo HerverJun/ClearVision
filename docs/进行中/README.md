@@ -4,9 +4,10 @@ This folder keeps active plans, open follow-ups, and review queues. Completed pl
 
 ## Current Active Plans
 
-- [ClearVision-最终整合TODO-2026-05-03.md](./当前计划/ClearVision-最终整合TODO-2026-05-03.md): the current main integration and field-readiness plan.
+- [ClearVision-无证据算子数据集与算法补齐计划-2026-05-18.md](./当前计划/ClearVision-无证据算子数据集与算法补齐计划-2026-05-18.md): current evidence-first operator dataset and algorithm completion plan.
+- [ClearVision-现场使用者体验审视与改进计划-2026-05-20.md](./当前计划/ClearVision-现场使用者体验审视与改进计划-2026-05-20.md): field-user experience review with code evidence and prioritized remediation.
 
-Recently closed plans are archived under [2026-05-15 当前计划闭环归档](../归档/已关闭事项/2026-05-15-当前计划闭环归档/闭环说明.md).
+Recently closed plans are archived under [2026-05-18 当前计划闭环归档](../归档/已关闭事项/2026-05-18-当前计划闭环归档/闭环说明.md).
 
 ## Supporting Entrypoints
 
