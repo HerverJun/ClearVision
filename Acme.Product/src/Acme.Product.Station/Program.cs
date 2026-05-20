@@ -1,5 +1,6 @@
 using Acme.Product.Infrastructure.DependencyInjection;
 using Acme.Product.Runtime;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,6 +17,13 @@ internal static class Program
         System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
 
         using var host = Host.CreateDefaultBuilder()
+            .ConfigureAppConfiguration((context, configuration) =>
+            {
+                configuration.AddJsonFile(
+                    StationSettingsPaths.GetStationSyncSettingsPath(),
+                    optional: true,
+                    reloadOnChange: false);
+            })
             .ConfigureServices((context, services) =>
             {
                 services.AddVisionRuntimeCoreServices();
@@ -42,6 +50,7 @@ internal static class Program
         try
         {
             host.StartAsync().GetAwaiter().GetResult();
+            MarkStationSyncSettingsApplied();
             System.Windows.Forms.Application.Run(host.Services.GetRequiredService<MainForm>());
             settingsStore.MarkCleanExit();
         }
@@ -50,5 +59,17 @@ internal static class Program
             host.StopAsync().GetAwaiter().GetResult();
             host.Services.GetRequiredService<RuntimeHost>().DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
+    }
+
+    private static void MarkStationSyncSettingsApplied()
+    {
+        var markerPath = StationSettingsPaths.GetStationSyncSettingsAppliedMarkerPath();
+        var directory = Path.GetDirectoryName(markerPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(markerPath, DateTimeOffset.UtcNow.ToString("O"));
     }
 }

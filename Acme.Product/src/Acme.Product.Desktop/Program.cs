@@ -14,6 +14,7 @@ using Acme.Product.Infrastructure.Logging;
 using Acme.Product.Infrastructure.Metrics;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Runtime;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -116,6 +117,10 @@ static class Program
         try
         {
             var builder = WebApplication.CreateBuilder();
+            builder.Configuration.AddJsonFile(
+                StationSettingsPaths.GetStudioCommunicationSettingsPath(),
+                optional: true,
+                reloadOnChange: false);
             builder.Services.AddSingleton<IValidateOptions<StationIngressOptions>, StationIngressOptionsValidator>();
             builder.Services.AddSingleton<IValidateOptions<AiGenerationOptions>, AiGenerationOptionsValidator>();
             builder.Services.AddOptions<StationIngressOptions>()
@@ -152,6 +157,7 @@ static class Program
             builder.Services.AddSingleton<RuntimeResultNormalizer>();
             builder.Services.AddSingleton<WebMessageHandler>();
             builder.Services.AddSingleton<StationIngressAuthService>();
+            builder.Services.AddSingleton<StationCommunicationSettingsStore>();
             builder.Services.AddSingleton<StationRegistryService>();
             builder.Services.AddSingleton<StationCentralStore>();
             builder.Services.AddSingleton<StationPackageStore>();
@@ -234,6 +240,7 @@ static class Program
             app.MapVisionApiEndpoints();
             app.MapSettingsEndpoints();
             app.MapPlcEndpoints();
+            app.MapStationCommunicationEndpoints();
             app.MapStationEndpoints();
             app.MapDemoEndpoints();
             app.MapAnalysisEndpoints();
