@@ -52,6 +52,16 @@
           "estimatedSeconds": 30
         },
         {
+          "id": "frame_change_trigger_contract",
+          "status": "active",
+          "evidenceKind": "contract",
+          "operators": ["FrameChangeTrigger"],
+          "command": ["dotnet", "run", "--project", "quality/tools/FrameChangeTriggerContractRunner/FrameChangeTriggerContractRunner.csproj", "--", "--output", "quality/evals/reports/FrameChangeTrigger_contract_baseline.json", "--report", "quality/evals/reports/FrameChangeTrigger_contract_baseline.md"],
+          "baselineJson": "quality/evals/reports/FrameChangeTrigger_contract_baseline.json",
+          "reportMarkdown": "quality/evals/reports/FrameChangeTrigger_contract_baseline.md",
+          "estimatedSeconds": 30
+        },
+        {
           "id": "feature_match_contract",
           "status": "active",
           "evidenceKind": "contract",

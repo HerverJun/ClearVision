@@ -40,6 +40,7 @@
       "params": {
         "Enabled": "true",
         "ShortCircuitWhenNotTriggered": "true",
+        "Profile": "line_fast_default",
         "PixelThreshold": "30",
         "MinChangeRatio": "0.02",
         "MinChangePixels": "500",
@@ -184,6 +185,7 @@
   "runtimeNotes": [
     "Set the camera binding triggerMode to Continuous and start with targetFrameRateFps between 5 and 10.",
     "Tune FrameChangeTrigger ROI only for arrival detection; detection ROI filtering is not part of this template.",
+    "The template defaults to FrameChangeTrigger.Profile=line_fast_default; noise_guard and low_contrast are opt-in evidence profiles.",
     "When FrameChangeTrigger is not triggered, the flow cycle is short-circuited and does not publish OK/NG."
   ]
 }

@@ -282,7 +282,7 @@
 ### 逻辑工具 (6)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.FrameChangeTrigger` | 帧变化触发 | 1 | 5 | 10 | 94 (A) | `1.0.0` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./FrameChangeTrigger.md) |
+| `OperatorType.FrameChangeTrigger` | 帧变化触发 | 1 | 10 | 20 | 94 (A) | `1.0.0` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./FrameChangeTrigger.md) |
 | `OperatorType.PointSetTool` | 点集工具 | 2 | 4 | 6 | 90 (A) | `1.0.0` | 当前元数据描述为：Merges/sorts/filters point lists … | [PointSetTool](./PointSetTool.md) |
 | `OperatorType.ScriptOperator` | 脚本算子 | 4 | 2 | 3 | 90 (A) | `1.0.0` | 当前元数据描述为：Runs user-defined expression or s… | [ScriptOperator](./ScriptOperator.md) |
 | `OperatorType.TextSave` | Text Save | 2 | 2 | 5 | 100 (A) | `1.0.0` | 当前元数据描述为：Saves text or structured data to … | [TextSave](./TextSave.md) |

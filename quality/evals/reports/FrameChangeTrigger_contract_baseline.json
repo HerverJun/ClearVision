@@ -1,0 +1,353 @@
+{
+  "EvidenceKind": "contract",
+  "BaselineId": "FrameChangeTrigger_contract_baseline",
+  "Summary": {
+    "GeneratedAtUtc": "2026-05-20T15:04:34.0932487+00:00",
+    "CaseCount": 31,
+    "Passed": 31,
+    "Failed": 0,
+    "RuntimeMs": 130.7
+  },
+  "Operators": [
+    {
+      "Operator": "FrameChangeTrigger",
+      "EvidenceKind": "contract",
+      "CaseCount": 31,
+      "Passed": 31,
+      "Failed": 0,
+      "RuntimeMsAvg": 4.216,
+      "MemoryAllocationBytesAvg": 36070,
+      "InputTypes": [
+        "ImageWrapper",
+        "Mat"
+      ],
+      "OutputFields": [
+        "Image",
+        "Triggered",
+        "ChangeScore",
+        "ChangedPixels",
+        "Reason",
+        "BaselineReady",
+        "TotalPixels",
+        "CooldownRemainingMs",
+        "EffectivePixelThreshold",
+        "EffectiveMinChangeRatio"
+      ]
+    }
+  ],
+  "Scenarios": [
+    {
+      "Scenario": "baseline and short-circuit",
+      "CaseCount": 4,
+      "Passed": 4,
+      "Failed": 0,
+      "RuntimeMsAvg": 27.9
+    },
+    {
+      "Scenario": "enablement",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.904
+    },
+    {
+      "Scenario": "input failure",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.258
+    },
+    {
+      "Scenario": "output contract",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.332
+    },
+    {
+      "Scenario": "parameter validation",
+      "CaseCount": 14,
+      "Passed": 14,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.624
+    },
+    {
+      "Scenario": "robustness",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.83
+    },
+    {
+      "Scenario": "roi boundary",
+      "CaseCount": 1,
+      "Passed": 1,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.089
+    },
+    {
+      "Scenario": "state isolation",
+      "CaseCount": 2,
+      "Passed": 2,
+      "Failed": 0,
+      "RuntimeMsAvg": 1.168
+    },
+    {
+      "Scenario": "trigger semantics",
+      "CaseCount": 3,
+      "Passed": 3,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.211
+    }
+  ],
+  "Cases": [
+    {
+      "Case": "first_frame_builds_baseline_and_short_circuits",
+      "Scenario": "baseline and short-circuit",
+      "Passed": true,
+      "RuntimeMs": 87.195,
+      "MemoryAllocationBytes": 74264,
+      "Failure": null
+    },
+    {
+      "Case": "large_area_change_triggers_and_continues",
+      "Scenario": "baseline and short-circuit",
+      "Passed": true,
+      "RuntimeMs": 23.355,
+      "MemoryAllocationBytes": 664808,
+      "Failure": null
+    },
+    {
+      "Case": "small_change_below_threshold_short_circuits",
+      "Scenario": "baseline and short-circuit",
+      "Passed": true,
+      "RuntimeMs": 0.591,
+      "MemoryAllocationBytes": 24696,
+      "Failure": null
+    },
+    {
+      "Case": "cooldown_suppresses_duplicate_arrival",
+      "Scenario": "baseline and short-circuit",
+      "Passed": true,
+      "RuntimeMs": 0.459,
+      "MemoryAllocationBytes": 37336,
+      "Failure": null
+    },
+    {
+      "Case": "disabled_passthrough_does_not_short_circuit",
+      "Scenario": "enablement",
+      "Passed": true,
+      "RuntimeMs": 1.013,
+      "MemoryAllocationBytes": 45640,
+      "Failure": null
+    },
+    {
+      "Case": "short_circuit_false_passes_untriggered_frame",
+      "Scenario": "enablement",
+      "Passed": true,
+      "RuntimeMs": 0.794,
+      "MemoryAllocationBytes": 25096,
+      "Failure": null
+    },
+    {
+      "Case": "missing_image_fails_with_stable_message",
+      "Scenario": "input failure",
+      "Passed": true,
+      "RuntimeMs": 0.434,
+      "MemoryAllocationBytes": 8704,
+      "Failure": null
+    },
+    {
+      "Case": "empty_image_fails_with_stable_message",
+      "Scenario": "input failure",
+      "Passed": true,
+      "RuntimeMs": 0.081,
+      "MemoryAllocationBytes": 4520,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_pixel_threshold_low_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.429,
+      "MemoryAllocationBytes": 3984,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_pixel_threshold_high_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.039,
+      "MemoryAllocationBytes": 4016,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_min_change_ratio_low_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.088,
+      "MemoryAllocationBytes": 4128,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_min_change_ratio_high_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.101,
+      "MemoryAllocationBytes": 4096,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_min_change_pixels_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.267,
+      "MemoryAllocationBytes": 4016,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_cooldown_low_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.036,
+      "MemoryAllocationBytes": 3968,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_cooldown_high_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.02,
+      "MemoryAllocationBytes": 3984,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_roi_negative_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.017,
+      "MemoryAllocationBytes": 3928,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_enabled_type_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 4.468,
+      "MemoryAllocationBytes": 60712,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_short_circuit_type_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.093,
+      "MemoryAllocationBytes": 4872,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_normalize_mode_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 2.806,
+      "MemoryAllocationBytes": 4696,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_reference_update_mode_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.287,
+      "MemoryAllocationBytes": 4952,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_blur_size_even_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.046,
+      "MemoryAllocationBytes": 4056,
+      "Failure": null
+    },
+    {
+      "Case": "invalid_reference_alpha_rejected",
+      "Scenario": "parameter validation",
+      "Passed": true,
+      "RuntimeMs": 0.032,
+      "MemoryAllocationBytes": 4144,
+      "Failure": null
+    },
+    {
+      "Case": "roi_clamps_to_image_boundary",
+      "Scenario": "roi boundary",
+      "Passed": true,
+      "RuntimeMs": 1.089,
+      "MemoryAllocationBytes": 14592,
+      "Failure": null
+    },
+    {
+      "Case": "output_fields_are_complete",
+      "Scenario": "output contract",
+      "Passed": true,
+      "RuntimeMs": 0.332,
+      "MemoryAllocationBytes": 11560,
+      "Failure": null
+    },
+    {
+      "Case": "operator_instances_keep_independent_baselines",
+      "Scenario": "state isolation",
+      "Passed": true,
+      "RuntimeMs": 0.435,
+      "MemoryAllocationBytes": 37704,
+      "Failure": null
+    },
+    {
+      "Case": "dispose_clears_state_for_long_running_reuse",
+      "Scenario": "state isolation",
+      "Passed": true,
+      "RuntimeMs": 1.9,
+      "MemoryAllocationBytes": 39160,
+      "Failure": null
+    },
+    {
+      "Case": "mean_shift_lighting_drift_does_not_trigger",
+      "Scenario": "robustness",
+      "Passed": true,
+      "RuntimeMs": 3.029,
+      "MemoryAllocationBytes": 2696,
+      "Failure": null
+    },
+    {
+      "Case": "noise_guard_suppresses_salt_pepper_noise",
+      "Scenario": "robustness",
+      "Passed": true,
+      "RuntimeMs": 0.632,
+      "MemoryAllocationBytes": 4352,
+      "Failure": null
+    },
+    {
+      "Case": "min_consecutive_changed_frames_suppresses_single_flash",
+      "Scenario": "trigger semantics",
+      "Passed": true,
+      "RuntimeMs": 0.266,
+      "MemoryAllocationBytes": 1608,
+      "Failure": null
+    },
+    {
+      "Case": "rising_edge_only_suppresses_sustained_change",
+      "Scenario": "trigger semantics",
+      "Passed": true,
+      "RuntimeMs": 0.192,
+      "MemoryAllocationBytes": 2536,
+      "Failure": null
+    },
+    {
+      "Case": "reset_after_no_change_allows_second_arrival",
+      "Scenario": "trigger semantics",
+      "Passed": true,
+      "RuntimeMs": 0.174,
+      "MemoryAllocationBytes": 3360,
+      "Failure": null
+    }
+  ]
+}

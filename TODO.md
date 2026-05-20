@@ -69,9 +69,9 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 
 ### P0-7 算子正式口径对齐
 
-- [ ] 处理 `FrameChangeTrigger` 已实现但未进入 155 正式算子目录/名片/质量矩阵的问题。
-- [ ] 如果正式发布：补名片、目录、版本记录、质量矩阵、suite evidence。
-- [ ] 如果仅内部使用：在文档生成器和质量矩阵中显式排除，并说明原因。
+- [x] 处理 `FrameChangeTrigger` 已进入 156 正式算子目录/名片/质量矩阵后的证据缺口。
+- [x] 正式口径已补 contract、dataset、field-substitute replay、名片、目录、质量矩阵、suite evidence。
+- [x] 如果仅内部使用：不适用；当前按正式 156 算子闭环。
 - 依据：`Acme.Product/src/Acme.Product.Infrastructure/Operators/FrameChangeTriggerOperator.cs`、`docs/算子资料/算子目录.md`
 
 ### P0-8 工业验证声明设硬门禁

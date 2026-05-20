@@ -1,0 +1,3176 @@
+{
+  "EvidenceKind": "dataset",
+  "BaselineId": "FrameChangeTrigger_dataset_baseline",
+  "DatasetId": "frame_change_trigger_synthetic_arrival_v1",
+  "Seed": 20260518,
+  "Profile": "line_fast_default",
+  "ImageWidth": 320,
+  "ImageHeight": 320,
+  "Roi": {
+    "X": 32,
+    "Y": 32,
+    "Width": 256,
+    "Height": 256
+  },
+  "Options": {
+    "PixelThreshold": 30,
+    "MinChangeRatio": 0.01,
+    "MinChangePixels": 500,
+    "CooldownMs": 300,
+    "ReferenceUpdateMode": "PreviousFrame",
+    "NormalizeMode": "None",
+    "BlurSize": 0,
+    "MorphOpenSize": 0
+  },
+  "Summary": {
+    "GeneratedAtUtc": "2026-05-20T15:04:50.6292458+00:00",
+    "CaseCount": 140,
+    "Passed": 140,
+    "Failed": 0,
+    "RuntimeMs": 381.747
+  },
+  "Operators": [
+    {
+      "Operator": "FrameChangeTrigger",
+      "EvidenceKind": "dataset",
+      "CaseCount": 140,
+      "Passed": 140,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.341,
+      "MemoryAllocationBytesAvg": 8590,
+      "HasPublicDataset": false,
+      "DatasetManifest": "quality/datasets/manifests/FrameChangeTrigger_synthetic_arrival_manifest.json"
+    }
+  ],
+  "Metrics": {
+    "TruePositiveTriggers": 70,
+    "FalseTriggerCount": 0,
+    "MissedTriggerCount": 0,
+    "DuplicateTriggerCount": 0,
+    "TriggerPrecision": 1,
+    "TriggerRecall": 1,
+    "DuplicateSuppressionRate": 1,
+    "StaticNoiseFalseTriggerRate": 0,
+    "RuntimeP95Ms": 0.285
+  },
+  "Scenarios": [
+    {
+      "Scenario": "camera_jitter",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.115,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "compression_noise",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.249,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "lighting_drift",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.115,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "local_glare_flash",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.11,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "low_contrast_enter",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.115,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "outside_roi_motion",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.104,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "partial_occlusion_enter",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.108,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "roi_edge_enter",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.097,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "salt_pepper_noise",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.133,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "small_area_noise",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.111,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "static_empty",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 3.179,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "terminal_enter_once",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.114,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "terminal_reenter_after_cooldown",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.119,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    },
+    {
+      "Scenario": "terminal_stay_cooldown",
+      "CaseCount": 10,
+      "Passed": 10,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.105,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0
+    }
+  ],
+  "Sequences": [
+    {
+      "Id": "static_empty_00",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 244.7,
+      "RuntimeMsAvg": 30.587,
+      "RuntimeP95Ms": 241.816,
+      "MemoryAllocationBytesAvg": 2814,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_01",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.138,
+      "RuntimeMsAvg": 0.142,
+      "RuntimeP95Ms": 0.212,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_02",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1,
+      "RuntimeMsAvg": 0.125,
+      "RuntimeP95Ms": 0.142,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_03",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.003,
+      "RuntimeMsAvg": 0.125,
+      "RuntimeP95Ms": 0.139,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_04",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.111,
+      "RuntimeMsAvg": 0.139,
+      "RuntimeP95Ms": 0.223,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_05",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.26,
+      "RuntimeMsAvg": 0.157,
+      "RuntimeP95Ms": 0.175,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_06",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.228,
+      "RuntimeMsAvg": 0.154,
+      "RuntimeP95Ms": 0.164,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_07",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.962,
+      "RuntimeMsAvg": 0.12,
+      "RuntimeP95Ms": 0.131,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_08",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.933,
+      "RuntimeMsAvg": 0.117,
+      "RuntimeP95Ms": 0.126,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "static_empty_09",
+      "Scenario": "static_empty",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.983,
+      "RuntimeMsAvg": 0.123,
+      "RuntimeP95Ms": 0.141,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "terminal_enter_once_00",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.339,
+      "RuntimeMsAvg": 0.167,
+      "RuntimeP95Ms": 0.543,
+      "MemoryAllocationBytesAvg": 1005,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_01",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.874,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.128,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_02",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.841,
+      "RuntimeMsAvg": 0.105,
+      "RuntimeP95Ms": 0.132,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_03",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.846,
+      "RuntimeMsAvg": 0.106,
+      "RuntimeP95Ms": 0.135,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_04",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.848,
+      "RuntimeMsAvg": 0.106,
+      "RuntimeP95Ms": 0.123,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_05",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.945,
+      "RuntimeMsAvg": 0.118,
+      "RuntimeP95Ms": 0.171,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_06",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.899,
+      "RuntimeMsAvg": 0.112,
+      "RuntimeP95Ms": 0.131,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_07",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.858,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.127,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_08",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.838,
+      "RuntimeMsAvg": 0.105,
+      "RuntimeP95Ms": 0.126,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_enter_once_09",
+      "Scenario": "terminal_enter_once",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.878,
+      "RuntimeMsAvg": 0.11,
+      "RuntimeP95Ms": 0.132,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_00",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.856,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.124,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_01",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.842,
+      "RuntimeMsAvg": 0.105,
+      "RuntimeP95Ms": 0.126,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_02",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.948,
+      "RuntimeMsAvg": 0.119,
+      "RuntimeP95Ms": 0.168,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_03",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.854,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.132,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_04",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.812,
+      "RuntimeMsAvg": 0.102,
+      "RuntimeP95Ms": 0.122,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_05",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.802,
+      "RuntimeMsAvg": 0.1,
+      "RuntimeP95Ms": 0.12,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_06",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.829,
+      "RuntimeMsAvg": 0.104,
+      "RuntimeP95Ms": 0.121,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_07",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.798,
+      "RuntimeMsAvg": 0.1,
+      "RuntimeP95Ms": 0.121,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_08",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.812,
+      "RuntimeMsAvg": 0.102,
+      "RuntimeP95Ms": 0.122,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_stay_cooldown_09",
+      "Scenario": "terminal_stay_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.842,
+      "RuntimeMsAvg": 0.105,
+      "RuntimeP95Ms": 0.127,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_00",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.415,
+      "RuntimeMsAvg": 0.177,
+      "RuntimeP95Ms": 0.386,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_01",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.373,
+      "RuntimeMsAvg": 0.172,
+      "RuntimeP95Ms": 0.542,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_02",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.86,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.141,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_03",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.828,
+      "RuntimeMsAvg": 0.103,
+      "RuntimeP95Ms": 0.125,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_04",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.886,
+      "RuntimeMsAvg": 0.111,
+      "RuntimeP95Ms": 0.127,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_05",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.847,
+      "RuntimeMsAvg": 0.106,
+      "RuntimeP95Ms": 0.129,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_06",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.828,
+      "RuntimeMsAvg": 0.104,
+      "RuntimeP95Ms": 0.125,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_07",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.822,
+      "RuntimeMsAvg": 0.103,
+      "RuntimeP95Ms": 0.128,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_08",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.812,
+      "RuntimeMsAvg": 0.102,
+      "RuntimeP95Ms": 0.124,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_09",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "ActualTriggerFrames": [
+        1,
+        6
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.824,
+      "RuntimeMsAvg": 0.103,
+      "RuntimeP95Ms": 0.124,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 4,
+        "change_detected": 2,
+        "cooldown": 1
+      }
+    },
+    {
+      "Id": "small_area_noise_00",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.806,
+      "RuntimeMsAvg": 0.101,
+      "RuntimeP95Ms": 0.121,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_01",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.817,
+      "RuntimeMsAvg": 0.102,
+      "RuntimeP95Ms": 0.12,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_02",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.97,
+      "RuntimeMsAvg": 0.121,
+      "RuntimeP95Ms": 0.18,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_03",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.869,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.12,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_04",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.876,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.123,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_05",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.892,
+      "RuntimeMsAvg": 0.112,
+      "RuntimeP95Ms": 0.126,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_06",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.876,
+      "RuntimeMsAvg": 0.11,
+      "RuntimeP95Ms": 0.122,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_07",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.874,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.123,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_08",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.918,
+      "RuntimeMsAvg": 0.115,
+      "RuntimeP95Ms": 0.128,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "small_area_noise_09",
+      "Scenario": "small_area_noise",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.946,
+      "RuntimeMsAvg": 0.118,
+      "RuntimeP95Ms": 0.148,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_00",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.488,
+      "RuntimeMsAvg": 0.186,
+      "RuntimeP95Ms": 0.57,
+      "MemoryAllocationBytesAvg": 8509,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_01",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.052,
+      "RuntimeMsAvg": 0.131,
+      "RuntimeP95Ms": 0.151,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_02",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.016,
+      "RuntimeMsAvg": 0.127,
+      "RuntimeP95Ms": 0.144,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_03",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.005,
+      "RuntimeMsAvg": 0.126,
+      "RuntimeP95Ms": 0.139,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_04",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.017,
+      "RuntimeMsAvg": 0.127,
+      "RuntimeP95Ms": 0.14,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_05",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.994,
+      "RuntimeMsAvg": 0.124,
+      "RuntimeP95Ms": 0.136,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_06",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.996,
+      "RuntimeMsAvg": 0.125,
+      "RuntimeP95Ms": 0.136,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_07",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.066,
+      "RuntimeMsAvg": 0.133,
+      "RuntimeP95Ms": 0.153,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_08",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1,
+      "RuntimeMsAvg": 0.125,
+      "RuntimeP95Ms": 0.137,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "salt_pepper_noise_09",
+      "Scenario": "salt_pepper_noise",
+      "NoiseModel": "fixed-seed sparse salt-pepper",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.001,
+      "RuntimeMsAvg": 0.125,
+      "RuntimeP95Ms": 0.141,
+      "MemoryAllocationBytesAvg": 8502,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_00",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 2.061,
+      "RuntimeMsAvg": 0.258,
+      "RuntimeP95Ms": 0.363,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_01",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.944,
+      "RuntimeMsAvg": 0.243,
+      "RuntimeP95Ms": 0.265,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_02",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.965,
+      "RuntimeMsAvg": 0.246,
+      "RuntimeP95Ms": 0.26,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_03",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 2.029,
+      "RuntimeMsAvg": 0.254,
+      "RuntimeP95Ms": 0.285,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_04",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.995,
+      "RuntimeMsAvg": 0.249,
+      "RuntimeP95Ms": 0.276,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_05",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.975,
+      "RuntimeMsAvg": 0.247,
+      "RuntimeP95Ms": 0.273,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_06",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 2.031,
+      "RuntimeMsAvg": 0.254,
+      "RuntimeP95Ms": 0.282,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_07",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.956,
+      "RuntimeMsAvg": 0.245,
+      "RuntimeP95Ms": 0.263,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_08",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.967,
+      "RuntimeMsAvg": 0.246,
+      "RuntimeP95Ms": 0.276,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "compression_noise_09",
+      "Scenario": "compression_noise",
+      "NoiseModel": "fixed-seed low-amplitude quantization noise",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.958,
+      "RuntimeMsAvg": 0.245,
+      "RuntimeP95Ms": 0.276,
+      "MemoryAllocationBytesAvg": 99606,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_00",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.952,
+      "RuntimeMsAvg": 0.119,
+      "RuntimeP95Ms": 0.146,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_01",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.964,
+      "RuntimeMsAvg": 0.12,
+      "RuntimeP95Ms": 0.144,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_02",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.895,
+      "RuntimeMsAvg": 0.112,
+      "RuntimeP95Ms": 0.144,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_03",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.883,
+      "RuntimeMsAvg": 0.11,
+      "RuntimeP95Ms": 0.14,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_04",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.919,
+      "RuntimeMsAvg": 0.115,
+      "RuntimeP95Ms": 0.147,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_05",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.888,
+      "RuntimeMsAvg": 0.111,
+      "RuntimeP95Ms": 0.142,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_06",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.865,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.137,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_07",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.969,
+      "RuntimeMsAvg": 0.121,
+      "RuntimeP95Ms": 0.212,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_08",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.936,
+      "RuntimeMsAvg": 0.117,
+      "RuntimeP95Ms": 0.17,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "lighting_drift_09",
+      "Scenario": "lighting_drift",
+      "NoiseModel": "global \u002B3 gray/frame drift",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.93,
+      "RuntimeMsAvg": 0.116,
+      "RuntimeP95Ms": 0.182,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_00",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.944,
+      "RuntimeMsAvg": 0.118,
+      "RuntimeP95Ms": 0.179,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_01",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.875,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.138,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_02",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.875,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.143,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_03",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.864,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.138,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_04",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.874,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.14,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_05",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.884,
+      "RuntimeMsAvg": 0.111,
+      "RuntimeP95Ms": 0.147,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_06",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.85,
+      "RuntimeMsAvg": 0.106,
+      "RuntimeP95Ms": 0.149,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_07",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.911,
+      "RuntimeMsAvg": 0.114,
+      "RuntimeP95Ms": 0.146,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_08",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.848,
+      "RuntimeMsAvg": 0.106,
+      "RuntimeP95Ms": 0.142,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "local_glare_flash_09",
+      "Scenario": "local_glare_flash",
+      "NoiseModel": "single-frame 20x20 specular patch",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.837,
+      "RuntimeMsAvg": 0.105,
+      "RuntimeP95Ms": 0.142,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_00",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.853,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.142,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_01",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.871,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.145,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_02",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.907,
+      "RuntimeMsAvg": 0.113,
+      "RuntimeP95Ms": 0.169,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_03",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.304,
+      "RuntimeMsAvg": 0.163,
+      "RuntimeP95Ms": 0.279,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_04",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.869,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.144,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_05",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.871,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.143,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_06",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.869,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.142,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_07",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.876,
+      "RuntimeMsAvg": 0.11,
+      "RuntimeP95Ms": 0.143,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_08",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.876,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.141,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "camera_jitter_09",
+      "Scenario": "camera_jitter",
+      "NoiseModel": "1px belt-edge stripe jitter",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.903,
+      "RuntimeMsAvg": 0.113,
+      "RuntimeP95Ms": 0.15,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_00",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.875,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.144,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_01",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.949,
+      "RuntimeMsAvg": 0.119,
+      "RuntimeP95Ms": 0.168,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_02",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.838,
+      "RuntimeMsAvg": 0.105,
+      "RuntimeP95Ms": 0.176,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_03",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.862,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.168,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_04",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.661,
+      "RuntimeMsAvg": 0.083,
+      "RuntimeP95Ms": 0.151,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_05",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.89,
+      "RuntimeMsAvg": 0.111,
+      "RuntimeP95Ms": 0.183,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_06",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.866,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.171,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_07",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.663,
+      "RuntimeMsAvg": 0.083,
+      "RuntimeP95Ms": 0.154,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_08",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.809,
+      "RuntimeMsAvg": 0.101,
+      "RuntimeP95Ms": 0.167,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "outside_roi_motion_09",
+      "Scenario": "outside_roi_motion",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [],
+      "ActualTriggerFrames": [],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.86,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.17,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 7
+      }
+    },
+    {
+      "Id": "roi_edge_enter_00",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.673,
+      "RuntimeMsAvg": 0.084,
+      "RuntimeP95Ms": 0.156,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_01",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.83,
+      "RuntimeMsAvg": 0.104,
+      "RuntimeP95Ms": 0.167,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_02",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.865,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.17,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_03",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.674,
+      "RuntimeMsAvg": 0.084,
+      "RuntimeP95Ms": 0.154,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_04",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.811,
+      "RuntimeMsAvg": 0.101,
+      "RuntimeP95Ms": 0.167,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_05",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.854,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.167,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_06",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.656,
+      "RuntimeMsAvg": 0.082,
+      "RuntimeP95Ms": 0.152,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_07",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.815,
+      "RuntimeMsAvg": 0.102,
+      "RuntimeP95Ms": 0.171,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_08",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.872,
+      "RuntimeMsAvg": 0.109,
+      "RuntimeP95Ms": 0.17,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "roi_edge_enter_09",
+      "Scenario": "roi_edge_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.68,
+      "RuntimeMsAvg": 0.085,
+      "RuntimeP95Ms": 0.162,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_00",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.824,
+      "RuntimeMsAvg": 0.103,
+      "RuntimeP95Ms": 0.168,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_01",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.864,
+      "RuntimeMsAvg": 0.108,
+      "RuntimeP95Ms": 0.167,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_02",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.667,
+      "RuntimeMsAvg": 0.083,
+      "RuntimeP95Ms": 0.151,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_03",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.948,
+      "RuntimeMsAvg": 0.118,
+      "RuntimeP95Ms": 0.203,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_04",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.743,
+      "RuntimeMsAvg": 0.093,
+      "RuntimeP95Ms": 0.192,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_05",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.81,
+      "RuntimeMsAvg": 0.101,
+      "RuntimeP95Ms": 0.154,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_06",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.904,
+      "RuntimeMsAvg": 0.113,
+      "RuntimeP95Ms": 0.172,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_07",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.736,
+      "RuntimeMsAvg": 0.092,
+      "RuntimeP95Ms": 0.171,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_08",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.124,
+      "RuntimeMsAvg": 0.141,
+      "RuntimeP95Ms": 0.277,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "partial_occlusion_enter_09",
+      "Scenario": "partial_occlusion_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.013,
+      "RuntimeMsAvg": 0.127,
+      "RuntimeP95Ms": 0.214,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_00",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.754,
+      "RuntimeMsAvg": 0.094,
+      "RuntimeP95Ms": 0.174,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_01",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.249,
+      "RuntimeMsAvg": 0.156,
+      "RuntimeP95Ms": 0.364,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_02",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.254,
+      "RuntimeMsAvg": 0.157,
+      "RuntimeP95Ms": 0.273,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_03",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.846,
+      "RuntimeMsAvg": 0.106,
+      "RuntimeP95Ms": 0.221,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_04",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.225,
+      "RuntimeMsAvg": 0.153,
+      "RuntimeP95Ms": 0.282,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_05",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 1.109,
+      "RuntimeMsAvg": 0.139,
+      "RuntimeP95Ms": 0.271,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_06",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.91,
+      "RuntimeMsAvg": 0.114,
+      "RuntimeP95Ms": 0.193,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_07",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.805,
+      "RuntimeMsAvg": 0.101,
+      "RuntimeP95Ms": 0.192,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_08",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.576,
+      "RuntimeMsAvg": 0.072,
+      "RuntimeP95Ms": 0.155,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    },
+    {
+      "Id": "low_contrast_enter_09",
+      "Scenario": "low_contrast_enter",
+      "NoiseModel": "none",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "ActualTriggerFrames": [
+        2
+      ],
+      "Passed": true,
+      "FalseTriggerCount": 0,
+      "MissedTriggerCount": 0,
+      "DuplicateTriggerCount": 0,
+      "RuntimeMsTotal": 0.487,
+      "RuntimeMsAvg": 0.061,
+      "RuntimeP95Ms": 0.164,
+      "MemoryAllocationBytesAvg": 998,
+      "ReasonCounts": {
+        "baseline": 1,
+        "below_threshold": 6,
+        "change_detected": 1
+      }
+    }
+  ]
+}

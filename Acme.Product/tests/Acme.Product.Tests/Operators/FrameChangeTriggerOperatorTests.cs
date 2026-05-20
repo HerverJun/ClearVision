@@ -35,6 +35,12 @@ public class FrameChangeTriggerOperatorTests
         result.OutputData.Should().NotBeNull();
         result.OutputData!["Triggered"].Should().Be(false);
         result.OutputData["Reason"].Should().Be("baseline");
+        result.OutputData["BaselineReady"].Should().Be(true);
+        result.OutputData.Should().ContainKeys(
+            "TotalPixels",
+            "CooldownRemainingMs",
+            "EffectivePixelThreshold",
+            "EffectiveMinChangeRatio");
     }
 
     [Fact]
@@ -58,6 +64,86 @@ public class FrameChangeTriggerOperatorTests
         result.OutputData!["Triggered"].Should().Be(true);
         result.OutputData["Reason"].Should().Be("change_detected");
         Convert.ToDouble(result.OutputData["ChangeScore"]).Should().BeGreaterThan(0.9);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShortCircuitDisabled_ShouldPassUntriggeredFrameDownstream()
+    {
+        using var first = CreateGrayImage(16, 16, 10);
+        using var second = CreateGrayImage(16, 16, 12);
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["ShortCircuitWhenNotTriggered"] = false,
+            ["MinChangeRatio"] = 0.9,
+            ["MinChangePixels"] = 200
+        });
+
+        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = first });
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = second });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.ShouldShortCircuitFlow.Should().BeFalse();
+        result.OutputData!["Triggered"].Should().Be(false);
+        result.OutputData["Reason"].Should().Be("below_threshold");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RoiPastImageBoundary_ShouldClampWithoutThrowing()
+    {
+        using var image = CreateGrayImage(16, 16, 10);
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["RoiX"] = 99,
+            ["RoiY"] = 99,
+            ["RoiW"] = 50,
+            ["RoiH"] = 50
+        });
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = image });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["RoiX"].Should().Be(15);
+        result.OutputData["RoiY"].Should().Be(15);
+        result.OutputData["RoiW"].Should().Be(1);
+        result.OutputData["RoiH"].Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvalidParameterType_ShouldReturnDiagnosticFailure()
+    {
+        using var image = CreateGrayImage(16, 16, 10);
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Enabled"] = "not-a-bool"
+        });
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Image"] = image });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Enabled");
+        result.ErrorMessage.Should().Contain("boolean");
+    }
+
+    [Fact]
+    public void ValidateParameters_ShouldRejectHardenedBoundaryViolations()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["MinChangePixels"] = -1,
+            ["CooldownMs"] = 60_001,
+            ["RoiX"] = -1,
+            ["BlurSize"] = 4,
+            ["NormalizeMode"] = "Invalid"
+        });
+
+        var validation = _operator.ValidateParameters(op);
+
+        validation.IsValid.Should().BeFalse();
+        string.Join("; ", validation.Errors).Should().Contain("MinChangePixels");
+        string.Join("; ", validation.Errors).Should().Contain("CooldownMs");
+        string.Join("; ", validation.Errors).Should().Contain("RoiX");
+        string.Join("; ", validation.Errors).Should().Contain("BlurSize");
+        string.Join("; ", validation.Errors).Should().Contain("NormalizeMode");
     }
 
     [Fact]

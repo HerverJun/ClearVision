@@ -1,6 +1,6 @@
 # Operator Quality Matrix
 
-GeneratedAtUtc: `2026-05-16T06:53:09+00:00`
+GeneratedAtUtc: `2026-05-20T15:11:34+00:00`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
 CardDirectory: `docs/算子资料/算子名片`
 EvidenceSources: `quality/evals/reports/*_baseline.json`
@@ -10,11 +10,11 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 - Total operators: 156
 - Level counts: A=152, B=4
 - Priority counts: P1=3, P2=30, P3=123
-- Any evidence signal: Yes=155, No=1
-- Contract evidence status: Yes=116, No=40
+- Any evidence signal: Yes=156
+- Contract evidence status: Yes=117, No=39
 - Golden test status: Yes=46, Partial=1, No=109
-- Dataset evidence status: Yes=16, Partial=6, No=134
-- Field replay status: Yes=21, No=135
+- Dataset evidence status: Yes=17, Partial=6, No=133
+- Field replay status: Yes=22, No=134
 - Cards with TODO: 0
 - P0 without evidence signal: 0
 - C-level without evidence signal: 0
@@ -68,7 +68,7 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 | OperatorType.SemanticSegmentation | 语义分割 | AI检测 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 10 | 11 | 当前元数据描述为：Runs an ONNX semantic segmentatio… | 5 | 0 | Yes | 27 | No | 0 | Yes | 72 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.ShapeMatching | 旋转尺度模板匹配 | 匹配定位 | 100 | A | 1.2.0 | 稳定 Stable | 2 | 2 | 13 | 当前元数据描述为：Rotation-scale template matching … | 4 | 0 | Yes | 24 | No | 0 | Yes | 72 | Yes | 20 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.StereoCalibration | Stereo Calibration | 标定 | 100 | A | 1.0.0 | 稳定 Stable | 2 | 6 | 11 | 当前元数据描述为：Calibrates stereo camera pair and… | 4 | 0 | No | 0 | Yes | 48 | Partial | 1 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.SurfaceDefectDetection | 表面缺陷检测 | AI检测 | 100 | A | 2.0.0 | 稳定 Stable | 2 | 8 | 24 | 当前元数据描述为：Detects surface defects using gra… | 4 | 0 | Yes | 24 | No | 0 | Yes | 1028 | Yes | 40 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
+| OperatorType.SurfaceDefectDetection | 表面缺陷检测 | AI检测 | 100 | A | 2.0.0 | 稳定 Stable | 2 | 8 | 24 | 当前元数据描述为：Detects surface defects using gra… | 4 | 0 | Yes | 24 | No | 0 | Yes | 24 | Yes | 40 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.TranslationRotationCalibration | 平移旋转标定 | 标定 | 100 | A | 1.0.0 | 稳定 Stable | 1 | 3 | 3 | 当前元数据描述为：Fits robust 2D rigid or similarit… | 3 | 0 | Yes | 24 | No | 0 | No | 0 | No | 0 | Yes | P2 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.VariableWrite | 变量写入 | 变量 | 80 | B | 1.0.0 | 稳定 Stable | 1 | 3 | 4 | 该算子用于写入值到全局变量表。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | 1 | 0 | Yes | 20 | No | 0 | No | 0 | No | 0 | Yes | P3 | Contract Test Agent | Review QScore/Level from evidence |
 | OperatorType.RegionComplement | Region Complement | Region | 85 | A | 1.0.1 | 稳定 Stable | 4 | 3 | 0 | Bounded run-length complement | 4 | 0 | No | 0 | Yes | 100 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
@@ -108,7 +108,7 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 | OperatorType.Delay | 延时 | 流程控制 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 1 | 该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读… | 1 | 0 | Yes | 20 | No | 0 | No | 0 | No | 0 | Yes | P3 | Contract Test Agent | Maintain regression baseline |
 | OperatorType.Filtering | Gaussian Blur | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 4 | Gaussian Blur (OpenCV) | 3 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.FrameAveraging | 帧平均 | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 2 | 2 | 当前元数据描述为：Averages multi-frame input to red… | 4 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
-| OperatorType.FrameChangeTrigger | 帧变化触发 | 逻辑工具 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 5 | 10 | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | 4 | 0 | No | 0 | No | 0 | No | 0 | No | 0 | No | P3 | Contract Test Agent | Add parameter and error-contract tests |
+| OperatorType.FrameChangeTrigger | 帧变化触发 | 逻辑工具 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 10 | 20 | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | 4 | 0 | Yes | 31 | No | 0 | Yes | 140 | Yes | 20 | Yes | P3 | Contract Test Agent | Maintain regression baseline |
 | OperatorType.HistogramAnalysis | 直方图分析 | 检测 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 11 | 6 | 当前元数据描述为：Computes histogram and intensity-… | 3 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.HistogramEqualization | 直方图均衡化 | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 1 | 1 | 4 | 当前元数据描述为：Supports global histogram equaliz… | 3 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |
 | OperatorType.ImageBlend | 图像融合 | 预处理 | 94 | A | 1.0.0 | 稳定 Stable | 2 | 1 | 3 | 该算子用于加权混合/透明叠加。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | 3 | 0 | Yes | 21 | No | 0 | No | 0 | No | 0 | Yes | P3 | Quality Flywheel Agent | Maintain regression baseline |

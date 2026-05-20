@@ -501,6 +501,14 @@ def evidence_or_default(evidence: dict[str, EvidenceFacts], operator: str) -> Ev
     )
 
 
+def operators_without_evidence_signal(rows: list[CatalogRow], evidence: dict[str, EvidenceFacts]) -> list[str]:
+    return [
+        row.operator
+        for row in rows
+        if not has_any_signal(evidence_or_default(evidence, row.operator))
+    ]
+
+
 def render_matrix(rows: list[CatalogRow], card_dir: Path, catalog_path: Path, baseline_path: Path, evidence: dict[str, EvidenceFacts]) -> str:
     facts_by_operator = {row.operator: parse_card(row.card_path) for row in rows}
 
@@ -649,10 +657,24 @@ def main() -> int:
     parser.add_argument("--card-dir", type=Path, default=DEFAULT_CARD_DIR)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--allow-no-evidence",
+        action="store_true",
+        help="Allow formal catalog operators with no accepted contract/golden/dataset/field evidence signal.",
+    )
     args = parser.parse_args()
 
     rows = parse_catalog(args.catalog, args.card_dir)
     evidence = load_golden_evidence(args.baseline)
+    missing_evidence = operators_without_evidence_signal(rows, evidence)
+    if missing_evidence and not args.allow_no_evidence:
+        print(
+            "Refusing to generate operator_quality_matrix.md with operators that have no evidence signal: "
+            + ", ".join(missing_evidence)
+        )
+        print("Use --allow-no-evidence only for pre-closure audit snapshots.")
+        return 1
+
     output = render_matrix(rows, args.card_dir, args.catalog, args.baseline, evidence)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

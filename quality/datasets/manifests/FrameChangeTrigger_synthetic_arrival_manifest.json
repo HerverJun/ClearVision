@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "2026-05-18.dataset-manifest",
+  "datasetId": "frame_change_trigger_synthetic_arrival_v1",
+  "operator": "FrameChangeTrigger",
+  "evidenceKind": "dataset",
+  "tier": "A",
+  "status": "promoted",
+  "source": {
+    "kind": "repo-local-synthetic",
+    "name": "FrameChangeTrigger synthetic arrival sequence set",
+    "version": "v1",
+    "uri": "in-repo generated protocol",
+    "license": "repo-local synthetic protocol",
+    "citation": "Deterministic synthetic video-arrival protocol for continuous acquisition lines without external trigger signals.",
+    "checksumSha256": ""
+  },
+  "storage": {
+    "localRootEnv": "",
+    "relativePath": "",
+    "gitPolicy": "manifest-and-report-only"
+  },
+  "split": {
+    "strategy": "fixed-seed-generated",
+    "seed": 20260518,
+    "trainCount": 0,
+    "validationCount": 0,
+    "testCount": 140,
+    "frameWidth": 320,
+    "frameHeight": 320,
+    "roi": {
+      "x": 32,
+      "y": 32,
+      "width": 256,
+      "height": 256
+    },
+    "caseListPath": "quality/evals/reports/FrameChangeTrigger_dataset_baseline.json"
+  },
+  "labels": {
+    "schema": "per-sequence expected trigger frame indices",
+    "positiveScenarios": [
+      "terminal_enter_once",
+      "terminal_stay_cooldown",
+      "terminal_reenter_after_cooldown",
+      "roi_edge_enter",
+      "partial_occlusion_enter",
+      "low_contrast_enter"
+    ],
+    "negativeScenarios": [
+      "static_empty",
+      "small_area_noise",
+      "salt_pepper_noise",
+      "compression_noise",
+      "lighting_drift",
+      "local_glare_flash",
+      "camera_jitter",
+      "outside_roi_motion"
+    ],
+    "ignoreRules": []
+  },
+  "metrics": {
+    "primary": "TriggerPrecision",
+    "secondary": [
+      "TriggerRecall",
+      "DuplicateSuppressionRate",
+      "StaticNoiseFalseTriggerRate",
+      "RuntimeP95Ms",
+      "FalseTriggerCount",
+      "MissedTriggerCount"
+    ],
+    "thresholds": {
+      "TriggerPrecision": 0.98,
+      "TriggerRecall": 0.95,
+      "DuplicateSuppressionRate": 0.98,
+      "StaticNoiseFalseTriggerRate": 0.02,
+      "RuntimeP95Ms": 3.0,
+      "Failed": 0
+    }
+  },
+  "runner": {
+    "project": "quality/tools/FrameChangeTriggerDatasetRunner/FrameChangeTriggerDatasetRunner.csproj",
+    "command": "dotnet run --project quality/tools/FrameChangeTriggerDatasetRunner/FrameChangeTriggerDatasetRunner.csproj -- --output quality/evals/reports/FrameChangeTrigger_dataset_baseline.json --report quality/evals/reports/FrameChangeTrigger_dataset_baseline.md --field-output quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.json --field-report quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.md",
+    "baselineJson": "quality/evals/reports/FrameChangeTrigger_dataset_baseline.json",
+    "reportMarkdown": "quality/evals/reports/FrameChangeTrigger_dataset_baseline.md",
+    "fieldSubstituteJson": "quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.json",
+    "fieldSubstituteMarkdown": "quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.md"
+  },
+  "fieldSubstituteReplay": {
+    "pipeline": "ImageAcquisition(Continuous) -> FrameChangeTrigger -> DeepLearning -> BoxFilter -> BoxNms -> DetectionSequenceJudge -> ResultOutput",
+    "caseCount": 20,
+    "scope": "anonymous synthetic substitute for continuous conveyor arrival replay",
+    "claimBoundary": "Does not claim real production-site or customer line sign-off."
+  },
+  "failureBoundaries": {
+    "required": true,
+    "taxonomy": [
+      "empty_baseline",
+      "arrival_miss",
+      "duplicate_trigger",
+      "noise_false_trigger",
+      "lighting_drift_false_trigger",
+      "jitter_false_trigger",
+      "roi_boundary_error",
+      "short_circuit_regression"
+    ],
+    "minimumFailureCases": 0
+  },
+  "privacy": {
+    "containsPersonalData": false,
+    "containsCustomerData": false,
+    "redactionNotes": "Generated geometric fixtures only; no public or customer image pixels are stored."
+  },
+  "promotionGate": {
+    "requiresEvidenceKindDataset": true,
+    "requiresZeroFailedBaseline": true,
+    "requiresReproducibleManifest": true,
+    "requiresFailureBoundarySection": true,
+    "requiresFieldSubstituteBoundaryStatement": true
+  }
+}

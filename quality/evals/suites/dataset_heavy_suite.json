@@ -166,6 +166,20 @@
           "estimatedSeconds": 240
         },
         {
+          "id": "frame_change_trigger_synthetic_arrival",
+          "status": "active",
+          "evidenceKind": "dataset",
+          "operators": ["FrameChangeTrigger"],
+          "datasetManifest": "quality/datasets/manifests/FrameChangeTrigger_synthetic_arrival_manifest.json",
+          "command": ["dotnet", "run", "--project", "quality/tools/FrameChangeTriggerDatasetRunner/FrameChangeTriggerDatasetRunner.csproj", "--", "--output", "quality/evals/reports/FrameChangeTrigger_dataset_baseline.json", "--report", "quality/evals/reports/FrameChangeTrigger_dataset_baseline.md", "--field-output", "quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.json", "--field-report", "quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.md"],
+          "baselineJson": "quality/evals/reports/FrameChangeTrigger_dataset_baseline.json",
+          "reportMarkdown": "quality/evals/reports/FrameChangeTrigger_dataset_baseline.md",
+          "fieldSubstituteJson": "quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.json",
+          "fieldSubstituteMarkdown": "quality/evals/reports/FrameChangeTrigger_field_substitute_baseline.md",
+          "estimatedSeconds": 60,
+          "notes": "Deterministic repo-local synthetic video-arrival evidence plus field-substitute short-circuit replay; not real production-site sign-off."
+        },
+        {
           "id": "deep_learning_runtime_benchmark",
           "status": "manual",
           "evidenceKind": "contract",

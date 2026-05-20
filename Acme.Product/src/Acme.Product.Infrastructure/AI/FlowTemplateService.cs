@@ -528,6 +528,7 @@ public class FlowTemplateService : IFlowTemplateService
                         {
                             ["Enabled"] = "true",
                             ["ShortCircuitWhenNotTriggered"] = "true",
+                            ["Profile"] = "line_fast_default",
                             ["PixelThreshold"] = "30",
                             ["MinChangeRatio"] = "0.02",
                             ["MinChangePixels"] = "500",

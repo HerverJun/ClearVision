@@ -1,0 +1,370 @@
+{
+  "EvidenceKind": "field",
+  "BaselineId": "FrameChangeTrigger_field_substitute_baseline",
+  "ReplayId": "frame_change_trigger_field_substitute_v1",
+  "Seed": 20260518,
+  "Pipeline": "ImageAcquisition(Continuous) -\u003E FrameChangeTrigger -\u003E DeepLearning -\u003E BoxFilter -\u003E BoxNms -\u003E DetectionSequenceJudge -\u003E ResultOutput",
+  "Scope": "field-substitute synthetic replay; no real production-site sign-off is claimed",
+  "Summary": {
+    "GeneratedAtUtc": "2026-05-20T15:04:50.6858939+00:00",
+    "CaseCount": 20,
+    "Passed": 20,
+    "Failed": 0,
+    "RuntimeMs": 9.065
+  },
+  "Operators": [
+    {
+      "Operator": "FrameChangeTrigger",
+      "EvidenceKind": "field",
+      "CaseCount": 20,
+      "Passed": 20,
+      "Failed": 0,
+      "RuntimeMsAvg": 0.057,
+      "MemoryAllocationBytesAvg": 1748,
+      "HasPublicDataset": false,
+      "DatasetManifest": "quality/datasets/manifests/FrameChangeTrigger_synthetic_arrival_manifest.json"
+    }
+  ],
+  "Metrics": {
+    "Cases": 20,
+    "NoMaterialFrames": 146,
+    "NoMaterialDownstreamExecutions": 0,
+    "ArrivalFrames": 14,
+    "ArrivalDownstreamExecutions": 14,
+    "TriggerFrameMismatches": 0
+  },
+  "Cases": [
+    {
+      "Id": "static_empty_00",
+      "Scenario": "static_empty",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.86,
+      "RuntimeMsAvg": 0.107,
+      "RuntimeP95Ms": 0.188,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "static_empty_01",
+      "Scenario": "static_empty",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.353,
+      "RuntimeMsAvg": 0.044,
+      "RuntimeP95Ms": 0.147,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "terminal_enter_once_00",
+      "Scenario": "terminal_enter_once",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.111,
+      "RuntimeMsAvg": 0.014,
+      "RuntimeP95Ms": 0.017,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "terminal_enter_once_01",
+      "Scenario": "terminal_enter_once",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.293,
+      "RuntimeMsAvg": 0.037,
+      "RuntimeP95Ms": 0.158,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "terminal_stay_cooldown_00",
+      "Scenario": "terminal_stay_cooldown",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.552,
+      "RuntimeMsAvg": 0.069,
+      "RuntimeP95Ms": 0.157,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "terminal_stay_cooldown_01",
+      "Scenario": "terminal_stay_cooldown",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.684,
+      "RuntimeMsAvg": 0.085,
+      "RuntimeP95Ms": 0.157,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_00",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "DownstreamExecutionFrames": [
+        1,
+        6
+      ],
+      "NoMaterialFrames": 6,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 1.122,
+      "RuntimeMsAvg": 0.14,
+      "RuntimeP95Ms": 0.17,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "terminal_reenter_after_cooldown_01",
+      "Scenario": "terminal_reenter_after_cooldown",
+      "ExpectedTriggerFrames": [
+        1,
+        6
+      ],
+      "DownstreamExecutionFrames": [
+        1,
+        6
+      ],
+      "NoMaterialFrames": 6,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.767,
+      "RuntimeMsAvg": 0.096,
+      "RuntimeP95Ms": 0.154,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "salt_pepper_noise_00",
+      "Scenario": "salt_pepper_noise",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 1.08,
+      "RuntimeMsAvg": 0.135,
+      "RuntimeP95Ms": 0.333,
+      "MemoryAllocationBytesAvg": 8502
+    },
+    {
+      "Id": "salt_pepper_noise_01",
+      "Scenario": "salt_pepper_noise",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.655,
+      "RuntimeMsAvg": 0.082,
+      "RuntimeP95Ms": 0.189,
+      "MemoryAllocationBytesAvg": 8502
+    },
+    {
+      "Id": "lighting_drift_00",
+      "Scenario": "lighting_drift",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.363,
+      "RuntimeMsAvg": 0.045,
+      "RuntimeP95Ms": 0.156,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "lighting_drift_01",
+      "Scenario": "lighting_drift",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.228,
+      "RuntimeMsAvg": 0.029,
+      "RuntimeP95Ms": 0.075,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "outside_roi_motion_00",
+      "Scenario": "outside_roi_motion",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.275,
+      "RuntimeMsAvg": 0.034,
+      "RuntimeP95Ms": 0.093,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "outside_roi_motion_01",
+      "Scenario": "outside_roi_motion",
+      "ExpectedTriggerFrames": [],
+      "DownstreamExecutionFrames": [],
+      "NoMaterialFrames": 8,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.284,
+      "RuntimeMsAvg": 0.036,
+      "RuntimeP95Ms": 0.11,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "roi_edge_enter_00",
+      "Scenario": "roi_edge_enter",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.113,
+      "RuntimeMsAvg": 0.014,
+      "RuntimeP95Ms": 0.018,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "roi_edge_enter_01",
+      "Scenario": "roi_edge_enter",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.119,
+      "RuntimeMsAvg": 0.015,
+      "RuntimeP95Ms": 0.02,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "partial_occlusion_enter_00",
+      "Scenario": "partial_occlusion_enter",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.115,
+      "RuntimeMsAvg": 0.014,
+      "RuntimeP95Ms": 0.02,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "partial_occlusion_enter_01",
+      "Scenario": "partial_occlusion_enter",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.111,
+      "RuntimeMsAvg": 0.014,
+      "RuntimeP95Ms": 0.017,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "low_contrast_enter_00",
+      "Scenario": "low_contrast_enter",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.435,
+      "RuntimeMsAvg": 0.054,
+      "RuntimeP95Ms": 0.161,
+      "MemoryAllocationBytesAvg": 998
+    },
+    {
+      "Id": "low_contrast_enter_01",
+      "Scenario": "low_contrast_enter",
+      "ExpectedTriggerFrames": [
+        2
+      ],
+      "DownstreamExecutionFrames": [
+        2
+      ],
+      "NoMaterialFrames": 7,
+      "NoMaterialDownstreamExecutions": 0,
+      "TriggerFrameMismatchCount": 0,
+      "Passed": true,
+      "RuntimeMsTotal": 0.545,
+      "RuntimeMsAvg": 0.068,
+      "RuntimeP95Ms": 0.155,
+      "MemoryAllocationBytesAvg": 998
+    }
+  ]
+}

@@ -798,6 +798,7 @@ public class Sprint7_AiEvolutionTests
             var triggerParams = root.GetProperty("operators").EnumerateArray()
                 .Single(item => item.GetProperty("tempId").GetString() == "op_2")
                 .GetProperty("parameters");
+            triggerParams.GetProperty("Profile").GetString().Should().Be("line_fast_default");
             triggerParams.GetProperty("ShortCircuitWhenNotTriggered").GetString().Should().Be("true");
 
             root.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())

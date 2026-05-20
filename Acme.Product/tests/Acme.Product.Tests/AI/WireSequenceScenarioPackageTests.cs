@@ -144,6 +144,7 @@ public class WireSequenceScenarioPackageTests
         var triggerParams = template.RootElement.GetProperty("operators").EnumerateArray()
             .Single(item => item.GetProperty("type").GetString() == "FrameChangeTrigger")
             .GetProperty("params");
+        triggerParams.GetProperty("Profile").GetString().Should().Be("line_fast_default");
         triggerParams.GetProperty("ShortCircuitWhenNotTriggered").GetString().Should().Be("true");
 
         template.RootElement.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
