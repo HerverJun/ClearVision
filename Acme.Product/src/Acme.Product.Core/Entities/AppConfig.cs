@@ -31,6 +31,7 @@ public class AppConfig
         Communication.Normalize();
         Storage ??= new StorageConfig();
         Runtime ??= new RuntimeConfig();
+        Runtime.Normalize();
         Features ??= new FeatureConfig();
         Features.Normalize();
         Cameras ??= new List<CameraBindingConfig>();
@@ -390,13 +391,30 @@ public class StorageConfig
 
 public class RuntimeConfig
 {
+    public const int DefaultMissingMaterialTimeoutSeconds = 120;
+    private const int LegacyMissingMaterialTimeoutSeconds = 30;
+
     public bool AutoRun { get; set; }
 
     public int StopOnConsecutiveNg { get; set; }
 
-    public int MissingMaterialTimeoutSeconds { get; set; } = 30;
+    public int MissingMaterialTimeoutSeconds { get; set; } = DefaultMissingMaterialTimeoutSeconds;
 
     public bool ApplyProtectionRules { get; set; } = true;
+
+    public void Normalize()
+    {
+        if (MissingMaterialTimeoutSeconds == LegacyMissingMaterialTimeoutSeconds)
+        {
+            MissingMaterialTimeoutSeconds = DefaultMissingMaterialTimeoutSeconds;
+            return;
+        }
+
+        if (MissingMaterialTimeoutSeconds < 0)
+        {
+            MissingMaterialTimeoutSeconds = DefaultMissingMaterialTimeoutSeconds;
+        }
+    }
 }
 
 public class SecurityConfig

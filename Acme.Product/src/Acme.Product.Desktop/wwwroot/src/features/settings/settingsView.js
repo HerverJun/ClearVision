@@ -2928,7 +2928,7 @@ class SettingsView {
             runtime: {
                 autoRun: false,
                 stopOnConsecutiveNg: 0,
-                missingMaterialTimeoutSeconds: 30,
+                missingMaterialTimeoutSeconds: 120,
                 applyProtectionRules: true
             },
             security: {
@@ -3313,10 +3313,10 @@ class SettingsView {
                         <div class="settings-fieldset" style="flex:1;">
                             <label>缺料等待超时 (秒)</label>
                             <div class="input-with-suffix" style="position:relative;">
-                                <input type="number" class="cv-input" id="cfg-missingMaterialTimeoutSeconds" value="${runtime.missingMaterialTimeoutSeconds || 30}" style="padding-right:36px;">
+                                <input type="number" class="cv-input" id="cfg-missingMaterialTimeoutSeconds" value="${runtime.missingMaterialTimeoutSeconds ?? 120}" style="padding-right:36px;">
                                 <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">s</span>
                             </div>
-                            <span class="settings-field-hint">触发信号到来前超出该时间未收到下一次触发，抛出超时警告。</span>
+                            <span class="settings-field-hint">连续运行中超过该时间未收到下一次检测结果时自动保护性停止，现场默认 120 秒。</span>
                         </div>
                     </div>
 

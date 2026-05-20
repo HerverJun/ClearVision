@@ -11,6 +11,8 @@ import { getCurrentProject } from '../project/projectManager.js';
 import { AnalysisCardsPanel, buildDiagnosticsAnalysisData } from './analysisCardsPanel.js';
 import { showToast } from '../../shared/components/uiComponents.js';
 
+const DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS = 120;
+
 function debugInspectionPanelLog(...args) {
     if (globalThis.CV_DEBUG_INSPECTION === true) {
         console.debug(...args);
@@ -54,7 +56,7 @@ class InspectionPanel {
         this.runtimeConfig = {
             autoRun: false,
             stopOnConsecutiveNg: 0,
-            missingMaterialTimeoutSeconds: 30,
+            missingMaterialTimeoutSeconds: DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS,
             applyProtectionRules: true
         };
         this.consecutiveNgCount = 0;
@@ -471,10 +473,15 @@ class InspectionPanel {
             try {
                 const settings = await httpClient.get('/settings');
                 const runtime = settings?.runtime || {};
+                const rawMissingMaterialTimeout = runtime.missingMaterialTimeoutSeconds;
+                const parsedMissingMaterialTimeout = Number(rawMissingMaterialTimeout);
+                const missingMaterialTimeoutSeconds = rawMissingMaterialTimeout === undefined || rawMissingMaterialTimeout === null || rawMissingMaterialTimeout === ''
+                    ? DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS
+                    : (Number.isFinite(parsedMissingMaterialTimeout) ? Math.max(0, parsedMissingMaterialTimeout) : DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS);
                 this.runtimeConfig = {
                     autoRun: !!runtime.autoRun,
                     stopOnConsecutiveNg: Math.max(0, Number(runtime.stopOnConsecutiveNg || 0)),
-                    missingMaterialTimeoutSeconds: Math.max(0, Number(runtime.missingMaterialTimeoutSeconds || 0)),
+                    missingMaterialTimeoutSeconds,
                     applyProtectionRules: runtime.applyProtectionRules !== false
                 };
                 this._runtimeConfigLoadedAt = Date.now();
@@ -483,7 +490,7 @@ class InspectionPanel {
                 this.runtimeConfig = {
                     autoRun: false,
                     stopOnConsecutiveNg: 0,
-                    missingMaterialTimeoutSeconds: 30,
+                    missingMaterialTimeoutSeconds: DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS,
                     applyProtectionRules: true
                 };
                 this._runtimeConfigLoadedAt = Date.now();

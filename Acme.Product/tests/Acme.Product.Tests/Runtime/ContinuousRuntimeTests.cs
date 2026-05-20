@@ -256,6 +256,51 @@ public class ContinuousRuntimeTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ContinuousInspectionWorker_Primary_WhenStreamFaults_ShouldRestartLeaseAndPublishDecision()
+    {
+        var frames = new[]
+        {
+            CreateFrame(1, new Scalar(0, 0, 0), 32),
+            CreateFrame(2, new Scalar(255, 255, 255), 32)
+        };
+        var stream = new FakeStreamCoordinator(frames, failFirstWait: true);
+        var flow = new FakeFlowExecutionService("OK");
+        var writer = new CapturingResultWriter();
+        var eventBus = new CapturingEventBus();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        writer.Written += () => cts.Cancel();
+
+        var worker = new ContinuousInspectionWorker(NullLogger.Instance);
+        await worker.RunAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new OperatorFlow("continuous-restart-test"),
+            "cam-1",
+            new ContinuousInspectionConfig
+            {
+                Mode = ContinuousInspectionMode.Primary,
+                DetectEveryNFrames = 1,
+                MinConsensusFrames = 1,
+                ConsensusThreshold = 1,
+                PreEventFrames = 0,
+                PostEventFrames = 0,
+                SaveReplayOnNgOnly = true
+            },
+            ContinuousInspectionMode.Primary,
+            stream,
+            flow,
+            writer,
+            NullInspectionImagePersistenceService.Instance,
+            eventBus,
+            cts.Token);
+
+        stream.LeaseCount.Should().BeGreaterThanOrEqualTo(2);
+        stream.ReleaseCount.Should().BeGreaterThanOrEqualTo(2);
+        writer.Results.Should().ContainSingle();
+        writer.Results[0].Status.Should().Be(InspectionStatus.OK);
+    }
+
     private static FrameEnvelope CreateFrame(long sequence, Scalar color, int size = 8)
     {
         using var mat = new Mat(size, size, MatType.CV_8UC3, color);
@@ -285,12 +330,19 @@ public class ContinuousRuntimeTests
     private sealed class FakeStreamCoordinator : ICameraFrameStreamCoordinator
     {
         private readonly List<FrameEnvelope> _frames;
+        private readonly bool _failFirstWait;
         private int _index;
+        private bool _hasFailedFirstWait;
 
-        public FakeStreamCoordinator(IEnumerable<FrameEnvelope> frames)
+        public FakeStreamCoordinator(IEnumerable<FrameEnvelope> frames, bool failFirstWait = false)
         {
             _frames = frames.ToList();
+            _failFirstWait = failFirstWait;
         }
+
+        public int LeaseCount { get; private set; }
+
+        public int ReleaseCount { get; private set; }
 
         public Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -298,8 +350,11 @@ public class ContinuousRuntimeTests
         public Task<FrameEnvelope> AcquireFrameEnvelopeAsync(string cameraId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_frames[Math.Min(_index, _frames.Count - 1)]);
 
-        public Task<CameraStreamLease> AcquireStreamLeaseAsync(string cameraId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CameraStreamLease("lease-1", cameraId, CameraTriggerMode.Continuous, 25));
+        public Task<CameraStreamLease> AcquireStreamLeaseAsync(string cameraId, CancellationToken cancellationToken = default)
+        {
+            LeaseCount++;
+            return Task.FromResult(new CameraStreamLease($"lease-{LeaseCount}", cameraId, CameraTriggerMode.Continuous, 25));
+        }
 
         public Task<CameraStreamFrame> WaitForNextFrameAsync(CameraStreamLease lease, long? afterSequence = null, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -307,6 +362,12 @@ public class ContinuousRuntimeTests
         public Task<FrameEnvelope> WaitForNextFrameEnvelopeAsync(CameraStreamLease lease, long? afterSequence = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_failFirstWait && !_hasFailedFirstWait)
+            {
+                _hasFailedFirstWait = true;
+                throw new InvalidOperationException("Camera stream 'cam-1' stopped producing frames because the camera acquisition loop is no longer running.");
+            }
+
             while (_index < _frames.Count && afterSequence.HasValue && _frames[_index].Sequence <= afterSequence.Value)
             {
                 _index++;
@@ -321,7 +382,11 @@ public class ContinuousRuntimeTests
             return Task.FromResult(_frames[_index++]);
         }
 
-        public Task ReleaseStreamLeaseAsync(CameraStreamLease lease) => Task.CompletedTask;
+        public Task ReleaseStreamLeaseAsync(CameraStreamLease lease)
+        {
+            ReleaseCount++;
+            return Task.CompletedTask;
+        }
         public Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task StopPreviewSessionAsync(string sessionId) => Task.CompletedTask;

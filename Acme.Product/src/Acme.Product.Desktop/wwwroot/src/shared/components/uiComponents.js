@@ -222,6 +222,7 @@ export function createCheckbox(options = {}) {
 // 延迟初始化 toast 容器，确保 DOM 已就绪
 let toastContainer = null;
 const activeToasts = new Map();
+const recentToastTimes = new Map();
 const maxVisibleToasts = 4;
 
 function getToastContainer() {
@@ -250,25 +251,41 @@ function getToastContainer() {
  * 显示Toast通知
  * @param {string} message - 消息内容
  * @param {string} type - 类型: success, error, warning, info
- * @param {number} duration - 显示时长(毫秒)
+ * @param {number|Object} duration - 显示时长(毫秒)，或包含 duration/key/minIntervalMs 的选项
  */
 export function showToast(message, type = 'info', duration = 3000) {
+    const options = typeof duration === 'object' && duration !== null ? duration : {};
+    const displayDuration = Number.isFinite(Number(options.duration))
+        ? Number(options.duration)
+        : (Number.isFinite(Number(duration)) ? Number(duration) : 3000);
     const container = getToastContainer();
     if (!container || !container.parentNode) {
         // 容器还未挂载，延迟执行
-        setTimeout(() => showToast(message, type, duration), 100);
+        setTimeout(() => showToast(message, type, typeof duration === 'object' ? options : displayDuration), 100);
         return null;
     }
 
     const normalizedMessage = String(message ?? '');
     const normalizedType = String(type || 'info');
     const toastKey = `${normalizedType}:${normalizedMessage}`;
+    const rateKey = String(options.key || options.rateKey || toastKey);
+    const minIntervalMs = Math.max(0, Number(options.minIntervalMs || 0));
+    if (minIntervalMs > 0) {
+        const now = Date.now();
+        const lastShownAt = recentToastTimes.get(rateKey) || 0;
+        if (now - lastShownAt < minIntervalMs) {
+            return activeToasts.get(toastKey) || null;
+        }
+
+        recentToastTimes.set(rateKey, now);
+    }
+
     const existingToast = activeToasts.get(toastKey);
     if (existingToast?.parentNode && existingToast.__cvToastRemoving !== true) {
         globalThis.clearTimeout(existingToast.__cvToastTimer);
         existingToast.__cvToastTimer = globalThis.setTimeout(() => {
             removeToast(existingToast);
-        }, duration);
+        }, displayDuration);
         return existingToast;
     }
     
@@ -315,7 +332,7 @@ export function showToast(message, type = 'info', duration = 3000) {
     // 自动移除
     toast.__cvToastTimer = setTimeout(() => {
         removeToast(toast);
-    }, duration);
+    }, displayDuration);
 
     return toast;
 }

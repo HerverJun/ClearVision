@@ -148,6 +148,54 @@ public class CameraFrameStreamCoordinatorTests
         await sut.StopPreviewSessionAsync(previewSession.SessionId);
     }
 
+    [Fact]
+    public async Task AcquireFrameAsync_WhenCameraAcquisitionStops_ShouldFaultProducerAndAllowNextAcquireToRestart()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var camera = CreateIndustrialCamera();
+        var isAcquiring = false;
+        Func<byte[], Task>? frameCallback = null;
+
+        camera.IsAcquiring.Returns(_ => isAcquiring);
+        camera.When(x => x.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()))
+            .Do(callInfo => frameCallback = callInfo.Arg<Func<byte[], Task>>());
+
+        var binding = new CameraBindingConfig
+        {
+            Id = "binding-restart",
+            SerialNumber = "SN-RESTART",
+            TriggerMode = "Continuous"
+        };
+
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+        cameraManager.GetOrCreateByBindingAsync(binding.Id).Returns(Task.FromResult<ICamera>(camera));
+        cameraManager.GetCamera(binding.SerialNumber).Returns(camera);
+
+        await using var sut = new CameraFrameStreamCoordinator(
+            cameraManager,
+            NullLogger<CameraFrameStreamCoordinator>.Instance,
+            NoOpTriggerInputService.Instance,
+            NoOpSerialPhotoelectricTriggerInputService.Instance,
+            TimeSpan.FromMilliseconds(20));
+
+        var firstAcquire = async () => await sut.AcquireFrameAsync(binding.Id);
+
+        await firstAcquire.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*acquisition loop is no longer running*");
+        sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeFalse();
+
+        isAcquiring = true;
+        var secondAcquireTask = sut.AcquireFrameAsync(binding.Id);
+        await Task.Delay(50);
+
+        var frameBytes = CreatePngBytes(new Scalar(64, 128, 192));
+        await frameCallback!(frameBytes);
+        var frame = await secondAcquireTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        frame.ImageData.Should().Equal(frameBytes);
+        await camera.Received(2).StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>());
+    }
+
     private static byte[] CreatePngBytes(Scalar color)
     {
         using var mat = new Mat(2, 2, MatType.CV_8UC3, color);
@@ -162,6 +210,7 @@ public class CameraFrameStreamCoordinatorTests
         camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.SetPixelFormatAsync(Arg.Any<CameraPixelFormat>()).Returns(Task.CompletedTask);
         camera.SetTriggerModeAsync(Arg.Any<CameraTriggerMode>(), Arg.Any<string?>()).Returns(Task.CompletedTask);
+        camera.IsAcquiring.Returns(true);
         camera.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()).Returns(Task.CompletedTask);
         camera.StopContinuousAcquisitionAsync().Returns(Task.CompletedTask);
         return camera;

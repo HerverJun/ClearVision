@@ -38,7 +38,6 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
 
         try
         {
-            var rootPath = ResolveImageSaveRoot(storage.ImageSavePath);
             var dateFolder = DateTime.Now.ToString("yyyyMMdd");
             var statusFolder = result.Status switch
             {
@@ -46,16 +45,25 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
                 InspectionStatus.NG => "NG",
                 _ => "ERROR"
             };
-
-            var targetDir = Path.Combine(rootPath, dateFolder, statusFolder);
-            Directory.CreateDirectory(targetDir);
-
             var persistedImage = EncodeForPersistence(result.OutputImage);
             var fileName = $"{result.ProjectId:N}_{result.Id:N}_{DateTime.Now:HHmmssfff}{persistedImage.Extension}";
-            var targetPath = Path.Combine(targetDir, fileName);
 
-            await File.WriteAllBytesAsync(targetPath, persistedImage.Bytes, cancellationToken);
-            _logger.LogDebug("[InspectionImagePersistence] 检测图像已落盘: {Path}", targetPath);
+            foreach (var rootPath in ResolveImageSaveRoots(storage.ImageSavePath))
+            {
+                var targetDir = Path.Combine(rootPath, dateFolder, statusFolder);
+                var targetPath = Path.Combine(targetDir, fileName);
+                try
+                {
+                    Directory.CreateDirectory(targetDir);
+                    await File.WriteAllBytesAsync(targetPath, persistedImage.Bytes, cancellationToken);
+                    _logger.LogDebug("[InspectionImagePersistence] 检测图像已落盘: {Path}", targetPath);
+                    return;
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogWarning(ex, "[InspectionImagePersistence] 检测图像落盘失败，尝试下一个保存目录: {Path}", targetPath);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -84,16 +92,19 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
         return status == InspectionStatus.NG;
     }
 
-    private static string ResolveImageSaveRoot(string? configuredPath)
+    private static IEnumerable<string> ResolveImageSaveRoots(string? configuredPath)
     {
+        var roots = new List<string>();
+        var fallbackRoot = GetFallbackImageSaveRoot();
+
         if (!string.IsNullOrWhiteSpace(configuredPath))
         {
             try
             {
                 var configuredRoot = Path.GetFullPath(configuredPath);
-                if (CanWriteToDirectory(configuredRoot))
+                if (!string.Equals(configuredRoot, fallbackRoot, StringComparison.OrdinalIgnoreCase))
                 {
-                    return configuredRoot;
+                    roots.Add(configuredRoot);
                 }
             }
             catch
@@ -101,34 +112,16 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
             }
         }
 
+        roots.Add(fallbackRoot);
+        return roots;
+    }
+
+    private static string GetFallbackImageSaveRoot()
+    {
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ClearVision",
             "Images");
-    }
-
-    private static bool CanWriteToDirectory(string directory)
-    {
-        try
-        {
-            var pathRoot = Path.GetPathRoot(directory);
-            if (!string.IsNullOrWhiteSpace(pathRoot) && !Directory.Exists(pathRoot))
-            {
-                return false;
-            }
-
-            Directory.CreateDirectory(directory);
-            var probePath = Path.Combine(directory, $".cv-write-test-{Guid.NewGuid():N}.tmp");
-            using (File.Create(probePath, 1, FileOptions.DeleteOnClose))
-            {
-            }
-
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static PersistedImage EncodeForPersistence(byte[] imageBytes)

@@ -82,6 +82,37 @@ public sealed class JsonConfigurationServiceTests
         }
     }
 
+    [Fact]
+    public async Task LoadAsync_ShouldMigrateLegacyMissingMaterialTimeoutDefault()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "config.json"),
+                """
+                {
+                  "runtime": {
+                    "autoRun": false,
+                    "stopOnConsecutiveNg": 0,
+                    "missingMaterialTimeoutSeconds": 30,
+                    "applyProtectionRules": true
+                  }
+                }
+                """);
+
+            var service = CreateService(root);
+            var config = await service.LoadAsync();
+
+            config.Runtime.MissingMaterialTimeoutSeconds.Should().Be(RuntimeConfig.DefaultMissingMaterialTimeoutSeconds);
+            service.GetCurrent().Runtime.MissingMaterialTimeoutSeconds.Should().Be(RuntimeConfig.DefaultMissingMaterialTimeoutSeconds);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
     private static JsonConfigurationService CreateService(string root)
     {
         return new JsonConfigurationService(

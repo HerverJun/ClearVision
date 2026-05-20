@@ -17,6 +17,7 @@ namespace Acme.Product.Infrastructure.Continuous;
 public sealed class ContinuousInspectionWorker
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan CameraStreamRestartDelay = TimeSpan.FromMilliseconds(500);
     private readonly ILogger _logger;
 
     public ContinuousInspectionWorker(ILogger logger)
@@ -106,91 +107,120 @@ public sealed class ContinuousInspectionWorker
             }
         };
 
-        var lease = await streamCoordinator.AcquireStreamLeaseAsync(cameraId, cancellationToken);
-        try
+        while (!cancellationToken.IsCancellationRequested)
         {
-            long? lastSequence = null;
-            while (!cancellationToken.IsCancellationRequested)
+            var restartRequested = false;
+            var lease = await streamCoordinator.AcquireStreamLeaseAsync(cameraId, cancellationToken);
+            try
             {
-                if (resolveCurrentMode?.Invoke() is { } currentMode &&
-                    (currentMode == ContinuousInspectionMode.Disabled || currentMode != mode))
+                long? lastSequence = null;
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogInformation(
-                        "[ContinuousInspection] Loop stopped by configuration change. CameraId={CameraId}, PreviousMode={PreviousMode}, CurrentMode={CurrentMode}",
-                        cameraId,
-                        mode,
-                        currentMode);
-                    break;
-                }
-
-                var frame = await streamCoordinator.WaitForNextFrameEnvelopeAsync(lease, lastSequence, cancellationToken);
-                lastSequence = frame.Sequence;
-                metrics.RecordFrameReceived();
-
-                if (frame.Sequence % config.DetectEveryNFrames != 0)
-                {
-                    continue;
-                }
-
-                var signal = detector.Update(frame);
-                if (signal == null)
-                {
-                    continue;
-                }
-
-                metrics.RecordArrivalSignal();
-                var track = tracker.Update(signal);
-                if (track.IsNew)
-                {
-                    metrics.RecordTrackCreated();
-                }
-
-                var frames = await CollectDecisionFramesAsync(
-                    streamCoordinator,
-                    lease,
-                    cameraId,
-                    frame,
-                    config,
-                    cancellationToken);
-                foreach (var candidate in frames)
-                {
-                    var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
-                        candidate,
-                        track.TrackId,
-                        (envelope, ct) => flowExecution.ExecuteFlowAsync(
-                            flow,
-                            new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
-                            cancellationToken: ct)));
-                    if (scheduled)
+                    if (resolveCurrentMode?.Invoke() is { } currentMode &&
+                        (currentMode == ContinuousInspectionMode.Disabled || currentMode != mode))
                     {
-                        metrics.RecordInferenceScheduled();
+                        _logger.LogInformation(
+                            "[ContinuousInspection] Loop stopped by configuration change. CameraId={CameraId}, PreviousMode={PreviousMode}, CurrentMode={CurrentMode}",
+                            cameraId,
+                            mode,
+                            currentMode);
+                        return;
                     }
-                    else
+
+                    var frame = await streamCoordinator.WaitForNextFrameEnvelopeAsync(lease, lastSequence, cancellationToken);
+                    lastSequence = frame.Sequence;
+                    metrics.RecordFrameReceived();
+
+                    if (frame.Sequence % config.DetectEveryNFrames != 0)
                     {
-                        metrics.RecordInferenceDropped();
+                        continue;
+                    }
+
+                    var signal = detector.Update(frame);
+                    if (signal == null)
+                    {
+                        continue;
+                    }
+
+                    metrics.RecordArrivalSignal();
+                    var track = tracker.Update(signal);
+                    if (track.IsNew)
+                    {
+                        metrics.RecordTrackCreated();
+                    }
+
+                    var frames = await CollectDecisionFramesAsync(
+                        streamCoordinator,
+                        lease,
+                        cameraId,
+                        frame,
+                        config,
+                        cancellationToken);
+                    foreach (var candidate in frames)
+                    {
+                        var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
+                            candidate,
+                            track.TrackId,
+                            (envelope, ct) => flowExecution.ExecuteFlowAsync(
+                                flow,
+                                new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
+                                cancellationToken: ct)));
+                        if (scheduled)
+                        {
+                            metrics.RecordInferenceScheduled();
+                        }
+                        else
+                        {
+                            metrics.RecordInferenceDropped();
+                        }
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (InvalidOperationException ex) when (IsRecoverableCameraStreamFault(ex) && !cancellationToken.IsCancellationRequested)
+            {
+                restartRequested = true;
+                _logger.LogWarning(
+                    ex,
+                    "[ContinuousInspection] Shared camera stream faulted; releasing lease and restarting. CameraId={CameraId}, Mode={Mode}",
+                    cameraId,
+                    mode);
+            }
+            finally
+            {
+                await streamCoordinator.ReleaseStreamLeaseAsync(lease);
+                var snapshot = metrics.Snapshot();
+                var logMessage = restartRequested
+                    ? "[ContinuousInspection] Stream lease released for restart. CameraId={CameraId}, Mode={Mode}, Frames={Frames}, Signals={Signals}, Tracks={Tracks}, Scheduled={Scheduled}, Completed={Completed}, Decisions={Decisions}, AvgLatencyMs={AvgLatencyMs:F1}"
+                    : "[ContinuousInspection] Loop stopped. CameraId={CameraId}, Mode={Mode}, Frames={Frames}, Signals={Signals}, Tracks={Tracks}, Scheduled={Scheduled}, Completed={Completed}, Decisions={Decisions}, AvgLatencyMs={AvgLatencyMs:F1}";
+                _logger.LogInformation(
+                    logMessage,
+                    cameraId,
+                    mode,
+                    snapshot.FramesReceived,
+                    snapshot.ArrivalSignals,
+                    snapshot.TracksCreated,
+                    snapshot.ScheduledInferences,
+                    snapshot.CompletedInferences,
+                    snapshot.FinalDecisions,
+                    snapshot.AverageInferenceLatencyMs);
+            }
+
+            if (!restartRequested)
+            {
+                break;
+            }
+
+            await Task.Delay(CameraStreamRestartDelay, cancellationToken);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        finally
-        {
-            await streamCoordinator.ReleaseStreamLeaseAsync(lease);
-            var snapshot = metrics.Snapshot();
-            _logger.LogInformation(
-                "[ContinuousInspection] Loop stopped. CameraId={CameraId}, Mode={Mode}, Frames={Frames}, Signals={Signals}, Tracks={Tracks}, Scheduled={Scheduled}, Completed={Completed}, Decisions={Decisions}, AvgLatencyMs={AvgLatencyMs:F1}",
-                cameraId,
-                mode,
-                snapshot.FramesReceived,
-                snapshot.ArrivalSignals,
-                snapshot.TracksCreated,
-                snapshot.ScheduledInferences,
-                snapshot.CompletedInferences,
-                snapshot.FinalDecisions,
-                snapshot.AverageInferenceLatencyMs);
-        }
+    }
+
+    private static bool IsRecoverableCameraStreamFault(InvalidOperationException exception)
+    {
+        return exception.Message.Contains("stopped producing frames", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<IReadOnlyList<Acme.Product.Core.Streaming.FrameEnvelope>> CollectDecisionFramesAsync(

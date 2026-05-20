@@ -87,7 +87,7 @@ function createPanel({ projectId = 'project-current', isContinuous = false } = {
     selectedRunMode: 'camera',
     runtimeConfig: {
       applyProtectionRules: true,
-      missingMaterialTimeoutSeconds: 30,
+      missingMaterialTimeoutSeconds: 120,
       stopOnConsecutiveNg: 0
     },
     consecutiveNgCount: 0,

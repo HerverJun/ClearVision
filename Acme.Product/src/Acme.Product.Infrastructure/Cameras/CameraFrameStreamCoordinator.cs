@@ -12,10 +12,12 @@ namespace Acme.Product.Infrastructure.Cameras;
 public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 {
     private static readonly TimeSpan DirectAcquireIdleTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultFrameHealthProbeInterval = TimeSpan.FromSeconds(2);
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<CameraFrameStreamCoordinator> _logger;
     private readonly ITriggerInputService _triggerInputService;
     private readonly ISerialPhotoelectricTriggerInputService _serialPhotoelectricTriggerInputService;
+    private readonly TimeSpan _frameHealthProbeInterval;
     private readonly ConcurrentDictionary<string, ProducerEntry> _producers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, PreviewSessionState> _previewSessions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -90,11 +92,24 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         ILogger<CameraFrameStreamCoordinator> logger,
         ITriggerInputService triggerInputService,
         ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService)
+        : this(cameraManager, logger, triggerInputService, serialPhotoelectricTriggerInputService, DefaultFrameHealthProbeInterval)
+    {
+    }
+
+    public CameraFrameStreamCoordinator(
+        ICameraManager cameraManager,
+        ILogger<CameraFrameStreamCoordinator> logger,
+        ITriggerInputService triggerInputService,
+        ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
+        TimeSpan frameHealthProbeInterval)
     {
         _cameraManager = cameraManager;
         _logger = logger;
         _triggerInputService = triggerInputService;
         _serialPhotoelectricTriggerInputService = serialPhotoelectricTriggerInputService;
+        _frameHealthProbeInterval = frameHealthProbeInterval > TimeSpan.Zero
+            ? frameHealthProbeInterval
+            : DefaultFrameHealthProbeInterval;
     }
 
     public async Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -753,7 +768,21 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                     signal = entry.NextFrameSignal;
                 }
 
-                await signal.Task.WaitAsync(cancellationToken);
+                try
+                {
+                    await signal.Task.WaitAsync(_frameHealthProbeInterval, cancellationToken);
+                }
+                catch (TimeoutException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    if (IsProducerCameraAcquiring(entry))
+                    {
+                        continue;
+                    }
+
+                    var message = $"Camera stream '{entry.CameraBindingId}' stopped producing frames because the camera acquisition loop is no longer running.";
+                    MarkProducerFaulted(entry, message);
+                    throw new InvalidOperationException(message);
+                }
             }
             finally
             {
@@ -762,6 +791,69 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
 
         throw new OperationCanceledException(cancellationToken);
+    }
+
+    private bool IsProducerCameraAcquiring(ProducerEntry entry)
+    {
+        if (!entry.IsRunning)
+        {
+            return false;
+        }
+
+        if (entry.EventCamera != null)
+        {
+            return entry.EventCamera.IsAcquiring;
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.SerialNumber) &&
+            _cameraManager.GetCamera(entry.SerialNumber) is { } camera)
+        {
+            return camera.IsAcquiring;
+        }
+
+        return true;
+    }
+
+    private void MarkProducerFaulted(ProducerEntry entry, string reason)
+    {
+        if (!entry.IsRunning)
+        {
+            return;
+        }
+
+        _logger.LogWarning(
+            "Shared camera stream faulted. CameraBindingId={CameraBindingId}, Reason={Reason}",
+            entry.CameraBindingId,
+            reason);
+
+        try
+        {
+            if (entry.EventCamera != null && entry.FrameReceivedHandler != null)
+            {
+                entry.EventCamera.FrameReceived -= entry.FrameReceivedHandler;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to detach camera frame event handler after stream fault. CameraBindingId={CameraBindingId}", entry.CameraBindingId);
+        }
+        finally
+        {
+            entry.EventCamera = null;
+            entry.FrameReceivedHandler = null;
+            entry.IdleStopCts?.Cancel();
+            entry.IdleStopCts?.Dispose();
+            entry.IdleStopCts = null;
+            entry.IsRunning = false;
+            entry.SerialNumber = string.Empty;
+            entry.ConfigurationSignature = string.Empty;
+            entry.LatestFrame = null;
+            entry.History = new FrameRingBuffer(24);
+            entry.Sequence = 0;
+            entry.LastPublishedTicks = 0;
+            entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
+            CompleteFrameWaiters(entry, new InvalidOperationException(reason));
+        }
     }
 
     private static void PublishFrame(ProducerEntry entry, CameraStreamFrame frame)

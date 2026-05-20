@@ -974,9 +974,9 @@ function initializeInspectionController() {
             message = `检测到 ${defectCount} 个目标`;
         }
 
-        // 实时检测的正常 OK/NG 结果会高频到达，面板已经展示状态与计数；Toast 只保留异常。
-        if (!isRealtimeResult || status === 'error') {
-            showToast(message, status);
+        // 检测节拍里的 OK/NG 属于高频生产状态，面板和结果列表已经承载；Toast 只保留异常。
+        if (status === 'error') {
+            showToast(message, status, { minIntervalMs: 5000, key: 'inspection-result-error' });
         }
     });
     

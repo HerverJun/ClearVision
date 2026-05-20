@@ -63,6 +63,10 @@
     border: none;
     box-shadow: none;
     border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
 }
 
 .inspection-side-panel .panel::before {
@@ -72,6 +76,107 @@
 .inspection-side-panel .panel:hover {
     transform: none;
     box-shadow: none;
+}
+
+.inspection-side-panel .panel-title {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 16px 18px 12px;
+}
+
+.inspection-side-panel .panel-title + .panel-title {
+    margin-top: 0 !important;
+    border-top: 1px solid rgba(225, 190, 188, 0.4);
+}
+
+.inspection-side-panel .analysis-cards-container {
+    flex: 0 1 46%;
+    min-height: 112px;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 10px;
+    padding: 0 14px 14px;
+}
+
+.inspection-side-panel .analysis-cards-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.inspection-side-panel .analysis-cards-container::-webkit-scrollbar-thumb {
+    background: #e1bebc;
+    border-radius: 2px;
+}
+
+.inspection-side-panel .ac-card {
+    width: 100%;
+    min-width: 0;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.inspection-side-panel .ac-card-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.inspection-side-panel .ac-card-title,
+.inspection-side-panel .ac-diagnostic-label,
+.inspection-side-panel .ac-diagnostic-value,
+.inspection-side-panel .ac-diagnostic-text,
+.inspection-side-panel .ac-diagnostic-message,
+.inspection-side-panel .ac-diagnostic-hint {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.inspection-side-panel .ac-card-title,
+.inspection-side-panel .ac-diagnostic-label,
+.inspection-side-panel .ac-diagnostic-chip,
+.inspection-side-panel .ac-diagnostic-key {
+    letter-spacing: 0;
+}
+
+.inspection-side-panel .ac-diagnostic-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+}
+
+.inspection-side-panel .ac-diagnostic-row {
+    display: grid;
+    grid-template-columns: minmax(72px, 0.42fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    min-width: 0;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(225, 190, 188, 0.3);
+    border-radius: 8px;
+}
+
+.inspection-side-panel .ac-diagnostic-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.inspection-side-panel .ac-diagnostic-value {
+    font-size: 12px;
+    text-align: right;
+}
+
+.inspection-side-panel .ac-diagnostic-sequence,
+.inspection-side-panel .ac-diagnostic-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
 }
 
 /* ==========================================================================
@@ -454,12 +559,14 @@
    ========================================================================== */
 
 .inspection-recent-results-grid {
+    flex: 1 1 auto;
+    min-height: 96px;
+    min-width: 0;
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
-    max-height: 260px;
     overflow-y: auto;
-    padding-right: 4px;
+    padding: 0 14px 14px;
     align-content: start;
 }
 
@@ -468,7 +575,7 @@
 
 .recent-result-item {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 6px;
     align-items: center;
     min-height: 54px;
@@ -533,6 +640,7 @@
     color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
     justify-self: end;
+    min-width: 0;
 }
 
 .result-text-preview {
