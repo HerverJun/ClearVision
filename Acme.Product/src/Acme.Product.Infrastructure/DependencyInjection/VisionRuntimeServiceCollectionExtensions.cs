@@ -216,6 +216,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<InspectionResultBackgroundService>();
         services.AddHostedService(sp => sp.GetRequiredService<InspectionResultBackgroundService>());
         services.AddSingleton<IInspectionResultChannelWriter>(sp => sp.GetRequiredService<InspectionResultBackgroundService>());
+        services.AddSingleton<IInspectionImagePersistenceService, InspectionImagePersistenceService>();
 
         services.AddSingleton<IInspectionRuntimeCoordinator, InspectionRuntimeCoordinator>();
         services.AddSingleton<InspectionWorker>();

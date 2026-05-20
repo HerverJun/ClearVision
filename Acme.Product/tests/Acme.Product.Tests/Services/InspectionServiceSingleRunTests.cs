@@ -389,6 +389,64 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WithNgOutputImage_ShouldPersistResultImage()
+    {
+        var projectId = Guid.NewGuid();
+        var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4 };
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        var explicitFlow = CreateFlow("client-flow");
+
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 16,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["Image"] = outputImage
+                }
+            }));
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance,
+            imagePersistence);
+
+        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+
+        result.Status.Should().Be(InspectionStatus.NG);
+        result.OutputImage.Should().Equal(outputImage);
+        await imagePersistence.Received(1).PersistAsync(
+            Arg.Is<InspectionResult>(item =>
+                item.Status == InspectionStatus.NG &&
+                item.OutputImage != null &&
+                item.OutputImage.SequenceEqual(outputImage)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WhenFlowExecutionThrows_ShouldReturnPersistedErrorResult()
     {
         var projectId = Guid.NewGuid();

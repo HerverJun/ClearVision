@@ -46,6 +46,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     private readonly InspectionMetrics _metrics;
     private readonly IImageCacheRepository _imageCacheRepository;
     private readonly IAnalysisDataBuilder _analysisDataBuilder;
+    private readonly IInspectionImagePersistenceService _imagePersistenceService;
 
     // 并发控制：跟踪运行中的任务
     private readonly ConcurrentDictionary<Guid, RunningTaskEntry> _runningTasks = new();
@@ -88,7 +89,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         IHostApplicationLifetime lifetime,
         InspectionMetrics metrics,
         IImageCacheRepository imageCacheRepository,
-        IAnalysisDataBuilder analysisDataBuilder)
+        IAnalysisDataBuilder analysisDataBuilder,
+        IInspectionImagePersistenceService? imagePersistenceService = null)
     {
         _scopeFactory = scopeFactory;
         _coordinator = coordinator;
@@ -98,6 +100,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         _metrics = metrics;
         _imageCacheRepository = imageCacheRepository;
         _analysisDataBuilder = analysisDataBuilder;
+        _imagePersistenceService = imagePersistenceService ?? NullInspectionImagePersistenceService.Instance;
 
         // 订阅应用关闭事件
         _lifetime.ApplicationStopping.Register(OnApplicationStopping);
@@ -443,6 +446,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     streamCoordinator,
                     flowExecution,
                     resultChannelWriter,
+                    _imagePersistenceService,
                     _eventBus,
                     ct,
                     () => ResolveContinuousInspectionMode(flow, cameraId));
@@ -1001,6 +1005,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
 
             TryAppendTraceabilityToAnalysisPayload(result);
+            await _imagePersistenceService.PersistAsync(result, ct);
             await CacheResultImageAsync(result);
             return result;
         }

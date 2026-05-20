@@ -424,6 +424,68 @@ public class InspectionWorkerTests
     }
 
     [Fact]
+    public async Task ExecuteCycleAsync_WithNgOutputImage_ShouldPersistResultImage()
+    {
+        var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 5, 6, 7, 8 };
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 1,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["Image"] = outputImage
+                }
+            }));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var imageCache = Substitute.For<IImageCacheRepository>();
+        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(Task.FromResult(Guid.NewGuid()));
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            Substitute.For<IInspectionResultChannelWriter>(),
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>());
+
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            new InMemoryInspectionEventBus(
+                NullLogger<InMemoryInspectionEventBus>.Instance,
+                new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance)),
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            imageCache,
+            new AnalysisDataBuilder(),
+            imagePersistence);
+
+        var result = await InvokeExecuteCycleAsync(
+            worker,
+            new OperatorFlow("NgOutputImageFlow"),
+            null,
+            flowExecution,
+            imageAcquisition,
+            CancellationToken.None);
+
+        result.Status.Should().Be(InspectionStatus.NG);
+        await imagePersistence.Received(1).PersistAsync(
+            Arg.Is<InspectionResult>(item =>
+                item.Status == InspectionStatus.NG &&
+                item.OutputImage != null &&
+                item.OutputImage.SequenceEqual(outputImage)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunRealtimeLoopAsync_WithDefaultRuntimeProtection_DoesNotStopAfterSixConsecutiveNg()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();

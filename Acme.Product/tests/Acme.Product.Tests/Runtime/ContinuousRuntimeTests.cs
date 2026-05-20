@@ -1,3 +1,4 @@
+using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
@@ -11,6 +12,7 @@ using Acme.Product.Infrastructure.Replay;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using OpenCvSharp;
 
 namespace Acme.Product.Tests.Runtime;
@@ -192,6 +194,7 @@ public class ContinuousRuntimeTests
             stream,
             flow,
             writer,
+            NullInspectionImagePersistenceService.Instance,
             eventBus,
             cts.Token);
 
@@ -200,6 +203,57 @@ public class ContinuousRuntimeTests
         eventBus.Results.Should().ContainSingle();
         flow.InputFrames.Should().ContainSingle();
         flow.InputFrames[0].Sequence.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ContinuousInspectionWorker_Primary_WithNgOutputImage_ShouldPersistResultImage()
+    {
+        var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 9, 8, 7, 6 };
+        var frames = new[]
+        {
+            CreateFrame(1, new Scalar(0, 0, 0), 32),
+            CreateFrame(2, new Scalar(255, 255, 255), 32)
+        };
+        var stream = new FakeStreamCoordinator(frames);
+        var flow = new FakeFlowExecutionService("NG", outputImage);
+        var writer = new CapturingResultWriter();
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        var eventBus = new CapturingEventBus();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        writer.Written += () => cts.Cancel();
+
+        var worker = new ContinuousInspectionWorker(NullLogger.Instance);
+        await worker.RunAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new OperatorFlow("continuous-ng-test"),
+            "cam-1",
+            new ContinuousInspectionConfig
+            {
+                Mode = ContinuousInspectionMode.Primary,
+                DetectEveryNFrames = 1,
+                MinConsensusFrames = 1,
+                ConsensusThreshold = 1,
+                PreEventFrames = 0,
+                PostEventFrames = 0,
+                SaveReplayOnNgOnly = true
+            },
+            ContinuousInspectionMode.Primary,
+            stream,
+            flow,
+            writer,
+            imagePersistence,
+            eventBus,
+            cts.Token);
+
+        writer.Results.Should().ContainSingle();
+        writer.Results[0].Status.Should().Be(InspectionStatus.NG);
+        await imagePersistence.Received(1).PersistAsync(
+            Arg.Is<InspectionResult>(item =>
+                item.Status == InspectionStatus.NG &&
+                item.OutputImage != null &&
+                item.OutputImage.SequenceEqual(outputImage)),
+            Arg.Any<CancellationToken>());
     }
 
     private static FrameEnvelope CreateFrame(long sequence, Scalar color, int size = 8)
@@ -289,11 +343,13 @@ public class ContinuousRuntimeTests
     private sealed class FakeFlowExecutionService : IFlowExecutionService
     {
         private readonly string _judgment;
+        private readonly byte[]? _outputImage;
         public List<FrameEnvelope> InputFrames { get; } = new();
 
-        public FakeFlowExecutionService(string judgment)
+        public FakeFlowExecutionService(string judgment, byte[]? outputImage = null)
         {
             _judgment = judgment;
+            _outputImage = outputImage;
         }
 
         public Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, CancellationToken cancellationToken = default)
@@ -307,7 +363,13 @@ public class ContinuousRuntimeTests
             {
                 IsSuccess = true,
                 ExecutionTimeMs = 1,
-                OutputData = new Dictionary<string, object> { ["JudgmentResult"] = _judgment }
+                OutputData = _outputImage == null
+                    ? new Dictionary<string, object> { ["JudgmentResult"] = _judgment }
+                    : new Dictionary<string, object>
+                    {
+                        ["JudgmentResult"] = _judgment,
+                        ["Image"] = _outputImage
+                    }
             });
         }
 

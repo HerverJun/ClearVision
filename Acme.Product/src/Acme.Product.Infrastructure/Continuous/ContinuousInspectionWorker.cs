@@ -34,6 +34,7 @@ public sealed class ContinuousInspectionWorker
         ICameraFrameStreamCoordinator streamCoordinator,
         IFlowExecutionService flowExecution,
         IInspectionResultChannelWriter resultChannelWriter,
+        IInspectionImagePersistenceService imagePersistenceService,
         IInspectionEventBus eventBus,
         CancellationToken cancellationToken,
         Func<ContinuousInspectionMode>? resolveCurrentMode = null)
@@ -90,6 +91,7 @@ public sealed class ContinuousInspectionWorker
             AppendRuntimeMetrics(result, outputData, metrics.Snapshot(), scheduler.Snapshot(), streamCoordinator.SnapshotFrameBufferStats(cameraId));
             if (mode == ContinuousInspectionMode.Primary)
             {
+                await imagePersistenceService.PersistAsync(result, cancellationToken);
                 await resultChannelWriter.WriteAsync(result, cancellationToken);
                 await PublishResultEventAsync(eventBus, projectId, sessionId, result, cancellationToken);
             }

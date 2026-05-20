@@ -37,6 +37,7 @@ public class InspectionService : IInspectionService
     private readonly IImageCacheRepository _imageCacheRepository;
     private readonly IAnalysisDataBuilder _analysisDataBuilder;
     private readonly IProjectFlowStorage _flowStorage;
+    private readonly IInspectionImagePersistenceService? _imagePersistenceService;
     private readonly ILogger<InspectionService> _logger;
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -55,7 +56,8 @@ public class InspectionService : IInspectionService
         IImageCacheRepository imageCacheRepository,
         IAnalysisDataBuilder analysisDataBuilder,
         IProjectFlowStorage flowStorage,
-        ILogger<InspectionService> logger)
+        ILogger<InspectionService> logger,
+        IInspectionImagePersistenceService? imagePersistenceService = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -69,6 +71,7 @@ public class InspectionService : IInspectionService
         _imageCacheRepository = imageCacheRepository;
         _analysisDataBuilder = analysisDataBuilder;
         _flowStorage = flowStorage;
+        _imagePersistenceService = imagePersistenceService;
         _logger = logger;
     }
 
@@ -651,6 +654,12 @@ public class InspectionService : IInspectionService
 
     private async Task PersistResultImageAsync(InspectionResult result, CancellationToken cancellationToken)
     {
+        if (_imagePersistenceService != null)
+        {
+            await _imagePersistenceService.PersistAsync(result, cancellationToken);
+            return;
+        }
+
         if (result.OutputImage == null || result.OutputImage.Length == 0)
         {
             return;
