@@ -150,10 +150,10 @@ export function createViewManager(options) {
                 break;
             }
             case 'results': {
-                containers.stations?.classList.remove('hidden');
-                const monitorView = await ensureStationMonitorView();
-                await monitorView?.activate?.();
-                monitorView?.focusResultsWorkbench?.();
+                containers.results?.classList.remove('hidden');
+                const panel = await ensureResultPanel();
+                await loadInspectionHistory?.();
+                panel?.render?.();
                 break;
             }
             case 'stations': {

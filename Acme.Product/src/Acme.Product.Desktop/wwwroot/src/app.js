@@ -170,9 +170,63 @@ function isInspectionActiveForBackgroundWork() {
 }
 let aiPanelModulePromise = null;
 
-// 自动保存定时器
+// 本机草稿备份定时器
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
+const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
+const promptedLocalDraftKeys = new Set();
+
+function getFlowNodeCount(flow) {
+    const nodes = flow?.nodes || flow?.Nodes || [];
+    if (Array.isArray(nodes)) {
+        return nodes.length;
+    }
+
+    if (nodes && typeof nodes === 'object') {
+        return Object.keys(nodes).length;
+    }
+
+    return 0;
+}
+
+function readLocalDraftBackup() {
+    try {
+        const raw = localStorage.getItem(LOCAL_DRAFT_BACKUP_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        debugLogger.warn('[LocalDraftBackup] 本机草稿读取失败:', error);
+        return null;
+    }
+}
+
+function saveLocalDraftBackup(project, flow, source = 'timer') {
+    if (!project || !flow) {
+        return null;
+    }
+
+    const backup = {
+        projectId: project.id,
+        projectName: project.name || '',
+        timestamp: new Date().toISOString(),
+        source,
+        nodeCount: getFlowNodeCount(flow),
+        flow
+    };
+
+    localStorage.setItem(LOCAL_DRAFT_BACKUP_KEY, JSON.stringify(backup));
+    return backup;
+}
+
+function clearLocalDraftBackup(projectId = null) {
+    const backup = readLocalDraftBackup();
+    if (!backup) {
+        return;
+    }
+
+    if (!projectId || backup.projectId === projectId) {
+        localStorage.removeItem(LOCAL_DRAFT_BACKUP_KEY);
+    }
+}
 
 function loadProjectViewModule() {
     if (!projectViewModulePromise) {
@@ -292,6 +346,8 @@ async function handleProjectChange(project) {
     resultPanel?.setProjectContext?.(project.id);
     resultPanel?.clear?.();
 
+    promptLocalDraftRestore(project);
+
     setCurrentView('flow');
     syncActiveNavButton('flow');
     await switchView('flow');
@@ -310,6 +366,50 @@ function syncCurrentProjectFlowFromCanvas() {
     const flow = flowCanvas.serialize();
     projectManager.updateFlow(flow);
     return flow;
+}
+
+function promptLocalDraftRestore(project) {
+    if (!project || !flowCanvas) {
+        return;
+    }
+
+    const backup = readLocalDraftBackup();
+    const promptKey = `${backup?.projectId || ''}:${backup?.timestamp || ''}`;
+    if (!backup || backup.projectId !== project.id || promptedLocalDraftKeys.has(promptKey)) {
+        return;
+    }
+
+    const currentFlow = typeof flowCanvas.serialize === 'function' ? flowCanvas.serialize() : project.flow;
+    if (JSON.stringify(currentFlow || null) === JSON.stringify(backup.flow || null)) {
+        return;
+    }
+
+    promptedLocalDraftKeys.add(promptKey);
+
+    const backupTime = backup.timestamp ? new Date(backup.timestamp).toLocaleString() : '未知时间';
+    const currentNodeCount = getFlowNodeCount(currentFlow);
+    const backupNodeCount = Number.isFinite(backup.nodeCount) ? backup.nodeCount : getFlowNodeCount(backup.flow);
+    const shouldRestore = window.confirm([
+        '检测到本机草稿备份。',
+        '',
+        `工程：${backup.projectName || project.name || project.id}`,
+        `备份时间：${backupTime}`,
+        `当前节点数：${currentNodeCount}`,
+        `草稿节点数：${backupNodeCount}`,
+        '',
+        '本机草稿仅保存在当前电脑浏览器缓存中，不等同于正式工程保存。',
+        '是否恢复这份草稿到当前流程画布？'
+    ].join('\n'));
+
+    if (!shouldRestore) {
+        return;
+    }
+
+    withProjectFlowSyncSuppressed(() => {
+        flowCanvas.deserialize(backup.flow);
+    });
+    projectManager.updateFlow(backup.flow);
+    showToast('已恢复本机草稿；请点击“保存工程”写入正式工程库。', 'warning');
 }
 
 function withProjectFlowSyncSuppressed(action) {
@@ -343,7 +443,7 @@ function initializeStudioPerformanceGuards() {
 
     studioPerformanceGuardsInitialized = true;
     const unsubscribe = eventBus.on('view:changed', ({ view } = {}) => {
-        if (view !== 'stations' && view !== 'results') {
+        if (view !== 'stations') {
             stationMonitorView?.deactivate?.();
         }
 
@@ -427,6 +527,23 @@ async function bootstrapApp() {
  */
 function initializeNavigation() {
     getViewManager().bindNavigation();
+    document.querySelectorAll('[data-open-view]').forEach((button) => {
+        if (button.dataset.cvOpenViewBound) {
+            return;
+        }
+
+        button.dataset.cvOpenViewBound = 'true';
+        button.addEventListener('click', () => {
+            const view = button.dataset.openView;
+            if (!view) {
+                return;
+            }
+
+            setCurrentView(view);
+            syncActiveNavButton(view);
+            void switchView(view).catch(error => handleFeatureLoadError('视图切换', error));
+        });
+    });
 }
 
 function handleFeatureLoadError(featureName, error) {
@@ -1140,8 +1257,8 @@ async function initializeOperatorLibrary() {
         renderOperatorLibrary(operators);
     } catch (error) {
         console.error('[App] 加载算子库失败:', error);
-        // 使用默认算子数据
-        renderOperatorLibrary(getDeprecatedDefaultOperators());
+        renderOperatorLibrary([]);
+        showToast('算子库服务不可用，未展示默认演示算子', 'warning');
     }
 }
 
@@ -1156,6 +1273,14 @@ function renderOperatorLibrary(operators) {
 
     const categories = groupByCategory(Array.isArray(operators) ? operators : []);
     const fragment = document.createDocumentFragment();
+
+    if (Object.keys(categories).length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-text';
+        empty.textContent = '算子库暂无可用数据，请检查服务连接后刷新。';
+        container.replaceChildren(empty);
+        return;
+    }
 
     Object.entries(categories).forEach(([category, items]) => {
         const categoryElement = document.createElement('div');
@@ -1211,21 +1336,6 @@ function groupByCategory(operators) {
         acc[category].push(op);
         return acc;
     }, {});
-}
-
-/**
- * 获取默认算子数据
- */
-function getDeprecatedDefaultOperators() {
-    return [];
-    /*
-        { type: 'ImageAcquisition', displayName: '图像采集', category: '输入', iconName: 'camera' },
-        { type: 'Filtering', displayName: '滤波', category: '预处理', iconName: 'filter' },
-        { type: 'EdgeDetection', displayName: '边缘检测', category: '特征提取', iconName: 'edge' },
-        { type: 'Thresholding', displayName: '二值化', category: '预处理', iconName: 'threshold' },
-        { type: 'ResultOutput', displayName: '结果输出', category: '输出', iconName: 'output' }
-    ];
-    */
 }
 
 /**
@@ -1412,7 +1522,7 @@ function initializeFlowEditor() {
     serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
     debugLogger.debug('[App] 流程编辑器交互增强已启用');
     
-    // 【阶段B】启动自动保存
+    // 【阶段B】启动本机草稿备份
     startAutoSave();
     
     debugLogger.debug('[App] 流程编辑器初始化完成');
@@ -1691,7 +1801,7 @@ async function handleThemeChanged({ previousTheme, nextTheme }) {
 }
 
 /**
- * 【阶段B-B4】启动自动保存
+ * 【阶段B-B4】启动本机草稿备份
  * 【修复】防止重复启动定时器
  */
 function startAutoSave() {
@@ -1700,60 +1810,51 @@ function startAutoSave() {
     
     autoSaveInterval = setInterval(async () => {
         if (isInspectionActiveForBackgroundWork()) {
-            debugLogger.debug('[AutoSave] 检测运行中，跳过本轮自动保存');
+            debugLogger.debug('[LocalDraftBackup] 检测运行中，跳过本轮本机草稿备份');
             return;
         }
 
         const project = getCurrentProject();
-    if (project && flowCanvas && flowCanvas.nodes.size > 0) {
+        if (project && flowCanvas && flowCanvas.nodes.size > 0) {
             try {
                 // 更新流程数据
-        project.flow = flowCanvas.serialize();
-                // 保存到本地存储作为备份
-                localStorage.setItem('cv_autosave_backup', JSON.stringify({
-                    projectId: project.id,
-                    timestamp: new Date().toISOString(),
-                    flow: project.flow
-                }));
-                debugLogger.debug('[AutoSave] 自动保存完成:', new Date().toLocaleTimeString());
+                project.flow = flowCanvas.serialize();
+                saveLocalDraftBackup(project, project.flow, 'timer');
+                debugLogger.debug('[LocalDraftBackup] 本机草稿备份完成:', new Date().toLocaleTimeString());
             } catch (err) {
-                console.error('[AutoSave] 自动保存失败:', err);
+                console.error('[LocalDraftBackup] 本机草稿备份失败:', err);
             }
         }
     }, AUTO_SAVE_DELAY);
     
-    debugLogger.debug('[AutoSave] 自动保存已启动，间隔:', AUTO_SAVE_DELAY / 1000 / 60, '分钟');
+    debugLogger.debug('[LocalDraftBackup] 本机草稿备份已启动，间隔:', AUTO_SAVE_DELAY / 1000 / 60, '分钟');
 }
 
 /**
- * 【阶段B-B4】停止自动保存
+ * 【阶段B-B4】停止本机草稿备份
  */
 function stopAutoSave() {
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
-        debugLogger.debug('[AutoSave] 自动保存已停止');
+        debugLogger.debug('[LocalDraftBackup] 本机草稿备份已停止');
     }
 }
 
 /**
- * 【阶段B-B4】立即执行自动保存
+ * 【阶段B-B4】立即执行本机草稿备份
  */
 async function triggerAutoSave() {
     const project = getCurrentProject();
     if (project && flowCanvas) {
         try {
-        project.flow = flowCanvas.serialize();
-            localStorage.setItem('cv_autosave_backup', JSON.stringify({
-                projectId: project.id,
-                timestamp: new Date().toISOString(),
-                flow: project.flow
-            }));
-            debugLogger.debug('[AutoSave] 手动触发保存完成');
-            showToast('流程草稿已保存到本地缓存', 'success');
+            project.flow = flowCanvas.serialize();
+            saveLocalDraftBackup(project, project.flow, 'manual');
+            debugLogger.debug('[LocalDraftBackup] 手动触发本机草稿备份完成');
+            showToast('本机草稿备份已更新；正式工程仍需点击“保存工程”。', 'success');
         } catch (err) {
-            console.error('[AutoSave] 手动保存失败:', err);
-            showToast('本地草稿保存失败', 'error');
+            console.error('[LocalDraftBackup] 手动备份失败:', err);
+            showToast('本机草稿备份失败', 'error');
         }
     }
 }
@@ -1864,19 +1965,19 @@ async function exportRuntimePackage(projectId = null) {
 
         const response = await httpClient.post(`/projects/${targetProjectId}/runtime-package/export`, requestBody);
 
-        showToast('Runtime Package 导出成功', 'success');
+        showToast('运行包导出成功', 'success');
         Dialog.alert(
-            'Runtime Package 已导出',
+            '运行包已导出',
             `路径: ${response.packageRootPath || '-'}<br>FlowHash: ${response.flowHash || '-'}`,
             null
         );
     } catch (err) {
-        console.error('[Export] Runtime Package export failed:', err);
+        console.error('[Export] 运行包导出失败:', err);
         const msg = err.message || '未知错误';
         if (msg.includes('\n')) {
             Dialog.alert('导出失败', msg.replace(/\n/g, '<br>'), null);
         } else {
-            showToast(`Runtime Package 导出失败: ${msg}`, 'error');
+            showToast(`运行包导出失败: ${msg}`, 'error');
         }
     }
 }
@@ -1895,12 +1996,12 @@ function showProjectExportDialog() {
                 </div>
             </div>
             <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
-                <div style="font-weight:600; margin-bottom:4px;">Project JSON</div>
+                <div style="font-weight:600; margin-bottom:4px;">工程文件</div>
                 <div style="color:var(--text-muted); font-size:12px;">导出可继续在 Studio 中编辑的工程快照。</div>
             </div>
             <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
-                <div style="font-weight:600; margin-bottom:4px;">Runtime Package</div>
-                <div style="color:var(--text-muted); font-size:12px;">导出可供 Station 使用的运行包；如果选中当前已打开工程，会带上画布上的最新修改。</div>
+                <div style="font-weight:600; margin-bottom:4px;">运行包</div>
+                <div style="color:var(--text-muted); font-size:12px;">导出可供工站使用的运行包；如果选中当前已打开工程，会带上画布上的最新修改。</div>
             </div>
         </div>
     `;
@@ -1917,7 +2018,7 @@ function showProjectExportDialog() {
         onClick: () => closeModal(modalOverlay)
     });
     const btnJson = createButton({
-        text: 'Project JSON',
+        text: '导出工程文件',
         type: 'secondary',
         disabled: true,
         onClick: async () => {
@@ -1932,7 +2033,7 @@ function showProjectExportDialog() {
         }
     });
     const btnRuntime = createButton({
-        text: 'Runtime Package',
+        text: '导出运行包',
         disabled: true,
         onClick: async () => {
             const selectedProjectId = projectSelect.value;
@@ -2296,22 +2397,22 @@ function showWelcomeScreen() {
     welcomeOverlay.innerHTML = `
         <div class="welcome-content">
             <h2 class="welcome-title">欢迎使用 ClearVision</h2>
-            <p class="welcome-desc">工业级视觉检测平台，零代码搭建检测流程</p>
+            <p class="welcome-desc">打开最近工程，确认设备连接，继续现场检测任务</p>
             <div class="welcome-features">
                 <div class="welcome-feature">
-                    <div class="welcome-feature-icon">🎨</div>
-                    <div class="welcome-feature-title">拖拽式流程编排</div>
+                    <div class="welcome-feature-icon">📁</div>
+                    <div class="welcome-feature-title">打开或创建工程</div>
                 </div>
                 <div class="welcome-feature">
-                    <div class="welcome-feature-icon">🔍</div>
-                    <div class="welcome-feature-title">实时检测分析</div>
+                    <div class="welcome-feature-icon">🔌</div>
+                    <div class="welcome-feature-title">确认设备连接</div>
                 </div>
                 <div class="welcome-feature">
                     <div class="welcome-feature-icon">📊</div>
-                    <div class="welcome-feature-title">数据可视化</div>
+                    <div class="welcome-feature-title">查看最近异常</div>
                 </div>
             </div>
-            <button class="btn btn-primary" id="btn-welcome-start">开始使用</button>
+            <button class="btn btn-primary" id="btn-welcome-start">进入工作台</button>
         </div>
     `;
     

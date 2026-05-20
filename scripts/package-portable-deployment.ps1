@@ -230,8 +230,8 @@ setlocal
 pushd "%~dp0"
 
 if not exist "%ProgramFiles(x86)%\Microsoft\EdgeWebView\Application" (
-  echo [WARN] 未检测到 WebView2 Runtime。
-  echo [WARN] 如启动后白屏或初始化失败，请先运行 "Prereqs\Install Prereqs.bat"。
+  echo [WARN] WebView2 Runtime was not detected.
+  echo [WARN] If the app opens with a blank window, run "Prereqs\Install Prereqs.bat" first.
   echo.
 )
 
@@ -269,7 +269,7 @@ if exist "windowsdesktop-runtime-8.0.22-win-x64.exe" (
 )
 
 echo.
-echo 现场依赖安装完成，请重新运行 "Launch ClearVision.bat"。
+echo Prerequisite installation completed. Please run "Launch ClearVision.bat" again.
 pause
 '@
 

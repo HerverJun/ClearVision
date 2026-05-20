@@ -38,6 +38,8 @@ export class OperatorLibraryPanel {
         this.filteredOperators = [];
         this.categories = new Map();
         this.metadataByType = new Map();
+        this.operatorLoadState = 'idle';
+        this.operatorLoadError = '';
 
         // 事件回调
         this.onOperatorDragStart = null;
@@ -318,15 +320,18 @@ export class OperatorLibraryPanel {
             const operators = await this.loadOperatorsFromMetadata();
             this.operators = operators;
             this.filteredOperators = operators;
+            this.operatorLoadState = 'ready';
+            this.operatorLoadError = '';
             this.renderOperatorTree();
             showToast(`已加载 ${operators.length} 个算子`, 'success');
         } catch (error) {
             console.error('[OperatorLibraryPanel] 加载算子失败:', error);
-            // 使用默认算子数据
-            this.operators = this.getDefaultOperators();
-            this.filteredOperators = this.operators;
+            this.operators = [];
+            this.filteredOperators = [];
+            this.operatorLoadState = 'unavailable';
+            this.operatorLoadError = error?.message || '算子库服务不可用';
             this.renderOperatorTree();
-            showToast('使用默认算子数据', 'warning');
+            showToast('算子库服务不可用，已停止显示默认演示算子', 'warning');
         }
     }
 
@@ -396,152 +401,6 @@ export class OperatorLibraryPanel {
         };
     }
 
-    /**
-     * 获取默认算子数据
-     */
-    getDefaultOperators() {
-        return [
-            { 
-                type: 'ImageAcquisition', 
-                displayName: '图像采集', 
-                category: '输入', 
-                icon: '📷', 
-                description: '从相机或文件获取图像',
-                parameters: [
-                    { name: 'SourceType', displayName: '采集源', type: 'enum', dataType: 'enum', defaultValue: 'File', options: [{label: '文件', value: 'File'}, {label: '相机', value: 'Camera'}] },
-                    { name: 'CameraId', displayName: '相机', type: 'cameraBinding', dataType: 'cameraBinding', defaultValue: '' },
-                    { name: 'FilePath', displayName: '文件路径', type: 'file', dataType: 'file', defaultValue: '', description: '支持 .bmp, .png, .jpg' }
-                ]
-            },
-            { 
-                type: 'Filtering', 
-                displayName: '滤波', 
-                category: '预处理', 
-                icon: '🔍', 
-                description: '图像滤波降噪处理',
-                parameters: [
-                    { name: 'method', displayName: '滤波方法', type: 'enum', dataType: 'enum', defaultValue: 'gaussian', options: [{label: '高斯滤波', value: 'gaussian'}, {label: '中值滤波', value: 'median'}, {label: '均值滤波', value: 'mean'}] },
-                    { name: 'kernelSize', displayName: '核大小', type: 'int', dataType: 'int', defaultValue: 3, min: 3, max: 15, description: '必须为奇数' }
-                ]
-            },
-            { 
-                type: 'EdgeDetection', 
-                displayName: '边缘检测', 
-                category: '特征提取', 
-                icon: '〰️', 
-                description: '检测图像边缘特征',
-                parameters: [
-                    { name: 'algorithm', displayName: '算子类型', type: 'enum', dataType: 'enum', defaultValue: 'canny', options: [{label: 'Canny', value: 'canny'}, {label: 'Sobel', value: 'sobel'}, {label: 'Laplacian', value: 'laplacian'}] },
-                    { name: 'threshold1', displayName: '阈值 1', type: 'int', dataType: 'int', defaultValue: 50, min: 0, max: 255 },
-                    { name: 'threshold2', displayName: '阈值 2', type: 'int', dataType: 'int', defaultValue: 150, min: 0, max: 255 }
-                ]
-            },
-            { 
-                type: 'Thresholding', 
-                displayName: '二值化', 
-                category: '预处理', 
-                icon: '⚫', 
-                description: '图像阈值分割',
-                parameters: [
-                    { name: 'method', displayName: '阈值方法', type: 'enum', dataType: 'enum', defaultValue: 'fixed', options: [{label: '固定阈值', value: 'fixed'}, {label: 'Otsu', value: 'otsu'}, {label: 'Adaptive', value: 'adaptive'}] },
-                    { name: 'threshold', displayName: '阈值', type: 'int', dataType: 'int', defaultValue: 128, min: 0, max: 255 },
-                    { name: 'invert', displayName: '反转结果', type: 'bool', dataType: 'bool', defaultValue: false }
-                ]
-            },
-            { 
-                type: 'Morphology', 
-                displayName: '形态学', 
-                category: '预处理', 
-                icon: '🔄', 
-                description: '腐蚀、膨胀、开闭运算',
-                parameters: [
-                    { name: 'operation', displayName: '操作类型', type: 'enum', dataType: 'enum', defaultValue: 'erode', options: [{label: '腐蚀', value: 'erode'}, {label: '膨胀', value: 'dilate'}, {label: '开运算', value: 'open'}, {label: '闭运算', value: 'close'}] },
-                    { name: 'kernelSize', displayName: '核大小', type: 'int', dataType: 'int', defaultValue: 3, min: 3, max: 21 },
-                    { name: 'iterations', displayName: '迭代次数', type: 'int', dataType: 'int', defaultValue: 1, min: 1, max: 10 }
-                ]
-            },
-            { 
-                type: 'BlobAnalysis', 
-                displayName: 'Blob分析', 
-                category: '特征提取', 
-                icon: '🔵', 
-                description: '连通区域分析',
-                parameters: [
-                    { name: 'minArea', displayName: '最小面积', type: 'int', dataType: 'int', defaultValue: 100, min: 0 },
-                    { name: 'maxArea', displayName: '最大面积', type: 'int', dataType: 'int', defaultValue: 100000, min: 0 },
-                    { name: 'color', displayName: '目标颜色', type: 'enum', dataType: 'enum', defaultValue: 'white', options: [{label: '白色', value: 'white'}, {label: '黑色', value: 'black'}] }
-                ]
-            },
-            { 
-                type: 'TemplateMatching', 
-                displayName: '模板匹配', 
-                category: '检测', 
-                icon: '🎯', 
-                description: '图像模板匹配定位',
-                parameters: [
-                    { name: 'method', displayName: '匹配方法', type: 'enum', dataType: 'enum', defaultValue: 'ncc', options: [{label: '归一化相关 (NCC)', value: 'ncc'}, {label: '平方差 (SQDIFF)', value: 'sqdiff'}] },
-                    { name: 'threshold', displayName: '匹配分数阈值', type: 'float', dataType: 'float', defaultValue: 0.8, min: 0.1, max: 1.0 },
-                    { name: 'maxMatches', displayName: '最大匹配数', type: 'int', dataType: 'int', defaultValue: 1, min: 1, max: 100 }
-                ]
-            },
-            { 
-                type: 'Measurement', 
-                displayName: '测量', 
-                category: '检测', 
-                icon: '📏', 
-                description: '几何尺寸测量',
-                parameters: [
-                    { name: 'type', displayName: '测量类型', type: 'enum', dataType: 'enum', defaultValue: 'distance', options: [{label: '距离', value: 'distance'}, {label: '角度', value: 'angle'}, {label: '圆径', value: 'radius'}] }    
-                ]
-            },
-            { 
-                type: 'DeepLearning', 
-                displayName: '深度学习', 
-                category: 'AI检测', 
-                icon: '🧠', 
-                description: 'AI缺陷检测',
-                parameters: [
-                    { name: 'modelPath', displayName: '模型路径', type: 'file', dataType: 'file', defaultValue: '' },
-                    { name: 'confidence', displayName: '置信度阈值', type: 'float', dataType: 'float', defaultValue: 0.5, min: 0.0, max: 1.0 }
-                ]
-            },
-            { 
-                type: 'ResultOutput', 
-                displayName: '结果输出', 
-                category: '输出', 
-                icon: '📤', 
-                description: '输出检测结果',
-                parameters: [
-                    { name: 'format', displayName: '输出格式', type: 'enum', dataType: 'enum', defaultValue: 'json', options: [{label: 'JSON', value: 'json'}, {label: 'CSV', value: 'csv'}, {label: 'Text', value: 'text'}] },
-                    { name: 'saveToFile', displayName: '保存到文件', type: 'bool', dataType: 'bool', defaultValue: true }
-                ]
-            },
-            { 
-                type: 'ResultJudgment', 
-                displayName: '结果判定', 
-                category: '流程控制', 
-                icon: '⚖️', 
-                description: '通用判定逻辑（数量/范围/阈值），输出OK/NG结果',
-                inputPorts: [
-                    { name: 'Value', displayName: '输入值', dataType: 'Any', isRequired: true },
-                    { name: 'Confidence', displayName: '置信度', dataType: 'Float', isRequired: false }
-                ],
-                outputPorts: [
-                    { name: 'JudgmentResult', displayName: '判定结果', dataType: 'String' },
-                    { name: 'IsOk', displayName: '是否OK', dataType: 'Boolean' },
-                    { name: 'Details', displayName: '详细信息', dataType: 'String' }
-                ],
-                parameters: [
-                    { name: 'FieldName', displayName: '判定字段', type: 'string', dataType: 'string', defaultValue: 'Value' },
-                    { name: 'Condition', displayName: '判定条件', type: 'enum', dataType: 'enum', defaultValue: 'Equal', options: [
-                        {label: '等于', value: 'Equal'}, {label: '大于', value: 'GreaterThan'}, {label: '小于', value: 'LessThan'}, {label: '范围内', value: 'Range'}
-                    ]},
-                    { name: 'ExpectValue', displayName: '期望值', type: 'string', dataType: 'string', defaultValue: '1' }
-                ]
-            }
-        ];
-    }
-
     getOperatorIconName(operator) {
         return normalizeOperatorIconName(operator);
     }
@@ -558,6 +417,22 @@ export class OperatorLibraryPanel {
      * 渲染算子树
      */
     renderOperatorTree() {
+        if (this.filteredOperators.length === 0) {
+            this.treeView.setData([]);
+            const treeContainer = this.container.querySelector('#library-tree');
+            if (treeContainer) {
+                const message = this.operatorLoadState === 'unavailable'
+                    ? `算子库不可用。请检查服务连接后点击刷新；当前未展示可拖拽的默认演示算子。${this.operatorLoadError ? `\n原因：${this.operatorLoadError}` : ''}`
+                    : '暂无可用算子';
+                treeContainer.innerHTML = `
+                    <div class="params-empty" style="white-space:pre-line; padding:12px; line-height:1.6;">
+                        ${this.escapeHtml(message)}
+                    </div>
+                `;
+            }
+            return;
+        }
+
         // 按类别分组
         const grouped = this.groupByCategory(this.filteredOperators);
         

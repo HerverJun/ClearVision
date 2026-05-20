@@ -148,6 +148,7 @@
     ],
     "op_3": [
       "ModelPath",
+      "LabelsPath",
       "OutputFormat",
       "Confidence"
     ],
@@ -155,6 +156,30 @@
       "ExpectedLabels",
       "ExpectedCount"
     ]
+  },
+  "productionReadiness": {
+    "status": "blockedUntilConfigured",
+    "blockingStages": [
+      "run",
+      "deploy",
+      "publish"
+    ],
+    "blockingParameters": {
+      "op_2": [
+        "RoiX",
+        "RoiY",
+        "RoiW",
+        "RoiH"
+      ],
+      "op_3": [
+        "ModelPath",
+        "LabelsPath"
+      ]
+    },
+    "operatorMessages": {
+      "op_2": "到料检测 ROI 仍为 0,0,0,0 时不能进入生产运行；请在 ArrivalTrigger 节点配置实际检测区域。",
+      "op_3": "模型路径或标签路径为空时不能部署；请在 WireRootDetection 节点配置真实 ONNX 模型和标签文件。"
+    }
   },
   "runtimeNotes": [
     "Set the camera binding triggerMode to Continuous and start with targetFrameRateFps between 5 and 10.",

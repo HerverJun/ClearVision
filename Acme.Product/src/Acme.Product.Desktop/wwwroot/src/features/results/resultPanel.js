@@ -805,7 +805,8 @@ class ResultPanel {
      */
     renderKPIs() {
         const { total, ok, ng, error, avgTime } = this.statistics;
-        const yieldRate = total > 0 ? ((ok / total) * 100).toFixed(1) : '0';
+        const hasSamples = total > 0;
+        const yieldRate = hasSamples ? ((ok / total) * 100).toFixed(1) : '--';
         const timeSec = avgTime > 1000 ? (avgTime / 1000).toFixed(1) : avgTime;
         const timeUnit = avgTime > 1000 ? 's' : 'ms';
 
@@ -818,14 +819,45 @@ class ResultPanel {
         setKPI('kpi-ok', ok.toLocaleString());
         setKPI('kpi-ng', ng.toLocaleString());
         setKPI('kpi-error', error.toLocaleString());
-        setKPI('kpi-yield', `${yieldRate}%`);
-        setKPI('kpi-avg-time', `${timeSec}${timeUnit}`);
+        setKPI('kpi-yield', hasSamples ? `${yieldRate}%` : '--');
+        setKPI('kpi-avg-time', hasSamples && avgTime > 0 ? `${timeSec}${timeUnit}` : '--');
+
+        ['kpi-total-change', 'kpi-ok-change', 'kpi-ng-change', 'kpi-error-change', 'kpi-yield-change', 'kpi-time-change']
+            .forEach(id => this.renderUnavailableChange(id));
 
         // 更新时间戳
         const updateTimeEl = document.getElementById('last-update-time');
         if (updateTimeEl) {
-            updateTimeEl.textContent = '更新于 刚刚';
+            updateTimeEl.textContent = hasSamples ? `更新于 ${new Date().toLocaleTimeString([], { hour12: false })}` : '暂无更新时间';
         }
+
+        const statusText = document.querySelector('.status-pill-text');
+        if (statusText) {
+            statusText.textContent = hasSamples ? this.getDashboardDataSourceLabel() : '暂无数据';
+        }
+    }
+
+    renderUnavailableChange(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const valueEl = el.querySelector('.change-value');
+        const refEl = el.querySelector('.change-ref');
+        if (valueEl) valueEl.textContent = '--';
+        if (refEl) refEl.textContent = '无历史窗口';
+        el.classList.remove('up', 'down');
+    }
+
+    getDashboardDataSourceLabel() {
+        if (this.serverAnalysisSource === 'server') {
+            return '真实数据';
+        }
+
+        if (this.serverAnalysisSource === 'server-unavailable') {
+            return '接口不可用';
+        }
+
+        return this.serverPaged ? '已加载页数据' : '本机视图数据';
     }
     
     /**
@@ -838,16 +870,20 @@ class ResultPanel {
 
         // 更新数值文字
         const gaugeValue = document.getElementById('gauge-percentage');
-        if (gaugeValue) gaugeValue.textContent = percentage;
+        if (gaugeValue) gaugeValue.textContent = total > 0 ? percentage : '--';
 
         // 状态评级
         const gaugeStatus = document.getElementById('gauge-status');
         if (gaugeStatus) {
-            let status = 'Critical';
-            if (yieldRate >= 0.95) status = 'Excellent';
-            else if (yieldRate >= 0.85) status = 'Good';
-            else if (yieldRate >= 0.7) status = 'Warning';
-            gaugeStatus.textContent = `Status: ${status}`;
+            if (total <= 0) {
+                gaugeStatus.textContent = '状态：暂无数据';
+            } else {
+                let status = '严重';
+                if (yieldRate >= 0.95) status = '优秀';
+                else if (yieldRate >= 0.85) status = '良好';
+                else if (yieldRate >= 0.7) status = '预警';
+                gaugeStatus.textContent = `状态：${status}`;
+            }
         }
 
         // 更新 SVG 半圆弧 — 总长度 282.7，按良率比例显示
@@ -866,13 +902,18 @@ class ResultPanel {
     renderRadarChart() {
         const radarData = document.getElementById('radar-data');
         if (!radarData) return;
+        const radarPoints = document.getElementById('radar-points');
 
         // 五个维度：划伤、脏污、缺角、气泡、其他
         const dimensions = ['划伤', '脏污', '缺角', '气泡', '其他'];
         const types = Object.entries(this.defectTypes);
 
         if (types.length === 0) {
-            // 无数据时保持默认形状
+            radarData.setAttribute('points', '');
+            radarData.dataset.state = 'no-data';
+            if (radarPoints) {
+                radarPoints.innerHTML = '';
+            }
             return;
         }
 
@@ -907,6 +948,15 @@ class ResultPanel {
         });
 
         radarData.setAttribute('points', points.join(' '));
+        radarData.dataset.state = 'ready';
+        if (radarPoints) {
+            radarPoints.innerHTML = points
+                .map(point => {
+                    const [x, y] = point.split(',');
+                    return `<circle cx="${x}" cy="${y}" r="4" />`;
+                })
+                .join('');
+        }
     }
     
     /**
@@ -918,7 +968,10 @@ class ResultPanel {
         if (!areaPath || !linePath) return;
 
         if (this.trendData.length < 2) {
-            // 保持默认 Mock 路径
+            areaPath.setAttribute('d', '');
+            linePath.setAttribute('d', '');
+            areaPath.dataset.state = 'no-data';
+            linePath.dataset.state = 'no-data';
             return;
         }
 
@@ -931,7 +984,13 @@ class ResultPanel {
         });
 
         const buckets = Array.from(bucketMap.entries()).sort((a, b) => a[0] - b[0]);
-        if (buckets.length < 2) return;
+        if (buckets.length < 2) {
+            areaPath.setAttribute('d', '');
+            linePath.setAttribute('d', '');
+            areaPath.dataset.state = 'no-data';
+            linePath.dataset.state = 'no-data';
+            return;
+        }
 
         const maxCount = Math.max(...buckets.map(([, c]) => c));
         const width = 400;
@@ -959,6 +1018,8 @@ class ResultPanel {
 
         linePath.setAttribute('d', lineD);
         areaPath.setAttribute('d', areaD);
+        areaPath.dataset.state = 'ready';
+        linePath.dataset.state = 'ready';
     }
     
     /**
@@ -1089,6 +1150,7 @@ class ResultPanel {
 
         const exportContext = this.getExportPayload(format);
         if (exportContext) {
+            window.alert('将导出服务端生成的追溯报告，包含当前时间范围、筛选条件、记录总数和数据来源。');
             const blob = new Blob([exportContext.content], { type: exportContext.mimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1115,16 +1177,20 @@ class ResultPanel {
         const filenamePrefix = this.isClientFilteringServerPage()
             ? 'inspection_results_current_page'
             : 'inspection_results';
+        const exportMetadata = this.buildClientExportMetadata(format);
         
         switch (format) {
             case 'json':
-                content = JSON.stringify(this.filteredResults, null, 2);
+                content = JSON.stringify({
+                    metadata: exportMetadata,
+                    records: this.filteredResults
+                }, null, 2);
                 filename = `${filenamePrefix}_${Date.now()}.json`;
                 mimeType = 'application/json';
                 break;
             case 'csv':
             case 'excel':
-                content = this.convertToCSV(this.filteredResults);
+                content = this.convertToCSV(this.filteredResults, exportMetadata);
                 filename = `${filenamePrefix}_${Date.now()}.csv`;
                 mimeType = 'text/csv';
                 break;
@@ -1154,7 +1220,7 @@ class ResultPanel {
             if (format === 'json') {
                 return {
                     content: JSON.stringify(report, null, 2),
-                    filename: `inspection_report_${timestamp}.json`,
+                    filename: `inspection_report_server_${timestamp}.json`,
                     mimeType: 'application/json'
                 };
             }
@@ -1162,7 +1228,7 @@ class ResultPanel {
             if (format === 'csv' || format === 'excel') {
                 return {
                     content: this.convertReportToCSV(report),
-                    filename: `inspection_report_${timestamp}.csv`,
+                    filename: `inspection_report_server_${timestamp}.csv`,
                     mimeType: 'text/csv'
                 };
             }
@@ -1171,7 +1237,25 @@ class ResultPanel {
         return null;
     }
 
-    convertToCSV(results) {
+    buildClientExportMetadata(format = 'json') {
+        const { startTime, endTime } = this.getTimeRangeBounds();
+        return {
+            dataSource: this.serverPaged ? 'server-page-loaded-in-browser' : 'browser-current-results',
+            exportScope: this.isClientFilteringServerPage() ? '当前已加载页' : '当前视图筛选结果',
+            format,
+            exportedAt: new Date().toISOString(),
+            timeRange: this.timeRange,
+            startTime: startTime instanceof Date ? startTime.toISOString() : '',
+            endTime: endTime instanceof Date ? endTime.toISOString() : '',
+            statusFilter: this.filters.status,
+            defectTypeFilter: this.filters.defectType,
+            loadedCount: this.results.length,
+            filteredCount: this.filteredResults.length,
+            totalServerCount: this.serverPaged ? this.totalResultCount : this.filteredResults.length
+        };
+    }
+
+    convertToCSV(results, metadata = null) {
         const headers = ['时间', '状态', '缺陷数', '处理时间(ms)', '置信度'];
         const rows = results.map(r => [
             r.timestamp ? new Date(r.timestamp).toISOString() : '',
@@ -1180,8 +1264,29 @@ class ResultPanel {
             r.processingTime || r.executionTimeMs || '',
             r.defects?.[0]?.confidenceScore ? (r.defects[0].confidenceScore * 100).toFixed(1) + '%' : ''
         ]);
-        
-        return [this.toCsvRow(headers), ...rows.map(row => this.toCsvRow(row))].join('\n');
+
+        const metadataRows = metadata
+            ? [
+                ['导出范围', metadata.exportScope],
+                ['数据来源', metadata.dataSource],
+                ['导出时间', metadata.exportedAt],
+                ['时间范围', metadata.timeRange],
+                ['开始时间', metadata.startTime],
+                ['结束时间', metadata.endTime],
+                ['状态筛选', metadata.statusFilter],
+                ['缺陷筛选', metadata.defectTypeFilter],
+                ['已加载记录数', metadata.loadedCount],
+                ['本次导出记录数', metadata.filteredCount],
+                ['服务端总记录数', metadata.totalServerCount],
+                []
+            ]
+            : [];
+
+        return [
+            ...metadataRows.map(row => row.length === 0 ? '' : this.toCsvRow(row)),
+            this.toCsvRow(headers),
+            ...rows.map(row => this.toCsvRow(row))
+        ].join('\n');
     }
 
     toCsvRow(fields) {

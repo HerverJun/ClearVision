@@ -469,11 +469,11 @@ public class InspectionService : IInspectionService
 
             if (!flowResult.IsSuccess)
             {
-                _logger.LogWarning("[InspectionService] 娴佺▼鎵ц澶辫触: {ErrorMessage}", flowResult.ErrorMessage);
+                _logger.LogWarning("[InspectionService] 流程执行失败: {ErrorMessage}", flowResult.ErrorMessage);
             }
             else
             {
-                _logger.LogInformation("[InspectionService] 鍒ゅ畾缁撴灉: {Status}", status);
+                _logger.LogInformation("[InspectionService] 判定结果: {Status}", status);
             }
 
             var errorMessage = !flowResult.IsSuccess

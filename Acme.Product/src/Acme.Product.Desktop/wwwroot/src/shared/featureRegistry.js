@@ -12,7 +12,7 @@ const FEATURE_REGISTRY = Object.freeze({
         badge: '暂未接入',
         buttonLabel: '暂未接入',
         title: '目录选择能力暂未接入',
-        description: '当前版本仍允许直接手填路径并持久化到设置，目录选择器本身尚未接入执行链路。'
+        description: '当前版本暂不支持界面选择目录；请由管理员确认路径后手填，保存时会校验路径是否可访问。'
     }),
     'storage.immediateCleanup': Object.freeze({
         id: 'storage.immediateCleanup',
@@ -21,7 +21,7 @@ const FEATURE_REGISTRY = Object.freeze({
         badge: '暂未开放',
         buttonLabel: '暂未开放',
         title: '过期文件即时清理动作暂未接入',
-        description: '当前版本仅支持保存清理策略；即时清理动作尚未开放为正式入口。'
+        description: '当前版本仅支持保存清理策略；如需立即清理，请由管理员在数据目录按保留天数处理。'
     }),
     'operator.autotuneStrategies': Object.freeze({
         id: 'operator.autotuneStrategies',

@@ -87,7 +87,17 @@ export function bindToolbarCommands(options) {
                 }
 
                 await projectManager.saveProject(projectManager?.getCurrentProject?.() || project);
-                showToast('Project saved', 'success');
+                try {
+                    const rawBackup = localStorage.getItem('cv_autosave_backup');
+                    const backup = rawBackup ? JSON.parse(rawBackup) : null;
+                    if (!backup?.projectId || backup.projectId === project.id) {
+                        localStorage.removeItem('cv_autosave_backup');
+                    }
+                } catch {
+                    localStorage.removeItem('cv_autosave_backup');
+                }
+
+                showToast(`工程已保存到服务端工程库（版本 v${project.version || '1.0.0'}）`, 'success');
                 return;
             }
 
@@ -96,10 +106,10 @@ export function bindToolbarCommands(options) {
                 return;
             }
 
-            showToast('Create or open a project first', 'warning');
+            showToast('请先创建或打开工程', 'warning');
         } catch (error) {
             console.error('[CommandHandlers] save failed', error);
-            showToast(`Save failed: ${error?.message || error}`, 'error');
+            showToast(`保存失败: ${error?.message || error}`, 'error');
         }
     }, cleanup);
 
@@ -107,13 +117,13 @@ export function bindToolbarCommands(options) {
         try {
             const project = getCurrentProject();
             if (!project) {
-                showToast('Create or open a project first', 'warning');
+                showToast('请先创建或打开工程', 'warning');
                 return;
             }
 
             const flowCanvas = getFlowCanvas();
             if (!flowCanvas || flowCanvas.nodes?.size === 0) {
-                showToast('Add at least one operator to the flow', 'warning');
+                showToast('请先在流程中添加至少一个算子', 'warning');
                 return;
             }
 
@@ -124,7 +134,7 @@ export function bindToolbarCommands(options) {
 
             const panel = await ensureInspectionPanelReady();
             initializeInspectionImageViewer();
-            panel?.updateStatus?.('running', 'Running...');
+            panel?.updateStatus?.('running', '运行中...');
             panel?.setButtonsState?.(true);
 
             const testImage = getImageViewer()?.currentTestImage;
@@ -136,7 +146,7 @@ export function bindToolbarCommands(options) {
             await inspectionController.executeSingle();
         } catch (error) {
             console.error('[CommandHandlers] run failed', error);
-            showToast(`Inspection failed: ${error?.message || error}`, 'error');
+            showToast(`检测失败: ${error?.message || error}`, 'error');
         }
     }, cleanup);
 

@@ -134,7 +134,7 @@ class StationMonitorView {
                         <div class="sm-surface-header sm-results-header">
                             <div>
                                 <span id="sm-results-title">全站结果明细</span>
-                                <small id="sm-results-subtitle">等待真实 Station 结果</small>
+                                <small id="sm-results-subtitle">等待真实工站结果</small>
                             </div>
                             <span class="sm-meta" id="sm-results-meta">0 条记录</span>
                         </div>
@@ -675,37 +675,42 @@ class StationMonitorView {
             return;
         }
 
+        if (this.stationActionRequiresConfirmation(action) && !this.confirmStationAction(action)) {
+            return;
+        }
+
         this.commandBusy = true;
         this.commandStatusMessage = this.getActionBusyMessage(action);
         this.commandStatusLevel = 'busy';
         this.render();
+        let actionResult = null;
         try {
             switch (action) {
                 case 'ping':
-                    await this.createCommand('Ping', {});
+                    actionResult = await this.createCommand('Ping', {});
                     break;
                 case 'reload':
-                    await this.createCommand('ReloadPackage', {});
+                    actionResult = await this.createCommand('ReloadPackage', {});
                     break;
                 case 'stop':
-                    await this.createCommand('StopRuntime', {});
+                    actionResult = await this.createCommand('StopRuntime', {});
                     break;
                 case 'deploy':
-                    await this.deployLatestPackage();
+                    actionResult = await this.deployLatestPackage();
                     break;
                 case 'testDeploy':
-                    await this.createAndDeployTestPackage();
+                    actionResult = await this.createAndDeployTestPackage();
                     break;
                 default:
                     break;
             }
 
             await this.loadStationDetail(this.selectedStationId);
-            this.commandStatusMessage = this.getActionSuccessMessage(action);
+            this.commandStatusMessage = this.getActionSuccessMessage(action, actionResult);
             this.commandStatusLevel = 'success';
         } catch (error) {
             console.error('[StationMonitorView] Station action failed:', error);
-            this.commandStatusMessage = error?.message || 'Station action failed.';
+            this.commandStatusMessage = error?.message || '工站命令下发失败。';
             this.commandStatusLevel = 'error';
         } finally {
             this.commandBusy = false;
@@ -717,7 +722,7 @@ class StationMonitorView {
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/commands`, {
             commandType,
             payloadJson: JSON.stringify(payload || {}),
-            issuedBy: 'Studio'
+            issuedBy: this.getCommandIssuer()
         });
     }
 
@@ -729,8 +734,76 @@ class StationMonitorView {
 
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
             packageId,
-            issuedBy: 'Studio'
+            issuedBy: this.getCommandIssuer()
         });
+    }
+
+    stationActionRequiresConfirmation(action) {
+        return ['stop', 'deploy', 'testDeploy'].includes(action);
+    }
+
+    getStationActionMeta(action) {
+        switch (action) {
+            case 'stop':
+                return {
+                    title: '停止运行',
+                    impact: '可能中断当前工站节拍，并让正在执行的检测进入停止流程。',
+                    confirmHint: '确认现场允许停机后再继续。'
+                };
+            case 'deploy':
+                return {
+                    title: '部署运行包',
+                    impact: '会向工站下发新的运行包，工站轮询执行后可能替换当前检测配置。',
+                    confirmHint: '请确认当前产线允许变更配置。'
+                };
+            case 'testDeploy':
+                return {
+                    title: '生成测试包并下发',
+                    impact: '会生成测试运行包并下发到工站，仅应用于调试或验收场景。',
+                    confirmHint: '请勿在生产节拍中误下发测试包。'
+                };
+            default:
+                return {
+                    title: '执行命令',
+                    impact: '将向当前工站下发命令。',
+                    confirmHint: '请确认后继续。'
+                };
+        }
+    }
+
+    confirmStationAction(action) {
+        const station = this.selectedStationDetail || this.stations.get(this.selectedStationId) || {};
+        const meta = this.getStationActionMeta(action);
+        const stationName = station.stationName || station.lineName || station.machineName || '未命名工作站';
+        const state = this.formatState(station.state, this.computeIsOnline(station));
+        const packageId = station.packageId || this.packages[0]?.packageId || this.packages[0]?.PackageId || '--';
+        const lines = [
+            `即将执行：${meta.title}`,
+            '',
+            `工站：${stationName}`,
+            `标识：${this.selectedStationId}`,
+            `当前状态：${state}`,
+            `当前/目标包：${packageId}`,
+            '',
+            `影响范围：${meta.impact}`,
+            meta.confirmHint,
+            '',
+            '该操作会记录操作人、时间和命令 ID。确认继续？'
+        ];
+
+        return window.confirm(lines.join('\n'));
+    }
+
+    getCommandIssuer() {
+        const user = window.currentUser || {};
+        return user.displayName || user.username || 'Studio';
+    }
+
+    formatCommandAck(result) {
+        const commandId = result?.commandId ?? result?.CommandId ?? result?.id ?? result?.Id ?? '--';
+        const issuer = this.getCommandIssuer();
+        const issuedAt = new Date().toLocaleString();
+        return `审计：操作人 ${issuer}，时间 ${issuedAt}，命令 ID ${commandId}`;
     }
 
     getActionBusyMessage(action) {
@@ -750,20 +823,21 @@ class StationMonitorView {
         }
     }
 
-    getActionSuccessMessage(action) {
+    getActionSuccessMessage(action, result = null) {
+        const audit = this.formatCommandAck(result);
         switch (action) {
             case 'testDeploy':
-                return '测试包已生成，部署命令已下发；等待 Station 轮询执行。';
+                return `测试包已生成，部署命令已下发；等待工站轮询执行；${audit}`;
             case 'deploy':
-                return '部署命令已下发；等待 Station 轮询执行。';
+                return `部署命令已下发；等待工站轮询执行；${audit}`;
             case 'reload':
-                return '重载命令已下发。';
+                return `重载命令已下发；${audit}`;
             case 'stop':
-                return '停止命令已下发。';
+                return `停止命令已下发；${audit}`;
             case 'ping':
-                return 'Ping 命令已下发。';
+                return `Ping 命令已下发；${audit}`;
             default:
-                return '命令已下发。';
+                return `命令已下发；${audit}`;
         }
     }
 
@@ -777,7 +851,7 @@ class StationMonitorView {
         this.packages = await httpClient.get('/station-packages').catch(() => this.packages);
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
             packageId,
-            issuedBy: 'Studio'
+            issuedBy: this.getCommandIssuer()
         });
     }
 
@@ -849,7 +923,7 @@ class StationMonitorView {
             this.matrix.innerHTML = `
                 <div class="sm-empty is-center">
                     <strong>暂无工作站数据</strong>
-                    <span>等待 Station 通过 /hubs/station-ingest 注册、心跳和上报结果。</span>
+                    <span>等待工站通过 /hubs/station-ingest 注册、心跳和上报结果。</span>
                 </div>
             `;
             return;
@@ -904,7 +978,7 @@ class StationMonitorView {
             this.focus.innerHTML = `
                 <div class="sm-empty is-center">
                     <strong>当前为全站监控</strong>
-                    <span>选择左侧某个工作站后，健康、日志、命令和结果明细会联动到该 Station。</span>
+                    <span>选择左侧某个工作站后，健康、日志、命令和结果明细会联动到该工站。</span>
                 </div>
             `;
             return;
@@ -920,8 +994,15 @@ class StationMonitorView {
         const recentCommands = Array.isArray(detail.recentCommands) ? detail.recentCommands : [];
         const latestHealth = recentHealth[0] || detail;
         const actionsDisabled = this.commandBusy ? 'disabled' : '';
-        const deployDisabled = this.commandBusy || this.packages.length === 0 ? 'disabled' : '';
-        const testDeployDisabled = this.commandBusy ? 'disabled' : '';
+        const productionActionDisabled = this.commandBusy || !isOnline
+            ? 'disabled title="工站离线或状态未知，不能下发会影响生产的命令"'
+            : '';
+        const deployDisabled = this.commandBusy || !isOnline || this.packages.length === 0
+            ? 'disabled title="工站离线、状态未知或暂无运行包，不能部署"'
+            : '';
+        const testDeployDisabled = this.commandBusy || !isOnline
+            ? 'disabled title="工站离线或状态未知，不能下发测试包"'
+            : '';
 
         this.focusMeta.textContent = isOnline ? '实时详情' : '已超时';
         this.focus.innerHTML = `
@@ -936,9 +1017,9 @@ class StationMonitorView {
             <div class="sm-detail-actions">
                 <button type="button" data-station-action="ping" ${actionsDisabled}>Ping</button>
                 <button type="button" data-station-action="reload" ${actionsDisabled}>重载</button>
-                <button type="button" data-station-action="stop" ${actionsDisabled}>停止</button>
-                <button type="button" data-station-action="deploy" ${deployDisabled}>部署</button>
-                <button type="button" class="sm-action-wide" data-station-action="testDeploy" ${testDeployDisabled}>生成测试包并下发</button>
+                <button type="button" data-station-action="stop" data-risk="production-impact" ${productionActionDisabled}>停止运行</button>
+                <button type="button" data-station-action="deploy" data-risk="configuration-change" ${deployDisabled}>部署运行包</button>
+                <button type="button" class="sm-action-wide" data-station-action="testDeploy" data-risk="configuration-change" ${testDeployDisabled}>下发测试包</button>
             </div>
             ${this.commandStatusMessage
                 ? `<div class="sm-command-status" data-level="${this.escapeHtml(this.commandStatusLevel)}">${this.escapeHtml(this.commandStatusMessage)}</div>`
@@ -1097,8 +1178,8 @@ class StationMonitorView {
         const totalPages = Math.max(1, Math.ceil(this.monitorTotalCount / this.monitorPageSize));
         this.resultsTitle.textContent = `${scopeLabel}结果明细`;
         this.resultsSubtitle.textContent = this.selectedStationId
-            ? '已按选中 Station 过滤'
-            : '默认汇总所有已接入 Station';
+            ? '已按选中工站过滤'
+            : '默认汇总所有已接入工站';
         this.resultsMeta.textContent = this.resultLoading
             ? '加载中'
             : `${this.monitorTotalCount} 条记录`;
@@ -1171,7 +1252,7 @@ class StationMonitorView {
             this.resultList.innerHTML = `
                 <div class="sm-empty is-center">
                     <strong>暂无结果</strong>
-                    <span>没有真实 Station 结果命中当前范围和筛选条件。</span>
+                    <span>没有真实工站结果命中当前范围和筛选条件。</span>
                 </div>
             `;
         } else {
@@ -1668,15 +1749,15 @@ class StationMonitorView {
 
     convertResultsToCsv(records) {
         const headers = [
-            'StationId',
-            'Station',
-            'SequenceId',
-            'Status',
-            'DiagnosticCode',
-            'DiagnosticMessage',
-            'ExecutionTimeMs',
-            'CompletedAtUtc',
-            'PackageName'
+            '工站ID',
+            '工站名称',
+            '序列号',
+            '状态',
+            '诊断码',
+            '诊断信息',
+            '耗时毫秒',
+            '完成时间UTC',
+            '运行包名称'
         ];
         const rows = records.map((record) => [
             record.stationId,

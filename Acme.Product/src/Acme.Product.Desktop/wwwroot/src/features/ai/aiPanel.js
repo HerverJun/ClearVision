@@ -374,7 +374,7 @@ export class AiPanel {
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
                                 <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
                             </svg>
-                            应用到环境
+                            应用到当前流程草稿
                         </button>
                     </div>
                 </aside>
@@ -4979,7 +4979,7 @@ export class AiPanel {
                 </div>
                 <div class="ai-apply-preview-actions">
                     <button class="ai-apply-preview-cancel" type="button">取消</button>
-                    <button class="ai-apply-preview-confirm" type="button">确认应用</button>
+                    <button class="ai-apply-preview-confirm" type="button">确认应用到流程草稿</button>
                 </div>
             </div>
         `;

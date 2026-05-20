@@ -520,11 +520,11 @@ class InspectionPanel {
                     <div class="run-mode-section" style="margin-bottom: 12px;">
                         <label class="form-label" style="display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary);">运行模式</label>
                         <select id="run-mode" class="form-select cv-input" style="width: 100%; border-radius: 6px;">
-                            <option value="camera">相机驱动 (Camera)</option>
-                            <option value="flow">流程驱动 (PLC触发)</option>
+                            <option value="camera">相机采集触发</option>
+                            <option value="flow">流程触发（PLC）</option>
                         </select>
                         <small style="display: block; margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
-                            <span id="run-mode-desc">相机驱动：由相机采集触发检测</span>
+                            <span id="run-mode-desc">相机采集触发：由相机采集启动检测</span>
                         </small>
                     </div>
                     
@@ -573,7 +573,7 @@ class InspectionPanel {
                         </div>
                         <div class="counter-item counter-error">
                             <span class="counter-value" id="counter-error">0</span>
-                            <span class="counter-label">ERROR</span>
+                            <span class="counter-label">异常</span>
                         </div>
                         <div class="counter-item counter-yield">
                             <span class="counter-value" id="counter-yield">0%</span>
@@ -584,7 +584,7 @@ class InspectionPanel {
 
                 <!-- 耗时统计 (移至左侧) -->
                 <div class="inspection-section timing-section cv-control-card">
-                    <h4 class="section-title">耗时统计 (CYCLE TIME)</h4>
+                    <h4 class="section-title">节拍耗时</h4>
                     <div class="timing-stats" id="timing-stats-panel">
                         <div class="timing-item">
                             <span class="timing-label">平均</span>
@@ -654,8 +654,8 @@ class InspectionPanel {
                 const descEl = this.container.querySelector('#run-mode-desc');
                 if (descEl) {
                     descEl.textContent = this.selectedRunMode === 'flow' 
-                        ? '流程驱动：流程内PLC读取算子等待触发信号'
-                        : '相机驱动：由相机采集触发检测';
+                        ? '流程触发：流程内 PLC 读取算子等待触发信号'
+                        : '相机采集触发：由相机采集启动检测';
                 }
             });
         }

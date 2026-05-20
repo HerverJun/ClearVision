@@ -80,8 +80,8 @@
                         <button class="nav-btn" data-view="inspection">
                             检测
                         </button>
-                        <button class="nav-btn hidden" data-view="results" aria-hidden="true" tabindex="-1">
-                            结果
+                        <button class="nav-btn" data-view="results">
+                            追溯
                         </button>
                         <button class="nav-btn" data-view="stations">
                             监控
@@ -246,7 +246,7 @@
                         >
                             <div class="panel">
                                 <!-- 分析卡片区 (新增) -->
-                                <h3 class="panel-title">ANALYSIS</h3>
+                                <h3 class="panel-title">检测分析</h3>
                                 <div class="analysis-cards-container" id="analysis-cards-container">
                                     <p class="empty-text">等待检测结果...</p>
                                 </div>
@@ -256,8 +256,16 @@
                                     class="panel-title"
                                     style="margin-top: 24px"
                                 >
-                                    RECENT RESULTS
+                                    最近结果
                                 </h3>
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    data-open-view="results"
+                                    style="width:100%; margin:8px 0 12px; padding:6px 10px; font-size:12px;"
+                                >
+                                    查看全部结果
+                                </button>
                                 <div
                                     class="inspection-recent-results-grid"
                                     id="inspection-recent-results-grid"
@@ -371,7 +379,7 @@
                         <div class="results-view-header">
                             <div>
                                 <h2>实时生产看板</h2>
-                                <p class="results-view-subtitle" id="production-line-info">2号生产线 视觉质检节点 A-04</p>
+                                <p class="results-view-subtitle" id="production-line-info">未选择产线 / 等待真实结果数据</p>
                             </div>
                             <div style="display:flex;align-items:center;gap:16px;">
                                 <div class="time-range-selector">
@@ -382,8 +390,8 @@
                                 </div>
                                 <div class="status-pill">
                                     <span class="status-dot"></span>
-                                    <span class="status-pill-text">监控运行中</span>
-                                    <span class="status-pill-time" id="last-update-time">更新于 10秒前</span>
+                                    <span class="status-pill-text">等待数据</span>
+                                    <span class="status-pill-time" id="last-update-time">暂无更新时间</span>
                                 </div>
                             </div>
                         </div>
@@ -396,8 +404,8 @@
                                     <span class="kpi-value-v3" id="kpi-total">0</span>
                                     <div class="kpi-change-v3 up" id="kpi-total-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
-                                        <span class="change-value">+5.2%</span>
-                                        <span class="change-ref">较昨日</span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
                                     </div>
                                 </div>
                             </div>
@@ -407,8 +415,8 @@
                                     <span class="kpi-value-v3" id="kpi-ok">0</span>
                                     <div class="kpi-change-v3 up" id="kpi-ok-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
-                                        <span class="change-value">+6.1%</span>
-                                        <span class="change-ref">较昨日</span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
                                     </div>
                                 </div>
                             </div>
@@ -418,8 +426,8 @@
                                     <span class="kpi-value-v3" id="kpi-ng">0</span>
                                     <div class="kpi-change-v3 down" id="kpi-ng-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
-                                        <span class="change-value">-1.5%</span>
-                                        <span class="change-ref">较昨日</span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
                                     </div>
                                 </div>
                             </div>
@@ -429,8 +437,8 @@
                                     <span class="kpi-value-v3 error" id="kpi-error">0</span>
                                     <div class="kpi-change-v3 down" id="kpi-error-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
-                                        <span class="change-value">-0.8%</span>
-                                        <span class="change-ref">较昨日</span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
                                     </div>
                                 </div>
                             </div>
@@ -440,8 +448,8 @@
                                     <span class="kpi-value-v3" id="kpi-yield">0%</span>
                                     <div class="kpi-change-v3 up" id="kpi-yield-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg></span>
-                                        <span class="change-value">+0.8%</span>
-                                        <span class="change-ref">较昨日</span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
                                     </div>
                                 </div>
                             </div>
@@ -451,8 +459,8 @@
                                     <span class="kpi-value-v3" id="kpi-avg-time">0<span class="kpi-unit-v3">ms</span></span>
                                     <div class="kpi-change-v3 down" id="kpi-time-change">
                                         <span class="arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
-                                        <span class="change-value">-0.1s</span>
-                                        <span class="change-ref">较昨日</span>
+                                        <span class="change-value">--</span>
+                                        <span class="change-ref">无历史窗口</span>
                                     </div>
                                 </div>
                             </div>
@@ -489,7 +497,7 @@
                                         </svg>
                                         <div class="gauge-value-overlay">
                                             <div class="gauge-value"><span id="gauge-percentage">0</span><span class="gauge-value-unit">%</span></div>
-                                            <div class="gauge-status" id="gauge-status">Status: --</div>
+                                            <div class="gauge-status" id="gauge-status">状态：暂无数据</div>
                                         </div>
                                     </div>
                                 </div>
@@ -514,14 +522,8 @@
                                             <line x1="100" y1="100" x2="53" y2="165" />
                                             <line x1="100" y1="100" x2="24" y2="75" />
                                         </g>
-                                        <polygon id="radar-data" class="chart-glow" fill="#ffdad7" fill-opacity="0.6" points="100,35 145,85 137,151 81,125 46,82" stroke="#af262c" stroke-width="2" />
-                                        <g fill="#b2292e" stroke="#fff" stroke-width="1.5">
-                                            <circle cx="100" cy="35" r="4" />
-                                            <circle cx="145" cy="85" r="4" />
-                                            <circle cx="137" cy="151" r="4" />
-                                            <circle cx="81" cy="125" r="4" />
-                                            <circle cx="46" cy="82" r="4" />
-                                        </g>
+                                        <polygon id="radar-data" class="chart-glow" fill="#ffdad7" fill-opacity="0.6" points="" stroke="#af262c" stroke-width="2" />
+                                        <g id="radar-points" fill="#b2292e" stroke="#fff" stroke-width="1.5"></g>
                                         <g fill="#59413f" font-family="Inter, sans-serif" font-size="10" font-weight="600">
                                             <text x="100" y="12" text-anchor="middle">划伤</text>
                                             <text x="182" y="78" text-anchor="start">脏污</text>
@@ -556,8 +558,8 @@
                                                 <line x1="0" y1="80" x2="400" y2="80" />
                                                 <line x1="0" y1="120" x2="400" y2="120" />
                                             </g>
-                                            <path id="throughput-area" d="M 0 100 C 40 100, 60 50, 100 60 C 140 70, 160 30, 200 40 C 240 50, 260 90, 300 80 C 340 70, 360 20, 400 30 L 400 160 L 0 160 Z" fill="url(#areaGradient)" />
-                                            <path id="throughput-line" class="chart-glow" d="M 0 100 C 40 100, 60 50, 100 60 C 140 70, 160 30, 200 40 C 240 50, 260 90, 300 80 C 340 70, 360 20, 400 30" fill="none" stroke="#af262c" stroke-width="2.5" stroke-linecap="round" />
+                                            <path id="throughput-area" d="" fill="url(#areaGradient)" />
+                                            <path id="throughput-line" class="chart-glow" d="" fill="none" stroke="#af262c" stroke-width="2.5" stroke-linecap="round" />
                                         </svg>
                                         <div class="area-chart-xlabels">
                                             <span>08:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span>
@@ -574,7 +576,7 @@
                                     <span class="stat-card-label">制程能力指数 (CPK)</span>
                                     <div>
                                         <span class="stat-card-value" id="stat-cpk">--</span>
-                                        <span class="stat-card-change" id="stat-cpk-change">+0.05</span>
+                                        <span class="stat-card-change" id="stat-cpk-change">未接入</span>
                                     </div>
                                 </div>
                                 <div class="stat-card-icon">
@@ -586,7 +588,7 @@
                                     <span class="stat-card-label">平均无故障时间 (MTBF)</span>
                                     <div>
                                         <span class="stat-card-value" id="stat-mtbf">--</span>
-                                        <span class="stat-card-change" id="stat-mtbf-change">+12h</span>
+                                        <span class="stat-card-change" id="stat-mtbf-change">未接入</span>
                                     </div>
                                 </div>
                                 <div class="stat-card-icon">
@@ -653,19 +655,19 @@
                                         class="export-menu-item"
                                         data-format="csv"
                                     >
-                                        导出 CSV
+                                        导出已加载页 CSV
                                     </div>
                                     <div
                                         class="export-menu-item"
                                         data-format="json"
                                     >
-                                        导出 JSON
+                                        导出已加载页 JSON
                                     </div>
                                     <div
                                         class="export-menu-item"
                                         data-format="excel"
                                     >
-                                        导出 Excel
+                                        导出已加载页 Excel
                                     </div>
                                 </div>
                             </div>

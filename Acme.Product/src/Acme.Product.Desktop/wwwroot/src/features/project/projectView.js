@@ -157,7 +157,7 @@ export class ProjectView {
                     </svg>
                 </div>
                 <h3 class="empty-state-title">还没有工程</h3>
-                <p class="empty-state-desc">创建您的第一个工程开始视觉检测之旅</p>
+                <p class="empty-state-desc">创建或导入工程后即可配置产品、连接设备并开始检测</p>
                 <button class="btn btn-primary empty-state-action" onclick="document.getElementById('btn-new-project-inline').click()">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>

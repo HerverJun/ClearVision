@@ -523,7 +523,7 @@ class SettingsView {
                         </div>
                         <div class="settings-menu-item" data-tab="station">
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M4 5h16v6H4V5zm2 2v2h12V7H6zm-2 6h7v6H4v-6zm2 2v2h3v-2H6zm7-2h7v6h-7v-6zm2 2v2h3v-2h-3z"/></svg>
-                            Station 设置
+                            工站通讯
                         </div>
                         <div class="settings-menu-item" data-tab="storage">
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z"/></svg>
@@ -531,7 +531,7 @@ class SettingsView {
                         </div>
                         <div class="settings-menu-item" data-tab="runtime">
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
-                            执行与运行
+                            生产运行保护
                         </div>
                         <div class="settings-menu-item" data-tab="cameras">
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg> 
@@ -546,9 +546,9 @@ class SettingsView {
                 </aside>
                 <div class="settings-content-area">
                     <div class="settings-header-banner">
-                        <h1 class="settings-main-title">常量预设</h1>
+                        <h1 class="settings-main-title">生产参数</h1>
                         <div class="settings-actions">
-                            <button class="cv-btn cv-btn-primary" id="btn-save-settings">保存所有更改</button>
+                            <button class="cv-btn cv-btn-primary" id="btn-save-settings">保存当前设置</button>
                         </div>
                     </div>
                     <div class="settings-tab-panels">
@@ -1818,7 +1818,7 @@ class SettingsView {
                     <td class="font-mono">${model}</td>
                     <td>
                         ${m.isActive 
-                            ? '<span class="settings-status-badge status-connected" style="background:#ecfdf5; padding:2px 8px;"><span class="status-dot"></span> Active</span>' 
+                            ? '<span class="settings-status-badge status-connected" style="background:#ecfdf5; padding:2px 8px;"><span class="status-dot"></span> 已启用</span>'
                             : `<button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="activate" data-id="${id}">设为激活</button>`}
                     </td>
                     <td>
@@ -3755,7 +3755,7 @@ class SettingsView {
                 </div>
                 <div class="settings-card-body">
                     <div class="settings-fieldset">
-                        <label>默认保存路径 (Image Save Path)</label>
+                        <label>默认图像保存路径</label>
                         <div style="display:flex; gap:12px;">
                             <div class="input-with-icon" style="flex:1;">
                                 <svg class="input-icon" viewBox="0 0 24 24" style="fill:#fbbf24;"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
@@ -3779,18 +3779,18 @@ class SettingsView {
                     <div class="settings-card-body">
                         <div style="display:flex; gap:24px; margin-bottom: 20px;">
                             <div class="settings-fieldset" style="flex:1;">
-                                <label>保存策略 (Save Policy)</label>
+                                <label>图像保存策略</label>
                                 <select class="cv-input" id="cfg-savePolicy">
-                                    <option value="All" ${storage.savePolicy === 'All' ? 'selected' : ''}>保存所有图像 (All)</option>
+                                    <option value="All" ${storage.savePolicy === 'All' ? 'selected' : ''}>保存所有图像</option>
                                     <option value="NgOnly" ${storage.savePolicy === 'NgOnly' ? 'selected' : ''}>仅保存 NG 图像</option>
-                                    <option value="None" ${storage.savePolicy === 'None' ? 'selected' : ''}>不保存 (None)</option>
+                                    <option value="None" ${storage.savePolicy === 'None' ? 'selected' : ''}>不保存图像</option>
                                 </select>
                             </div>
                             <div class="settings-fieldset" style="flex:1;">
                                 <label>自动清理阈值 (天)</label>
                                 <div class="input-with-suffix" style="position:relative;">
                                     <input type="number" class="cv-input" id="cfg-retentionDays" value="${storage.retentionDays || 30}" style="padding-right:36px;">
-                                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">Days</span>
+                                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">天</span>
                                 </div>
                             </div>
                         </div>
@@ -3837,7 +3837,7 @@ class SettingsView {
         return `
             <div class="settings-section-title" style="display:flex; justify-content:space-between; align-items:flex-end;">
                 <div>
-                    <h2>执行与控制 (Runtime)</h2>
+                    <h2>生产运行保护</h2>
                     <p>配置自动运行逻辑、异常停机条件及硬件联动保护。</p>
                 </div>
                 <div class="settings-status-badge status-connected" style="background:rgba(232, 85, 78, 0.08); color:#c0392b; border-color:rgba(232, 85, 78, 0.25);">
@@ -3849,7 +3849,7 @@ class SettingsView {
                 <div class="settings-card-header">
                     <div class="settings-header-left">
                         <svg viewBox="0 0 24 24" class="settings-header-icon" style="fill:#e74c3c;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                        <span>生产保护机制 (Production Guards)</span>
+                        <span>生产保护机制</span>
                     </div>
                 </div>
                 <div class="settings-card-body">
@@ -3886,7 +3886,7 @@ class SettingsView {
                                 <input type="checkbox" id="cfg-applyProtectionRules" ${runtime.applyProtectionRules !== false ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--cinnabar);">
                                 保存后立即启用运行保护规则
                             </label>
-                            <span class="settings-field-hint" style="margin-left: 24px;">该配置会随“保存所有更改”一起持久化，并作为运行保护的开关。</span>
+                            <span class="settings-field-hint" style="margin-left: 24px;">该配置会随“保存当前设置”一起持久化，并作为运行保护的开关。</span>
                         </div>
                     </div>
                 </div>
@@ -4165,7 +4165,7 @@ class SettingsView {
                                 <th>名称</th>
                                 <th>协议</th>
                                 <th>模型标识</th>
-                                <th>状态 (Active)</th>
+                                <th>状态</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -4508,6 +4508,30 @@ class SettingsView {
         }
     }
 
+    async validateStoragePathBeforeSave(path) {
+        const normalizedPath = String(path || '').trim();
+        if (!normalizedPath) {
+            showToast('请先填写默认图像保存路径。', 'warning');
+            return false;
+        }
+
+        try {
+            const usage = await httpClient.get(`/settings/disk-usage?path=${encodeURIComponent(normalizedPath)}`);
+            if (usage?.isAccessible === false || usage?.canWrite === false) {
+                showToast('保存路径不可访问或不可写，请联系管理员确认目录权限。', 'error');
+                return false;
+            }
+
+            this.diskUsage = usage;
+            this.updateDiskUsageCard();
+            return true;
+        } catch (error) {
+            console.warn('[SettingsView] 保存路径校验失败:', error);
+            showToast(`保存路径校验失败，请确认目录存在且当前账号可写: ${error.message}`, 'error');
+            return false;
+        }
+    }
+
     updateDiskUsageCard() {
         if (!this.container || !this.diskUsage) return;
 
@@ -4651,8 +4675,9 @@ class SettingsView {
      */
     async save() {
         console.log('[SettingsView] Saving config...');
+        const activeTabName = this.getActiveTabName();
 
-        if (this.getActiveTabName() === 'station') {
+        if (activeTabName === 'station') {
             await this.saveStationCommunicationSettings();
             return;
         }
@@ -4691,8 +4716,16 @@ class SettingsView {
             ? parsedLoginFailureLockoutCount
             : (this.config?.security?.loginFailureLockoutCount ?? defaultConfig.security.loginFailureLockoutCount);
         const activeCameraId = this.resolveActiveCameraId();
+        const imageSavePath = this.container?.querySelector('#cfg-imageSavePath')?.value || '';
 
-        // 保证“保存所有更改”也会带上当前选中相机的参数修改。
+        if (activeTabName === 'storage') {
+            const storagePathValid = await this.validateStoragePathBeforeSave(imageSavePath);
+            if (!storagePathValid) {
+                return;
+            }
+        }
+
+        // 保证“保存当前设置”也会带上当前选中相机的参数修改。
         if (this.selectedCameraBindingId) {
             const selectedBinding = this.cameraBindings.find(b => b.id === this.selectedCameraBindingId);
             const exposureInput = this.container?.querySelector('#cam-param-exposure');
@@ -4774,7 +4807,7 @@ class SettingsView {
                 heartbeatIntervalMs
             },
             storage: {
-                imageSavePath: this.container?.querySelector('#cfg-imageSavePath')?.value || '',
+                imageSavePath,
                 savePolicy: this.container?.querySelector('#cfg-savePolicy')?.value || 'NgOnly',
                 retentionDays,
                 minFreeSpaceGb
@@ -4798,7 +4831,7 @@ class SettingsView {
             // 先保存相机绑定，避免运行中相机流拒绝参数变更时，全局配置已提前落盘。
             const bindingsSaved = await this.saveCameraBindings({ silent: true });
             if (!bindingsSaved) {
-                throw new Error(this.lastCameraBindingSaveError || 'Camera bindings save failed');
+                throw new Error(this.lastCameraBindingSaveError || '相机绑定保存失败');
             }
 
             config.cameras = this.collectCameraBindings();
@@ -4810,7 +4843,6 @@ class SettingsView {
             this.plcSettingsLoaded = true;
 
             // 仅在 AI 页显式保存时同步当前模型，避免全局保存触发隐式副作用。
-            const activeTabName = this.getActiveTabName();
             const hasPendingAiChanges = this.hasPendingAiChanges();
             if (activeTabName === 'ai' && hasPendingAiChanges) {
                 await this._saveCurrentForm();

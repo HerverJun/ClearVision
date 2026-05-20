@@ -150,6 +150,21 @@ public class WireSequenceScenarioPackageTests
             .Should().Contain("FrameChangeTrigger.MinChangeRatio");
         template.RootElement.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
             .Should().Contain("DeepLearning.Confidence");
+
+        template.RootElement.GetProperty("parametersNeedingReview").GetProperty("op_3")
+            .EnumerateArray().Select(item => item.GetString())
+            .Should().Contain("LabelsPath");
+
+        var readiness = template.RootElement.GetProperty("productionReadiness");
+        readiness.GetProperty("status").GetString().Should().Be("blockedUntilConfigured");
+        readiness.GetProperty("blockingStages").EnumerateArray().Select(item => item.GetString())
+            .Should().Equal("run", "deploy", "publish");
+        readiness.GetProperty("blockingParameters").GetProperty("op_2")
+            .EnumerateArray().Select(item => item.GetString())
+            .Should().Equal("RoiX", "RoiY", "RoiW", "RoiH");
+        readiness.GetProperty("blockingParameters").GetProperty("op_3")
+            .EnumerateArray().Select(item => item.GetString())
+            .Should().Equal("ModelPath", "LabelsPath");
     }
 
     [Fact]

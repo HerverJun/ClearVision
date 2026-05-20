@@ -20,6 +20,7 @@ class HttpClient {
             'Content-Type': 'application/json'
         };
         this._discoveredPort = null;
+        this._lastSuccessfulConnectionAt = null;
     }
 
     /**
@@ -111,6 +112,7 @@ class HttpClient {
      */
     saveSuccessfulPort(url) {
         try {
+            this._lastSuccessfulConnectionAt = new Date();
             const match = url.match(/:(\d+)\/api/);
             if (match) {
                 saveApiPort(Number.parseInt(match[1], 10));
@@ -119,6 +121,57 @@ class HttpClient {
         } catch (e) {
             // 忽略存储错误
         }
+    }
+
+    getLastSuccessfulConnectionText() {
+        if (!this._lastSuccessfulConnectionAt) {
+            return '本次会话尚未成功连接';
+        }
+
+        return this._lastSuccessfulConnectionAt.toLocaleString();
+    }
+
+    isDeveloperDiagnosticsEnabled() {
+        try {
+            return localStorage.getItem('cv_developer_diagnostics') === 'true';
+        } catch {
+            return false;
+        }
+    }
+
+    buildFieldNetworkErrorMessage(apiUrl, error) {
+        const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}`;
+        const diagnosticInfo = [
+            `requestId=${requestId}`,
+            `time=${new Date().toISOString()}`,
+            `service=${apiUrl.origin}`,
+            `path=${apiUrl.pathname}`,
+            `lastSuccess=${this.getLastSuccessfulConnectionText()}`,
+            `error=${error?.message || error?.name || 'NetworkError'}`
+        ].join('; ');
+
+        return `
+无法连接到 ClearVision 服务 (${apiUrl.host})
+
+现场检查步骤：
+1. 确认本机 ClearVision 服务窗口仍在运行，托盘或任务管理器中没有异常退出。
+2. 检查工控机网线、交换机和防火墙策略，确认当前电脑可以访问 ${apiUrl.hostname}:${apiUrl.port || '(默认端口)'}。
+3. 如果刚修改过服务端口或部署包，请重启 ClearVision 后再刷新页面。
+4. 仍无法恢复时，将下方诊断信息发给设备维护或售后人员。
+
+上次成功连接：${this.getLastSuccessfulConnectionText()}
+诊断信息：${diagnosticInfo}
+        `.trim();
+    }
+
+    buildDeveloperNetworkErrorMessage(apiUrl) {
+        return `
+
+开发诊断：
+- 当前尝试端口: ${apiUrl.port || '(默认端口)'}
+- 可用端口探测范围: ${API_PORT_CANDIDATES.join(', ')}
+- 如需临时指定端口，可在浏览器控制台设置 cv_api_port 后刷新。
+        `.trimEnd();
     }
 
     get rootBaseUrl() {
@@ -389,40 +442,16 @@ class HttpClient {
      */
     handleNetworkError(error, url) {
         if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            const apiUrl = new URL(url);
-            const errorMessage = `
-🔴 无法连接到后端服务 (${apiUrl.host})
+            const apiUrl = new URL(url, window.location.href);
+            let errorMessage = this.buildFieldNetworkErrorMessage(apiUrl, error);
+            if (this.isDeveloperDiagnosticsEnabled()) {
+                errorMessage += this.buildDeveloperNetworkErrorMessage(apiUrl);
+            }
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 问题诊断：
-
-1️⃣ 后端服务未运行
-   • 你需要先启动 Acme.Product.Desktop 项目
-   • 在 Visual Studio 中按 F5 运行
-
-2️⃣ 后端运行在其他端口
-   • 当前尝试端口: ${apiUrl.port}
-   • 后端会在 5000-5010 范围内自动选择端口
-
-3️⃣ 防火墙/安全软件阻止
-   • 检查 Windows Defender 或其他安全软件
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 快速修复：
-
-方式1 - 启动后端服务：
-   cd Acme.Product/src/Acme.Product.Desktop
-   dotnet run
-
-方式2 - 临时指定端口（浏览器控制台执行）：
-   localStorage.setItem('cv_api_port', '5001');
-   location.reload();
-
-方式3 - 检查后端实际端口：
-   在 Visual Studio "输出" 窗口查看 Web 服务器启动日志
-            `.trim();
             console.error('[HttpClient] 连接失败:', errorMessage);
-            return new Error(errorMessage);
+            const wrappedError = new Error(errorMessage);
+            wrappedError.diagnosticInfo = errorMessage;
+            return wrappedError;
         }
         return error;
     }
