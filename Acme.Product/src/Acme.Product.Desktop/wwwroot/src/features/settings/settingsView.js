@@ -76,7 +76,7 @@ class SettingsView {
     normalizeCameraTargetFrameRate(value) {
         const parsed = Number.parseInt(String(value ?? ''), 10);
         if (!Number.isFinite(parsed) || parsed <= 0) {
-            return 10;
+            return 30;
         }
 
         return Math.min(120, Math.max(1, parsed));
@@ -2250,7 +2250,7 @@ class SettingsView {
                     serialPhotoelectricDebounceMs: 200,
                     serialPhotoelectricTimeoutMs: 30000,
                     ignoreSerialPhotoelectricTriggerWhileBusy: true,
-                    targetFrameRateFps: 10
+                    targetFrameRateFps: 30
                 };
 
                 this.cameraBindings.push(newBinding);
@@ -2875,7 +2875,11 @@ class SettingsView {
             imageEl.src = preview.imageUrl;
             imageEl.style.display = 'block';
             placeholderEl.style.display = 'none';
-            metaEl.textContent = `触发模式: ${triggerModeLabel} · 目标帧率: ${preview.targetFrameRateFps ?? '--'} fps · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
+            const targetFpsText = preview.targetFrameRateFps ?? '--';
+            const actualFpsText = Number.isFinite(preview.actualFrameRateFps)
+                ? preview.actualFrameRateFps.toFixed(1)
+                : '--';
+            metaEl.textContent = `触发模式: ${triggerModeLabel} · 目标帧率: ${targetFpsText} fps · 实际帧率: ${actualFpsText} fps · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
         };
 
         const startPreview = async () => {
@@ -2890,6 +2894,10 @@ class SettingsView {
             try {
                 const session = await this.startContinuousPreviewSession(binding.id);
                 sessionId = session.sessionId || session.SessionId;
+                const sessionTargetFrameRateFps = this.normalizeCameraTargetFrameRate(
+                    session.targetFrameRateFps || session.TargetFrameRateFps || binding.targetFrameRateFps
+                );
+                const previewFrameTimes = [];
 
                 while (previewActive && sessionId && loopToken === previewLoopToken) {
                     const abortController = typeof AbortController !== 'undefined'
@@ -2907,7 +2915,23 @@ class SettingsView {
                         break;
                     }
 
-                    renderFrame(preview);
+                    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                    previewFrameTimes.push(now);
+                    while (previewFrameTimes.length > 1 && now - previewFrameTimes[0] > 3000) {
+                        previewFrameTimes.shift();
+                    }
+                    const elapsedMs = previewFrameTimes.length > 1
+                        ? previewFrameTimes[previewFrameTimes.length - 1] - previewFrameTimes[0]
+                        : 0;
+                    const actualFrameRateFps = elapsedMs > 0
+                        ? ((previewFrameTimes.length - 1) * 1000) / elapsedMs
+                        : null;
+
+                    renderFrame({
+                        ...preview,
+                        targetFrameRateFps: sessionTargetFrameRateFps,
+                        actualFrameRateFps
+                    });
                 }
             } catch (error) {
                 if (error?.name === 'AbortError') {
@@ -4008,7 +4032,7 @@ class SettingsView {
                                 <input type="number" class="cv-input" id="cam-param-target-frame-rate" value="" min="1" max="120" style="padding-right:36px;" disabled readonly aria-disabled="true">
                                 <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">fps</span>
                             </div>
-                            <span class="settings-field-hint" id="cam-param-target-frame-rate-hint">帧驱动模式（Continuous / External）下可编辑；默认 10 fps，范围 1 - 120。</span>
+                            <span class="settings-field-hint" id="cam-param-target-frame-rate-hint">帧驱动模式（Continuous / External）下可编辑；默认 30 fps，范围 1 - 120。</span>
                         </div>
                     </div>
                     <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-bottom:24px;">

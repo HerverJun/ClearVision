@@ -18,7 +18,7 @@ public enum CameraSoftwareTriggerSource
 
 public static class CameraTriggerModeExtensions
 {
-    public const int DefaultTargetFrameRateFps = 10;
+    public const int DefaultTargetFrameRateFps = 30;
     public const int MinTargetFrameRateFps = 1;
     public const int MaxTargetFrameRateFps = 120;
 

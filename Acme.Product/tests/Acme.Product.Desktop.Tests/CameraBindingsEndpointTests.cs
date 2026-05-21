@@ -73,7 +73,7 @@ public class CameraBindingsEndpointTests
         GetProperty(FindById(items, "cam-connected"), "TriggerMode", "triggerMode").GetString().Should().Be("External");
         GetProperty(FindById(items, "cam-connected"), "HardwareTriggerSource", "hardwareTriggerSource").GetString().Should().Be("Line2");
         GetProperty(FindById(items, "cam-connected"), "PixelFormat", "pixelFormat").GetString().Should().Be("RGB8");
-        GetProperty(FindById(items, "cam-connected"), "TargetFrameRateFps", "targetFrameRateFps").GetInt32().Should().Be(10);
+        GetProperty(FindById(items, "cam-connected"), "TargetFrameRateFps", "targetFrameRateFps").GetInt32().Should().Be(30);
         GetProperty(FindById(items, "cam-online"), "SoftwareTriggerSource", "softwareTriggerSource").GetString().Should().Be("EnterPhotoelectric");
         GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricDebounceMs", "enterPhotoelectricDebounceMs").GetInt32().Should().Be(75);
         GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricTimeoutMs", "enterPhotoelectricTimeoutMs").GetInt32().Should().Be(12000);

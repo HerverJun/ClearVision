@@ -474,7 +474,7 @@ public class CameraBindingConfig
 
     public bool IgnoreSerialPhotoelectricTriggerWhileBusy { get; set; } = true;
 
-    public int TargetFrameRateFps { get; set; } = 10;
+    public int TargetFrameRateFps { get; set; } = Acme.Product.Core.Cameras.CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
 
     public ContinuousInspectionConfig ContinuousInspection { get; set; } = new();
 
