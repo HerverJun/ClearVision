@@ -85,9 +85,10 @@ class FlowCanvas {
         this._logicalWidth = 0;
         this._logicalHeight = 0;
 
-        // 网格设置
+        // 画布对齐与点阵背景设置
         this.gridSize = 20;
-        this.gridColor = 'rgba(0, 0, 0, 0.08)'; // 浅色网格 (适配浅色背景)
+        this.gridColor = 'rgba(48, 71, 62, 0.16)';
+        this.gridDotRadius = 1.05;
 
         // 事件回调
         this.onNodeSelected = null;
@@ -589,40 +590,47 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制网格
+     * 绘制点阵背景
      */
     drawGrid() {
         const width = this._logicalWidth;
         const height = this._logicalHeight;
 
-        this.ctx.strokeStyle = this.gridColor;
-        this.ctx.lineWidth = 1;
+        this.ctx.fillStyle = this.gridColor;
 
-        // 计算偏移后的起始位置
-        const startX = Math.floor(this.offset.x / this.gridSize) * this.gridSize;
-        const startY = Math.floor(this.offset.y / this.gridSize) * this.gridSize;
+        const gridScreenSize = this.gridSize * this.scale;
+        const minScreenSpacing = 12;
+        const stepMultiplier = Math.max(1, Math.ceil(minScreenSpacing / Math.max(gridScreenSize, 0.01)));
+        const dotStep = this.gridSize * stepMultiplier;
+
+        const startX = Math.floor(this.offset.x / dotStep) * dotStep;
+        const startY = Math.floor(this.offset.y / dotStep) * dotStep;
 
         // 可视区域使用逻辑尺寸，避免 DPR 导致重复绘制
         const visibleWidth = width / this.scale;
         const visibleHeight = height / this.scale;
 
+        const radius = Math.max(0.65, Math.min(1.35, this.gridDotRadius * Math.sqrt(Math.max(this.scale, 0.2))));
         this.ctx.beginPath();
 
-        // 垂直线
-        for (let x = startX; x < this.offset.x + visibleWidth; x += this.gridSize) {
+        for (let x = startX; x < this.offset.x + visibleWidth; x += dotStep) {
             const screenX = (x - this.offset.x) * this.scale;
-            this.ctx.moveTo(screenX, 0);
-            this.ctx.lineTo(screenX, height);
+            if (screenX < -radius || screenX > width + radius) {
+                continue;
+            }
+
+            for (let y = startY; y < this.offset.y + visibleHeight; y += dotStep) {
+                const screenY = (y - this.offset.y) * this.scale;
+                if (screenY < -radius || screenY > height + radius) {
+                    continue;
+                }
+
+                this.ctx.moveTo(screenX + radius, screenY);
+                this.ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+            }
         }
 
-        // 水平线
-        for (let y = startY; y < this.offset.y + visibleHeight; y += this.gridSize) {
-            const screenY = (y - this.offset.y) * this.scale;
-            this.ctx.moveTo(0, screenY);
-            this.ctx.lineTo(width, screenY);
-        }
-
-        this.ctx.stroke();
+        this.ctx.fill();
     }
 
     /**
