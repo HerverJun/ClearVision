@@ -28,6 +28,8 @@ internal sealed class NoOpCameraFrameStreamCoordinator : ICameraFrameStreamCoord
 
     public Task ReleaseStreamLeaseAsync(CameraStreamLease lease) => Task.CompletedTask;
 
+    public Task ReleaseIdleStreamAsync(string cameraId) => Task.CompletedTask;
+
     public Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 

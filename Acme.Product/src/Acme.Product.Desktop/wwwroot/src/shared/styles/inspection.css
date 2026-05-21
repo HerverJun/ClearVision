@@ -81,7 +81,7 @@
 .inspection-side-panel .panel-title {
     flex: 0 0 auto;
     margin: 0;
-    padding: 16px 18px 12px;
+    padding: 14px 18px 8px;
 }
 
 .inspection-side-panel .panel-title + .panel-title {
@@ -90,16 +90,16 @@
 }
 
 .inspection-side-panel .analysis-cards-container {
-    flex: 0 1 46%;
-    min-height: 112px;
+    flex: 1 1 auto;
+    min-height: 160px;
     min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: 10px;
-    padding: 0 14px 14px;
+    gap: 8px;
+    padding: 0 12px 12px;
 }
 
 .inspection-side-panel .analysis-cards-container::-webkit-scrollbar {
@@ -115,14 +115,15 @@
     width: 100%;
     min-width: 0;
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
 }
 
 .inspection-side-panel .ac-card-header {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
+    margin-bottom: 8px;
 }
 
 .inspection-side-panel .ac-card-title,
@@ -144,39 +145,107 @@
 
 .inspection-side-panel .ac-diagnostic-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    gap: 6px;
+    margin-top: 6px;
 }
 
 .inspection-side-panel .ac-diagnostic-row {
     display: grid;
-    grid-template-columns: minmax(72px, 0.42fr) minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px;
     align-items: start;
     min-width: 0;
-    padding: 8px;
+    padding: 7px 8px;
     background: rgba(255, 255, 255, 0.5);
     border: 1px solid rgba(225, 190, 188, 0.3);
     border-radius: 8px;
 }
 
+.inspection-side-panel .ac-diagnostic-row-sequence {
+    align-items: center;
+}
+
 .inspection-side-panel .ac-diagnostic-label {
     color: var(--text-muted);
     font-size: 10px;
+    line-height: 1.25;
     font-weight: 700;
 }
 
 .inspection-side-panel .ac-diagnostic-value {
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.3;
     text-align: right;
 }
 
-.inspection-side-panel .ac-diagnostic-sequence,
 .inspection-side-panel .ac-diagnostic-chip-list {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 4px;
     min-width: 0;
+}
+
+.inspection-side-panel .ac-diagnostic-sequence-text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.inspection-side-panel .ac-diagnostic-message {
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.inspection-side-panel .cv-result-card-body {
+    gap: 6px;
+}
+
+.inspection-side-panel .cv-result-field {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px;
+    padding: 7px 8px;
+}
+
+.inspection-side-panel .cv-result-label {
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.inspection-side-panel .cv-result-rendered-value {
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: right;
+    overflow-wrap: normal;
+}
+
+.inspection-side-panel .cv-result-number {
+    font-size: 16px;
+}
+
+.inspection-side-panel .cv-result-detection-row,
+.inspection-side-panel .cv-result-kv-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+}
+
+.inspection-side-panel .cv-result-detection-label,
+.inspection-side-panel .cv-result-detection-score,
+.inspection-side-panel .cv-result-number {
+    white-space: nowrap;
+}
+
+.inspection-side-panel .cv-result-detection-box,
+.inspection-side-panel .cv-result-kv-value {
+    font-size: 10px;
+    overflow-wrap: anywhere;
 }
 
 /* ==========================================================================
@@ -559,8 +628,8 @@
    ========================================================================== */
 
 .inspection-recent-results-grid {
-    flex: 1 1 auto;
-    min-height: 96px;
+    flex: 0 0 auto;
+    min-height: 0;
     min-width: 0;
     display: grid;
     grid-template-columns: 1fr;

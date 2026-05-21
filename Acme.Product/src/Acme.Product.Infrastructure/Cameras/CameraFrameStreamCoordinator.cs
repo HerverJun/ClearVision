@@ -230,6 +230,41 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
     }
 
+    public async Task ReleaseIdleStreamAsync(string cameraId)
+    {
+        var producerKey = ResolveProducerKey(cameraId);
+        if (!_producers.TryGetValue(producerKey, out var entry))
+        {
+            return;
+        }
+
+        var disposeGate = false;
+        await entry.Gate.WaitAsync();
+        try
+        {
+            if (entry.LeaseCount == 0 &&
+                entry.PreviewSessionCount == 0 &&
+                Volatile.Read(ref entry.PendingFrameWaiters) == 0)
+            {
+                await StopProducerCoreAsync(entry);
+                _producers.TryRemove(entry.CameraBindingId, out _);
+                disposeGate = true;
+            }
+        }
+        finally
+        {
+            if (!disposeGate)
+            {
+                entry.Gate.Release();
+            }
+        }
+
+        if (disposeGate)
+        {
+            entry.Gate.Dispose();
+        }
+    }
+
     public async Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default)
     {
         var binding = ResolveBinding(cameraId);

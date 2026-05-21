@@ -12,6 +12,7 @@ import { AnalysisCardsPanel, buildDiagnosticsAnalysisData } from './analysisCard
 import { showToast } from '../../shared/components/uiComponents.js';
 
 const DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS = 120;
+const RECENT_RESULTS_PREVIEW_LIMIT = 3;
 
 function debugInspectionPanelLog(...args) {
     if (globalThis.CV_DEBUG_INSPECTION === true) {
@@ -732,7 +733,7 @@ class InspectionPanel {
         }
 
         const recentResults = getRecentResults();
-        setRecentResults([result, ...recentResults].slice(0, 8));
+        setRecentResults([result, ...recentResults].slice(0, RECENT_RESULTS_PREVIEW_LIMIT));
         if (options.render === false) {
             this._recentResultsDirty = true;
             return;
@@ -749,12 +750,15 @@ class InspectionPanel {
         }
 
         const recentResults = getRecentResults();
-        if (!Array.isArray(recentResults) || recentResults.length === 0) {
+        const visibleResults = Array.isArray(recentResults)
+            ? recentResults.slice(0, RECENT_RESULTS_PREVIEW_LIMIT)
+            : [];
+        if (visibleResults.length === 0) {
             container.innerHTML = '<p class="empty-text">无检测记录</p>';
             return;
         }
 
-        container.innerHTML = recentResults.map((result) => {
+        container.innerHTML = visibleResults.map((result) => {
             const rawStatus = String(result?.status ?? result?.Status ?? 'NG').toUpperCase();
             const status = rawStatus === 'OK'
                 ? 'OK'

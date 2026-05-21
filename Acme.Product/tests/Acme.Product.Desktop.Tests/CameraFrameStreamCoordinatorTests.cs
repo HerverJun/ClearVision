@@ -196,6 +196,44 @@ public class CameraFrameStreamCoordinatorTests
         await camera.Received(2).StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>());
     }
 
+    [Fact]
+    public async Task ReleaseIdleStreamAsync_AfterDirectAcquire_ShouldStopProducerImmediately()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var camera = CreateIndustrialCamera();
+        Func<byte[], Task>? frameCallback = null;
+
+        camera.When(x => x.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()))
+            .Do(callInfo => frameCallback = callInfo.Arg<Func<byte[], Task>>());
+
+        var binding = new CameraBindingConfig
+        {
+            Id = "binding-idle",
+            SerialNumber = "SN-IDLE",
+            TriggerMode = "Continuous"
+        };
+
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+        cameraManager.GetOrCreateByBindingAsync(binding.Id).Returns(Task.FromResult<ICamera>(camera));
+        cameraManager.GetCamera(binding.SerialNumber).Returns(camera);
+
+        await using var sut = new CameraFrameStreamCoordinator(cameraManager, NullLogger<CameraFrameStreamCoordinator>.Instance);
+        var acquireTask = sut.AcquireFrameAsync(binding.Id);
+        await Task.Delay(50);
+
+        var frameBytes = CreatePngBytes(new Scalar(32, 64, 96));
+        await frameCallback!(frameBytes);
+        var frame = await acquireTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        frame.ImageData.Should().Equal(frameBytes);
+        sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeTrue();
+
+        await sut.ReleaseIdleStreamAsync(binding.Id);
+
+        sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeFalse();
+        await camera.Received(1).StopContinuousAcquisitionAsync();
+    }
+
     private static byte[] CreatePngBytes(Scalar color)
     {
         using var mat = new Mat(2, 2, MatType.CV_8UC3, color);

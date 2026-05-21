@@ -265,18 +265,31 @@ function normalizeDeepLearningPreviewDiagnostics(outputData) {
     };
 }
 
+function getDiagnosticVariant(field) {
+    return String(readFirstDefined(field?.variant, field?.Variant, field?.displayHint, field?.DisplayHint, ''))
+        .trim()
+        .toLowerCase();
+}
+
 function formatDiagnosticValue(field) {
     const value = readFirstDefined(field?.value, field?.Value);
-    const variant = readFirstDefined(field?.variant, field?.Variant);
-    const normalizedVariant = String(variant || field?.Variant || field?.displayHint || field?.DisplayHint || '').trim().toLowerCase();
-    if ((normalizedVariant === 'sequence' || normalizedVariant === 'labels') && Array.isArray(value)) {
+    const normalizedVariant = getDiagnosticVariant(field);
+    if (normalizedVariant === 'sequence' && Array.isArray(value)) {
         if (value.length === 0) {
             return '<span class="ac-diagnostic-empty">无</span>';
         }
 
-        const className = normalizedVariant === 'sequence' ? 'ac-diagnostic-sequence' : 'ac-diagnostic-chip-list';
+        const text = value.map(item => String(item)).join('->');
+        return `<span class="ac-diagnostic-sequence-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+    }
+
+    if (normalizedVariant === 'labels' && Array.isArray(value)) {
+        if (value.length === 0) {
+            return '<span class="ac-diagnostic-empty">无</span>';
+        }
+
         const items = value.map(item => `<span class="ac-diagnostic-chip">${escapeHtml(String(item))}</span>`).join('');
-        return `<div class="${className}">${items}</div>`;
+        return `<div class="ac-diagnostic-chip-list">${items}</div>`;
     }
 
     if (normalizedVariant === 'status') {
@@ -315,12 +328,16 @@ function renderDiagnosticCardHtml(card, fallbackStatus, options = {}) {
     const fields = Array.isArray(sourceFields)
         ? (compact ? sourceFields.slice(0, 4) : sourceFields)
         : [];
-    const rows = fields.map(field => `
-        <div class="ac-diagnostic-row">
+    const rows = fields.map(field => {
+        const variant = getDiagnosticVariant(field).replace(/[^a-z0-9_-]/g, '');
+        const variantClass = variant ? ` ac-diagnostic-row-${variant}` : '';
+        return `
+        <div class="ac-diagnostic-row${variantClass}">
             <span class="ac-diagnostic-label">${escapeHtml(readFirstDefined(field.label, field.Label, '--'))}</span>
             <div class="ac-diagnostic-value">${formatDiagnosticValue(field)}</div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     const messageText = readFirstDefined(card?.message, card?.Message, card?.meta?.Message, card?.Meta?.Message);
     const message = messageText
         ? `<div class="ac-diagnostic-message ${statusClass}">${escapeHtml(messageText)}</div>`

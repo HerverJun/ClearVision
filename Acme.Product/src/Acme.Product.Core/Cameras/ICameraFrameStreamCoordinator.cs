@@ -16,6 +16,7 @@ public interface ICameraFrameStreamCoordinator : IAsyncDisposable
         long? afterSequence = null,
         CancellationToken cancellationToken = default);
     Task ReleaseStreamLeaseAsync(CameraStreamLease lease);
+    Task ReleaseIdleStreamAsync(string cameraId);
     Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default);
     Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default);
     Task StopPreviewSessionAsync(string sessionId);

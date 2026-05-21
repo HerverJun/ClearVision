@@ -560,6 +560,83 @@ public class InspectionWorkerTests
         resultCount.Should().BeGreaterThanOrEqualTo(6);
     }
 
+    [Fact]
+    public async Task RunRealtimeLoopAsync_WhenFrameDrivenExecutionStops_ShouldReleaseIdleCameraStream()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 1,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "OK"
+                }
+            }));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        imageAcquisition.AcquireFromCameraAsync("cam-release", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ImageDto
+            {
+                Id = Guid.NewGuid(),
+                DataBase64 = Convert.ToBase64String(new byte[] { 1, 2, 3 })
+            }));
+        imageAcquisition.ReleaseImageAsync(Arg.Any<Guid>()).Returns(Task.CompletedTask);
+
+        var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
+        resultChannelWriter.WriteAsync(Arg.Any<InspectionResult>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.CompletedTask);
+        var configurationService = Substitute.For<IConfigurationService>();
+        configurationService.GetCurrent().Returns(new AppConfig());
+        var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+        streamCoordinator.ReleaseIdleStreamAsync("cam-release").Returns(Task.CompletedTask);
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>(),
+            configurationService);
+
+        var eventBus = new InMemoryInspectionEventBus(
+            NullLogger<InMemoryInspectionEventBus>.Instance,
+            new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance));
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            eventBus,
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var subscription = eventBus.Subscribe<InspectionProgressEvent>((_, _) =>
+        {
+            cts.Cancel();
+            return Task.CompletedTask;
+        });
+
+        await InvokeRunRealtimeLoopAsync(
+            worker,
+            new OperatorFlow("FrameDrivenRelease"),
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            configurationService,
+            cts.Token,
+            streamCoordinator,
+            "cam-release").WaitAsync(TimeSpan.FromSeconds(5));
+
+        await streamCoordinator.Received(1).ReleaseIdleStreamAsync("cam-release");
+    }
+
     private static async Task<FlowExecutionResult> WaitForCancellationAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -650,7 +727,10 @@ public class InspectionWorkerTests
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
         IConfigurationService configurationService,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICameraFrameStreamCoordinator? streamCoordinator = null,
+        string? cameraId = null,
+        bool frameDrivenExecution = true)
     {
         var method = typeof(InspectionWorker).GetMethod(
             "RunRealtimeLoopAsync",
@@ -664,10 +744,10 @@ public class InspectionWorkerTests
                 Guid.NewGuid(),
                 Guid.NewGuid(),
                 flow,
-                null,
+                cameraId,
                 ContinuousInspectionMode.Disabled,
-                null,
-                true,
+                streamCoordinator,
+                frameDrivenExecution,
                 false,
                 flowExecution,
                 imageAcquisition,

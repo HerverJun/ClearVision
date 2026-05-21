@@ -460,55 +460,94 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         int cycleCount = 0;
         int consecutiveNgCount = 0;
 
-        while (!ct.IsCancellationRequested)
+        try
         {
-            var currentContinuousInspectionMode = ResolveContinuousInspectionMode(flow, cameraId);
-            if (currentContinuousInspectionMode == ContinuousInspectionMode.Primary)
+            while (!ct.IsCancellationRequested)
             {
-                await RunRealtimeLoopAsync(
-                    projectId,
-                    sessionId,
-                    flow,
-                    cameraId,
-                    currentContinuousInspectionMode,
-                    streamCoordinator,
-                    frameDrivenExecution,
-                    blockingSoftwareTriggerExecution,
-                    flowExecution,
-                    imageAcquisition,
-                    resultChannelWriter,
-                    configurationService,
-                    ct);
-                return;
-            }
-
-            var startTime = DateTime.UtcNow;
-            cycleCount++;
-            var cycleSucceeded = false;
-
-            try
-            {
-                _logger.LogDebug("[InspectionWorker] 开始第 {CycleCount} 轮检测", cycleCount);
-
-                // 执行单轮检测
-                var result = await ExecuteCycleAsync(
-                    projectId,
-                    sessionId,
-                    flow,
-                    cameraId,
-                    currentContinuousInspectionMode,
-                    streamCoordinator,
-                    flowExecution,
-                    imageAcquisition,
-                    ct);
-
-                // 保存结果(异步非阻塞)
-                if (IsNoMaterialSkippedResult(result))
+                var currentContinuousInspectionMode = ResolveContinuousInspectionMode(flow, cameraId);
+                if (currentContinuousInspectionMode == ContinuousInspectionMode.Primary)
                 {
-                    consecutiveNgCount = 0;
-                    currentIntervalMs = 500;
-                    cycleSucceeded = true;
+                    await RunRealtimeLoopAsync(
+                        projectId,
+                        sessionId,
+                        flow,
+                        cameraId,
+                        currentContinuousInspectionMode,
+                        streamCoordinator,
+                        frameDrivenExecution,
+                        blockingSoftwareTriggerExecution,
+                        flowExecution,
+                        imageAcquisition,
+                        resultChannelWriter,
+                        configurationService,
+                        ct);
+                    return;
+                }
 
+                var startTime = DateTime.UtcNow;
+                cycleCount++;
+                var cycleSucceeded = false;
+
+                try
+                {
+                    _logger.LogDebug("[InspectionWorker] 开始第 {CycleCount} 轮检测", cycleCount);
+
+                    // 执行单轮检测
+                    var result = await ExecuteCycleAsync(
+                        projectId,
+                        sessionId,
+                        flow,
+                        cameraId,
+                        currentContinuousInspectionMode,
+                        streamCoordinator,
+                        flowExecution,
+                        imageAcquisition,
+                        ct);
+
+                    // 保存结果(异步非阻塞)
+                    if (IsNoMaterialSkippedResult(result))
+                    {
+                        consecutiveNgCount = 0;
+                        currentIntervalMs = 500;
+                        cycleSucceeded = true;
+
+                        await _eventBus.PublishAsync(new InspectionProgressEvent
+                        {
+                            ProjectId = projectId,
+                            SessionId = sessionId,
+                            ProcessedCount = cycleCount
+                        }, ct);
+
+                        continue;
+                    }
+
+                    await resultChannelWriter.WriteAsync(result, ct);
+
+                    var outputPayload = EnsureTraceabilityPayload(
+                        AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),
+                        result);
+                    var analysisPayload = EnsureTraceabilityPayload(
+                        AnalysisPayloadSerialization.DeserializeJsonDictionary(result.AnalysisDataJson),
+                        result);
+
+                    await _eventBus.PublishAsync(new InspectionResultEvent
+                    {
+                        ProjectId = projectId,
+                        SessionId = sessionId,
+                        ResultId = result.Id,
+                        ImageId = result.ImageId,
+                        Status = result.Status.ToString(),
+                        DefectCount = result.Defects.Count,
+                        ProcessingTimeMs = result.ProcessingTimeMs,
+                        ErrorMessage = result.ErrorMessage,
+                        OutputImageBase64 = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
+                        OutputData = outputPayload,
+                        AnalysisData = analysisPayload
+                    }, ct);
+                    _metrics.RecordDetectionLatency(result.ProcessingTimeMs, result.Status.ToString());
+                    _metrics.RecordInspectionCompleted(result.Status.ToString(), result.Defects.Count);
+
+                    // 【架构修复 v2】发布进度事件
                     await _eventBus.PublishAsync(new InspectionProgressEvent
                     {
                         ProjectId = projectId,
@@ -516,106 +555,96 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         ProcessedCount = cycleCount
                     }, ct);
 
+                    // 连续 NG 检查
+                    if (result.Status == InspectionStatus.NG)
+                    {
+                        consecutiveNgCount++;
+                        var protectionOptions = ResolveRuntimeProtectionOptions(configurationService);
+                        if (protectionOptions.ApplyProtectionRules &&
+                            protectionOptions.StopOnConsecutiveNg > 0 &&
+                            consecutiveNgCount >= protectionOptions.StopOnConsecutiveNg)
+                        {
+                            _logger.LogWarning(
+                                "连续 NG 达到运行保护阈值，停止检测: {ProjectId}, Threshold={Threshold}",
+                                projectId,
+                                protectionOptions.StopOnConsecutiveNg);
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        consecutiveNgCount = 0;
+                    }
+
+                    if (result.Status == InspectionStatus.Error)
+                    {
+                        _metrics.RecordInspectionFailed(result.ErrorMessage ?? InspectionStatus.Error.ToString());
+                        currentIntervalMs = Math.Min(currentIntervalMs * 2, maxIntervalMs);
+                    }
+                    else
+                    {
+                        currentIntervalMs = 500;
+                        cycleSucceeded = true;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw; // 正常取消，退出循环
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[InspectionWorker] 第 {CycleCount} 轮检测异常", cycleCount);
+                    _metrics.RecordInspectionFailed(ex.GetType().Name);
+                    currentIntervalMs = Math.Min(currentIntervalMs * 2, maxIntervalMs);
+                }
+
+                // 计算间隔
+                var elapsedMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                if ((frameDrivenExecution || blockingSoftwareTriggerExecution) && cycleSucceeded)
+                {
                     continue;
                 }
 
-                await resultChannelWriter.WriteAsync(result, ct);
+                var delayMs = Math.Max(currentIntervalMs - elapsedMs, minIntervalMs);
 
-                var outputPayload = EnsureTraceabilityPayload(
-                    AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),
-                    result);
-                var analysisPayload = EnsureTraceabilityPayload(
-                    AnalysisPayloadSerialization.DeserializeJsonDictionary(result.AnalysisDataJson),
-                    result);
-
-                await _eventBus.PublishAsync(new InspectionResultEvent
+                try
                 {
-                    ProjectId = projectId,
-                    SessionId = sessionId,
-                    ResultId = result.Id,
-                    ImageId = result.ImageId,
-                    Status = result.Status.ToString(),
-                    DefectCount = result.Defects.Count,
-                    ProcessingTimeMs = result.ProcessingTimeMs,
-                    ErrorMessage = result.ErrorMessage,
-                    OutputImageBase64 = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
-                    OutputData = outputPayload,
-                    AnalysisData = analysisPayload
-                }, ct);
-                _metrics.RecordDetectionLatency(result.ProcessingTimeMs, result.Status.ToString());
-                _metrics.RecordInspectionCompleted(result.Status.ToString(), result.Defects.Count);
-
-                // 【架构修复 v2】发布进度事件
-                await _eventBus.PublishAsync(new InspectionProgressEvent
-                {
-                    ProjectId = projectId,
-                    SessionId = sessionId,
-                    ProcessedCount = cycleCount
-                }, ct);
-
-                // 连续 NG 检查
-                if (result.Status == InspectionStatus.NG)
-                {
-                    consecutiveNgCount++;
-                    var protectionOptions = ResolveRuntimeProtectionOptions(configurationService);
-                    if (protectionOptions.ApplyProtectionRules &&
-                        protectionOptions.StopOnConsecutiveNg > 0 &&
-                        consecutiveNgCount >= protectionOptions.StopOnConsecutiveNg)
-                    {
-                        _logger.LogWarning(
-                            "连续 NG 达到运行保护阈值，停止检测: {ProjectId}, Threshold={Threshold}",
-                            projectId,
-                            protectionOptions.StopOnConsecutiveNg);
-                        break;
-                    }
+                    await Task.Delay(delayMs, ct);
                 }
-                else
+                catch (OperationCanceledException)
                 {
-                    consecutiveNgCount = 0;
+                    break;
                 }
-
-                if (result.Status == InspectionStatus.Error)
-                {
-                    _metrics.RecordInspectionFailed(result.ErrorMessage ?? InspectionStatus.Error.ToString());
-                    currentIntervalMs = Math.Min(currentIntervalMs * 2, maxIntervalMs);
-                }
-                else
-                {
-                    currentIntervalMs = 500;
-                    cycleSucceeded = true;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw; // 正常取消，退出循环
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[InspectionWorker] 第 {CycleCount} 轮检测异常", cycleCount);
-                _metrics.RecordInspectionFailed(ex.GetType().Name);
-                currentIntervalMs = Math.Min(currentIntervalMs * 2, maxIntervalMs);
-            }
-
-            // 计算间隔
-            var elapsedMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
-            if ((frameDrivenExecution || blockingSoftwareTriggerExecution) && cycleSucceeded)
-            {
-                continue;
-            }
-
-            var delayMs = Math.Max(currentIntervalMs - elapsedMs, minIntervalMs);
-
-            try
-            {
-                await Task.Delay(delayMs, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
             }
         }
+        finally
+        {
+            await ReleaseFrameDrivenStreamIfIdleAsync(streamCoordinator, flow, cameraId, frameDrivenExecution);
+            _logger.LogInformation("[InspectionWorker] 检测循环结束，共执行 {CycleCount} 轮", cycleCount);
+        }
+    }
 
-        _logger.LogInformation("[InspectionWorker] 检测循环结束，共执行 {CycleCount} 轮", cycleCount);
+    private async Task ReleaseFrameDrivenStreamIfIdleAsync(
+        ICameraFrameStreamCoordinator? streamCoordinator,
+        OperatorFlow flow,
+        string? cameraId,
+        bool frameDrivenExecution)
+    {
+        if (!frameDrivenExecution ||
+            streamCoordinator == null ||
+            !TryResolveCycleCameraId(flow, cameraId, out var releaseCameraId))
+        {
+            return;
+        }
+
+        try
+        {
+            await streamCoordinator.ReleaseIdleStreamAsync(releaseCameraId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionWorker] Failed to release idle camera stream after realtime loop stopped. CameraId={CameraId}", releaseCameraId);
+        }
     }
 
     private static RuntimeProtectionOptions ResolveRuntimeProtectionOptions(IConfigurationService? configurationService)

@@ -2972,7 +2972,6 @@ class SettingsView {
         let previewClosed = false;
         let previewLoading = false;
         let previewRequestId = 0;
-        let autoRearmTimer = null;
         let activePreviewAbortController = null;
         const content = document.createElement('div');
         const bindingLabel = this.escapeHtml(binding.displayName || binding.serialNumber || binding.id);
@@ -3016,10 +3015,6 @@ class SettingsView {
                 previewClosed = true;
                 previewRequestId += 1;
                 cancelActivePreviewRequest();
-                if (autoRearmTimer) {
-                    clearTimeout(autoRearmTimer);
-                    autoRearmTimer = null;
-                }
                 cleanupPreviewUrl();
             }
         });
@@ -3084,19 +3079,13 @@ class SettingsView {
             imageEl.style.display = 'none';
         };
 
-        const queueAutoRearm = () => {
+        const rearmNextPreview = () => {
             if (!isPhotoelectricTrigger || previewClosed) {
                 return;
             }
 
-            if (autoRearmTimer) {
-                clearTimeout(autoRearmTimer);
-            }
-
-            autoRearmTimer = setTimeout(() => {
-                autoRearmTimer = null;
-                void loadPreview();
-            }, 0);
+            // Arm immediately so an Enter pulse cannot land between frames and be filtered by the next cutoff.
+            void loadPreview();
         };
 
         const loadPreview = async () => {
@@ -3166,7 +3155,7 @@ class SettingsView {
                 }
 
                 if (shouldAutoRearm) {
-                    queueAutoRearm();
+                    rearmNextPreview();
                 }
             }
         };

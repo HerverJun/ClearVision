@@ -387,6 +387,7 @@ public class ContinuousRuntimeTests
             ReleaseCount++;
             return Task.CompletedTask;
         }
+        public Task ReleaseIdleStreamAsync(string cameraId) => Task.CompletedTask;
         public Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task StopPreviewSessionAsync(string sessionId) => Task.CompletedTask;

@@ -76,6 +76,9 @@ const { setCurrentProject } = await import(
 const { InspectionPanel } = await import(
   '../../../../src/Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js'
 );
+const { renderDiagnosticsCardsHtml } = await import(
+  '../../../../src/Acme.Product.Desktop/wwwroot/src/features/inspection/analysisCardsPanel.js'
+);
 
 function createPanel({ projectId = 'project-current', isContinuous = false } = {}) {
   const calls = [];
@@ -212,4 +215,59 @@ test('handleInspectionResult keeps continuous controls running for stale project
     true
   );
   assert.equal(calls.some(([kind]) => kind === 'updateCounters'), false);
+});
+
+test('addRecentResult renders only the latest three inspection results', (t) => {
+  const originalGetElementById = globalThis.document.getElementById;
+  const container = { innerHTML: '' };
+  const panel = Object.create(InspectionPanel.prototype);
+
+  Object.assign(panel, {
+    container: { querySelector: () => null },
+    analysisCardsPanel: { clear() {} },
+    clearProtectionWatchdog() {},
+    updateStatus() {},
+    updateCounters() {},
+    setButtonsState() {},
+    updateProtectionNotice() {}
+  });
+
+  globalThis.document.getElementById = (id) => (
+    id === 'inspection-recent-results-grid' ? container : null
+  );
+
+  t.after(() => {
+    panel.reset();
+    globalThis.document.getElementById = originalGetElementById;
+  });
+
+  for (let index = 1; index <= 4; index += 1) {
+    panel.addRecentResult({
+      id: `result-${index}`,
+      status: 'NG',
+      timestamp: `2026-05-21T10:30:0${index}Z`,
+      errorMessage: `preview-${index}`
+    });
+  }
+
+  const renderedItems = container.innerHTML.match(/recent-result-item/g) || [];
+  assert.equal(renderedItems.length, 3);
+  assert.match(container.innerHTML, /preview-4/);
+  assert.match(container.innerHTML, /preview-3/);
+  assert.match(container.innerHTML, /preview-2/);
+  assert.doesNotMatch(container.innerHTML, /preview-1/);
+});
+
+test('diagnostic sequence fields render as compact single-line text', () => {
+  const html = renderDiagnosticsCardsHtml({
+    expectedLabels: ['wire_brown', 'wire_black', 'wire_blue'],
+    actualOrder: ['wire_brown', 'wire_black', 'wire_blue'],
+    isMatch: true,
+    message: 'Sequence matched: wire_brown -> wire_black -> wire_blue.'
+  }, 'OK');
+
+  assert.match(html, /ac-diagnostic-row-sequence/);
+  assert.match(html, /ac-diagnostic-sequence-text/);
+  assert.match(html, /wire_brown-&gt;wire_black-&gt;wire_blue/);
+  assert.doesNotMatch(html, /ac-diagnostic-sequence"><span class="ac-diagnostic-chip"/);
 });
