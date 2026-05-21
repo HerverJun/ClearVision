@@ -2488,15 +2488,15 @@ class SettingsView {
         const effectiveTriggerMode = this.normalizeCameraTriggerMode(
             triggerMode ?? this.container?.querySelector('#cam-param-trigger-mode')?.value
         );
-        const disabled = forceDisabled || effectiveTriggerMode !== 'Continuous';
+        const disabled = forceDisabled || (effectiveTriggerMode !== 'Continuous' && effectiveTriggerMode !== 'External');
         frameRateInput.disabled = disabled;
         frameRateInput.readOnly = disabled;
         frameRateInput.setAttribute('aria-disabled', disabled ? 'true' : 'false');
 
         if (hintEl) {
             hintEl.textContent = disabled
-                ? '仅 Continuous 模式下可编辑；当前值会保留。'
-                : 'Continuous 模式下按该目标 fps 在应用侧节流。';
+                ? '仅帧驱动模式下可编辑；当前值会保留。'
+                : '帧驱动模式下按该目标 fps 在应用侧节流。';
         }
     }
 
@@ -2744,6 +2744,9 @@ class SettingsView {
             return {
                 ...preview,
                 triggerMode: this.normalizeCameraTriggerMode(session.triggerMode || session.TriggerMode),
+                targetFrameRateFps: this.normalizeCameraTargetFrameRate(
+                    session.targetFrameRateFps || session.TargetFrameRateFps || preview.targetFrameRateFps
+                ),
                 cameraBindingId
             };
         } finally {
@@ -2872,7 +2875,7 @@ class SettingsView {
             imageEl.src = preview.imageUrl;
             imageEl.style.display = 'block';
             placeholderEl.style.display = 'none';
-            metaEl.textContent = `触发模式: ${triggerModeLabel} · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
+            metaEl.textContent = `触发模式: ${triggerModeLabel} · 目标帧率: ${preview.targetFrameRateFps ?? '--'} fps · 分辨率: ${preview.width ?? '--'} x ${preview.height ?? '--'}${preview.sequence ? ` · 序号: ${preview.sequence}` : ''}`;
         };
 
         const startPreview = async () => {
@@ -2972,6 +2975,7 @@ class SettingsView {
         let previewClosed = false;
         let previewLoading = false;
         let previewRequestId = 0;
+        let autoRearmTimer = null;
         let activePreviewAbortController = null;
         const content = document.createElement('div');
         const bindingLabel = this.escapeHtml(binding.displayName || binding.serialNumber || binding.id);
@@ -3015,6 +3019,10 @@ class SettingsView {
                 previewClosed = true;
                 previewRequestId += 1;
                 cancelActivePreviewRequest();
+                if (autoRearmTimer) {
+                    clearTimeout(autoRearmTimer);
+                    autoRearmTimer = null;
+                }
                 cleanupPreviewUrl();
             }
         });
@@ -3084,8 +3092,14 @@ class SettingsView {
                 return;
             }
 
-            // Arm immediately so an Enter pulse cannot land between frames and be filtered by the next cutoff.
-            void loadPreview();
+            if (autoRearmTimer) {
+                clearTimeout(autoRearmTimer);
+            }
+
+            autoRearmTimer = setTimeout(() => {
+                autoRearmTimer = null;
+                void loadPreview();
+            }, 0);
         };
 
         const loadPreview = async () => {
@@ -3947,7 +3961,7 @@ class SettingsView {
                     <div id="camera-selection-hint" class="settings-field-hint" style="display:block; margin-bottom:16px;">
                         请先在上方绑定列表中选择一台相机，再进行预览、二维平面标定或参数保存。
                     </div>
-                    <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:24px; margin-bottom: 24px;">
+                    <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:24px; margin-bottom: 16px;">
                         <div class="settings-fieldset">
                             <label>曝光时间 (Exposure Time)</label>
                             <div class="input-with-suffix" style="position:relative;">
@@ -3985,6 +3999,16 @@ class SettingsView {
                                 <option value="Continuous">连续采集</option>
                             </select>
                             <span class="settings-field-hint">仅作用于当前所选相机</span>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:minmax(280px, 1fr); gap:24px; margin-bottom: 24px;">
+                        <div class="settings-fieldset">
+                            <label>采集帧率 (Frame Rate)</label>
+                            <div class="input-with-suffix" style="position:relative;">
+                                <input type="number" class="cv-input" id="cam-param-target-frame-rate" value="" min="1" max="120" style="padding-right:36px;" disabled readonly aria-disabled="true">
+                                <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">fps</span>
+                            </div>
+                            <span class="settings-field-hint" id="cam-param-target-frame-rate-hint">帧驱动模式（Continuous / External）下可编辑；默认 10 fps，范围 1 - 120。</span>
                         </div>
                     </div>
                     <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-bottom:24px;">
@@ -4086,15 +4110,7 @@ class SettingsView {
                             <span class="settings-field-hint" style="margin-left:24px;">仅串口光电触发来源下生效。</span>
                         </div>
                     </div>
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:24px;">
-                        <div class="settings-fieldset">
-                            <label>采集帧率 (Frame Rate)</label>
-                            <div class="input-with-suffix" style="position:relative;">
-                                <input type="number" class="cv-input" id="cam-param-target-frame-rate" value="" min="1" max="120" style="padding-right:36px;" disabled readonly aria-disabled="true">
-                                <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">fps</span>
-                            </div>
-                            <span class="settings-field-hint" id="cam-param-target-frame-rate-hint">仅 Continuous 模式下可编辑；当前值会保留。</span>
-                        </div>
+                    <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:24px;">
                         <div class="settings-fieldset">
                             <label>图像宽度 (Width)</label>
                             <div class="input-with-suffix" style="position:relative;">
