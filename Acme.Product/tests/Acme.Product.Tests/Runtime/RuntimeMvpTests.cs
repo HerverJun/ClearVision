@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
@@ -171,6 +172,67 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_StopAsync_WhenCancellationTokenIsCanceledAfterStopping_ShouldStillFinalize()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var replayRoot = Path.Combine(root, "replay");
+            Directory.CreateDirectory(replayRoot);
+            await File.WriteAllBytesAsync(Path.Combine(replayRoot, "input-1.png"), new byte[] { 2, 4, 6, 8 });
+
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateProjectDto("stop-cancel"),
+                TargetRootDirectory = root
+            });
+
+            var profilePath = Path.Combine(export.PackageRootPath, "runtime-profile.json");
+            var profile = JsonSerializer.Deserialize<RuntimeProfile>(
+                await File.ReadAllTextAsync(profilePath),
+                CreateJsonOptions())!;
+            profile.StopTimeoutMs = 100;
+            await File.WriteAllTextAsync(profilePath, JsonSerializer.Serialize(profile, CreateJsonOptions()));
+
+            var started = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var flowExecutionService = CreateFlowExecutionService(new BlockingResultOutputExecutor(started, release));
+
+            await using var runtimeHost = new RuntimeHost(
+                flowExecutionService,
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            await runtimeHost.StartFolderRunAsync(replayRoot);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+            var stopCts = new CancellationTokenSource();
+            var stopTask = runtimeHost.StopAsync(stopCts.Token);
+            await WaitForStateAsync(runtimeHost, RuntimeHostState.Stopping, TimeSpan.FromSeconds(1));
+            stopCts.Cancel();
+
+            var stopSummary = await stopTask.WaitAsync(TimeSpan.FromSeconds(2));
+            stopSummary.WasRunning.Should().BeTrue();
+            stopSummary.TimedOut.Should().BeTrue();
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Faulted);
+
+            var reloadWhileOldRunIsAlive = async () => await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            await reloadWhileOldRunIsAlive.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*忙*");
+
+            release.TrySetResult(null);
+            await WaitForStateAsync(runtimeHost, RuntimeHostState.Loaded, TimeSpan.FromSeconds(2));
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public void ArchitectureGuard_ShouldKeepRuntimeAndStationFreeFromDesktopWebDependencies()
     {
         var repoRoot = FindRepositoryRoot();
@@ -213,6 +275,22 @@ public class RuntimeMvpTests
             new[] { executor },
             NullLogger<FlowExecutionService>.Instance,
             new VariableContext());
+    }
+
+    private static async Task WaitForStateAsync(RuntimeHost runtimeHost, RuntimeHostState state, TimeSpan timeout)
+    {
+        var deadline = Stopwatch.StartNew();
+        while (deadline.Elapsed < timeout)
+        {
+            if (runtimeHost.GetSnapshot().State == state)
+            {
+                return;
+            }
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException($"RuntimeHost did not reach state {state} within {timeout}.");
     }
 
     private static InspectionService CreateInspectionService(IFlowExecutionService flowExecutionService)
@@ -345,6 +423,39 @@ public class RuntimeMvpTests
                 ["JudgmentResult"] = isOk ? "OK" : "NG",
                 ["DecisionByte"] = decisionByte,
                 ["Image"] = imageBytes
+            });
+        }
+
+        public ValidationResult ValidateParameters(Operator @operator)
+        {
+            return ValidationResult.Valid();
+        }
+    }
+
+    private sealed class BlockingResultOutputExecutor : IOperatorExecutor
+    {
+        private readonly TaskCompletionSource<object?> _started;
+        private readonly TaskCompletionSource<object?> _release;
+
+        public BlockingResultOutputExecutor(TaskCompletionSource<object?> started, TaskCompletionSource<object?> release)
+        {
+            _started = started;
+            _release = release;
+        }
+
+        public OperatorType OperatorType => OperatorType.ResultOutput;
+
+        public async Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default)
+        {
+            _started.TrySetResult(null);
+            await _release.Task.ConfigureAwait(false);
+            return OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["JudgmentResult"] = "OK",
+                ["Image"] = new byte[] { 2, 4, 6, 8 }
             });
         }
 

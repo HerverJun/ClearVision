@@ -10,6 +10,7 @@ using Acme.Product.Core.Exceptions;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Acme.Product.Application.Services;
 
@@ -21,6 +22,7 @@ public class ProjectService
     private readonly IProjectRepository _projectRepository;
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IOperatorFactory _operatorFactory;
+    private readonly ILogger<ProjectService>? _logger;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -31,10 +33,20 @@ public class ProjectService
     };
 
     public ProjectService(IProjectRepository projectRepository, IProjectFlowStorage flowStorage, IOperatorFactory operatorFactory)
+        : this(projectRepository, flowStorage, operatorFactory, null)
+    {
+    }
+
+    public ProjectService(
+        IProjectRepository projectRepository,
+        IProjectFlowStorage flowStorage,
+        IOperatorFactory operatorFactory,
+        ILogger<ProjectService>? logger)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
         _operatorFactory = operatorFactory;
+        _logger = logger;
     }
 
     /// <summary>
@@ -78,8 +90,9 @@ public class ProjectService
                     dto.Flow = flowDto;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                _logger?.LogWarning(ex, "Failed to deserialize flow JSON for project {ProjectId}; falling back to database flow.", id);
                 // 忽略反序列化错误，回退到 DB 数据
             }
         }

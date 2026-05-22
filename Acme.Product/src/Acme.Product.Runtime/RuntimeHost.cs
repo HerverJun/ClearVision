@@ -24,6 +24,9 @@ public sealed class RuntimeHost : IAsyncDisposable
     private RuntimeSiteProfile? _activeSiteProfile;
     private CancellationTokenSource? _activeRunCts;
     private Task? _backgroundRunTask;
+    private long _runGenerationCounter;
+    private long _activeRunGeneration;
+    private bool _stopTimeoutPending;
     private Guid? _currentFlowId;
     private string? _currentRunId;
     private int _sessionOkCount;
@@ -143,14 +146,23 @@ public sealed class RuntimeHost : IAsyncDisposable
         string imagePath,
         CancellationToken cancellationToken = default)
     {
+        CancellationTokenSource runCts;
+        Task<RuntimeNormalizedResult> backgroundRunTask;
+        long runGeneration;
+
         await _stateGate.WaitAsync(cancellationToken);
         try
         {
             EnsurePackageLoaded();
             EnsureNotRunning();
-            _activeRunCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            runCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            runGeneration = Interlocked.Increment(ref _runGenerationCounter);
+            _activeRunGeneration = runGeneration;
+            _stopTimeoutPending = false;
+            _activeRunCts = runCts;
             _state = RuntimeHostState.Running;
-            _backgroundRunTask = ExecuteSingleCoreAsync(imagePath, _activeRunCts.Token);
+            backgroundRunTask = ExecuteSingleCoreAsync(imagePath, runCts.Token);
+            _backgroundRunTask = backgroundRunTask;
         }
         finally
         {
@@ -161,11 +173,11 @@ public sealed class RuntimeHost : IAsyncDisposable
 
         try
         {
-            return await ((Task<RuntimeNormalizedResult>)_backgroundRunTask);
+            return await backgroundRunTask;
         }
         finally
         {
-            await FinalizeRunAsync();
+            await FinalizeRunAsync(runGeneration, runCts);
         }
     }
 
@@ -184,10 +196,14 @@ public sealed class RuntimeHost : IAsyncDisposable
             }
 
             _pendingCount = files.Count;
-            _activeRunCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var runCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var runGeneration = Interlocked.Increment(ref _runGenerationCounter);
+            _activeRunGeneration = runGeneration;
+            _stopTimeoutPending = false;
+            _activeRunCts = runCts;
             _state = RuntimeHostState.Running;
             _backgroundRunTask = Task.Run(
-                () => ExecuteFolderReplayAsync(files, _activeRunCts.Token),
+                () => ExecuteFolderReplayAsync(files, runGeneration, runCts),
                 CancellationToken.None);
         }
         finally
@@ -207,13 +223,15 @@ public sealed class RuntimeHost : IAsyncDisposable
         RuntimeProfile? profile;
         int pendingCount;
         bool wasRunning;
+        long activeRunGeneration;
 
         await _stateGate.WaitAsync(cancellationToken);
         try
         {
-            wasRunning = _state is RuntimeHostState.Running or RuntimeHostState.Stopping;
+            wasRunning = _state is RuntimeHostState.Running or RuntimeHostState.Stopping || HasActiveRun();
             activeRunCts = _activeRunCts;
             backgroundRunTask = _backgroundRunTask;
+            activeRunGeneration = _activeRunGeneration;
             currentFlowId = _currentFlowId;
             profile = _loadedPackage?.RuntimeProfile;
             pendingCount = _pendingCount;
@@ -253,27 +271,50 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
 
         var timeout = TimeSpan.FromMilliseconds(profile?.StopTimeoutMs ?? 5_000);
-        var completedTask = await Task.WhenAny(backgroundRunTask, Task.Delay(timeout, cancellationToken));
-        var completed = completedTask == backgroundRunTask;
+        var completedTask = await Task.WhenAny(backgroundRunTask, Task.Delay(timeout));
+        var completed = completedTask == backgroundRunTask || backgroundRunTask.IsCompleted;
 
         if (completed)
         {
-            await FinalizeRunAsync();
+            await FinalizeRunAsync(activeRunGeneration, activeRunCts);
         }
         else
         {
-            await _stateGate.WaitAsync(cancellationToken);
+            var markTimedOut = false;
+            var completedAfterTimeout = false;
+            await _stateGate.WaitAsync(CancellationToken.None);
             try
             {
-                _state = RuntimeHostState.Faulted;
+                if (_activeRunGeneration == activeRunGeneration &&
+                    ReferenceEquals(_backgroundRunTask, backgroundRunTask))
+                {
+                    if (backgroundRunTask.IsCompleted)
+                    {
+                        completedAfterTimeout = true;
+                    }
+                    else
+                    {
+                        _state = RuntimeHostState.Faulted;
+                        _stopTimeoutPending = true;
+                        markTimedOut = true;
+                    }
+                }
             }
             finally
             {
                 _stateGate.Release();
             }
 
-            EmitSnapshot();
-            EmitLog("停止等待超时，当前任务未在超时前退出。");
+            if (completedAfterTimeout)
+            {
+                completed = true;
+                await FinalizeRunAsync(activeRunGeneration, activeRunCts);
+            }
+            else if (markTimedOut)
+            {
+                EmitSnapshot();
+                EmitLog("停止等待超时，当前任务未在超时前退出。");
+            }
         }
 
         return new RuntimeStopSummary
@@ -322,8 +363,13 @@ public sealed class RuntimeHost : IAsyncDisposable
         _stateGate.Dispose();
     }
 
-    private async Task ExecuteFolderReplayAsync(IReadOnlyList<string> files, CancellationToken cancellationToken)
+    private async Task ExecuteFolderReplayAsync(
+        IReadOnlyList<string> files,
+        long runGeneration,
+        CancellationTokenSource runCts)
     {
+        var cancellationToken = runCts.Token;
+
         try
         {
             foreach (var file in files)
@@ -342,21 +388,31 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             _logger.LogError(ex, "Folder replay failed.");
             EmitLog($"批量运行失败：{ex.Message}");
-            await _stateGate.WaitAsync(cancellationToken);
             try
             {
-                _state = RuntimeHostState.Faulted;
-            }
-            finally
-            {
-                _stateGate.Release();
-            }
+                await _stateGate.WaitAsync(CancellationToken.None);
+                try
+                {
+                    if (_activeRunGeneration == runGeneration)
+                    {
+                        _state = RuntimeHostState.Faulted;
+                        _stopTimeoutPending = false;
+                    }
+                }
+                finally
+                {
+                    _stateGate.Release();
+                }
 
-            EmitSnapshot();
+                EmitSnapshot();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
         finally
         {
-            await FinalizeRunAsync();
+            await FinalizeRunAsync(runGeneration, runCts);
         }
     }
 
@@ -512,29 +568,56 @@ public sealed class RuntimeHost : IAsyncDisposable
         return (_resultWriter?.DroppedCount ?? 0) + (_imageWriter?.DroppedCount ?? 0);
     }
 
-    private async Task FinalizeRunAsync()
+    private async Task FinalizeRunAsync(long expectedGeneration, CancellationTokenSource? runCts)
     {
-        await _stateGate.WaitAsync();
+        var emitSnapshot = false;
+
+        if (Interlocked.CompareExchange(ref _disposeStarted, 0, 0) != 0)
+        {
+            runCts?.Dispose();
+            return;
+        }
+
         try
         {
-            _activeRunCts?.Dispose();
-            _activeRunCts = null;
-            _backgroundRunTask = null;
-            _currentFlowId = null;
-            _currentRunId = null;
-            _pendingCount = 0;
+            await _stateGate.WaitAsync(CancellationToken.None);
+        }
+        catch (ObjectDisposedException)
+        {
+            runCts?.Dispose();
+            return;
+        }
 
-            if (_state != RuntimeHostState.Faulted)
+        try
+        {
+            if (_activeRunGeneration == expectedGeneration)
             {
-                _state = _loadedPackage == null ? RuntimeHostState.Idle : RuntimeHostState.Loaded;
+                _activeRunCts = null;
+                _backgroundRunTask = null;
+                _activeRunGeneration = 0;
+                _currentFlowId = null;
+                _currentRunId = null;
+                _pendingCount = 0;
+
+                if (_state != RuntimeHostState.Faulted || _stopTimeoutPending)
+                {
+                    _state = _loadedPackage == null ? RuntimeHostState.Idle : RuntimeHostState.Loaded;
+                }
+
+                _stopTimeoutPending = false;
+                emitSnapshot = true;
             }
         }
         finally
         {
             _stateGate.Release();
+            runCts?.Dispose();
         }
 
-        EmitSnapshot();
+        if (emitSnapshot)
+        {
+            EmitSnapshot();
+        }
     }
 
     private async Task RecreateWritersAsync(RuntimeProfile profile)
@@ -589,10 +672,15 @@ public sealed class RuntimeHost : IAsyncDisposable
 
     private void EnsureNotRunning()
     {
-        if (_state is RuntimeHostState.Running or RuntimeHostState.Stopping)
+        if (_state is RuntimeHostState.Running or RuntimeHostState.Stopping || HasActiveRun())
         {
             throw new RuntimePackageException("运行引擎当前正忙，请先等待当前任务结束。");
         }
+    }
+
+    private bool HasActiveRun()
+    {
+        return _backgroundRunTask is { IsCompleted: false };
     }
 
     private void EmitSnapshot()
@@ -945,22 +1033,37 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly Task _consumerTask;
     private readonly ILogger _logger;
+    private readonly TimeSpan _disposeDrainTimeout;
     private int _backpressureWaitCount;
     private int _droppedCount;
     private int _persistenceFailureCount;
     private int _disposeStarted;
 
-    public RuntimeResultRecordWriter(string dataRoot, int capacity, ILogger logger)
+    public RuntimeResultRecordWriter(
+        string dataRoot,
+        int capacity,
+        ILogger logger)
+        : this(dataRoot, capacity, logger, default, null)
+    {
+    }
+
+    public RuntimeResultRecordWriter(
+        string dataRoot,
+        int capacity,
+        ILogger logger,
+        TimeSpan disposeDrainTimeout = default,
+        Task? consumerTaskOverride = null)
     {
         DataRoot = dataRoot;
         _logger = logger;
+        _disposeDrainTimeout = disposeDrainTimeout > TimeSpan.Zero ? disposeDrainTimeout : TimeSpan.FromSeconds(10);
         _channel = Channel.CreateBounded<RuntimeNormalizedResult>(new BoundedChannelOptions(Math.Max(1, capacity))
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
         });
-        _consumerTask = Task.Run(() => ConsumeAsync(_disposeCts.Token));
+        _consumerTask = consumerTaskOverride ?? Task.Run(() => ConsumeAsync(_disposeCts.Token));
     }
 
     public string DataRoot { get; }
@@ -1022,7 +1125,20 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
         _channel.Writer.TryComplete();
         try
         {
-            await _consumerTask.ConfigureAwait(false);
+            var completedTask = await Task.WhenAny(_consumerTask, Task.Delay(_disposeDrainTimeout)).ConfigureAwait(false);
+            if (completedTask == _consumerTask)
+            {
+                await _consumerTask.ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Runtime result record writer dispose timed out after {Timeout}. Pending records may be dropped.",
+                    _disposeDrainTimeout);
+                _ = _consumerTask.ContinueWith(
+                    task => _logger.LogDebug(task.Exception, "Runtime result record writer consumer faulted after timed out disposal."),
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+            }
         }
         finally
         {
@@ -1077,23 +1193,38 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
     private readonly Task _consumerTask;
     private readonly RuntimeProfile _profile;
     private readonly ILogger _logger;
+    private readonly TimeSpan _disposeDrainTimeout;
     private int _backpressureWaitCount;
     private int _droppedCount;
     private int _persistenceFailureCount;
     private int _disposeStarted;
 
-    public RuntimeImageWriter(string dataRoot, RuntimeProfile profile, ILogger logger)
+    public RuntimeImageWriter(
+        string dataRoot,
+        RuntimeProfile profile,
+        ILogger logger)
+        : this(dataRoot, profile, logger, default, null)
+    {
+    }
+
+    public RuntimeImageWriter(
+        string dataRoot,
+        RuntimeProfile profile,
+        ILogger logger,
+        TimeSpan disposeDrainTimeout = default,
+        Task? consumerTaskOverride = null)
     {
         DataRoot = dataRoot;
         _profile = profile;
         _logger = logger;
+        _disposeDrainTimeout = disposeDrainTimeout > TimeSpan.Zero ? disposeDrainTimeout : TimeSpan.FromSeconds(10);
         _channel = Channel.CreateBounded<RuntimeNormalizedResult>(new BoundedChannelOptions(Math.Max(1, profile.ImageQueueCapacity))
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
         });
-        _consumerTask = Task.Run(() => ConsumeAsync(_disposeCts.Token));
+        _consumerTask = consumerTaskOverride ?? Task.Run(() => ConsumeAsync(_disposeCts.Token));
     }
 
     public string DataRoot { get; }
@@ -1184,7 +1315,20 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
         _channel.Writer.TryComplete();
         try
         {
-            await _consumerTask.ConfigureAwait(false);
+            var completedTask = await Task.WhenAny(_consumerTask, Task.Delay(_disposeDrainTimeout)).ConfigureAwait(false);
+            if (completedTask == _consumerTask)
+            {
+                await _consumerTask.ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Runtime image writer dispose timed out after {Timeout}. Pending images may be dropped.",
+                    _disposeDrainTimeout);
+                _ = _consumerTask.ContinueWith(
+                    task => _logger.LogDebug(task.Exception, "Runtime image writer consumer faulted after timed out disposal."),
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+            }
         }
         finally
         {

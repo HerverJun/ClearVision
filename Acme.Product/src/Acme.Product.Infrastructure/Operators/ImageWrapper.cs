@@ -77,7 +77,7 @@ public sealed class ImageWrapper : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         var mat = GetMat();
 
-        if (Interlocked.CompareExchange(ref _refCount, 0, 0) == 1)
+        if (RefCount == 1)
             return mat;
 
         var pooledMat = _pool.Rent(mat.Width, mat.Height, mat.Type());
@@ -98,7 +98,13 @@ public sealed class ImageWrapper : IDisposable
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            Interlocked.Increment(ref _refCount);
+            if (_refCount <= 0)
+                throw new ObjectDisposedException(nameof(ImageWrapper));
+
+            checked
+            {
+                _refCount++;
+            }
         }
 
         return this;
@@ -106,20 +112,29 @@ public sealed class ImageWrapper : IDisposable
 
     public void Release()
     {
-        int remaining = Interlocked.Decrement(ref _refCount);
+        lock (_lock)
+        {
+            if (_refCount <= 0)
+                throw new InvalidOperationException("[ImageWrapper] RefCount became negative (double release detected).");
 
-        if (remaining == 0)
-        {
-            Dispose();
-        }
-        else if (remaining < 0)
-        {
-            Interlocked.Increment(ref _refCount);
-            throw new InvalidOperationException("[ImageWrapper] RefCount became negative (double release detected).");
+            _refCount--;
+            if (_refCount == 0)
+            {
+                DisposeCoreLocked();
+            }
         }
     }
 
-    public int RefCount => Interlocked.CompareExchange(ref _refCount, 0, 0);
+    public int RefCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _refCount;
+            }
+        }
+    }
 
     /// <summary>
     /// Returns PNG bytes by default.
@@ -159,19 +174,25 @@ public sealed class ImageWrapper : IDisposable
     {
         lock (_lock)
         {
-            if (_disposed)
-                return;
-
-            _disposed = true;
-
-            if (_mat != null && !_mat.IsDisposed)
-                _pool.Return(_mat);
-
-            _mat = null;
-            _bytes = null;
+            _refCount = 0;
+            DisposeCoreLocked();
         }
 
         GC.SuppressFinalize(this);
+    }
+
+    private void DisposeCoreLocked()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+
+        if (_mat != null && !_mat.IsDisposed)
+            _pool.Return(_mat);
+
+        _mat = null;
+        _bytes = null;
     }
 
     public static ImageWrapper FromBytes(byte[] bytes, MatPool? pool = null)

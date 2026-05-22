@@ -521,90 +521,141 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             await industrialCamera.SetTriggerModeAsync(binding.TriggerMode, binding.HardwareTriggerSource);
         }
 
-        entry.IsRunning = true;
-        entry.SerialNumber = binding.SerialNumber;
-        entry.ConfigurationSignature = configurationSignature;
-        entry.TriggerMode = binding.TriggerMode;
-        entry.TargetFrameRateFps = binding.TargetFrameRateFps;
-        entry.LatestFrame = null;
-        entry.History = new FrameRingBuffer(binding.FrameBufferCapacity);
-        entry.Sequence = 0;
-        entry.LastPublishedTicks = 0;
-        entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps);
-        entry.PendingFrameWaiters = 0;
-        lock (entry.SignalGate)
+        try
         {
-            entry.NextFrameSignal = CreateFrameSignal();
-        }
+            entry.IsRunning = false;
+            entry.SerialNumber = binding.SerialNumber;
+            entry.ConfigurationSignature = configurationSignature;
+            entry.TriggerMode = binding.TriggerMode;
+            entry.TargetFrameRateFps = binding.TargetFrameRateFps;
+            entry.LatestFrame = null;
+            entry.History = new FrameRingBuffer(binding.FrameBufferCapacity);
+            entry.Sequence = 0;
+            entry.LastPublishedTicks = 0;
+            entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.NormalizeTargetFrameRate(binding.TargetFrameRateFps);
+            entry.PendingFrameWaiters = 0;
+            lock (entry.SignalGate)
+            {
+                entry.NextFrameSignal = CreateFrameSignal();
+            }
 
-        if (camera is IIndustrialCamera eventCamera)
-        {
-            EventHandler<CameraFrameReceivedEventArgs> handler = (_, args) =>
+            if (camera is IIndustrialCamera eventCamera)
+            {
+                EventHandler<CameraFrameReceivedEventArgs> handler = (_, args) =>
+                {
+                    try
+                    {
+                        if (!TryEnterPublishWindow(entry))
+                        {
+                            return;
+                        }
+
+                        var contentType = args.ImageData.Length > 2 &&
+                                          args.ImageData[0] == 0xFF &&
+                                          args.ImageData[1] == 0xD8
+                            ? "image/jpeg"
+                            : "image/png";
+                        var frame = CreateFrame(
+                            binding.CameraBindingId,
+                            args.ImageData,
+                            contentType,
+                            args.Width,
+                            args.Height,
+                            args.CameraTimestampNs.HasValue ? (long?)args.CameraTimestampNs.Value : null,
+                            args.DeviceFrameCounter.HasValue ? (long?)args.DeviceFrameCounter.Value : null,
+                            args.Stride);
+                        PublishFrame(entry, frame);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to publish shared camera frame from metadata event. CameraBindingId={CameraBindingId}", binding.CameraBindingId);
+                    }
+                };
+
+                eventCamera.FrameReceived += handler;
+                entry.EventCamera = eventCamera;
+                entry.FrameReceivedHandler = handler;
+            }
+
+            await camera.StartContinuousAcquisitionAsync(async imageData =>
             {
                 try
                 {
+                    if (entry.EventCamera is CameraProviderAdapter)
+                    {
+                        return;
+                    }
+
                     if (!TryEnterPublishWindow(entry))
                     {
                         return;
                     }
 
-                    var contentType = args.ImageData.Length > 2 &&
-                                      args.ImageData[0] == 0xFF &&
-                                      args.ImageData[1] == 0xD8
-                        ? "image/jpeg"
-                        : "image/png";
-                    var frame = CreateFrame(
-                        binding.CameraBindingId,
-                        args.ImageData,
-                        contentType,
-                        args.Width,
-                        args.Height,
-                        args.CameraTimestampNs.HasValue ? (long?)args.CameraTimestampNs.Value : null,
-                        args.DeviceFrameCounter.HasValue ? (long?)args.DeviceFrameCounter.Value : null,
-                        args.Stride);
+                    var frame = CreateFrame(binding.CameraBindingId, imageData, "image/jpeg");
                     PublishFrame(entry, frame);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to publish shared camera frame from metadata event. CameraBindingId={CameraBindingId}", binding.CameraBindingId);
+                    _logger.LogWarning(ex, "Failed to publish shared camera frame. CameraBindingId={CameraBindingId}", binding.CameraBindingId);
                 }
-            };
 
-            eventCamera.FrameReceived += handler;
-            entry.EventCamera = eventCamera;
-            entry.FrameReceivedHandler = handler;
+                await Task.CompletedTask;
+            });
+
+            entry.IsRunning = true;
         }
-
-        await camera.StartContinuousAcquisitionAsync(async imageData =>
+        catch (Exception ex)
         {
-            try
-            {
-                if (entry.EventCamera is CameraProviderAdapter)
-                {
-                    return;
-                }
-
-                if (!TryEnterPublishWindow(entry))
-                {
-                    return;
-                }
-
-                var frame = CreateFrame(binding.CameraBindingId, imageData, "image/jpeg");
-                PublishFrame(entry, frame);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to publish shared camera frame. CameraBindingId={CameraBindingId}", binding.CameraBindingId);
-            }
-
-            await Task.CompletedTask;
-        });
+            await RollBackFailedProducerStartAsync(entry, camera, ex);
+            throw;
+        }
 
         _logger.LogInformation(
             "Shared camera stream started. CameraBindingId={CameraBindingId}, TriggerMode={TriggerMode}, TargetFrameRateFps={TargetFrameRateFps}",
             binding.CameraBindingId,
             binding.TriggerMode,
             binding.TargetFrameRateFps);
+    }
+
+    private async Task RollBackFailedProducerStartAsync(ProducerEntry entry, ICamera camera, Exception exception)
+    {
+        try
+        {
+            if (entry.EventCamera != null && entry.FrameReceivedHandler != null)
+            {
+                entry.EventCamera.FrameReceived -= entry.FrameReceivedHandler;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to detach camera frame event handler after start failure. CameraBindingId={CameraBindingId}", entry.CameraBindingId);
+        }
+
+        try
+        {
+            await camera.StopContinuousAcquisitionAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to stop camera acquisition after start failure. CameraBindingId={CameraBindingId}", entry.CameraBindingId);
+        }
+
+        entry.EventCamera = null;
+        entry.FrameReceivedHandler = null;
+        entry.IdleStopCts?.Cancel();
+        entry.IdleStopCts?.Dispose();
+        entry.IdleStopCts = null;
+        entry.IsRunning = false;
+        entry.SerialNumber = string.Empty;
+        entry.ConfigurationSignature = string.Empty;
+        entry.LatestFrame = null;
+        entry.History = new FrameRingBuffer(24);
+        entry.Sequence = 0;
+        entry.LastPublishedTicks = 0;
+        entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
+        CompleteFrameWaiters(entry, new InvalidOperationException($"Camera stream '{entry.CameraBindingId}' failed to start.", exception));
+
+        _logger.LogWarning(exception, "Failed to start shared camera stream. CameraBindingId={CameraBindingId}", entry.CameraBindingId);
     }
 
     private async Task StopProducerCoreAsync(ProducerEntry entry)

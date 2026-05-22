@@ -1,9 +1,12 @@
 using Acme.Product.Application.Services;
+using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Core.ValueObjects;
 using Acme.Product.Infrastructure.Services;
 using FluentAssertions;
 using NSubstitute;
+using Acme.Product.Tests.TestSupport;
 
 namespace Acme.Product.Tests.Services;
 
@@ -33,10 +36,75 @@ public class OperatorServiceTests
         metadata.Outputs.Should().Contain(output => output.Name == "Diagnostics");
     }
 
+    [Fact]
+    public async Task CreateAsync_WhenParameterIsInvalid_ShouldLogWarningAndContinue()
+    {
+        var repository = Substitute.For<IOperatorRepository>();
+        var factory = new OperatorFactory();
+        var logger = new RecordingLogger<OperatorService>();
+        var sut = new OperatorService(repository, factory, logger);
+
+        var created = await sut.CreateAsync(new CreateOperatorRequest
+        {
+            Type = OperatorType.ImageAcquisition,
+            Name = "camera",
+            Parameters =
+            [
+                new ParameterRequest { Name = "NotAParameter", Value = "value" }
+            ]
+        });
+
+        created.Should().NotBeNull();
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
+            entry.Message.Contains("Ignored invalid operator parameter"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenParameterValueCannotSerialize_ShouldLogWarningAndContinue()
+    {
+        var id = Guid.NewGuid();
+        var repository = Substitute.For<IOperatorRepository>();
+        var factory = new OperatorFactory();
+        var logger = new RecordingLogger<OperatorService>();
+        var sut = new OperatorService(repository, factory, logger);
+        var entity = new Operator(id, "camera", OperatorType.ImageAcquisition, 0, 0);
+        entity.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "Payload",
+            "Payload",
+            string.Empty,
+            "object",
+            defaultValue: "initial"));
+        repository.GetByIdAsync(id).Returns(entity);
+
+        var cyclicValue = new CyclicValue();
+        cyclicValue.Next = cyclicValue;
+
+        var updated = await sut.UpdateAsync(id, new UpdateOperatorRequest
+        {
+            Parameters =
+            [
+                new ParameterRequest { Name = "Payload", Value = cyclicValue }
+            ]
+        });
+
+        updated.Should().NotBeNull();
+        await repository.Received(1).UpdateAsync(entity);
+        logger.Entries.Should().Contain(entry =>
+            entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
+            entry.Message.Contains("Ignored invalid operator parameter while updating"));
+    }
+
     private static OperatorService CreateSut()
     {
         var repository = Substitute.For<IOperatorRepository>();
         var factory = new OperatorFactory();
         return new OperatorService(repository, factory);
+    }
+
+    private sealed class CyclicValue
+    {
+        public CyclicValue? Next { get; set; }
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
 using FluentAssertions;
@@ -69,6 +70,69 @@ public sealed class RuntimeWriterBackpressureTests
 
             Directory.EnumerateFiles(Path.Combine(root, "images"), "*.png").Should().HaveCount(20);
             ReadIntProperty(writer, "DroppedCount").Should().Be(0);
+        }
+        finally
+        {
+            await DisposeIfNeededAsync(writer);
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ResultRecordWriter_DisposeAsync_ShouldReturnWhenConsumerDoesNotFinish()
+    {
+        var root = CreateTempDirectory();
+        var consumer = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var writer = CreateInternalWriter(
+            "Acme.Product.Runtime.RuntimeResultRecordWriter",
+            root,
+            1,
+            NullLogger.Instance,
+            TimeSpan.FromMilliseconds(100),
+            consumer.Task);
+
+        try
+        {
+            await EnqueueAsync(writer, BuildResult(1));
+
+            var stopwatch = Stopwatch.StartNew();
+            await ((IAsyncDisposable)writer).DisposeAsync();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+        }
+        finally
+        {
+            await DisposeIfNeededAsync(writer);
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ImageWriter_DisposeAsync_ShouldReturnWhenConsumerDoesNotFinish()
+    {
+        var root = CreateTempDirectory();
+        var consumer = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var profile = new RuntimeProfile
+        {
+            ImageQueueCapacity = 1
+        };
+        var writer = CreateInternalWriter(
+            "Acme.Product.Runtime.RuntimeImageWriter",
+            root,
+            profile,
+            NullLogger.Instance,
+            TimeSpan.FromMilliseconds(100),
+            consumer.Task);
+
+        try
+        {
+            var result = BuildResult(1);
+            result.SavedImagePath = Path.Combine(root, "images", "01.png");
+            result.OutputImageBytes = [0x89, 0x50, 0x4E, 0x47, 0x01];
+            await EnqueueAsync(writer, result);
+
+            var stopwatch = Stopwatch.StartNew();
+            await ((IAsyncDisposable)writer).DisposeAsync();
+            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
         }
         finally
         {

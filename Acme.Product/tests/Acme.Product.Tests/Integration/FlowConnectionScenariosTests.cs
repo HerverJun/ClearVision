@@ -231,6 +231,64 @@ public class FlowConnectionScenariosTests
         output.OutputData.Should().NotContainKey("Image");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteFlowAsync_MultipleRootConsumers_SharedInitialImageWrapper_ShouldNotDoubleRelease(bool enableParallel)
+    {
+        using var inputImage = new ImageWrapper(new Mat(12, 12, MatType.CV_8UC3, Scalar.All(9)));
+        var consumerExecutor = new TestInitialImageConsumerOperator(NullLogger<TestInitialImageConsumerOperator>.Instance);
+        var service = CreateFlowService(consumerExecutor);
+
+        var flow = new OperatorFlow();
+        var consumerA = CreateOperator("consumer-a", OperatorType.ImageDiff, inputPorts: [("Image", PortDataType.Image)]);
+        var consumerB = CreateOperator("consumer-b", OperatorType.ImageDiff, inputPorts: [("Image", PortDataType.Image)]);
+
+        flow.AddOperator(consumerA);
+        flow.AddOperator(consumerB);
+
+        var output = await service.ExecuteFlowAsync(
+            flow,
+            new Dictionary<string, object>
+            {
+                ["Image"] = inputImage
+            },
+            enableParallel: enableParallel);
+
+        output.IsSuccess.Should().BeTrue(output.ErrorMessage);
+        consumerExecutor.ExecutionCount.Should().Be(2);
+        inputImage.RefCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenRootConsumerFails_ShouldReleaseReservedInitialImageRefs()
+    {
+        using var inputImage = new ImageWrapper(new Mat(12, 12, MatType.CV_8UC3, Scalar.All(9)));
+        var failingExecutor = new TestFailingCommentImageConsumerOperator(NullLogger<TestFailingCommentImageConsumerOperator>.Instance);
+        var skippedExecutor = new TestInitialImageConsumerOperator(NullLogger<TestInitialImageConsumerOperator>.Instance);
+        var service = CreateFlowService(failingExecutor, skippedExecutor);
+
+        var flow = new OperatorFlow();
+        var failingRoot = CreateOperator("failing-root", OperatorType.Comment, inputPorts: [("Image", PortDataType.Image)]);
+        var skippedRoot = CreateOperator("skipped-root", OperatorType.ImageDiff, inputPorts: [("Image", PortDataType.Image)]);
+
+        flow.AddOperator(failingRoot);
+        flow.AddOperator(skippedRoot);
+
+        var output = await service.ExecuteFlowAsync(
+            flow,
+            new Dictionary<string, object>
+            {
+                ["Image"] = inputImage
+            },
+            enableParallel: false);
+
+        output.IsSuccess.Should().BeFalse();
+        output.ErrorMessage.Should().Contain("synthetic root consumer failure");
+        skippedExecutor.ExecutionCount.Should().Be(0);
+        inputImage.RefCount.Should().Be(0);
+    }
+
     private static IFlowExecutionService CreateFlowService(params IOperatorExecutor[] executors)
     {
         return new FlowExecutionService(
@@ -367,6 +425,33 @@ public class FlowConnectionScenariosTests
         }
     }
 
+    private sealed class TestFailingCommentImageConsumerOperator : OperatorBase
+    {
+        public override OperatorType OperatorType => OperatorType.Comment;
+
+        public TestFailingCommentImageConsumerOperator(ILogger<TestFailingCommentImageConsumerOperator> logger) : base(logger)
+        {
+        }
+
+        protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs,
+            CancellationToken cancellationToken)
+        {
+            if (!TryGetInputImage(inputs, "Image", out _))
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure("missing image"));
+            }
+
+            return Task.FromResult(OperatorExecutionOutput.Failure("synthetic root consumer failure"));
+        }
+
+        public override ValidationResult ValidateParameters(Operator @operator)
+        {
+            return ValidationResult.Valid();
+        }
+    }
+
     private sealed class TestYoloLikeSourceOperator : OperatorBase
     {
         public override OperatorType OperatorType => OperatorType.ImageAcquisition;
@@ -388,6 +473,40 @@ public class FlowConnectionScenariosTests
             });
 
             return Task.FromResult(OperatorExecutionOutput.Success(output));
+        }
+
+        public override ValidationResult ValidateParameters(Operator @operator)
+        {
+            return ValidationResult.Valid();
+        }
+    }
+
+    private sealed class TestInitialImageConsumerOperator : OperatorBase
+    {
+        public override OperatorType OperatorType => OperatorType.ImageDiff;
+
+        public int ExecutionCount { get; private set; }
+
+        public TestInitialImageConsumerOperator(ILogger<TestInitialImageConsumerOperator> logger) : base(logger)
+        {
+        }
+
+        protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs,
+            CancellationToken cancellationToken)
+        {
+            if (!TryGetInputImage(inputs, "Image", out var image) || image == null)
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure("missing image"));
+            }
+
+            ExecutionCount++;
+            return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Width"] = image.Width,
+                ["Height"] = image.Height
+            }));
         }
 
         public override ValidationResult ValidateParameters(Operator @operator)

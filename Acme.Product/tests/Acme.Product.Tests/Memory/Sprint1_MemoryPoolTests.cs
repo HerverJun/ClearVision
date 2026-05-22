@@ -82,6 +82,21 @@ public class Sprint1_MemoryPoolTests
         testPool.Dispose();
     }
 
+    [Fact]
+    public void ImageWrapper_AddRef_AfterFinalRelease_ShouldThrowObjectDisposedException()
+    {
+        var testPool = new MatPool(maxPerBucket: 8, maxTotalGb: 0.5);
+        using var originalMat = new Mat(100, 100, MatType.CV_8UC3);
+        var wrapper = new ImageWrapper(originalMat.Clone(), testPool);
+
+        wrapper.Release();
+
+        Assert.Throws<ObjectDisposedException>(() => wrapper.AddRef());
+        Assert.Equal(0, wrapper.RefCount);
+
+        testPool.Dispose();
+    }
+
     /// <summary>
     /// 测试写时复制(CoW)：
     /// 两个并发线程对同一 ImageWrapper 调用 GetWritableMat()

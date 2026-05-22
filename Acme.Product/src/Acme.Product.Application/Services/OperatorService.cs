@@ -10,6 +10,7 @@ using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Operators;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Acme.Product.Application.Services;
 
@@ -21,14 +22,24 @@ public class OperatorService : IOperatorService
 {
     private readonly IOperatorRepository _operatorRepository;
     private readonly IOperatorFactory _operatorFactory;
+    private readonly ILogger<OperatorService>? _logger;
     private static readonly Dictionary<OperatorType, OperatorMetadataDto> OperatorMetadataCache = new();
 
     public OperatorService(
         IOperatorRepository operatorRepository,
         IOperatorFactory operatorFactory)
+        : this(operatorRepository, operatorFactory, null)
+    {
+    }
+
+    public OperatorService(
+        IOperatorRepository operatorRepository,
+        IOperatorFactory operatorFactory,
+        ILogger<OperatorService>? logger)
     {
         _operatorRepository = operatorRepository;
         _operatorFactory = operatorFactory;
+        _logger = logger;
         InitializeMetadataCache();
     }
 
@@ -465,9 +476,9 @@ public class OperatorService : IOperatorService
                     {
                         operatorEntity.UpdateParameter(param.Name, param.Value);
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        // 记录日志或忽略无效参数
+                        _logger?.LogWarning(ex, "Ignored invalid operator parameter while creating {OperatorType}: {ParameterName}", request.Type, param.Name);
                     }
                 }
             }
@@ -505,9 +516,9 @@ public class OperatorService : IOperatorService
                     {
                         entity.UpdateParameter(param.Name, param.Value);
                     }
-                    catch (InvalidOperationException)
+                    catch (Exception ex)
                     {
-                        // 参数不存在，跳过或记录日志
+                        _logger?.LogWarning(ex, "Ignored invalid operator parameter while updating {OperatorId}: {ParameterName}", id, param.Name);
                     }
                 }
             }

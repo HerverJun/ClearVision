@@ -197,6 +197,60 @@ public class CameraFrameStreamCoordinatorTests
     }
 
     [Fact]
+    public async Task AcquireFrameAsync_WhenStartContinuousAcquisitionThrows_ShouldResetProducerStateAndAllowRetry()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var camera = CreateIndustrialCamera();
+        var attempt = 0;
+        Func<byte[], Task>? frameCallback = null;
+
+        camera.When(x => x.StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>()))
+            .Do(callInfo =>
+            {
+                attempt++;
+                frameCallback = callInfo.Arg<Func<byte[], Task>>();
+                if (attempt == 1)
+                {
+                    throw new InvalidOperationException("synthetic startup failure");
+                }
+            });
+
+        var binding = new CameraBindingConfig
+        {
+            Id = "binding-start-failure",
+            SerialNumber = "SN-START-FAIL",
+            TriggerMode = "Continuous"
+        };
+
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
+        cameraManager.GetOrCreateByBindingAsync(binding.Id).Returns(Task.FromResult<ICamera>(camera));
+        cameraManager.GetCamera(binding.SerialNumber).Returns(camera);
+
+        await using var sut = new CameraFrameStreamCoordinator(
+            cameraManager,
+            NullLogger<CameraFrameStreamCoordinator>.Instance,
+            NoOpTriggerInputService.Instance,
+            NoOpSerialPhotoelectricTriggerInputService.Instance,
+            TimeSpan.FromMilliseconds(20));
+
+        var firstAcquire = async () => await sut.AcquireFrameAsync(binding.Id);
+
+        await firstAcquire.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*synthetic startup failure*");
+        sut.SnapshotStreamUsage(binding.Id).IsRunning.Should().BeFalse();
+
+        var secondAcquireTask = sut.AcquireFrameAsync(binding.Id);
+        await Task.Delay(50);
+
+        var frameBytes = CreatePngBytes(new Scalar(8, 16, 32));
+        await frameCallback!(frameBytes);
+        var frame = await secondAcquireTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        frame.ImageData.Should().Equal(frameBytes);
+        await camera.Received(2).StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>());
+    }
+
+    [Fact]
     public async Task ReleaseIdleStreamAsync_AfterDirectAcquire_ShouldStopProducerImmediately()
     {
         var cameraManager = Substitute.For<ICameraManager>();

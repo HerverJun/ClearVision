@@ -250,6 +250,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             // 设置初始输入数据
             if (inputData != null)
             {
+                ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
                 operatorOutputs[Guid.Empty] = inputData;
             }
 
@@ -978,11 +979,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         foreach (var (operatorId, outputData) in operatorOutputs)
         {
-            if (operatorId == Guid.Empty)
-            {
-                continue;
-            }
-
             foreach (var value in outputData.Values)
             {
                 CollectImageWrappers(value, wrappers);
@@ -1117,6 +1113,61 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             _logger.LogDebug("[FlowExecution] Set ref count: Operator={OperatorName}, Port={PortName}, FanOut={FanOut}, RefCount={RefCount}",
                 op.Name, portName, fanOut, img.RefCount);
         }
+    }
+
+    private void ApplyInitialInputRefCounts(
+        Dictionary<string, object> inputData,
+        IReadOnlyCollection<Operator> executionOrder,
+        FlowInputPreparationIndex inputPreparationIndex)
+    {
+        var consumerCount = CountInitialInputConsumers(executionOrder, inputPreparationIndex);
+        if (consumerCount <= 1)
+        {
+            return;
+        }
+
+        var wrappers = new HashSet<ImageWrapper>(ReferenceEqualityComparer.Instance);
+        foreach (var value in inputData.Values)
+        {
+            if (value is ImageWrapper wrapper)
+            {
+                wrappers.Add(wrapper);
+            }
+        }
+
+        foreach (var wrapper in wrappers)
+        {
+            for (var i = 1; i < consumerCount; i++)
+            {
+                wrapper.AddRef();
+            }
+        }
+    }
+
+    private int CountInitialInputConsumers(
+        IReadOnlyCollection<Operator> executionOrder,
+        FlowInputPreparationIndex inputPreparationIndex)
+    {
+        var count = 0;
+        foreach (var op in executionOrder)
+        {
+            if (!op.IsEnabled)
+            {
+                continue;
+            }
+
+            if (inputPreparationIndex.GetIncomingConnections(op.Id).Count != 0)
+            {
+                continue;
+            }
+
+            if (TryResolveExecutor(op.Type, out var executor) && executor is OperatorBase)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     #endregion
@@ -1385,6 +1436,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             // 设置初始输入数据
             if (inputData != null)
             {
+                ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
                 operatorOutputs[Guid.Empty] = inputData;
             }
 
