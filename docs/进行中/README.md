@@ -1,20 +1,19 @@
 # 进行中
 
-This folder keeps active plans, open follow-ups, and review queues. Completed plans should be moved to `docs/归档/` with a short closure note instead of being deleted.
+本目录保留仍在推进的计划、未闭环事项和待复核队列。已完成计划应迁入 `docs/归档/`，并补充简短闭环说明，不直接删除。
 
-## Current Active Plans
+## 当前计划
 
-- [ClearVision-无证据算子数据集与算法补齐计划-2026-05-18.md](./当前计划/ClearVision-无证据算子数据集与算法补齐计划-2026-05-18.md): current evidence-first operator dataset and algorithm completion plan.
-- [ClearVision-现场使用者体验审视与改进计划-2026-05-20.md](./当前计划/ClearVision-现场使用者体验审视与改进计划-2026-05-20.md): field-user experience review with code evidence and prioritized remediation.
+- [ClearVision-全面提升 TODO（2026-05-09）](./当前计划/ClearVision-全面提升TODO-2026-05-09.md)：项目稳定性、质量、现场化、验证与发布提升总清单。
 
-Recently closed plans are archived under [2026-05-18 当前计划闭环归档](../归档/已关闭事项/2026-05-18-当前计划闭环归档/闭环说明.md).
+近期已关闭计划见 [2026-05-22 当前计划闭环归档](../归档/已关闭事项/2026-05-22-当前计划闭环归档/闭环说明.md) 和 [已关闭事项索引](../归档/已关闭事项/索引.md)。
 
-## Supporting Entrypoints
+## 支撑入口
 
 - [当前计划](./当前计划/)
 - [未闭环事项](./未闭环事项/)
 - [待复核](./待复核/)
 
-## Closure Rule
+## 闭环规则
 
-Before a plan is closed, update its checklist, add verification evidence, and link any new evidence pages from either [docs/README.md](../README.md) or this file.
+计划关闭前，需要更新清单勾选状态，补充验证证据，并从 [docs/README.md](../README.md) 或本文档链接新增证据页。

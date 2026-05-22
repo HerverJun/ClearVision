@@ -8,7 +8,8 @@ This directory is the primary documentation entry point. Active release and engi
 - [产品审计报告](./产品审计报告-2026-05-16.md)
 - [功能使用说明](./功能使用说明-2026-05-16.md)
 - [文档健康检查报告](./文档健康检查报告-2026-05-16.md)
-- [当前最终整合 TODO](./进行中/当前计划/ClearVision-最终整合TODO-2026-05-03.md)
+- [当前计划总入口](./进行中/README.md)
+- [ClearVision 全面提升 TODO](./进行中/当前计划/ClearVision-全面提升TODO-2026-05-09.md)
 - [Station-Studio sync SOP](./runtime/station-studio-sync.md)
 - [Desktop/Studio boundary](./runtime/Desktop-Studio-Boundary.md)
 
