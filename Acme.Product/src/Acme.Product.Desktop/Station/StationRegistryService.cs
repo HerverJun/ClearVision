@@ -216,6 +216,42 @@ public sealed class StationRegistryService
         return cursor;
     }
 
+    public StationAckDto ReportResultGap(string connectionId, StationResultGapDto gap)
+    {
+        List<StoredStationRegistryEvent> events;
+        StationAckDto ack;
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(gap.StationId);
+            TouchConnectionLocked(entry, connectionId, now);
+
+            ack = _centralStore?.ReportResultGap(gap)
+                ?? new StationAckDto
+                {
+                    StationId = gap.StationId,
+                    AcceptedSequenceId = gap.DroppedThroughSequenceId,
+                    LastPersistedSequenceId = Math.Max(entry.LastAcceptedSequenceId, gap.DroppedThroughSequenceId),
+                    Duplicate = gap.DroppedThroughSequenceId <= entry.LastAcceptedSequenceId,
+                    Message = "Result gap acknowledged.",
+                    ServerTimeUtc = now,
+                    CreatedAtUtc = now
+                };
+
+            entry.LastAcceptedSequenceId = Math.Max(entry.LastAcceptedSequenceId, ack.LastPersistedSequenceId);
+            entry.AcceptedResultSequences.RemoveWhere(sequenceId => sequenceId <= entry.LastAcceptedSequenceId);
+            events =
+            [
+                CreateEventLocked("stationUpserted", ToStatusViewModelLocked(entry, now)),
+                CreateEventLocked("summaryUpdated", BuildSummaryLocked(now))
+            ];
+        }
+
+        PublishEvents(events);
+        return ack;
+    }
+
     public StationAckDto UpsertHealthSnapshot(string connectionId, StationHealthSnapshotDto snapshot)
     {
         List<StoredStationRegistryEvent> events;

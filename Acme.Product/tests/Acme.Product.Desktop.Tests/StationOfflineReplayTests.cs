@@ -140,6 +140,10 @@ public sealed class StationOfflineReplayTests
             restartedSpool.GetPendingBatch(200).Select(result => result.SequenceId)
                 .Should()
                 .Equal(Enumerable.Range(6, 100).Select(value => (long)value));
+            restartedSpool.GetPendingUnavailableRange().Should().Be((1L, 5L));
+
+            restartedSpool.AcknowledgeUnavailableThrough(5);
+            restartedSpool.GetPendingUnavailableRange().Should().Be((0L, 0L));
         }
         finally
         {

@@ -239,6 +239,79 @@ public sealed class StationPackageStore
         return manifest;
     }
 
+    public async Task<StationPackageManifestDto> ImportRuntimePackageAsync(
+        string runtimePackageRootPath,
+        string? createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(runtimePackageRootPath))
+        {
+            throw new ArgumentException("Runtime package root path is required.", nameof(runtimePackageRootPath));
+        }
+
+        var runtimeRoot = Path.GetFullPath(runtimePackageRootPath);
+        var runtimeManifestPath = Path.Combine(runtimeRoot, "package.json");
+        if (!File.Exists(runtimeManifestPath))
+        {
+            throw new FileNotFoundException("Runtime package manifest was not found.", runtimeManifestPath);
+        }
+
+        var runtimeManifestJson = await File.ReadAllTextAsync(runtimeManifestPath, cancellationToken);
+        var runtimeManifest = JsonSerializer.Deserialize<RuntimePackageManifest>(runtimeManifestJson, PackageJsonOptions)
+            ?? throw new InvalidOperationException("Runtime package manifest could not be read.");
+        var packageId = SanitizePackageId(runtimeManifest.PackageId);
+        var packageDirectory = Path.Combine(FilesDirectory, packageId);
+        Directory.CreateDirectory(packageDirectory);
+
+        var staging = Path.Combine(packageDirectory, "staging");
+        if (Directory.Exists(staging))
+        {
+            Directory.Delete(staging, recursive: true);
+        }
+
+        var stagedRuntimeRoot = Path.Combine(staging, "package");
+        CopyDirectory(runtimeRoot, stagedRuntimeRoot);
+
+        var manifest = new StationPackageManifestDto
+        {
+            PackageId = packageId,
+            PackageName = string.IsNullOrWhiteSpace(runtimeManifest.PackageName)
+                ? packageId
+                : runtimeManifest.PackageName.Trim(),
+            PackageVersion = string.IsNullOrWhiteSpace(runtimeManifest.RuntimeApiVersion)
+                ? "1.0"
+                : runtimeManifest.RuntimeApiVersion.Trim(),
+            FlowHash = runtimeManifest.FlowHash,
+            CreatedBy = string.IsNullOrWhiteSpace(createdBy)
+                ? (string.IsNullOrWhiteSpace(runtimeManifest.CreatedBy) ? "Studio" : runtimeManifest.CreatedBy.Trim())
+                : createdBy.Trim(),
+            MinStationVersion = string.IsNullOrWhiteSpace(runtimeManifest.MinStationVersion)
+                ? "0.1.0"
+                : runtimeManifest.MinStationVersion.Trim(),
+            CreatedAtUtc = runtimeManifest.CreatedAt == default ? DateTimeOffset.UtcNow : runtimeManifest.CreatedAt
+        };
+
+        Directory.CreateDirectory(staging);
+        await File.WriteAllTextAsync(
+            Path.Combine(staging, "manifest.json"),
+            JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }),
+            cancellationToken);
+
+        var targetFile = Path.Combine(packageDirectory, $"{packageId}.cvpkg");
+        if (File.Exists(targetFile))
+        {
+            File.Delete(targetFile);
+        }
+
+        ZipFile.CreateFromDirectory(staging, targetFile, CompressionLevel.Fastest, includeBaseDirectory: false);
+        Directory.Delete(staging, recursive: true);
+
+        manifest.SizeBytes = new FileInfo(targetFile).Length;
+        manifest.Sha256 = await ComputeSha256Async(targetFile, cancellationToken);
+        Persist(manifest, targetFile);
+        return manifest;
+    }
+
     private static OperatorFlowDto CreateSmokeFlow(string packageId)
     {
         return new OperatorFlowDto
@@ -344,6 +417,40 @@ public sealed class StationPackageStore
         return path.EndsWith(Path.DirectorySeparatorChar)
             ? path
             : path + Path.DirectorySeparatorChar;
+    }
+
+    private static string SanitizePackageId(string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(packageId))
+        {
+            return $"pkg_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}"[..32];
+        }
+
+        var safe = string.Concat(packageId.Trim().Select(ch =>
+            char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.'
+                ? ch
+                : '_'));
+        return string.IsNullOrWhiteSpace(safe) || safe is "." or ".."
+            ? $"pkg_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}"[..32]
+            : safe;
+    }
+
+    private static void CopyDirectory(string sourceDirectory, string targetDirectory)
+    {
+        Directory.CreateDirectory(targetDirectory);
+        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, directory);
+            Directory.CreateDirectory(Path.Combine(targetDirectory, relativePath));
+        }
+
+        foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, file);
+            var targetPath = Path.Combine(targetDirectory, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+            File.Copy(file, targetPath, overwrite: true);
+        }
     }
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)

@@ -36,6 +36,7 @@ internal static class Program
                 services.Configure<Sync.StationSyncOptions>(context.Configuration.GetSection(Sync.StationSyncOptions.SectionName));
                 services.AddSingleton<Sync.StationIdentityResolver>();
                 services.AddSingleton<Sync.StationSpoolStore>();
+                services.AddSingleton<Sync.StationCommandResultSpoolStore>();
                 services.AddSingleton<Sync.StationHubClient>();
                 services.AddSingleton<Sync.StationPackageDeploymentService>();
                 services.AddSingleton<Sync.StationLogRelayService>();

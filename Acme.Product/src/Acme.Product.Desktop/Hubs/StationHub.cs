@@ -82,6 +82,12 @@ public sealed class StationHub : Hub
         return Task.FromResult(_registryService.UpsertResultSummary(Context.ConnectionId, result));
     }
 
+    public Task<StationAckDto> ReportResultGap(StationResultGapDto gap)
+    {
+        EnsureAuthorizedForStation(gap.StationId);
+        return Task.FromResult(_registryService.ReportResultGap(Context.ConnectionId, gap));
+    }
+
     public Task<StationAckDto> PushResult(StationResultSummaryDto result)
     {
         EnsureAuthorizedForStation(result.StationId);

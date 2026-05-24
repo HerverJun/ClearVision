@@ -63,6 +63,24 @@ public sealed class StationSpoolStore
         }
     }
 
+    public (long FromSequenceId, long ThroughSequenceId) GetPendingUnavailableRange()
+    {
+        lock (_syncRoot)
+        {
+            if (_state.UnavailableThroughSequenceId <= _state.ReportedUnavailableThroughSequenceId)
+            {
+                return (0, 0);
+            }
+
+            var fromSequenceId = _state.UnavailableFromSequenceId > 0
+                ? _state.UnavailableFromSequenceId
+                : _state.ReportedUnavailableThroughSequenceId + 1;
+            fromSequenceId = Math.Max(fromSequenceId, _state.ReportedUnavailableThroughSequenceId + 1);
+            fromSequenceId = Math.Min(fromSequenceId, _state.UnavailableThroughSequenceId);
+            return (fromSequenceId, _state.UnavailableThroughSequenceId);
+        }
+    }
+
     public int PendingCount
     {
         get
@@ -147,8 +165,41 @@ public sealed class StationSpoolStore
             }
 
             _state.AckedSequenceId = ackedSequenceId;
+            if (_state.UnavailableThroughSequenceId > 0 &&
+                ackedSequenceId >= _state.UnavailableThroughSequenceId)
+            {
+                _state.ReportedUnavailableThroughSequenceId = Math.Max(
+                    _state.ReportedUnavailableThroughSequenceId,
+                    _state.UnavailableThroughSequenceId);
+                _state.UnavailableFromSequenceId = 0;
+            }
+
             _pendingResults.RemoveAll(result => result.SequenceId <= ackedSequenceId);
             RewriteSpoolLocked();
+            SaveStateLocked();
+        }
+    }
+
+    public void AcknowledgeUnavailableThrough(long sequenceId)
+    {
+        if (sequenceId <= 0)
+        {
+            return;
+        }
+
+        lock (_syncRoot)
+        {
+            if (sequenceId <= _state.ReportedUnavailableThroughSequenceId)
+            {
+                return;
+            }
+
+            _state.ReportedUnavailableThroughSequenceId = sequenceId;
+            if (_state.ReportedUnavailableThroughSequenceId >= _state.UnavailableThroughSequenceId)
+            {
+                _state.UnavailableFromSequenceId = 0;
+            }
+
             SaveStateLocked();
         }
     }
@@ -295,6 +346,20 @@ public sealed class StationSpoolStore
         var droppedFromId = dropped.Min(result => result.SequenceId);
         var cutoffSequenceId = dropped.Max(result => result.SequenceId);
         _state.AckedSequenceId = Math.Max(_state.AckedSequenceId, cutoffSequenceId);
+        if (_state.UnavailableThroughSequenceId <= _state.ReportedUnavailableThroughSequenceId)
+        {
+            _state.UnavailableFromSequenceId = droppedFromId;
+        }
+        else if (_state.UnavailableFromSequenceId <= 0)
+        {
+            _state.UnavailableFromSequenceId = droppedFromId;
+        }
+        else
+        {
+            _state.UnavailableFromSequenceId = Math.Min(_state.UnavailableFromSequenceId, droppedFromId);
+        }
+
+        _state.UnavailableThroughSequenceId = Math.Max(_state.UnavailableThroughSequenceId, cutoffSequenceId);
 
         _logger.LogWarning(
             "Dropped Station spool records due to capacity limit. Range={FromSequenceId}-{ToSequenceId}",
@@ -346,5 +411,11 @@ public sealed class StationSpoolStore
         public long NextSequenceId { get; set; }
 
         public long AckedSequenceId { get; set; }
+
+        public long UnavailableFromSequenceId { get; set; }
+
+        public long UnavailableThroughSequenceId { get; set; }
+
+        public long ReportedUnavailableThroughSequenceId { get; set; }
     }
 }

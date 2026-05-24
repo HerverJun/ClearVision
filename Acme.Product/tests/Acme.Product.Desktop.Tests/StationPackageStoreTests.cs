@@ -1,7 +1,13 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Acme.Product.Application.DTOs;
+using Acme.Product.Core.Enums;
 using Acme.Product.Desktop.Station;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Runtime;
+using Acme.Product.Runtime.Abstractions;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +18,16 @@ namespace Acme.Product.Desktop.Tests;
 
 public sealed class StationPackageStoreTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true,
+        Converters =
+        {
+            new JsonStringEnumConverter()
+        }
+    };
+
     [Fact]
     public async Task CreateTestPackageAsync_ShouldCreateDeployableRuntimePackage()
     {
@@ -67,6 +83,123 @@ public sealed class StationPackageStoreTests
                 DeleteDirectoryWithRetry(root);
             }
         }
+    }
+
+    [Fact]
+    public async Task ImportRuntimePackageAsync_ShouldCreateStationDeployablePackageRecord()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationPackageImportTests", Guid.NewGuid().ToString("N"));
+        var dbPath = Path.Combine(root, "vision.db");
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await using (var provider = new ServiceCollection()
+                .AddLogging()
+                .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+                .AddSingleton<StationPackageStore>()
+                .AddSingleton<RuntimePackageValidator>()
+                .AddSingleton<RuntimePackageLoader>()
+                .BuildServiceProvider())
+            {
+                await using (var scope = provider.CreateAsyncScope())
+                {
+                    await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+                }
+
+                var runtimeRoot = Path.Combine(root, "runtime-package");
+                await CreateRuntimePackageRootAsync(runtimeRoot, "cvpkg-import-1");
+
+                var store = provider.GetRequiredService<StationPackageStore>();
+                var manifest = await store.ImportRuntimePackageAsync(runtimeRoot, "unit-test", CancellationToken.None);
+                var packagePath = store.GetPackagePath(manifest.PackageId);
+
+                manifest.PackageId.Should().Be("cvpkg-import-1");
+                manifest.CreatedBy.Should().Be("unit-test");
+                packagePath.Should().NotBeNullOrWhiteSpace();
+                File.Exists(packagePath).Should().BeTrue();
+
+                var extractRoot = Path.Combine(root, "extract-imported");
+                ZipFile.ExtractToDirectory(packagePath!, extractRoot);
+                File.Exists(Path.Combine(extractRoot, "manifest.json")).Should().BeTrue();
+
+                var runtimePackageRoot = Path.Combine(extractRoot, "package");
+                var loaded = await provider.GetRequiredService<RuntimePackageLoader>().LoadAsync(runtimePackageRoot);
+                loaded.Manifest.PackageId.Should().Be("cvpkg-import-1");
+                loaded.ValidationReport.IsValid.Should().BeTrue();
+
+                store.GetPackages().Should().Contain(item => item.PackageId == manifest.PackageId);
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(root))
+            {
+                DeleteDirectoryWithRetry(root);
+            }
+        }
+    }
+
+    private static async Task CreateRuntimePackageRootAsync(string runtimeRoot, string packageId)
+    {
+        Directory.CreateDirectory(runtimeRoot);
+        Directory.CreateDirectory(Path.Combine(runtimeRoot, "quality"));
+        Directory.CreateDirectory(Path.Combine(runtimeRoot, "field"));
+
+        var flow = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "Import test runtime flow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Result",
+                    Type = OperatorType.ResultOutput,
+                    X = 0,
+                    Y = 0,
+                    InputPorts = [],
+                    OutputPorts = [],
+                    Parameters = []
+                }
+            ],
+            Connections = []
+        };
+        var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, JsonOptions);
+        var flowHash = $"sha256:{Convert.ToHexString(SHA256.HashData(flowBytes)).ToLowerInvariant()}";
+        var manifest = new RuntimePackageManifest
+        {
+            PackageId = packageId,
+            PackageName = "Import Test Package",
+            RuntimeApiVersion = "1.0",
+            MinStationVersion = "0.1.0",
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "ClearVision Studio",
+            EntryFlow = "flow.json",
+            FlowHash = flowHash,
+            OperatorCatalogVersion = "unit-test",
+            ExportAllowed = true,
+            FieldExtensions = new RuntimeFieldExtensions
+            {
+                RuntimeParameters = "field/runtime-parameters.json",
+                DefaultSiteProfile = "field/station-profile.default.json"
+            }
+        };
+        var validationReport = new RuntimeValidationReport
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            IsValid = true,
+            FlowHash = flowHash
+        };
+
+        await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "flow.json"), flowBytes);
+        await File.WriteAllTextAsync(Path.Combine(runtimeRoot, "package.json"), JsonSerializer.Serialize(manifest, JsonOptions));
+        await File.WriteAllTextAsync(Path.Combine(runtimeRoot, "runtime-profile.json"), JsonSerializer.Serialize(new RuntimeProfile(), JsonOptions));
+        await File.WriteAllTextAsync(
+            Path.Combine(runtimeRoot, "quality", "validation-report.json"),
+            JsonSerializer.Serialize(validationReport, JsonOptions));
     }
 
     private static void DeleteDirectoryWithRetry(string path)

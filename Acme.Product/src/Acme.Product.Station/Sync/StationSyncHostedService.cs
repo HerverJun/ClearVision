@@ -15,6 +15,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private readonly RuntimeHost _runtimeHost;
     private readonly StationIdentityResolver _identityResolver;
     private readonly StationSpoolStore _spoolStore;
+    private readonly StationCommandResultSpoolStore _commandResultSpoolStore;
     private readonly StationHubClient _hubClient;
     private readonly StationPackageDeploymentService _packageDeploymentService;
     private readonly StationLogRelayService _logRelayService;
@@ -38,7 +39,6 @@ public sealed class StationSyncHostedService : BackgroundService
     private DateTimeOffset? _lastResultAtUtc;
     private long _nextControlSequenceId;
     private long _queuedResultSummaries;
-    private long _resultSummaryBackpressureEvents;
     private long _droppedResultSummaries;
     private long _overwrittenSnapshots;
 
@@ -46,6 +46,7 @@ public sealed class StationSyncHostedService : BackgroundService
         RuntimeHost runtimeHost,
         StationIdentityResolver identityResolver,
         StationSpoolStore spoolStore,
+        StationCommandResultSpoolStore commandResultSpoolStore,
         StationHubClient hubClient,
         StationPackageDeploymentService packageDeploymentService,
         StationLogRelayService logRelayService,
@@ -56,6 +57,7 @@ public sealed class StationSyncHostedService : BackgroundService
         _runtimeHost = runtimeHost;
         _identityResolver = identityResolver;
         _spoolStore = spoolStore;
+        _commandResultSpoolStore = commandResultSpoolStore;
         _hubClient = hubClient;
         _packageDeploymentService = packageDeploymentService;
         _logRelayService = logRelayService;
@@ -106,6 +108,8 @@ public sealed class StationSyncHostedService : BackgroundService
                 {
                     didWork |= await TryRegisterAsync(stoppingToken);
                     didWork |= await TryPushSnapshotAsync(stoppingToken);
+                    didWork |= await TryReportResultGapAsync(stoppingToken);
+                    didWork |= await TryPushPendingCommandResultsAsync(stoppingToken);
                     didWork |= await TryPushPendingResultsAsync(stoppingToken);
                     didWork |= await TryPushHealthAsync(stoppingToken);
                     didWork |= await TryPushPendingLogsAsync(stoppingToken);
@@ -183,28 +187,24 @@ public sealed class StationSyncHostedService : BackgroundService
             var summary = StationResultMapper.ToSummary(result, identity);
             _lastResultAtUtc = summary.CompletedAtUtc;
 
-            var queued = Interlocked.Increment(ref _queuedResultSummaries);
-            if (_resultIngressChannel.Writer.TryWrite(summary))
+            Interlocked.Increment(ref _queuedResultSummaries);
+            try
             {
+                _spoolStore.Enqueue(summary);
                 SignalSync();
-                return;
             }
-
-            Interlocked.Decrement(ref _queuedResultSummaries);
-            var backpressureEvents = Interlocked.Increment(ref _resultSummaryBackpressureEvents);
-            var dropped = Interlocked.Increment(ref _droppedResultSummaries);
-            if (dropped == 1 || dropped % 100 == 0)
+            finally
             {
-                _logger.LogWarning(
-                    "Dropped Station Studio result summary because the bounded outbound queue is full. DroppedResultSummaries={DroppedResultSummaries}, BackpressureEvents={BackpressureEvents}, Capacity={Capacity}",
-                    dropped,
-                    backpressureEvents,
-                    Math.Max(1, _options.OutboundQueueCapacity));
+                Interlocked.Decrement(ref _queuedResultSummaries);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to queue Station result summary.");
+            var dropped = Interlocked.Increment(ref _droppedResultSummaries);
+            _logger.LogError(
+                ex,
+                "Failed to persist Station result summary to local spool from runtime event. DroppedResultSummaries={DroppedResultSummaries}",
+                dropped);
         }
     }
 
@@ -373,6 +373,65 @@ public sealed class StationSyncHostedService : BackgroundService
         _isRegistered = true;
         ApplyAck(response);
         return true;
+    }
+
+    private async Task<bool> TryReportResultGapAsync(CancellationToken stoppingToken)
+    {
+        var gap = _spoolStore.GetPendingUnavailableRange();
+        if (gap.ThroughSequenceId <= 0)
+        {
+            return false;
+        }
+
+        var identity = _identityResolver.GetOrCreate();
+        var response = await _hubClient.ReportResultGapAsync(
+            new StationResultGapDto
+            {
+                SchemaVersion = StationSyncContractDefaults.SchemaVersion,
+                StationId = identity.StationId,
+                DroppedFromSequenceId = gap.FromSequenceId,
+                DroppedThroughSequenceId = gap.ThroughSequenceId,
+                Reason = "station-spool-trim",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            },
+            stoppingToken);
+        if (response == null)
+        {
+            _isRegistered = false;
+            return false;
+        }
+
+        if (response.LastPersistedSequenceId >= gap.ThroughSequenceId)
+        {
+            _spoolStore.AcknowledgeUnavailableThrough(gap.ThroughSequenceId);
+        }
+
+        ApplyAck(response);
+        return true;
+    }
+
+    private async Task<bool> TryPushPendingCommandResultsAsync(CancellationToken stoppingToken)
+    {
+        var batch = _commandResultSpoolStore.GetPendingBatch(Math.Max(1, _options.PendingBatchSize));
+        if (batch.Count == 0)
+        {
+            return false;
+        }
+
+        var sentAny = false;
+        foreach (var result in batch)
+        {
+            if (!await _hubClient.ReportCommandResultAsync(result, stoppingToken))
+            {
+                _isRegistered = false;
+                return sentAny;
+            }
+
+            _commandResultSpoolStore.Acknowledge(result.CommandId, result.Status);
+            sentAny = true;
+        }
+
+        return sentAny;
     }
 
     private async Task<bool> TryPushPendingResultsAsync(CancellationToken stoppingToken)
@@ -634,7 +693,7 @@ public sealed class StationSyncHostedService : BackgroundService
         await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Runtime package reloaded.", cancellationToken);
     }
 
-    private Task ReportCommandAsync(
+    private async Task ReportCommandAsync(
         StationCommandDto command,
         StationCommandStatus status,
         int progress,
@@ -644,7 +703,7 @@ public sealed class StationSyncHostedService : BackgroundService
         string? errorDetail = null)
     {
         var now = DateTimeOffset.UtcNow;
-        return _hubClient.ReportCommandResultAsync(new StationCommandResultDto
+        var payload = new StationCommandResultDto
         {
             CommandId = command.CommandId,
             StationId = command.StationId,
@@ -653,11 +712,18 @@ public sealed class StationSyncHostedService : BackgroundService
             Message = message,
             ErrorCode = errorCode,
             ErrorDetail = errorDetail,
-            StartedAtUtc = status is StationCommandStatus.Running or StationCommandStatus.Succeeded or StationCommandStatus.Failed ? now : null,
+            StartedAtUtc = status == StationCommandStatus.Running ? now : null,
             CompletedAtUtc = status is StationCommandStatus.Succeeded or StationCommandStatus.Failed or StationCommandStatus.Rejected ? now : null,
             ReportedAtUtc = now,
             CreatedAtUtc = now
-        }, cancellationToken);
+        };
+
+        if (!await _hubClient.ReportCommandResultAsync(payload, cancellationToken))
+        {
+            _isRegistered = false;
+            _commandResultSpoolStore.Enqueue(payload);
+            SignalSync();
+        }
     }
 
     private async Task WaitForNextSignalAsync(CancellationToken stoppingToken)
@@ -807,23 +873,22 @@ public sealed class StationSyncHostedService : BackgroundService
             PlcStatusSummary = BuildPlcStatusSummary(snapshot),
             CurrentPackageId = snapshot.PackageId,
             CurrentPackageHealth = snapshot.PackageId == null ? "NoPackage" : "Loaded",
-            LastErrorCode = Volatile.Read(ref _droppedResultSummaries) > 0 ? "StationResultBackpressure" : null,
-            LastErrorMessage = BuildBackpressureSummary(),
+            LastErrorCode = Volatile.Read(ref _droppedResultSummaries) > 0 ? "StationResultSpoolPersistFailed" : null,
+            LastErrorMessage = BuildResultSpoolSummary(),
             CreatedAtUtc = now
         };
     }
 
-    private string? BuildBackpressureSummary()
+    private string? BuildResultSpoolSummary()
     {
         var dropped = Volatile.Read(ref _droppedResultSummaries);
-        var backpressure = Volatile.Read(ref _resultSummaryBackpressureEvents);
         var queued = Volatile.Read(ref _queuedResultSummaries);
-        if (dropped == 0 && backpressure == 0)
+        if (dropped == 0)
         {
             return null;
         }
 
-        return $"queued={queued}; droppedResultSummaries={dropped}; backpressureEvents={backpressure}; spoolPending={_spoolStore.PendingCount}; spoolBytes={_spoolStore.SpoolBytes}";
+        return $"queued={queued}; failedResultSpoolWrites={dropped}; spoolPending={_spoolStore.PendingCount}; spoolBytes={_spoolStore.SpoolBytes}";
     }
 
     private static string BuildPlcStatusSummary(RuntimeHostSnapshot snapshot)

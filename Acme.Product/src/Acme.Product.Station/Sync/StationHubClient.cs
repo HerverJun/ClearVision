@@ -84,6 +84,13 @@ public sealed class StationHubClient : IAsyncDisposable
         return InvokeAsync<StationReplayCursorDto>("PushResultSummaryAsync", payload, cancellationToken);
     }
 
+    public Task<StationAckDto?> ReportResultGapAsync(
+        StationResultGapDto payload,
+        CancellationToken cancellationToken)
+    {
+        return InvokeAsync<StationAckDto>("ReportResultGap", payload, cancellationToken);
+    }
+
     public Task<StationAckDto?> PushHealthAsync(
         StationHealthSnapshotDto payload,
         CancellationToken cancellationToken)
@@ -103,20 +110,22 @@ public sealed class StationHubClient : IAsyncDisposable
         return InvokeAsync<StationCommandDto?>("PollCommand", stationId, cancellationToken);
     }
 
-    public async Task ReportCommandResultAsync(StationCommandResultDto payload, CancellationToken cancellationToken)
+    public async Task<bool> ReportCommandResultAsync(StationCommandResultDto payload, CancellationToken cancellationToken)
     {
         if (!await EnsureConnectedAsync(cancellationToken))
         {
-            return;
+            return false;
         }
 
         try
         {
             await _connection!.InvokeAsync("ReportCommandResult", payload, cancellationToken);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Studio Station hub invocation failed: ReportCommandResult");
+            return false;
         }
     }
 

@@ -13,10 +13,12 @@ using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
 using Acme.Product.Desktop.Handlers;
 using Acme.Product.Desktop.Middleware;
+using Acme.Product.Desktop.Station;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Runtime;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -79,6 +81,8 @@ public static class ApiEndpoints
         public string? TargetRootDirectory { get; set; }
 
         public OperatorFlowDto? Flow { get; set; }
+
+        public bool RegisterForStationDeployment { get; set; } = true;
     }
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
@@ -176,6 +180,7 @@ public static class ApiEndpoints
             ExportRuntimePackageRequest? request,
             ProjectService service,
             RuntimePackageExporter exporter,
+            StationPackageStore packageStore,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -204,6 +209,14 @@ public static class ApiEndpoints
                         TargetRootDirectory = request?.TargetRootDirectory
                     },
                     cancellationToken);
+                StationPackageManifestDto? stationPackage = null;
+                if (request?.RegisterForStationDeployment != false)
+                {
+                    stationPackage = await packageStore.ImportRuntimePackageAsync(
+                        exportResult.PackageRootPath,
+                        exportResult.Manifest.CreatedBy,
+                        cancellationToken);
+                }
 
                 return Results.Ok(new
                 {
@@ -211,6 +224,9 @@ public static class ApiEndpoints
                     PackageId = exportResult.Manifest.PackageId,
                     PackageName = exportResult.Manifest.PackageName,
                     FlowHash = exportResult.Manifest.FlowHash,
+                    RegisteredForStationDeployment = stationPackage != null,
+                    StationPackageId = stationPackage?.PackageId,
+                    StationPackage = stationPackage,
                     exportResult.ValidationReport,
                     exportResult.ReadmePath
                 });

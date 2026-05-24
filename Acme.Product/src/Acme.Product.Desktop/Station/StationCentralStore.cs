@@ -11,6 +11,8 @@ namespace Acme.Product.Desktop.Station;
 
 public sealed class StationCentralStore
 {
+    private static readonly TimeSpan CommandRedeliveryDelay = TimeSpan.FromSeconds(10);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -254,6 +256,62 @@ public sealed class StationCentralStore
             .ToList();
     }
 
+    public StationAckDto ReportResultGap(StationResultGapDto dto)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var droppedThrough = Math.Max(0, dto.DroppedThroughSequenceId);
+            if (droppedThrough == 0)
+            {
+                return BuildAck(dto.StationId, 0, GetLastPersistedSequenceId(dto.StationId), true, "Empty result gap ignored.");
+            }
+
+            var droppedFrom = dto.DroppedFromSequenceId > 0
+                ? Math.Min(dto.DroppedFromSequenceId, droppedThrough)
+                : droppedThrough;
+            var cursor = GetOrCreateCursor(db, dto.StationId);
+            var previousCursor = cursor.LastPersistedSequenceId;
+            var duplicate = droppedThrough <= previousCursor;
+            if (!duplicate)
+            {
+                cursor.LastPersistedSequenceId = droppedThrough;
+                cursor.UpdatedAtUtc = now;
+
+                var node = GetOrCreateNode(db, dto.StationId, now);
+                node.LastSeenAtUtc = now;
+                node.OnlineState = StationOnlineState.Online.ToString();
+
+                db.StationConnectionEvents.Add(new StationConnectionEventEntity
+                {
+                    StationId = dto.StationId,
+                    EventType = "ResultGap",
+                    Message = $"Station reported unavailable result sequence range {droppedFrom}-{droppedThrough}; Studio cursor advanced from {previousCursor} to {droppedThrough}.",
+                    CreatedAtUtc = now
+                });
+            }
+
+            db.SaveChanges();
+            return BuildAck(
+                dto.StationId,
+                droppedThrough,
+                Math.Max(previousCursor, droppedThrough),
+                duplicate,
+                duplicate ? "Result gap already acknowledged." : "Result gap acknowledged.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to persist Station result gap for {StationId}/{DroppedThroughSequenceId}",
+                dto.StationId,
+                dto.DroppedThroughSequenceId);
+            return BuildAck(dto.StationId, dto.DroppedThroughSequenceId, GetLastPersistedSequenceId(dto.StationId), false, "Result gap persistence failed.");
+        }
+    }
+
     public StationResultsPageViewModel GetResultsPage(
         string? stationId,
         DateTimeOffset? fromUtc,
@@ -431,6 +489,7 @@ public sealed class StationCentralStore
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         var now = DateTimeOffset.UtcNow;
+        var redeliverBeforeUtc = now - CommandRedeliveryDelay;
         var createdStatus = StationCommandStatus.Created.ToString();
         var deliveredStatus = StationCommandStatus.Delivered.ToString();
 
@@ -452,9 +511,14 @@ public sealed class StationCentralStore
         var command = db.StationCommandRecords
             .Where(item =>
                 item.StationId == stationId &&
-                item.Status == createdStatus)
+                (item.Status == createdStatus ||
+                 item.Status == deliveredStatus))
             .AsEnumerable()
             .Where(item => item.ExpiresAtUtc > now)
+            .Where(item =>
+                item.Status == createdStatus ||
+                item.DeliveredAtUtc == null ||
+                item.DeliveredAtUtc <= redeliverBeforeUtc)
             .OrderBy(item => item.CreatedAtUtc)
             .FirstOrDefault();
 

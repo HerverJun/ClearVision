@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Acme.Product.Runtime.Abstractions;
 
@@ -7,6 +8,7 @@ public sealed class StationLocalSettingsStore
 {
     private readonly object _syncRoot = new();
     private readonly string _settingsPath;
+    private readonly string _settingsBackupPath;
     private readonly string _crashMarkerPath;
     private StationLocalSettings _settings;
 
@@ -24,6 +26,7 @@ public sealed class StationLocalSettingsStore
             : rootPath;
         Directory.CreateDirectory(root);
         _settingsPath = Path.Combine(root, "station-settings.json");
+        _settingsBackupPath = _settingsPath + ".bak";
         _crashMarkerPath = Path.Combine(root, ".session.lock");
         _settings = Load();
     }
@@ -133,27 +136,51 @@ public sealed class StationLocalSettingsStore
 
     private StationLocalSettings Load()
     {
-        if (!File.Exists(_settingsPath))
+        if (TryLoadSettings(_settingsPath, out var settings))
         {
-            return new StationLocalSettings();
+            return settings;
+        }
+
+        if (TryLoadSettings(_settingsBackupPath, out settings))
+        {
+            return settings;
+        }
+
+        return new StationLocalSettings();
+    }
+
+    private static bool TryLoadSettings(string path, out StationLocalSettings settings)
+    {
+        settings = new StationLocalSettings();
+        if (!File.Exists(path))
+        {
+            return false;
         }
 
         try
         {
-            var json = File.ReadAllText(_settingsPath);
-            return JsonSerializer.Deserialize<StationLocalSettings>(json, CreateJsonOptions())
+            var json = File.ReadAllText(path, Encoding.UTF8);
+            settings = JsonSerializer.Deserialize<StationLocalSettings>(json, CreateJsonOptions())
                 ?? new StationLocalSettings();
+            return true;
         }
         catch
         {
-            return new StationLocalSettings();
+            return false;
         }
     }
 
     private void SaveLocked()
     {
         var json = JsonSerializer.Serialize(_settings, CreateJsonOptions());
-        File.WriteAllText(_settingsPath, json);
+        var tempPath = _settingsPath + ".tmp";
+        File.WriteAllText(tempPath, json, new UTF8Encoding(false));
+        if (File.Exists(_settingsPath))
+        {
+            File.Copy(_settingsPath, _settingsBackupPath, overwrite: true);
+        }
+
+        File.Move(tempPath, _settingsPath, overwrite: true);
     }
 
     private static JsonSerializerOptions CreateJsonOptions()

@@ -514,6 +514,30 @@ public sealed class StationResultSummaryDto
 }
 
 /// <summary>
+/// Reports result sequences that are no longer available for replay from the Station spool.
+/// </summary>
+public sealed class StationResultGapDto
+{
+    /// <summary>Payload schema version.</summary>
+    public int SchemaVersion { get; set; } = StationSyncContractDefaults.SchemaVersion;
+
+    /// <summary>Stable station identifier.</summary>
+    public string StationId { get; set; } = string.Empty;
+
+    /// <summary>First unavailable result sequence in the reported range.</summary>
+    public long DroppedFromSequenceId { get; set; }
+
+    /// <summary>Last unavailable result sequence in the reported range.</summary>
+    public long DroppedThroughSequenceId { get; set; }
+
+    /// <summary>Best-effort reason, for example capacity, age, or byte limit.</summary>
+    public string Reason { get; set; } = "spool-trim";
+
+    /// <summary>When this payload was created.</summary>
+    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
 /// Acknowledges a Station telemetry message after Studio processing.
 /// </summary>
 public sealed class StationAckDto

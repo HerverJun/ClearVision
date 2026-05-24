@@ -147,6 +147,86 @@ public sealed class StationRegistryServiceTests
     }
 
     [Fact]
+    public void ReportResultGap_ShouldAdvanceMemoryCursorAcrossUnavailableRange()
+    {
+        var registry = CreateRegistry();
+        registry.UpsertRegistration("conn-gap-report", new StationRegistrationDto
+        {
+            StationId = "station-gap-report",
+            MachineName = "machine-gap-report",
+            ClientVersion = "1.0.0",
+            StartedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        var gapAck = registry.ReportResultGap("conn-gap-report", new StationResultGapDto
+        {
+            StationId = "station-gap-report",
+            DroppedFromSequenceId = 101,
+            DroppedThroughSequenceId = 200,
+            Reason = "unit-test"
+        });
+        var resultAck = registry.UpsertResultSummary("conn-gap-report", BuildResult(201, stationId: "station-gap-report", diagnosticCode: "SEQ-201"));
+
+        gapAck.LastPersistedSequenceId.Should().Be(200);
+        resultAck.AckedSequenceId.Should().Be(201);
+        registry.GetStation("station-gap-report")!.LastSequenceId.Should().Be(201);
+    }
+
+    [Fact]
+    public async Task CentralStore_ShouldAdvanceCursorAcrossUnavailableResultGap()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationResultGapTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var gapAck = store.ReportResultGap(new StationResultGapDto
+            {
+                StationId = "station-central-gap",
+                DroppedFromSequenceId = 101,
+                DroppedThroughSequenceId = 200,
+                Reason = "unit-test"
+            });
+            var resultAck = store.UpsertResultSummary(BuildResult(201, stationId: "station-central-gap", diagnosticCode: "SEQ-201"));
+
+            gapAck.LastPersistedSequenceId.Should().Be(200);
+            resultAck.LastPersistedSequenceId.Should().Be(201);
+
+            await using var verifyScope = provider.CreateAsyncScope();
+            var db = verifyScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            (await db.StationSyncCursors.SingleAsync(item => item.StationId == "station-central-gap"))
+                .LastPersistedSequenceId
+                .Should()
+                .Be(201);
+            (await db.StationConnectionEvents.CountAsync(item =>
+                item.StationId == "station-central-gap" &&
+                item.EventType == "ResultGap")).Should().Be(1);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
     public async Task CentralStore_ShouldPersistDeployCommandFailuresAndAuditTrail()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandAuditTests", Guid.NewGuid().ToString("N"));
@@ -220,6 +300,67 @@ public sealed class StationRegistryServiceTests
             audits.Select(item => item.Action).Should().Contain(StationCommandType.DeployPackage.ToString());
             audits.Select(item => item.Action).Should().Contain("CommandCompleted");
             audits.Last().Result.Should().Be(StationCommandStatus.Failed.ToString());
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CentralStore_ShouldRedeliverStaleDeliveredCommand()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandRedeliveryTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var command = store.CreateCommand(
+                "station-redelivery",
+                StationCommandType.Ping,
+                "{}",
+                "unit-test",
+                TimeSpan.FromMinutes(30));
+
+            var delivered = store.PollCommand("station-redelivery");
+            var immediateRetry = store.PollCommand("station-redelivery");
+
+            delivered.Should().NotBeNull();
+            delivered!.CommandId.Should().Be(command.CommandId);
+            delivered.Status.Should().Be(StationCommandStatus.Delivered);
+            immediateRetry.Should().BeNull();
+
+            await using (var mutateScope = provider.CreateAsyncScope())
+            {
+                var db = mutateScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+                var persisted = await db.StationCommandRecords.SingleAsync(item => item.CommandId == command.CommandId);
+                persisted.DeliveredAtUtc = DateTimeOffset.UtcNow.AddSeconds(-30);
+                await db.SaveChangesAsync();
+            }
+
+            var redelivered = store.PollCommand("station-redelivery");
+
+            redelivered.Should().NotBeNull();
+            redelivered!.CommandId.Should().Be(command.CommandId);
+            redelivered.Status.Should().Be(StationCommandStatus.Delivered);
         }
         finally
         {
