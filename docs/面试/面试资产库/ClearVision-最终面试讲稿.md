@@ -103,9 +103,9 @@
 
 > 这条主线最好的试点案例就是线序检测场景包，也就是 `wire-sequence-terminal`。  
 >  
-> 这个场景现在不是只有概念，它已经有 `README`、`manifest`、模板 JSON、规则文件、FAQ 和版本记录。模板骨架也不是一句话描述，而是明确到 `ImageAcquisition -> DeepLearning -> BoxFilter -> BoxNms -> DetectionSequenceJudge -> ResultOutput`。  
+> 这个场景现在不是只有概念，它已经有 `README`、`manifest`、模板 JSON、规则文件、FAQ 和版本记录。模板骨架也不是一句话描述，而是明确到 `ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput`。
 >  
-> 更重要的是，这个场景里我踩过一个非常典型的坑，就是阈值和 NMS 职责分散。一开始 `DeepLearning` 内部 NMS、`BoxNms` 和 `DetectionSequenceJudge.MinConfidence` 三层都在影响结果，现场看到 NG 以后很难知道该调哪一层。后来我先补了结构化诊断，再把职责收口到 `BoxNms`，让 `BoxNms.ScoreThreshold` 和 `BoxNms.IouThreshold` 成为现场优先调参项，同时把 `DeepLearning.Confidence` 降成低置信度地板，把 `DetectionSequenceJudge.MinConfidence` 固定到 `0.0`。  
+> 更重要的是，这个场景里我踩过一个非常典型的坑，就是阈值和 NMS 职责分散。一开始 `DeepLearning` 内部 NMS、平台侧 `BoxNms` 和 `DetectionSequenceJudge.MinConfidence` 三层都在影响结果，现场看到 NG 以后很难知道该调哪一层。现在的订正是信任导出的 ONNX 模型内置 NMS，不再把候选框抑制拆成平台侧默认节点；平台只保留 `DeepLearning.Confidence` 和顺序判定诊断。
 >  
 > 这个例子对我很重要，因为它说明我不是只会把流程做出来，而是开始把业务语义、模板边界、阈值职责和诊断输出真正理顺。
 
@@ -199,4 +199,3 @@
 3. 我有没有把“格式正确”说成“业务正确”？
 
 只要这三个问题能稳住，这版讲稿就基本成型了。
-

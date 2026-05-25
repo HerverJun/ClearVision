@@ -71,7 +71,7 @@ public class PromptBuilder
         1. Defect detection:
            ImageAcquisition -> Filtering -> Thresholding -> BlobAnalysis -> ResultJudgment -> ResultOutput
         2. AI detection:
-           ImageAcquisition -> ImageResize -> DeepLearning -> BoxNms/BoxFilter -> ResultJudgment -> ResultOutput
+           ImageAcquisition -> ImageResize -> DeepLearning(OutputFormat=EndToEndNms) -> optional BoxFilter -> ResultJudgment -> ResultOutput
         3. Measurement:
            ImageAcquisition -> Filtering -> EdgeDetection -> CircleMeasurement/LineMeasurement -> CoordinateTransform -> ResultOutput
         4. OCR or barcode:
@@ -86,6 +86,8 @@ public class PromptBuilder
         - Prefer ResultJudgment before hardware output so OK/NG semantics are explicit.
         - Add parametersNeedingReview when thresholds, calibration files, PLC addresses, model paths, or table names cannot be inferred safely.
         - Use calibration resources for pixel-to-world conversion; do not invent millimeter values from pixel coordinates.
+        - For ONNX detection models exported with candidate suppression or NMS, trust the model output: set DeepLearning.OutputFormat=EndToEndNms and do not add BoxNms.
+        - Add BoxNms only when the user explicitly asks for platform-side NMS, raw candidate boxes, or a RawYolo model that does not include NMS.
         """;
 
     private string GetTemplateFirstStrategy() => """
@@ -106,20 +108,22 @@ public class PromptBuilder
         ## New workflow patterns
         1. Precision width measurement:
            ImageAcquisition -> Filtering -> CaliperTool -> WidthMeasurement -> UnitConvert -> ResultJudgment -> ResultOutput
-        2. AI post-processing:
-           ImageAcquisition -> DeepLearning -> BoxNms -> BoxFilter -> ResultJudgment -> ResultOutput
+        2. AI post-processing with model-embedded NMS:
+           ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> BoxFilter(optional ROI/score/class filter) -> ResultJudgment -> ResultOutput
         3. Detection sequence judgment:
-           ImageAcquisition -> DeepLearning -> BoxNms -> DetectionSequenceJudge -> ConditionalBranch/ResultOutput
-        4. Image quality gate:
+           ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ConditionalBranch/ResultOutput
+        4. Legacy raw-YOLO platform-side NMS, only when explicitly required:
+           ImageAcquisition -> DeepLearning(OutputFormat=RawYolo, EnableInternalNms=false) -> BoxNms -> ResultJudgment -> ResultOutput
+        5. Image quality gate:
            ImageAcquisition -> SharpnessEvaluation -> ConditionalBranch -> continue or reject
-        5. Calibration-assisted metrology:
+        6. Calibration-assisted metrology:
            CalibrationLoader -> CoordinateTransform/PixelToWorldTransform -> measurement operators -> UnitConvert -> ResultOutput
         ## Phrase mapping additions
         - "measure width/thickness/gap" => WidthMeasurement
         - "caliper/find edge pair" => CaliperTool
         - "point to line distance" => PointLineDistance
         - "line to line distance/parallelism" => LineLineDistance
-        - "remove duplicate boxes / NMS" => BoxNms
+        - "remove duplicate boxes / NMS" => prefer DeepLearning.OutputFormat=EndToEndNms; use BoxNms only for explicit platform-side raw candidate suppression
         - "filter detections by class/area/score" => BoxFilter
         - "wire sequence / terminal order / connector order" => DetectionSequenceJudge
         - "is image sharp / focus check / blur" => SharpnessEvaluation
@@ -211,7 +215,9 @@ public class PromptBuilder
         - Feed calibration consumers through CalibrationData when possible, and mark calibration bundle paths and coordinate-system choices for review.
 
         3. AI models
-        - For DeepLearning, include ModelPath, InputSize, Confidence, and TargetClasses when known.
+        - For DeepLearning, include ModelPath, InputSize, Confidence, OutputFormat=EndToEndNms, and TargetClasses when known.
+        - Do not set EnableInternalNms=false unless the user explicitly says the ONNX model emits raw YOLO candidates for downstream platform-side NMS.
+        - Do not add BoxNms after DeepLearning when OutputFormat=EndToEndNms; the ONNX model owns candidate suppression/NMS.
         - If any model resource is missing, list it in parametersNeedingReview.
 
         4. Hardware and database output

@@ -84,7 +84,7 @@ public enum DetectionOutputFormat
 [OperatorParam("GpuDeviceId", "GPU设备ID", "int", DefaultValue = 0, Min = 0, Max = 15)]
 [OperatorParam("TargetClasses", "目标类别", "string", Description = "检测目标类别（逗号分隔，如 person,car），为空则检测所有类别", DefaultValue = "")]
 [OperatorParam("LabelsPath", "标签文件路径", "file", Description = "无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。", DefaultValue = "")]
-[OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。", DefaultValue = true)]
+[OperatorParam("EnableInternalNms", "启用内部NMS", "bool", Description = "仅用于 RawYolo 输出的后处理开关；OutputFormat=EndToEndNms 时信任 ONNX 模型内部候选框抑制/NMS，平台侧不再额外拆出 BoxNms。", DefaultValue = true)]
 [OperatorParam("NmsIouThreshold", "NMS IoU Threshold", "double", Description = "内部 NMS 与预览 NMS 使用的 IoU 阈值。", DefaultValue = 0.45, Min = 0.0, Max = 1.0)]
 [OperatorParam("OutputFormat", "输出格式", "enum", Description = "Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。", DefaultValue = "Auto", Options = new[] { "Auto|自动识别", "RawYolo|原始 YOLO", "EndToEndNms|端到端 NMS" })]
 [OperatorParam("DetectionMode", "检测模式", "enum", Description = "缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK)", DefaultValue = "Defect", Options = new[] { "Defect|缺陷检测", "Object|目标检测" })]
@@ -431,7 +431,11 @@ public class DeepLearningOperator : OperatorBase
         var isObjectMode = detectionMode.Equals("Object", StringComparison.OrdinalIgnoreCase);
 
         // 10. 绘制结果
-        var visualizationDetections = BuildVisualizationDetections(detections, confidenceThreshold, enableInternalNms, nmsIouThreshold);
+        var visualizationDetections = BuildVisualizationDetections(
+            detections,
+            confidenceThreshold,
+            enableInternalNms || postprocessResult.ResolvedOutputFormat == DetectionOutputFormat.EndToEndNms,
+            nmsIouThreshold);
         var outputImage = DrawResults(src, visualizationDetections, labels, detectionMode);
 
         // 11. 构建输出 - Sprint 1 Task 1.2: 使用 DetectionList 类型
@@ -457,7 +461,7 @@ public class DeepLearningOperator : OperatorBase
         var additionalData = new Dictionary<string, object>
         {
             { "DetectionMode", detectionMode },
-            { "InternalNmsEnabled", enableInternalNms },
+            { "InternalNmsEnabled", enableInternalNms || postprocessResult.ResolvedOutputFormat == DetectionOutputFormat.EndToEndNms },
             { "NmsIouThreshold", nmsIouThreshold },
             { "OutputFormat", postprocessResult.ResolvedOutputFormat.ToString() },
             { "RawCandidateCount", postprocessResult.Diagnostics.RawCandidateCount },

@@ -61,7 +61,7 @@
         "Confidence": "0.05",
         "InputSize": "640",
         "TargetClasses": "Wire_Black,Wire_Blue",
-        "EnableInternalNms": "false",
+        "EnableInternalNms": "true",
         "OutputFormat": "EndToEndNms",
         "DetectionMode": "Object"
       }

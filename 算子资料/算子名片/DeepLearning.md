@@ -48,7 +48,7 @@
 | `GpuDeviceId` | GPU设备ID | `int` | 0 | [0, 15] | Yes | - |
 | `TargetClasses` | 目标类别 | `string` | "" | - | Yes | 检测目标类别（逗号分隔，如 person,car），为空则检测所有类别 |
 | `LabelsPath` | 标签文件路径 | `file` | "" | - | Yes | 无 ONNX metadata names 时的后备标签文件路径（每行一个标签）；模型包含 metadata names 时忽略此项。为空时查找模型目录 labels.txt，仍不可用则执行失败。 |
-| `EnableInternalNms` | 启用内部NMS | `bool` | true | - | Yes | 关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。 |
+| `EnableInternalNms` | 启用内部NMS | `bool` | true | - | Yes | 仅用于 RawYolo 输出的后处理开关；OutputFormat=EndToEndNms 时信任 ONNX 模型内部候选框抑制/NMS，平台侧不再额外拆出 BoxNms。 |
 | `NmsIouThreshold` | NMS IoU Threshold | `double` | 0.45 | [0, 1] | Yes | 内部 NMS 与预览 NMS 使用的 IoU 阈值。 |
 | `DetectionMode` | 检测模式 | `enum` | Defect | Defect/缺陷检测；Object/目标检测 | Yes | 缺陷检测：检出目标视为缺陷(NG)；目标检测：检出目标视为正常(OK) |
 | `ModelId` | Model Id | `string` | "" | - | Yes | - |

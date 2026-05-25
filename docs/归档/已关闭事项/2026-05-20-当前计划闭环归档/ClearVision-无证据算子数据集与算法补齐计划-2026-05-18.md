@@ -92,7 +92,7 @@ owner: "Quality Flywheel Agent"
 ### D3 Field-substitute replay
 
 - [ ] 从线序视频流模板构造 field-substitute replay manifest：
-  - `ImageAcquisition(Continuous) -> FrameChangeTrigger -> DeepLearning -> BoxFilter -> BoxNms -> DetectionSequenceJudge -> ResultOutput`
+  - `ImageAcquisition(Continuous) -> FrameChangeTrigger -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput`
 - [ ] 用匿名/合成帧序列模拟现场无光电触发输送线。
 - [ ] 验证未触发帧短路，不进入 DeepLearning，触发帧继续向下游传递。
 - [ ] 验收门槛：

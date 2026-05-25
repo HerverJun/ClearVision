@@ -420,7 +420,7 @@ public class Sprint7_AiEvolutionTests
             var deepLearningParams = document.RootElement.GetProperty("operators").EnumerateArray()
                 .Single(item => item.GetProperty("tempId").GetString() == "op_2")
                 .GetProperty("parameters");
-            deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+            deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("true");
             deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
             deepLearningParams.GetProperty("Confidence").GetString().Should().Be("0.05");
         }
@@ -529,9 +529,9 @@ public class Sprint7_AiEvolutionTests
                 var template = templates[testCase.Name];
                 template.Industry.Should().Be("空调制造");
                 template.Tags.Should().Equal(testCase.Tags);
-                template.TemplateVersion.Should().Be("1.0.0");
-                template.ScenarioKey.Should().BeNull();
-                template.ScenarioPackage.Should().BeNull();
+                template.TemplateVersion.Should().Be("1.2.0");
+                template.ScenarioKey.Should().NotBeNullOrWhiteSpace();
+                template.ScenarioPackage.Should().NotBeNull();
 
                 using var document = JsonDocument.Parse(template.FlowJson);
                 var root = document.RootElement;
@@ -544,13 +544,13 @@ public class Sprint7_AiEvolutionTests
                     "ImageResize",
                     "DeepLearning",
                     "BoxFilter",
-                    "BoxNms",
                     "ResultJudgment",
                     "ResultOutput");
 
                 var deepLearningParams = operators.Single(item => item.GetProperty("tempId").GetString() == "op_3")
                     .GetProperty("parameters");
-                deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+                deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("true");
+                deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
                 deepLearningParams.GetProperty("DetectionMode").GetString().Should().Be(testCase.DetectionMode);
                 deepLearningParams.GetProperty("TargetClasses").GetString().Should().Be(testCase.TargetClasses);
                 deepLearningParams.GetProperty("ModelPath").GetString().Should().BeEmpty();
@@ -561,11 +561,7 @@ public class Sprint7_AiEvolutionTests
                 boxFilterParams.GetProperty("RegionW").GetString().Should().Be("999999");
                 boxFilterParams.GetProperty("RegionH").GetString().Should().Be("999999");
 
-                var boxNmsParams = operators.Single(item => item.GetProperty("tempId").GetString() == "op_5")
-                    .GetProperty("parameters");
-                boxNmsParams.GetProperty("ShowSuppressed").GetString().Should().Be("false");
-
-                var judgmentParams = operators.Single(item => item.GetProperty("tempId").GetString() == "op_6")
+                var judgmentParams = operators.Single(item => item.GetProperty("tempId").GetString() == "op_5")
                     .GetProperty("parameters");
                 judgmentParams.GetProperty("Condition").GetString().Should().Be(testCase.Condition);
                 judgmentParams.GetProperty("ExpectValue").GetString().Should().Be(testCase.ExpectValue);
@@ -577,30 +573,29 @@ public class Sprint7_AiEvolutionTests
                     item.GetProperty("targetTempId").GetString() == "op_4" &&
                     item.GetProperty("targetPortName").GetString() == "Detections");
                 connections.Should().Contain(item =>
-                    item.GetProperty("sourceTempId").GetString() == "op_5" &&
+                    item.GetProperty("sourceTempId").GetString() == "op_4" &&
                     item.GetProperty("sourcePortName").GetString() == "Count" &&
-                    item.GetProperty("targetTempId").GetString() == "op_6" &&
+                    item.GetProperty("targetTempId").GetString() == "op_5" &&
                     item.GetProperty("targetPortName").GetString() == "Value");
                 connections.Should().Contain(item =>
-                    item.GetProperty("sourceTempId").GetString() == "op_6" &&
+                    item.GetProperty("sourceTempId").GetString() == "op_5" &&
                     item.GetProperty("sourcePortName").GetString() == "JudgmentResult" &&
-                    item.GetProperty("targetTempId").GetString() == "op_7" &&
+                    item.GetProperty("targetTempId").GetString() == "op_6" &&
                     item.GetProperty("targetPortName").GetString() == "Result");
                 connections.Should().Contain(item =>
-                    item.GetProperty("sourceTempId").GetString() == "op_6" &&
+                    item.GetProperty("sourceTempId").GetString() == "op_5" &&
                     item.GetProperty("sourcePortName").GetString() == "Details" &&
-                    item.GetProperty("targetTempId").GetString() == "op_7" &&
+                    item.GetProperty("targetTempId").GetString() == "op_6" &&
                     item.GetProperty("targetPortName").GetString() == "Text");
 
                 var reviewParameters = root.GetProperty("parametersNeedingReview");
                 reviewParameters.GetProperty("op_3").EnumerateArray().Select(item => item.GetString())
                     .Should().BeEquivalentTo(testCase.RequiresTargetClassesReview
-                        ? new[] { "ModelPath", "TargetClasses", "Confidence" }
-                        : new[] { "ModelPath", "Confidence" });
+                        ? new[] { "ModelPath", "TargetClasses", "OutputFormat", "Confidence" }
+                        : new[] { "ModelPath", "OutputFormat", "Confidence" });
                 reviewParameters.GetProperty("op_4").EnumerateArray().Select(item => item.GetString())
                     .Should().BeEquivalentTo(new[] { "RegionX", "RegionY", "RegionW", "RegionH" });
-                reviewParameters.GetProperty("op_5").EnumerateArray().Select(item => item.GetString())
-                    .Should().BeEquivalentTo(new[] { "ScoreThreshold", "IouThreshold" });
+                reviewParameters.TryGetProperty("op_5", out _).Should().BeFalse();
             }
 
             var copperHoleTemplate = templates["两器铜孔间距检测"];
@@ -745,7 +740,7 @@ public class Sprint7_AiEvolutionTests
             var deepLearningParams = root.GetProperty("operators").EnumerateArray()
                 .Single(item => item.GetProperty("tempId").GetString() == "op_2")
                 .GetProperty("parameters");
-            deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+            deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("true");
             deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
             deepLearningParams.GetProperty("Confidence").GetString().Should().Be("0.05");
             deepLearningParams.GetProperty("LabelsPath").GetString().Should().BeEmpty();

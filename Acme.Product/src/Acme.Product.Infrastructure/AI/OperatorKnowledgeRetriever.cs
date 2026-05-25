@@ -50,6 +50,7 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
         var userText = $"{query.Description} {query.AdditionalContext} {string.Join(" ", query.AttachmentNames ?? Array.Empty<string>())}"
             .Trim();
         var normalizedText = userText.ToLowerInvariant();
+        var explicitlyRequestsPlatformNms = ExplicitlyRequestsPlatformNms(normalizedText);
 
         var scenarioMatches = await _scenarioMatcher.MatchAsync(
             query.Description,
@@ -113,6 +114,9 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
             if (card.KnownLimitations.Any(item => item.Contains("未完成现场工业验证", StringComparison.OrdinalIgnoreCase)))
                 score += 0.2;
 
+            if (IsBoxNms(card.OperatorType) && !explicitlyRequestsPlatformNms)
+                score -= 100.0;
+
             scored[card.OperatorType] = score;
         }
 
@@ -126,6 +130,9 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
 
         foreach (var core in CoreTypes.Select(type => type.ToString()))
             prioritizedTypes.Add(core);
+
+        if (ShouldPreferModelEmbeddedNms(matchedScenarioKeys, normalizedText))
+            prioritizedTypes.Remove(OperatorType.BoxNms.ToString());
 
         var finalCards = cards
             .Where(card => prioritizedTypes.Contains(card.OperatorType))
@@ -148,7 +155,14 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
             .ToList();
 
         var takeCount = Math.Clamp(query.TopN <= 0 ? 24 : query.TopN, 8, Math.Max(8, metadata.Count));
-        var cards = metadata.Take(takeCount).Select(item => new OperatorKnowledgeCard
+        var normalizedText = $"{query.Description} {query.AdditionalContext} {string.Join(" ", query.AttachmentNames ?? Array.Empty<string>())}"
+            .Trim()
+            .ToLowerInvariant();
+        var explicitlyRequestsPlatformNms = ExplicitlyRequestsPlatformNms(normalizedText);
+        var cards = metadata
+            .Where(item => explicitlyRequestsPlatformNms || item.Type != OperatorType.BoxNms)
+            .Take(takeCount)
+            .Select(item => new OperatorKnowledgeCard
         {
             OperatorType = item.Type.ToString(),
             DisplayName = item.DisplayName,
@@ -191,10 +205,49 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
         };
     }
 
+    private static bool ShouldPreferModelEmbeddedNms(
+        IReadOnlySet<string> matchedScenarioKeys,
+        string normalizedText)
+    {
+        var explicitlyRequestsPlatformNms =
+            normalizedText.Contains("boxnms", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("box nms", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("rawyolo", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("raw yolo", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("原始候选", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("平台侧 nms", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("平台侧nms", StringComparison.OrdinalIgnoreCase);
+
+        if (explicitlyRequestsPlatformNms)
+            return false;
+
+        return matchedScenarioKeys.Any(key => key.Contains("wire-sequence", StringComparison.OrdinalIgnoreCase)) ||
+            normalizedText.Contains("线序", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("端子", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("wire sequence", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("endtoendnms", StringComparison.OrdinalIgnoreCase) ||
+            normalizedText.Contains("onnx nms", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static OperatorType ParseType(string operatorType)
     {
         return Enum.TryParse<OperatorType>(operatorType, ignoreCase: true, out var parsed)
             ? parsed
             : OperatorType.Comment;
     }
+
+    private static bool IsBoxNms(string operatorType) =>
+        string.Equals(operatorType, OperatorType.BoxNms.ToString(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool ExplicitlyRequestsPlatformNms(string normalizedText) =>
+        normalizedText.Contains("boxnms", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("platform nms", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("platform-side nms", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("rawyolo", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("raw yolo", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("平台侧nms", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("平台侧 nms", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("平台侧候选框抑制", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("原始候选框", StringComparison.OrdinalIgnoreCase) ||
+        normalizedText.Contains("原始 yolo", StringComparison.OrdinalIgnoreCase);
 }

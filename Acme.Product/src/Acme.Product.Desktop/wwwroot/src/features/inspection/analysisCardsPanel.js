@@ -256,12 +256,12 @@ function normalizeDeepLearningPreviewDiagnostics(outputData) {
 
     return {
         detectionMode,
-        internalNmsEnabled: false,
+        internalNmsEnabled: isEndToEndNms,
         outputFormat,
         rawCandidateCount: rawCandidates,
         visualizedCount,
         visualOwner: isEndToEndNms ? 'ONNX output' : 'Preview-NMS',
-        businessOwner: isEndToEndNms ? 'ONNX NMS' : 'BoxNms'
+        businessOwner: isEndToEndNms ? 'ONNX NMS' : 'RawYolo compatibility'
     };
 }
 
@@ -382,7 +382,7 @@ export function buildDiagnosticsAnalysisData(outputData, fallbackStatus = 'OK') 
             icon: ICONS.note,
             message: isEndToEndNms
                 ? '当前检测结果来自 ONNX 模型内置候选框抑制，平台侧不再串接检测 ROI 过滤或 BoxNms。'
-                : '当前预览图使用 Preview-NMS 收敛重叠框，仅用于可视化；真正业务去重仍由下游 BoxNms 执行。',
+                : '当前预览图使用 Preview-NMS 收敛重叠框，仅用于 RawYolo 兼容链路的可视化；正式业务链路默认由 ONNX 模型内置 NMS 负责。',
             priority: 130,
             fields: [
                 { label: '检测模式', value: deepLearningPreview.detectionMode },
@@ -391,7 +391,7 @@ export function buildDiagnosticsAnalysisData(outputData, fallbackStatus = 'OK') 
                 { label: '预览图显示框', value: deepLearningPreview.visualizedCount },
                 { label: '预览去重层', value: deepLearningPreview.visualOwner },
                 { label: '业务去重层', value: deepLearningPreview.businessOwner },
-                { label: '内部 NMS', value: 'Off' }
+                { label: '内部 NMS', value: deepLearningPreview.internalNmsEnabled ? 'On' : 'Off' }
             ]
         });
     }
@@ -425,7 +425,7 @@ export function buildDiagnosticsAnalysisData(outputData, fallbackStatus = 'OK') 
     if (nms) {
         const nmsStatus = (nms.inputCount ?? 0) > 0 && (nms.keptCount ?? 0) === 0 ? 'NG' : 'OK';
         const nmsMessage = nmsStatus === 'NG'
-            ? '候选框在分数阈值或 NMS 阶段被全部过滤，请优先检查 BoxNms.ScoreThreshold 和 IoU 阈值。'
+            ? '候选框在分数阈值或 NMS 阶段被全部过滤，请优先检查 DeepLearning.Confidence、模型导出侧 score/NMS 阈值和类别映射。'
             : '';
         cards.push({
             category: 'diagnostic',

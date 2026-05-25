@@ -395,7 +395,7 @@ ImageAcquisition -> Filtering -> Thresholding -> BlobAnalysis -> ResultJudgment 
 **2. AI 目标检测**
 
 ```text
-ImageAcquisition -> ImageResize -> DeepLearning -> BoxNms/BoxFilter -> ResultJudgment -> ResultOutput
+ImageAcquisition -> ImageResize -> DeepLearning(OutputFormat=EndToEndNms) -> optional BoxFilter -> ResultJudgment -> ResultOutput
 ```
 
 **3. 几何测量**
@@ -495,7 +495,7 @@ ImageAcquisition -> DeepLearning -> DetectionSequenceJudge -> ResultOutput
 **文档中的完整调试链路也可讲**
 
 ```text
-ImageAcquisition -> DeepLearning -> BoxFilter(FilterMode=Region) -> BoxNms -> DetectionSequenceJudge -> ResultOutput
+ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput
 ```
 
 **现场交付前检查**

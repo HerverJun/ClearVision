@@ -93,10 +93,9 @@ public class OperatorKnowledgeGraphTests
             });
 
             slice.PrioritizedOperatorTypes.Should().Contain("DeepLearning");
-            slice.PrioritizedOperatorTypes.Should().Contain("BoxFilter");
-            slice.PrioritizedOperatorTypes.Should().Contain("BoxNms");
             slice.PrioritizedOperatorTypes.Should().Contain("DetectionSequenceJudge");
             slice.PrioritizedOperatorTypes.Should().Contain("ResultOutput");
+            slice.PrioritizedOperatorTypes.Should().NotContain("BoxNms");
         }
         finally
         {

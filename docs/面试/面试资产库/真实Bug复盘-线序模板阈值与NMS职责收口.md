@@ -26,7 +26,7 @@
 
 复现并不依赖一个特殊 Bug 输入，而是在线序模板进入真实调参与解释阶段时稳定暴露：
 
-- 流程里同时存在 `DeepLearning -> BoxNms -> DetectionSequenceJudge`
+- 历史流程里同时存在 `DeepLearning -> BoxNms -> DetectionSequenceJudge`
 - 线序判断依赖候选框排序与筛选
 - `ResultOutput` 没有接入足够的结构化诊断
 
@@ -88,14 +88,12 @@
 
 核心不是再加更多参数，而是把职责收口：
 
-1. 在线序模板中关闭 `DeepLearning` 内部 NMS
-2. 把 `DeepLearning.Confidence` 降为低置信度地板
+1. 在线序模板中使用 `DeepLearning(OutputFormat=EndToEndNms)`，信任 ONNX 模型内置 NMS
+2. 把 `DeepLearning.Confidence` 作为平台侧置信度地板
 3. 把 `DetectionSequenceJudge.MinConfidence` 固定为 `0.0`
-4. 把现场优先调参收口到：
-   - `BoxNms.ScoreThreshold`
-   - `BoxNms.IouThreshold`
-5. 给 `BoxNms` 和 `DetectionSequenceJudge` 增加结构化诊断输出
-6. 让 `ResultOutput` 同时携带图像、NMS 诊断、线序诊断和文本消息
+4. 重复框问题回到 ONNX 导出侧 score/NMS 阈值排查，不再默认新增平台侧 `BoxNms`
+5. 给 `DeepLearning` 后处理和 `DetectionSequenceJudge` 增加结构化诊断输出
+6. 让 `ResultOutput` 同时携带图像、模型后处理诊断、线序诊断和文本消息
 
 ---
 
@@ -129,9 +127,8 @@
 
 ## 8. 面试里 1 分钟讲法
 
-> 我现在最愿意讲的一个真实坑，是线序模板里阈值和 NMS 职责分散的问题。最开始 `DeepLearning`、`BoxNms` 和 `DetectionSequenceJudge` 三层都在影响结果，导致现场看到 NG 以后根本不知道该调哪一层。  
+> 我现在最愿意讲的一个真实坑，是线序模板里阈值和 NMS 职责分散的问题。最开始 `DeepLearning`、平台侧 `BoxNms` 和 `DetectionSequenceJudge` 三层都在影响结果，导致现场看到 NG 以后根本不知道该调哪一层。
 >  
-> 后来我没有继续加参数，而是先补结构化诊断，再把职责收口：关闭 `DeepLearning` 内部 NMS，把 `DetectionSequenceJudge.MinConfidence` 固定，把现场优先调参收口到 `BoxNms.ScoreThreshold` 和 `BoxNms.IouThreshold`。这样一来，不仅结果更可解释，排查路径也清楚了。  
+> 后来我没有继续加参数，而是先补结构化诊断，再把职责收口：当前模板信任 ONNX 模型内置 NMS，平台侧不再默认拆出 `BoxNms`，`DetectionSequenceJudge.MinConfidence` 固定为 `0.0`。这样一来，不仅结果更可解释，排查路径也清楚了。
 >  
 > 这个例子对我来说很重要，因为它说明我不是只会把功能做出来，而是开始把业务语义、算子职责和调参边界真正理顺。
-

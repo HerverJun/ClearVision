@@ -80,7 +80,7 @@ public class WireSequenceScenarioPackageTests
         var deepLearningParams = template.RootElement.GetProperty("operators").EnumerateArray()
             .Single(item => item.GetProperty("id").GetString() == "op_2")
             .GetProperty("params");
-        deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("false");
+        deepLearningParams.GetProperty("EnableInternalNms").GetString().Should().Be("true");
         deepLearningParams.GetProperty("OutputFormat").GetString().Should().Be("EndToEndNms");
         deepLearningParams.GetProperty("Confidence").GetString().Should().Be("0.05");
 

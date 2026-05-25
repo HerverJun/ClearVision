@@ -21,7 +21,7 @@ public class PromptBuilderKnowledgeSliceTests
                 {
                     card.RequiredResources = ["DeepLearning.ModelPath"];
                     card.TypicalUpstream = ["ImageResize"];
-                    card.TypicalDownstream = ["BoxFilter", "BoxNms"];
+                    card.TypicalDownstream = ["BoxFilter"];
                     card.AntiPatterns = ["ModelPath=todo"];
                     card.KnownLimitations = ["功能可用但未完成现场工业验证"];
                     card.Evidence = new OperatorKnowledgeEvidence

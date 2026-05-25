@@ -1,4 +1,5 @@
 using Acme.Product.Contracts.Messages;
+using Acme.Product.Application.DTOs;
 using Acme.Product.Core.DTOs;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Services;
@@ -256,6 +257,39 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             connection.TargetPortName == "Result");
         validatedFlow.ParametersNeedingReview["op_1"].Should().ContainSingle("FilePath");
         validatedFlow.ParametersNeedingReview["op_2"].Should().ContainSingle("Format");
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should collapse redundant BoxNms after model-embedded NMS")]
+    public async Task GenerateFlowAsync_EndToEndNmsDeepLearning_ShouldCollapseRedundantBoxNms()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildEndToEndNmsFlowWithBoxNmsJson()
+            }));
+
+        var validator = new AiFlowValidator(new OperatorFactory());
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(connector, validator, conversationService, useRealOperatorFactory: true);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "用 ONNX 模型做目标检测，模型已内置 NMS",
+            SessionId: "normalize-onnx-nms"));
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        var flow = result.Flow.Should().BeOfType<OperatorFlowDto>().Subject;
+        flow.Operators.Select(op => op.Type.ToString()).Should().NotContain("BoxNms");
+
+        var deepLearning = flow.Operators.Single(op => op.Type.ToString() == "DeepLearning");
+        deepLearning.Parameters.Single(param => param.Name == "OutputFormat").Value?.ToString()
+            .Should().Be("EndToEndNms");
+        deepLearning.Parameters.Single(param => param.Name == "EnableInternalNms").Value?.ToString()
+            .Should().Be("true");
     }
 
     [Fact(DisplayName = "GenerateFlowAsync should route truncated JSON to manual retry without converter exceptions")]
@@ -1238,6 +1272,118 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                  ],
                  "connections": [],
                  "parametersNeedingReview": {}
+               }
+               """;
+    }
+
+    private static string BuildEndToEndNmsFlowWithBoxNmsJson()
+    {
+        return """
+               {
+                 "explanation": "ONNX 模型已内置 NMS，平台侧不需要再做候选框抑制。",
+                 "operators": [
+                   {
+                     "tempId": "op_1",
+                     "operatorType": "ImageAcquisition",
+                     "displayName": "图像采集",
+                     "parameters": {
+                       "SourceType": "File",
+                       "FilePath": "data/input.png"
+                     }
+                   },
+                   {
+                     "tempId": "op_2",
+                     "operatorType": "DeepLearning",
+                     "displayName": "目标检测",
+                     "parameters": {
+                       "ModelPath": "models/wire-seq-yolo-nms.onnx",
+                       "LabelsPath": "",
+                       "Confidence": "0.05",
+                       "InputSize": "640",
+                       "TargetClasses": "Wire_Black,Wire_Blue",
+                       "OutputFormat": "EndToEndNms",
+                       "EnableInternalNms": "false",
+                       "DetectionMode": "Object"
+                     }
+                   },
+                   {
+                     "tempId": "op_3",
+                     "operatorType": "BoxNms",
+                     "displayName": "候选框抑制",
+                     "parameters": {
+                       "IouThreshold": "0.45",
+                       "ScoreThreshold": "0.25",
+                       "MaxDetections": "20",
+                       "ShowSuppressed": "false"
+                     }
+                   },
+                   {
+                     "tempId": "op_4",
+                     "operatorType": "ResultJudgment",
+                     "displayName": "数量判定",
+                     "parameters": {
+                       "Condition": "GreaterOrEqual",
+                       "ExpectValue": "1",
+                       "MinConfidence": "0.0"
+                     }
+                   },
+                   {
+                     "tempId": "op_5",
+                     "operatorType": "ResultOutput",
+                     "displayName": "结果输出",
+                     "parameters": {
+                       "Format": "JSON",
+                       "SaveToFile": "false"
+                     }
+                   }
+                 ],
+                 "connections": [
+                   {
+                     "sourceTempId": "op_1",
+                     "sourcePortName": "Image",
+                     "targetTempId": "op_2",
+                     "targetPortName": "Image"
+                   },
+                   {
+                     "sourceTempId": "op_2",
+                     "sourcePortName": "Objects",
+                     "targetTempId": "op_3",
+                     "targetPortName": "Detections"
+                   },
+                   {
+                     "sourceTempId": "op_3",
+                     "sourcePortName": "Count",
+                     "targetTempId": "op_4",
+                     "targetPortName": "Value"
+                   },
+                   {
+                     "sourceTempId": "op_3",
+                     "sourcePortName": "Image",
+                     "targetTempId": "op_5",
+                     "targetPortName": "Image"
+                   },
+                   {
+                     "sourceTempId": "op_3",
+                     "sourcePortName": "Diagnostics",
+                     "targetTempId": "op_5",
+                     "targetPortName": "Data"
+                   },
+                   {
+                     "sourceTempId": "op_4",
+                     "sourcePortName": "JudgmentResult",
+                     "targetTempId": "op_5",
+                     "targetPortName": "Result"
+                   },
+                   {
+                     "sourceTempId": "op_4",
+                     "sourcePortName": "Details",
+                     "targetTempId": "op_5",
+                     "targetPortName": "Text"
+                   }
+                 ],
+                 "parametersNeedingReview": {
+                   "op_2": ["ModelPath"]
+                 }
                }
                """;
     }

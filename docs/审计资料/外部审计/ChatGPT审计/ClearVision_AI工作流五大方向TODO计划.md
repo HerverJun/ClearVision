@@ -182,8 +182,8 @@ TODO：
 
 验收标准：
 
-- [X] 端子线序模板生成结果必须保留 `ImageAcquisition -> DeepLearning -> BoxFilter -> BoxNms -> DetectionSequenceJudge -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
-- [X] 包装箱/空调外观检测必须保留 `ImageResize -> DeepLearning -> BoxFilter -> BoxNms -> ResultJudgment -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
+- [X] 端子线序模板生成结果必须保留 `ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> DetectionSequenceJudge -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
+- [X] 包装箱/空调外观检测必须保留 `ImageResize -> DeepLearning(OutputFormat=EndToEndNms) -> BoxFilter -> ResultJudgment -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
 - [X] 铜孔间距检测必须保留 `Filtering -> EdgeDetection -> GapMeasurement -> ResultJudgment -> ResultOutput` 主干。（由模板骨架 prompt + Template Gate 兜底）
 - [X] LLM 不能把模板主干替换成无关算子组合。（偏离会进入模板约束诊断/ManualRetry）
 
@@ -733,7 +733,7 @@ TODO：
 - [X] 展示：推荐模板名、行业、版本、场景 Key、置信度、命中关键词、缺失信号。
 - [X] 支持 Top3 模板候选切换。
 - [X] 支持“强制使用此模板 / 允许轻微改造 / 不使用模板”三种模式。
-- [X] 模板卡片展示核心拓扑摘要，例如：`ImageAcquisition -> DeepLearning -> BoxNms -> ResultJudgment -> ResultOutput`。
+- [X] 模板卡片展示核心拓扑摘要，例如：`ImageAcquisition -> DeepLearning(OutputFormat=EndToEndNms) -> ResultJudgment -> ResultOutput`。
 
 本轮约束：模板卡片只展示 Top3 和三种选择动作，不做模板库管理、模板编辑器或多方案横向评审。
 

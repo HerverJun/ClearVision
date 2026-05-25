@@ -293,7 +293,21 @@ public class FlowTemplateService : IFlowTemplateService
         if (string.IsNullOrWhiteSpace(existing.TemplateVersion))
             return !string.IsNullOrWhiteSpace(candidate.TemplateVersion);
 
-        return CompareTemplateVersions(candidate.TemplateVersion, existing.TemplateVersion) > 0;
+        var comparison = CompareTemplateVersions(candidate.TemplateVersion, existing.TemplateVersion);
+        if (comparison > 0)
+            return true;
+
+        return comparison == 0 &&
+            UsesLegacyPlatformNmsPolicy(existing) &&
+            !UsesLegacyPlatformNmsPolicy(candidate);
+    }
+
+    private static bool UsesLegacyPlatformNmsPolicy(FlowTemplate template)
+    {
+        var flowJson = template.FlowJson ?? string.Empty;
+        return flowJson.Contains("\"BoxNms\"", StringComparison.OrdinalIgnoreCase) ||
+            flowJson.Contains("\"EnableInternalNms\": \"false\"", StringComparison.OrdinalIgnoreCase) ||
+            flowJson.Contains("\"EnableInternalNms\":\"false\"", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int CompareTemplateVersions(string? left, string? right)
@@ -439,7 +453,7 @@ public class FlowTemplateService : IFlowTemplateService
                             ["Confidence"] = "0.05",
                             ["InputSize"] = "640",
                             ["TargetClasses"] = "Wire_Black,Wire_Blue",
-                            ["EnableInternalNms"] = "false",
+                            ["EnableInternalNms"] = "true",
                             ["OutputFormat"] = "EndToEndNms",
                             ["DetectionMode"] = "Object"
                         }),
@@ -545,7 +559,7 @@ public class FlowTemplateService : IFlowTemplateService
                             ["Confidence"] = "0.05",
                             ["InputSize"] = "640",
                             ["TargetClasses"] = "Wire_Black,Wire_Blue",
-                            ["EnableInternalNms"] = "false",
+                            ["EnableInternalNms"] = "true",
                             ["OutputFormat"] = "EndToEndNms",
                             ["DetectionMode"] = "Object"
                         }),
@@ -587,7 +601,7 @@ public class FlowTemplateService : IFlowTemplateService
                 name: "包装箱外观检测",
                 scenarioKey: "carton-appearance-inspection",
                 industry: "包装终检",
-                description: "适合包装终检工位的包装箱外观缺陷检测，默认骨架为缩放 + AI 检测 + Region ROI 过滤 + NMS + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
+                description: "适合包装终检工位的包装箱外观缺陷检测，默认骨架为缩放 + 内置 NMS 的 ONNX AI 检测 + Region ROI 过滤 + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
                 explanation: "适用于包装终检工位的包装箱外观检测，默认检测箱体破损、压痕、脏污、封箱异常、标签异常等缺陷。",
                 tags: ["包装箱", "外观", "AI", "YOLO"],
                 targetClasses: "CartonDamage,CartonDent,CartonStain,SealAnomaly,LabelAnomaly",
@@ -600,7 +614,7 @@ public class FlowTemplateService : IFlowTemplateService
                 name: "空调内机外观检测",
                 scenarioKey: "aircon-indoor-appearance-inspection",
                 industry: AirConditioningIndustry,
-                description: "适合总装/终检工位的空调内机外观检测，默认骨架为缩放 + AI 检测 + Region ROI 过滤 + NMS + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
+                description: "适合总装/终检工位的空调内机外观检测，默认骨架为缩放 + 内置 NMS 的 ONNX AI 检测 + Region ROI 过滤 + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
                 explanation: "适用于总装或终检工位的空调内机外观检测，默认检测面板划伤、面板缝隙、污渍、磕碰等缺陷。",
                 tags: ["内机", "外观", "AI", "YOLO"],
                 targetClasses: "PanelScratch,PanelGap,Stain,Damage",
@@ -613,7 +627,7 @@ public class FlowTemplateService : IFlowTemplateService
                 name: "空调外机外观检测",
                 scenarioKey: "aircon-outdoor-appearance-inspection",
                 industry: AirConditioningIndustry,
-                description: "适合总装/终检工位的空调外机外观检测，默认骨架为缩放 + AI 检测 + Region ROI 过滤 + NMS + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
+                description: "适合总装/终检工位的空调外机外观检测，默认骨架为缩放 + 内置 NMS 的 ONNX AI 检测 + Region ROI 过滤 + OK/NG 判定；需人工确认模型、类别、ROI 与阈值。",
                 explanation: "适用于总装或终检工位的空调外机外观检测，默认检测翅片变形、护网破损、凹陷、缺件等缺陷。",
                 tags: ["外机", "外观", "AI", "YOLO"],
                 targetClasses: "FinDeform,NetDamage,Dent,MissingPart",
@@ -626,7 +640,7 @@ public class FlowTemplateService : IFlowTemplateService
                 name: "遥控器漏装检测",
                 scenarioKey: "remote-controller-missing-inspection",
                 industry: AirConditioningIndustry,
-                description: "适合包装位/附件位的遥控器漏装检测，默认骨架为缩放 + AI 目标检测 + Region ROI 过滤 + NMS + 有无判定；需人工确认模型、ROI 与阈值。",
+                description: "适合包装位/附件位的遥控器漏装检测，默认骨架为缩放 + 内置 NMS 的 ONNX AI 目标检测 + Region ROI 过滤 + 有无判定；需人工确认模型、ROI 与阈值。",
                 explanation: "适用于包装位或附件位的遥控器漏装检测，默认判断附件区域中是否存在遥控器目标。",
                 tags: ["遥控器", "漏装", "附件", "AI"],
                 targetClasses: "RemoteController",
@@ -656,10 +670,9 @@ public class FlowTemplateService : IFlowTemplateService
         var reviewParameters = new Dictionary<string, List<string>>
         {
             ["op_3"] = includeTargetClassesInReview
-                ? ["ModelPath", "TargetClasses", "Confidence"]
-                : ["ModelPath", "Confidence"],
-            ["op_4"] = ["RegionX", "RegionY", "RegionW", "RegionH"],
-            ["op_5"] = ["ScoreThreshold", "IouThreshold"]
+                ? ["ModelPath", "TargetClasses", "OutputFormat", "Confidence"]
+                : ["ModelPath", "OutputFormat", "Confidence"],
+            ["op_4"] = ["RegionX", "RegionY", "RegionW", "RegionH"]
         };
 
         return new FlowTemplate
@@ -669,7 +682,7 @@ public class FlowTemplateService : IFlowTemplateService
             Description = description,
             Industry = industry,
             Tags = tags.ToList(),
-            TemplateVersion = "1.1.0",
+            TemplateVersion = "1.2.0",
             ScenarioKey = scenarioKey,
             ScenarioPackage = new ScenarioPackageBinding
             {
@@ -677,7 +690,7 @@ public class FlowTemplateService : IFlowTemplateService
                 PackageVersion = "1.0.0",
                 AssetVersionIds =
                 [
-                    $"template:{scenarioKey}@1.1.0",
+                    $"template:{scenarioKey}@1.2.0",
                     $"model:{scenarioKey}-detector@1.0.0",
                     $"label:{scenarioKey}-labels@1.0.0"
                 ],
@@ -692,9 +705,7 @@ public class FlowTemplateService : IFlowTemplateService
                 requiredResources = new[] { "DeepLearning.ModelPath" },
                 tunableParameters = new[]
                 {
-                    "DeepLearning.Confidence",
-                    "BoxNms.ScoreThreshold",
-                    "BoxNms.IouThreshold"
+                    "DeepLearning.Confidence"
                 },
                 operators = new object[]
                 {
@@ -711,7 +722,8 @@ public class FlowTemplateService : IFlowTemplateService
                         ["Confidence"] = "0.5",
                         ["InputSize"] = "640",
                         ["TargetClasses"] = targetClasses,
-                        ["EnableInternalNms"] = "false",
+                        ["EnableInternalNms"] = "true",
+                        ["OutputFormat"] = "EndToEndNms",
                         ["DetectionMode"] = detectionMode
                     }),
                     Node("op_4", "BoxFilter", "ROI区域过滤", new Dictionary<string, string>
@@ -723,20 +735,13 @@ public class FlowTemplateService : IFlowTemplateService
                         ["RegionH"] = TemplateDefaultRegionExtent,
                         ["MinScore"] = "0.0"
                     }),
-                    Node("op_5", "BoxNms", "候选框抑制", new Dictionary<string, string>
-                    {
-                        ["IouThreshold"] = "0.45",
-                        ["ScoreThreshold"] = "0.25",
-                        ["MaxDetections"] = "20",
-                        ["ShowSuppressed"] = "false"
-                    }),
-                    Node("op_6", "ResultJudgment", detectionMode == "Object" ? "漏装判定" : "外观判定", new Dictionary<string, string>
+                    Node("op_5", "ResultJudgment", detectionMode == "Object" ? "漏装判定" : "外观判定", new Dictionary<string, string>
                     {
                         ["Condition"] = judgmentCondition,
                         ["ExpectValue"] = judgmentExpectValue,
                         ["MinConfidence"] = "0.0"
                     }),
-                    Node("op_7", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    Node("op_6", "ResultOutput", "结果输出", new Dictionary<string, string>
                     {
                         ["Format"] = "JSON",
                         ["SaveToFile"] = "true"
@@ -748,14 +753,11 @@ public class FlowTemplateService : IFlowTemplateService
                     Link("op_2", "Image", "op_3", "Image"),
                     Link("op_3", detectionPort, "op_4", "Detections"),
                     Link("op_2", "Image", "op_4", "Image"),
-                    Link("op_4", "Detections", "op_5", "Detections"),
-                    Link("op_2", "Image", "op_5", "Image"),
-                    Link("op_3", "OriginalImage", "op_5", "SourceImage"),
-                    Link("op_5", "Count", "op_6", "Value"),
-                    Link("op_5", "Image", "op_7", "Image"),
-                    Link("op_5", "Diagnostics", "op_7", "Data"),
-                    Link("op_6", "JudgmentResult", "op_7", "Result"),
-                    Link("op_6", "Details", "op_7", "Text")
+                    Link("op_4", "Count", "op_5", "Value"),
+                    Link("op_4", "Image", "op_6", "Image"),
+                    Link("op_3", "PostprocessDiagnostics", "op_6", "Data"),
+                    Link("op_5", "JudgmentResult", "op_6", "Result"),
+                    Link("op_5", "Details", "op_6", "Text")
                 },
                 parametersNeedingReview = reviewParameters
             }, _jsonOptions),

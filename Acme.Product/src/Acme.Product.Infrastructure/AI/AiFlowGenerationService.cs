@@ -462,6 +462,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 }
 
                 ApplyTemplateMetadata(generatedFlow, templatePriority);
+                ApplyModelEmbeddedNmsDefaults(generatedFlow);
 
                 // 推送：校验结果
                 ReportProgress("正在校验生成的算子和参数有效性...");
@@ -2140,6 +2141,281 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 .ToList();
         }
     }
+
+    private static void ApplyModelEmbeddedNmsDefaults(AiGeneratedFlowJson generatedFlow)
+    {
+        if (generatedFlow.Operators.Count == 0)
+            return;
+
+        foreach (var deepLearning in generatedFlow.Operators.Where(op => IsOperatorType(op, "DeepLearning")))
+        {
+            deepLearning.Parameters ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var outputFormat = ReadParameter(deepLearning, "OutputFormat");
+            if (string.IsNullOrWhiteSpace(outputFormat) ||
+                outputFormat.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            {
+                SetParameter(deepLearning, "OutputFormat", "EndToEndNms");
+                outputFormat = "EndToEndNms";
+            }
+
+            if (IsEndToEndNmsFormat(outputFormat))
+                SetParameter(deepLearning, "EnableInternalNms", "true");
+        }
+
+        CollapseRedundantBoxNmsAfterModelEmbeddedNms(generatedFlow);
+    }
+
+    private static void CollapseRedundantBoxNmsAfterModelEmbeddedNms(AiGeneratedFlowJson generatedFlow)
+    {
+        var operatorsById = generatedFlow.Operators
+            .Where(op => !string.IsNullOrWhiteSpace(op.TempId))
+            .ToDictionary(op => op.TempId, StringComparer.OrdinalIgnoreCase);
+
+        var boxNmsOperators = generatedFlow.Operators
+            .Where(op => IsOperatorType(op, "BoxNms"))
+            .ToList();
+
+        foreach (var boxNms in boxNmsOperators)
+        {
+            if (!TryResolveModelEmbeddedNmsSource(generatedFlow, operatorsById, boxNms.TempId, out var source))
+                continue;
+
+            var sourceConnections = generatedFlow.Connections
+                .Where(conn => string.Equals(conn.SourceTempId, boxNms.TempId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (sourceConnections.Any(conn =>
+                    IsPort(conn.SourcePortName, "SuppressedCount") ||
+                    IsPort(conn.SourcePortName, "SuppressedDetections")))
+            {
+                continue;
+            }
+
+            var replacementConnections = new List<AiGeneratedConnection>();
+            foreach (var connection in sourceConnections)
+            {
+                var replacement = BuildBoxNmsReplacementConnection(connection, source);
+                if (replacement != null)
+                    replacementConnections.Add(replacement);
+            }
+
+            generatedFlow.Operators.Remove(boxNms);
+            generatedFlow.Connections = generatedFlow.Connections
+                .Where(conn =>
+                    !string.Equals(conn.SourceTempId, boxNms.TempId, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(conn.TargetTempId, boxNms.TempId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var replacement in replacementConnections)
+                AddConnectionIfUseful(generatedFlow.Connections, replacement);
+
+            generatedFlow.ParametersNeedingReview.Remove(boxNms.TempId);
+            generatedFlow.PendingParameters.RemoveAll(item =>
+                string.Equals(item.OperatorId, boxNms.TempId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private static bool TryResolveModelEmbeddedNmsSource(
+        AiGeneratedFlowJson generatedFlow,
+        IReadOnlyDictionary<string, AiGeneratedOperator> operatorsById,
+        string boxNmsTempId,
+        out NmsBypassSource source)
+    {
+        source = default;
+        var detectionsInput = generatedFlow.Connections.FirstOrDefault(conn =>
+            string.Equals(conn.TargetTempId, boxNmsTempId, StringComparison.OrdinalIgnoreCase) &&
+            IsPort(conn.TargetPortName, "Detections"));
+
+        if (detectionsInput == null)
+            return false;
+
+        return TryTraceModelEmbeddedNmsSource(
+            generatedFlow,
+            operatorsById,
+            detectionsInput.SourceTempId,
+            detectionsInput.SourcePortName,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            out source);
+    }
+
+    private static bool TryTraceModelEmbeddedNmsSource(
+        AiGeneratedFlowJson generatedFlow,
+        IReadOnlyDictionary<string, AiGeneratedOperator> operatorsById,
+        string sourceTempId,
+        string sourcePortName,
+        ISet<string> visited,
+        out NmsBypassSource source)
+    {
+        source = default;
+        if (!visited.Add(sourceTempId) || !operatorsById.TryGetValue(sourceTempId, out var sourceOperator))
+            return false;
+
+        if (IsOperatorType(sourceOperator, "DeepLearning"))
+        {
+            if (!UsesModelEmbeddedNms(sourceOperator))
+                return false;
+
+            source = new NmsBypassSource(
+                PassthroughTempId: sourceTempId,
+                DetectionsPortName: sourcePortName,
+                CountPortName: ResolveDeepLearningCountPort(sourceOperator, sourcePortName),
+                ImagePortName: "Image",
+                DiagnosticsTempId: sourceTempId,
+                DiagnosticsPortName: "PostprocessDiagnostics");
+            return true;
+        }
+
+        if (!IsOperatorType(sourceOperator, "BoxFilter"))
+            return false;
+
+        var filterInput = generatedFlow.Connections.FirstOrDefault(conn =>
+            string.Equals(conn.TargetTempId, sourceTempId, StringComparison.OrdinalIgnoreCase) &&
+            IsPort(conn.TargetPortName, "Detections"));
+        if (filterInput == null)
+            return false;
+
+        if (!TryTraceModelEmbeddedNmsSource(
+                generatedFlow,
+                operatorsById,
+                filterInput.SourceTempId,
+                filterInput.SourcePortName,
+                visited,
+                out var upstream))
+        {
+            return false;
+        }
+
+        source = upstream with
+        {
+            PassthroughTempId = sourceTempId,
+            DetectionsPortName = sourcePortName,
+            CountPortName = "Count",
+            ImagePortName = "Image"
+        };
+        return true;
+    }
+
+    private static AiGeneratedConnection? BuildBoxNmsReplacementConnection(
+        AiGeneratedConnection oldConnection,
+        NmsBypassSource source)
+    {
+        if (IsPort(oldConnection.SourcePortName, "Detections"))
+        {
+            return new AiGeneratedConnection
+            {
+                SourceTempId = source.PassthroughTempId,
+                SourcePortName = source.DetectionsPortName,
+                TargetTempId = oldConnection.TargetTempId,
+                TargetPortName = oldConnection.TargetPortName
+            };
+        }
+
+        if (IsPort(oldConnection.SourcePortName, "Count") ||
+            IsPort(oldConnection.SourcePortName, "InputCount"))
+        {
+            return new AiGeneratedConnection
+            {
+                SourceTempId = source.PassthroughTempId,
+                SourcePortName = source.CountPortName,
+                TargetTempId = oldConnection.TargetTempId,
+                TargetPortName = oldConnection.TargetPortName
+            };
+        }
+
+        if (IsPort(oldConnection.SourcePortName, "Image"))
+        {
+            return new AiGeneratedConnection
+            {
+                SourceTempId = source.PassthroughTempId,
+                SourcePortName = source.ImagePortName,
+                TargetTempId = oldConnection.TargetTempId,
+                TargetPortName = oldConnection.TargetPortName
+            };
+        }
+
+        if (IsPort(oldConnection.SourcePortName, "Diagnostics"))
+        {
+            return new AiGeneratedConnection
+            {
+                SourceTempId = source.DiagnosticsTempId,
+                SourcePortName = source.DiagnosticsPortName,
+                TargetTempId = oldConnection.TargetTempId,
+                TargetPortName = oldConnection.TargetPortName
+            };
+        }
+
+        return null;
+    }
+
+    private static void AddConnectionIfUseful(List<AiGeneratedConnection> connections, AiGeneratedConnection connection)
+    {
+        var targetAlreadyConnected = connections.Any(existing =>
+            string.Equals(existing.TargetTempId, connection.TargetTempId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(existing.TargetPortName, connection.TargetPortName, StringComparison.OrdinalIgnoreCase));
+        if (targetAlreadyConnected)
+            return;
+
+        var duplicate = connections.Any(existing =>
+            string.Equals(existing.SourceTempId, connection.SourceTempId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(existing.SourcePortName, connection.SourcePortName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(existing.TargetTempId, connection.TargetTempId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(existing.TargetPortName, connection.TargetPortName, StringComparison.OrdinalIgnoreCase));
+        if (!duplicate)
+            connections.Add(connection);
+    }
+
+    private static bool UsesModelEmbeddedNms(AiGeneratedOperator op)
+    {
+        var outputFormat = ReadParameter(op, "OutputFormat");
+        return string.IsNullOrWhiteSpace(outputFormat) ||
+            outputFormat.Equals("Auto", StringComparison.OrdinalIgnoreCase) ||
+            IsEndToEndNmsFormat(outputFormat);
+    }
+
+    private static string ResolveDeepLearningCountPort(AiGeneratedOperator op, string detectionPortName)
+    {
+        if (IsPort(detectionPortName, "Objects"))
+            return "ObjectCount";
+        if (IsPort(detectionPortName, "Defects"))
+            return "DefectCount";
+
+        var detectionMode = ReadParameter(op, "DetectionMode");
+        return string.Equals(detectionMode, "Object", StringComparison.OrdinalIgnoreCase)
+            ? "ObjectCount"
+            : "DefectCount";
+    }
+
+    private static bool IsOperatorType(AiGeneratedOperator op, string operatorType) =>
+        string.Equals(op.OperatorType, operatorType, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPort(string? actual, string expected) =>
+        string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+
+    private static string? ReadParameter(AiGeneratedOperator op, string name) =>
+        op.Parameters != null && op.Parameters.TryGetValue(name, out var value)
+            ? value
+            : null;
+
+    private static void SetParameter(AiGeneratedOperator op, string name, string value)
+    {
+        op.Parameters ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        op.Parameters[name] = value;
+    }
+
+    private static bool IsEndToEndNmsFormat(string? outputFormat) =>
+        outputFormat is not null &&
+        (outputFormat.Equals("EndToEndNms", StringComparison.OrdinalIgnoreCase) ||
+         outputFormat.Equals("EndToEnd", StringComparison.OrdinalIgnoreCase) ||
+         outputFormat.Equals("OnnxNms", StringComparison.OrdinalIgnoreCase) ||
+         outputFormat.Equals("Nms", StringComparison.OrdinalIgnoreCase));
+
+    private readonly record struct NmsBypassSource(
+        string PassthroughTempId,
+        string DetectionsPortName,
+        string CountPortName,
+        string ImagePortName,
+        string DiagnosticsTempId,
+        string DiagnosticsPortName);
 
     private static void MergeValidationResult(AiValidationResult target, AiValidationResult source)
     {
