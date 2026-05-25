@@ -12,6 +12,9 @@ namespace Acme.Product.Station.Sync;
 
 public sealed class StationSyncHostedService : BackgroundService
 {
+    private const string ResultBackpressureDiagnosticCode = "StationResultBackpressure";
+    private const string ResultSpoolPersistFailedDiagnosticCode = "StationResultSpoolPersistFailed";
+
     private readonly RuntimeHost _runtimeHost;
     private readonly StationIdentityResolver _identityResolver;
     private readonly StationSpoolStore _spoolStore;
@@ -39,6 +42,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private DateTimeOffset? _lastResultAtUtc;
     private long _nextControlSequenceId;
     private long _queuedResultSummaries;
+    private long _resultBackpressureWaits;
     private long _droppedResultSummaries;
     private long _overwrittenSnapshots;
 
@@ -188,14 +192,31 @@ public sealed class StationSyncHostedService : BackgroundService
             _lastResultAtUtc = summary.CompletedAtUtc;
 
             Interlocked.Increment(ref _queuedResultSummaries);
+            var accepted = false;
             try
             {
-                _spoolStore.Enqueue(summary);
-                SignalSync();
+                if (!_resultIngressChannel.Writer.TryWrite(summary))
+                {
+                    var waits = Interlocked.Increment(ref _resultBackpressureWaits);
+                    if (waits == 1 || waits % 100 == 0)
+                    {
+                        _logger.LogWarning(
+                            "Station result sync is applying backpressure instead of dropping result summaries. BackpressureWaits={BackpressureWaits}, OutboundQueueCapacity={OutboundQueueCapacity}",
+                            waits,
+                            Math.Max(1, _options.OutboundQueueCapacity));
+                    }
+
+                    _resultIngressChannel.Writer.WriteAsync(summary).AsTask().GetAwaiter().GetResult();
+                }
+
+                accepted = true;
             }
             finally
             {
-                Interlocked.Decrement(ref _queuedResultSummaries);
+                if (!accepted)
+                {
+                    Interlocked.Decrement(ref _queuedResultSummaries);
+                }
             }
         }
         catch (Exception ex)
@@ -203,7 +224,7 @@ public sealed class StationSyncHostedService : BackgroundService
             var dropped = Interlocked.Increment(ref _droppedResultSummaries);
             _logger.LogError(
                 ex,
-                "Failed to persist Station result summary to local spool from runtime event. DroppedResultSummaries={DroppedResultSummaries}",
+                "Failed to queue Station result summary for local spool persistence. DroppedResultSummaries={DroppedResultSummaries}",
                 dropped);
         }
     }
@@ -855,6 +876,19 @@ public sealed class StationSyncHostedService : BackgroundService
         var driveRoot = Path.GetPathRoot(Path.GetFullPath(dataDirectory));
         var driveInfo = string.IsNullOrWhiteSpace(driveRoot) ? null : new DriveInfo(driveRoot);
 
+        var queuedResultSummaries = Volatile.Read(ref _queuedResultSummaries);
+        var resultBackpressureWaits = Volatile.Read(ref _resultBackpressureWaits);
+        var droppedResultSummaries = Volatile.Read(ref _droppedResultSummaries);
+        var spoolPendingCount = spoolStore.PendingCount;
+        var spoolBytes = spoolStore.SpoolBytes;
+        var resultSyncDiagnostic = BuildResultSyncDiagnostic(
+            queuedResultSummaries,
+            resultBackpressureWaits,
+            droppedResultSummaries,
+            spoolPendingCount,
+            spoolBytes,
+            driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0);
+
         return new StationHealthSnapshotDto
         {
             StationId = identity.StationId,
@@ -867,28 +901,67 @@ public sealed class StationSyncHostedService : BackgroundService
             PrivateMemoryMb = process.PrivateMemorySize64 / 1024 / 1024,
             DiskFreeMb = driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0,
             DiskTotalMb = driveInfo?.TotalSize / 1024 / 1024 ?? 0,
-            SpoolPendingCount = spoolStore.PendingCount,
-            SpoolBytes = spoolStore.SpoolBytes,
+            SpoolPendingCount = spoolPendingCount,
+            SpoolBytes = spoolBytes,
             CameraStatusSummary = "Unknown",
             PlcStatusSummary = BuildPlcStatusSummary(snapshot),
             CurrentPackageId = snapshot.PackageId,
             CurrentPackageHealth = snapshot.PackageId == null ? "NoPackage" : "Loaded",
-            LastErrorCode = Volatile.Read(ref _droppedResultSummaries) > 0 ? "StationResultSpoolPersistFailed" : null,
-            LastErrorMessage = BuildResultSpoolSummary(),
+            LastErrorCode = resultSyncDiagnostic.Code,
+            LastErrorMessage = resultSyncDiagnostic.Message,
             CreatedAtUtc = now
         };
     }
 
-    private string? BuildResultSpoolSummary()
+    private (string? Code, string? Message) BuildResultSyncDiagnostic(
+        long queued,
+        long backpressureWaits,
+        long dropped,
+        int spoolPending,
+        long spoolBytes,
+        long diskFreeMb)
     {
-        var dropped = Volatile.Read(ref _droppedResultSummaries);
-        var queued = Volatile.Read(ref _queuedResultSummaries);
-        if (dropped == 0)
+        if (dropped > 0)
         {
-            return null;
+            return (
+                ResultSpoolPersistFailedDiagnosticCode,
+                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb));
         }
 
-        return $"queued={queued}; failedResultSpoolWrites={dropped}; spoolPending={_spoolStore.PendingCount}; spoolBytes={_spoolStore.SpoolBytes}";
+        if (IsResultBackpressured(queued, spoolPending))
+        {
+            return (
+                ResultBackpressureDiagnosticCode,
+                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb));
+        }
+
+        return (null, null);
+    }
+
+    private bool IsResultBackpressured(long queued, int spoolPending)
+    {
+        if (queued > 0)
+        {
+            return true;
+        }
+
+        var pendingThreshold = Math.Max(
+            Math.Max(1, _options.OutboundQueueCapacity),
+            Math.Max(1, _options.PendingBatchSize) * 10);
+        return spoolPending >= pendingThreshold;
+    }
+
+    private string BuildResultSyncDiagnosticMessage(
+        long queued,
+        long backpressureWaits,
+        long dropped,
+        int spoolPending,
+        long spoolBytes,
+        long diskFreeMb)
+    {
+        return "Station 结果同步出现背压。请检查：Studio 连接、工站到 Studio 的网络、防火墙规则、spool 磁盘空间/权限、StationSync 队列容量。 " +
+            $"queued={queued}; outboundQueueCapacity={Math.Max(1, _options.OutboundQueueCapacity)}; backpressureWaits={backpressureWaits}; " +
+            $"spoolPending={spoolPending}; spoolBytes={spoolBytes}; diskFreeMb={diskFreeMb}; failedResultSpoolWrites={dropped}";
     }
 
     private static string BuildPlcStatusSummary(RuntimeHostSnapshot snapshot)

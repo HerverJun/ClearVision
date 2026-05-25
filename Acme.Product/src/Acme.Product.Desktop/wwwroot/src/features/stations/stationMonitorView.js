@@ -993,6 +993,10 @@ class StationMonitorView {
         const recentLogs = Array.isArray(detail.recentLogs) ? detail.recentLogs : [];
         const recentCommands = Array.isArray(detail.recentCommands) ? detail.recentCommands : [];
         const latestHealth = recentHealth[0] || detail;
+        const healthDiagnosticCode = latestHealth.lastErrorCode || null;
+        const healthDiagnosticMessage = latestHealth.lastErrorMessage || null;
+        const activeDiagnosticCode = healthDiagnosticCode || detail.lastDiagnosticCode || null;
+        const activeDiagnosticMessage = healthDiagnosticMessage || detail.lastDiagnosticMessage || null;
         const actionsDisabled = this.commandBusy ? 'disabled' : '';
         const productionActionDisabled = this.commandBusy || !isOnline
             ? 'disabled title="工站离线或状态未知，不能下发会影响生产的命令"'
@@ -1024,6 +1028,7 @@ class StationMonitorView {
             ${this.commandStatusMessage
                 ? `<div class="sm-command-status" data-level="${this.escapeHtml(this.commandStatusLevel)}">${this.escapeHtml(this.commandStatusMessage)}</div>`
                 : ''}
+            ${this.renderStationDiagnosticAdvice(activeDiagnosticCode, activeDiagnosticMessage)}
             <div class="sm-detail-stats">
                 <div><span>良品</span><b>${Number(detail.sessionOkCount || 0)}</b></div>
                 <div><span>不良</span><b>${Number(detail.sessionNgCount || 0)}</b></div>
@@ -1033,7 +1038,7 @@ class StationMonitorView {
             <dl class="sm-detail-meta">
                 <div><dt>上次在线</dt><dd>${this.escapeHtml(this.formatRelativeTime(detail.lastSeenAtUtc))}</dd></div>
                 <div><dt>最近结果</dt><dd>${this.escapeHtml(this.formatOutcome(detail.lastOutcome, detail.lastInspectionStatus))}</dd></div>
-                <div><dt>诊断码</dt><dd>${this.escapeHtml(detail.lastDiagnosticCode || detail.lastDiagnosticMessage || '--')}</dd></div>
+                <div><dt>诊断码</dt><dd>${this.escapeHtml(activeDiagnosticCode || activeDiagnosticMessage || '--')}</dd></div>
                 <div><dt>包版本</dt><dd>${this.escapeHtml(detail.packageId || '--')}</dd></div>
                 <div><dt>缓存队列</dt><dd>${Number(detail.spoolPendingCount || latestHealth.spoolPendingCount || 0)} / ${this.formatBytes(detail.spoolBytes || latestHealth.spoolBytes || 0)}</dd></div>
                 <div><dt>磁盘剩余</dt><dd>${this.formatDisk(latestHealth.diskFreeMb, latestHealth.diskTotalMb)}</dd></div>
@@ -1088,6 +1093,32 @@ class StationMonitorView {
         `;
     }
 
+    renderStationDiagnosticAdvice(code, message) {
+        const normalizedCode = String(code || '').trim();
+        const text = String(message || '').trim();
+        const defaultAdvice = this.getStationDiagnosticAdvice(normalizedCode);
+        if (!defaultAdvice) {
+            return '';
+        }
+
+        const label = normalizedCode ? `${normalizedCode}: ` : '';
+        const body = text.includes('请检查') ? text : `${defaultAdvice}${text ? ` ${text}` : ''}`;
+        return `<div class="sm-command-status" data-level="error">排查建议：${this.escapeHtml(label + body)}</div>`;
+    }
+
+    getStationDiagnosticAdvice(code) {
+        const normalizedCode = String(code || '').trim().toLowerCase();
+        if (normalizedCode === 'stationresultbackpressure') {
+            return '请检查：Studio 连接、工站到 Studio 的网络、防火墙规则、spool 磁盘空间/权限、StationSync 队列容量。';
+        }
+
+        if (normalizedCode === 'stationresultspoolpersistfailed') {
+            return '请检查：spool 磁盘空间/权限、StationSync spool 路径、Studio 连接、工站到 Studio 的网络和防火墙规则。';
+        }
+
+        return '';
+    }
+
     renderDetailSection(title, items, renderItem, emptyText, take) {
         const rows = Array.isArray(items) ? items : [];
         return `
@@ -1124,6 +1155,7 @@ class StationMonitorView {
         ].sort((left, right) => new Date(right.atUtc || 0).getTime() - new Date(left.atUtc || 0).getTime());
 
         this.streamMeta.textContent = `${flow.length} 条缓存`;
+        this.stream.classList.toggle('is-empty', flow.length === 0);
         if (flow.length === 0) {
             this.stream.innerHTML = `
                 <div class="sm-empty is-center">

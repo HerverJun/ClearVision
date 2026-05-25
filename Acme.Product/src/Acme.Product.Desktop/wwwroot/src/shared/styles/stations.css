@@ -848,6 +848,18 @@
     flex: 1;
 }
 
+.sm-feed-body.is-empty {
+    overflow: hidden;
+}
+
+.sm-feed-body::-webkit-scrollbar {
+    display: none;
+}
+
+.sm-feed-body {
+    scrollbar-width: none;
+}
+
 .sm-feed-item {
     display: flex;
     justify-content: space-between;

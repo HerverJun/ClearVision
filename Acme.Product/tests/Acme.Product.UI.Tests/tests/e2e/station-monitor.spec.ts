@@ -83,7 +83,7 @@ async function mockBaseApis(page: Page) {
   });
 }
 
-async function mockStationApis(page: Page, eventBody = '') {
+async function mockStationApis(page: Page, eventBody = '', stationList = stations, healthByStation: Record<string, unknown[]> = {}) {
   const allResults = [
     buildResult('station-a', 2, 'Ng', 'WIRE_SWAP'),
     buildResult('station-b', 1, 'Error', 'CAMERA_TIMEOUT'),
@@ -139,7 +139,7 @@ async function mockStationApis(page: Page, eventBody = '') {
     if (path.endsWith('/api/stations/events')) {
       const initialState = [
         'event: initialState',
-        `data: ${JSON.stringify({ summary: { offlineThresholdSeconds: 15 }, stations, recentResults: [] })}`,
+        `data: ${JSON.stringify({ summary: { offlineThresholdSeconds: 15 }, stations: stationList, recentResults: [] })}`,
         '',
         '',
       ].join('\n');
@@ -154,14 +154,14 @@ async function mockStationApis(page: Page, eventBody = '') {
     const detailMatch = path.match(/\/api\/stations\/([^/]+)$/);
     if (detailMatch) {
       const stationId = decodeURIComponent(detailMatch[1]);
-      const station = stations.find(item => item.stationId === stationId);
+      const station = stationList.find(item => item.stationId === stationId);
       await route.fulfill({
         status: station ? 200 : 404,
         contentType: 'application/json',
         body: station ? JSON.stringify({
           ...station,
           recentResults: allResults.filter(item => item.stationId === stationId),
-          recentHealth: [],
+          recentHealth: healthByStation[stationId] ?? [],
           recentLogs: [],
           recentCommands: [],
         }) : '{}',
@@ -173,7 +173,7 @@ async function mockStationApis(page: Page, eventBody = '') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(stations),
+        body: JSON.stringify(stationList),
       });
       return;
     }
@@ -219,5 +219,45 @@ test.describe('Station monitor', () => {
     await openMonitor(page);
 
     await expect(page.locator('#sm-result-list')).toContainText('LIVE_NG');
+  });
+
+  test('surfaces backpressure troubleshooting advice in station detail', async ({ page }) => {
+    const backpressureMessage = 'Station 结果同步出现背压。请检查：Studio 连接、工站到 Studio 的网络、防火墙规则、spool 磁盘空间/权限、StationSync 队列容量。 queued=1000; spoolPending=1500';
+    const stationList = [
+      {
+        ...stations[0],
+        lastDiagnosticCode: 'StationResultBackpressure',
+        lastDiagnosticMessage: backpressureMessage,
+        spoolPendingCount: 1500,
+        spoolBytes: 1048576,
+      },
+      stations[1],
+    ];
+    const recentHealth = {
+      'station-a': [{
+        stationId: 'station-a',
+        sequenceId: 4,
+        runtimeState: 'Running',
+        spoolPendingCount: 1500,
+        spoolBytes: 1048576,
+        diskFreeMb: 2048,
+        diskTotalMb: 4096,
+        currentPackageHealth: 'Loaded',
+        lastErrorCode: 'StationResultBackpressure',
+        lastErrorMessage: backpressureMessage,
+        createdAtUtc: now,
+      }],
+    };
+
+    await mockStationApis(page, '', stationList, recentHealth);
+    await openMonitor(page);
+    await page.locator('[data-station-id="station-a"]').click();
+
+    const focus = page.locator('#sm-detail');
+    await expect(focus).toContainText('排查建议');
+    await expect(focus).toContainText('Studio 连接');
+    await expect(focus).toContainText('防火墙规则');
+    await expect(focus).toContainText('spool 磁盘空间/权限');
+    await expect(focus).toContainText('StationSync 队列容量');
   });
 });
