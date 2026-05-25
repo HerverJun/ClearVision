@@ -136,6 +136,7 @@ public static class SettingsEndpoints
                 m.TimeoutMs,
                 m.IsActive,
                 m.Protocol,
+                m.WireApi,
                 m.AuthMode,
                 m.AuthHeaderName,
                 m.ExtraHeaders,
@@ -180,6 +181,7 @@ public static class SettingsEndpoints
                     BaseUrl = string.IsNullOrWhiteSpace(request.BaseUrl) ? null : request.BaseUrl,
                     TimeoutMs = request.TimeoutMs > 0 ? request.TimeoutMs : 120000,
                     Protocol = request.Protocol,
+                    WireApi = request.WireApi,
                     AuthMode = request.AuthMode,
                     AuthHeaderName = request.AuthHeaderName,
                     ExtraHeaders = CloneStringMap(request.ExtraHeaders),
@@ -219,6 +221,7 @@ public static class SettingsEndpoints
                     BaseUrl = request.BaseUrl,
                     TimeoutMs = request.TimeoutMs,
                     Protocol = request.Protocol,
+                    WireApi = request.WireApi,
                     AuthMode = request.AuthMode,
                     AuthHeaderName = request.AuthHeaderName,
                     ExtraHeaders = CloneStringMap(request.ExtraHeaders),
@@ -761,6 +764,7 @@ public static class SettingsEndpoints
         m.TimeoutMs,
         m.IsActive,
         m.Protocol,
+        m.WireApi,
         m.AuthMode,
         m.AuthHeaderName,
         m.ExtraHeaders,
@@ -1323,6 +1327,7 @@ public class AiModelCreateRequest
     public string? BaseUrl { get; set; }
     public int TimeoutMs { get; set; }
     public string? Protocol { get; set; }
+    public string? WireApi { get; set; }
     public string? AuthMode { get; set; }
     public string? AuthHeaderName { get; set; }
     public Dictionary<string, string>? ExtraHeaders { get; set; }
@@ -1344,6 +1349,7 @@ public class AiModelUpdateRequest
     public string? BaseUrl { get; set; }
     public int TimeoutMs { get; set; }
     public string? Protocol { get; set; }
+    public string? WireApi { get; set; }
     public string? AuthMode { get; set; }
     public string? AuthHeaderName { get; set; }
     public Dictionary<string, string>? ExtraHeaders { get; set; }

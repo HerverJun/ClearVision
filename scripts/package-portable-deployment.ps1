@@ -337,6 +337,17 @@ function Write-Readme {
 }
 
 $repoRoot = Resolve-RepoRoot -ScriptRoot $PSScriptRoot
+$dotnetShimPath = Join-Path $repoRoot "scripts\dotnet.ps1"
+$dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to resolve repository .NET SDK with $dotnetShimPath."
+}
+
+$dotnetPath = ($dotnetPathOutput | Select-Object -Last 1).Trim()
+if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
+    throw "Resolved dotnet path is empty."
+}
+
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot ".tmp\publish-check\portable-deployment"
 }
@@ -389,7 +400,7 @@ if (Test-Path $zipPath) {
 
 if (-not $SkipPublish) {
     Write-Host "Publishing self-contained desktop build..."
-    & dotnet publish $desktopProject `
+    & $dotnetPath publish $desktopProject `
         -c $Configuration `
         -r $RuntimeIdentifier `
         --self-contained true `

@@ -51,13 +51,14 @@ public class AiModelEndpointsTests
         var gpt5 = models.EnumerateArray().First(x => x.GetProperty("id").GetString() == "gpt5");
         gpt5.GetProperty("reasoning").GetProperty("mode").GetString().Should().Be("on");
         gpt5.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("high");
+        gpt5.GetProperty("wireApi").GetString().Should().Be("chat_completions");
         gpt5.GetProperty("reasoningSupport").GetProperty("familyId").GetString().Should().Be("openai_gpt5");
         gpt5.GetProperty("reasoningSupport").GetProperty("supportsExplicitMode").GetBoolean().Should().BeTrue();
         gpt5.GetProperty("reasoningSupport").GetProperty("supportsEffort").GetBoolean().Should().BeTrue();
         gpt5.GetProperty("reasoningSupport").GetProperty("allowedModes").EnumerateArray().Select(x => x.GetString())
             .Should().BeEquivalentTo(["auto", "on"]);
         gpt5.GetProperty("reasoningSupport").GetProperty("allowedEfforts").EnumerateArray().Select(x => x.GetString())
-            .Should().BeEquivalentTo(["low", "medium", "high"]);
+            .Should().BeEquivalentTo(["low", "medium", "high", "xhigh"]);
     }
 
     [Fact]
@@ -203,6 +204,7 @@ public class AiModelEndpointsTests
             provider = "OpenAI Compatible",
             model = "gpt-4o-mini",
             baseUrl = "https://api.openai.com/v1",
+            wireApi = "responses",
             apiKey = "created-secret-key",
             timeoutMs = 90000
         });
@@ -228,9 +230,11 @@ public class AiModelEndpointsTests
         var createdModel = modelsDocument.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == createdId);
         createdModel.TryGetProperty("apiKey", out _).Should().BeFalse();
         createdModel.GetProperty("hasApiKey").GetBoolean().Should().BeTrue();
+        createdModel.GetProperty("wireApi").GetString().Should().Be("responses");
 
         var reloaded = host.CreateReloadedStore();
         reloaded.GetById(createdId!)!.ApiKey.Should().Be("created-secret-key");
+        reloaded.GetById(createdId!)!.WireApi.Should().Be("responses");
     }
 
     [Fact]

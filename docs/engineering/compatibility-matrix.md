@@ -5,7 +5,8 @@
 | Area | Supported baseline |
 | --- | --- |
 | OS | Windows x64 for Desktop Studio and field portable packages. |
-| .NET SDK | `9.0.300` via `global.json`, roll-forward limited to latest feature. |
+| .NET SDK | Exact `9.0.300` via `global.json`; use `scripts/dotnet.ps1` to avoid PATH-based SDK drift. |
+| .NET runtimes | .NET 8 Core / ASP.NET / WindowsDesktop runtime for test and Desktop debug; `scripts/dotnet.ps1 -InstallIfMissing` installs `8.0.26` into the selected user-local dotnet host. |
 | Product TFM | `net8.0-windows` for Desktop, `net8.0` for shared/runtime libraries. |
 | UI runtime | WebView2 inside WinForms Desktop. |
 | Database | SQLite for local Studio/Station persistence. |

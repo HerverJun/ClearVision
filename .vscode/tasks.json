@@ -1,0 +1,68 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "restore-product",
+            "command": "powershell",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/scripts/dotnet.ps1",
+                "-InstallIfMissing",
+                "restore",
+                "${workspaceFolder}/Acme.Product/Acme.Product.sln",
+                "--locked-mode"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build",
+            "dependsOn": "restore-product",
+            "dependsOrder": "sequence",
+            "command": "powershell",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/scripts/dotnet.ps1",
+                "-InstallIfMissing",
+                "build",
+                "${workspaceFolder}/Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj",
+                "--configuration",
+                "Debug",
+                "--no-restore",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-station",
+            "dependsOn": "restore-product",
+            "dependsOrder": "sequence",
+            "command": "powershell",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/scripts/dotnet.ps1",
+                "-InstallIfMissing",
+                "build",
+                "${workspaceFolder}/Acme.Product/src/Acme.Product.Station/Acme.Product.Station.csproj",
+                "--configuration",
+                "Debug",
+                "--no-restore",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

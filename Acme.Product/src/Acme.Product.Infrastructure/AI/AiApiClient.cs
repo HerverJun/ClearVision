@@ -108,6 +108,45 @@ public class AiApiClient
         return body;
     }
 
+    private static Dictionary<string, object?> BuildOpenAiResponsesRequestBody(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        AiGenerationOptions options,
+        bool stream,
+        AiReasoningSupportInfo support)
+    {
+        var body = CreateObjectMap(
+            ("model", options.Model),
+            ("instructions", systemPrompt),
+            ("input", BuildOpenAiResponsesInput(messages)),
+            ("max_output_tokens", options.MaxTokens));
+
+        if (stream)
+        {
+            body["stream"] = true;
+        }
+
+        var reasoningPayload = ResolveOpenAiReasoningPayload(options, support);
+        if (support.FamilyId == AiReasoningModelFamilyCatalog.FamilyOpenAiGpt5 &&
+            !string.IsNullOrWhiteSpace(reasoningPayload.WireReasoningEffort))
+        {
+            body["reasoning"] = CreateObjectMap(("effort", reasoningPayload.WireReasoningEffort));
+        }
+
+        if (reasoningPayload.AllowTemperature)
+        {
+            body["temperature"] = options.Temperature;
+        }
+
+        MergeAdditionalBody(body, options.ExtraBody);
+        if (!reasoningPayload.AllowTemperature)
+        {
+            body.Remove("temperature");
+        }
+
+        return body;
+    }
+
     private static void ApplyExplicitReasoningOverrides(
         Dictionary<string, object?> body,
         AiGenerationOptions options,
@@ -216,6 +255,7 @@ public class AiApiClient
         return effort switch
         {
             AiReasoningEfforts.Low => 1024,
+            AiReasoningEfforts.XHigh => 3072,
             AiReasoningEfforts.High => 3072,
             _ => 2048
         };
@@ -337,6 +377,27 @@ public class AiApiClient
         return AppendQueryParameters(apiUrl, options.ExtraQuery);
     }
 
+    private static string BuildOpenAiResponsesApiUrl(AiGenerationOptions options)
+    {
+        var apiUrl = "https://api.openai.com/v1/responses";
+        if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+        {
+            apiUrl = options.BaseUrl.Trim();
+            if (!UrlPathEndsWith(apiUrl, "/responses"))
+            {
+                if (!UrlPathContains(apiUrl, "/v1/") &&
+                    !UrlPathEndsWith(apiUrl, "/v1"))
+                {
+                    apiUrl = AppendPathSegment(apiUrl, "v1");
+                }
+
+                apiUrl = AppendPathSegment(apiUrl, "responses");
+            }
+        }
+
+        return AppendQueryParameters(apiUrl, options.ExtraQuery);
+    }
+
     private static string BuildAzureOpenAiApiUrl(AiGenerationOptions options)
     {
         var apiUrl = options.BaseUrl?.Trim();
@@ -389,6 +450,11 @@ public class AiApiClient
     private static string ResolveProtocol(AiGenerationOptions options)
     {
         return AiModelConfig.NormalizeProtocol(options.Protocol, options.Provider);
+    }
+
+    private static bool UsesOpenAiResponsesApi(AiGenerationOptions options)
+    {
+        return AiModelConfig.NormalizeWireApi(options.WireApi) == AiModelConfig.WireApiResponses;
     }
 
     private static AiModelCapabilities ResolveCapabilities(AiGenerationOptions options)
@@ -531,6 +597,7 @@ public class AiApiClient
         {
             AiReasoningEfforts.Low => "Low",
             AiReasoningEfforts.High => "High",
+            AiReasoningEfforts.XHigh => "XHigh",
             _ => "Medium"
         };
     }
@@ -562,6 +629,11 @@ public class AiApiClient
         if (protocol == AiModelConfig.ProtocolOllamaNative)
         {
             return await CallOllamaAsync(systemPrompt, messages, currentOptions, cancellationToken);
+        }
+
+        if (protocol == AiModelConfig.ProtocolOpenAiCompatible && UsesOpenAiResponsesApi(currentOptions))
+        {
+            return await CallOpenAiResponsesAsync(systemPrompt, messages, currentOptions, cancellationToken);
         }
 
         if (protocol is AiModelConfig.ProtocolOpenAiCompatible or AiModelConfig.ProtocolAzureOpenAi)
@@ -610,6 +682,11 @@ public class AiApiClient
         if (protocol == AiModelConfig.ProtocolOllamaNative)
         {
             return await StreamOllamaAsync(systemPrompt, messages, currentOptions, onChunk, cancellationToken);
+        }
+
+        if (protocol == AiModelConfig.ProtocolOpenAiCompatible && UsesOpenAiResponsesApi(currentOptions))
+        {
+            return await StreamOpenAiResponsesAsync(systemPrompt, messages, currentOptions, onChunk, cancellationToken);
         }
 
         if (protocol is AiModelConfig.ProtocolOpenAiCompatible or AiModelConfig.ProtocolAzureOpenAi)
@@ -771,6 +848,171 @@ public class AiApiClient
                 }
             }
             catch (JsonException) { }
+        }
+
+        onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
+        return new AiCompletionResult { Content = fullContent.ToString(), Reasoning = fullReasoning.ToString(), TokenUsage = tokenUsage };
+    }
+
+    private async Task<AiCompletionResult> CallOpenAiResponsesAsync(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        AiGenerationOptions options,
+        CancellationToken cancellationToken)
+    {
+        var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
+        var requestBody = BuildOpenAiResponsesRequestBody(systemPrompt, messages, options, stream: false, support: support);
+        var request = new HttpRequestMessage(HttpMethod.Post, BuildOpenAiResponsesApiUrl(options));
+        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeBearer, "Authorization");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody, _jsonOptions),
+            Encoding.UTF8,
+            "application/json");
+        ApplyExtraHeaders(request, options.ExtraHeaders);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(options.TimeoutSeconds, 1)));
+
+        using var response = await _httpClient.SendAsync(request, cts.Token);
+        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
+
+        var responseJson = await response.Content.ReadAsStringAsync(cts.Token);
+        if (!TryParseOpenAiResponsesPayload(responseJson, out var content, out var reasoning, out var tokenUsage))
+        {
+            throw new InvalidOperationException("AI 返回了空响应");
+        }
+
+        return new AiCompletionResult
+        {
+            Content = content,
+            Reasoning = reasoning,
+            TokenUsage = tokenUsage
+        };
+    }
+
+    private async Task<AiCompletionResult> StreamOpenAiResponsesAsync(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        AiGenerationOptions options,
+        Action<AiStreamChunk> onChunk,
+        CancellationToken cancellationToken)
+    {
+        var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
+        var requestBody = BuildOpenAiResponsesRequestBody(systemPrompt, messages, options, stream: true, support: support);
+        var request = new HttpRequestMessage(HttpMethod.Post, BuildOpenAiResponsesApiUrl(options));
+        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeBearer, "Authorization");
+        request.Content = new StringContent(JsonSerializer.Serialize(requestBody, _jsonOptions), Encoding.UTF8, "application/json");
+        ApplyExtraHeaders(request, options.ExtraHeaders);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(options.TimeoutSeconds, 1)));
+
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
+
+        using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+        using var reader = new StreamReader(stream);
+
+        var fullContent = new StringBuilder();
+        var fullReasoning = new StringBuilder();
+        var nonSseBuffer = new StringBuilder();
+        var sawSsePayload = false;
+        AiTokenUsage? tokenUsage = null;
+
+        while (!reader.EndOfStream && !cts.Token.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(cts.Token);
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            if (!line.StartsWith("data: ", StringComparison.Ordinal))
+            {
+                if (!sawSsePayload)
+                {
+                    nonSseBuffer.AppendLine(line);
+                }
+                continue;
+            }
+
+            sawSsePayload = true;
+            var dataStr = line["data: ".Length..].Trim();
+            if (dataStr == "[DONE]")
+                break;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(dataStr);
+                if (TryExtractReasoningChunk(doc.RootElement, out var reasoningChunk) &&
+                    !string.IsNullOrEmpty(reasoningChunk))
+                {
+                    fullReasoning.Append(reasoningChunk);
+                    onChunk(new AiStreamChunk(AiStreamChunkType.Thinking, reasoningChunk));
+                }
+
+                if (TryProcessOpenAiStreamPayload(doc.RootElement, out var contentChunk) &&
+                    !string.IsNullOrEmpty(contentChunk))
+                {
+                    fullContent.Append(contentChunk);
+                    onChunk(new AiStreamChunk(AiStreamChunkType.Content, contentChunk));
+                }
+
+                if (TryExtractOpenAiResponsesUsage(doc.RootElement, out var eventUsage))
+                {
+                    tokenUsage = eventUsage;
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore malformed stream lines.
+            }
+        }
+
+        if (fullContent.Length == 0)
+        {
+            if (TryExtractJsonObject(fullReasoning.ToString(), out var recoveredJson))
+            {
+                fullContent.Append(recoveredJson);
+                onChunk(new AiStreamChunk(AiStreamChunkType.Content, recoveredJson));
+            }
+            else if (!sawSsePayload &&
+                TryParseOpenAiResponsesPayload(nonSseBuffer.ToString(), out var payloadContent, out var payloadReasoning, out var payloadUsage))
+            {
+                if (!string.IsNullOrWhiteSpace(payloadContent))
+                {
+                    fullContent.Append(payloadContent);
+                    onChunk(new AiStreamChunk(AiStreamChunkType.Content, payloadContent));
+                }
+
+                if (fullReasoning.Length == 0 && !string.IsNullOrWhiteSpace(payloadReasoning))
+                {
+                    fullReasoning.Append(payloadReasoning);
+                }
+
+                tokenUsage ??= payloadUsage;
+            }
+            else
+            {
+                try
+                {
+                    var fallback = await CallOpenAiResponsesAsync(systemPrompt, messages, options, cts.Token);
+                    if (!string.IsNullOrWhiteSpace(fallback.Content))
+                    {
+                        fullContent.Append(fallback.Content);
+                        onChunk(new AiStreamChunk(AiStreamChunkType.Content, fallback.Content));
+                    }
+
+                    if (fullReasoning.Length == 0 && !string.IsNullOrWhiteSpace(fallback.Reasoning))
+                    {
+                        fullReasoning.Append(fallback.Reasoning);
+                    }
+
+                    tokenUsage ??= fallback.TokenUsage;
+                }
+                catch
+                {
+                    // Preserve existing empty-stream behavior if fallback also fails.
+                }
+            }
         }
 
         onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
@@ -1252,6 +1494,67 @@ public class AiApiClient
         return new { role = message.Role, content = contentParts };
     }
 
+    private static List<object> BuildOpenAiResponsesInput(List<ChatMessage> messages)
+    {
+        return messages.Select(BuildOpenAiResponsesMessage).ToList();
+    }
+
+    private static object BuildOpenAiResponsesMessage(ChatMessage message)
+    {
+        if (!message.HasRichContent)
+        {
+            return new { role = message.Role, content = message.Content };
+        }
+
+        var contentParts = BuildOpenAiResponsesContentParts(message);
+        if (contentParts.Count == 0)
+        {
+            return new { role = message.Role, content = message.Content };
+        }
+
+        return new { role = message.Role, content = contentParts };
+    }
+
+    private static List<object> BuildOpenAiResponsesContentParts(ChatMessage message)
+    {
+        var parts = new List<object>();
+
+        if (!string.IsNullOrWhiteSpace(message.Content))
+        {
+            parts.Add(new { type = "input_text", text = message.Content });
+        }
+
+        if (message.Parts == null)
+        {
+            return parts;
+        }
+
+        foreach (var part in message.Parts)
+        {
+            if (part.Type == ChatContentPartType.Text)
+            {
+                if (!string.IsNullOrWhiteSpace(part.Text))
+                {
+                    parts.Add(new { type = "input_text", text = part.Text });
+                }
+                continue;
+            }
+
+            if (part.Type == ChatContentPartType.Image &&
+                TryReadImageData(part.ImagePath, out var imageBase64, out var mediaType))
+            {
+                parts.Add(new
+                {
+                    type = "input_image",
+                    image_url = $"data:{mediaType};base64,{imageBase64}",
+                    detail = part.Detail
+                });
+            }
+        }
+
+        return parts;
+    }
+
     private static List<object> BuildOpenAiContentParts(ChatMessage message)
     {
         var parts = new List<object>();
@@ -1432,12 +1735,28 @@ public class AiApiClient
             {
                 return !string.IsNullOrEmpty(contentChunk);
             }
+
+            if (IsOpenAiResponsesFinalContentEvent(eventType))
+            {
+                return false;
+            }
         }
 
         if (TryExtractTextProperty(root, "output_text", out contentChunk))
             return !string.IsNullOrEmpty(contentChunk);
 
         return TryExtractTextProperty(root, "text", out contentChunk) && !string.IsNullOrEmpty(contentChunk);
+    }
+
+    private static bool IsOpenAiResponsesFinalContentEvent(string eventType)
+    {
+        if (!eventType.StartsWith("response.", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return eventType.Equals("response.output_text.done", StringComparison.OrdinalIgnoreCase) ||
+            eventType.Equals("response.content_part.done", StringComparison.OrdinalIgnoreCase) ||
+            eventType.Equals("response.output_item.done", StringComparison.OrdinalIgnoreCase) ||
+            eventType.Equals("response.completed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryExtractReasoningChunk(JsonElement root, out string reasoningChunk)
@@ -1655,6 +1974,174 @@ public class AiApiClient
         {
             return false;
         }
+    }
+
+    private static bool TryParseOpenAiResponsesPayload(
+        string payload,
+        out string content,
+        out string reasoning,
+        out AiTokenUsage? tokenUsage)
+    {
+        content = string.Empty;
+        reasoning = string.Empty;
+        tokenUsage = null;
+
+        if (string.IsNullOrWhiteSpace(payload))
+            return false;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+            TryExtractOpenAiResponsesUsage(root, out tokenUsage);
+            TryExtractOpenAiResponsesReasoning(root, out reasoning);
+
+            if (TryExtractOpenAiResponsesContent(root, out content))
+            {
+                return !string.IsNullOrWhiteSpace(content) || !string.IsNullOrWhiteSpace(reasoning);
+            }
+
+            if (TryParseOpenAiNonStreamingPayload(payload, out var chatContent, out var chatReasoning))
+            {
+                content = chatContent;
+                reasoning = string.IsNullOrWhiteSpace(reasoning) ? chatReasoning : reasoning;
+                return !string.IsNullOrWhiteSpace(content) || !string.IsNullOrWhiteSpace(reasoning);
+            }
+
+            return !string.IsNullOrWhiteSpace(reasoning);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryExtractOpenAiResponsesContent(JsonElement root, out string content)
+    {
+        content = string.Empty;
+
+        if (TryExtractTextProperty(root, "output_text", out content))
+            return !string.IsNullOrWhiteSpace(content);
+
+        if (root.TryGetProperty("response", out var response) &&
+            response.ValueKind == JsonValueKind.Object &&
+            TryExtractOpenAiResponsesContent(response, out content))
+        {
+            return !string.IsNullOrWhiteSpace(content);
+        }
+
+        if (!root.TryGetProperty("output", out var output) ||
+            output.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var sb = new StringBuilder();
+        foreach (var item in output.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+            {
+                sb.Append(item.GetString());
+                continue;
+            }
+
+            if (item.ValueKind != JsonValueKind.Object)
+                continue;
+
+            if (item.TryGetProperty("type", out var typeEl) &&
+                typeEl.ValueKind == JsonValueKind.String &&
+                typeEl.GetString()?.Contains("reasoning", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                continue;
+            }
+
+            if (TryExtractTextProperty(item, "output_text", out var itemOutputText))
+            {
+                sb.Append(itemOutputText);
+                continue;
+            }
+
+            if (TryExtractTextProperty(item, "text", out var itemText))
+            {
+                sb.Append(itemText);
+                continue;
+            }
+
+            if (item.TryGetProperty("content", out var contentElement) &&
+                TryExtractTextValue(contentElement, out var contentText))
+            {
+                sb.Append(contentText);
+            }
+        }
+
+        content = sb.ToString();
+        return !string.IsNullOrWhiteSpace(content);
+    }
+
+    private static bool TryExtractOpenAiResponsesReasoning(JsonElement root, out string reasoning)
+    {
+        reasoning = string.Empty;
+
+        if (TryExtractTextProperty(root, "reasoning", out reasoning) ||
+            TryExtractTextProperty(root, "reasoning_content", out reasoning))
+        {
+            return !string.IsNullOrWhiteSpace(reasoning);
+        }
+
+        if (root.TryGetProperty("response", out var response) &&
+            response.ValueKind == JsonValueKind.Object &&
+            TryExtractOpenAiResponsesReasoning(response, out reasoning))
+        {
+            return !string.IsNullOrWhiteSpace(reasoning);
+        }
+
+        if (!root.TryGetProperty("output", out var output) ||
+            output.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var sb = new StringBuilder();
+        foreach (var item in output.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object)
+                continue;
+
+            if (item.TryGetProperty("type", out var typeEl) &&
+                typeEl.ValueKind == JsonValueKind.String &&
+                typeEl.GetString()?.Contains("reasoning", StringComparison.OrdinalIgnoreCase) == true &&
+                TryExtractTextValue(item, out var itemReasoning))
+            {
+                sb.Append(itemReasoning);
+            }
+        }
+
+        reasoning = sb.ToString();
+        return !string.IsNullOrWhiteSpace(reasoning);
+    }
+
+    private static bool TryExtractOpenAiResponsesUsage(JsonElement root, out AiTokenUsage? tokenUsage)
+    {
+        tokenUsage = null;
+
+        if (root.TryGetProperty("usage", out var usage) &&
+            usage.ValueKind == JsonValueKind.Object)
+        {
+            tokenUsage = new AiTokenUsage
+            {
+                InputTokens = ReadIntPropertyOrZero(usage, "input_tokens"),
+                OutputTokens = ReadIntPropertyOrZero(usage, "output_tokens")
+            };
+            return true;
+        }
+
+        if (root.TryGetProperty("response", out var response) &&
+            response.ValueKind == JsonValueKind.Object)
+        {
+            return TryExtractOpenAiResponsesUsage(response, out tokenUsage);
+        }
+
+        return false;
     }
 
     private static async Task EnsureSuccessStatusCodeWithDetailsAsync(HttpResponseMessage response, CancellationToken cancellationToken)

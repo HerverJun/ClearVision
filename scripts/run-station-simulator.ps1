@@ -12,7 +12,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-dotnet run --project "Acme.Product/src/Acme.Product.Station.Simulator/Acme.Product.Station.Simulator.csproj" -- `
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent $scriptRoot
+$dotnetShimPath = Join-Path $scriptRoot "dotnet.ps1"
+$dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to resolve repository .NET SDK with $dotnetShimPath."
+}
+
+$dotnetPath = ($dotnetPathOutput | Select-Object -Last 1).Trim()
+if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
+    throw "Resolved dotnet path is empty."
+}
+
+& $dotnetPath run --project (Join-Path $repoRoot "Acme.Product/src/Acme.Product.Station.Simulator/Acme.Product.Station.Simulator.csproj") -- `
     --studio $Studio `
     --token $Token `
     --stations $Stations `

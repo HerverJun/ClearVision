@@ -74,7 +74,8 @@ flowchart LR
 前置条件：
 
 - Windows 10/11
-- .NET SDK `9.0.300`，仓库根目录 `global.json` 已固定 SDK 版本，并使用 `latestFeature` roll-forward
+- .NET SDK `9.0.300`，仓库根目录 `global.json` 精确固定 SDK 版本，不做 roll-forward
+- .NET 8 Desktop Runtime（调试/运行 WinForms + WebView2 桌面端需要）
 - Microsoft Edge WebView2 Runtime
 - PowerShell
 - Node.js 20，仅 UI/Playwright 测试需要
@@ -83,11 +84,14 @@ flowchart LR
 git clone https://github.com/HerverJun/ClearVision.git
 cd ClearVision
 
-dotnet restore .\Acme.Product\Acme.Product.sln --locked-mode
-dotnet build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore
+& ".\scripts\dotnet.ps1" -InstallIfMissing --version
+& ".\scripts\dotnet.ps1" restore .\Acme.Product\Acme.Product.sln --locked-mode
+& ".\scripts\dotnet.ps1" build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore
 
-dotnet run --project .\Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj --configuration Debug --no-build
+& ".\Acme.Product\src\Acme.Product.Desktop\bin\Debug\net8.0-windows\win-x64\Acme.Product.Desktop.exe"
 ```
+
+如果本机同时存在 `C:\Program Files\dotnet` 和 `%LOCALAPPDATA%\Microsoft\dotnet`，不要直接依赖 PATH 中的裸 `dotnet`。仓库脚本会读取 `global.json`，优先选择包含 SDK `9.0.300` 的 dotnet host；`-InstallIfMissing` 会补齐 SDK `9.0.300` 和 .NET 8 Core / ASP.NET / WindowsDesktop runtime，避免两台机器因为 PATH 顺序不同而使用不同 SDK 或运行时。
 
 AI 流程生成相关密钥默认不写入仓库。需要联调时，请在本地配置文件或运行环境中配置自己的 provider、base URL 和 API key，避免提交任何密钥。
 
@@ -109,7 +113,7 @@ AI 流程生成相关密钥默认不写入仓库。需要联调时，请在本�
 OperatorLibrary 打包与 smoke 验证：
 
 ```powershell
-dotnet build .\Acme.OperatorLibrary\Acme.OperatorLibrary.csproj --configuration Release
+& ".\scripts\dotnet.ps1" build .\Acme.OperatorLibrary\Acme.OperatorLibrary.csproj --configuration Release
 & ".\Acme.OperatorLibrary\pack.ps1" -Configuration Release -RunSmokeTest
 ```
 

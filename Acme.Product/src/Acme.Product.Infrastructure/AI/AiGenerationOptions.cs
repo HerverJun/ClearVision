@@ -60,6 +60,8 @@ public class AiGenerationOptions
 
     public string? Protocol { get; set; }
 
+    public string? WireApi { get; set; }
+
     public string? AuthMode { get; set; }
 
     public string? AuthHeaderName { get; set; }

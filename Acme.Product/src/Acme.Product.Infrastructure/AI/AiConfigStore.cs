@@ -264,6 +264,7 @@ public class AiConfigStore
                         Name = "系统默认模型",
                         Provider = legacy.Provider,
                         Protocol = AiModelConfig.NormalizeProtocol(null, legacy.Provider),
+                        WireApi = AiModelConfig.NormalizeWireApi(legacy.WireApi),
                         AuthMode = AiModelConfig.NormalizeAuthMode(null, AiModelConfig.NormalizeProtocol(null, legacy.Provider)),
                         ApiKey = legacy.ApiKey,
                         Model = legacy.Model,
@@ -407,6 +408,7 @@ public class AiConfigStore
             Name = "系统默认模型",
             Provider = fallback.Provider,
             Protocol = AiModelConfig.NormalizeProtocol(null, fallback.Provider),
+            WireApi = AiModelConfig.NormalizeWireApi(fallback.WireApi),
             AuthMode = AiModelConfig.NormalizeAuthMode(null, AiModelConfig.NormalizeProtocol(null, fallback.Provider)),
             ApiKey = fallback.ApiKey,
             Model = fallback.Model,
@@ -440,6 +442,7 @@ public class AiConfigStore
         BaseUrl = model.BaseUrl,
         TimeoutMs = model.TimeoutMs,
         Protocol = model.Protocol,
+        WireApi = model.WireApi,
         AuthMode = model.AuthMode,
         AuthHeaderName = model.AuthHeaderName,
         ExtraHeaders = CloneStringDictionary(model.ExtraHeaders),
@@ -463,6 +466,7 @@ public class AiConfigStore
         candidate.BaseUrl = updated.BaseUrl;
         candidate.TimeoutMs = updated.TimeoutMs > 0 ? updated.TimeoutMs : candidate.TimeoutMs;
         candidate.Protocol = updated.Protocol ?? (providerChanged ? null : candidate.Protocol);
+        candidate.WireApi = updated.WireApi ?? candidate.WireApi;
         candidate.AuthMode = updated.AuthMode ?? (providerChanged || updated.Protocol != null ? null : candidate.AuthMode);
         candidate.AuthHeaderName = updated.AuthHeaderName ??
             (providerChanged || updated.Protocol != null || updated.AuthMode != null ? null : candidate.AuthHeaderName);
@@ -529,6 +533,7 @@ public class AiConfigStore
         Temperature = options.Temperature,
         BaseUrl = options.BaseUrl,
         Protocol = options.Protocol,
+        WireApi = options.WireApi,
         AuthMode = options.AuthMode,
         AuthHeaderName = options.AuthHeaderName,
         ExtraHeaders = CloneStringDictionary(options.ExtraHeaders),

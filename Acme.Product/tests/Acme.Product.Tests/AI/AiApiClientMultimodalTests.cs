@@ -197,6 +197,131 @@ public class AiApiClientMultimodalTests : IDisposable
         chunks.Count(c => c.ChunkType == AiStreamChunkType.Done).Should().Be(1);
     }
 
+    [Fact(DisplayName = "AiApiClient should call OpenAI Responses API when wireApi is responses")]
+    public async Task CompleteAsync_OpenAiResponses_ShouldUseResponsesEndpoint()
+    {
+        string? capturedUrl = null;
+        string? capturedAuthorization = null;
+        string? capturedRequestJson = null;
+        var handler = new CaptureHandler(async (request, cancellationToken) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            capturedAuthorization = request.Headers.Authorization?.ToString();
+            capturedRequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                {
+                  "output": [
+                    {
+                      "type": "message",
+                      "content": [
+                        { "type": "output_text", "text": "{\"ok\":true}" }
+                      ]
+                    }
+                  ],
+                  "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 6
+                  }
+                }
+                """, Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+
+        var result = await apiClient.CompleteAsync(
+            systemPrompt: "system",
+            messages: new List<ChatMessage> { new("user", "test") },
+            options: new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+                WireApi = AiModelConfig.WireApiResponses,
+                ApiKey = "codex-key",
+                Model = "gpt-5.5",
+                BaseUrl = "http://192.168.31.152:8317/v1",
+                MaxTokens = 256,
+                TimeoutSeconds = 10,
+                ReasoningMode = AiReasoningModes.On,
+                ReasoningEffort = AiReasoningEfforts.XHigh
+            });
+
+        result.Content.Should().Be("{\"ok\":true}");
+        result.TokenUsage!.InputTokens.Should().Be(12);
+        result.TokenUsage.OutputTokens.Should().Be(6);
+        capturedUrl.Should().Be("http://192.168.31.152:8317/v1/responses");
+        capturedAuthorization.Should().Be("Bearer codex-key");
+
+        using var document = JsonDocument.Parse(capturedRequestJson!);
+        var root = document.RootElement;
+        root.GetProperty("model").GetString().Should().Be("gpt-5.5");
+        root.GetProperty("instructions").GetString().Should().Be("system");
+        root.GetProperty("input")[0].GetProperty("role").GetString().Should().Be("user");
+        root.GetProperty("max_output_tokens").GetInt32().Should().Be(256);
+        root.GetProperty("reasoning").GetProperty("effort").GetString().Should().Be("xhigh");
+        root.TryGetProperty("messages", out _).Should().BeFalse();
+        root.TryGetProperty("max_tokens", out _).Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "AiApiClient should stream OpenAI Responses API chunks")]
+    public async Task StreamCompleteAsync_OpenAiResponses_ShouldParseOutputTextDelta()
+    {
+        string? capturedUrl = null;
+        var ssePayload = string.Join("\n",
+        [
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"{\\\"ok\\\":\"}",
+            "",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"true}\"}",
+            "",
+            "data: {\"type\":\"response.output_text.done\",\"text\":\"{\\\"ok\\\":true}\"}",
+            "",
+            "data: {\"type\":\"response.completed\",\"output_text\":\"{\\\"ok\\\":true}\",\"response\":{\"usage\":{\"input_tokens\":10,\"output_tokens\":4}}}",
+            "",
+            "data: [DONE]",
+            ""
+        ]);
+
+        var handler = new CaptureHandler((request, _) =>
+        {
+            capturedUrl = request.RequestUri!.ToString();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ssePayload, Encoding.UTF8, "text/event-stream")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var apiClient = CreateApiClient(httpClient);
+        var chunks = new List<AiStreamChunk>();
+
+        var result = await apiClient.StreamCompleteAsync(
+            systemPrompt: "system",
+            messages: new List<ChatMessage> { new("user", "test") },
+            onChunk: chunks.Add,
+            options: new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                WireApi = AiModelConfig.WireApiResponses,
+                ApiKey = "codex-key",
+                Model = "gpt-5.5",
+                BaseUrl = "http://192.168.31.152:8317/v1",
+                MaxTokens = 256,
+                TimeoutSeconds = 10,
+                ReasoningMode = AiReasoningModes.On,
+                ReasoningEffort = AiReasoningEfforts.XHigh
+            });
+
+        capturedUrl.Should().Be("http://192.168.31.152:8317/v1/responses");
+        result.Content.Should().Be("{\"ok\":true}");
+        result.TokenUsage!.InputTokens.Should().Be(10);
+        result.TokenUsage.OutputTokens.Should().Be(4);
+        chunks.Count(c => c.ChunkType == AiStreamChunkType.Content).Should().Be(2);
+        chunks.Count(c => c.ChunkType == AiStreamChunkType.Done).Should().Be(1);
+    }
+
     [Fact(DisplayName = "AiApiClient stream should ignore null usage chunks")]
     public async Task StreamCompleteAsync_OpenAi_ShouldIgnoreNullUsageChunks()
     {

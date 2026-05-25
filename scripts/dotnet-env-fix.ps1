@@ -39,6 +39,14 @@ $NugetGlobalConfig = Join-Path $NugetGlobalDir "NuGet.Config"
 $NugetCacheDir = Join-Path $env:USERPROFILE ".nuget\packages"
 $ProjectConfigPath = Join-Path $RepoRoot "nuget.config"
 $LocalFallbackDir = Join-Path $RepoRoot ".tmp\nuget-packages"
+$DotnetShimPath = Join-Path $PSScriptRoot "dotnet.ps1"
+$DotnetPath = $null
+$RequiredRuntimeBand = "8.0"
+$RequiredRuntimeNames = @(
+    "Microsoft.NETCore.App",
+    "Microsoft.AspNetCore.App",
+    "Microsoft.WindowsDesktop.App"
+)
 
 # --- helpers ---
 
@@ -69,6 +77,30 @@ function Record-Issue($desc) {
     Write-Fail $desc
 }
 
+function Resolve-RepoDotnetPath {
+    param(
+        [switch]$InstallIfMissing
+    )
+
+    if ($InstallIfMissing) {
+        $output = & $DotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode 2>&1
+    }
+    else {
+        $output = & $DotnetShimPath -PrintPath -ReturnExitCode 2>&1
+    }
+    $exit = $LASTEXITCODE
+    if ($exit -ne 0) {
+        throw "dotnet resolver failed with exit code ${exit}: $($output -join [Environment]::NewLine)"
+    }
+
+    $path = ($output | Select-Object -Last 1).Trim()
+    if ([string]::IsNullOrWhiteSpace($path)) {
+        throw "dotnet resolver returned an empty path."
+    }
+
+    return $path
+}
+
 # ===================== DIAGNOSTICS =====================
 
 Write-Host ""
@@ -79,11 +111,45 @@ Write-Host "Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gr
 # --- 1. dotnet SDK ---
 Write-Header "1. dotnet SDK"
 try {
-    $sdkVersion = dotnet --version 2>&1
-    Write-Pass "SDK version: $sdkVersion"
-    $sdks = dotnet --list-sdks 2>&1
+    $pathDotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+    if ($pathDotnet) {
+        Write-Info "PATH dotnet: $($pathDotnet.Source)"
+    }
+
+    $DotnetPath = Resolve-RepoDotnetPath -InstallIfMissing:(!$DiagnoseOnly)
+    Write-Pass "Repository dotnet: $DotnetPath"
+
+    if ($pathDotnet -and $pathDotnet.Source -ne $DotnetPath) {
+        Write-Warn "PATH resolves to a different dotnet host. Use .\scripts\dotnet.ps1 or repo scripts for this project."
+    }
+
+    $sdkVersion = & $DotnetPath --version 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Record-Issue "Repository dotnet --version failed: $sdkVersion"
+    } else {
+        Write-Pass "SDK version: $sdkVersion"
+    }
+
+    $sdks = & $DotnetPath --list-sdks 2>&1
     Write-Info "Installed SDKs:"
     $sdks | ForEach-Object { Write-Info "  $_" }
+
+    $runtimes = & $DotnetPath --list-runtimes 2>&1
+    Write-Info "Required .NET 8 runtimes:"
+    foreach ($runtimeName in $RequiredRuntimeNames) {
+        $hasRuntime = $false
+        foreach ($line in $runtimes) {
+            if ($line -match "^\s*$([regex]::Escape($runtimeName))\s+$([regex]::Escape($RequiredRuntimeBand))\.") {
+                $hasRuntime = $true
+                Write-Pass "  $line"
+                break
+            }
+        }
+
+        if (-not $hasRuntime) {
+            Record-Issue "Missing $runtimeName $RequiredRuntimeBand.x in repository dotnet host. Run: .\scripts\dotnet.ps1 -InstallIfMissing --version"
+        }
+    }
 } catch {
     Record-Issue "dotnet CLI not found or broken: $_"
 }
@@ -351,7 +417,11 @@ Write-Host ""
 Write-Info "Fix 3: Clearing potentially corrupted NuGet caches..."
 
 try {
-    $clearOutput = dotnet nuget locals all --clear 2>&1
+    if ([string]::IsNullOrWhiteSpace($DotnetPath)) {
+        $DotnetPath = Resolve-RepoDotnetPath -InstallIfMissing
+    }
+
+    $clearOutput = & $DotnetPath nuget locals all --clear 2>&1
     Write-Pass "Cleared all NuGet caches (http-cache, global-packages, temp)"
 } catch {
     Write-Warn "Could not clear NuGet caches: $_"
@@ -403,7 +473,11 @@ if (Test-Path $sanityProj) {
     Remove-Item (Join-Path $sanityDir "obj") -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $sanityDir "bin") -Recurse -Force -ErrorAction SilentlyContinue
 
-    $restoreResult = dotnet restore $sanityProj --verbosity quiet 2>&1
+    if ([string]::IsNullOrWhiteSpace($DotnetPath)) {
+        $DotnetPath = Resolve-RepoDotnetPath -InstallIfMissing
+    }
+
+    $restoreResult = & $DotnetPath restore $sanityProj --verbosity quiet 2>&1
     $restoreExit = $LASTEXITCODE
 
     if ($restoreExit -eq 0) {
@@ -440,15 +514,15 @@ Write-Host "  Issues found and addressed: $issueCount" -ForegroundColor $color
 if ($issueCount -eq 0) {
     Write-Host ""
     Write-Host "  Environment looks healthy. You can now run:" -ForegroundColor Green
-    Write-Host "    dotnet restore" -ForegroundColor White
-    Write-Host "    dotnet build" -ForegroundColor White
+    Write-Host "    .\scripts\dotnet.ps1 restore .\Acme.Product\Acme.Product.sln --locked-mode" -ForegroundColor White
+    Write-Host "    .\scripts\dotnet.ps1 build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore" -ForegroundColor White
 } else {
     Write-Host ""
     Write-Host "  Some issues could not be auto-fixed. Manual steps:" -ForegroundColor Yellow
     Write-Host "    1. Check if antivirus is locking NuGet files" -ForegroundColor White
     Write-Host "    2. Run this script as Administrator if ACL fixes failed" -ForegroundColor White
     Write-Host "    3. If TLS fails, check proxy/VPN settings" -ForegroundColor White
-    Write-Host "    4. Try: dotnet restore --source https://api.nuget.org/v3/index.json --disable-parallel" -ForegroundColor White
+    Write-Host "    4. Try: .\scripts\dotnet.ps1 restore --source https://api.nuget.org/v3/index.json --disable-parallel" -ForegroundColor White
 }
 
 Write-Host ""

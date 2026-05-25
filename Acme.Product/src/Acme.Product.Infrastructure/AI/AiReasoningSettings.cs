@@ -25,6 +25,7 @@ public static class AiReasoningEfforts
     public const string Low = "low";
     public const string Medium = "medium";
     public const string High = "high";
+    public const string XHigh = "xhigh";
 
     public static string Normalize(string? effort)
     {
@@ -33,6 +34,7 @@ public static class AiReasoningEfforts
         {
             Low => Low,
             High => High,
+            XHigh => XHigh,
             _ => Medium
         };
     }
@@ -151,6 +153,7 @@ public static class AiReasoningModelFamilyCatalog
     private static readonly string[] FullModeSet = [AiReasoningModes.Auto, AiReasoningModes.Off, AiReasoningModes.On];
     private static readonly string[] MediumOnlyEfforts = [AiReasoningEfforts.Medium];
     private static readonly string[] LowMediumHighEfforts = [AiReasoningEfforts.Low, AiReasoningEfforts.Medium, AiReasoningEfforts.High];
+    private static readonly string[] LowMediumHighXHighEfforts = [AiReasoningEfforts.Low, AiReasoningEfforts.Medium, AiReasoningEfforts.High, AiReasoningEfforts.XHigh];
     private static readonly string[] HighOnlyEfforts = [AiReasoningEfforts.High];
     private static readonly string[] MediumHighEfforts = [AiReasoningEfforts.Medium, AiReasoningEfforts.High];
 
@@ -347,7 +350,7 @@ public static class AiReasoningModelFamilyCatalog
                 FamilyOpenAiGpt5,
                 "OpenAI GPT-5",
                 AutoAndOnModes,
-                LowMediumHighEfforts,
+                LowMediumHighXHighEfforts,
                 AiReasoningModes.On,
                 "当前 GPT-5 变体默认开启 reasoning；可保持 Auto 或显式 On，Off / none 不支持。");
             return true;

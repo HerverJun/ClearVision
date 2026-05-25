@@ -13,7 +13,10 @@
 [Rr]elease/
 [Rr]eleases/
 .vs/
-.vscode/
+.vscode/*
+!.vscode/
+!.vscode/launch.json
+!.vscode/tasks.json
 *.user
 *.suo
 *.userprefs
@@ -115,6 +118,7 @@ tools/virtual-plc/modbus/.venv/
 tools/virtual-plc/modbus/.vendor/
 /.tmp/localdeform-debug/
 /.tmp/dotnet-cli-home/
+/.tmp/dotnet-install.ps1
 /.tmp/dotnet-tools/
 /.tmp/python-temp/
 /.tmp/publish-check/

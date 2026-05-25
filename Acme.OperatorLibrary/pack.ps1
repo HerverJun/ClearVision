@@ -17,8 +17,19 @@ $nupkgPath = Join-Path $scriptRoot "nupkg"
 $smokeTestPath = Join-Path $scriptRoot "tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj"
 $nugetConfigPath = Join-Path $scriptRoot "nuget.config"
 $serialTestRunnerPath = Join-Path $repoRoot "scripts/run-dotnet-test-serial.ps1"
+$dotnetShimPath = Join-Path $repoRoot "scripts/dotnet.ps1"
 $smokePackageRoot = Join-Path $repoRoot ".tmp/nuget-packages/operator-library-smoke"
 $smokeLockPath = Join-Path $smokePackageRoot "packages.lock.json"
+
+$dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
+if ($LASTEXITCODE -ne 0) {
+    throw "[pack] unable to resolve repository .NET SDK with $dotnetShimPath."
+}
+
+$dotnetPath = ($dotnetPathOutput | Select-Object -Last 1).Trim()
+if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
+    throw "[pack] resolved dotnet path is empty."
+}
 
 if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
     $PackageVersion = $env:ACME_OPERATORLIB_PACKAGE_VERSION
@@ -79,19 +90,22 @@ if (-not [string]::IsNullOrWhiteSpace($RepositoryCommit)) {
 
 New-Item -Path $nupkgPath -ItemType Directory -Force | Out-Null
 
-dotnet restore $projectPath --locked-mode
+& $dotnetPath restore $projectPath --locked-mode
 if ($LASTEXITCODE -ne 0) {
     throw "[pack] dotnet restore (locked) failed with exit code $LASTEXITCODE"
 }
 
-dotnet pack $projectPath -c $Configuration -o $nupkgPath --no-restore @packProperties
+& $dotnetPath pack $projectPath -c $Configuration -o $nupkgPath --no-restore @packProperties
 if ($LASTEXITCODE -ne 0) {
     throw "[pack] dotnet pack failed with exit code $LASTEXITCODE"
 }
 
 $resolvedPackageVersion = $PackageVersion
 if ([string]::IsNullOrWhiteSpace($resolvedPackageVersion)) {
-    $resolvedPackageVersion = (dotnet msbuild $projectPath -nologo -getProperty:PackageVersion).Trim()
+    $resolvedPackageVersion = (& $dotnetPath msbuild $projectPath -nologo -getProperty:PackageVersion).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "[pack] dotnet msbuild getProperty failed with exit code $LASTEXITCODE"
+    }
 }
 
 $expectedPackageName = "Acme.OperatorLibrary.$resolvedPackageVersion.nupkg"
@@ -112,7 +126,7 @@ if ($RunSmokeTest) {
         Remove-Item -LiteralPath $smokeLockPath -Force
     }
 
-    dotnet restore $smokeTestPath `
+    & $dotnetPath restore $smokeTestPath `
         --configfile $nugetConfigPath `
         --packages $smokePackageRoot `
         --no-cache `

@@ -118,9 +118,10 @@ Package metadata includes project URL, repository traceability, license expressi
 NuGet restore reproducibility workflow:
 
 ```powershell
-dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --use-lock-file
-git diff -- Acme.OperatorLibrary/packages.lock.json
-dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
+cd Acme.OperatorLibrary
+../scripts/dotnet.ps1 restore ./Acme.OperatorLibrary.csproj --use-lock-file
+git diff -- packages.lock.json
+../scripts/dotnet.ps1 restore ./Acme.OperatorLibrary.csproj --locked-mode
 ```
 
 Dependency upgrade PRs must include the reviewed `packages.lock.json` diff; local restore without `--locked-mode` is only for intentionally updating that lock file.
@@ -129,7 +130,7 @@ Dependency upgrade PRs must include the reviewed `packages.lock.json` diff; loca
 
 Toolchain policy:
 
-- Build with .NET SDK `9.0.300` from the repository `global.json` (`rollForward: latestFeature`).
+- Build with exact .NET SDK `9.0.300` from the repository `global.json` (`rollForward: disable`).
 - Target framework remains `net8.0`.
 - Direct `Microsoft.Extensions.*` dependencies are aligned to the repository net8-compatible package lane through `Directory.Packages.props`.
 - Consumers should validate OpenCvSharp, ONNX Runtime, PaddleOCRSharp, HslCommunication, database, serial-port, and PLC dependencies in their deployment profile before treating the package as a thin abstractions-only dependency.
@@ -163,7 +164,7 @@ Benchmark evidence currently lives in two lanes:
 For ad hoc baseline performance checks:
 
 ```powershell
-dotnet run --project scripts/BaselineBenchmark/BaselineBenchmark.csproj -- `
+./scripts/dotnet.ps1 run --project scripts/BaselineBenchmark/BaselineBenchmark.csproj -- `
   --iterations 8 `
   --warmup 1 `
   --output docs/审计资料/报告/baseline_performance.json

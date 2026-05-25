@@ -16,22 +16,22 @@ updated: "2026-05-09"
 {
   "sdk": {
     "version": "9.0.300",
-    "rollForward": "latestFeature"
+    "rollForward": "disable"
   }
 }
 ```
 
-本机 `dotnet --version` 可能解析到同一 feature band 内的更高补丁版本。记录验证环境时请同时保留：
+本机裸 `dotnet` 可能因为 PATH 顺序命中其他安装位置。仓库脚本 [`scripts/dotnet.ps1`](../../../scripts/dotnet.ps1) 会读取 `global.json` 并选择包含 SDK `9.0.300` 的 dotnet host；缺失时可用 `-InstallIfMissing` 将 SDK `9.0.300` 和 .NET 8 Core / ASP.NET / WindowsDesktop runtime 安装到用户目录。记录验证环境时请同时保留：
 
 - `global.json` 固定版本；
-- `dotnet --version` 实际解析结果；
-- `dotnet --info` 中的 SDK 列表和 global.json 路径。
+- `.\scripts\dotnet.ps1 --version` 实际解析结果；
+- `.\scripts\dotnet.ps1 -PrintPath` 实际 dotnet host 路径。
 
 ## 版本口径
 
 - 主应用和算子库仍以 `net8.0` / `net8.0-windows` 为目标框架。
 - SDK 版本不等于目标框架版本；升级 SDK 前必须单独验证 restore、build、test、pack 和发布。
-- 当前不跨大版本 roll-forward；历史 SDK 10 `csc` workaround 已删除。
+- 当前不做 SDK roll-forward；历史 SDK 10 `csc` workaround 已删除。
 - 若未来切换到 .NET SDK 10.x，应同步更新 `global.json`、README、CI 和依赖治理文档，并跑完整质量门。
 
 ## 依赖口径
@@ -44,10 +44,10 @@ updated: "2026-05-09"
 ## 验证命令
 
 ```powershell
-dotnet --version
-dotnet --info
-dotnet restore Acme.Product/Acme.Product.sln
-dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore
-dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
-dotnet build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release --no-restore
+.\scripts\dotnet.ps1 --version
+.\scripts\dotnet.ps1 -PrintPath
+.\scripts\dotnet.ps1 restore Acme.Product/Acme.Product.sln --locked-mode
+.\scripts\dotnet.ps1 build Acme.Product/Acme.Product.sln --configuration Debug --no-restore
+.\scripts\dotnet.ps1 restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
+.\scripts\dotnet.ps1 build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release --no-restore
 ```

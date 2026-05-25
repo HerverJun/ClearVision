@@ -35,6 +35,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$dotnetShimPath = Join-Path $PSScriptRoot "dotnet.ps1"
+$dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to resolve repository .NET SDK with $dotnetShimPath."
+}
+
+$dotnetPath = ($dotnetPathOutput | Select-Object -Last 1).Trim()
+if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
+    throw "Resolved dotnet path is empty."
+}
+
 function Quote-Argument {
     param(
         [Parameter(Mandatory = $true)]
@@ -252,10 +263,10 @@ try {
     Write-Host "[dotnet-test] $preview"
 
     if ($ReturnExitCode) {
-        & dotnet @arguments 2>&1 | ForEach-Object { Write-Host $_ }
+        & $dotnetPath @arguments 2>&1 | ForEach-Object { Write-Host $_ }
     }
     else {
-        & dotnet @arguments
+        & $dotnetPath @arguments
     }
 
     $exitCode = $LASTEXITCODE

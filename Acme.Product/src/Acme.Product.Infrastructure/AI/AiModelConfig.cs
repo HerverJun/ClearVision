@@ -16,6 +16,9 @@ public class AiModelConfig
     public const string ProtocolAzureOpenAi = "azure_openai";
     public const string ProtocolOllamaNative = "ollama_native";
 
+    public const string WireApiChatCompletions = "chat_completions";
+    public const string WireApiResponses = "responses";
+
     public const string AuthModeBearer = "bearer";
     public const string AuthModeHeaderKey = "header_key";
     public const string AuthModeNone = "none";
@@ -49,6 +52,9 @@ public class AiModelConfig
 
     /// <summary>Protocol identity for provider routing.</summary>
     public string? Protocol { get; set; }
+
+    /// <summary>OpenAI-compatible wire API: chat_completions | responses.</summary>
+    public string? WireApi { get; set; }
 
     /// <summary>Authentication mode: bearer | header_key | none.</summary>
     public string? AuthMode { get; set; }
@@ -88,6 +94,7 @@ public class AiModelConfig
     {
         var protocol = NormalizeProtocol(Protocol, Provider);
         Protocol = protocol;
+        WireApi = NormalizeWireApi(WireApi);
 
         if (string.IsNullOrWhiteSpace(Provider))
             Provider = GetLegacyProviderByProtocol(protocol);
@@ -189,6 +196,23 @@ public class AiModelConfig
         };
     }
 
+    public static string NormalizeWireApi(string? wireApi)
+    {
+        if (string.IsNullOrWhiteSpace(wireApi))
+            return WireApiChatCompletions;
+
+        var normalized = wireApi.Trim().ToLowerInvariant().Replace("-", "_").Replace("/", "_");
+        return normalized switch
+        {
+            "response" => WireApiResponses,
+            WireApiResponses => WireApiResponses,
+            "chat" => WireApiChatCompletions,
+            "chat_completion" => WireApiChatCompletions,
+            WireApiChatCompletions => WireApiChatCompletions,
+            _ => WireApiChatCompletions
+        };
+    }
+
     public static string NormalizeAuthHeaderName(string? authHeaderName, string authMode, string? protocol = null)
     {
         var normalizedAuthMode = NormalizeAuthMode(authMode, ProtocolOpenAiCompatible);
@@ -274,6 +298,7 @@ public class AiModelConfig
             Model = Model,
             BaseUrl = BaseUrl,
             Protocol = protocol,
+            WireApi = NormalizeWireApi(WireApi),
             AuthMode = AuthMode,
             AuthHeaderName = AuthHeaderName,
             ExtraHeaders = CloneStringMap(ExtraHeaders),
@@ -327,6 +352,7 @@ public class AiModelConfig
         {
             AiReasoningEfforts.Low => "Low",
             AiReasoningEfforts.High => "High",
+            AiReasoningEfforts.XHigh => "XHigh",
             _ => "Medium"
         };
     }

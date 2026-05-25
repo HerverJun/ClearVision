@@ -1426,8 +1426,13 @@ class SettingsView {
         const effort = `${reasoning?.effort || 'medium'}`.toLowerCase();
         return {
             mode: ['auto', 'off', 'on'].includes(mode) ? mode : 'auto',
-            effort: ['low', 'medium', 'high'].includes(effort) ? effort : 'medium'
+            effort: ['low', 'medium', 'high', 'xhigh'].includes(effort) ? effort : 'medium'
         };
+    }
+
+    normalizeAiWireApi(wireApi) {
+        const normalized = `${wireApi || 'chat_completions'}`.trim().toLowerCase().replace(/[-/]/g, '_');
+        return normalized === 'responses' || normalized === 'response' ? 'responses' : 'chat_completions';
     }
 
     getDefaultAiReasoningSupport() {
@@ -1452,7 +1457,7 @@ class SettingsView {
             .filter(mode => ['auto', 'off', 'on'].includes(mode));
         const normalizedEfforts = allowedEfforts
             .map(effort => `${effort || ''}`.toLowerCase())
-            .filter(effort => ['low', 'medium', 'high'].includes(effort));
+            .filter(effort => ['low', 'medium', 'high', 'xhigh'].includes(effort));
         const finalModes = normalizedModes.length > 0 ? [...new Set(normalizedModes)] : fallback.allowedModes;
         const finalEfforts = normalizedEfforts.length > 0 ? [...new Set(normalizedEfforts)] : fallback.allowedEfforts;
 
@@ -1470,7 +1475,7 @@ class SettingsView {
 
     getAiReasoningNote(support) {
         const modeText = support.allowedModes.map(mode => mode === 'auto' ? 'Auto' : mode === 'off' ? 'Off' : 'On').join(' / ');
-        const effortText = support.allowedEfforts.map(effort => effort === 'low' ? 'Low' : effort === 'high' ? 'High' : 'Medium').join(' / ');
+        const effortText = support.allowedEfforts.map(effort => effort === 'low' ? 'Low' : effort === 'high' ? 'High' : effort === 'xhigh' ? 'XHigh' : 'Medium').join(' / ');
 
         if (support.allowedModes.length === 1 && support.allowedModes[0] === 'auto') {
             return '当前模型族仅支持 Auto。';
@@ -1592,6 +1597,7 @@ class SettingsView {
                         model: '',
                         baseUrl: '',
                         apiKey: '',
+                        wireApi: 'chat_completions',
                         timeoutMs: 120000
                     });
                     await this.loadAiModels();
@@ -1685,6 +1691,7 @@ class SettingsView {
             const fieldMap = {
                 'cfg-ai-name': 'name',
                 'cfg-ai-provider': 'provider',
+                'cfg-ai-wireapi': 'wireApi',
                 'cfg-ai-model': 'model',
                 'cfg-ai-baseurl': 'baseUrl',
                 'cfg-ai-apikey': 'apiKey',
@@ -1762,6 +1769,7 @@ class SettingsView {
 
         return (aiTab.querySelector('#cfg-ai-name')?.value || '') !== (model.name || '')
             || (aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible') !== (model.provider || 'OpenAI Compatible')
+            || this.normalizeAiWireApi(aiTab.querySelector('#cfg-ai-wireapi')?.value) !== this.normalizeAiWireApi(model.wireApi)
             || (aiTab.querySelector('#cfg-ai-model')?.value || '') !== (model.model || '')
             || (aiTab.querySelector('#cfg-ai-baseurl')?.value || '') !== (model.baseUrl || '')
             || normalizedTimeout !== (model.timeoutMs ?? 120000)
@@ -1780,6 +1788,7 @@ class SettingsView {
         const payload = {
             name: aiTab.querySelector('#cfg-ai-name')?.value || '',
             provider: aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible',
+            wireApi: this.normalizeAiWireApi(aiTab.querySelector('#cfg-ai-wireapi')?.value),
             model: aiTab.querySelector('#cfg-ai-model')?.value || '',
             baseUrl: aiTab.querySelector('#cfg-ai-baseurl')?.value || '',
             apiKey: aiTab.querySelector('#cfg-ai-apikey')?.value || '', // 空 → 后端保留原值
@@ -1849,6 +1858,7 @@ class SettingsView {
         // apiKey 不再从后端获取真实值，用 placeholder 提示
         const apiKeyPlaceholder = m.hasApiKey ? '●●●●●●（已配置，留空则不修改）' : '请输入 API Key';
         const reasoning = this.normalizeAiReasoning(m.reasoning);
+        const wireApi = this.normalizeAiWireApi(m.wireApi);
         const support = this.normalizeAiReasoningSupport(this.aiReasoningSupportPreview || m.reasoningSupport);
         const nameValue = this.escapeHtml(m.name || '');
         const modelValue = this.escapeHtml(m.model || '');
@@ -1868,6 +1878,13 @@ class SettingsView {
                          <option value="OpenAI API" ${m.provider==='OpenAI API'?'selected':''}>OpenAI API</option>
                          <option value="Anthropic Claude" ${m.provider==='Anthropic Claude'?'selected':''}>Anthropic Claude</option>
                          <option value="OpenAI Compatible" ${m.provider==='OpenAI Compatible'?'selected':''}>本地模型 / OpenAI 兼容 (Ollama, vLLM, GLM等)</option>
+                     </select>
+                 </div>
+                 <div class="settings-fieldset" style="flex:1;">
+                     <label>API 接口</label>
+                     <select class="cv-input" id="cfg-ai-wireapi">
+                         <option value="chat_completions" ${wireApi === 'chat_completions' ? 'selected' : ''}>Chat Completions</option>
+                         <option value="responses" ${wireApi === 'responses' ? 'selected' : ''}>Responses</option>
                      </select>
                  </div>
                  <div class="settings-fieldset" style="flex:1;">
@@ -1912,6 +1929,7 @@ class SettingsView {
                               <option value="low" ${reasoning.effort === 'low' ? 'selected' : ''}>Low</option>
                               <option value="medium" ${reasoning.effort === 'medium' ? 'selected' : ''}>Medium</option>
                               <option value="high" ${reasoning.effort === 'high' ? 'selected' : ''}>High</option>
+                              <option value="xhigh" ${reasoning.effort === 'xhigh' ? 'selected' : ''}>XHigh</option>
                           </select>
                       </div>
                   </div>
